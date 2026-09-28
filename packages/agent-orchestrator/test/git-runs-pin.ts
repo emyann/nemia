@@ -2,8 +2,7 @@
  * What `git-before-after.test.ts` reads every shipped folder's runs as: the briefs, the workspace plans, the decisions, the listings and
  * a forget's line of a git run, built by hand with fixed ids, times and paths, so nothing here runs git or reads the clock.
  *
- * Not a test file (`*.test.ts`): the test imports it, and so did the one-off that wrote `fixtures/git-runs-before.json` from the code
- * of the commit before folder workspaces.
+ * Not a test file (`*.test.ts`): the test imports it, and `everything()` is what writes `fixtures/git-runs-before.json`.
  */
 import path from 'node:path';
 import { composeBrief, decision, forgetLine, listing, toDecide, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
@@ -64,7 +63,10 @@ const valueOf = (step: Workflow, field: string): unknown => {
           : `${step.name}'s ${field}`;
 };
 
-// As a harness writes it, `needs: null` (the schema's nullable), not the parsed `Closeout`'s absent key: the pinned fixture was recorded so.
+/**
+ * A step's closeout as a harness writes it, `needs: null` (the schema's nullable), not the parsed `Closeout`'s absent key: the pinned
+ * fixture holds it so.
+ */
 const closeout = (step: Workflow): Closeout =>
   ({
     outcome: 'done',
@@ -83,12 +85,12 @@ const terminal = (steps: readonly Workflow[]) => steps.filter((s) => !steps.some
 
 const PHASES = ['running', 'succeeded', 'last failed'] as const;
 
+/** Each task's phase in the pinned state `which`: a step's check settles as the step did, passed (exit 0) beside a step that succeeded. */
 const phasesOf = (steps: readonly Workflow[], which: (typeof PHASES)[number]): Record<string, TaskPhase> =>
   Object.fromEntries(
     steps.flatMap((s) => {
       const phase: TaskPhase =
         which === 'running' ? 'running' : which === 'last failed' && terminal(steps).includes(s.name) ? 'failed' : 'succeeded';
-      // A step's check settles as the step did: passed (exit 0) beside a step that succeeded.
       return [[`t-${s.name}`, phase], ...(s.check ? [[`c-${s.name}`, phase]] : [])];
     }),
   );

@@ -4,25 +4,30 @@ import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
+  /**
+   * A run whose review loop is out of rounds, waiting on you. Its record names a repository that is not on this machine, so the Decide
+   * section says its branch could not be read, and the page renders. The graph the run froze: implement → review, the edge back beneath
+   * the row, and review drawn as a human gate. Each step's note is on hover on the canvas and under its chip on the run's page, read before
+   * a click opens the inspector, which has a heading of its own. The timeline has a row a try and a total a round; implement's Details
+   * list its three rounds, each a task of its own, and round 2 selected shows its closeout with the other two folded beneath.
+   */
   name: 'loop',
   route: `/runs/${LOOPING.id}`,
   expect: async (page) => {
     await sidebar(page);
-    // The folder beside the record reads as the loop the run froze: nothing has drifted, and nothing is unread.
     await expectCount(
       page.getByText(/no longer reads as a workflow|has changed since this run started/),
       0,
-      'no warning about the workflow folder',
+      'no warning about the workflow folder: it reads as the loop the run froze, with nothing drifted and nothing unread',
     );
     await expectVisible(
       page.getByText(`Waiting on you: ${LOOPING.exhausted}`),
       `the run's page says ${LOOPING.exhausted} is waiting on you`,
     );
-    // Its record names a repository that is not on this machine: a branch git could not read, said, and the page renders.
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(
       decide.getByText(/^not read: git could not diff /).first(),
-      `the Decide section says ${LOOPING.id}'s branch could not be read`,
+      `the Decide section says ${LOOPING.id}'s branch could not be read: its record names a repository not on this machine`,
     );
     await expectVisible(decide.locator('[data-lesson="unknown"]'), 'the lesson chip says nobody can know, not that nothing was written');
     await expectVisible(
@@ -36,7 +41,6 @@ export default {
       LOOPING.steps.length,
       `the loop's graph has a node per step (${LOOPING.steps.join(', ')})`,
     );
-    // The graph the run froze: an arrow from implement to review, and the edge back that `loop: implement` makes, under the row.
     const edge = (id: string) => graph.locator(`.react-flow__edge[data-id="${id}"]`);
     await expectCount(graph.locator('.react-flow__edge'), 2, "the loop's graph has two edges: implement → review, and the edge back");
     await expectVisible(edge('implement->review').locator('.react-flow__edge-path'), 'an arrow from implement to review');
@@ -57,15 +61,16 @@ export default {
       graph.locator('.react-flow__node'),
       'the edge back runs beneath the row, under both steps',
     );
-    // On the canvas there is no room under a chip: the note follows what the state means, on hover.
     await expectVisible(
       node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, {
         hasText: 'rounds exhausted',
       }),
-      `${LOOPING.exhausted}, out of rounds, is an amber chip on the graph, its note after what that means on hover`,
+      `${LOOPING.exhausted}, out of rounds, is an amber chip on the graph, its note after what that means on hover, with no room under a chip`,
     );
-    // Waiting on a person, as a step signed off blocked is: drawn as a human gate. implement, done, is not one.
-    await expectVisible(node(LOOPING.exhausted).getByText('human gate'), `${LOOPING.exhausted}, out of rounds, is drawn as a human gate`);
+    await expectVisible(
+      node(LOOPING.exhausted).getByText('human gate'),
+      `${LOOPING.exhausted}, out of rounds, is drawn as a human gate, as a step signed off blocked is`,
+    );
     await expectVisible(
       node(LOOPING.exhausted).getByText('waiting on you'),
       `${LOOPING.exhausted}, out of rounds, says it is waiting on you on the graph`,
@@ -75,15 +80,13 @@ export default {
       node('implement').locator(`[data-state="unverified"][title$="${LOOPING.notes.implement}"]`),
       `implement's chip on the graph ends its title with the round it is on (${LOOPING.notes.implement})`,
     );
-    // Under the chip on the run's page, where there is room. Before a click: the inspector has a heading of its own.
     for (const name of LOOPING.steps) {
       const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name, exact: true }) });
       await expectVisible(
         section.locator('[data-note]', { hasText: LOOPING.notes[name] }),
-        `the run's page shows ${name}'s note under its chip (${LOOPING.notes[name]})`,
+        `the run's page shows ${name}'s note under its chip, where there is room (${LOOPING.notes[name]})`,
       );
     }
-    // The timeline, from the tries on the record: a row for each step's try in each of the three rounds, and a total a round, then the run's.
     const timeline = page.locator('section[aria-label="Timeline"]');
     for (const name of LOOPING.steps) {
       await expectCount(
@@ -99,7 +102,6 @@ export default {
     await expectCount(timeline.locator('tfoot tr[data-total]'), 4, "a total for each of the loop's three rounds, and the run's");
     await node(LOOPING.exhausted).click();
     const inspector = page.locator(`aside[aria-label="Step ${LOOPING.exhausted}"]`);
-    // Signed off blocked, it opens on its Output; its note is under Details, the tab kept as implement is pressed below.
     await expectVisible(
       inspector.getByRole('tab', { name: 'Output', selected: true }),
       `${LOOPING.exhausted}'s inspector opens on Output: it has signed off`,
@@ -117,17 +119,19 @@ export default {
       'every step is on the canvas beside the open inspector',
     );
 
-    // implement, the loop's target, ran a try in each of three rounds, each a task of its own: a row a round in its Details.
     await node(LOOPING.target).click();
     const target = page.locator(`aside[aria-label="Step ${LOOPING.target}"]`);
     const rows = target.locator('section[aria-label="Rounds"] li[data-try]');
-    await expectCount(rows, 3, `${LOOPING.target}'s Details list its three rounds, a row each`);
+    await expectCount(
+      rows,
+      3,
+      `${LOOPING.target}'s Details, the tab kept from ${LOOPING.exhausted}'s inspector, list its three rounds, a row each`,
+    );
     for (const [i, label] of ['round 1 · try 1', 'round 2 · try 2 (round)', 'round 3 · try 3 (round)'].entries()) {
       await expectVisible(rows.nth(i).getByText(label), `row ${i + 1} is ${label}`);
       await expectVisible(rows.nth(i).getByText(`${LOOPING.id}-implement-${i + 1}`, { exact: true }), `row ${i + 1} names its own task`);
     }
     await expectVisible(target.locator('li[data-try="3"][aria-current="true"]'), 'the current round is the one selected');
-    // Round 2 selected: the Output tab shows its closeout, its reply as `finding → answer · why`, and the other two rounds folded beneath.
     await target.getByRole('button', { name: 'Show the closeout of round 2 · try 2 (round)' }).click();
     await expectVisible(target.locator('[data-shown-try="2"]'), 'selecting round 2 opens its closeout in the Output tab');
     await expectVisible(

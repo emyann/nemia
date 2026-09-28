@@ -1,7 +1,7 @@
 /**
  * What `file` refuses, at both doors, in one set of words.
  *
- * The harness-agnostic refusals live under the Effect `file` (`refusalOf` in `src/engine.ts`), so a consumer of
+ * The harness-agnostic refusals live under the Effect `file` (`refusalOf` in `src/core/engine/filing.ts`), so a consumer of
  * `agent-runtime/effect` cannot journal `deadlineSeconds: NaN`, which would stop its task on the first pass, and
  * `createEngine().file()` throws the same sentence behind `file: `. The harness's own words stay at the facade
  * (`test/facade.test.ts`); the Effect door has no harnesses to ask.
@@ -10,9 +10,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { Journal } from '../src/journal.ts';
-import { Runner } from '../src/runner.ts';
-import { file, type Filing } from '../src/engine.ts';
+import { Journal } from '../src/core/engine/journal.ts';
+import { Runner } from '../src/harness/seam.ts';
+import { file, type Filing } from '../src/core/engine/filing.ts';
 import { createEngine, type Event, type HarnessArgs, type PromiseJournal, type Sighting } from '../src/facade.ts';
 
 /** The Effect door, over a store and a harness that cost nothing. */

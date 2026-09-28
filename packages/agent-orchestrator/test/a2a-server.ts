@@ -4,8 +4,9 @@
  * runtime's own test server, which this package may not import (`contract.test.ts`). Not a test file.
  *
  * It serves its card, and JSON-RPC through the SDK's express handler; with `token`, the card asks for a bearer scheme named `token` and a
- * request without it is refused 401. Each message it is sent makes a Task, which `answer` completes at once with one artifact, a text part or
- * a data part, fails, or leaves waiting on a question (`input-required`). What it was sent and the headers it was sent with are kept for the test.
+ * request without it is refused 401. Each message it is sent makes a Task, which `answer` completes at once with one artifact, a text part
+ * or a data part, fails, or leaves waiting on a question (`input-required`). What it was sent and the headers it was sent with are kept for
+ * the test. The JSON-RPC handler is made once the port is known, since the card names it.
  */
 import express from 'express';
 import http from 'node:http';
@@ -133,7 +134,6 @@ export async function a2aServer(o: { token?: string; answer?: (text: string) => 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  // Made once the port is known, since the card names it.
   app.use(
     '/a2a/jsonrpc',
     jsonRpcHandler({

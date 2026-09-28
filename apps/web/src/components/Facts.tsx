@@ -24,6 +24,12 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
  * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
+ *
+ * The context is the session's window as the step writes it — `200k` — and the model's whole window where neither the step nor the try has
+ * one. `workspace` is a row only where the step says it (`main`, the repository's own checkout rather than a worktree of the run's): a
+ * detail from an api that does not carry the key has none. `loop` and `rounds`, the edge back and how many rounds it may run, are rows
+ * beside `after` on a looping step only. A codex step's fence is its sandbox, which the engine's task files as its permission mode: the
+ * same row, under Codex's name (`fenceLabel`).
  */
 export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> =>
   isRemote(spec, filed)
@@ -32,13 +38,9 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
         ['harness', code(spec.harness)],
         ['model', modelRow(spec.model, filed)],
         ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
-        // The session's context window, as the step writes it — `200k` — and the model's whole window where neither the step nor the try has one.
         ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
         ['after', spec.after.length ? code(spec.after.join(', ')) : null],
-        // Only where the step says it: `main`, the repository's own checkout rather than a worktree of the run's. A detail from an api that does
-        // not carry the key says nothing, rather than an empty row.
         ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
-        // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
         ...(spec.loop === null
           ? []
           : ([
@@ -46,7 +48,6 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
               ['rounds', spec.rounds],
             ] satisfies Array<[string, ReactNode]>)),
         ['resume', code(spec.resume)],
-        // A codex step's fence is its sandbox, which the engine's task files as its permission mode: the same row, under Codex's name.
         [fenceLabel(spec), modeRow(spec.sandbox ?? spec.permissionMode, filed)],
         ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
         ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
@@ -58,7 +59,7 @@ const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.
 /**
  * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, the deadline.
  * No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a `harness's own · default` row there
- * would say the run chose what nobody here chose. The address is the store's word now; where it no longer declares the agent, says so.
+ * would say the run chose what nobody here chose. The address is the store's current word; where the store does not declare the agent, it says so.
  */
 function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
   const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
@@ -144,9 +145,9 @@ function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
 }
 
 /**
- * The fence a try was filed with, in the words the workflow now uses for it. A codex run frozen before 2026-09-23 named its widest sandbox
- * `permissionMode: bypassPermissions`, which its record now reads as `sandbox: danger-full-access` (`asNamed`) while the engine's task keeps
- * the word it was filed with; Codex ran it `-s danger-full-access` either way, so it is the same fence and no try of its own.
+ * The fence a try was filed with, in the words the workflow uses for it: a task filed `bypassPermissions` for a codex step whose record
+ * reads `sandbox: danger-full-access` (`asNamed` reads a frozen `permissionMode: bypassPermissions` so) is that sandbox — Codex runs both
+ * `-s danger-full-access` — and not a fence of the try's own.
  */
 const filedFence = (filed: string | null, workflow: string | null): string | null =>
   filed === 'bypassPermissions' && workflow === 'danger-full-access' ? workflow : filed;
@@ -214,11 +215,11 @@ const WARN = 'text-amber-700 dark:text-amber-400';
 /**
  * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its
  * context to the cache again. The peak is marked where it reached the step's `context:` cap or passed 200k with none, and so is the rebuild:
- * each is a session that paid for a context it need not have carried, or carried again. The words are the package's (`readWords`).
+ * each is a session that paid for a context it need not have carried, or carried again. The words are the package's (`readWords`). Where no
+ * peak was measured, the compactions (`compacted at its 200k cap`) stand in its place among the counts.
  */
 export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; rebuilt: number }) {
   const parts = said.split(' · ');
-  // The peak, or where no peak was measured, the compactions alone (`compacted at its 200k cap`), which are where it stands.
   const counts = parts.filter((part) => /^(read|wrote|peak|compacted)\b/.test(part));
   const rest = parts.filter((part) => !counts.includes(part));
   return (

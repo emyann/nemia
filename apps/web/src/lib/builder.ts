@@ -165,7 +165,8 @@ export function removeStep(steps: readonly DraftStep[], name: string): DraftStep
 
 /**
  * One key set on a step. `loop` brings its rounds with it — the default when set with none, none when unset — as drawing and taking away the
- * edge do; `resume` waits on the step it names, as the parser reads it. Every other key is set as given.
+ * edge do; `resume` waits on the step it names, as the parser reads it. Every other key is set as given; a role key unset on a step with
+ * an agent is the agent's again, and takes the agent's value, which is what the save reads back.
  *
  * `agent` set on a step with none makes what the step has its own — every key it sets, and what it is told as its note after the agent's
  * words. Set, from none or from another agent, every role key the step does not set itself takes the new agent's value (`agents`, from the
@@ -197,7 +198,6 @@ export function setKey<K extends keyof WorkflowStepSpec>(
     if (key === 'resume' && typeof value === 'string' && !spec.after.includes(value)) next.after = [...spec.after, value];
     return next;
   });
-  // A role key unset on a step with an agent is the agent's again, and shows the agent's value — what the save will read back.
   if (isSet(value) || !form.roleKeys.includes(key)) return next;
   return next.map((step) => {
     const given = step.name === name && step.own && step.spec.agent ? form.agents[step.spec.agent]?.[key] : undefined;
@@ -302,7 +302,6 @@ export const listOf = (typed: string): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-/** A count or an amount typed into the form, as the listing has it: null for nothing typed, and otherwise the number, which the package judges. */
 /**
  * Tokens as a person types them — `200k`, `150000`, `1M` — or null for none, or for anything else: the package's `tokensOf`, which the page
  * cannot import. Whether the harness takes the number is the package's to say when the draft is saved.
@@ -317,6 +316,7 @@ export function tokensOf(typed: string): number | null {
 /** A context window as the package's `renderStep` writes it: thousands with `k` when it is a whole number of them, digits otherwise. */
 export const contextText = (tokens: number): string => (tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
 
+/** A count or an amount typed into the form, as the listing has it: null for nothing typed, and otherwise the number, which the package judges. */
 export function numberOf(typed: string): number | null {
   if (!typed.trim()) return null;
   const n = Number(typed);

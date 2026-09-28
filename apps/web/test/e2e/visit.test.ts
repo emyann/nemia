@@ -62,8 +62,11 @@ test('a page with a console error makes the e2e exit non-zero, naming the page, 
     [],
     'console-error-light-failed.png',
   );
-  // Stopped at the first failure, with a picture of it, and no screenshot claiming the page passed.
-  assert.deepEqual(ended.shots, ['console-error-light-failed.png'], said(ended));
+  assert.deepEqual(
+    ended.shots,
+    ['console-error-light-failed.png'],
+    `stopped at the first failure, with a picture of it, and no screenshot claiming the page passed\n${said(ended)}`,
+  );
 });
 
 test(
@@ -108,7 +111,6 @@ test(
   "a page that fails once the e2e's store is gone says the store is gone, not what the page could not find",
   { timeout: 60_000 },
   async () => {
-    // A sweep of /tmp took the e2e's store halfway through the dark theme, and the check blamed the answer page for a run the board said was removed.
     const ended = await e2eOn('store-removed');
     assert.equal(ended.code, 1, said(ended));
     assert.match(ended.stderr, /^  what removes it: a sweep of the temporary directory — /m, said(ended));

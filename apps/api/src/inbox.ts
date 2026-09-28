@@ -75,7 +75,11 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
-/** The inbox as the package lists it, each entry with its body and when its file was written (`InboxEntry`). */
+/**
+ * The inbox as the package lists it, each entry with its body and when its file was written (`InboxEntry`). An entry dropped, or edited
+ * into a card that does not read, since the listing read it is listed as the listing has it, with no body or time, and read again next
+ * time.
+ */
 export function listInbox(): InboxEntry[] {
   return readInbox().map((entry) => {
     const file = path.join(inboxDir(), entry.file);
@@ -84,9 +88,7 @@ export function listInbox(): InboxEntry[] {
     try {
       filedAt = fs.statSync(file).mtime.toISOString();
       if (entry.error === null) body = parseInboxCard(entry.file, fs.readFileSync(file, 'utf8'), isDirectory).body;
-    } catch {
-      // Dropped, or edited into a card that does not read, since the listing read it: listed as the listing has it, and read again next time.
-    }
+    } catch {}
     return { ...entry, body, filedAt };
   });
 }
@@ -215,6 +217,10 @@ function queueRefusalStatus(name: string): 404 | 409 | 422 {
  * is found under the repository's `workflows/` at start. Yours, or any workflow on a card about another repository, is written as the folder
  * found, absolute, since its name would be looked for where it is not. Whether the idea, the workflow and the repo make a card is the package's
  * to say (`addToInbox`).
+ *
+ * An absolute `repo` is written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start
+ * records names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is, for
+ * the package to refuse: the api has no directory it was typed from.
  */
 function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { text: string; workflow?: string; repo?: string } | Refusal {
   const { body: text, workflow, from, repo: about } = body;
@@ -224,9 +230,6 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
       error: "`from` says where the card's workflow is read from, and this request names no `workflow`. Name one, or leave both out.",
     };
   }
-  // An absolute path written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start records
-  // names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is, for the
-  // package to refuse: the api has no directory it was typed from.
   const filing: { text: string; workflow?: string; repo?: string } = {
     text,
     ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
@@ -244,18 +247,33 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
  */
 const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e) => e.file.endsWith('.md')).map((e) => e.name);
 
+/**
+ * The inbox's routes. Each write passes the guard (guard.ts) before its body is read.
+ *
+ * - `GET /api/inbox` — the cards, and every entry of the folder that does not read as one, with why: never hidden, as a workflow that
+ *   does not load is not. 500 for a run's record that does not parse: the listing reads them all, for the runs a card was started as.
+ * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
+ *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
+ *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`). 404 for a card not there, or
+ *   dropped since the listing read it, the sentence naming the cards that are. Its keys are as the listing reads them: `queued` is when it
+ *   was queued (the listing carries its place too), null when unset.
+ * - `POST /api/inbox` — `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line (201,
+ *   `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for word (`exitCode` 2), is 422:
+ *   an idea with nothing in it, a key it would write on two lines, a repo that is not an absolute path to a directory, an `after:` in the
+ *   idea's own frontmatter. Anything else is the store's, 500: the inbox could not be written.
+ * - `DELETE /api/inbox/:name` — `wf inbox rm <name>`: a card dropped without being started. A name that would leave the inbox, or a hidden
+ *   one, is refused in the package's words (400) before anything is read; 404 for a card not there.
+ * - `POST` and `DELETE /api/inbox/:name/queue` — `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names;
+ *   and `--off`, the mark taken back (`queueRoute`).
+ */
 export const inbox = new Hono()
-  // The cards, and every entry of the folder that does not read as one, with why: never hidden, as a workflow that does not load is not.
   .get('/api/inbox', (c) => {
     try {
       return c.json(listInbox());
     } catch (err) {
-      // A run's record that does not parse: the listing reads them all, for the runs a card was started as.
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // One card, for its page. A name that would leave the inbox, or a hidden one, is refused in the package's words before anything is read; a
-  // card is found among the entries the inbox lists, never by a path joined from what was sent.
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
@@ -266,17 +284,14 @@ export const inbox = new Hono()
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }
-    // A card before a stray file of the same name: `notes.md` and `notes` both list as `notes`.
     const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
     if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
     let source: string;
     try {
       source = fs.readFileSync(path.join(inboxDir(), entry.file), 'utf8');
     } catch {
-      // Dropped since the listing read it: not among the cards the sentence names.
       return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
     }
-    // A card's keys as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
     const keys =
       entry.error === null
         ? INBOX_KEYS.map((key) => ({
@@ -287,7 +302,6 @@ export const inbox = new Hono()
         : null;
     return c.json({ ...entry, source, keys } satisfies InboxCardPage);
   })
-  // `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line.
   .post('/api/inbox', async (c) => {
     const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
@@ -306,12 +320,9 @@ export const inbox = new Hono()
         201,
       );
     } catch (err) {
-      // The package's refusal, word for word (`exitCode` 2): an idea with nothing in it, a key it would write on two lines, a repo that is not
-      // an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's: the inbox could not be written.
       return c.json({ error: messageOf(err) }, (err as { exitCode?: unknown }).exitCode === 2 ? 422 : 500);
     }
   })
-  // `wf inbox rm <name>`: a card dropped without being started.
   .delete('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const refused = refusedBeforeReading(
@@ -321,7 +332,6 @@ export const inbox = new Hono()
       c.req.header('content-type'),
     );
     if (refused) return c.json({ error: refused.error }, refused.status);
-    // A name that would leave the inbox, or a hidden one, in the package's words, before anything is read.
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
     try {
@@ -332,7 +342,6 @@ export const inbox = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names; and `--off`, the mark taken back.
   .post('/api/inbox/:name/queue', (c) => queueRoute(c, false))
   .delete('/api/inbox/:name/queue', (c) => queueRoute(c, true));
 
@@ -343,6 +352,7 @@ export const inbox = new Hono()
  * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
  * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken back
  * would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
+ * A time that cannot be set back leaves the queue written all the same: the card lists at the time of the queue, until it is written again.
  */
 async function queueRoute(c: Context, off: boolean) {
   const name = c.req.param('name')!;
@@ -360,9 +370,7 @@ async function queueRoute(c: Context, off: boolean) {
     if (filed && done.was !== 'not queued') {
       try {
         fs.utimesSync(file, filed, filed);
-      } catch {
-        // The queue is written all the same: the card lists at the time of the queue, until it is written again.
-      }
+      } catch {}
     }
     return c.json({
       name: done.card.name,

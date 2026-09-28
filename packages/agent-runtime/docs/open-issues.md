@@ -55,7 +55,7 @@ need that work somewhere else first. A session whose task a person or a deadline
 
 ### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
 
-`agent-runtime/src/runner-detached-output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`agent-runtime/src/harness/detached/output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
 prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
 is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
@@ -79,8 +79,8 @@ cannot be told apart from what its parent spent. `claude-detached` records what 
 
 ### 6. The Effect door's `file` refuses no harness's words
 
-**Where.** `file` in `agent-runtime/src/engine.ts` refuses what the task says of itself; the refusals in a harness's
-words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade.ts`), because that is where the
+**Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
+words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade/consumer.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
@@ -95,7 +95,7 @@ and one line of `refusalOf` (its cases fail).
 
 **What changed again** (2026-09-23, thin runtime stage 1, part 1). The harness's arguments are one `config` on the task
 (`HarnessArgs`), and the checks of them that every harness shares left `refusalOf` for the adapter side, in the same words:
-`argsRefusalOf` in `harness-args.ts` — an empty model or effort, tool lists and permission rules, `mcp`, `remoteControl`
+`argsRefusalOf` in `harness/args.ts` — an empty model or effort, tool lists and permission rules, `mcp`, `remoteControl`
 and `contextTokens` that are not values of their kind — with three new refusals of where an argument is (one beside
 `config`, a `config` that is no object, a key in it that is no argument). Every `Runner` asks them first through
 `Runner.layer`'s `refuses`, then its own `RunnerOps.refuses`, which `composite` forwards to the task's harness; the Effect
@@ -165,7 +165,7 @@ has no Codex servers configured.
 `transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
-(`claudeResultOutput` in `agent-runtime/src/runner-detached-output.ts`). Low priority, like issue 4: this
+(`claudeResultOutput` in `agent-runtime/src/harness/detached/output.ts`). Low priority, like issue 4: this
 harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
 
 **Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
@@ -174,7 +174,7 @@ keeps the json form, and this issue, as the harness there to compare against.
 
 ### 12. `said` means the words were handed to the inbox, not that the session read them
 
-**Where.** `claudeOps.say` in `agent-runtime/src/runner.ts`: a line posted to the session's inbox socket, which
+**Where.** `claudeOps.say` in `agent-runtime/src/harness/claude/bg.ts`: a line posted to the session's inbox socket, which
 writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
 
 **Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
@@ -306,7 +306,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 ### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
-(`claudeOps` in `agent-runtime/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
+(`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
 2.1.273 (agent-orchestrator `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
 an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
 that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-orchestrator's `check` — naming the
@@ -386,7 +386,7 @@ does anything to a background session, since workers run on the model's whole wi
   The control, a session that never compacted, agreed to the token (34,869 and 365). Its `costUsd` was right throughout: it
   is the `cost-state`'s own. **Fixed**: an attempt whose lines hold a `compact_boundary` takes its tokens from the
   `cost-state` the way it takes its cost — its own share of the total — and has none while no `cost-state` is written,
-  rather than a count missing its compactions (`transcriptUsage` in `src/runner-claude-transcript.ts`). The `claude -p` session's transcript
+  rather than a count missing its compactions (`transcriptUsage` in `src/harness/claude/transcript.ts`). The `claude -p` session's transcript
   then read 1,327,896 input tokens, what its result's `modelUsage` said.
 
 **What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on
@@ -403,7 +403,7 @@ under the engine.
 ### 27. The A2A seam carries every call to a session, the transcript as an extension method
 
 Since thin runtime stage 1 part 2 (2026-09-23), `createEngine` puts every harness behind an A2A agent of its own
-(`src/a2a-handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a-client.ts`):
+(`src/a2a/handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a/client.ts`):
 `spawn` is a message, `observe` a listing, `stop` a cancel. Since part 3 (the same day), `say` is a follow-up message on
 the session's Task, and `find`, `logs` and `release` are the runtime extension's methods (`findSession`, `sessionLogs`,
 `releaseSession`), offered as the harness's card lists them. Since part 4 (the same day), a transcript is read by the
@@ -477,7 +477,7 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
 
 Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
-`config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
+`config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
 `/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12).
 
@@ -626,7 +626,7 @@ What `codex exec` cannot do, said and not faked:
   transcript is read from a cursor.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
-attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/engine.ts`), and Codex writes
+attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/core/engine/engine.ts`), and Codex writes
 `-o` before it exits; the worker writes `done` only once Codex has exited and its pipes have drained. For that moment `view`
 says `input-required` while `getTask` still answers the harness's `WORKING`, and the process is still there. It closes by
 itself, and the test pins both sides of it with a fake that holds its exit (`test/codex-agent.test.ts`). Nothing reads the
@@ -660,13 +660,13 @@ the group is empty (review, round 2). What that leaves (`bin/ae-worker.ts`, `tes
 
 ### 33. A pass reads every task's journal, settled or not (2026-09-25; the pass fixed the same day, two gaps left)
 
-`tick()` (`src/engine.ts`) listed every id in the journal and folded each on every pass, twice, so a store's runtime phase
+`tick()` (`src/core/engine/engine.ts`) listed every id in the journal and folded each on every pass, twice, so a store's runtime phase
 grew with every task ever filed: on this machine's store, 16 MB of journals over 1,167 tasks. **Fixed for an engine's passes
-after its first** (`src/tick-memo.ts`): an engine keeps a cursor into its own feed and the settled tasks it has folded, and a
+after its first** (`src/core/engine/memo.ts`): an engine keeps a cursor into its own feed and the settled tasks it has folded, and a
 pass folds only the tasks not settled, the tasks the feed named since the last pass, and the ones this engine never folded.
 A settled task it skips is still let go of its sessions off what the memo kept, and a `measured` that writes goes through
 the feed, so the next pass folds it again. `decide` of a settled task is nothing in every journal shape, whatever is appended
-after (`test/lifecycle.test.ts`), and a check mode in `test/engine.test.ts` folds each skipped task again and fails the pass
+after (`src/core/lifecycle.test.ts`), and a check mode in `test/engine.test.ts` folds each skipped task again and fails the pass
 on a difference. Over a copy of this machine's store (1,200 tasks) a pass read 27.4 MB before, and 0.08 MB after its first.
 What is left:
 
@@ -685,7 +685,7 @@ What is left:
 
 ### 34. A remote Task answered in the moment before the registry holds it is owned by nobody (2026-09-25; the slow agent fixed in part 2 the same day)
 
-A remote A2A agent's spawn (`src/a2a-remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
+A remote A2A agent's spawn (`src/a2a/remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
 one SendMessage, and writes the Task's id beside the intent when the answer comes back. An answer that never reaches that
 write leaves an intent with no Task: the next spawn under the name refuses to send again, in words that are no refusal,
 and the grace window reads the attempt `lost`. Nothing is sent twice, which is the rule the registry keeps. But the Task
@@ -726,7 +726,7 @@ its registry). `decide` reads an unread name as `UNREAD` — nothing in `working
 (found in review); in `stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
 finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
-`test/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
+`src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
@@ -737,7 +737,7 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 - **The deadline ends an unread attempt without stopping what may run under it.** Past its deadline, an attempt whose harness could
   not be read gets `DEADLINE_PASSED` with no sighting, so `live` is false and the edge records the end, `failed`, `deadline`, with no
   `stop`: the session was unread, not gone. A `--bg` session is let go by `release` on the next pass that reads it, since the memo
-  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`runner-claude-code.ts`), so a job past
+  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`harness/claude/code.ts`), so a job past
   its deadline on a pass that could not read it runs on to its own end, in its worktree, after its attempt is recorded ended. This
   predates the change (a failed read was an empty map, and read the same). Neither fix is small: a stop needs the session's id, which
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
@@ -892,7 +892,7 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 - **Resuming a Codex task** (`f63dc55`). The argument order is checked against Codex's own parser; no
   workflow has resumed a Codex step, so whether exec-level `-C` and `-s` apply to the resumed session
   is unknown.
-- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/engine.ts`). In the
+- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/core/engine/engine.ts`). In the
   one live resumed step, the session was busy for as long as only its parent's `StructuredOutput` call
   existed, so the busy rule alone explains why it did not settle early.
 - **A resumed attempt's own closeout and usage** (engine `00e301b`). A fake `claude` that keeps a
@@ -1011,7 +1011,7 @@ review — the run waits for a person to notice, and the closeout on the transcr
 not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
 
 **Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
-own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/runner.ts`;
+own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`;
 `lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
 session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
 an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
@@ -1064,8 +1064,8 @@ for a long implement: the model summarises and stops.
 **Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
 and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
 Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
-cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/domain.ts`). The words are the
-fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
+cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/core/domain.ts`). The words are the
+fix, so `src/core/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
 
@@ -1082,7 +1082,7 @@ known.
 ### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
 
 A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
-(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
+(`src/harness/detached/detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
 group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
 `stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
 answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
@@ -1161,7 +1161,7 @@ step read `unsigned`. The nudged retry (`…-try2`) `--resume`d the same id, gav
 `StructuredOutput` at 22:58:32Z, and its `ended` carried no closeout and usage identical to the first's
 (turns 29, tool calls 93, the same tokens). Only a daemon restart and a third try made it read.
 
-**What the code allowed.** `finalStatements` and `finalUsage` in `runner.ts` were keyed by session id,
+**What the code allowed.** `finalStatements` and `finalUsage` in `harness/claude/bg.ts` were keyed by session id,
 set on the first sighting the registry listed `done`, `failed` or `stopped` (and not busy), and never
 cleared. A resume keeps the id, so try 2 was handed try 1's pins: a statement of `undefined`, and try
 1's usage.
@@ -1239,7 +1239,7 @@ first fixture had no prompt line. Every `--bg` transcript seen starts with its p
 machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `reason: harness`, no closeout, and settled
 `succeeded` (implement steps of four runs, among them `the-web-app-s-components-on-3xq9` and
 `the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
-as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
+as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`src/core/decide.test.ts`, and a fake `claude`
 listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
 it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
 engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
@@ -1271,7 +1271,7 @@ over this machine's store that day: of 511 settled tasks, 4 settled with their l
 note `operator`, all on tasks with a schema — so no `ended`, no reason, and a statement given before the stop, had there
 been one, dropped. A deadline did the same (none on the record). `decide` now ends such an attempt `operator` (recorded
 `stopped`) or `deadline` (recorded `failed`) before its task settles, or as its harness ended it if it had, statement
-untouched. The contract test in `test/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
+untouched. The contract test in `src/core/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
 settle; it found a third: an attempt cut at its budget and listed `done` (or quiet) was recorded `done`, reason `budget`,
 and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
 Each of the three fails the contract test when reverted. agent-orchestrator reads a check ended `deadline` or `operator` as

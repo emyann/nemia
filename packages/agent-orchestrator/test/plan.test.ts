@@ -29,11 +29,14 @@ test('a card is its file: the name without .md, `workflow:` and `after:` from it
     { name: 'd', file: 'd.md', workflow: 'dev', after: ['b', 'c'], body: 'do d' },
   ]);
   assert.deepEqual(CARD_KEYS, ['workflow', 'after']);
-  // Saved on Windows, with a comment and a blank line in its frontmatter, and a brief of more than one paragraph: the same card.
   const [windows] = parsePlan([
     { file: 'a.md', text: '﻿---\r\n# what runs it\r\nworkflow: dev\r\n\r\n---\r\nParse the flag.\r\n\r\nIn cli.ts.\r\n' },
   ]);
-  assert.deepEqual(windows, { name: 'a', file: 'a.md', workflow: 'dev', after: [], body: 'Parse the flag.\n\nIn cli.ts.' });
+  assert.deepEqual(
+    windows,
+    { name: 'a', file: 'a.md', workflow: 'dev', after: [], body: 'Parse the flag.\n\nIn cli.ts.' },
+    'saved on Windows, with a comment and a blank line in its frontmatter, and a brief of more than one paragraph: the same card',
+  );
 });
 
 test('`planOrder` puts parents first — the diamond is a, b, c, d whatever order its files are in — and among the cards that may go next, by name', () => {
@@ -52,10 +55,10 @@ test('`planOrder` puts parents first — the diamond is a, b, c, d whatever orde
     ['z', 'm', 'b'],
     'started parents first',
   );
-  // x waits on y, so w and y — which may go at once — go by name, and x after y.
   assert.deepEqual(
     planOrder(parsePlan([card('y', 'workflow: dev'), card('x', 'workflow: dev\nafter: y'), card('w', 'workflow: dev')])).map((c) => c.name),
     ['w', 'y', 'x'],
+    'x waits on y, so w and y, which may go at once, go by name, and x after y',
   );
 });
 
@@ -89,12 +92,12 @@ test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty 
   );
   assert.throws(() => parsePlan([card('a', 'workflow:')]), refusedWith(/^a\.md: `workflow` has no value\./));
   assert.throws(() => parsePlan([card('a', 'workflow dev')]), refusedWith(/^a\.md: `workflow dev` is not `key: value`\./));
-  // `repo:` is an inbox card's key: a plan works on the one repository `wf plan --repo` is given.
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
     refusedWith(
       /^a\.md: `repo` is not a key a plan's card has: a plan works on one repository, the one wf plan <folder> --repo <r> is given, and a card started by hand works on wf start's --repo\. `repo:` is an inbox card's — delete the line, or file the idea in the inbox: wf inbox add <file> --repo <r>\.$/,
     ),
+    "`repo:` is an inbox card's key: a plan works on the one repository `wf plan --repo` is given",
   );
   assert.throws(
     () => parsePlan([{ file: 'a.md', text: '---\nworkflow: dev\nParse the flag.\n' }]),
@@ -211,11 +214,11 @@ test('a plan stopped part-way says which card refused and why, names the runs th
       "  wf start '/plans/q3/a.md' --workflows '/repo/workflows/dev' --repo '/repo'",
     ],
   );
-  // Quoted for the shell: a space, and a quote, in a path.
   const spaced = { dir: "/home/me/plans/q3 it's", repo: '/code/my app', folderOf: () => '/code/my app/workflows/dev' };
   assert.equal(
     planStopped({ card: cards[0], why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
     `  wf start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`,
+    'quoted for the shell: a space, and a quote, in a path',
   );
 });
 
@@ -238,8 +241,6 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
     'no workflow: — --workflows says, or the default',
   );
 
-  // Not a card, so the whole text is the brief: no frontmatter, a key a card does not have beside a card's, prose between two rules, one that
-  // never closes, and an empty block.
   for (const text of [
     'Parse the flag.\n',
     '---\ntitle: the flag\nworkflow: dev\n---\nParse it.\n',
@@ -248,23 +249,26 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
     '---\n---\nParse it.\n',
     '---\n\n# only a comment\n---\nParse it.\n',
   ]) {
-    assert.equal(cardToStart('brief.md', text, []), null, JSON.stringify(text));
+    assert.equal(cardToStart('brief.md', text, []), null, `not a card, so the whole text is the brief: ${JSON.stringify(text)}`);
   }
 
-  // REFUSED at shipped defaults, by name: a card whose after: names cards, started with no --after — whatever the rest of it says.
   assert.throws(
     () => cardToStart('plans/q3/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', []),
     refusedWith(
       /^plans\/q3\/d\.md: `after: b, c` — this card waits on the runs of b and c, and wf start was given no --after, so it would start at once, beside the work it was written to wait for\. Give the id of each, from wf ls: wf start plans\/q3\/d\.md --after <b's run id> --after <c's run id>\.$/,
     ),
+    'a card whose after: names cards, started with no --after, is refused whatever the rest of it says',
   );
   assert.throws(() => cardToStart('e.md', '---\nafter: a, b, c\n---\nx\n', []), refusedWith(/waits on the runs of a, b and c,/));
   assert.throws(
     () => cardToStart('e.md', '---\nafter: a\n---\nx\n', []),
     refusedWith(/^e\.md: `after: a` — this card waits on the run of a,.* wf start e\.md --after <a's run id>\.$/),
   );
-  // And what wf plan refuses of a card: an empty body, a key set twice or to nothing, an after: naming no card, or one twice.
-  assert.throws(() => cardToStart('a.md', '---\nworkflow: dev\n---\n', []), refusedWith(/^a\.md: the body is empty\./));
+  assert.throws(
+    () => cardToStart('a.md', '---\nworkflow: dev\n---\n', []),
+    refusedWith(/^a\.md: the body is empty\./),
+    'what wf plan refuses of a card is refused here too: an empty body, a key set twice or to nothing, an after: naming no card, or one twice',
+  );
   assert.throws(
     () => cardToStart('a.md', '---\nworkflow: dev\nworkflow: ui\n---\nx\n', []),
     refusedWith(/^a\.md: `workflow` is set twice/),
@@ -272,10 +276,10 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
   assert.throws(() => cardToStart('a.md', '---\nworkflow:\n---\nx\n', []), refusedWith(/^a\.md: `workflow` has no value\./));
   assert.throws(() => cardToStart('a.md', '---\nafter: ,\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: ,` names no card\./));
   assert.throws(() => cardToStart('a.md', '---\nafter: b, b\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: b, b` names b twice\./));
-  // A card carried out of the inbox is a card, not a brief whose first lines are its frontmatter — and its `repo:` is refused, by name.
   assert.throws(
     () => cardToStart('idea.md', '---\nworkflow: dev\nrepo: /home/me/code/app\n---\nx\n', []),
     refusedWith(/^idea\.md: `repo` is not a key a plan's card has:/),
+    'a card carried out of the inbox is a card, not a brief whose first lines are its frontmatter, and its `repo:` is refused by name',
   );
   assert.throws(
     () => cardToStart('idea.md', '---\nrepo: /home/me/code/app\n---\nx\n', []),

@@ -48,7 +48,12 @@ const write = (file: string, text: string | Buffer) => {
   fs.writeFileSync(file, text);
 };
 
-/** Writes the run, its folder, its engine tasks and its one image; answers every path written, to take back. */
+/**
+ * Writes the run, its folder, its engine tasks and its one image into the store at `root`; answers every path written, to take back. Each
+ * task ran once and ended with the statement it gave, or none; one asked for a statement says whether it came. `quiet` ends as the runtime
+ * records a session that gave none — done, `stated: false`, succeeded — which the orchestrator calls `unsigned` (`endWords`); `garbled`
+ * ends on a statement cut off mid-string: no closeout, and still what the agent said.
+ */
 function writeRun(root: string): string[] {
   const { id } = OUTCOME;
   const now = Date.now();
@@ -83,7 +88,6 @@ function writeRun(root: string): string[] {
     tasks.push(task);
     return task;
   };
-  /** A task that ran once: ended as `end` says, with the statement it gave, or none — asked for one when `end` says whether it came. */
   const ran = (step: string, end: { observed: string; reason: string; settled: string; stated?: boolean }, closeout?: object | string) =>
     write(
       taskOf(step),
@@ -147,7 +151,6 @@ function writeRun(root: string): string[] {
   );
   ran('review', signed, said('Three findings, none worth another round.', { findings: OUTCOME.findings, again: false }));
   ran('ask', signed, said('Half of it is drawn.', { needs: OUTCOME.needs }, 'blocked'));
-  // As the runtime records it since stage 4a: done, no statement, succeeded. `unsigned` is the orchestrator's word for it (`endWords`).
   ran('quiet', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
   ran(
     'odd',
@@ -160,7 +163,6 @@ function writeRun(root: string): string[] {
       weights: { plan: 0.2, review: { findings: 0.7 } },
     }),
   );
-  // A statement cut off mid-string: no closeout, and still what the agent said.
   ran('garbled', signed, OUTCOME.garbled);
 
   for (const step of steps) {
@@ -193,9 +195,8 @@ function writeRun(root: string): string[] {
   return [record, dir, files, ...tasks];
 }
 
-/** The step's inspector, on its Output tab: what a click on its node opens. */
+/** The step's inspector, on its Output tab: what a click on its node opens, the click sent to the node where it is, whatever lies over it. */
 async function outputOf(page: Page, step: string) {
-  // Seven steps side by side put one under the graph's legend, which takes the pointer: a click the node is sent, where it is.
   await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${step}"]`).dispatchEvent('click');
   const inspector = page.locator(`aside[aria-label="Step ${step}"]`);
   await inspector.getByRole('tab', { name: 'Output' }).click();
@@ -220,8 +221,12 @@ async function photograph(page: Page, inspector: ReturnType<Page['locator']>, na
 }
 
 export default {
-  // A run whose steps each ended another way, and the Output tab of each: the outcome and who said it first, then each field drawn by
-  // its shape — findings, a plan, replies, a blocked step's needs, the machine's reason there is no statement, and JSON for the rest.
+  /**
+   * A run whose steps each ended another way, and the Output tab of each: the outcome and who said it first, then each field drawn by its
+   * shape — findings, a plan, replies, a blocked step's needs, the machine's reason there is no statement, and JSON for the rest — and Raw,
+   * the statement as the engine recorded it, whole, in place of the drawing. The page leaves the run before it takes it back, so no poll
+   * asks for a run that is gone.
+   */
   name: 'outcome',
   route: '/runs',
   expect: async (page) => {
@@ -255,7 +260,6 @@ export default {
       );
       await photograph(page, review, 'review');
 
-      // Raw: the statement as the engine recorded it, whole, in place of the drawing — and back.
       const raw = review.getByRole('switch');
       await review.locator('label', { hasText: /^Raw$/ }).click();
       if (!(await raw.isChecked())) throw new Refused('the Raw switch is on once its label is pressed');
@@ -332,13 +336,15 @@ export default {
       );
       await photograph(page, garbled, 'garbled');
     } finally {
-      // Off the run first, so no poll of it asks for a run that is gone.
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
-      // Said on the feed, as the tick says a run gone from the store: the list follows the feed, and polls once a minute beside it.
       fed(OUTCOME.id, 'removed');
     }
-    await expectCount(page.locator(`a[href="/runs/${OUTCOME.id}"]`), 0, 'taken back: the run is gone from the list');
+    await expectCount(
+      page.locator(`a[href="/runs/${OUTCOME.id}"]`),
+      0,
+      'taken back and said on the feed, as the tick says a run gone from the store: the run is gone from the list',
+    );
   },
 } satisfies PageSpec;

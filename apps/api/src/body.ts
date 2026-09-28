@@ -1,6 +1,6 @@
 /**
  * A request's JSON body, decoded with its route's schema — or refused in the route's own words. A schema says what each key must be; a
- * route's `words` say why the first key that is not was refused, as the route has always said it. No schema's message reaches a response.
+ * route's `words` say why the first key that is not is refused. No schema's message reaches a response.
  */
 import { Result, Schema, SchemaIssue } from 'effect';
 import type { SchemaAST } from 'effect';

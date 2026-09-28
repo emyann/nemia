@@ -1,7 +1,9 @@
 /**
  * The queue, as the board reads and writes it: GET /api/inbox's `queued` and `tried`; POST and DELETE /api/inbox/:name/queue (inbox.ts), a card
  * queued and taken off the queue through the package's `queueInInbox`; and GET /api/ceilings (app.ts), the cap the daemon's last pass ran with
- * and the runs it counts and holds, held to the package's `runSlots` — in a scratch store and a scratch repository.
+ * and the runs it counts and holds, held to the package's `runSlots` — in a scratch store and a scratch repository. `WF_ROOT` is set before
+ * the orchestrator is imported, as it locates its store, and so its inbox, when it loads; and the shell's `WF_MAX_RUNS` is dropped, so no
+ * cap comes from it.
  */
 import { observations } from './harness.ts';
 import { test } from 'node:test';
@@ -11,7 +13,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store, and so its inbox, when the module loads: point it at a scratch directory first. No cap from this shell.
 const root = scratch('hkb-api-queue-');
 process.env.WF_ROOT = root;
 delete process.env.WF_MAX_RUNS;
@@ -82,8 +83,6 @@ const startedFrom = (id: string, card: string): string =>
 
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
-// ─── the inbox's queue ──────────────────────────────────────────────────────
-
 test("GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them", async () => {
   clear();
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo }).card;
@@ -91,7 +90,6 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   const parked = addToInbox({ text: 'Not queued' }).card;
   queueInInbox(first.name);
   queueInInbox(second.name);
-  // The tick's own file for a start it refused, of the card as it stands.
   const tried = {
     at: '2026-09-16T10:00:00.000Z',
     text: cardText(second.name),
@@ -104,10 +102,9 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
 
   const entries = await listed();
   const byName = new Map(entries.map((e) => [e.name, e]));
-  // Every key the package lists, as it lists it: the api's own two beside them.
   for (const entry of readInbox()) {
     const { body, filedAt, ...rest } = byName.get(entry.name)!;
-    assert.deepEqual(rest, entry, entry.name);
+    assert.deepEqual(rest, entry, `${entry.name}: every key the package lists, as it lists it, the api's own two beside them`);
     assert.equal(typeof body, 'string');
     assert.equal(typeof filedAt, 'string');
   }
@@ -115,7 +112,11 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   assert.match(byName.get(first.name)!.queued!.at, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(byName.get(first.name)!.tried, undefined, 'no try of a card the tick has not tried');
   assert.equal(byName.get(second.name)!.queued!.place, 2);
-  assert.deepEqual(byName.get(second.name)!.tried, { at: tried.at, repo, why: tried.why, refused: true });
+  assert.deepEqual(
+    byName.get(second.name)!.tried,
+    { at: tried.at, repo, why: tried.why, refused: true },
+    "the tick's own file for a start it refused, of the card as it stands",
+  );
   assert.equal('queued' in byName.get(parked.name)!, false, 'a card not queued carries no `queued`');
 });
 
@@ -142,9 +143,8 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
     'written as wf inbox queue writes it',
   );
 
-  // A body of `{}` is no body.
   const behind = (await (await queue(second.name, JSON_TYPE, '{}')).json()) as InboxQueueAnswer;
-  assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2]);
+  assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2], 'a body of {} is no body');
   const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
   assert.deepEqual(
     (await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(byName),
@@ -167,12 +167,11 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   assert.equal(cardText(first.name), '---\nworkflow: dev\n---\nCache the views between passes\n');
   assert.equal((await listed()).find((e) => e.name === second.name)!.queued!.place, 1, 'the card behind it moves up');
 
-  // Taken back again: not queued, and nothing written.
   const before = inboxAsIs();
   const again = await unqueue(first.name);
   assert.equal(again.status, 200);
-  assert.equal(((await again.json()) as InboxQueueAnswer).was, 'not queued');
-  assert.deepEqual(inboxAsIs(), before);
+  assert.equal(((await again.json()) as InboxQueueAnswer).was, 'not queued', 'taken back again: not queued');
+  assert.deepEqual(inboxAsIs(), before, 'and nothing written');
 });
 
 test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it was: a queue is no edit of the idea, and the Inbox page orders the cards by it", async () => {
@@ -196,8 +195,11 @@ test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it wa
   assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
   assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
 
-  // Refused, nothing is written, and nothing is set.
-  assert.equal((await queue(newer.card.name, JSON_TYPE, '{"workflow":"dev"}')).status, 400);
+  assert.equal(
+    (await queue(newer.card.name, JSON_TYPE, '{"workflow":"dev"}')).status,
+    400,
+    'refused: nothing is written, and nothing is set',
+  );
   assert.equal((await unqueue(newer.card.name)).status, 200);
   assert.deepEqual(await filedAt(), before, 'a refusal, and a card taken off a queue it was not in, leave it as it was');
 });
@@ -244,8 +246,10 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, refusalOf(name, off), `${off ? 'DELETE' : 'POST'} ${name}`);
   }
-  // The sentences are the ones a person reads at the command line: not there names the cards there are.
-  assert.ok(refusalOf('no-such-card').startsWith(noCardLine('no-such-card', ['broken', bare.name, queued.name, started.name])));
+  assert.ok(
+    refusalOf('no-such-card').startsWith(noCardLine('no-such-card', ['broken', bare.name, queued.name, started.name])),
+    'the sentences are the ones a person reads at the command line: not there names the cards there are',
+  );
   assert.match(refusalOf(bare.name), /no workflow — a queued card starts on its own/);
   assert.match(refusalOf(queued.name), /already queued, at .+, 1 in the queue's order/);
   assert.match(refusalOf(started.name), /this card was started as started-run-k2q9/);
@@ -347,20 +351,17 @@ test('REFUSED at shipped defaults: a queue or its taking back another site could
   }
   assert.deepEqual(inboxAsIs(), before);
 
-  // As the board sends each, through vite's proxy: taken.
   const board = {
     'content-type': 'application/json',
     'sec-fetch-site': 'same-origin',
     origin: 'http://localhost:5173',
     host: '127.0.0.1:8787',
   };
-  assert.equal((await queue(card.name, board)).status, 200);
-  assert.equal((await unqueue(other.name, board)).status, 200);
+  assert.equal((await queue(card.name, board)).status, 200, "a queue as the board sends it, through vite's proxy: taken");
+  assert.equal((await unqueue(other.name, board)).status, 200, 'and its taking back, as the board sends it: taken');
   assert.match(cardText(card.name), /\nqueued: /);
   assert.doesNotMatch(cardText(other.name), /\nqueued: /);
 });
-
-// ─── the cap ────────────────────────────────────────────────────────────────
 
 const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}:00.000Z`;
 
@@ -434,38 +435,43 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
   let before = observations();
   const one = await ceilings();
   assert.equal(observations() - before, 1, 'one `claude agents` for every run at once');
-  // A run waiting on a run in flight wants no slot, and a run called off none: neither counted, neither held.
-  assert.deepEqual(one, {
-    last: { sessions: 2, runs: 1 },
-    cap: 1,
-    inFlight: ['a-flying'],
-    held: [
-      { run: 'b-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
-      { run: 'c-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
-    ],
-    pass: null,
-  });
+  assert.deepEqual(
+    one,
+    {
+      last: { sessions: 2, runs: 1 },
+      cap: 1,
+      inFlight: ['a-flying'],
+      held: [
+        { run: 'b-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
+        { run: 'c-wants', inFlight: 1, cap: 1, word: 'waiting for a run slot (1 of 1 in flight)' },
+      ],
+      pass: null,
+    },
+    'a run waiting on a run in flight wants no slot, and a run called off none: neither counted, neither held',
+  );
   assert.deepEqual(one.held, await packageHeld(), "held as the package's runSlots holds them");
 
-  // A cap of 2: the oldest wanting a slot is admitted and counted, and the next held at 2 of 2.
   tickWrote({ sessions: 2, runs: 2 });
   const two = await ceilings();
   assert.deepEqual(
     [two.cap, two.inFlight, two.held],
     [2, ['a-flying'], [{ run: 'c-wants', inFlight: 2, cap: 2, word: 'waiting for a run slot (2 of 2 in flight)' }]],
+    'a cap of 2: the oldest wanting a slot is admitted and counted, and the next held at 2 of 2',
   );
   assert.deepEqual(two.held, await packageHeld());
 
-  // A cap of 3: nothing held.
   tickWrote({ sessions: 4, runs: 3 });
-  assert.deepEqual(await ceilings(), { last: { sessions: 4, runs: 3 }, cap: 3, inFlight: ['a-flying'], held: [], pass: null });
+  assert.deepEqual(
+    await ceilings(),
+    { last: { sessions: 4, runs: 3 }, cap: 3, inFlight: ['a-flying'], held: [], pass: null },
+    'a cap of 3: nothing held',
+  );
   assert.deepEqual(await packageHeld(), []);
 
-  // Two in flight, oldest first by `createdAt`, then id.
   pending('t-also');
   writeRun('0-also-flying', 5, { taskId: 't-also' });
   before = observations();
-  assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying']);
+  assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying'], 'two in flight, oldest first by createdAt, then id');
   assert.equal(observations() - before, 1);
 });
 
@@ -482,10 +488,13 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
   tickWrote({ sessions: 2, runs: 3 });
   assert.equal((await ceilings()).cap, 3, 'the last pass cap, not the shell of the api');
 
-  // Before any pass: the api's own.
   fs.rmSync(path.join(root, 'tick.json'));
   const own = await ceilings();
-  assert.deepEqual([own.last, own.cap, own.inFlight, own.held.map((h) => h.run)], [null, 1, ['a-flying'], ['b-wants', 'c-wants']]);
+  assert.deepEqual(
+    [own.last, own.cap, own.inFlight, own.held.map((h) => h.run)],
+    [null, 1, ['a-flying'], ['b-wants', 'c-wants']],
+    "before any pass: the api's own",
+  );
 
   process.env.WF_MAX_RUNS = 'two';
   const res = await app.request('/api/ceilings');
@@ -494,9 +503,8 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
     ((await res.json()) as { error: string }).error,
     'WF_MAX_RUNS=two is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.',
   );
-  // Once a pass has written its ceilings, the api's environment is not read at all.
   tickWrote({ sessions: 2, runs: 2 });
-  assert.equal((await ceilings()).cap, 2);
+  assert.equal((await ceilings()).cap, 2, "once a pass has written its ceilings, the api's environment is not read at all");
 });
 
 /** What a pass cost, as the tick writes it (`recordPassCost`): each phase, the harnesses observed, and the totals. */

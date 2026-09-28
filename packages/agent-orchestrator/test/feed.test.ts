@@ -3,6 +3,8 @@
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would be
  * in it. The fold and the diff are pure, and are tested here beside the file, since what matters of them is what the file ends up saying.
+ * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from
+ * its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,9 +21,7 @@ const ROOT = scratch('wf-feed-');
 const RUNS = path.join(ROOT, 'runs');
 const FEED = path.join(ROOT, 'feed.jsonl');
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } =
@@ -157,9 +157,12 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
   assert.deepEqual(words(run.id), ['running'], 'the run says it is running, once');
   assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
 
-  // Filed on that pass, it reads as filed on the next — the feed words what the pass read before it filed — and then says nothing more.
   for (let i = 0; i < 3; i++) await tick(b.e);
-  assert.deepEqual(words(run.id, 'plan').slice(1), ['pending']);
+  assert.deepEqual(
+    words(run.id, 'plan').slice(1),
+    ['pending'],
+    'filed on that pass, it reads as filed on the next, since the feed words what the pass read before it filed, and then says nothing more',
+  );
   const quiet = size();
   await tick(b.e);
   assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
@@ -183,11 +186,14 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
     'at its gate, in the word wf decide says it in: nothing failed',
   );
 
-  // A person's word: the approval is a file of its own, and the next pass's line is what it changed.
   await approve(b.e, run.id, 'plan');
   for (let i = 0; i < 3; i++) await tick(b.e);
   const plan = words(run.id, 'plan');
-  assert.notEqual(plan.at(-1), 'awaiting approval', plan.join(' → '));
+  assert.notEqual(
+    plan.at(-1),
+    'awaiting approval',
+    `the approval is a file of its own, and the next pass's line is what it changed: ${plan.join(' → ')}`,
+  );
   assert.equal(new Set(plan).size, plan.length, `no word said twice in a row: ${plan.join(' → ')}`);
   const runLines = lines().filter((l) => l.run === run.id && l.step === undefined);
   assert.equal(runLines.at(-1)!.note, undefined, 'the run no longer waits on you');
@@ -200,8 +206,11 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
     ['succeeded'],
   );
 
-  // And every line carries its time, its run, and its word: the shape a reader parses.
-  for (const l of lines()) assert.ok(typeof l.at === 'string' && l.run && l.word, JSON.stringify(l));
+  for (const l of lines())
+    assert.ok(
+      typeof l.at === 'string' && l.run && l.word,
+      `every line carries its time, its run, and its word, the shape a reader parses: ${JSON.stringify(l)}`,
+    );
 });
 
 /** A workflow of `implement → ship`, whose ending waits at its gate for a person before it is filed: as the shipped `dev` ends. */
@@ -218,7 +227,6 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   const repo = aRepo();
   const run = start({ brief: 'the ship gate', repo, workflowDir: ending });
   await tick(b.e);
-  // Work on the step's branch, as a session leaves it: a branch that never moved is read by git as merged already.
   const branch = readRun(run.id).steps.implement.branch!;
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' }).trim();
@@ -226,23 +234,29 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   b.set(`${run.id}-implement`, 'succeeded', SIGNED);
   for (let i = 0; i < 3; i++) await tick(b.e);
 
-  assert.equal(words(run.id, 'ship').at(-1), 'awaiting approval', 'the ship step waits at its gate');
+  assert.equal(
+    words(run.id, 'ship').at(-1),
+    'awaiting approval',
+    "the ship step waits at its gate, with work on the step's branch as a session leaves it: a branch that never moved is read by git as merged already",
+  );
   const last = lines()
     .filter((l) => l.run === run.id && l.step === undefined)
     .at(-1)!;
   assert.deepEqual({ word: last.word, note: last.note }, { word: 'awaiting approval', note: 'waiting on you: approve ship' });
   assert.equal(words(run.id).includes('failed'), false, `no line of the run says failed: ${words(run.id).join(' → ')}`);
-  // What wf decide says of the same run: awaiting approval, and nothing failed.
   const decided = (await printedBy(t, b.e, 'decide', run.id)).join('\n');
-  assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/);
-  assert.doesNotMatch(decided, /FAILED/);
+  assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'wf decide says the same run awaits approval');
+  assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
 
-  // And a run in which a step did break says so: a word that fits a gate is not a word that hides a failure.
   const broke = start({ brief: 'the break', repo: aRepo(), workflowDir: ending });
   await tick(b.e);
   b.set(`${broke.id}-implement`, 'failed');
   for (let i = 0; i < 2; i++) await tick(b.e);
-  assert.equal(words(broke.id).at(-1), 'failed');
+  assert.equal(
+    words(broke.id).at(-1),
+    'failed',
+    'a run in which a step did break says so: a word that fits a gate is not a word that hides a failure',
+  );
 });
 
 test('a step that signed off blocked says what it needs on its line in the feed, made one line, beside BLOCKED — and the run says blocked, not failed', async () => {
@@ -269,7 +283,6 @@ test('a step that signed off blocked says what it needs on its line in the feed,
     .at(-1)!;
   assert.deepEqual({ word: said.word, note: said.note }, { word: 'blocked', note: 'waiting on you: plan' });
 
-  // Long, it is clipped, and wf decide has it whole; a step that signed off done says nothing it needs, whatever its closeout holds.
   const long = started('the long question');
   const other = started('the done');
   await tick(b.e);
@@ -279,10 +292,14 @@ test('a step that signed off blocked says what it needs on its line in the feed,
   const clipped = lines()
     .filter((l) => l.run === long.id && l.step === 'plan')
     .at(-1)!.note!;
-  assert.ok(clipped.startsWith('needs: why why') && clipped.endsWith('…') && clipped.length <= 'needs: '.length + 200, clipped);
+  assert.ok(
+    clipped.startsWith('needs: why why') && clipped.endsWith('…') && clipped.length <= 'needs: '.length + 200,
+    `long, it is clipped, and wf decide has it whole: ${clipped}`,
+  );
   assert.equal(
     lines().some((l) => l.run === other.id && l.note?.includes('needs:')),
     false,
+    'a step that signed off done says nothing it needs, whatever its closeout holds',
   );
 });
 
@@ -294,22 +311,29 @@ test('nothing is written when nothing changed, across a restart: a daemon with n
   const pass = await tick(b.e);
   const before = fs.readFileSync(FEED, 'utf8');
 
-  // A restarted daemon: nothing in memory, the same world. Its first pass folds the feed from the start, and owes it no line.
-  assert.deepEqual(recordFeed(judged(pass), { memo: freshFeedMemo() }), []);
+  assert.deepEqual(
+    recordFeed(judged(pass), { memo: freshFeedMemo() }),
+    [],
+    'a restarted daemon, with nothing in memory and the same world, folds the feed from the start on its first pass and owes it no line',
+  );
   assert.equal(fs.readFileSync(FEED, 'utf8'), before);
 
-  // The same after the world did change, then was written: the new process says what changed, once, and a second new one nothing.
   b.set(`${run.id}-plan`, 'succeeded', SIGNED);
   const moved = await tick(b.e);
   const after = size();
   assert.ok(after > before.length, 'the pass wrote the gate');
-  assert.deepEqual(recordFeed(judged(moved), { memo: freshFeedMemo() }), []);
+  assert.deepEqual(
+    recordFeed(judged(moved), { memo: freshFeedMemo() }),
+    [],
+    'the same after the world did change, then was written: the new process said what changed, once, and a second new one nothing',
+  );
   assert.equal(size(), after);
 
-  // And a fold that is not the feed — a daemon that remembered nothing and read nothing — would say every word again: what makes the
-  // restart quiet is reading the feed, not the memo.
   fs.rmSync(FEED);
-  assert.ok(recordFeed(judged(moved), { memo: freshFeedMemo() }).length > 0);
+  assert.ok(
+    recordFeed(judged(moved), { memo: freshFeedMemo() }).length > 0,
+    'a fold that is not the feed, a daemon that remembered nothing and read nothing, says every word again: what makes the restart quiet is reading the feed, not the memo',
+  );
 });
 
 test("a step's live word moving — `running (working)` to `running (idle)` and back — writes nothing: the feed says running, once", async () => {
@@ -335,10 +359,13 @@ test("a step's live word moving — `running (working)` to `running (idle)` and 
   );
   assert.equal(words(run.id, 'plan').at(-1), 'running');
 
-  // A word the tick decides on is not folded: a session its harness blocked is a person's to answer.
   b.set(`${run.id}-plan`, 'needs-human');
   await tick(b.e);
-  assert.equal(words(run.id, 'plan').at(-1)!.startsWith('needs-human'), true, words(run.id, 'plan').join(' → '));
+  assert.equal(
+    words(run.id, 'plan').at(-1)!.startsWith('needs-human'),
+    true,
+    `a word the tick decides on is not folded: a session its harness blocked is a person's to answer: ${words(run.id, 'plan').join(' → ')}`,
+  );
 });
 
 test('a person calling the run off writes one line, and a run gone from the store writes one `removed`, then nothing', async () => {
@@ -355,7 +382,6 @@ test('a person calling the run off writes one line, and a run gone from the stor
     ['cancelled'],
   );
 
-  // `wf rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once, with no line for its steps.
   fs.rmSync(path.join(RUNS, `${goes.id}.json`));
   const before = lines().length;
   for (let i = 0; i < 3; i++) await tick(b.e);
@@ -363,9 +389,13 @@ test('a person calling the run off writes one line, and a run gone from the stor
   assert.deepEqual(
     said.map((l) => [l.run, l.step, l.word]),
     [[goes.id, undefined, 'removed']],
+    "`wf rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once, with no line for its steps",
   );
-  // And a restarted daemon reads it as gone: nothing said of it again.
-  assert.deepEqual(recordFeed(judged(await tick(b.e)), { memo: freshFeedMemo() }), []);
+  assert.deepEqual(
+    recordFeed(judged(await tick(b.e)), { memo: freshFeedMemo() }),
+    [],
+    'a restarted daemon reads it as gone: nothing said of it again',
+  );
 });
 
 test("a pruned run's word says so, once: `wf prune`'s marker is a person's fact, and the run's line gains it", async () => {
@@ -410,16 +440,17 @@ test('REFUSED: a cursor inside a line is refused by name, by the read, by `wf fe
   await assert.rejects(main(['feed', '0', '1'], b.e), refusedWith(/^wf feed takes one cursor at most/));
   assert.throws(() => readFeed(-1), refusedWith(/^a feed cursor is a whole number of bytes/));
 
-  // Every cursor a read hands out is one the next read takes: 0, each line's end, and the end.
   let at = 0;
   for (const line of fs.readFileSync(FEED, 'utf8').split('\n').slice(0, -1)) {
     at += Buffer.byteLength(line) + 1;
-    assert.doesNotThrow(() => readFeed(at));
+    assert.doesNotThrow(
+      () => readFeed(at),
+      `every cursor a read hands out is one the next read takes: 0, each line's end (${at}), and the end`,
+    );
   }
   assert.equal(at, cursor);
-  // And a feed not written yet reads as nothing, at 0 — where every reader starts.
   emptyStore();
-  assert.deepEqual(readFeed(0), { lines: [], cursor: 0 });
+  assert.deepEqual(readFeed(0), { lines: [], cursor: 0 }, 'a feed not written yet reads as nothing, at 0, where every reader starts');
 });
 
 test('the cursor never passes a partial line: a line being written is not read, nor stepped over, and is read once it ends', () => {
@@ -471,9 +502,8 @@ test('a line a writer died in the middle of is ended by the next pass, and costs
     false,
     'and the torn line is read by nobody',
   );
-  // And nothing after it is said twice.
   const plan = after.filter((l) => l.run === run.id && l.step === 'plan').map((l) => l.word);
-  assert.equal(new Set(plan).size, plan.length, plan.join(' → '));
+  assert.equal(new Set(plan).size, plan.length, `nothing after it is said twice: ${plan.join(' → ')}`);
 });
 
 test('`wf feed` prints each line and the cursor to read on from; `wf watch` follows the lines as they are written, until stopped', async (t) => {
@@ -506,7 +536,6 @@ test('`wf feed` prints each line and the cursor to read on from; `wf watch` foll
     });
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
-    // Waited for by what it counts, under a bound of seconds — never a length of time.
     await Promise.race([
       two,
       new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000)),
@@ -526,7 +555,6 @@ test('a watch hands each line on with its own cursor: the byte after it, in byte
   emptyStore();
   const line = (run: string, word: string, note?: string) =>
     JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word, ...(note ? { note } : {}) });
-  // A note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody.
   fs.writeFileSync(
     FEED,
     [
@@ -540,7 +568,11 @@ test('a watch hands each line on with its own cursor: the byte after it, in byte
       .join(''),
   );
   const whole = readFeed(0);
-  assert.equal(whole.lines.length, 4);
+  assert.equal(
+    whole.lines.length,
+    4,
+    'a note of three-byte dashes, then a line a writer died in, ended by the next: its bytes move the cursor and it is handed on to nobody',
+  );
 
   const got: { line: FeedLine; cursor: number }[] = [];
   let arrived: () => void = () => {};
@@ -585,7 +617,6 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   const b = board();
   const run = started('the cut');
   await tick(b.e);
-  // A real `wf watch`, since it never returns: its process is killed at the end. Its engine is never asked anything.
   const cli = new URL('../src/cli.ts', import.meta.url).href;
   const child = spawn(
     process.execPath,
@@ -603,7 +634,6 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   child.stderr.on('data', (d) => {
     err += d;
   });
-  /** Wait until `ok` holds of what the watch printed, under a bound of seconds: for what it counts, never a length of time. */
   const printed = async (ok: () => boolean, what: string) => {
     const bound = Date.now() + 10_000;
     while (!ok()) {
@@ -613,27 +643,30 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   };
   const cuts = () => err.split('\n').filter((l) => l.includes('under this watch'));
   try {
-    await printed(() => out.includes('watching from'), 'the watch starts');
+    await printed(
+      () => out.includes('watching from'),
+      'a real `wf watch`, in a process killed at the end since it never returns, its engine never asked anything, starts',
+    );
 
-    // Truncated to nothing: said once, and the watch reads the feed the tick writes again from its start — the transition among it.
     fs.truncateSync(FEED, 0);
-    await printed(() => cuts().length === 1, 'the truncation is said');
+    await printed(() => cuts().length === 1, 'truncated to nothing: the truncation is said once');
     assert.match(cuts()[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
     await tick(b.e);
-    await printed(() => /\splan\s+awaiting approval/.test(out), 'the gate reached after the cut is delivered');
+    await printed(
+      () => /\splan\s+awaiting approval/.test(out),
+      'the watch reads the feed the tick writes again from its start: the gate reached after the cut is delivered',
+    );
 
-    // Deleted: the same.
     const before = out.length;
     fs.rmSync(FEED);
-    await printed(() => cuts().length === 2, 'the deletion is said');
+    await printed(() => cuts().length === 2, 'deleted: the same, the deletion is said');
     assert.match(cuts()[1], /the feed was deleted under this watch/);
     await approve(b.e, run.id, 'plan');
     for (let i = 0; i < 2; i++) await tick(b.e);
     await printed(() => /\splan\s+(?!awaiting)/.test(out.slice(before)), 'the approval after the deletion is delivered');
 
-    // Replaced by another file of the same bytes and more: nothing about its size tells, its inode does.
     const at = out.length;
     const next = `${FEED}.next`;
     fs.writeFileSync(
@@ -641,15 +674,17 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
       `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`,
     );
     fs.renameSync(next, FEED);
-    await printed(() => out.slice(at).includes('r-new'), 'the replacement is read');
+    await printed(
+      () => out.slice(at).includes('r-new'),
+      'replaced by another file of the same bytes and more: nothing about its size tells, its inode does, and the replacement is read',
+    );
     assert.equal(cuts().length, 3);
     assert.match(cuts()[2], /the feed was replaced under this watch/);
 
-    // Once each: every beat after reads on, and says nothing more — no `past the end`, ever.
     const quiet = err;
     fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
-    await printed(() => out.includes('r-last'), 'the line after is delivered');
-    assert.equal(err, quiet, 'nothing more said');
+    await printed(() => out.includes('r-last'), 'each cut said once: every beat after reads on, and the line after is delivered');
+    assert.equal(err, quiet, 'nothing more said, and no `past the end`, ever');
     assert.doesNotMatch(err, /past the end|falls inside a line/);
   } finally {
     child.kill();
@@ -661,7 +696,6 @@ test('`wf watch` says it is watching only once it holds its cursor: a feed cut t
   const line = JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' });
   fs.writeFileSync(FEED, `${line}\n${line}\n`);
   const from = size();
-  // A reader acting on the banner at once, as fast as it can: in this process, before the next line of the watch's own start.
   const out: string[] = [];
   const err: string[] = [];
   t.mock.method(console, 'log', (...a: unknown[]) => {
@@ -673,7 +707,11 @@ test('`wf watch` says it is watching only once it holds its cursor: a feed cut t
   });
   const watch = watchPrinted(from);
   try {
-    assert.deepEqual(out, [`watching from ${from}, ^C to stop`]);
+    assert.deepEqual(
+      out,
+      [`watching from ${from}, ^C to stop`],
+      "a reader acts on the banner at once, as fast as it can: in this process, before the next line of the watch's own start",
+    );
     const bound = performance.now() + 10_000;
     while (!err.length) {
       assert.ok(performance.now() < bound, 'the truncation was not said in 10s');
@@ -716,7 +754,6 @@ test('a watch says each read that works, before the lines it found and whether o
   emptyStore();
   fs.writeFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-a', word: 'running' })}\n`);
   const said: string[] = [];
-  /** Wait until `ok` holds of what the watch said, under a bound of seconds: for the beats counted, never a length of time. */
   const heard = async (ok: () => boolean, what: string) => {
     const bound = Date.now() + 5_000;
     while (!ok()) {
@@ -780,12 +817,13 @@ test('the feed asks the engine nothing of its own: a pass reads each task as man
   const before = b.views();
   await tick(b.e);
   const perPass = b.views() - before;
-  // One read per task filed — the plan's — per pass: what `advance` reads for its own judgement, and nothing for the feed.
-  assert.equal(perPass, 1);
+  assert.equal(
+    perPass,
+    1,
+    "one read per task filed, the plan's, per pass: what `advance` reads for its own judgement, and nothing for the feed",
+  );
   assert.equal(feedFile(), FEED);
 });
-
-// ─── pure: the words, the fold, the diff ────────────────────────────────────
 
 test("feedPhase folds the engine's live words into running, and keeps every word a decision reads", () => {
   for (const live of ['running (working)', 'running (idle)', 'working (quiescent)', 'starting', 'between attempts'])
@@ -842,12 +880,17 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   );
   assert.deepEqual(feedWords(other, run, { status: 'running' }), a, 'the count in flight moving is not a change');
   assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'succeeded' }).run, { word: 'succeeded (pruned)' });
-  // A run stopped on a person's word, and not on anything that broke, says what it stopped on — pruned too — and one that broke says failed.
-  assert.deepEqual(feedWords(held, run, { status: 'failed', stoppedOn: 'awaiting approval' }).run, { word: 'awaiting approval' });
-  assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'failed', stoppedOn: 'blocked' }).run, {
-    word: 'blocked (pruned)',
-  });
-  assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' });
+  assert.deepEqual(
+    feedWords(held, run, { status: 'failed', stoppedOn: 'awaiting approval' }).run,
+    { word: 'awaiting approval' },
+    "a run stopped on a person's word, and not on anything that broke, says what it stopped on",
+  );
+  assert.deepEqual(
+    feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'failed', stoppedOn: 'blocked' }).run,
+    { word: 'blocked (pruned)' },
+    'pruned too',
+  );
+  assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' }, 'and one that broke says failed');
 });
 
 test('the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved', () => {

@@ -24,8 +24,9 @@ import { BuilderEdge, type BuilderFlowEdge } from './BuilderEdge';
 import { StepForm, type DraftUpdate } from './StepForm';
 import { SpecNode, type SpecFlowNode } from './StepNode';
 
-// Declared once: a new object per render makes React Flow warn and mount every node afresh.
+/** The builder's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
+/** The builder's edge types for React Flow, one object for the module's life. */
 const edgeTypes = { builder: BuilderEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1 };
@@ -45,19 +46,24 @@ const INPUT =
  * to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`, with its
  * rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its form.
  *
- * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`), at
- * the version the draft was read from. The api answers the folder read back from disk, which the draft starts again from; or the package's
- * refusal, shown above the canvas and on each step it names (`SaveRefused`); or, for a folder changed on disk since, a 409 with Read the folder
- * again. Changes not saved are marked on the card and on each step.
+ * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`) in
+ * one write, judged whole by the api before any of it is written, at the version the draft was read from. The api answers the folder read
+ * back from disk, which the draft starts again from; or the package's refusal, shown above the canvas and on each step it names
+ * (`SaveRefused`); or, for a folder changed on disk since, a 409 with Read the folder again, rather than a write over it. Changes not saved
+ * are marked on the card and on each step, and the draft is compared with the folder as it was last read.
+ *
+ * Read the folder again starts the draft from what the folder holds now, and lets go of what was drawn; a folder gone, or one that no
+ * longer reads, closes the builder, and the card says why. A read that fails keeps the refusal's status, so a 409's "nothing written" is
+ * not turned into "it may have been written" by a read that wrote nothing either. After a save or a discard, the form is a new one with
+ * its fields as the draft has them. The canvas is fitted again, mounted anew, whenever a step comes, goes or moves — an edge drawn moves
+ * the step it points at a column right — so every step stays in the frame to draw from.
  */
 export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListing; onClose: () => void }) {
   const queryClient = useQueryClient();
   const form = useQuery(keyFormQuery);
-  // What the draft is compared with: the folder as the listing had it when the builder opened, and as the api read it back after each save.
   const [base, setBase] = useState(workflow);
   const [steps, setSteps] = useState<DraftStep[]>(() => draftOf(workflow));
   const [selected, setSelected] = useState<string | null>(workflow.steps[0]?.name ?? null);
-  // A new form, with its fields as the draft has them, after a save or a discard.
   const [version, setVersion] = useState(0);
   const [adding, setAdding] = useState(false);
   const [refusal, setRefusal] = useState<BuildRefusal | null>(null);
@@ -68,15 +74,12 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
     setSaved(null);
   }, []);
 
-  /** The draft started again from `listing`, the folder as the api read it: after a save, or once the folder is read again. */
   const startFrom = (listing: WorkflowListing) => {
     setBase(listing);
     setSteps(draftOf(listing));
     setVersion((v) => v + 1);
   };
 
-  // One write: the steps and the schemas pasted for them, judged together by the api before either is written, at the version the draft
-  // was read from, so a folder changed on disk since is refused rather than written over.
   const save = useMutation({
     mutationFn: (draft: DraftStep[]) => saveWorkflow(base.name, { version: base.version, steps: toPut(draft), schemas: schemasOf(draft) }),
     onMutate: () => {
@@ -96,8 +99,6 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
     },
   });
 
-  // The folder read again after a save refused because it changed on disk: the draft starts from what it holds now, and what was drawn is
-  // let go — the refusal said so. A folder gone, or one that no longer reads, has no builder: the card says why.
   const reread = useMutation({
     mutationFn: () => queryClient.fetchQuery({ ...workflowsQuery, staleTime: 0 }),
     onSuccess: (list) => {
@@ -107,8 +108,6 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       setRefusal(null);
       setSaved(null);
     },
-    // The read failed, and the save's answer still says what the folder may hold: its status is kept, so a 409's "nothing written" is not
-    // turned into "it may have been written" by a read that wrote nothing either (`SaveRefused`).
     onError: (err) => setRefusal((was) => new BuildRefusal(`Could not read the folder again: ${err.message}`, [], was?.status ?? null)),
   });
 
@@ -222,8 +221,6 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
           style={{ height }}
         >
           <ReactFlow
-            // Fitted again whenever a step comes, goes or moves — an edge drawn moves the step it points at a column right — so every step
-            // stays in the frame to draw from.
             key={steps.map((s) => `${s.name}@${at.get(s.name)!.x},${at.get(s.name)!.y}`).join('\n')}
             id={`builder-${base.name}`}
             nodes={nodes}

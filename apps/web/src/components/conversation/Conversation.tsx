@@ -22,10 +22,10 @@ type Props = {
 
 /**
  * A step's conversation, in shadcn's scroller: read-only, newest at the bottom. It starts at the end, and follows what is
- * added while the reader is at the bottom; a reader who scrolls up is left where they are, with a button back down.
+ * added while the reader is at the bottom; a reader who scrolls up is left where they are, with a button back down. A call with no result
+ * in its tail, where nothing has been said since (`tailStart`), is still running while the session is live.
  */
 export function Conversation({ turns, live, density = 'page', className }: Props) {
-  // Where nothing has been said since: a call there with no result is still running while the session is live.
   const tail = tailStart(turns);
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="end">

@@ -1,7 +1,8 @@
 /**
  * What the store reads back, read against what the tick and the verbs write: a run record, a person's asks and markers. A record that does
- * not read as a run is refused by `readRun` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and says
- * why in the verb's words; a marker that does not read still holds its run. Every shape a former `wf` wrote reads as it did.
+ * not read as a run is refused by `readRun` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and
+ * says why in the verb's words; a marker that does not read still holds its run. Every shape a former `wf` wrote reads as it did. `WF_ROOT`
+ * is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,6 @@ import type { Run } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-record-read-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const store = await import('../src/store.ts');
 const {
@@ -96,8 +96,10 @@ test('a frozen step with no name, a step record with no task, and a folder run w
 
   const { repo: _r, baseRef: _b, branch: _br, isolate: _i, ...folder } = aRecord('r-place');
   put('r-place', { ...folder, place: { kind: 'shelf' } });
-  // Read against the folder run it says it is, not the git run it is not.
-  assert.ok(refusalOf('r-place').includes('its `place.kind` is "shelf", where wf writes "folder"'));
+  assert.ok(
+    refusalOf('r-place').includes('its `place.kind` is "shelf", where wf writes "folder"'),
+    'read against the folder run it says it is, not the git run it is not',
+  );
 });
 
 test('a record that is not JSON, or holds no object, is refused saying so', () => {
@@ -141,7 +143,6 @@ test('a key the tick does not name survives a read and a rewrite, and so does a 
 });
 
 test("the oldest shapes on the owner's store read: no frozen workflow, `disallow:` on a frozen step, an earlier try, a landing and a slot", () => {
-  // Before the run froze its workflow; with a step on a try it was retried from, a check, a hand-off, and the ship's landing.
   const { workflow: _, ...unfrozen } = aRecord('r-old');
   put('r-old', {
     ...unfrozen,
@@ -161,19 +162,22 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
     },
   });
   const old = readRun('r-old');
-  assert.equal(old.workflow, undefined);
+  assert.equal(
+    old.workflow,
+    undefined,
+    "a record with no frozen workflow reads, with a retried try, a check, a hand-off and the ship's landing",
+  );
   assert.equal(old.steps.implement.tries![0].then, 'retries');
 
-  // A step frozen before `disallow:` was renamed reads under the name it has now, and is written back under both.
   const renamed = aRecord('r-renamed');
   (renamed.workflow as Array<Record<string, unknown>>)[0].disallow = ['SendMessage'];
   put('r-renamed', renamed);
   const run: Run = readRun('r-renamed');
-  assert.deepEqual(run.workflow![0].disallowedTools, ['SendMessage']);
+  assert.deepEqual(run.workflow![0].disallowedTools, ['SendMessage'], 'a step frozen with `disallow:` reads under the name it has now');
   rewriteRun(run);
   const written = JSON.parse(fs.readFileSync(runFile('r-renamed'), 'utf8')) as { workflow: Array<Record<string, unknown>> };
   assert.deepEqual(written.workflow[0].disallowedTools, ['SendMessage']);
-  assert.deepEqual(written.workflow[0].disallow, ['SendMessage']);
+  assert.deepEqual(written.workflow[0].disallow, ['SendMessage'], 'and is written back under both names');
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

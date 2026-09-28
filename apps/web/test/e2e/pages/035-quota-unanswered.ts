@@ -8,10 +8,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // The quota when Claude Code, signed in to a subscription, answers get_usage with rate_limits null — Anthropic's usage service gave it
-  // nothing (the answer 2.1.278 gave the owner on 2026-09-19). The header says so in its own words, not as a shape it does not read, and
-  // under the sentence the last good reading — the one the quota page left, read on its last reload — both windows dimmed and dated. The
-  // e2e's api asks on every read (HKB_QUOTA_KEEP_MS and HKB_QUOTA_BACKOFF_MS 0), so the api's waits are its own tests'; the answer is put back.
+  /**
+   * The quota when Claude Code, signed in to a subscription, answers get_usage with rate_limits null: Anthropic's usage service gave it
+   * nothing. The header says so in its own words, not as a shape it does not read, and under the sentence the last good reading — the one
+   * the quota page left, read on its last reload — both windows dimmed and dated; the header, a line taller with it, leaves every card
+   * clear of the one beneath it. The e2e's api asks on every read (HKB_QUOTA_KEEP_MS and HKB_QUOTA_BACKOFF_MS 0), so the api's waits are
+   * its own tests'; the answer is put back.
+   */
   name: 'quota-unanswered',
   route: '/',
   expect: async (page) => {
@@ -59,7 +62,6 @@ export default {
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `factory-quota-unanswered-${await themeOf(page)}.png`), fullPage: true });
 
-      // The header, a line taller with the last reading, leaves every card clear of the one beneath it.
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       await expectClearOfEachOther(page);

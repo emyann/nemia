@@ -1,11 +1,13 @@
 /**
- * `workflows/dev-planned/`, the workflow for a brief that warrants a plan before the work, held to its shape at shipped defaults — so an edit
- * that gives the plan a tool that writes, drops the question it may ask, or unhooks implement from the plan fails the suite rather than a run.
+ * `workflows/dev-planned/`, the workflow for a brief that warrants a plan before the work, held to its shape at shipped defaults — so an
+ * edit that gives the plan a tool that writes, drops the question it may ask, or unhooks implement from the plan fails the suite rather
+ * than a run.
  *
  *   plan → implement ⇄ review
  *
- * Plan mode and AskUserQuestion are withheld from a session nobody sits beside (plan §4 Q), so planning is a step on tools that cannot
- * write, whose closeout is the plan, and asking is that step's `blocked` with the question in `needs`, answered by `wf retry --message`.
+ * Plan mode and AskUserQuestion are withheld from a session nobody sits beside, since nobody is there to answer them, so planning is a
+ * step on tools that cannot write, whose closeout is the plan, and asking is that step's `blocked` with the question in `needs`, answered
+ * by `wf retry --message`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,9 +62,12 @@ test("dev-planned loads, at shipped defaults, as plan → implement ⇄ review �
     terminalSteps(planned).map((s) => s.name),
     ['ship'],
   );
-  // A chain: implement works where the plan looked, and review where implement worked.
-  assert.deepEqual(workspacePlan(planned, steps.implement), { kind: 'inherit', from: 'plan' });
-  assert.deepEqual(workspacePlan(planned, steps.review), { kind: 'inherit', from: 'implement' });
+  assert.deepEqual(
+    workspacePlan(planned, steps.implement),
+    { kind: 'inherit', from: 'plan' },
+    'a chain: implement works where the plan looked',
+  );
+  assert.deepEqual(workspacePlan(planned, steps.review), { kind: 'inherit', from: 'implement' }, 'and review where implement worked');
   assert.deepEqual(
     [steps.plan.check, steps.plan.retries, steps.plan.resume],
     [undefined, undefined, undefined],
@@ -90,10 +95,17 @@ test('REFUSED by machinery: plan has no tool that writes — read-only tools and
     "review's fence, word for word",
   );
 
-  // The guard refuses: a plan given a tool that writes, every tool, or a mode that does not deny.
-  assert.deepEqual(writesBy({ ...steps.plan, tools: [...tools!, 'Edit'] }), ['Edit writes']);
-  assert.deepEqual(writesBy({ ...steps.plan, tools: undefined }), ['no tools: line, so every tool']);
-  assert.deepEqual(writesBy({ ...steps.plan, permissionMode: 'acceptEdits' }), ['permissionMode: acceptEdits, not dontAsk']);
+  assert.deepEqual(
+    writesBy({ ...steps.plan, tools: [...tools!, 'Edit'] }),
+    ['Edit writes'],
+    'the guard refuses a plan given a tool that writes',
+  );
+  assert.deepEqual(writesBy({ ...steps.plan, tools: undefined }), ['no tools: line, so every tool'], 'or every tool');
+  assert.deepEqual(
+    writesBy({ ...steps.plan, permissionMode: 'acceptEdits' }),
+    ['permissionMode: acceptEdits, not dontAsk'],
+    'or a mode that does not deny',
+  );
   assert.deepEqual(writesBy(steps.implement), ['no tools: line, so every tool'], 'implement writes, and is not a plan');
 });
 
@@ -139,7 +151,6 @@ test("plan's closeout is the plan, strict — approach, files with a line each, 
 });
 
 test("plan's brief says when to sign off done and when blocked with the question in needs, and that the answer comes back as `## Your answer`", () => {
-  // Told by the planner's skill `ask-when-it-reads-two-ways`, given whole after its instructions (since agents card 1b).
   const body = said(toldIn(PLANNED, steps.plan));
   for (const sentence of [
     'When what was asked for reads one way, sign off `done` with the plan.',
@@ -148,7 +159,10 @@ test("plan's brief says when to sign off done and when blocked with the question
     "A person answers with `wf retry`, and the answer comes back to you in the try's brief, under `## Try <n>`, as `## Your answer`.",
     'You work read-only: write nothing into the workspace.',
   ])
-    assert.ok(body.includes(sentence), `${sentence}\n\n${body}`);
+    assert.ok(
+      body.includes(sentence),
+      `${sentence}\n\nis told by the planner's skill ask-when-it-reads-two-ways, given whole after its instructions:\n\n${body}`,
+    );
 });
 
 test("implement is dev's, after the plan and reading it: the plan reaches it under `## From plan`, as data, and never plan's summary — review is dev's, file for file", () => {
@@ -212,9 +226,9 @@ test("dev-planned-build is dev-planned with dev-build's check on implement: the 
   const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));
   for (const name of ['plan', 'review'])
     assert.deepEqual({ ...byName[name], body: '' }, { ...plannedByName[name], body: '' }, `${name} is dev-planned's, key for key`);
-  // And its ending is dev-build's, file for file: the same step, with the build and the e2e in the check it runs itself.
   assert.equal(
     fs.readFileSync(path.join(built, 'ship.md'), 'utf8'),
     fs.readFileSync(path.join(REPO, 'workflows', 'dev-build', 'ship.md'), 'utf8'),
+    "its ending is dev-build's, file for file: the same step, with the build and the e2e in the check it runs itself",
   );
 });

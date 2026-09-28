@@ -61,13 +61,16 @@ test('a skill the form gives is shown where an agent of yours finds it now, else
   );
   assert.equal(rows[1].error, 'as read');
   assert.match(rows[2].error!, /^Neither your library nor this repository has `ship-it`/);
-  // The list read again after a copy: the agent as read said it was missing, and the list now has it in your library.
   const copied = givenRows(
     ['gone'],
     [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
     places([row({ name: 'gone' })]),
   );
-  assert.deepEqual([copied[0].from, copied[0].error], ['yours', null], 'what the list says now wins over what the agent was read with');
+  assert.deepEqual(
+    [copied[0].from, copied[0].error],
+    ['yours', null],
+    'the list read again after a copy has the skill in your library: what it says now wins over the agent that was read missing it',
+  );
   assert.deepEqual(
     givenRows(['typed'], [], undefined).map((r) => [r.from, r.error]),
     [[null, null]],

@@ -17,7 +17,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fold } from '../src/domain.ts';
+import { fold } from '../src/core/domain.ts';
 import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest } from '../src/facade.ts';
 
 /**

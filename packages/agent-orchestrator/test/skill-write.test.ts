@@ -2,7 +2,7 @@
  * A skill written (`writeSkill`, `renderSkill`, `withPreload`): what the board's skill page does, a person writing a skill of their own in the
  * store's library. What is written is read back as the card reader reads it and as YAML does, each refusal is made to refuse at shipped
  * defaults — asserted on its message, its kind, and with the library as it was — and a write of a skill is proven to move the version of every
- * agent that gives it.
+ * agent that gives it. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,6 @@ import { agentVersion, preloads, skillVersion } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { writeSkill, SkillWriteError } = await import('../src/runner.ts');
 
@@ -181,10 +180,10 @@ test('withPreload changes that one line, and nothing else of the file', () => {
     () => withPreload('SKILL.md', 'no frontmatter', true),
     (err: Error) => /has no frontmatter, and `preload:` is a line of it/.test(err.message),
   );
-  // A `preload:` the reader finds inside another key's lines is not one a line of its own could change.
   assert.throws(
     () => withPreload('SKILL.md', '---\ndescription: d\nmetadata:\n  preload: true\n---\n', false),
     (err: Error) => /could not be written so it reads false/.test(err.message),
+    "a preload: the reader finds inside another key's lines is not one a line of its own could change",
   );
 });
 
@@ -238,7 +237,7 @@ test('a place that is not a skills folder beside the workflows is refused, and a
   assert.deepEqual(fs.readdirSync(outside), []);
 });
 
-test('a change is written at the version it was read at, and refused once the skill has moved or gone', () => {
+test('a change is written at the version it was read at, and refused once the skill has moved (a file added beside SKILL.md moves it too) or gone', () => {
   fresh();
   const { version } = writeSkill(LIBRARY, DRAFT, { version: null });
   const changed = writeSkill(LIBRARY, { ...DRAFT, body: 'New body.' }, { version });
@@ -249,7 +248,6 @@ test('a change is written at the version it was read at, and refused once the sk
     'stale',
     /changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)\. Read it again/,
   );
-  // A file added beside SKILL.md moves it too: the version counts the whole folder, as an agent's does.
   fs.writeFileSync(path.join(LIBRARY, 'tidy-notes', 'reference.md'), 'more');
   refuses(
     () => writeSkill(LIBRARY, { name: 'tidy-notes', preload: true }, { version: changed.version }),

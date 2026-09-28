@@ -8,6 +8,14 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
+  /**
+   * The Workflows page: a card per workflow, the checkout's and yours, each with its graph, and a folder the loader refuses with its
+   * refusal. The start form enables Start once there is a brief, and offers to wait on every run on its repository, each by where it
+   * stands: a run waiting on a run called off has filed nothing, and never will without you, so it is not finished. Start is not pressed
+   * here, as a run started would be on every page visited after this one; in a page of its own, whose one refusal is the point, a start
+   * that waits on a run called off is refused in `afterRefusal`'s words beside the form, and nothing is written. Each step's page opens
+   * from a link under the graph, in the order a run runs them, and from its block on the graph.
+   */
   name: 'workflows',
   route: '/workflows',
   expect: async (page) => {
@@ -45,7 +53,6 @@ export default {
       `review's node counts its ${tools} tools and names them on hover (${good.tools})`,
     );
     await expectVisible(node('review').getByText(good.loop, { exact: true }), `review's node shows its loop and its rounds (${good.loop})`);
-    // The effort each runs at, and its tools: what it sets, or its harness's own.
     await expectVisible(
       node('review').locator('dd', { hasText: new RegExp(`^${good.effort}$`) }),
       `review's node says the effort it runs at (${good.effort})`,
@@ -64,8 +71,11 @@ export default {
       2,
       "implement sets neither effort nor tools: its node says both are its harness's own",
     );
-    // Chips only: since B5 an edge's path carries `data-state` too, so the count is taken inside the nodes.
-    await expectCount(graph.locator('.react-flow__node [data-state]'), 0, 'a step no run has started has no status chip');
+    await expectCount(
+      graph.locator('.react-flow__node [data-state]'),
+      0,
+      "a step no run has started has no status chip, counted inside the nodes: an edge's path carries data-state too",
+    );
     await expectCount(graph.getByText(/no attempt yet|^#\d/), 0, 'nor an attempt');
     await expectCount(graph.locator('.react-flow__edge'), 2, "the graph's two edges: implement → review, and the edge back");
     await expectVisible(
@@ -75,8 +85,6 @@ export default {
     await settled(page);
     await expectInside(graph.locator('.react-flow__node'), graph, "every step is inside its card's graph");
 
-    // Start is not pressed: a run started here would be on every page visited after this one, and a refusal is an answer
-    // of 422, which the visit counts against the page. The api's tests start a run of a workflow, and refuse one.
     const brief = dev.getByRole('textbox', { name: 'Start a run' });
     const start = dev.getByRole('button', { name: 'Start' });
     await expectVisible(brief, `${good.name} has a box for the brief`);
@@ -85,7 +93,6 @@ export default {
     await brief.fill('Give the board a legend');
     if (!(await start.isEnabled())) throw new Refused('Start is enabled once a brief is written — it stayed disabled');
 
-    // After: every run on the repository a start runs in, and none on another.
     const offered = dev.locator('ul[aria-label="Runs to wait on"] li');
     await expectCount(offered, DIAMOND_RUNS.length, `the start form offers the ${DIAMOND_RUNS.length} runs on this repository to wait on`);
     for (const run of DIAMOND_RUNS)
@@ -94,7 +101,6 @@ export default {
         `${run.id} is offered, by its title`,
       );
     await expectCount(dev.locator(`[data-run="${FAKE.id}"]`), 0, `${FAKE.id}, on another repository, is not offered`);
-    // Each by where it stands: a run waiting on a run called off has filed nothing, and never will without you — not finished.
     for (const [run, standing] of [
       [DIAMOND.orphan, 'waiting on you'],
       [DIAMOND.cancelled, 'cancelled'],
@@ -108,8 +114,6 @@ export default {
       );
     }
 
-    // A start that waits on a run the package will not wait on — one called off — through the board: refused in `afterRefusal`'s words,
-    // beside the form, and nothing written. In a page of its own, whose one refusal is the point.
     const runsDir = path.join(store!, 'runs');
     const before = fs.readdirSync(runsDir).sort();
     const refused = await page.context().newPage();
@@ -145,14 +149,15 @@ export default {
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `start-refused-${await themeOf(refused)}.png`), fullPage: true });
       await idle(refused);
-      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 422: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
         (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal as the browser reports it (its answer, and the line Chromium writes to the console for one) and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     } finally {
       await refused.close();
     }
@@ -166,7 +171,6 @@ export default {
     await expectVisible(mine.getByText('yours', { exact: true }), `${yours.name}, under workflows/ in the store, is marked as yours`);
     await expectCount(mine.locator('.react-flow__node'), yours.steps.length, `${yours.name}'s graph has its one step`);
 
-    // Each step's page, from a link under the graph — in the order a run runs them — and from its block on the graph.
     const links = (card: Locator, name: string) => card.getByRole('navigation', { name: `Steps of ${name}` }).getByRole('link');
     await expectTexts(links(dev, good.name), good.steps, `under ${good.name}'s graph, a link to each step's page, in the order they run`);
     await expectTexts(links(mine, yours.name), yours.steps, `and under ${yours.name}'s`);

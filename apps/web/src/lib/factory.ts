@@ -23,18 +23,18 @@ import { layers, type Point } from './layout.ts';
  *
  * So is a run a person holds until runs ship (`wf hold`), and on the same terms. `assess` calls a held run running whatever its steps say, and
  * the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it (`holding.onYou`):
- * then it waits on them (`waitsOnYou`). `holding` is read tolerantly, for an api older than the hold.
+ * then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
 
-/** What `inFlight` and `waitsOnYou` read beside their own fields, each missing from an api older than it. */
+/** What `inFlight` and `waitsOnYou` read beside their own fields, each read as absent where a listing lacks it. */
 type Held = { waiting?: RunSummary['waiting']; holding?: RunSummary['holding']; cancelledAt?: string | null };
 
 /**
  * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
- * while there is nothing — and for a list from an api started before it carried one, read tolerantly as `onYouOf` is, since the Factory
- * polls the list and a refusal would take the whole floor down for a word.
+ * while there is nothing — and for a listing without `toDecide`, read tolerantly as `onYouOf` is, since the Factory polls the list and a
+ * refusal would take the whole floor down for a word.
  */
 export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide | null => run.toDecide ?? null;
 
@@ -49,8 +49,8 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'>
 
 /**
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
- * a list from an api started before it carried `onYou`, the steps by name, as the board said them then. The list is read tolerantly, not
- * refused as a run's detail is (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
+ * a listing without `onYou`, the steps by name (`waitingOnYou`). The list is read tolerantly, not refused as a run's detail is
+ * (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
  *
  * Without the ending step whose gate the to-decide line already says, as `wf ls` prints it (cli.ts): that line is above, it names the step
  * and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what is
@@ -125,12 +125,12 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  *
  * A run to decide stays on the floor whatever "Show finished" says, and until it is decided. Nothing of it moves, so `inFlight` has it
  * finished and the switch would hide it: a run that finished with its ending waiting for a word, or its branch waiting for a merge, would
- * step off the board the moment it wanted a person most — which is the pain §8 was registered as. Level-triggered, as the api reads it:
+ * step off the board the moment it wanted a person most. Level-triggered, as the api reads it:
  * the card goes when the approval or the merge is given, with nothing told to the board.
  *
  * So does a run that waits on a person anywhere else: a step at its gate in the middle of the run, or one that signed off blocked and
  * asks something. The api reads such a run `failed` — a step stops its followers and nothing runs — with nothing to decide about its
- * result, so neither `inFlight` nor `toDecideOf` keeps it, and it vanished the moment its plan reached its gate. It stays until the
+ * result, so neither `inFlight` nor `toDecideOf` keeps it, and it would vanish the moment its plan reached its gate. It stays until the
  * approval or the answer is given; a cancelled run waits on nobody, and is not kept by this. The header's `waiting on you` counts the
  * same runs (`waitsOnYou`), so each one it counts has its card on the floor.
  *
@@ -158,7 +158,7 @@ export type RunEdge = { id: string; source: string; target: string; state: Extra
  *
  * And one from each run a card is held until (`heldUntil`, `wf hold`) that is on the floor too, drawn as an `after` edge is: the hold is a
  * wait on a run's shipping, set after the start rather than at it. None where an `after` edge already joins the two, which says the same.
- * `heldUntil` is read tolerantly, for an api older than the hold.
+ * A listing without `heldUntil` draws no edge of a hold.
  */
 export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>): RunEdge[] {
   const floor = new Set(runs.map((run) => run.id));
@@ -210,7 +210,7 @@ export const inFlightFirst = <T extends Pick<RunSummary, 'id' | 'createdAt' | 's
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
 export const CELL_WIDTH = 384;
 /**
- * A cell holds a card at rest and the gap under it, as its width holds a card and the gap beside it. A card's steps no longer make it
+ * A cell holds a card at rest and the gap under it, as its width holds a card and the gap beside it. A card's steps do not make it
  * taller: they are its rail (`StepRail`), a pill a step, never more than `RAIL_LANES` lanes whatever the run, and an open card takes as
  * many cells down as its tiles need (`openSpan`). What makes a card at rest tall is what it asks of a person — a line per ask and per step
  * blocked (`needsOf`, two lines each), a gate's line and its buttons. Of the cards the e2e seeds, the tallest is the gate's in
@@ -291,11 +291,15 @@ export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<stri
  *    Closed cards joined by `after` — each run's parents on the floor — are placed together, the first time
  *    one of them comes up: layered as a run's steps are (`layers`), each a column right of every card it
  *    waits on and level with the middle of them, so a diamond reads as one; and the whole at the first free
- *    place right of every card already down that one of them waits on, and left of every one that waits on it.
+ *    place right of every card already down that one of them waits on, and left of every one that waits on it
+ *    — or, where no column keeps both, right of what it waits on. Cards whose `after` go round in a cycle,
+ *    which only a record edited by hand could have, are each placed on their own.
  *    When some of a group are down and others are not, the group is laid out again together if an open card moved
- *    one of them aside, and the others go in among the cards down if they are coming onto the floor — each
- *    only where every edge still points right, the other way if that one cannot, and the cards down kept
- *    where they are if neither can.
+ *    one of them aside — moved a card at a time, it would be layered over the cards that moved alone — and the
+ *    others go in among the cards down, which a person is looking at, if they are coming onto the floor. Each
+ *    only where every edge still points right — a group that waits on an open run and that the open run waits
+ *    on too has no such column when the two are also joined directly — the other way if that one cannot, and
+ *    the cards down kept where they are, the others given way, if neither can.
  *
  * A card is in the cell nearest its corner — both rows, for one the layering puts halfway down a row — and
  * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
@@ -313,11 +317,9 @@ export function placeRuns(
   const floor = new Set(ids);
   const order = [...[...spans.keys()].filter((id) => floor.has(id)), ...ids.filter((id) => !spans.has(id))];
   const spanOfId = (id: string) => spans.get(id) ?? ONE_CELL;
-  // The edges between cards on the floor, each way.
   const parents = new Map(ids.map((id) => [id, [...new Set(after.get(id) ?? [])].filter((p) => floor.has(p) && p !== id)]));
   const children = new Map(ids.map((id) => [id, ids.filter((child) => parents.get(child)!.includes(id))]));
   const at = new Map<string, Point>();
-  // Every cell a placed card is in; and the cells of the runs unfolding, which a card on the floor yields to.
   const taken = new Set<string>();
   const unfolded = new Set<string>();
   const mark = (id: string, point: Point) => {
@@ -330,7 +332,6 @@ export function placeRuns(
     at.set(id, point);
     mark(id, point);
   };
-  /** Cards given up, to be placed again: the cells are worked out afresh, since cards may share one. */
   const unput = (gone: readonly string[]) => {
     for (const id of gone) at.delete(id);
     taken.clear();
@@ -340,8 +341,6 @@ export function placeRuns(
   const free = (point: Point, span: Span, of: ReadonlySet<string>) => cellsOf(point, span).every((cell) => !of.has(cell));
   const columnOf = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
 
-  // An open run coming back onto the floor opens as it comes: back in its own cell, when no card on the floor is in it, it claims first,
-  // and the cards that started beside it while it was away move aside for it (1) — as if it had come back closed and been opened there.
   const standing = new Set(order.flatMap((id) => (onFloor.has(id) ? cellsOf(onFloor.get(id)!, spanOfId(id)) : [])));
   for (const id of order) {
     const left = saved?.get(id);
@@ -356,10 +355,6 @@ export function placeRuns(
     const left = saved?.get(id);
     if (!at.has(id) && left && free(left, spanOfId(id), taken)) put(id, left);
   }
-  /**
-   * The closed cards `after` joins to `id`, placed or not, oldest first. `id` alone when it is open, and when what joins it goes round in
-   * a cycle, which a record edited by hand could have: each of those cards is then placed on its own turn.
-   */
   const groupOf = (id: string): string[] => {
     if (spans.has(id)) return [id];
     const found = new Set([id]);
@@ -374,21 +369,12 @@ export function placeRuns(
     }
     return group;
   };
-  /**
-   * Where each of `members` goes, in cells from the corner of the room they take: their layering's columns, each centred on the
-   * tallest — so a column a card short of it sits half a row down. Asked only of cards `groupOf` found in no cycle.
-   */
   const shapeOf = (members: readonly string[]): Map<string, Point> => {
     const columns = layers(members.map((name) => ({ name, after: parents.get(name)!.filter((p) => members.includes(p)) })));
     const cells = columns.flatMap((column, c) => column.map((name, i) => [name, { x: c, y: i - (column.length - 1) / 2 }] as const));
     const top = Math.min(...cells.map(([, p]) => p.y));
     return new Map(cells.map(([name, p]) => [name, { x: p.x, y: p.y - top }]));
   };
-  /**
-   * `members` put down in their shape at the first free place, row by row, where each is right of every card already down that it waits
-   * on and left of every one that waits on it. When no column keeps both, `strict` puts nothing and says so; otherwise the second gives
-   * way, and the first holds.
-   */
   const placeTogether = (members: readonly string[], strict: boolean): boolean => {
     const shape = shapeOf(members);
     const cell = (name: string) => shape.get(name)!;
@@ -412,8 +398,6 @@ export function placeRuns(
     );
     if (cap < first && strict) return false;
     const width = Math.max(...members.map((m) => cell(m).x + spanOfId(m).columns));
-    // The last column an anchor can take and keep the whole in the row, or the first for one wider than the grid — and no further right
-    // than the cards that wait on them allow, when they allow a column at all.
     const last = Math.min(Math.max(first, GRID_COLUMNS - Math.min(width, GRID_COLUMNS)), cap < first ? Infinity : cap);
     for (let row = 0; ; row++) {
       for (let column = first; column <= last; column++) {
@@ -435,9 +419,7 @@ export function placeRuns(
       placeTogether(group, false);
       continue;
     }
-    /** The cards not yet placed, in among the cards down, which stay where they are. */
     const amongDown = () => placeTogether(loose, true);
-    /** The whole group laid out again — or, where a card outside it leaves no column for that, the cards down put back. */
     const again = () => {
       const were = down.map((m) => [m, at.get(m)!] as const);
       unput(down);
@@ -445,11 +427,6 @@ export function placeRuns(
       for (const [m, point] of were) put(m, point);
       return false;
     };
-    // A card of the group that was on the floor and has lost its place — a card opened over it — takes the rest of its group with it,
-    // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone. Cards coming onto the
-    // floor go in among the ones down first, which a person is looking at. Either only where every edge still points right: laid out
-    // again, a group that waits on an open run and that the open run waits on too has no column when the two are also joined directly
-    // (a triangle, a chain with a skip). And if neither can, the cards down stay, and only the cards not yet placed give way.
     const movedAside = loose.some((m) => onFloor.has(m));
     if (!(movedAside ? again() || amongDown() : amongDown() || again())) placeTogether(loose, false);
   }
@@ -460,9 +437,8 @@ export function placeRuns(
  * The cells a card at `point` is in, as `row:column`: `span` across, from the column nearest its corner, and down every row it reaches.
  *
  * A card between two rows is in both of them, since a card is drawn up to a cell tall (`CELL_HEIGHT`): the layering puts a card halfway
- * down a row, level with the middle of the two beside it, and a person drags a card wherever they like. Rounding to the nearest row
- * instead left the row a card hangs a little way into free, and the card placed there was drawn over its foot — the e2e's floor had a
- * card 45 short of its row over the bottom of a card 27 short of a cell, and the two overlapped by the difference.
+ * down a row, level with the middle of the two beside it, and a person drags a card wherever they like. Rounded to the nearest row, the
+ * row a card hangs a little way into would be free, and a card placed there would be drawn over its foot.
  *
  * Across it still rounds: cards are narrower than their cell by the gap between them, so two columns' cards never touch.
  */
@@ -477,14 +453,14 @@ function cellsOf({ x, y }: Point, span: Span): string[] {
   return cells;
 }
 
-/** How wide a cell was before a card carried its rail: an arrangement saved then puts its cards this far apart. */
+/** How wide a cell is in an arrangement saved on a narrow grid, which puts its cards this far apart (`widenLayout`). */
 export const NARROW_CELL_WIDTH = 320;
 
 /**
- * An arrangement saved while a cell was `NARROW_CELL_WIDTH` wide, on today's grid: each card as many cells across as it was then, and
- * as far into its cell, so a card on the third column is on the third column still. Read unchanged, the cards kept their old places
- * `NARROW_CELL_WIDTH` apart, each on a cell of its own by `placeRuns`' rounding, and every card covered the right of the one beside it.
- * Down is unchanged: a cell is as tall as it was.
+ * An arrangement saved with cells `NARROW_CELL_WIDTH` wide, on the grid of cells `CELL_WIDTH` wide: each card as many cells across as it
+ * was, and as far into its cell, so a card on the third column is on the third column still. Read unchanged, the cards would stand
+ * `NARROW_CELL_WIDTH` apart, each on a cell of its own by `placeRuns`' rounding, and every card would cover the right of the one beside it.
+ * Down is unchanged: a cell is as tall in both.
  */
 export function widenLayout(saved: ReadonlyMap<string, Point> | null): Map<string, Point> | null {
   if (!saved) return null;

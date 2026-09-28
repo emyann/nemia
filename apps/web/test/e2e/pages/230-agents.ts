@@ -8,13 +8,16 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it, linked.
-  // Each says what its agent can do, its card generated from its skills in A2A's words: an entry for each skill it gives, read off its
-  // SKILL.md, or one from its description when it gives none. The repository's `implementer` read, and the node that names it followed to
-  // its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and its card shown read-only,
-  // one entry, for it gives no skills; an agent made with a skill picked from your library, its card that skill's entry, edited and removed, each on
-  // disk as the package writes it, and no card file anywhere. And, in a page of its own, a removal refused
-  // because a node still names the agent. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
+  /**
+   * The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it,
+   * linked. Each says what its agent can do, its card generated from its skills in A2A's words: an entry for each skill it gives, read off
+   * its SKILL.md, or one from its description when it gives none. The repository's `implementer` read, and the node that names it followed
+   * to its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and its card shown
+   * read-only, one entry, for it gives no skills; an agent made with a skill picked from your library, its card that skill's entry, edited
+   * and removed, each on disk as the package writes it, and no card file anywhere. And, in a page of its own, a removal refused because a
+   * node still names the agent; the workflow that names it is removed before that page closes, so the list, focused again, reads the store
+   * as seeded. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
+   */
   name: 'agents',
   route: '/agents',
   expect: async (page) => {
@@ -40,11 +43,10 @@ export default {
     await expectTexts(scribe.locator('[data-used-by]'), ['No node names it yet.'], `and that no node names ${seeded.name}`);
     const says = (where: ReturnType<typeof card>, skill: { id: string; name: string; description: string; tags: readonly string[] }) =>
       where.locator(`[data-agent-skill="${skill.id}"]`);
-    // Given no skills, it says one thing, made from itself: its name, its description, and its name again as the tag.
     await expectTexts(
       scribe.locator('[data-agent-skill]'),
       [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`],
-      `${seeded.name} says what it can do, one entry made from its description`,
+      `${seeded.name}, given no skills, says what it can do in one entry made from itself: its name, its description, and its name again as the tag`,
     );
     await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
     const implementer = card(page, 'repo', good.agent.name);
@@ -60,7 +62,6 @@ export default {
     if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`)
       throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
 
-    // The repository's agent, read-only: every field read and none written, no Save, and how to start one of yours from it.
     await implementer.getByRole('link', { name: good.agent.name, exact: true }).click();
     await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
     const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
@@ -92,7 +93,6 @@ export default {
     await settled(page);
     await page.screenshot({ path: path.join(OUT, `agents-repo-${await themeOf(page)}.png`), fullPage: true });
 
-    // Its node, followed: the step's page names the agent attached to it, linked back.
     await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
     await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
     const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
@@ -104,18 +104,16 @@ export default {
     await back.click();
     await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
 
-    // Yours: scribe's form, its result schema read from the file its output: names.
     await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const scribeForm = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(scribeForm, `${seeded.name}'s form`);
     if ((await scribeForm.getByRole('textbox', { name: 'Schema file' }).inputValue()) !== seeded.keys.output)
-      throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}`);
+      throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}, read from the file its output: names`);
     if ((await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue()) !== `${seeded.schema}\n`)
       throw new Refused(
         `and its fields are the schema's text — it shows ${JSON.stringify(await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue())}`,
       );
-    // Its card, read-only where a card file was once edited: what the package generates, and no field that writes it.
     await expectTexts(
       scribeForm.locator('[data-card] [data-agent-skill]'),
       [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`],
@@ -134,7 +132,6 @@ export default {
     await expectVisible(scribeForm.getByRole('button', { name: 'Save' }), 'yours offers Save');
     if (!(await scribeForm.getByRole('button', { name: 'Save' }).isDisabled())) throw new Refused('Save waits for a change');
 
-    // Made: the form, filled, creates agents/<name>.md as the package writes it, and opens its page.
     const madeFile = path.join(agentsDir, `${made.name}.md`);
     try {
       await page.goto(new URL('/agents', page.url()).href, { waitUntil: 'load' });
@@ -146,7 +143,6 @@ export default {
       await form.getByRole('textbox', { name: 'Description' }).fill(made.description);
       await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill(made.tools);
-      // Its skill picked from the list, in your library, where it is seeded: nothing to type.
       await form.getByRole('button', { name: 'Add a skill' }).click();
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await sheet
@@ -190,16 +186,14 @@ export default {
             .map(([n]) => n)
             .join(', ')}`,
         );
-      // Its card is the skill it gives, read off that skill's SKILL.md: the title its name, and its description and tags.
       const entry = page.locator(`[data-card] [data-agent-skill="${made.skill.id}"]`);
       await expectVisible(
         entry.getByText(made.skill.name, { exact: true }),
-        `and the page of ${made.name} says what it can do: ${made.skill.name}, the title of the skill it gives`,
+        `and the page of ${made.name} says what it can do: ${made.skill.name}, the title of the skill it gives, read off its SKILL.md`,
       );
       await expectVisible(entry.getByText(made.skill.description, { exact: true }), 'with what that skill is for');
       for (const tag of made.skill.tags) await expectVisible(entry.getByText(tag, { exact: true }), `and its tag ${tag}`);
 
-      // Edited: its model changed and saved, against the version it was read at.
       const madeForm = page.locator(`form[data-agent-form="${made.name}"]`);
       await expectVisible(madeForm, `the page of ${made.name}, made`);
       await madeForm.getByRole('textbox', { name: 'Model' }).fill(made.edited);
@@ -220,7 +214,6 @@ export default {
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `agents-edit-${await themeOf(page)}.png`), fullPage: true });
 
-      // Removed: asked twice, then gone from disk and from the list.
       await page.getByRole('button', { name: 'Remove…' }).click();
       await expectTexts(
         page.locator('[data-remove-asks] code'),
@@ -242,8 +235,6 @@ export default {
       fs.rmSync(madeFile, { force: true });
     }
 
-    // Refused, in a page of its own whose one refusal is the point: scribe removed while a node of yours names it. The package's sentence,
-    // word for word, with the node linked, and nothing removed.
     const namingDir = path.join(store!, 'workflows', naming);
     fs.mkdirSync(namingDir, { recursive: true });
     fs.writeFileSync(path.join(namingDir, 'write.md'), `---\nagent: ${seeded.name}\n---\nWrite the notes.\n`);
@@ -292,7 +283,6 @@ export default {
       if (!seen.includes(expected) || others.length)
         throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
     } finally {
-      // Removed before the page closes: the list, focused again, reads the store once more, and must read it as seeded.
       fs.rmSync(namingDir, { recursive: true, force: true });
       await refused.close();
     }

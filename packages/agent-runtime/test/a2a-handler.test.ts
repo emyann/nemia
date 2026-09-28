@@ -1,5 +1,5 @@
 /**
- * A harness as an A2A agent (`src/a2a-handler.ts`), called directly with a `ServerCallContext`, over a driver a test
+ * A harness as an A2A agent (`src/a2a/handler.ts`), called directly with a `ServerCallContext`, over a driver a test
  * moves by hand and a journal in memory.
  *
  * Every refusal is made to refuse here, at shipped defaults, and asked of a harness that must then have been asked for
@@ -18,10 +18,10 @@ import {
   TaskNotFoundError,
   UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
-import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
-import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
-import type { Event, Sighting } from '../src/domain.ts';
-import { RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
+import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a/handler.ts';
+import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a/map.ts';
+import type { Event, Sighting } from '../src/core/domain.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/harness/seam.ts';
 
 const ctx = new ServerCallContext();
 

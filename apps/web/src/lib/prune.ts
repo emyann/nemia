@@ -30,8 +30,8 @@ export type Awaiting = NonNullable<Decidable['awaiting']>;
 
 /**
  * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run shipped or called off
- * (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. `awaiting` is read tolerantly, for an
- * api older than it.
+ * (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. A decision without `awaiting` is
+ * read as null.
  */
 export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
 

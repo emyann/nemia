@@ -23,8 +23,7 @@ test("each page lights one place in the menu — a run and its steps lighting Ru
   assert.deepEqual(lit('/agents/yours/scribe'), ['Agents']);
   assert.deepEqual(lit('/agents/new'), ['Agents']);
   assert.deepEqual(lit('/nowhere'), []);
-  // Refused: a path that only begins with a place's name is not under it.
-  assert.deepEqual(lit('/inboxes'), []);
-  assert.deepEqual(lit('/workflowsx/repo'), []);
-  assert.deepEqual(lit('/agentsx'), []);
+  assert.deepEqual(lit('/inboxes'), [], "refused: a path that only begins with a place's name is not under it");
+  assert.deepEqual(lit('/workflowsx/repo'), [], "refused: a path that only begins with a place's name is not under it");
+  assert.deepEqual(lit('/agentsx'), [], "refused: a path that only begins with a place's name is not under it");
 });

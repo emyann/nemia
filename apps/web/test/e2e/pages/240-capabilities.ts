@@ -4,6 +4,11 @@ import { CHECKOUT, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
+  /**
+   * The Capabilities page: the checkout's skills, agents, MCP servers, deny rules and ask rules, each with where it was read from, and
+   * what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the harness's own set, and yours, on
+   * Codex, which claims nothing it was not measured to have.
+   */
   name: 'capabilities',
   route: '/capabilities',
   expect: async (page) => {
@@ -71,12 +76,14 @@ export default {
       rules.getByText(`refuses ${server.name} · wipe`),
       `the denied list says which listed tool ${server.denied} refuses`,
     );
-    // The settings' ask rules, listed for the repository as its deny rules are — whether or not a step reads them.
     const asks = section('Asks');
-    for (const rule of asked) await expectVisible(asks.getByText(rule, { exact: true }), `the ask list has ${rule}`);
+    for (const rule of asked)
+      await expectVisible(
+        asks.getByText(rule, { exact: true }),
+        `the ask list has ${rule}, listed for the repository as its deny rules are, whether or not a step reads them`,
+      );
     await expectVisible(asks.getByText('.claude/settings.json', { exact: true }), 'with where it was read from');
 
-    // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
     const { good, yours } = WORKFLOWS;
     const steps = section('What each step gets');
     await expectVisible(
@@ -88,8 +95,10 @@ export default {
     for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
     await expectCount(review.locator('[data-tool]'), declared.length, `review has exactly the tools it declares (${good.tools})`);
     await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
-    // The fence as the file declares it, its allowedTools: and all: in dontAsk what a rule allows is what the step may do, and the page said only what it denies.
-    await expectVisible(review.locator('dt', { hasText: /^allowed tools$/ }), "review's fence says what it allows, beside what it denies");
+    await expectVisible(
+      review.locator('dt', { hasText: /^allowed tools$/ }),
+      "review's fence says what it allows, beside what it denies: in dontAsk what a rule allows is what the step may do",
+    );
     await expectVisible(
       review
         .locator('dt', { hasText: /^allowed tools$/ })
@@ -103,7 +112,6 @@ export default {
         `review, in dontAsk, shows the Bash command the settings allow (${command})`,
       );
     }
-    // Claude Code's read-only commands ask for no rule, in dontAsk too: the page says so, and claims no denial of them.
     await expectVisible(
       review.getByText(
         "In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:",
@@ -178,10 +186,9 @@ export default {
       implement.locator('[data-read-only="grep"]:not([data-documented])'),
       'implement, in no mode, runs the read-only commands without a rule too (grep)',
     );
-    // Implement is a job, which asks nobody in any mode: what an ask rule makes ask is denied there too, and the page said it would ask.
     await expectVisible(
       implement.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`),
-      `and cat, which the settings make ask (${ask}), is denied on a job`,
+      `and cat, which the settings make ask (${ask}), is denied on a job, which asks nobody in any mode`,
     );
     await expectVisible(
       implement.locator('[data-read-only-taken]', { hasText: `cat asks, by ${ask} (.claude/settings.json), which a job denies` }),

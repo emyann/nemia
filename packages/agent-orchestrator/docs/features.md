@@ -4824,7 +4824,7 @@ Shipped 2026-09-25, split by the owner out of *a finished run costs a pass nothi
 and stage 5, which rewrote the same `tick()`. The runtime's pass folded every task's journal on every pass, twice (once for the pass,
 once in its step): agent-runtime's open issue 33.
 
-- **The memo** (`agent-runtime/src/tick-memo.ts`). An engine keeps a cursor into its own feed and, for each settled task it has folded,
+- **The memo** (`agent-runtime/src/core/engine/memo.ts`). An engine keeps a cursor into its own feed and, for each settled task it has folded,
   what `releaseFinished` still reads (`Releasable`). Each pass reads the feed on from the cursor before anything else, forgets every
   task it names, and skips a task still kept: no read, no fold, no `settleTask`; its finished sessions are let go off the memo. A fresh
   engine folds everything, and `createEngine` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on

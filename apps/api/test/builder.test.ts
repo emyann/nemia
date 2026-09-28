@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The scratch store, set as `WF_ROOT` before the app is imported: agent-orchestrator locates its store when the module loads. */
 const root = scratch('hkb-api-builder-');
 process.env.WF_ROOT = root;
 const repo = scratch('hkb-api-builder-repo-');
@@ -163,15 +163,22 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
   assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
   assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
-  // Codex's fence is its sandbox, a key of its own; each harness has one of the two, and the form offers a step the one its harness takes.
-  assert.deepEqual([kindOf.sandbox, form.keys.find((k) => k.key === 'sandbox')?.byHarness], ['harness-word', SANDBOXES]);
+  assert.deepEqual(
+    [kindOf.sandbox, form.keys.find((k) => k.key === 'sandbox')?.byHarness],
+    ['harness-word', SANDBOXES],
+    "Codex's fence is its sandbox, a key of its own, offered to a step whose harness takes it",
+  );
   for (const harness of HARNESSES)
-    assert.equal(Object.hasOwn(PERMISSION_MODES, harness) !== Object.hasOwn(SANDBOXES, harness), true, harness);
-  // `denials:` says one word or nothing, as `slot:` does: a choice of `fail`, which the parser reads and nothing else.
-  assert.deepEqual([kindOf.denials, form.keys.find((k) => k.key === 'denials')?.choices], ['choice', ['fail']]);
-  // The agent is picked from yours' agents/, and the keys a step takes from it are the package's agent keys but the description.
-  // Each that loads comes with its role values as a step's spec gives them — only those it sets — and one the load refuses is picked from
-  // all the same, with no values: a step saved naming it is refused in its words.
+    assert.equal(
+      Object.hasOwn(PERMISSION_MODES, harness) !== Object.hasOwn(SANDBOXES, harness),
+      true,
+      `${harness} has one of a permission mode and a sandbox`,
+    );
+  assert.deepEqual(
+    [kindOf.denials, form.keys.find((k) => k.key === 'denials')?.choices],
+    ['choice', ['fail']],
+    '`denials:` says one word or nothing, as `slot:` does: `fail`, which the parser reads and nothing else',
+  );
   write(
     path.join(STORE, 'agents', 'picked.md'),
     '---\nmodel: opus\ncontext: 200k\ntools: Read, Grep\noutput: picked.schema.json\n---\nPick me.\n',
@@ -183,7 +190,11 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   write(path.join(STORE, 'agents', 'broken.md'), '---\nloop: build\n---\nWired wrong.\n');
   const withAgents = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
   const agents = withAgents.keys.find((k) => k.key === 'agent');
-  assert.deepEqual([agents?.kind, agents?.choices?.includes('picked'), agents?.choices?.includes('broken')], ['choice', true, true]);
+  assert.deepEqual(
+    [agents?.kind, agents?.choices?.includes('picked'), agents?.choices?.includes('broken')],
+    ['choice', true, true],
+    "the agent is picked from yours' agents/, one the load refuses included",
+  );
   assert.deepEqual(
     agents?.choices,
     fs
@@ -192,34 +203,31 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
       .map((f) => f.slice(0, -3))
       .sort(),
   );
-  assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
+  assert.deepEqual(
+    withAgents.agents.picked,
+    { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' },
+    "an agent that loads comes with the role values it sets, as a step's spec gives them",
+  );
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  // The role keys are the agent keys a step has too: what the builder may set on the node. `description`, `skills` and `systemPrompt`
-  // say what the agent is, what it is given (and so what its card says it can do) and what becomes of its system prompt, and belong to no step, so none is on the
-  // step form and none is ever written into a step file. Written out, so a key added to AGENT_KEYS is decided here, not inherited.
-  const OWN = ['description', 'skills', 'systemPrompt'];
-  assert.deepEqual(form.roleKeys, [
-    'harness',
-    'model',
-    'effort',
-    'context',
-    'permissionMode',
-    'sandbox',
-    'tools',
-    'disallowedTools',
-    'allowedTools',
-    'remote',
-    'output',
-  ]);
+  const agentOnly = ['description', 'skills', 'systemPrompt'];
   assert.deepEqual(
     form.roleKeys,
-    AGENT_KEYS.filter((k) => !OWN.includes(k)),
+    ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
+    'the role keys, what the builder may set on the node, are written out: a key added to AGENT_KEYS is decided here, not inherited',
   );
-  for (const own of OWN) assert.equal(form.roleKeys.includes(own as never), false, own);
+  assert.deepEqual(
+    form.roleKeys,
+    AGENT_KEYS.filter((k) => !agentOnly.includes(k)),
+    'the role keys are the agent keys but description, skills and systemPrompt',
+  );
+  for (const own of agentOnly)
+    assert.equal(
+      form.roleKeys.includes(own as never),
+      false,
+      `${own} says what the agent is, what it is given or what becomes of its system prompt, and is never on the step form or in a step file`,
+    );
 
-  // The kinds held to the parser. A count is what the parser refuses as "not a count", and nothing else is: in a folder where every key can be
-  // read — `b` waits on `a`, loops to it, and declares `again` — each key set to a word that is not a number.
   const refusedAs = (key: string, value: string): string | null => {
     const lines = { after: 'a', output: 'b.schema.json', loop: 'a' } as Record<string, string>;
     lines[key] = value;
@@ -241,21 +249,25 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   };
   for (const key of STEP_KEYS) {
     const said = refusedAs(key, 'several') ?? '';
-    assert.equal(kindOf[key] === 'count', said.includes(`\`${key}: several\` is not a count`), `${key} (${kindOf[key]}): ${said}`);
+    assert.equal(
+      kindOf[key] === 'count',
+      said.includes(`\`${key}: several\` is not a count`),
+      `a count is what the parser refuses as not a count, and nothing else is — ${key} (${kindOf[key]}): ${said}`,
+    );
   }
-  // A flag's words are the ones the parser takes, and gate's `false` is refused.
   const flags = Object.fromEntries(form.keys.filter((k) => k.kind === 'flag').map((k) => [k.key, k.choices]));
   assert.deepEqual(flags, { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] });
-  for (const [key, words] of Object.entries(flags)) for (const word of words) assert.equal(refusedAs(key, word), null, `${key}: ${word}`);
-  assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/);
-  // The default harness is the parser's: a step that names none takes each of its modes, not a sandbox of codex's as a mode, and no sandbox.
-  assert.equal(form.defaultHarness, DEFAULT_HARNESS);
+  for (const [key, words] of Object.entries(flags))
+    for (const word of words) assert.equal(refusedAs(key, word), null, `the parser takes the flag's word ${key}: ${word}`);
+  assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/, "gate's `false` is refused");
+  assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
   for (const mode of PERMISSION_MODES[DEFAULT_HARNESS]) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
-  assert.equal(Object.hasOwn(SANDBOXES, DEFAULT_HARNESS), false);
+  assert.equal(Object.hasOwn(SANDBOXES, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');
   const codexOnly = SANDBOXES.codex.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS].includes(m))!;
   assert.throws(
     () => parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`),
     (e: Error) => e.message.startsWith('a: '),
+    "a step that names no harness takes no sandbox of codex's as a mode",
   );
   assert.throws(
     () => parseWorkflow('a', `---\nsandbox: ${codexOnly}\n---\nDo a.\n`),
@@ -299,12 +311,14 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     own: { keys: ['check'], body: 'And mind the cache.' },
   });
 
-  // As listed: nothing written, the agent's keys and words left in its file.
   let res = await put('with-agent', { steps: [build] });
   assert.equal(res.status, 200, await res.clone().text());
-  assert.deepEqual(((await res.json()) as WorkflowSaved).kept, ['build.md']);
+  assert.deepEqual(
+    ((await res.json()) as WorkflowSaved).kept,
+    ['build.md'],
+    "as listed, nothing is written: the agent's keys and words stay in its file",
+  );
 
-  // A key changed, which the board makes the node's own, and the note: written, and nothing else of the agent's.
   const edited = {
     ...build,
     spec: { ...build.spec, effort: 'low' },
@@ -315,14 +329,18 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
   assert.equal(
     fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
     '---\nagent: coder\neffort: low\ncheck: npm test\n---\nAnd mind the index.\n',
+    "a key changed, which the board makes the node's own, and the note are written, and nothing else of the agent's",
   );
   const [read] = await listedSteps('with-agent');
   assert.deepEqual([read.spec.model, read.spec.effort, read.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
 
-  // Sent without `own`, as a step drafted by hand: every key it sets is its own, and its body is its note.
   res = await put('with-agent', { steps: [{ name: 'build', spec: { agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }] });
   assert.equal(res.status, 200, await res.clone().text());
-  assert.equal(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), '---\nagent: coder\ncheck: npm test\n---\nMind nothing.\n');
+  assert.equal(
+    fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
+    '---\nagent: coder\ncheck: npm test\n---\nMind nothing.\n',
+    'a step sent without `own`, as one drafted by hand, has every key it sets as its own, and its body as its note',
+  );
 });
 
 test("REFUSED at shipped defaults: a step's `own` that is not the listing's shape is a 400 naming the step, and a step naming an agent agents/ does not have is the package's 422 — and nothing is written", async () => {
@@ -396,33 +414,38 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
   const dir = path.join(STORE, 'skilled');
   write(path.join(dir, 'build.md'), '---\nagent: cacher\n---\n');
   try {
-    // Read with its own place alone, the skill is not there; the board reads with the repository's and yours, as `wf start --repo` does.
     assert.throws(
       () => loadWorkflows(dir),
       (e: Error) => /gives the skill `mind-the-cache`, and no skills folder has it/.test(e.message),
+      'read with its own place alone, the skill is not there',
     );
     const listing = listWorkflows(repo, root).find((w) => w.name === 'skilled' && w.from === 'yours');
-    assert.equal(listing?.error, null, JSON.stringify(listing?.error));
+    assert.equal(
+      listing?.error,
+      null,
+      `the board reads with the repository's place and yours, as wf start --repo does: ${JSON.stringify(listing?.error)}`,
+    );
     const [build] = await listedSteps('skilled');
-    // Its version moves with the skill's folder: the board would otherwise save over an edit it never read.
     const at = versionOf(dir);
     fs.appendFileSync(skill, 'And say so.\n');
     const edited = versionOf(dir);
-    assert.notEqual(edited, at, 'an edit of the skill the agent names');
+    assert.notEqual(
+      edited,
+      at,
+      'an edit of the skill the agent names moves the version, or the board would save over an edit it never read',
+    );
     write(path.join(path.dirname(skill), 'notes.md'), 'A file beside SKILL.md.\n');
     assert.notEqual(versionOf(dir), edited, 'a file added to the skill');
-    // Saved as listed: judged and written with the same places, so a folder that reads on the board saves.
     let res = await put('skilled', { steps: [build] });
-    assert.equal(res.status, 200, await res.clone().text());
-    // The skill gone from every place: the package's refusal, naming where it looked, and nothing written.
+    assert.equal(res.status, 200, `saved as listed, judged and written with the places it was read with: ${await res.clone().text()}`);
     fs.rmSync(path.join(repo, '.claude'), { recursive: true });
     const before = snapshot(dir);
     res = await put('skilled', { steps: [build] });
-    assert.equal(res.status, 422);
+    assert.equal(res.status, 422, "the skill gone from every place is the package's refusal");
     const refused = (await res.json()) as BuildRefused;
     assert.match(refused.error, /^build: `agent: cacher` gives the skill `mind-the-cache`, and no skills folder has it — looked in /);
-    assert.ok(refused.error.includes(path.join(repo, '.claude', 'skills')), refused.error);
-    assert.deepEqual(snapshot(dir), before);
+    assert.ok(refused.error.includes(path.join(repo, '.claude', 'skills')), `naming where it looked: ${refused.error}`);
+    assert.deepEqual(snapshot(dir), before, 'nothing written');
   } finally {
     fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
     fs.rmSync(dir, { recursive: true, force: true });
@@ -437,28 +460,27 @@ test('a folder that writes a list under its former name — `disallow:`, `allow:
   assert.deepEqual([step.spec.disallowedTools, step.spec.allowedTools], [['SendMessage'], ['Edit(**)']]);
   assert.equal(Object.hasOwn(step.spec, 'allow') || Object.hasOwn(step.spec, 'disallow'), false, 'the listing has one name for each list');
 
-  // A page open since before the rename sends the lists under the names it knew: refused in words that say to reload, and the file kept.
   const before = snapshot(dir);
   const { disallowedTools, allowedTools, ...rest } = step.spec;
   const stale = await put('former', { steps: [{ ...step, spec: { ...rest, disallow: disallowedTools, allow: allowedTools } }] });
   const refusal = (await stale.json()) as BuildRefused;
-  assert.equal(stale.status, 422, JSON.stringify(refusal));
+  assert.equal(stale.status, 422, `a page that sends the lists under their former names is refused: ${JSON.stringify(refusal)}`);
   assert.match(
     refusal.error,
     /^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\./,
   );
   assert.deepEqual(snapshot(dir), before, 'nothing written');
 
-  // A save of the step from today's page writes the names the keys have now.
   const saved = await put('former', { steps: [{ ...step, spec: { ...step.spec, allowedTools: ['Edit(notes/**)'] } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(
     fs.readFileSync(path.join(dir, 'write.md'), 'utf8'),
     '---\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n',
+    'a save of the step writes the names the keys have',
   );
 });
 
-test('a codex step that names its sandbox as `permissionMode:`, as before 2026-09-23, is listed with its `sandbox`, and a save writes `sandbox:`; REFUSED: a page from before, which sends `permissionMode`, and `sandbox` on a Claude Code step — nothing written', async () => {
+test('a codex step that names its sandbox under the former key `permissionMode:` is listed with its `sandbox`, and a save writes `sandbox:`; REFUSED: a page that sends `permissionMode` for it, and `sandbox` on a Claude Code step — nothing written', async () => {
   const dir = path.join(STORE, 'fenced');
   write(path.join(dir, 'review.md'), '---\nharness: codex\npermissionMode: read-only\n---\nReview it.\n');
   const [step] = (await listedSteps('fenced')) as [ListedStep];
@@ -480,25 +502,27 @@ test('a codex step that names its sandbox as `permissionMode:`, as before 2026-0
   assert.deepEqual(refusal.steps, ['review']);
   assert.deepEqual(snapshot(dir), before, 'nothing written');
 
-  // A Claude Code step has no sandbox: refused naming its own fence.
   const claude = await put('fenced', { steps: [{ ...step, spec: { ...step.spec, harness: 'claude' } }] });
   const refused = (await claude.json()) as BuildRefused;
-  assert.equal(claude.status, 422, JSON.stringify(refused));
+  assert.equal(claude.status, 422, `a Claude Code step has no sandbox: ${JSON.stringify(refused)}`);
   assert.ok(
     refused.error.startsWith(
       "review: `sandbox: read-only` is not a key claude takes. `sandbox:` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, `permissionMode:`",
     ),
-    refused.error,
+    `refused naming its own fence: ${refused.error}`,
   );
   assert.deepEqual(snapshot(dir), before, 'nothing written');
 
-  // Saved unchanged, the file is kept, as it reads as the step; saved with a change from today's page, it says `sandbox:`.
   const kept = await put('fenced', { steps: [step] });
   assert.equal(kept.status, 200, await kept.clone().text());
-  assert.deepEqual(snapshot(dir), before, 'kept');
+  assert.deepEqual(snapshot(dir), before, 'saved unchanged, the file is kept, as it reads as the step');
   const saved = await put('fenced', { steps: [{ ...step, spec: { ...step.spec, sandbox: 'workspace-write' } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
-  assert.equal(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), '---\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n');
+  assert.equal(
+    fs.readFileSync(path.join(dir, 'review.md'), 'utf8'),
+    '---\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n',
+    'saved with a change, it says `sandbox:`',
+  );
 });
 
 test('the form offers each remote A2A agent the store declares as a harness, and a step on one is saved as the package reads it', async (t) => {
@@ -507,38 +531,47 @@ test('the form offers each remote A2A agent the store declares as a harness, and
   write(declared, JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer' } }));
   const form = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, [...HARNESSES, 'a2a:reviewer']);
-  // A remote agent takes none of a harness's words, and the form leaves off such a step every key the load refuses there.
   for (const key of ['effort', 'permissionMode', 'sandbox'] as const)
-    assert.equal(Object.hasOwn(form.keys.find((k) => k.key === key)!.byHarness!, 'a2a:reviewer'), false, key);
+    assert.equal(
+      Object.hasOwn(form.keys.find((k) => k.key === key)!.byHarness!, 'a2a:reviewer'),
+      false,
+      `${key}: a remote agent takes none of a harness's words`,
+    );
   assert.deepEqual(form.remote, { prefix: 'a2a:', refuses: [...REMOTE_REFUSED_KEYS] });
   assert.ok(
     form.remote.refuses.includes('model') && form.remote.refuses.includes('permissionMode') && !form.remote.refuses.includes('after'),
+    'the form leaves off a remote step every key the load refuses there',
   );
 
-  // A file refused as it stands offers none of its agents, and the form is still drawn.
   write(declared, '{ "reviewer": ');
   const broken = await app.request('/api/workflows/keys');
-  assert.equal(broken.status, 200);
-  assert.deepEqual(((await broken.json()) as KeyForm).keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
+  assert.equal(broken.status, 200, 'a file of agents refused as it stands still draws the form');
+  assert.deepEqual(
+    ((await broken.json()) as KeyForm).keys.find((k) => k.key === 'harness')?.choices,
+    HARNESSES,
+    'and offers none of its agents',
+  );
   write(declared, JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer' } }));
 
-  // Saved, the step says its harness as the package reads it, and the listing carries the agent's name in it.
   const dir = path.join(STORE, 'asked');
   write(path.join(dir, 'ask.md'), '---\nworkspace: folder\n---\nAsk it.\n');
   const [ask] = (await listedSteps('asked')) as [ListedStep];
   const saved = await put('asked', { steps: [{ ...ask, spec: { ...ask.spec, harness: 'a2a:reviewer' } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
-  assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), '---\nworkspace: folder\nharness: a2a:reviewer\n---\nAsk it.\n');
-  assert.equal((await listedSteps('asked'))[0].spec.harness, 'a2a:reviewer');
+  assert.equal(
+    fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'),
+    '---\nworkspace: folder\nharness: a2a:reviewer\n---\nAsk it.\n',
+    'saved, the step says its harness as the package reads it',
+  );
+  assert.equal((await listedSteps('asked'))[0].spec.harness, 'a2a:reviewer', "the listing carries the agent's name in the harness");
 
-  // A key a remote step may not set is refused in the package's words, and nothing is written.
   const before = fs.readFileSync(path.join(dir, 'ask.md'), 'utf8');
   const [remote] = (await listedSteps('asked')) as [ListedStep];
   const refused = await put('asked', { steps: [{ ...remote, spec: { ...remote.spec, model: 'opus' } }] });
   const said = (await refused.json()) as BuildRefused;
-  assert.equal(refused.status, 422, JSON.stringify(said));
+  assert.equal(refused.status, 422, `a key a remote step may not set is refused: ${JSON.stringify(said)}`);
   assert.match(said.error, /^ask: `model: opus` .*`harness: a2a:reviewer` is a remote A2A agent\. Delete the line/);
-  assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), before);
+  assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), before, 'nothing is written');
 });
 
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {
@@ -587,13 +620,19 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     'answered as the listing reads it',
   );
 
-  // A context window, sent as its tokens, is written in the package's one form, and listed back as the number.
   const windowed = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, context: 150_000 } }, review] });
   assert.equal(windowed.status, 200, await windowed.clone().text());
-  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^context: 150k$/m);
-  assert.equal(((await windowed.json()) as WorkflowSaved).workflow.steps.find((s) => s.name === 'build')?.spec.context, 150_000);
+  assert.match(
+    fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
+    /^context: 150k$/m,
+    "a context window, sent as its tokens, is written in the package's one form",
+  );
+  assert.equal(
+    ((await windowed.json()) as WorkflowSaved).workflow.steps.find((s) => s.name === 'build')?.spec.context,
+    150_000,
+    'and listed back as the number',
+  );
 
-  // A step run as a background session says so, and is listed back as one; a step that does not say is a job, listed as null.
   const background = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, background: true } }, review] });
   assert.equal(background.status, 200, await background.clone().text());
   assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^background: true$/m);
@@ -605,14 +644,18 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
       ['build', true],
       ['review', null],
     ],
+    'a step run as a background session says so and is listed back as one; a step that does not say is a job, listed as null',
   );
 
-  // An edge deleted takes its key; a step gone takes its file. A key the listing leaves out is unset.
   const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { check: 'npm test' }, body: 'Build it.' }] });
   assert.equal(gone.status, 200, await gone.clone().text());
   const after = (await gone.json()) as WorkflowSaved;
-  assert.deepEqual([after.written, after.removed], [['build.md'], ['review.md']]);
-  assert.equal(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), '---\ncheck: npm test\n---\nBuild it.\n');
+  assert.deepEqual([after.written, after.removed], [['build.md'], ['review.md']], 'a step gone takes its file');
+  assert.equal(
+    fs.readFileSync(path.join(dir, 'build.md'), 'utf8'),
+    '---\ncheck: npm test\n---\nBuild it.\n',
+    'an edge deleted takes its key, and a key the listing leaves out is unset',
+  );
   assert.deepEqual(after.workflow.graph, { roots: ['build', 'plan'], edges: [] });
   assert.deepEqual(after.workflow.schemas, ['build.schema.json'], 'the schema is left as it is');
 });
@@ -642,7 +685,6 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     const res = await put('refused', { steps });
     assert.equal(res.status, 422, `${what}: ${await res.clone().text()}`);
     const { error, steps: said } = (await res.json()) as BuildRefused;
-    // The package's sentence, word for word: what `writeWorkflow` throws for the same steps.
     const drafts = (steps as ListedStep[]).map((s) => ({
       ...Object.fromEntries(Object.entries(s.spec).filter(([, v]) => v !== null)),
       name: s.name,
@@ -653,7 +695,7 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     assert.throws(
       () => writeWorkflow(dir, drafts),
       (e: Error) => e.message === error,
-      `${what}: ${error}`,
+      `${what}: the package's sentence, word for word, as writeWorkflow throws it for the same steps: ${error}`,
     );
     assert.deepEqual(said, named, `${what}: ${error}`);
     assert.deepEqual(snapshot(dir), before, `${what}: nothing written`);
@@ -675,13 +717,12 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
     assert.equal(res.status, 403, route);
     assert.equal(((await res.json()) as { error: string }).error, sentence(route, name), route);
   }
-  // Anywhere else is not a source at all.
   for (const res of [
     await put('mine', { steps: [step] }, 'elsewhere'),
     await post({ name: 'x', step }, 'elsewhere'),
     await put('mine', { steps: [step], from: 'elsewhere' }),
   ]) {
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 400, 'anywhere else is not a source at all');
     assert.match(
       ((await res.json()) as { error: string }).error,
       /the builder writes yours, at \/api\/workflows\/yours\/…, and this request named "elsewhere"\.$/,
@@ -726,7 +767,7 @@ test('REFUSED at shipped defaults: a write another site could make — a body no
   assert.equal(fs.existsSync(path.join(STORE, 'guarded-2')), false);
 });
 
-test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 naming the step and the key — and nothing is written", async () => {
+test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 naming the step and the key — a `version` left out among them, so a save that does not say what it read is never written over a folder changed since — and nothing is written", async () => {
   const dir = planned('shaped');
   const before = snapshot(dir);
   const [plan] = (await listedSteps('shaped')) as [ListedStep];
@@ -755,7 +796,6 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     [{ steps: [{ ...plan, spec: { output: { file: 'x.json' } } }] }, /`output` is a string, the schema file's name/],
     [{ steps: [{ ...plan, spec: { tools: ['Read', 3] } }] }, /`tools` is a list of strings/],
     [{ steps: [plan], readme: 42 }, /`readme` is the README's text, a string, or left out/],
-    // What the draft was read from: required, so a save that does not say is never written over a folder changed since.
     [
       { version: undefined, steps: [plan] },
       /takes the `version` the folder was read at, as GET \/api\/workflows lists it.*This request's was undefined/,
@@ -782,7 +822,6 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     assert.match(error, said, error);
     assert.ok(error.startsWith('PUT /api/workflows/yours/shaped'), error);
   }
-  // A schema's file that is not one directly in the folder, in `schemaNameRefusal`'s words.
   for (const [file, said] of [
     ['review.txt', /ends in \.json/],
     ['.hidden.json', /is hidden/],
@@ -792,17 +831,16 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     ['tab\t.json', /control character/],
   ] as const) {
     const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
-    assert.equal(res.status, 400, file);
-    assert.match(((await res.json()) as { error: string }).error, said, file);
+    assert.equal(res.status, 400, `${file}: not a file directly in the folder`);
+    assert.match(((await res.json()) as { error: string }).error, said, `${file}, in schemaNameRefusal's words`);
   }
   assert.deepEqual(snapshot(dir), before);
   assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);
 });
 
-test('REFUSED at shipped defaults: a put to a folder yours does not have is a 404 that says how to make one — a name only the repository has, a hidden folder, a name that climbs — and nothing is made', async () => {
+test('REFUSED at shipped defaults: a put to a folder yours does not have is a 404 that says how to make one — a name only the repository has, a hidden folder, a name that climbs through an encoded slash (a URL resolves a bare `..` before the route) — and nothing is made', async () => {
   write(path.join(STORE, '.hidden', 'plan.md'), 'Plan it.\n');
   const step = { name: 'plan', spec: spec(), body: 'Plan it.' };
-  // `..` itself never reaches the route: a URL resolves it first. An encoded slash does.
   for (const name of ['nope', 'good', '.hidden', '..%2Fworkflows%2Fmine', '..%2F..%2Fworkflows']) {
     const res = await put(name, { steps: [step] });
     assert.equal(res.status, 404, name);
@@ -837,15 +875,18 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
     listWorkflows(repo, root).find((w) => w.name === 'fresh'),
   );
   assert.equal(saved.workflow.from, 'yours');
-  // The step as a start would read it.
   assert.deepEqual(
     loadWorkflows(dir).map((s) => renderStep(s)),
     ['---\nharness: codex\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'],
+    'the step as a start would read it',
   );
 
-  // A name the repository has too is yours to make: the board starts it with `from`.
   const same = await post({ name: 'good', step: { name: 'implement', spec: spec(), body: 'Implement it.' } });
-  assert.equal(same.status, 201, await same.clone().text());
+  assert.equal(
+    same.status,
+    201,
+    `a name the repository has too is yours to make, and the board starts it with \`from\`: ${await same.clone().text()}`,
+  );
   assert.deepEqual(snapshot(path.join(STORE, 'good')), { 'implement.md': 'Implement it.\n' });
   fs.rmSync(path.join(STORE, 'good'), { recursive: true });
 });
@@ -972,17 +1013,17 @@ test('PUT /api/workflows/yours/:name writes the schemas pasted for it beside the
   assert.deepEqual(saved.workflow.schemas, ['build.schema.json', 'plan.schema.json']);
   assert.equal(saved.workflow.version, versionOf(dir), 'at the version the folder is at now, for the next save');
 
-  // The same text again is kept; another text replaces the file.
   const steps = saved.workflow.steps;
   const same = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: `${risks}\n` }] });
-  assert.deepEqual((({ written, kept }) => [written, kept])((await same.json()) as WorkflowSaved), [
-    [],
-    ['build.md', 'plan.md', 'plan.schema.json'],
-  ]);
+  assert.deepEqual(
+    (({ written, kept }) => [written, kept])((await same.json()) as WorkflowSaved),
+    [[], ['build.md', 'plan.md', 'plan.schema.json']],
+    'the same text again is kept',
+  );
   const wider = risks.replace('"risks"', '"notes"').replace('"risks"', '"notes"');
   const replaced = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: wider }] });
   assert.equal(replaced.status, 200, await replaced.clone().text());
-  assert.deepEqual(((await replaced.json()) as WorkflowSaved).written, ['plan.schema.json']);
+  assert.deepEqual(((await replaced.json()) as WorkflowSaved).written, ['plan.schema.json'], 'another text replaces the file');
   assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${wider}\n`);
 });
 
@@ -1017,9 +1058,8 @@ test("REFUSED at shipped defaults: a pasted schema is judged with the steps befo
       ['implement'],
       422,
     ],
-    // Any JSON object used to be written: the parser judges it only once a step names it, which the folder on disk did not yet.
     [
-      'not strict, for a new output',
+      'not strict, for an output no step on disk names yet',
       { steps: [outputOf(implement, 'implement.schema.json'), review], schemas: [{ file: 'implement.schema.json', text: loose }] },
       /^implement: `output: implement\.schema\.json` is not strict at /,
       ['implement'],
@@ -1045,9 +1085,8 @@ test("REFUSED at shipped defaults: a pasted schema is judged with the steps befo
       ['implement', 'review'],
       422,
     ],
-    // A name is refused before anything else, a cycle included, as `writeWorkflow` refuses it: the pasted schemas are not judged ahead of it.
     [
-      'a good schema beside a name refused, and a cycle',
+      'a good schema beside a name refused, and a cycle: the name refused first, as writeWorkflow refuses it, and no schema judged ahead of it',
       {
         steps: [
           { ...implement, spec: { ...implement.spec, after: ['review/it'] } },
@@ -1103,11 +1142,13 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
       () => write(path.join(dir, 'README.md'), '# edited, by hand\n'),
       () => write(path.join(dir, 'README.md'), '# edited\n'),
     ],
-    // Hidden, and a step all the same: the package reads it as one, and the save below, which does not have it, would remove it.
-    ['.draft.md added', () => write(path.join(dir, '.draft.md'), 'Draft.\n'), () => fs.rmSync(path.join(dir, '.draft.md'))],
-    // And a hidden schema, which an `output:` may name, and a save then reads.
     [
-      '.shared.schema.json added',
+      '.draft.md added, hidden and a step all the same, which a save without it would remove',
+      () => write(path.join(dir, '.draft.md'), 'Draft.\n'),
+      () => fs.rmSync(path.join(dir, '.draft.md')),
+    ],
+    [
+      '.shared.schema.json added, a hidden schema an `output:` may name and a save then reads',
       () => write(path.join(dir, '.shared.schema.json'), again),
       () => fs.rmSync(path.join(dir, '.shared.schema.json')),
     ],
@@ -1131,15 +1172,17 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
     assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);
   }
 
-  // What is no step and no schema moves nothing: a note beside the steps, a hidden one, a folder inside it.
   write(path.join(dir, 'NOTES.txt'), 'Ideas.\n');
   write(path.join(dir, '.notes.txt'), 'Ideas.\n');
   write(path.join(dir, 'sub', 'x.md'), 'Not a step.\n');
-  assert.equal(versionOf(dir), read);
+  assert.equal(
+    versionOf(dir),
+    read,
+    'what is no step and no schema moves nothing: a note beside the steps, a hidden one, a folder inside it',
+  );
 
-  // Read at the version it is at, the save is taken; and the version it was read at before that save is stale after it.
   const taken = await put('edited', draft);
-  assert.equal(taken.status, 200, await taken.clone().text());
+  assert.equal(taken.status, 200, `read at the version it is at, the save is taken: ${await taken.clone().text()}`);
   assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m);
   for (const kept of ['NOTES.txt', '.notes.txt', 'sub/x.md'])
     assert.ok(fs.existsSync(path.join(dir, kept)), `the save leaves ${kept}, which it did not count, where it was`);
@@ -1180,7 +1223,6 @@ test(
     fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o444);
     const before = snapshot(dir);
     try {
-      // `new.schema.json` is written, then `kept.schema.json` is not: the write of the first is undone, as a refusal of the folder undoes it.
       const res = await put('read-only', {
         steps: [
           { name: 'plan', spec: spec({ output: 'new.schema.json' }), body: 'Plan it.' },
@@ -1193,7 +1235,11 @@ test(
       });
       assert.equal(res.status, 500, await res.clone().text());
       assert.match(((await res.json()) as { error: string }).error, /EACCES/);
-      assert.deepEqual(snapshot(dir), before, 'the schema written before it removed, the read-only one as it was, and no step written');
+      assert.deepEqual(
+        snapshot(dir),
+        before,
+        'new.schema.json, written before kept.schema.json was refused, removed as a refusal of the folder removes it; the read-only one as it was; and no step written',
+      );
     } finally {
       fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o644);
     }
@@ -1201,7 +1247,7 @@ test(
 );
 
 test(
-  'putSchemasBack: a schema a write truncated is put back, one the write never opened is left alone — a read-only file, which writing back would refuse in turn — and one the save made is removed',
+  'putSchemasBack: a schema a write truncated after its open is put back — fs.writeFileSync truncates first, and a write that then failed (the disk full) is nothing the save can tell from which writes returned — one the write never opened is left alone — a read-only file, which writing back would refuse in turn — and one the save made is removed',
   { skip: process.getuid?.() === 0 ? 'root writes a read-only file all the same' : false },
   () => {
     const dir = path.join(STORE, 'put-back');
@@ -1209,8 +1255,6 @@ test(
     write(path.join(dir, 'locked.schema.json'), again);
     fs.chmodSync(path.join(dir, 'locked.schema.json'), 0o444);
     write(path.join(dir, 'made.schema.json'), risks);
-    // What a write that failed after the open leaves — the disk full, a read that broke: `fs.writeFileSync` truncates first, so the file is
-    // there and shorter than it was. Nothing the save can tell from which writes returned.
     fs.writeFileSync(path.join(dir, 'cut.schema.json'), '{ "type": ');
     try {
       putSchemasBack(dir, [

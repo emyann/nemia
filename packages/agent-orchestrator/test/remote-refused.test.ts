@@ -2,6 +2,7 @@
  * A store's `a2a-agents.json` refused — as it stands, or one entry of it — stops only a step that names what is refused. `engine()`, which
  * every command and the api make, leaves it out and says why on stderr, so `wf ls` and `wf tick` of a run with no remote step go on as
  * before, at shipped defaults: `main` with the engine it makes itself. A fake `claude` and `codex` first on PATH, so nothing real is asked.
+ * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +11,6 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-remote-refused-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
@@ -86,11 +86,11 @@ for (const [what, text, why] of [
       const ticked = await said(['tick']);
       assert.match(ticked.err, why);
       assert.ok(readRun(id).steps.work, `the local step was filed: ${JSON.stringify(readRun(id).steps)}`);
-      // `wf start` of a step on the agent is refused, in the file's words, and writes no run.
       const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
       await assert.rejects(
         said(['start', 'a review', '--workflows', REMOTE]),
         (err: Error & { exitCode?: number }) => err.exitCode === 2 && why.test(err.message),
+        "wf start of a step on the agent is refused, in the file's words",
       );
       assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
     } finally {

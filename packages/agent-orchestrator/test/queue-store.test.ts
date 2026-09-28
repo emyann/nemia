@@ -4,8 +4,10 @@
  *
  * What the cap and the queue decide is pure, and lives in run.test.ts and inbox.test.ts. This is the part that is not: a pass over the whole
  * store, which advances the runs that have started first, admits the rest oldest first, then starts a queued card while a slot is free — and
- * the verbs that say what it did, as a person types them. A file of its own, since `tick` reads every run under `WF_ROOT`, and the runs of the
- * other store tests would be ticked with these.
+ * the verbs that say what it did, as a person types them. A file of its own, since `tick` reads every run under `WF_ROOT`, and the runs of
+ * the other store tests would be ticked with these. `WF_ROOT` is read as the module loads, so it is set before the import; `WF_MAX_RUNS` is
+ * read on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws
+ * (`verifyRest` in tick.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,9 +23,7 @@ const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
 const INBOX = path.join(ROOT, 'inbox');
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it. WF_MAX_RUNS is read on every pass.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, cancel, decide, listRuns, readInbox, readRun, start, tick } = await import('../src/runner.ts');
@@ -37,7 +37,8 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 
 /**
  * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is settled
- * `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says.
+ * `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says, and `later` moves that clock on, in
+ * minutes.
  */
 const board = () => {
   const tasks = new Map<
@@ -105,7 +106,6 @@ const board = () => {
     feed: async (after = 0) => ({ entries: feed.slice(after), cursor: feed.length }),
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  /** Moves the board's clock on, in minutes. */
   const later = (minutes: number) => {
     now += minutes * 60_000;
   };
@@ -188,10 +188,13 @@ test('REFUSED at a cap of 2 at shipped defaults: a third run is not filed — `w
   const heldAt = readRun(three.id).slotHeldAt;
   assert.ok(heldAt, 'the pass that held it wrote when');
 
-  // The next pass holds it again, files nothing, and writes nothing: the time stands, and the note is said once.
   const { runs: again } = await tick(b.e);
-  assert.deepEqual([b.filings.length, readRun(three.id).slotHeldAt], [2, heldAt]);
-  assert.deepEqual(again.find((a) => a.run.id === three.id)!.notes, []);
+  assert.deepEqual(
+    [b.filings.length, readRun(three.id).slotHeldAt],
+    [2, heldAt],
+    'the next pass holds it again, files nothing, and writes nothing: the time stands',
+  );
+  assert.deepEqual(again.find((a) => a.run.id === three.id)!.notes, [], 'and the note is said once');
   assert.deepEqual(
     [
       again.find((a) => a.run.id === three.id)!.held,
@@ -226,11 +229,13 @@ test("`wf ls` and `wf decide` judge by the cap the last pass ran with, not their
   const b = board();
   const [one, two, three] = [started('first', at(1)), started('second', at(2)), started('third', at(3))];
   const recorded = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'tick.json'), 'utf8')) as { sessions: number; runs: number };
-  // The daemon's pass, with its own environment.
   await tick(b.e);
-  assert.deepEqual([b.filings, recorded().runs], [[`${one.id}-implement`, `${two.id}-implement`], 2]);
+  assert.deepEqual(
+    [b.filings, recorded().runs],
+    [[`${one.id}-implement`, `${two.id}-implement`], 2],
+    "the daemon's pass, with its own environment",
+  );
 
-  /** What a person's shell says of the store: `wf ls`'s lines that wait for a slot, and `wf decide` on the third run. */
   const seen = async () => ({
     listed: (await printedBy(t, b.e, 'ls')).filter((l) => l.includes('waiting for a run slot')).map((l) => l.trim()),
     decided: (await printedBy(t, b.e, 'decide', three.id)).slice(2),
@@ -242,24 +247,25 @@ test("`wf ls` and `wf decide` judge by the cap the last pass ran with, not their
       `  nothing of ${three.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
     ],
   };
-  // A shell with no WF_MAX_RUNS, and shells with other values, one that is not a count among them: each says what the daemon holds.
   for (const shell of [undefined, '5', '1', 'two']) {
     if (shell === undefined) delete process.env.WF_MAX_RUNS;
     else process.env.WF_MAX_RUNS = shell;
-    assert.deepEqual(await seen(), held, `WF_MAX_RUNS=${shell}`);
+    assert.deepEqual(await seen(), held, `a shell with WF_MAX_RUNS=${shell} says in wf ls and wf decide what the daemon holds`);
   }
 
-  // Before any pass has written its ceilings, the shell's own: with none, nothing is held, and a value that is not a count is refused.
   fs.rmSync(path.join(ROOT, 'tick.json'));
   delete process.env.WF_MAX_RUNS;
-  assert.deepEqual((await seen()).listed, []);
+  assert.deepEqual((await seen()).listed, [], "before any pass has written its ceilings, the shell's own: with none, nothing is held");
   process.env.WF_MAX_RUNS = 'two';
-  await assert.rejects(main(['ls'], b.e), refusedWith(/^WF_MAX_RUNS=two is not a count\./));
+  await assert.rejects(
+    main(['ls'], b.e),
+    refusedWith(/^WF_MAX_RUNS=two is not a count\./),
+    "and a shell's own value that is not a count is refused",
+  );
 
-  // A pass that runs with no cap writes that down, and files the third: a shell that sets a cap reads none.
   delete process.env.WF_MAX_RUNS;
   await tick(b.e);
-  assert.deepEqual([recorded().runs, b.filings.length], [0, 3]);
+  assert.deepEqual([recorded().runs, b.filings.length], [0, 3], 'a pass that runs with no cap writes that down, and files the third');
   started('fourth', at(4));
   process.env.WF_MAX_RUNS = '1';
   try {
@@ -286,28 +292,38 @@ test('a run that finishes frees its slot on the next pass, and so does one calle
     ],
   );
 
-  // Signed off: finished, and nothing in flight. The next pass files the run held longest, and holds the other.
   b.later(12);
   b.settle(`${one.id}-implement`, 'succeeded', SIGNED);
   const { runs: freed } = await tick(b.e);
-  assert.deepEqual(b.filings, [`${one.id}-implement`, `${two.id}-implement`]);
+  assert.deepEqual(
+    b.filings,
+    [`${one.id}-implement`, `${two.id}-implement`],
+    'signed off: finished, and nothing in flight, so the next pass files the run held longest',
+  );
   assert.deepEqual(
     [freed.find((a) => a.run.id === two.id)!.filed, freed.find((a) => a.run.id === three.id)!.held],
     [['implement'], { inFlight: 1, cap: 1 }],
+    'and holds the other',
   );
 
-  // Called off while it runs: the engine stops it on its tick, and that pass files the third.
   b.settle(`${two.id}-implement`, 'running');
   await cancel(b.e, two.id);
   b.later(3);
   await tick(b.e);
-  assert.deepEqual(b.filings, [`${one.id}-implement`, `${two.id}-implement`, `${three.id}-implement`]);
+  assert.deepEqual(
+    b.filings,
+    [`${one.id}-implement`, `${two.id}-implement`, `${three.id}-implement`],
+    'called off while it runs: the engine stops it on its tick, and that pass files the third',
+  );
   assert.equal(b.tasks.get(`${two.id}-implement`)!.phase, 'stopped');
 
-  // The third was created at 09:03 and filed at 10:15: that wait is its run's queue.
   b.settle(`${three.id}-implement`, 'succeeded', SIGNED);
   const { timeline } = await decide(b.e, three.id);
-  assert.deepEqual(timeline.slot, { from: at(3), filedAt: '2026-09-16T10:15:00.000Z', ms: 72 * 60_000, queued: '1h12m' });
+  assert.deepEqual(
+    timeline.slot,
+    { from: at(3), filedAt: '2026-09-16T10:15:00.000Z', ms: 72 * 60_000, queued: '1h12m' },
+    "the third was created at 09:03 and filed at 10:15: that wait is its run's queue",
+  );
   assert.ok((await printedBy(t, b.e, 'decide', three.id)).includes('  timeline  run slot  queued 1h12m'), 'on the screen');
 });
 
@@ -354,11 +370,10 @@ test('with no cap — WF_MAX_RUNS unset, or 0 — a pass files every run as befo
 test('the oldest run is admitted first, by when it was created — not by its id, nor the order the store lists it in', async () => {
   emptyStore('1');
   const b = board();
-  // Ids sort a, b, c; created c, a, b.
   const youngest = started('b the youngest', at(9));
   const oldest = started('c the oldest', at(1));
   const middle = started('a the middle', at(5));
-  assert.deepEqual([middle.id < youngest.id, youngest.id < oldest.id], [true, true]);
+  assert.deepEqual([middle.id < youngest.id, youngest.id < oldest.id], [true, true], 'ids sort a, b, c; created c, a, b');
   await tick(b.e);
   assert.deepEqual(b.filings, [`${oldest.id}-implement`]);
   b.settle(`${oldest.id}-implement`, 'succeeded', SIGNED);
@@ -388,18 +403,21 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
     if (concurrent === undefined) delete process.env.WF_MAX_CONCURRENT;
     else process.env.WF_MAX_CONCURRENT = concurrent;
   }
-  // The store taken, said once per start (daemon-store.test.ts has the rest of it).
   const holds = `   holds ${ROOT} as pid ${process.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`;
-  assert.deepEqual(printed, [
-    'up — every 4000ms, ^C to stop',
-    '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
-    '   runs in flight: no cap (WF_MAX_RUNS)',
-    holds,
-    'up — every 1000ms, ^C to stop',
-    '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
-    '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
-    holds,
-  ]);
+  assert.deepEqual(
+    printed,
+    [
+      'up — every 4000ms, ^C to stop',
+      '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
+      '   runs in flight: no cap (WF_MAX_RUNS)',
+      holds,
+      'up — every 1000ms, ^C to stop',
+      '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
+      '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
+      holds,
+    ],
+    'the store taken is said once per start; daemon-store.test.ts has the rest of it',
+  );
 
   emptyStore('two');
   started('first', at(1));
@@ -411,8 +429,6 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
   await assert.rejects(main(['ls'], board().e), refused);
   emptyStore(undefined);
 });
-
-// ─── cards that start themselves ────────────────────────────────────────────
 
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
 const aRepoWith = (...workflows: string[]): string => {
@@ -474,7 +490,6 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
     'its roots filed on the next pass, and nothing more started',
   );
 
-  // `wf up` logs it the same way, a time before it: a pass that starts a card, then a pass the test stops.
   emptyStore(undefined);
   const again = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
   await printedBy(t, b.e, 'inbox', 'queue', again.card.name);
@@ -498,7 +513,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   const [upRun] = fromCard(again.card.name);
   assert.ok(
     printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun.id}$`).test(l)),
-    printed.join('\n'),
+    `\`wf up\` logs it the same way, a time before it, on a pass that starts a card:\n${printed.join('\n')}`,
   );
 });
 
@@ -507,21 +522,26 @@ test("`wf inbox queue` keeps the card file's time: a queue is no edit of the ide
   const b = board();
   const repo = aRepoWith('dev');
   const { card, file } = addToInbox({ text: 'Filed this morning', workflow: 'dev', repo });
-  // Filed long enough ago that a file written by the queue could not pass for it.
   const filed = new Date('2026-09-16T08:00:00.000Z');
   fs.utimesSync(file, filed, filed);
 
   await printedBy(t, b.e, 'inbox', 'queue', card.name);
   assert.match(fs.readFileSync(file, 'utf8'), /^queued: /m, 'the card is queued');
-  assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and its file is as old as it was');
+  assert.equal(
+    fs.statSync(file).mtime.toISOString(),
+    filed.toISOString(),
+    'and its file is as old as it was, filed long enough ago that a file written by the queue could not pass for it',
+  );
 
   await printedBy(t, b.e, 'inbox', 'queue', card.name, '--off');
   assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^queued: /m, 'taken back');
   assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and as old still');
 
-  // A card filed is written now: it is the queue that keeps the time it found, not every write of the inbox.
   const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', repo });
-  assert.ok(Date.now() - fs.statSync(fresh.file).mtime.getTime() < 60_000, 'wf inbox add writes a card at the time it is filed');
+  assert.ok(
+    Date.now() - fs.statSync(fresh.file).mtime.getTime() < 60_000,
+    'wf inbox add writes a card at the time it is filed: it is the queue that keeps the time it found, not every write of the inbox',
+  );
 });
 
 test('a queued card that names no repository starts on the repository the daemon runs in, as `wf start` takes `.`', async (t) => {
@@ -554,9 +574,12 @@ test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a queued
   const freed = await tick(b.e);
   const [first] = fromCard('first-a1b2');
   assert.deepEqual(freed.queue, { card: 'first-a1b2', run: first.id, removed: true });
-  // The card's run has nothing filed: the next pass admits it into the slot, and the second card waits behind it.
   const counted = await tick(b.e);
-  assert.deepEqual([counted.queue, b.filings, fromCard('second-c3d4')], [undefined, [`${busy.id}-implement`, `${first.id}-implement`], []]);
+  assert.deepEqual(
+    [counted.queue, b.filings, fromCard('second-c3d4')],
+    [undefined, [`${busy.id}-implement`, `${first.id}-implement`], []],
+    "the card's run has nothing filed: the next pass admits it into the slot, and the second card waits behind it",
+  );
 });
 
 test('the oldest queued card starts first — by when it was queued, not by its name — one card a pass', async () => {
@@ -646,12 +669,10 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
   assert.equal(fs.readFileSync(bare.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nNo workflow yet\n`);
   assert.deepEqual([(await tick(b.e)).queue, listRuns()], [undefined, []], 'taken back: not started');
 
-  // Queued, then dropped: nothing to start.
   await printedBy(t, b.e, 'inbox', 'queue', bare.card.name);
   await printedBy(t, b.e, 'inbox', 'rm', bare.card.name);
-  assert.deepEqual([(await tick(b.e)).queue, listRuns()], [undefined, []]);
+  assert.deepEqual([(await tick(b.e)).queue, listRuns()], [undefined, []], 'queued, then dropped: nothing to start');
 
-  // A card a run's record names — its removal failed — is not queued.
   const kept = aCard('kept-a1b2', { workflow: 'dev', repo }, 'Started already');
   fs.writeFileSync(
     path.join(RUNS, 'started-already-zz99.json'),
@@ -662,8 +683,9 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     refusedWith(
       /^kept-a1b2\.md: this card was started as started-already-zz99 — that run's record says so — and is still in the inbox because its removal failed\./,
     ),
+    "a card a run's record names, its removal failed, is refused",
   );
-  assert.equal(fs.readFileSync(kept, 'utf8').includes('queued:'), false);
+  assert.equal(fs.readFileSync(kept, 'utf8').includes('queued:'), false, 'and not queued');
 });
 
 test(
@@ -724,20 +746,26 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
     /^gone-a1b2 +Its workflow is gone  workflow: nope  repo: \S+  queued 1 of 2 — not started at \S+: gone-a1b2\.md: `workflow: nope` — no workflow folder at .* Edit the card, or take it back and queue it again, and the tick tries it again$/,
   );
 
-  // The next pass does not try it again: the card behind it starts.
   const next = await tick(b.e);
   const [behind] = fromCard('behind-c3d4');
-  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true });
+  assert.deepEqual(
+    next.queue,
+    { card: 'behind-c3d4', run: behind.id, removed: true },
+    'the next pass does not try it again: the card behind it starts',
+  );
   assert.deepEqual([(await tick(b.e)).queue, fromCard('gone-a1b2')], [undefined, []], 'nothing more: the refused card waits for a person');
 
-  // The workflow put back, and the card queued again: the next pass tries it, and starts it.
   fs.mkdirSync(path.join(repo, 'workflows', 'nope'));
   fs.writeFileSync(path.join(repo, 'workflows', 'nope', 'implement.md'), 'implement it\n');
   await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off');
   await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2');
   const retried = await tick(b.e);
   const [back] = fromCard('gone-a1b2');
-  assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back.id, removed: true });
+  assert.deepEqual(
+    retried.queue,
+    { card: 'gone-a1b2', run: back.id, removed: true },
+    'the workflow put back, and the card queued again: the next pass tries it, and starts it',
+  );
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
 });
 
@@ -768,12 +796,13 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   const [behind] = fromCard('behind-c3d4');
   assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true });
 
-  // Taken back though its repository is gone, and listed with why, out of the queue.
-  assert.deepEqual(await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off'), [
-    `gone-a1b2  taken back: it no longer starts on its own — start it with wf start ${gone}`,
-  ]);
+  assert.deepEqual(
+    await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off'),
+    [`gone-a1b2  taken back: it no longer starts on its own — start it with wf start ${gone}`],
+    'taken back though its repository is gone',
+  );
   assert.equal(fs.readFileSync(gone, 'utf8'), `---\nworkflow: dev\nrepo: ${doomed}\n---\nIts repository is gone\n`);
-  assert.equal(readInbox().find((l) => l.name === 'gone-a1b2')!.queued, undefined);
+  assert.equal(readInbox().find((l) => l.name === 'gone-a1b2')!.queued, undefined, 'and listed with why, out of the queue');
   await assert.rejects(
     main(['inbox', 'queue', 'gone-a1b2'], b.e),
     refusedWith(/^gone-a1b2\.md: `repo: .*` names no directory\./),
@@ -785,7 +814,6 @@ test('a queued card whose start fails without a refusal — its repository no gi
   emptyStore(undefined);
   const b = board();
   const repo = aRepoWith('dev');
-  // A directory with a workflow in it, and no git: the start's `git rev-parse` fails, with no exit code of the package's.
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
   fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
   fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
@@ -795,7 +823,11 @@ test('a queued card whose start fails without a refusal — its repository no gi
   const first = await tick(b.e);
   assert.ok(first.queue && 'failed' in first.queue, JSON.stringify(first.queue));
   assert.deepEqual([first.queue.card, first.queue.again], ['no-git-a1b2', false]);
-  assert.match(first.queue.failed, /^Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  assert.match(
+    first.queue.failed,
+    /^Command failed: git rev-parse HEAD \/ .*not a git repository/,
+    "a directory with a workflow in it, and no git: the start's `git rev-parse` fails, with no exit code of the package's",
+  );
   const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8'));
   assert.deepEqual([written.refused, written.repo, written.why], [false, bare, first.queue.failed]);
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('no-git-a1b2'))!;
@@ -804,7 +836,6 @@ test('a queued card whose start fails without a refusal — its repository no gi
     / {2}queued 1 of 2 — failed at \S+: Command failed: git rev-parse HEAD .* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
-  // `wf up` over two passes: the failure said on the first, the card tried on both, and the card behind it not started.
   const up = board();
   let passes = 0;
   const stop = new Error('the test stops the daemon');
@@ -822,10 +853,12 @@ test('a queued card whose start fails without a refusal — its repository no gi
   } finally {
     log.mock.restore();
   }
-  // Said on the daemon's first pass though the failure is `again`: it was written down by the `tick` above, whose line this daemon never
-  // printed, and a person restarting `wf up` to see why cards stopped starting is told by it. Then not again, however many passes follow.
   const named = printed.filter((l) => l.includes('no-git-a1b2'));
-  assert.equal(named.length, 1, printed.join('\n'));
+  assert.equal(
+    named.length,
+    1,
+    `\`wf up\` over two passes says the failure once, on its first pass, though it is \`again\`: the \`tick\` above wrote it down and this daemon never printed its line, and a person restarting \`wf up\` to see why cards stopped starting is told by it:\n${printed.join('\n')}`,
+  );
   assert.match(
     named[0],
     /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
@@ -838,25 +871,24 @@ test('a queued card whose start fails without a refusal — its repository no gi
   );
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8')).at, written.at, 'not written again');
 
-  // Git put there: the next pass starts it, and the pass after removes its try, then starts the card behind it.
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: bare, stdio: 'ignore' });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
   const cleared = await tick(b.e);
   const [run] = fromCard('no-git-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run.id, removed: true });
+  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run.id, removed: true }, 'git put there: the next pass starts it');
   const behind = await tick(b.e);
   assert.deepEqual(
     [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
     ['behind-c3d4', []],
+    'and the pass after removes its try, then starts the card behind it',
   );
 });
 
 test("a queued card whose `repo:` is no git repository leaves the daemon's own stderr alone: git's words are read off the failure, not passed through", async (t) => {
   emptyStore(undefined);
   const b = board();
-  // A directory with a workflow in it and no git, as above: the start's `git rev-parse` fails, and git writes `fatal:` on its stderr.
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
   fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
   fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
@@ -873,26 +905,33 @@ test("a queued card whose `repo:` is no git repository leaves the daemon's own s
   } finally {
     stderr.mock.restore();
   }
-  assert.deepEqual(said, [], "git's stderr is not the daemon's: a pass every four seconds would print it every four seconds");
+  assert.deepEqual(
+    said,
+    [],
+    "git writes `fatal:` on its stderr, and that stderr is not the daemon's: a pass every four seconds would print it every four seconds",
+  );
 
-  // Read all the same, and said once, with the card's name on it.
   assert.ok(pass.queue && 'failed' in pass.queue, JSON.stringify(pass.queue));
-  assert.match(queueLine(pass.queue), /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/);
+  assert.match(
+    queueLine(pass.queue),
+    /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/,
+    "read all the same, and said once, with the card's name on it",
+  );
 });
 
 test('a `wf up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written', async (t) => {
   emptyStore('1');
   const b = board();
-  // A card whose start fails without a refusal, tried and written down by a pass of its own — the daemon that is gone.
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
   fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
   fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
   aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
   const before = await tick(b.e);
-  assert.ok(before.queue && 'failed' in before.queue && !before.queue.again, JSON.stringify(before.queue));
+  assert.ok(
+    before.queue && 'failed' in before.queue && !before.queue.again,
+    `a card whose start fails without a refusal, tried and written down by a pass of its own, the daemon that is gone: ${JSON.stringify(before.queue)}`,
+  );
 
-  // A run to hold the one slot, so the daemon's first pass files it and reads no queue at all — and finishes before the second pass,
-  // which tries the card and fails as the pass above did: `again`, and never said by this daemon.
   const busy = started('holds the slot', at(1));
   let passes = 0;
   const stop = new Error('the test stops the daemon');
@@ -913,7 +952,11 @@ test('a `wf up` at a cap of 1 names the card its queue is stuck on once a slot f
   }
 
   const named = printed.filter((l) => l.includes('no-git-a1b2'));
-  assert.equal(named.length, 1, printed.join('\n'));
+  assert.equal(
+    named.length,
+    1,
+    `a run holds the one slot, so the daemon's first pass reads no queue, and its second tries the card and fails as the pass above did, \`again\`, never said by this daemon:\n${printed.join('\n')}`,
+  );
   assert.match(named[0], /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);

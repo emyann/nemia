@@ -74,9 +74,9 @@ export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { hol
   }));
 
 /**
- * The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. The same for a run listed with no
- * graph, by an api process started before the list carried one: the list is read tolerantly (`onYouOf`), so each card says what to do
- * rather than the floor refusing every run, or a card printing the TypeError reading `undefined` makes.
+ * The layering's columns, left first; on a cycle, the run's order a column each, and what is wrong. The same, with `UNGRAPHED`, for a run
+ * an api older than the board listed with no graph: the list is read tolerantly (`onYouOf`), so each card says what to do rather than the
+ * floor refusing every run.
  */
 export function columnsOf(names: readonly string[], graph: RunGraph): { columns: string[][]; error: string | null } {
   if (!Array.isArray((graph as Partial<RunGraph> | undefined)?.edges)) return { columns: names.map((name) => [name]), error: UNGRAPHED };
@@ -266,22 +266,26 @@ function sideCurve(a: Pill, b: Pill): Curve {
   return { path: `M ${x1},${y1} C ${mid},${y1} ${mid},${y2} ${x2},${y2}`, end: { x: x2, y: y2 }, toward: { x: mid, y: y2 } };
 }
 
-/** Over the row, from the top of one box to the top of one a column or more on, its middle at `peak`. */
+/**
+ * Over the row, from the top of one box to the top of one a column or more on, its middle at `peak`: a cubic's point at t = ½ is ⅛ of
+ * each end and ⅜ of each control point, as in `loopPath`.
+ */
 function overCurve(a: Pill, b: Pill, peak: number): Curve {
   const [x1, y1, x2, y2] = [a.x + a.width * 0.75, a.y, b.x + b.width * 0.25, b.y];
-  // A cubic's point at t = ½ is ⅛ of each end and ⅜ of each control point, as in `loopPath`.
   const control = (peak - (y1 + y2) / 8) / 0.75;
   return { path: `M ${x1},${y1} C ${x1},${control} ${x2},${control} ${x2},${y2}`, end: { x: x2, y: y2 }, toward: { x: x2, y: control } };
 }
 
-/** Under the row, from under the looping step to under the one it runs again (`loopPath`), its middle at `bottom`. */
+/**
+ * Under the row, from under the looping step to under the one it runs again (`loopPath`), its middle at `bottom`. The head comes from
+ * the last control point, which `loopPath` puts straight under the target, so it points up into it.
+ */
 function loopCurve(a: Pill, b: Pill, bottom: number): Curve {
   const [source, target] = [
     { x: a.x + a.width / 2, y: a.y + a.height },
     { x: b.x + b.width / 2, y: b.y + b.height },
   ];
   const { path } = loopPath(source, target, bottom - Math.max(source.y, target.y));
-  // Its last control point, as `loopPath` puts it: straight under the target, so the head points up into it.
   return { path, end: target, toward: { x: target.x, y: (bottom - (source.y + target.y) / 8) / 0.75 } };
 }
 

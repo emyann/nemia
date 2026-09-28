@@ -432,7 +432,7 @@ export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>
 
 /**
  * Whether a skill asks to be told whole, in the system prompt after the agent's instructions, rather than named for the session to load:
- * its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (F8: its own `preload` is inert on a plugin's skill), so
+ * its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (its own `preload` is inert on a plugin's skill), so
  * the run does it when it renders the agent (`writeAgentFiles`). False for a SKILL.md that cannot be read.
  */
 export function preloads(skillDir: string): boolean {

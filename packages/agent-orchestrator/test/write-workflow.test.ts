@@ -3,6 +3,9 @@
  *
  * The write is the only way the board changes a folder, so what it refuses is refused before a byte is written — each refusal here is
  * asserted in its words and with the folder as it was — and what it writes is what `loadWorkflows` reads back.
+ *
+ * `WF_ROOT` is set before the modules are imported, since they read it as they load. The repository's agents and skills are copied
+ * beside the store's workflows, as beside its own: dev's steps name them.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,14 +16,12 @@ import { loadWorkflows } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-write-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { writeWorkflow } = await import('../src/runner.ts');
 
 const STORE = path.join(ROOT, 'workflows');
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'dev');
 
-/** The repository's agents, beside the store's workflows as beside its own: dev's steps name them. */
 fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
 fs.cpSync(path.join(SHIPPED, '..', 'skills'), path.join(STORE, 'skills'), { recursive: true });
 
@@ -77,7 +78,6 @@ test("a workflow's steps written back as they were leave every file as it was �
 
 test('a step changed is rendered and written, a step unchanged keeps its file, a step gone loses its file — and the schema and the README stay as they are', () => {
   const dir = devIn('changed');
-  // dev's review reads its schema beside its agent now; a schema in the folder is still the folder's, and no write of the steps touches it.
   fs.copyFileSync(path.join(STORE, 'agents', 'review.schema.json'), path.join(dir, 'review.schema.json'));
   const before = snapshot(dir);
   const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
@@ -90,31 +90,39 @@ test('a step changed is rendered and written, a step unchanged keeps its file, a
   assert.deepEqual(loadWorkflows(dir), fewer.steps, 'what it returns is what the folder reads as');
   assert.equal(fewer.steps.find((s) => s.name === 'review')!.rounds, 2);
 
-  // Implement and docs, review and ship gone: docs.md written, their files removed, review.schema.json and the README untouched.
   const docs = step('docs', { after: ['implement'], model: 'sonnet' });
   const other = writeWorkflow(dir, [docs, implement]);
-  assert.deepEqual([other.written, other.kept, other.removed], [['docs.md'], ['implement.md'], ['review.md', 'ship.md']]);
+  assert.deepEqual(
+    [other.written, other.kept, other.removed],
+    [['docs.md'], ['implement.md'], ['review.md', 'ship.md']],
+    'implement and docs, review and ship gone: docs.md written, their files removed',
+  );
   assert.deepEqual(Object.keys(snapshot(dir)), ['README.md', 'docs.md', 'implement.md', 'review.schema.json']);
-  assert.equal(snapshot(dir)['README.md'], before['README.md']);
-  assert.equal(snapshot(dir)['review.schema.json'], before['review.schema.json']);
+  assert.equal(snapshot(dir)['README.md'], before['README.md'], 'the README untouched');
+  assert.equal(
+    snapshot(dir)['review.schema.json'],
+    before['review.schema.json'],
+    "a schema in the folder is the folder's, and no write of the steps touches it",
+  );
   assert.equal(fs.readFileSync(path.join(dir, 'docs.md'), 'utf8'), '---\nafter: implement\nmodel: sonnet\n---\ndocs it\n');
   assert.deepEqual(
     loadWorkflows(dir).map((s) => s.name),
     ['implement', 'docs'],
   );
 
-  // A folder's other files are not steps, and are not the write's to remove.
   fs.writeFileSync(path.join(dir, 'notes.txt'), 'mine\n');
   fs.mkdirSync(path.join(dir, 'schemas'));
   fs.writeFileSync(path.join(dir, 'schemas', 'old.md'), 'not a step: not in the folder itself\n');
-  assert.deepEqual(writeWorkflow(dir, [implement]).removed, ['docs.md']);
-  assert.deepEqual(Object.keys(snapshot(dir)), [
-    'README.md',
-    'implement.md',
-    'notes.txt',
-    'review.schema.json',
-    path.join('schemas', 'old.md'),
-  ]);
+  assert.deepEqual(
+    writeWorkflow(dir, [implement]).removed,
+    ['docs.md'],
+    "a folder's other files are not steps, and not the write's to remove",
+  );
+  assert.deepEqual(
+    Object.keys(snapshot(dir)),
+    ['README.md', 'implement.md', 'notes.txt', 'review.schema.json', path.join('schemas', 'old.md')],
+    "a folder's other files stay",
+  );
 });
 
 test('the README is written only when it is given, to the name the README already has — and a new workflow is a folder made, with its first step', () => {
@@ -146,10 +154,13 @@ test("written where the board lists workflows from — the store's workflows/ an
   const repo = scratch('wf-write-repo-');
   fs.mkdirSync(path.join(repo, '.git'));
   assert.deepEqual(writeWorkflow(path.join(repo, 'workflows', 'dev'), [step('implement')]).written, ['implement.md'], "a repository's");
-  // A worktree's .git is a file, and a worktree is a repository all the same.
   const worktree = scratch('wf-write-worktree-');
   fs.writeFileSync(path.join(worktree, '.git'), 'gitdir: /elsewhere\n');
-  assert.deepEqual(writeWorkflow(path.join(worktree, 'workflows', 'dev'), [step('implement')]).written, ['implement.md'], "a worktree's");
+  assert.deepEqual(
+    writeWorkflow(path.join(worktree, 'workflows', 'dev'), [step('implement')]).written,
+    ['implement.md'],
+    "a worktree's: its .git is a file, and a worktree is a repository all the same",
+  );
 
   const elsewhere = path.join(scratch('wf-write-elsewhere-'), 'dev');
   assert.deepEqual(writeWorkflow(elsewhere, [step('implement')], undefined, { anywhere: true }).written, ['implement.md']);
@@ -241,21 +252,24 @@ test('REFUSED, with the folder as it was: an `output:` naming a schema that is n
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: 'reviews.schema.json' } }])),
     /^review: `output: reviews\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/,
   );
-  // A schema of the step's own, beside another workflow: there, strict, and still not the folder's.
   const theirs = path.join(devIn('theirs'), 'review.schema.json');
   const up = path.relative(dir, theirs);
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: up } }])),
     `review: \`output: ${up}\` names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — \`output: review.schema.json\` — or delete the line, and the step declares no output.`,
+    "a schema of the step's own, beside another workflow: there, strict, and still not the folder's",
   );
   assert.match(
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, output: { file: theirs } }])),
     /^review: `output: \/.*` names a file outside the workflow folder/,
   );
-  // A schema given with the step is not what is read: the folder's file is.
   const loose = { type: 'object', properties: { x: { type: 'string' } }, required: [], additionalProperties: false } as const;
   const written = writeWorkflow(dir, [implement, { ...review, output: { file: 'review.schema.json', schema: loose } } as StepDraft]);
-  assert.deepEqual(written.steps.find((s) => s.name === 'review')!.output, review.output);
+  assert.deepEqual(
+    written.steps.find((s) => s.name === 'review')!.output,
+    review.output,
+    "a schema given with the step is not what is read: the folder's file is",
+  );
 });
 
 test('REFUSED, with the folder as it was: a step name that is not a file name, one name twice, no steps, a line break in a value, and a folder that is a file', () => {
@@ -323,8 +337,6 @@ const caseSensitive = (() => {
 test('the files of the steps the folder no longer has go before a byte of the new ones is written', (t) => {
   const dir = devIn('order');
   const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
-  // The order the write made them in, which is what a filesystem that does not tell case apart turns on, and the only way to read it on one
-  // that does: there `review.md` and `REVIEW.md` are one file, and a removal after the write would remove what was written.
   const order: string[] = [];
   const { rmSync, writeFileSync } = fs;
   const removals = t.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => {
@@ -345,11 +357,14 @@ test('the files of the steps the folder no longer has go before a byte of the ne
     removals.mock.restore();
     writes.mock.restore();
   }
-  // Which removal came first is `readdirSync`'s order, which is the filesystem's and not sorted; what the rule says is that every one of
-  // them came before the write.
   const wrote = order.indexOf('wrote REVIEW.md');
   assert.ok(wrote >= 0, order.join(', '));
-  assert.deepEqual(order.slice(0, wrote).sort(), ['removed review.md', 'removed ship.md'], 'both removals come before the write');
+  assert.deepEqual(
+    order.slice(0, wrote).sort(),
+    ['removed review.md', 'removed ship.md'],
+    "both removals come before the write, in readdirSync's order, the filesystem's: where case is not told apart review.md and " +
+      'REVIEW.md are one file, and a removal after the write would remove what was written',
+  );
   assert.deepEqual(order.slice(wrote), ['wrote REVIEW.md'], 'and nothing is removed after it — implement.md is left as it is');
 });
 
@@ -378,7 +393,6 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
   const dir = devIn('linked');
   const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
   const away = scratch('wf-write-linked-');
-  /** A file of the folder moved out of it and linked back in, as a person keeping a step beside another workflow would. */
   const link = (file: string): string => {
     const to = path.join(away, file);
     fs.renameSync(path.join(dir, file), to);
@@ -392,7 +406,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship])),
     fix('review.md'),
-    'a step the write would render through it',
+    'a step the write would render through a link — its file moved out and linked back in, as a person keeping a step beside another would',
   );
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement])),
@@ -401,13 +415,13 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
   );
   assert.equal(fs.readFileSync(path.join(away, 'review.md'), 'utf8'), was, 'what it points at is untouched');
 
-  // A linked README is refused when a README is given, since that is when it is written — and not otherwise, since then nothing touches it.
   fs.rmSync(path.join(dir, 'review.md'));
   fs.renameSync(path.join(away, 'review.md'), path.join(dir, 'review.md'));
   const readme = fs.readFileSync(link('README.md'), 'utf8');
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [implement, review, ship], '# theirs\n')),
     fix('README.md'),
+    'a linked README is refused when a README is given, since that is when it is written',
   );
   assert.equal(fs.readFileSync(path.join(away, 'README.md'), 'utf8'), readme, 'and what it points at is untouched');
   assert.deepEqual(

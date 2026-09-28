@@ -9,10 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
-import { clientOf } from '../src/a2a-client.ts';
-import { sightingOf } from '../src/a2a-map.ts';
+import { clientOf } from '../src/a2a/client.ts';
+import { sightingOf } from '../src/a2a/map.ts';
 import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest } from '../src/facade.ts';
-import type { RunnerOps } from '../src/runner.ts';
+import type { RunnerOps } from '../src/harness/seam.ts';
 
 /**
  * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With

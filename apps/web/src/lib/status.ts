@@ -34,8 +34,9 @@ export type StepState =
   | 'unknown';
 
 /**
- * `runHeld` has no default, on purpose: a caller that forgot the hold would draw a held run's gate as asking a person, and the compiler names
- * every caller that has to say it.
+ * A step's state from its word, whether the run was called off, and whether a person holds the run: `held` for a state a hold stops
+ * (`HELD_BY_A_HOLD`) on a run not called off. `runHeld` has no default, so the compiler names every caller that has to say it: a caller
+ * that forgot the hold would draw a held run's gate as asking a person.
  */
 export function stepState(status: string, runCancelled: boolean, runHeld: boolean): StepState {
   const state = wordState(status, runCancelled);
@@ -53,47 +54,40 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
   'budget-exhausted',
 ]);
 
-/** A step's state from its word alone, and whether the run was called off. */
+/**
+ * A step's state from its word alone, and whether the run was called off. `succeeded · BLOCKED` is `blocked`: the session ended cleanly,
+ * and the step waits on a person. `over budget` comes with the amounts — `over budget $4.25 of $3`, or `over budget — implement $4.25 of $3`
+ * on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at most its own word, `unverified`; so is
+ * `input-required`, a task held open whose turn signed and waits for a person's word with nothing running, whose word beside it says which
+ * (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started `--after` runs that have not shipped, and
+ * `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the feed's `waiting for a run slot` without the
+ * count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `running (working)`, `working (quiescent)`,
+ * `starting`, `between attempts`, or one `wf ls` has that this does not know — is `working`: a step the board cannot name is shown as still
+ * going, never as done or as needing you.
+ */
 function wordState(status: string, runCancelled: boolean): StepState {
-  // `succeeded · BLOCKED`: the session ended cleanly, and the step is waiting on a person.
   const [word = '', said] = status.split(' · ');
   if (said === 'BLOCKED') return 'blocked';
-  // The run's own verdict on a signed step: its check exited 0, is running, or did not exit 0.
   if (word === 'verified ✓') return 'verified';
-  // At its gate: signed off — verified first, where it has a check — and nothing after it is filed until a person approves it or sends it back.
   if (word === 'awaiting approval') return 'awaiting-approval';
-  // A loop out of rounds: its looping step asked for another round on the last one `rounds:` allows. Final, and a person decides.
   if (word === 'rounds exhausted') return 'exhausted';
-  // Past its cap, with the amounts: its tries have cost its `budget:` or more and another session of it is the way on — `over budget $4.25 of
-  // $3`, or on a looping step whose round would file one, `over budget — implement $4.25 of $3` — or its harness ended its session at the cap.
-  // Final, and a person decides whether to spend more.
   if (word.startsWith('over budget ')) return 'over-budget';
   if (word === 'budget exhausted' || word.startsWith('budget exhausted ')) return 'budget-exhausted';
   if (word === 'checking') return 'checking';
   if (word.startsWith('failed ✗ check')) return 'failed-check';
-  // Signed off, with no `check:` to run: nothing but its own word says it worked.
   if (word === 'unverified') return 'unverified';
-  // Ended without the closeout it was asked for.
   if (word === 'unsigned') return 'unsigned';
-  // Signed off, having been denied a call, on a step that says `denials: fail`: nothing after it is filed, and its check did not run.
   if (word === 'denied') return 'denied';
   if (word === 'needs-human') return 'needs-human';
   if (word === 'failed') return 'failed';
   if (word === 'stopped') return 'cancelled';
-  // The engine's word for a session that ended, which is not work that was done: at most its own word.
   if (word === 'succeeded') return 'unverified';
-  // A task held open whose turn signed, waiting for a person's word with nothing running: the run reads it as it signed. Its word beside
-  // it says which — `input-required · BLOCKED` — and `wf ls` gives it that word or its own; alone it is a session that ended, as above.
   if (word === 'input-required') return 'unverified';
   if (word === 'unreadable') return 'unreadable';
   if (word === 'unknown') return 'unknown';
-  // `waiting on a-1x2y (cancelled), b-3z4w`: a root of a run started `--after` runs that have not shipped. Not filed, as `waiting` is.
-  // `waiting for a run slot (2 of 2 in flight)`, and on the feed without the count: a root of a run the cap on runs in flight holds.
   if (word === 'waiting for a run slot' || word.startsWith('waiting for a run slot ('))
     return runCancelled ? 'cancelled' : 'waiting-for-slot';
   if (word === 'waiting' || word.startsWith('waiting on ') || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
-  // `running (working)`, `working (quiescent)`, `starting`, `between attempts` — and, on purpose, a word `wf ls` has
-  // gained since this was written: a step the board cannot name is shown as still going, never as done or as needing you.
   return 'working';
 }
 
@@ -146,31 +140,31 @@ export const stateMeaning: Record<StepState, string> = {
   unknown: 'unknown: the engine has no record of its task',
 };
 
+/**
+ * The chip's classes for each state. Amber and bold for a state that waits on a person's word (`isGate`); amber and ringed for work to try
+ * again, not a question (`unsigned`, `denied`); red for a failure. `unverified` is neutral and ringed, not green, since nothing checked it,
+ * and `StatusChip` marks it too, so it does not pass for a step still to do. `held` is violet, not grey as `waiting` is: nobody is asked,
+ * and a person's word stops it, not the order of the steps.
+ */
 export const stateClass: Record<StepState, string> = {
   working: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
   'needs-human': 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300',
   checking: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
   verified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  // Neutral, not green: nothing checked it. `StatusChip` marks it too, so it does not pass for a step still to do.
   unverified:
     'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
   blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  // Waiting on a person, as `blocked` is: the work is signed off, and a person's word is what files what follows.
   'awaiting-approval': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  // Waiting on a person, as `blocked` is: nothing broke, and the loop goes no further until somebody decides.
   exhausted: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
-  // Waiting on a person too: whether to spend more is a decision, and the amounts beside the word say what was spent.
   'over-budget': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   'budget-exhausted': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   unsigned: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
-  // As `unsigned`: work to try again, not a question — it signed off, and what it did without the call is a person's to weigh.
   denied: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
   'failed-check':
     'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
   'waiting-for-slot': 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
-  // Nobody is asked, as with `waiting`, and not grey: a person's word stops it, not the order of the steps.
   held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
   unreadable: 'border border-dashed border-red-400 text-red-800 dark:border-red-700 dark:text-red-300',

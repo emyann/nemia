@@ -1,9 +1,11 @@
 /**
  * A workflow step on a remote A2A agent, end to end: `wf start` on a folder team whose step says `harness: a2a:reviewer`, the store's
- * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `wf up` makes (`engine()`),
- * each run at rest judged in full as well (`WF_VERIFY_REST`). The agent is sent the brief as a message, with the secret its card asks for read
- * from `WF_A2A_REVIEWER_TOKEN` and never written to the store; the brief names nothing of this machine; the Task it completes is the step's
- * sign-off, and a data part on it is read as a closeout. A secret not given sends nothing, and the step's failure names the variable to set.
+ * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `wf up` makes
+ * (`engine()`), each run at rest judged in full as well (`WF_VERIFY_REST`): a difference throws (`verifyRest` in tick.ts). The agent is
+ * sent the brief as a message, with the secret its card asks for read from the variable `envNameOf` names, WF_A2A_REVIEWER_TOKEN here, and
+ * never written to the store; the brief names nothing of this machine; the Task it completes is the step's sign-off, and a data part on it
+ * is read as a closeout. A secret not given sends nothing, and the step's failure names the variable to set. `WF_ROOT` is set before the
+ * import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,9 +15,7 @@ import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-remote-step-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { engine, readRun, tick } = await import('../src/runner.ts');
@@ -118,12 +118,12 @@ test('a step on a remote agent is sent its brief, with the secret its card asks 
   assert.ok(run.steps.ask?.taskId, 'filed');
   assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
   assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
-  // The secret is in no file of the store.
   const everything = (dir: string): string[] =>
     fs
       .readdirSync(dir, { withFileTypes: true })
       .flatMap((d) => (d.isDirectory() ? everything(path.join(dir, d.name)) : [path.join(dir, d.name)]));
-  for (const file of everything(ROOT)) assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `${file} holds the secret`);
+  for (const file of everything(ROOT))
+    assert.equal(fs.readFileSync(file, 'utf8').includes('s3cret'), false, `the secret is in no file of the store, and ${file} holds it`);
 });
 
 test('a data part on the Task the agent completes is its closeout: `blocked` there reads blocked, with what it needs', async () => {
@@ -145,10 +145,9 @@ test('a secret not given sends nothing, and the step fails naming the variable t
   assert.equal(view.phase, 'failed');
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
-  // Offered a new Task, and not a session continued nor a model, which `wf retry` refuses on a remote step.
   assert.ok(
     decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  wf retry ${id} ask`),
-    decided.join('\n'),
+    `offered a new Task, not a session continued nor a model, which wf retry refuses on a remote step:\n${decided.join('\n')}`,
   );
   assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
 });
@@ -171,13 +170,12 @@ test('a Task the agent leaves waiting on a question reads as waiting on you: wf 
     const listed = (await printed(['ls'], e)).join('\n');
     assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
     const decided = (await printed(['decide', id], e)).join('\n');
-    // Where a person answers it is `wf say`, not a Claude Code session a remote agent is not in.
     assert.match(
       decided,
       new RegExp(
         `ask: waiting for an input — read its question with wf logs ${id} ask, and answer it with wf say ${id} ask "<your answer>"`,
       ),
-      decided,
+      `a person answers with wf say, not in a Claude Code session a remote agent is not in:\n${decided}`,
     );
     assert.equal(decided.includes('claude agents'), false, decided);
     assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);

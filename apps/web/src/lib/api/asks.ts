@@ -10,8 +10,8 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
  * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
  * session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that cannot ride
- * on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own about the request.
- * `budget` is `--budget`: the cap a step over its budget, or ended at it, is raised to.
+ * on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own about the request; and an answer that succeeded without the try,
+ * saying the ask may be written. `budget` is `--budget`: the cap a step over its budget, or ended at it, is raised to.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
@@ -27,7 +27,6 @@ export async function askTry(
     | undefined;
   if (res.ok && typeof body?.try === 'number') return { try: body.try, file: String(body.file), stopFirst: body.stopFirst === true };
   if (res.ok) {
-    // Written, it may well be: look before asking again.
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the try it asked for, so the api and this board disagree about what an ask answers. ` +
         `The ask may be written: look at the step's note (\`wf ls ${runId}\`) before asking again, and restart the api (\`npm run dev\`).`,
@@ -40,7 +39,7 @@ export async function askTry(
  * Ask for another round of a run's loop, as `wf round` does — past a cap, with `budget`, `--budget`: the api calls the package's `round()`,
  * which writes the ask and nothing else, and the next tick files the round. Resolves with the looping step, the round asked for, and its ask
  * file; rejects with the api's refusal in full — the package's words for a round the loop may not go, or a budget not above what its steps
- * have cost — or the api's own about the request.
+ * have cost — or the api's own about the request; and an answer that succeeded without the round, saying the ask may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
  */
@@ -56,7 +55,6 @@ export async function askRound(
   if (res.ok && typeof body?.step === 'string' && typeof body.round === 'number')
     return { step: body.step, round: body.round, file: String(body.file) };
   if (res.ok) {
-    // Written, it may well be: look before asking again.
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the round it asked for, so the api and this board disagree about what an ask answers. ` +
         `The ask may be written: look at the looping step's note (\`wf ls ${runId}\`) before asking again, and restart the api (\`npm run dev\`).`,
@@ -69,7 +67,8 @@ export async function askRound(
  * Approve a step waiting at its gate, as `wf approve` does — with `message`, `--message`, the words every step after the gate is handed: the
  * api calls the package's `approve()`, which writes the approval and nothing else, and the next tick files what waits on the step. Resolves
  * with the try approved, when, the words and the approval's file; rejects with the api's refusal in full — the package's words for a step
- * that may not be approved, or for empty words — or the api's own about the request.
+ * that may not be approved, or for empty words — or the api's own about the request; and an answer that succeeded without the approval,
+ * saying it may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
@@ -87,7 +86,6 @@ export async function approveStep(
     return { try: body.try, at: body.at, message: typeof body.message === 'string' ? body.message : null, file: String(body.file) };
   }
   if (res.ok) {
-    // Written, it may well be: look before approving again.
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the approval it wrote, so the api and this board disagree about what approving answers. ` +
         `The approval may be written: look at the step (\`wf decide ${runId}\`) before approving again, and restart the api (\`npm run dev\`).`,
@@ -101,7 +99,8 @@ export async function approveStep(
  * findings open, which every step after the loop is handed, and which the package requires: the api calls the package's `accept()`, which
  * writes the acceptance and nothing else, and the next tick files what waits on the looping step. Resolves with the step, the try accepted,
  * when, the words and the acceptance's file; rejects with the api's refusal in full — the package's words for words missing or empty, or for a
- * loop that may not be accepted — or the api's own about the request.
+ * loop that may not be accepted — or the api's own about the request; and an answer that succeeded without the acceptance, saying it may be
+ * written.
  *
  * Sent as `application/json`, which the api requires of it, as of an approval. Going round once more is `askRound`.
  */
@@ -119,7 +118,6 @@ export async function acceptLoop(
     return { step: body.step, try: body.try, at: body.at, message: String(body.message), file: String(body.file) };
   }
   if (res.ok) {
-    // Written, it may well be: look before accepting again.
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the acceptance it wrote, so the api and this board disagree about what accepting answers. ` +
         `The acceptance may be written: look at the looping step (\`wf ls ${runId}\`) before accepting again, and restart the api (\`npm run dev\`).`,
@@ -131,7 +129,8 @@ export async function acceptLoop(
 /**
  * Tell a step's running session something, as `wf say` does: the api calls the package's `say()`, which hands the words to the session through
  * the engine, and the engine journals them on the step's task. Resolves with that entry; rejects with the api's refusal in full — the package's
- * words or the engine's, verbatim — or the api's own about the request.
+ * words or the engine's, verbatim — or the api's own about the request; and an answer that succeeded without the entry, saying the words
+ * may have been said.
  *
  * Sent as `application/json`, which the api requires of it, as of a start and an ask.
  */
@@ -145,7 +144,6 @@ export async function sayToStep(runId: string, step: string, text: string): Prom
     return { at: body.at, attempt: body.attempt, text: body.text };
   }
   if (res.ok) {
-    // Said, it may well be: look before saying it twice.
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without what it journalled, so the api and this board disagree about what saying answers. ` +
         `The words may have been said: read the step's record (\`wf decide ${runId}\`) before saying them again, and restart the api (\`npm run dev\`).`,

@@ -148,7 +148,9 @@ function skillFolders(dir: string): string[] {
 
 /**
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is in
- * yours alone — then what HKB ships, each marked where an agent of yours already finds a skill of its name.
+ * yours alone — then what HKB ships, each marked where an agent of yours already finds a skill of its name. A name both of one repository's
+ * places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed in yours with
+ * the package's refusal as its `error`.
  */
 export function listSkills(repo: string, home: string = HOME, shipped: string = SHIPPED_SKILLS): SkillPlace[] {
   const found = skillsOfYours(repo, home);
@@ -161,7 +163,6 @@ export function listSkills(repo: string, home: string = HOME, shipped: string = 
   const where = new Map<string, 'yours' | 'repo'>();
   for (const [name, at] of [...found.at].sort(([a], [b]) => a.localeCompare(b))) {
     if (at instanceof WorkflowError) {
-      // One repository's two places for skills both have it: only when the store is in that repository, and nothing says which is given.
       places[0].skills.push({ ...skillRow(name, path.join(places[0].dir, name), 'yours', usedBy(name)), entry: null, error: at.message });
       where.set(name, 'yours');
       continue;
@@ -373,7 +374,10 @@ export const quoted = (text: string): string => `'${text.replace(/'/g, `'\\''`)}
  */
 export const copyCommand = (dir: string, into: string): string => `mkdir -p ${quoted(into)} && cp -r ${quoted(dir)} ${quoted(`${into}/`)}`;
 
-/** The skill `name` of `from` read now, for its page. Null when that place has no such skill. */
+/**
+ * The skill `name` of `from` read now, for its page. Null when that place has no such skill. A SKILL.md that cannot be read, or does not
+ * read as a draft, leaves `draft` null, the row saying why, and the page is filled from the body.
+ */
 export function skillDetail(
   from: SkillSource,
   name: string,
@@ -394,15 +398,11 @@ export function skillDetail(
   let text = '';
   try {
     text = fs.readFileSync(file, 'utf8');
-  } catch {
-    /* the row says why */
-  }
+  } catch {}
   let draft: SkillDraft | null = null;
   try {
     draft = skillDraftOf(file, name, text);
-  } catch {
-    /* the row says why, and the page is filled from the body */
-  }
+  } catch {}
   let body: string;
   try {
     body = splitFrontmatter(file, text).body;
@@ -467,8 +467,21 @@ const repoRefusal = (route: string, name: string | null, repo: string): string =
   return `${route} refuses to write the repository's skills (${theirs}): the board writes only your library, in ${librarySkills()}, and the api writes nothing into a checkout. Write the skill in your library, then copy its folder into the repository by hand — \`${copyCommand(path.join(librarySkills(), name ?? '<name>'), theirs)}\` — where git shows it as a change to commit.`;
 };
 
+/**
+ * The skills' routes. Each write is guarded (guard.ts) and writes only your library: 403 for the repository's (`repoRefusal`), 400 for
+ * any other place; the package's refusals are answered as `written` and `writeRefused` say.
+ *
+ * - `GET /api/skills` — every skill by place (`listSkills`), read from disk on each request, so a skill a person has just written lists as
+ *   it is now.
+ * - `GET /api/skills/:from/:name` — one skill, on its page (`skillDetail`): where it is, what it says, what it costs a turn, and the agents
+ *   that give it. 400 for a place that is not `yours`, `repo` or `shipped`, or a name that is not a skill's; 404 for one the place has not.
+ * - `POST /api/skills/:from` — a skill of yours made: written on the board (`skill`), or one HKB ships copied under its name (`copy`),
+ *   one of the two; refused, in the package's words, where the library has the name already. 201.
+ * - `PUT /api/skills/:from/:name` — a skill of yours changed at the `version` it was read at: written whole from its form (`skill`), or its
+ *   `preload:` alone, from its switch (`preload`). Either is a change of every agent that gives it. 400 for a form that names the skill
+ *   otherwise: its name is its folder.
+ */
 export const skills = new Hono()
-  // Read from disk on each request, so a skill a person has just written lists as it is now.
   .get('/api/skills', (c) => {
     try {
       return c.json(listSkills(repoOf()));
@@ -476,7 +489,6 @@ export const skills = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // One skill, on its page: where it is, what it says, what it costs a turn, and the agents that give it.
   .get('/api/skills/:from/:name', (c) => {
     const { from, name } = c.req.param();
     if (from !== 'yours' && from !== 'repo' && from !== 'shipped')
@@ -502,8 +514,6 @@ export const skills = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // A skill of yours made — written on the board, or one HKB ships copied under its name — refused, in the package's words, where the library
-  // has the name already.
   .post('/api/skills/:from', async (c) => {
     const { from } = c.req.param();
     const route = `POST /api/skills/${from}`;
@@ -547,8 +557,6 @@ export const skills = new Hono()
       .map(([agent]) => agent);
     return c.json({ skill: skillRow(name, copied.dir, 'yours', agents), written: copied.written } satisfies SkillAdded, 201);
   })
-  // A skill of yours changed at the version it was read at: written whole from its form, or its `preload:` alone, from its switch. Either is a
-  // change of every agent that gives it.
   .put('/api/skills/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `PUT /api/skills/${from}/${name}`;

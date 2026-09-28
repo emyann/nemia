@@ -42,28 +42,43 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * how long.
  *
  * The chevron, or a click anywhere on the card, opens it: the card grows to the right with every step a tile (`StepTiles`), and a
- * tile opens its step's inspector. The title opens the run's page. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which
- * leaves the gap between cards.
+ * tile opens its step's inspector. The title opens the run's page, and is not preloaded on hover: only an open run reads its detail.
+ * `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards.
+ *
+ * - Its clock (`runClock`) says how long it has been at work from its first filing, or how long it has waited before that; it moves
+ *   every second while it counts (`clockCounts`), and every 30 s otherwise.
+ * - A card nobody has decided the result of is ringed, and not dimmed as a finished card is: it is the one finished card on the floor
+ *   that waits for a person rather than for a machine.
+ * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder
+ *   run of the store's own, is tagged with its agent instead, since its folder is on no page.
+ * - On whom a run started `--after` waits, and a person's hold on it (`wf hold`), each in `wf ls`'s word, amber when only a person moves
+ *   it, with what to do on hover. A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
+ * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
+ *   lines each, whole on hover, each a link to its step on the run's page.
+ * - The gate, answered here (`CardGate`). Once answered, what the card said, through the state the answer was given in and the one it
+ *   moved the run to (the step approved, or the try asked), until the run moves on from that, the tick filing it, or back, the answer
+ *   taken back; the answer kept from the last render is adjusted as the render that sees the new state runs.
+ * - A result nobody decided, in a line that fits, whole on hover in `wf ls`'s words, a link to where it is decided on the run's page.
+ * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,
+ *   could not be read.
+ * - In its footer, so the card is no taller for them (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none on it; its
+ *   chips; the hold lifted here, as `wf hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
+ *   (`RunSummary.unreadable`), whole on hover.
+ * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that
+ *   waits on it leaves.
  */
 export function RunNode({ data: { run, finished, open, detail, trouble, selected, onToggle, onStep } }: NodeProps<RunFlowNode>) {
-  // Every second while its clock counts (`clockCounts`); a finished run's "started … ago" moves slowly.
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
   const decide = toDecideOf(run);
-  // The gate the card answers, and the needs besides it: the gate's own `approve <step>` is its line, not a need said twice.
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
-  // What the card said when a person answered its gate: through the state the answer was given in and the one it moved the run to (the
-  // step approved, or the try asked), until the run moves on from that — the tick filing it — or back, the answer taken back.
   const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
-  // Moved on as the render that sees the new state runs, as React has a state kept from the last render adjusted, not in an effect after it.
   const [taken, setTaken] = useState<Taken | null>(null);
   if (taken && stamp !== taken.stamp && stamp !== taken.next) setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;
-  // How long it has been at work, from its first filing — or, before that, how long it has waited (`runClock`).
   const clock = runClock(run, now, finished);
-  // The flowchart, off the list's own record of the run: its graph, and each step's word.
   const names = useMemo(() => run.steps.map((step) => step.name), [run.steps]);
   const edgeSteps = useMemo(() => flowSteps(run), [run]);
   const rail = useMemo(() => railOf(names, run.graph, edgeSteps, cancelled), [names, run.graph, edgeSteps, cancelled]);
@@ -73,8 +88,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
   );
 
   return (
-    // Marked while nobody has decided its result, and not dimmed as a finished card is: nothing of it moves, so it is finished, and it is
-    // on the floor because it is the one card there that is waiting for a person rather than for a machine.
     <Card
       size="sm"
       className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${decide ? 'ring-1 ring-emerald-500/60' : finished ? 'opacity-50 hover:opacity-80' : ''}`}
@@ -82,7 +95,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
           <div className="flex items-center gap-1">
-            {/* Not preloaded on hover: only an open run reads its detail. */}
             <Link
               to="/runs/$runId"
               params={{ runId: run.id }}
@@ -98,7 +110,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               aria-label={open ? 'Hide steps' : 'Show steps'}
               title={open ? 'Hide its steps' : 'Open its steps'}
               onClick={(event) => {
-                // The card toggles on a click too; this one click is the chevron's.
                 event.stopPropagation();
                 onToggle(run.id);
               }}
@@ -111,8 +122,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             <span className="truncate font-mono" title={run.id}>
               {run.id}
             </span>
-            {/* A folder run has no repository: its steps work in folders the run made (`workspace: folder`). */}
-            {/* A try of an agent, started from its page, is a folder run of the store's own: tagged, since its folder is on no page. */}
             {run.try ? (
               <TryTag agent={run.try.agent} />
             ) : (
@@ -124,7 +133,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               </span>
             )}
           </p>
-          {/* On whom a run started `--after` waits, in `wf ls`'s word — amber when one never ships without you — and what to do, on hover. */}
           {run.waiting && (
             <p
               data-waiting={run.waiting.onYou ? 'on-you' : 'on-runs'}
@@ -134,8 +142,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               {run.waiting.word}
             </p>
           )}
-          {/* A person's hold on it (`wf hold`), in `wf ls`'s word — amber once only a person lifts it — and what to do, on hover. It is what the
-              card says instead of a gate: while it stands, nothing of the run is asked of anyone, and no Approve would be taken. */}
           {run.holding && (
             <p
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
@@ -149,8 +155,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
 
         <StepRail run={run} flow={rail} />
 
-        {/* What a person has to know to act: a step's question, or a session the harness blocked. Two lines each, whole on hover, each a link
-            to its step on the run's page, where it is answered. */}
         {needs.length > 0 && (
           <ul aria-label="Needs" className="space-y-0.5 px-3 text-[11px]">
             {needs.map((need) => (
@@ -170,8 +174,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
           </ul>
         )}
 
-        {/* A gate, answered here: what approving does and where a send-back goes, and Approve and Send back. Once answered, what happened and
-            what comes next, until the run moves. */}
         {said ? (
           <p data-taken className="px-3 text-[11px] break-words text-emerald-800 dark:text-emerald-300">
             {said}
@@ -186,7 +188,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
           />
         ) : null}
 
-        {/* A result nobody decided: said in a line that fits, whole on hover in `wf ls`'s words, decided on the run's page. */}
         {decide?.kind === 'git' && !cancelled && (
           <p title={decide.said} className="line-clamp-2 px-3 text-[11px] break-words">
             <RouteLink
@@ -201,10 +202,8 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
           </p>
         )}
 
-        {/* For triage among the runs waiting on you: how far the work reaches, read once the card is opened. */}
         {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
 
-        {/* The tiles are the list's; what the run's record adds to them — each step's attempt and cost — could not be read. */}
         {open && trouble && <p className="px-3 text-[11px] text-red-600 dark:text-red-400">{trouble}</p>}
 
         <div className="flex min-h-6 items-center justify-between gap-2 border-t px-3 pt-2">
@@ -212,7 +211,6 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             <time dateTime={clock.at} title={clock.title} className="truncate">
               {clock.words}
             </time>
-            {/* What it has cost, beside its age, once a cost was measured: `≥` where an ended attempt has none on it. */}
             {run.cost && (
               <span data-cost title={spentTitle(run.cost, "the run's tries")} className="shrink-0 text-foreground">
                 · {run.cost.said}
@@ -227,16 +225,13 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
                 held
               </Badge>
             )}
-            {/* The hold lifted here, as `wf hold --off` lifts it: beside its chip, in the row the card already has. */}
             {run.holding && !cancelled && <CardLift id={run.id} />}
             {cancelled && <Badge variant="outline">cancelled</Badge>}
-            {/* In the footer the card already has, so a pruned card is no taller for it (`CELL_HEIGHT`). */}
             {run.pruned && (
               <Badge variant="outline" data-pruned title={run.pruned.said} className="text-neutral-500">
                 pruned
               </Badge>
             )}
-            {/* Why the run is not judged (`RunSummary.unreadable`), whole on hover, in the footer so the card is no taller for it. */}
             {run.unreadable && (
               <Badge
                 variant="outline"
@@ -253,9 +248,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
 
       {tiles && <StepTiles run={run} detail={detail} flow={tiles} selected={selected} onStep={(step) => onStep(run.id, step)} />}
 
-      {/* Where the edge from a run this one waits on comes in. */}
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
-      {/* Where the edge into each card that waits on it leaves the card. */}
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </Card>
   );

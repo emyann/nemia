@@ -64,9 +64,9 @@
       // bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
       // value such a file still takes by a cast keeps its guard with an `oxlint-disable-next-line` saying why.
       "files": [
-        "packages/agent-runtime/src/event-schema.ts",
-        "packages/agent-runtime/src/journal.ts",
-        "packages/agent-runtime/src/runner-detached.ts",
+        "packages/agent-runtime/src/core/event-schema.ts",
+        "packages/agent-runtime/src/core/engine/journal.ts",
+        "packages/agent-runtime/src/harness/detached/detached.ts",
         "packages/agent-orchestrator/src/store.ts",
         "packages/agent-orchestrator/src/daemon-store.ts",
         "packages/agent-orchestrator/src/inbox-store.ts",
@@ -86,8 +86,8 @@
     },
     {
       // What a test prints is read by the developer who runs it, from raw harness JSON and fetch mocks; the messages a person reads are
-      // made in src, where a value that could be an object is never stringified as `[object Object]`.
-      "files": ["**/test/**"],
+      // made in src, where a value that could be an object is never stringified as `[object Object]`. A test beside its code is one too.
+      "files": ["**/test/**", "**/*.test.ts"],
       "rules": {
         "typescript/no-base-to-string": "off",
         "typescript/restrict-template-expressions": "off"
@@ -99,7 +99,6 @@
     // reads these blocks.
     {
       "files": ["apps/api/**"],
-      "excludeFiles": ["apps/api/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
@@ -113,7 +112,6 @@
     },
     {
       "files": ["apps/web/**"],
-      "excludeFiles": ["apps/web/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
@@ -127,7 +125,6 @@
     },
     {
       "files": ["packages/agent-orchestrator/**"],
-      "excludeFiles": ["packages/agent-orchestrator/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

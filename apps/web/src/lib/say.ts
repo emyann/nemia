@@ -15,7 +15,8 @@ export type Sayable = { open: true } | { open: false; why: string };
  * Open while the step's current try has a session in flight, as the run's page words the step: at work, quiet, starting, or blocked by its
  * harness — a session waiting on a person is running, and the engine hands it the words. Closed, with the reason, for a run called off, a
  * step not filed, a task the engine has no record of, one filed and not started, and a session that has ended — signed off, checked, failed
- * or stopped — which is the run page's to answer or try again. What the page cannot see coming, the api refuses in the package's words or
+ * or stopped — which is the run page's to answer or try again. A held run stays open: a hold stops what is filed next and the answers to a
+ * gate, never a session at work, and `wf say` is not refused on it. What the page cannot see coming, the api refuses in the package's words or
  * the engine's, and the box shows that refusal as it is.
  */
 export function sayable(
@@ -30,7 +31,6 @@ export function sayable(
   }
   if (!step.taskId)
     return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
-  // A hold stops what is filed next and the answers to a gate, never a session at work: `wf say` is not refused on a held run.
   const state = stepState(step.status, false, false);
   if (state === 'working' || state === 'needs-human') return { open: true };
   if (state === 'unknown')

@@ -26,6 +26,22 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * One step on the canvas: which step, what it runs on, and what it is doing now.
  *
  * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
+ *
+ * - Its attempt's time moves every second while it counts, and every 30 s otherwise.
+ * - It is drawn as a human gate when it is one (`isGate`), a step that signed off blocked or a loop out of rounds, and the run's
+ *   `waitingOnYou` names it: a step a person has sent round or asked to retry keeps its word until the tick files what they asked for,
+ *   and is no gate from the moment they ask, as the page's banner says.
+ * - What its tries have cost, of its cap where it has one, red once they have cost it or more. It is held on its budget only when its
+ *   word says so: past the cap alone, a finished step holds nothing, since its harness ends a job at its cap, a little past it where a
+ *   call was under way.
+ * - A gate's line, and what it waits for when the step said (`nodeNeed`), on one line whole on hover, so the node is no taller than
+ *   the layering's row; the card and the run's banner say it whole.
+ * - A session the harness blocked, which is no gate: the step asked nothing. Its line says what the harness waits for
+ *   (`needNodeText`), and the whole of it, with what the session said last, is on hover and in the banner.
+ * - What the harness denied its current try: a job carries on past a denied call, so its work may be short of it. How many, on a line
+ *   that fits; which, in the package's words, on hover and on the step's section.
+ * - Its handles: on its sides, then under it where the edge back that `loop:` makes leaves its looping step and comes into its target
+ *   (`StateEdge`). The side ones come first, so an edge that names no handle takes the one on the side.
  */
 export function StepNode({
   data: { step, index, runCancelled, runHeld, waitingOnYou },
@@ -35,20 +51,13 @@ export function StepNode({
 }: NodeProps<StepFlowNode>) {
   const state = stepState(step.status, runCancelled, runHeld);
   const live = isLive(state);
-  // Every second while the attempt's time is counting; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
   const running = state === 'working';
-  // The human gate: a step that signed off blocked, or a loop out of rounds — and that the api says waits on you. A step a
-  // person has sent round (`wf round`) or asked to retry (`wf retry`) keeps its word until the tick files what they asked
-  // for, and is no gate from the moment they ask: the page's banner reads the api, and so does the drawing.
   const gate = waitingOnYou && isGate(state, runCancelled);
-  // What a person has to know to act on it: the question of a step that asks, or that the harness blocked its session.
   const need = needOf(step, waitingOnYou, runCancelled);
   const { spec } = step;
-  // What its tries have cost, of its cap where it has one: red once they have cost it or more.
   const cost = costText(step);
   const over = pastBudget(step);
-  // Held on its budget only when its word says so: past the cap alone, a finished step holds nothing (a job is ended at its cap by its harness, a little past it where a call was under way — agent-runtime's M9).
   const held = state === 'over-budget' || state === 'budget-exhausted';
 
   return (
@@ -108,10 +117,6 @@ export function StepNode({
         </p>
       )}
 
-      {/*
-        The gate, and what it waits for when the step said: one line, as the node's others, and whole on hover — a second would
-        make the node taller than the layering's row, and the card and the run's banner say it whole.
-      */}
       {gate && (
         <p
           title={need ? nodeNeed(need, step) : undefined}
@@ -126,8 +131,6 @@ export function StepNode({
           )}
         </p>
       )}
-      {/* A session the harness blocked is no gate: the step asked nothing. The line says what its harness waits for, which is what this
-          page has nowhere else at a glance (`needNodeText`); the whole of it, with what the session said last, is on hover and in the banner. */}
       {!gate && need && (
         <p
           data-need={need.kind}
@@ -137,8 +140,6 @@ export function StepNode({
           {needNodeText(need)}
         </p>
       )}
-      {/* What the harness denied its current try: a job carries on past a denied call, so its work may be short of it and nothing else
-          on the node says so. How many, on a line that fits; which, in the package's words, on hover and on the step's section. */}
       {step.denied && (
         <p
           data-denied
@@ -150,10 +151,6 @@ export function StepNode({
       )}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
-      {/*
-        Under the node, where the edge back that `loop:` makes leaves its looping step and comes into its target (`StateEdge`).
-        Last, so an edge that names no handle takes the one on the side: React Flow takes the first of a type.
-      */}
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />
     </div>
@@ -211,9 +208,10 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
 }
 
 /**
- * The step node in its spec mode, for a workflow before any run of it: the frame, the head and the handles a run's step has,
- * and where a run's step has its status and its attempt, what the step is set to do (`specLines`). No status and no
- * attempt: nothing has happened to it.
+ * The step node in its spec mode, for a workflow before any run of it: the frame, the head and the handles a run's step has, in
+ * the order `StepNode` has them, so an edge meets a step here where it meets it on a run; and where a run's step has its status and
+ * its attempt, what the step is set to do (`specLines`), each value wrapped to three lines, since a check is a command a person reads
+ * whole, then whole on hover. No status and no attempt: nothing has happened to it. While the builder has it, it is a `BuildingNode`.
  */
 export function SpecNode({
   data: { name, index, spec, build },
@@ -254,7 +252,6 @@ export function SpecNode({
           {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-neutral-500">{label}</dt>
-              {/* Wrapped rather than cut to one line: a check is a command a person reads whole. Three lines, then the title. */}
               <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>
                 {value}
               </dd>
@@ -263,7 +260,6 @@ export function SpecNode({
         </dl>
       )}
 
-      {/* The handles a run's step has, in its order (`StepNode`), so an edge meets a step here where it meets it on a run. */}
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />

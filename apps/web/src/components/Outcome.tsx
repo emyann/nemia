@@ -182,7 +182,10 @@ const ANSWER: Record<string, string> = {
   "won't fix": 'bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200',
 };
 
-/** A loop's target's answers, `finding → answer · why`: the finding and why as the markdown they are, the answer a badge. */
+/**
+ * A loop's target's answers, `finding → answer · why`: the finding, then its answer and why beneath it — the finding and why as the markdown
+ * they are, each maybe more than a line, and the answer a badge.
+ */
 function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
   return (
     <ul className="space-y-2 text-xs">
@@ -190,7 +193,6 @@ function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
         const answer = text(reply.answer ?? '');
         const why = reply.why === undefined ? '' : text(reply.why);
         return (
-          // The finding, then its answer and why beneath it: each of the agent's texts is markdown, and may be more than a line.
           <li key={i} data-answer={answer} className="space-y-0.5">
             <Markdown>{text(reply.finding ?? '')}</Markdown>{' '}
             <div className="flex items-start gap-1.5 text-neutral-500">
@@ -228,14 +230,13 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
   );
 }
 
-/** Strings a line each, each the markdown it may be; one that names an image among the try's files, that image. */
+/** Strings a line each, each the markdown it may be; one that names an image among the try's files, that image, with no bullet beside its caption. */
 function StringList({ items, artifacts }: { items: string[]; artifacts: readonly StepArtifact[] }) {
   if (!items.length) return <None />;
   return (
     <ul className="list-disc space-y-1 pl-4 marker:text-neutral-400">
       {items.map((item, i) => {
         const artifact = artifacts.find((a) => a.path === item && 'url' in a && a.kind === 'image');
-        // An image is its own mark: a bullet would sit beside its caption, under it.
         return artifact ? (
           <li key={i} className="-ml-4 list-none">
             <ArtifactView artifact={artifact} />

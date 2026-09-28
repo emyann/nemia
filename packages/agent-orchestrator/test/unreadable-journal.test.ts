@@ -3,6 +3,9 @@
  * why (`TickReport.unreadable`), and the tick leaves the run it belongs to unjudged and says so, while every other run advances — through
  * `tick` and `wf tick`, never a throw that stops the daemon. Walked through the runtime itself, `createEngine` over an in-memory journal
  * that hands back what was put in it, as a store does, and a harness the test signs by hand, as rest-store.test.ts does.
+ *
+ * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` admits sessions enough for both
+ * runs, and no cap is set on runs.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +18,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-unreadable-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it. Sessions enough for both runs, no cap on runs.
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';

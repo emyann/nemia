@@ -15,12 +15,12 @@ function answering(t: { after: (fn: () => void) => void }, body: object) {
 }
 
 const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] };
-/** A run's totals on the clock, with nothing filed: what a detail carries once its api has the timeline. */
+/** A run's totals on the clock, with nothing filed, as a detail's `timeline` carries them. */
 const TOTALS = {
   rounds: [],
   run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' },
 };
-/** A detail cut to what the check reads: the run as an api from before `graph` answers it, give or take the rest. */
+/** A detail cut to what the check reads: the run as an api that sends no `graph` answers it, give or take the rest. */
 const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, onYou: [], ...extra }) as unknown as RunDetail;
 
 const refusesStale = (err: Error) =>
@@ -126,8 +126,11 @@ const { workflowNameOf } = await import('../src/lib/api.ts');
 test("a run's workflow is named by the last segment of its folder, as the Workflows page names it", () => {
   assert.equal(workflowNameOf('/code/app/workflows/dev-build'), 'dev-build');
   assert.equal(workflowNameOf('/code/app/workflows/ui/'), 'ui');
-  // The package's shipped default is a folder called `workflows`, and that is its name.
-  assert.equal(workflowNameOf('/code/app/packages/agent-orchestrator/workflows'), 'workflows');
+  assert.equal(
+    workflowNameOf('/code/app/packages/agent-orchestrator/workflows'),
+    'workflows',
+    "the package's shipped default is a folder called `workflows`, and that is its name",
+  );
   assert.equal(workflowNameOf('C:\\code\\app\\workflows\\dev'), 'dev');
 });
 
@@ -159,8 +162,11 @@ test("a start is posted as JSON, the one body the api takes, and resolves with t
   const [{ url, init }] = sent as [(typeof sent)[number]];
   assert.equal(url, '/api/runs');
   assert.equal(init?.method, 'POST');
-  // Anything else the api answers 415: a body any page could send it unasked.
-  assert.equal(new Headers(init?.headers).get('content-type'), 'application/json');
+  assert.equal(
+    new Headers(init?.headers).get('content-type'),
+    'application/json',
+    'the api answers anything else 415: a body any page could send it unasked',
+  );
   assert.deepEqual(JSON.parse(String(init?.body)), asked);
 });
 
@@ -218,7 +224,6 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 test("a run's decision is asked for once while a live step's engine word moves, once more when it settles — and the last one stays shown meanwhile", async (t) => {
-  // GET /decision, answered when the test says: each ask waits on a resolver of its own.
   const answers: Array<(body: object) => void> = [];
   const before = globalThis.fetch;
   globalThis.fetch = async () => {
@@ -231,7 +236,6 @@ test("a run's decision is asked for once while a live step's engine word moves, 
     client.clear();
   });
 
-  // A fan-out `assess` calls failed: implement signed off blocked, and tokens still working.
   const run = (tokens: string) => ({
     status: 'failed' as const,
     cancelledAt: null,
@@ -250,32 +254,36 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   answers[0](first);
   await until(() => observer.getCurrentResult().data !== undefined);
 
-  // The poll brings tokens' word as the engine has it, each time a little different.
   for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'running (working)']) {
     observer.setOptions(decisionQuery('r-1', decisionStamp(run(word))));
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  assert.equal(answers.length, 1, 'no ask for a word that moved and a decision that did not');
+  assert.equal(
+    answers.length,
+    1,
+    "no ask while the poll brings tokens' engine word a little different each time, and nothing the decision reads moves",
+  );
 
-  // tokens signs off: asked once more, and until the answer lands, the decision read before is what is shown.
   observer.setOptions(decisionQuery('r-1', decisionStamp(run('unverified · done'))));
   await until(() => answers.length === 2);
-  assert.equal(answers.length, 2);
+  assert.equal(answers.length, 2, 'tokens signs off: asked once more');
   const meanwhile = observer.getCurrentResult();
-  assert.deepEqual([meanwhile.data, meanwhile.isPlaceholderData], [first, true]);
+  assert.deepEqual(
+    [meanwhile.data, meanwhile.isPlaceholderData],
+    [first, true],
+    'until the answer lands, the decision read before is what is shown',
+  );
 
   const second = { touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } };
   answers[1](second);
   await until(() => !observer.getCurrentResult().isPlaceholderData);
   assert.deepEqual(observer.getCurrentResult().data, second);
-  // From the first answer on, never nothing: the section does not blink out. The observer hands back its own copy of what was answered, so
-  // the first answer is found by what it says, not by identity — `indexOf` found none, and `slice(-1)` held only the last value to it.
   const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
-  assert.ok(from >= 0, `the first answer is among what was shown: ${JSON.stringify(shown)}`);
+  assert.ok(from >= 0, `the first answer, a copy the observer made, is among what was shown: ${JSON.stringify(shown)}`);
   assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
   assert.ok(
     shown.slice(from).every((data) => data !== undefined),
-    JSON.stringify(shown),
+    `from the first answer on, never nothing, so the section does not blink out: ${JSON.stringify(shown)}`,
   );
 });
 
@@ -307,9 +315,12 @@ test("an answer is asked for as the api takes it — POST, JSON, the step by nam
   assert.deepEqual(sent[0].init.headers, { 'content-type': 'application/json' });
   assert.deepEqual(JSON.parse(String(sent[0].init.body)), { mode: 'nudge', message: '--flag stays' });
 
-  // Continue on a session the harness blocked: the tick stops it before it files the try, and the api says so.
   asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true }), sent);
-  assert.deepEqual(await askTry('r-1', 'held', { mode: 'nudge' }), { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true });
+  assert.deepEqual(
+    await askTry('r-1', 'held', { mode: 'nudge' }),
+    { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true },
+    'continue on a session the harness blocked: the tick stops it before it files the try, and the api says so',
+  );
   assert.deepEqual(JSON.parse(String(sent[1].init.body)), { mode: 'nudge' });
 });
 
@@ -417,28 +428,36 @@ test("REFUSED: a run's detail without its gate — who it waits on in wf ls's wo
   const refuses = (what: string) => (err: Error) =>
     err.message ===
     `The api answered run 'r-1' without ${what}, so it is older than this board, whose run page approves a step at its gate. Restart the api (\`npm run dev\` from the repository, or whatever serves /api), then reload the page.`;
-  // The detail an api from before the gate answers: every field the board had before, and none of the gate's.
   const { approve: _approve, gate: _gate, ...before } = gated;
   const stale = detail({ graph, steps: [before], onYou: undefined });
-  assert.throws(() => withGraph('r-1', stale), refuses("the gate of its step 'plan'"));
+  assert.throws(
+    () => withGraph('r-1', stale),
+    refuses("the gate of its step 'plan'"),
+    "a detail with every other field, and none of the gate's",
+  );
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the gate of its step 'plan'"));
-  // One field of the two is not the gate either, whichever it is, nor is a run without `onYou` whose steps have theirs.
   assert.throws(
     () => withGraph('r-1', detail({ graph, steps: [gated, { ...before, name: 'review', approve: null }] })),
     refuses("the gate of its step 'review'"),
+    'one field of the two is not the gate',
   );
-  assert.throws(() => withGraph('r-1', detail({ graph, steps: [{ ...before, gate: null }] })), refuses("the gate of its step 'plan'"));
+  assert.throws(
+    () => withGraph('r-1', detail({ graph, steps: [{ ...before, gate: null }] })),
+    refuses("the gate of its step 'plan'"),
+    'one field of the two is not the gate, whichever it is',
+  );
   for (const onYou of [undefined, null, 'approve plan']) {
     assert.throws(
       () => withGraph('r-1', detail({ graph, steps: [gated], onYou })),
       refuses("who it waits on in wf ls's words"),
-      JSON.stringify(onYou),
+      `a run whose onYou is ${JSON.stringify(onYou)} is refused, though its steps have their gates`,
     );
   }
-  // Null is an answer: a step with no gate, and nothing to approve.
-  assert.doesNotThrow(() =>
-    withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })),
+  assert.doesNotThrow(
+    () =>
+      withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })),
+    'null is an answer: a step with no gate, and nothing to approve',
   );
 });
 
@@ -457,14 +476,16 @@ test('a run removed while its page is open is said as gone on the one read that 
   });
   const last = detail({ graph });
   client.setQueryData(runQuery('r-1').queryKey, last);
-  // A page open on the run, which read it on its load: nothing is read until the feed says so.
   const observer = new QueryObserver(client, { ...runQuery('r-1'), refetchOnMount: false });
   t.after(observer.subscribe(() => {}));
 
-  // What the feed's `removed` does: the record read again, exactly.
   await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
   const result = observer.getCurrentResult();
-  assert.equal(runGone(result.error), true, `the read that found none is told apart: ${String(result.error)}`);
+  assert.equal(
+    runGone(result.error),
+    true,
+    `on a page that read the run on its load, the read the feed's \`removed\` asks for finds none and is told apart: ${String(result.error)}`,
+  );
   assert.ok(result.error instanceof ReadRefusal);
   assert.equal(result.error.message, said, "in the api's words");
   assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');

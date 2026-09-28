@@ -1,5 +1,5 @@
 /**
- * XState stays inside the lifecycle: `src/lifecycle.ts` is the one file that imports it, no other
+ * XState stays inside the lifecycle: `src/core/lifecycle.ts` is the one file that imports it, no other
  * package of the workspace depends on it or imports it, and neither of the runtime's entries hands a consumer an XState name
  * or value, the machine, or the readings `decide` moves by. The machine is the runtime's judgement, as `decide` is, and a
  * consumer that could call it would be deciding beside the pass.
@@ -14,7 +14,7 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 const ROOT = path.join(PKG, '..', '..');
 const XSTATE = 'xstate';
-const LIFECYCLE = 'src/lifecycle.ts';
+const LIFECYCLE = 'src/core/lifecycle.ts';
 /** This file reads XState's exports to refuse them, and is the one test let import it. */
 const SELF = 'packages/agent-runtime/test/xstate-boundary.test.ts';
 
@@ -41,7 +41,7 @@ function xstateBreaches(file: string, text: string): string[] {
     .filter((spec) => spec === XSTATE || spec.startsWith(`${XSTATE}/`) || spec.startsWith('@xstate/'))
     .map(
       (spec) =>
-        `${file} imports ${spec}: only agent-runtime's src/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there`,
+        `${file} imports ${spec}: only agent-runtime's src/core/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there`,
     );
 }
 
@@ -62,7 +62,7 @@ const workspaceFiles = (): string[] =>
 test('the scan reads every workspace, and the lifecycle imports XState — or it would pass by reading nothing', () => {
   const files = workspaceFiles();
   for (const f of [
-    'packages/agent-runtime/src/engine.ts',
+    'packages/agent-runtime/src/core/engine/engine.ts',
     'packages/agent-orchestrator/src/tick.ts',
     'apps/api/src/app.ts',
     'packages/agent-runtime/bin/ae.ts',
@@ -74,7 +74,7 @@ test('the scan reads every workspace, and the lifecycle imports XState — or it
   );
 });
 
-test('only src/lifecycle.ts imports XState, in any workspace', () => {
+test('only src/core/lifecycle.ts imports XState, in any workspace', () => {
   assert.deepEqual(
     workspaceFiles().flatMap((f) => xstateBreaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'))),
     [],
@@ -82,10 +82,11 @@ test('only src/lifecycle.ts imports XState, in any workspace', () => {
 });
 
 test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a type, a re-export, a dynamic import, another package', () => {
-  const why = "only agent-runtime's src/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there";
+  const why =
+    "only agent-runtime's src/core/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there";
   const planted: Array<[string, string, string]> = [
-    ['packages/agent-runtime/src/engine.ts', "import { transition } from 'xstate';", 'xstate'],
-    ['packages/agent-runtime/src/domain.ts', "import type { AnyStateMachine } from 'xstate';", 'xstate'],
+    ['packages/agent-runtime/src/core/engine/engine.ts', "import { transition } from 'xstate';", 'xstate'],
+    ['packages/agent-runtime/src/core/domain.ts', "import type { AnyStateMachine } from 'xstate';", 'xstate'],
     ['packages/agent-runtime/src/index.ts', "export { setup } from 'xstate';", 'xstate'],
     ['packages/agent-runtime/bin/ae.ts', "const x = await import('xstate');", 'xstate'],
     ['packages/agent-runtime/test/engine.test.ts', "import { createActor } from 'xstate';", 'xstate'],
@@ -101,7 +102,7 @@ test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a 
     'not refused: the lifecycle itself',
   );
   assert.deepEqual(
-    xstateBreaches('packages/agent-runtime/src/engine.ts', "// import { transition } from 'xstate';\n * from 'xstate'"),
+    xstateBreaches('packages/agent-runtime/src/core/engine/engine.ts', "// import { transition } from 'xstate';\n * from 'xstate'"),
     [],
     'not refused: prose that names XState',
   );
@@ -150,7 +151,7 @@ test('XState is a dependency of the runtime alone, pinned', () => {
 /** The readings and the move a consumer must not be handed: they are `decide`'s, which no entry exports either. */
 const JUDGEMENT = ['lifecycleOf', 'observe', 'spawnRefused', 'settledQuiet', 'Lifecycle'];
 
-/** What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/lifecycle.ts` exports, or a reading `decide` moves by. */
+/** What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/core/lifecycle.ts` exports, or a reading `decide` moves by. */
 function exportBreaches(entry: string, exported: Record<string, unknown>, inside: { names: Set<string>; values: Set<unknown> }): string[] {
   return Object.entries(exported).flatMap(([name, value]) =>
     inside.names.has(name) || inside.values.has(value) || JUDGEMENT.includes(name)
@@ -161,7 +162,7 @@ function exportBreaches(entry: string, exported: Record<string, unknown>, inside
   );
 }
 
-/** Every name and value XState exports, and every value `src/lifecycle.ts` does (its names are too common to refuse by: `transition`, `STATES`). */
+/** Every name and value XState exports, and every value `src/core/lifecycle.ts` does (its names are too common to refuse by: `transition`, `STATES`). */
 const insides = async () => {
   const names = new Set<string>();
   const values = new Set<unknown>();
@@ -169,7 +170,7 @@ const insides = async () => {
     names.add(name);
     if ((typeof value === 'function' || typeof value === 'object') && value !== null) values.add(value);
   }
-  for (const value of Object.values(await import('../src/lifecycle.ts'))) values.add(value);
+  for (const value of Object.values(await import('../src/core/lifecycle.ts'))) values.add(value);
   return { names, values };
 };
 
@@ -184,8 +185,8 @@ test("neither of the runtime's entries exports XState, the machine, or what deci
 test('REFUSED: an entry that exports an XState name, the machine or its move renamed, or a reading of decide', async () => {
   const inside = await insides();
   const { setup } = await import(XSTATE);
-  const lifecycle = await import('../src/lifecycle.ts');
-  const { lifecycleOf } = await import('../src/domain.ts');
+  const lifecycle = await import('../src/core/lifecycle.ts');
+  const { lifecycleOf } = await import('../src/core/domain.ts');
   const effect = { ...(await import('agent-runtime/effect')) };
   const says = (entry: string, name: string) =>
     `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`;

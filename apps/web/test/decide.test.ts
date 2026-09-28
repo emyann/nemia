@@ -22,7 +22,7 @@ const radius: Radius = {
     { path: 'logo.png', added: null, removed: null },
     { from: 'packages/a/test/x.test.ts', path: 'packages/b/test/x.test.ts', added: 10, removed: 3 },
   ],
-  // The rename counts in both packages, as `radius` counts it.
+  /** The rename counts in both packages, as `radius` counts it. */
   groups: [group('(root)', 2, 2, 0, 1), group('packages/a', 1, 10, 3), group('packages/b', 1, 10, 3)],
   agentFacing: ['CLAUDE.md'],
   checkAffecting: ['packages/a/test/x.test.ts → packages/b/test/x.test.ts'],
@@ -42,16 +42,17 @@ test("the Factory card's line: every group once, each change's lines once — a 
     ]),
     'touched 1 package · +4 −1',
   );
-  // Two branches with the same changes count each package and each file once, and a branch that could not be read is said, not dropped.
-  assert.equal(touchedSummary([read, read, unread('wf/r/gone')]), 'touched 3 packages · +12 −3 · 1 not read');
+  assert.equal(
+    touchedSummary([read, read, unread('wf/r/gone')]),
+    'touched 3 packages · +12 −3 · 1 not read',
+    'two branches with the same changes count each package and each file once, and a branch that could not be read is said, not dropped',
+  );
   assert.equal(touchedSummary([unread('wf/r/gone')]), 'touched not known — its branch could not be read');
   assert.equal(touchedSummary([unread('a'), unread('b')]), 'touched not known — 2 branches could not be read');
   assert.equal(touchedSummary([]), 'touched nothing — no branch to read');
 });
 
 test("REFUSED: a fan-out's result branches each carry the parent's changes, and the card counts them once — not once per branch", () => {
-  // plan changed packages/a/src/x.ts; api and web each started from its branch in a worktree of their own. api added a file beside it, and
-  // web changed x.ts further and a file of its own. Each result branch is diffed against the run's base, so each carries plan's +100.
   const branch = (name: string, changes: Radius['changes'], groups: Radius['groups']): Touched => ({
     branch: `wf/r/${name}`,
     radius: { changes, groups, agentFacing: [], checkAffecting: [], lessons: [] },
@@ -72,14 +73,23 @@ test("REFUSED: a fan-out's result branches each carry the parent's changes, and 
     ],
     [group('packages/a', 1, 120, 4), group('apps/web', 1, 7, 1)],
   );
-  // x.ts once, as the branch that changed it most has it — plan's lines and web's on top: +120 −4; then y.ts +5 and z.ts +7 −1.
-  assert.equal(touchedSummary([api, web]), 'touched 2 packages · +132 −5');
+  assert.equal(
+    touchedSummary([api, web]),
+    'touched 2 packages · +132 −5',
+    "api and web each started from plan's branch, which added x.ts's +100: x.ts once, as web changed it most (+120 −4), then y.ts +5 and z.ts +7 −1",
+  );
   assert.notEqual(touchedSummary([api, web]), 'touched 2 packages · +232 −5', "plan's +100 counted once per result branch");
-  // In either order: the larger change is the file's, whichever branch is read first.
-  assert.equal(touchedSummary([web, api]), 'touched 2 packages · +132 −5');
-  // A binary file on both adds no lines, and does not stand in for a counted change of the same path.
+  assert.equal(
+    touchedSummary([web, api]),
+    'touched 2 packages · +132 −5',
+    "the larger change is the file's, whichever branch is read first",
+  );
   const bin = branch('bin', [{ path: 'packages/a/src/x.ts', added: null, removed: null }], [group('packages/a', 1, 0, 0, 1)]);
-  assert.equal(touchedSummary([bin, api]), 'touched 1 package · +105 −0');
+  assert.equal(
+    touchedSummary([bin, api]),
+    'touched 1 package · +105 −0',
+    'a binary file on both adds no lines, and does not stand in for a counted change of the same path',
+  );
 });
 
 test("a bar is its group's share of the most lines a group on the branch changed: the largest fills the track, a binary-only group has none", () => {
@@ -95,8 +105,11 @@ test("a bar is its group's share of the most lines a group on the branch changed
     ],
   );
   assert.deepEqual(barOf(group('x', 1, 1, 2), 3), { added: 33.33, removed: 66.67 });
-  // A branch of binary files only: nothing to measure against, and no bar rather than a division by zero.
-  assert.deepEqual(barOf(group('x', 1, 0, 0, 1), mostLines([group('x', 1, 0, 0, 1)])), { added: 0, removed: 0 });
+  assert.deepEqual(
+    barOf(group('x', 1, 0, 0, 1), mostLines([group('x', 1, 0, 0, 1)])),
+    { added: 0, removed: 0 },
+    'a branch of binary files only has nothing to measure against: no bar rather than a division by zero',
+  );
   assert.equal(mostLines([]), 0);
 });
 
@@ -107,8 +120,11 @@ test('a run is asked for its decision once it finished or waits on a person — 
   assert.equal(decidableRun({ status: 'running', cancelledAt: null, waitingOnYou: ['implement'] }), true);
   assert.equal(decidableRun({ status: 'running', cancelledAt: null, waitingOnYou: [] }), false);
   assert.equal(decidableRun({ status: 'cancelled', cancelledAt: at, waitingOnYou: [] }), false);
-  // As the api has a cancelled run, and with a step still named: called off all the same.
-  assert.equal(decidableRun({ status: 'cancelled', cancelledAt: at, waitingOnYou: ['implement'] }), false);
+  assert.equal(
+    decidableRun({ status: 'cancelled', cancelledAt: at, waitingOnYou: ['implement'] }),
+    false,
+    'a cancelled run as the api has it, with a step still named: called off all the same',
+  );
 });
 
 test("only the api's decision is shown: not `running`, not `nothing`, not an answer still to come", () => {
@@ -153,9 +169,12 @@ const fanOut = (tokens: string, over: { status?: RunStatus; waitingOnYou?: strin
 
 test('a decision is read again when a step settles, a try is filed, or the run moves — and the list and the detail stamp a run alike', () => {
   const stamp = decisionStamp(fanOut('running (working)'));
-  // The detail's steps carry more; the stamp reads what both have.
   const detail = fanOut('running (working)');
-  assert.equal(decisionStamp({ ...detail, steps: detail.steps.map((s) => ({ ...s, closeout: null, used: null })) }), stamp);
+  assert.equal(
+    decisionStamp({ ...detail, steps: detail.steps.map((s) => ({ ...s, closeout: null, used: null })) }),
+    stamp,
+    "the detail's steps carry more: the stamp reads what both have",
+  );
   for (const settled of ['checking', 'unverified · done', 'succeeded · BLOCKED', 'failed', 'unsigned']) {
     assert.notEqual(decisionStamp(fanOut(settled)), stamp, `tokens signed off or ended: ${settled}`);
   }
@@ -172,8 +191,11 @@ test('a decision is read again when a step settles, a try is filed, or the run m
     decisionStamp(fanOut('succeeded · BLOCKED')),
     'the run moved',
   );
-  // A step not filed is not in flight, and one filed is: the task moves it.
-  assert.notEqual(decisionStamp(fanOut('waiting', { tokensTask: null })), decisionStamp(fanOut('pending')), 'a step filed');
+  assert.notEqual(
+    decisionStamp(fanOut('waiting', { tokensTask: null })),
+    decisionStamp(fanOut('pending')),
+    'a step filed: one not filed is not in flight, and one filed is, so the task moves it',
+  );
 });
 
 test("a decision is not read again while a live step's engine word moves and nothing it says has", () => {
@@ -213,11 +235,10 @@ test('the board presses `accept` on the step its command names, and on no other 
   const accept = (command: string) => ({ label: 'accept' as const, command });
   assert.equal(acceptStepOf(accept('wf accept r-1 review --message "<why>"'), 'r-1'), 'review');
   assert.equal(acceptStepOf(accept('wf accept r 1 review --message "<why>"'), 'r 1'), 'review');
-  // Every other row only copies, and a command that is not `wf accept` for this run — or names no one step — is not pressed.
-  assert.equal(acceptStepOf({ label: 'once more', command: 'wf round r-1 review' }, 'r-1'), null);
-  assert.equal(acceptStepOf(accept('wf accept r-2 review --message "<why>"'), 'r-1'), null);
-  assert.equal(acceptStepOf(accept('wf accept r-1 --message "<why>"'), 'r-1'), null);
-  assert.equal(acceptStepOf(accept('wf accept r-1 review extra --message "<why>"'), 'r-1'), null);
+  assert.equal(acceptStepOf({ label: 'once more', command: 'wf round r-1 review' }, 'r-1'), null, 'every other row only copies');
+  assert.equal(acceptStepOf(accept('wf accept r-2 review --message "<why>"'), 'r-1'), null, 'not `wf accept` for this run');
+  assert.equal(acceptStepOf(accept('wf accept r-1 --message "<why>"'), 'r-1'), null, 'names no step');
+  assert.equal(acceptStepOf(accept('wf accept r-1 review extra --message "<why>"'), 'r-1'), null, 'names no one step');
   assert.equal(acceptStepOf(accept('wf accept r-1 review'), 'r-1'), null);
 });
 

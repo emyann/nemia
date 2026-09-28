@@ -1,7 +1,7 @@
 /**
  * The admission the tick makes off the runtime's views (`src/admission.ts`): which queued tasks start, per pool, under the ceiling.
  *
- * Each rule has a fixture in the order that rule has to undo, and each was deleted in turn to see its test fail: the id tiebreak (views
+ * Each rule has a fixture in the order that rule has to undo, so that its test fails without it: the id tiebreak (views
  * given in reversed id order), the filing-time compare (a later id filed first), momentum (a first step filed before an after-step),
  * `POOLS`' `claude-detached` line (harnesses given detached-first), the `needs-human` and `input-required` exclusions, `starting` and
  * admitted-but-pending holding a slot, the per-pool count, and each kind `momentumOf` names.
@@ -30,19 +30,21 @@ test("POOLS: Claude Code's job and background session share one pool; codex and 
   assert.equal(poolOf('check'), 'check');
   assert.equal(poolOf('fake'), 'fake');
   assert.equal(poolOf(undefined), 'default');
-  // A name on Object's prototype is no pool line.
-  assert.equal(poolOf('toString'), 'toString');
+  assert.equal(poolOf('toString'), 'toString', "a name on Object's prototype is no pool line");
 });
 
 test("a claude-detached session counts against claude's ceiling, and a detached task waits on claude's", () => {
-  // Detached first, so a pool keyed by the harness name alone would read two pools of one.
   const views = [
     live('d-1', 'running (working)', 'claude-detached'),
     live('c-1', 'running (working)'),
     queued('c-2', 1),
     queued('d-2', 2, 'claude-detached'),
   ];
-  assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 2 }), []);
+  assert.deepEqual(
+    toAdmit({ views, momentum: none, ceiling: 2 }),
+    [],
+    'detached first, so a pool keyed by the harness name alone would read two pools of one',
+  );
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 3 }), ['c-2']);
 });
 
@@ -63,11 +65,13 @@ test("the ceiling is counted per pool: codex does not fill claude's slots, nor c
 test('each task admitted is counted at once: a full pool admits nothing more, and it drains one for one', () => {
   const waiting = [queued('c-1', 1), queued('c-2', 2), queued('c-3', 3)];
   assert.deepEqual(toAdmit({ views: waiting, momentum: none, ceiling: 2 }), ['c-1', 'c-2']);
-  // The pass after: those two admitted hold their slots, and the third is refused one.
   const next = [{ ...waiting[0], admission: 'admitted' as const }, { ...waiting[1], admission: 'admitted' as const }, waiting[2]];
-  assert.deepEqual(toAdmit({ views: next, momentum: none, ceiling: 2 }), []);
-  // One ended: exactly one more.
-  assert.deepEqual(toAdmit({ views: [next[0], next[2]], momentum: none, ceiling: 2 }), ['c-3']);
+  assert.deepEqual(
+    toAdmit({ views: next, momentum: none, ceiling: 2 }),
+    [],
+    'the pass after: those two admitted hold their slots, and the third is refused one',
+  );
+  assert.deepEqual(toAdmit({ views: [next[0], next[2]], momentum: none, ceiling: 2 }), ['c-3'], 'one ended: exactly one more');
   assert.deepEqual(toAdmit({ views: waiting, momentum: none, ceiling: 0 }), []);
 });
 
@@ -97,9 +101,8 @@ test('a session blocked on a person holds no slot, and counts again once it work
 });
 
 test('the earlier filing goes first, whatever the ids say', () => {
-  // The later id filed first; a sort by id alone takes c-a.
   const views = [queued('c-a', 20), queued('c-b', 10)];
-  assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 1 }), ['c-b']);
+  assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 1 }), ['c-b'], 'the later id filed first; a sort by id alone takes c-a');
 });
 
 test('filed in the same millisecond, the lower id goes first, given in reversed order', () => {
@@ -114,11 +117,14 @@ test('a filing time that does not parse goes last', () => {
 });
 
 test("momentum goes before the filing: a run in flight keeps its slot over a newer run's first step", () => {
-  // The first step filed first, the after-step later: filing order alone takes the first step.
   const views = [queued('first', 1), queued('after', 9)];
   const momentum = (id: string) => (id === 'after' ? MOMENTUM : 0);
   assert.deepEqual(toAdmit({ views, momentum, ceiling: 1 }), ['after']);
-  assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 1 }), ['first']);
+  assert.deepEqual(
+    toAdmit({ views, momentum: none, ceiling: 1 }),
+    ['first'],
+    'the first step filed first, the after-step later: filing order alone takes the first step',
+  );
 });
 
 test('a task already admitted or not queued is never admitted again', () => {
@@ -137,26 +143,23 @@ test('momentumOf: each task a run names reads as tick.ts filed it, and an id no 
   ];
   const run = {
     steps: {
-      // A first step on its second try: the first try is the step's first filing, its later try and every check are MOMENTUM.
       plan: {
         taskId: 'plan-2',
         check: { taskId: 'plan-2-check' },
         tries: [{ taskId: 'plan-1', check: { taskId: 'plan-1-check' }, then: 'retries' as const }],
       },
-      // A step after another, its first filing.
       implement: { taskId: 'impl-1' },
-      // A round of the review: its round's task is a later filing of the step.
       review: { taskId: 'review-2', tries: [{ taskId: 'review-1', then: 'round' as const }] },
     },
   };
   const m = momentumOf([{ run, steps }]);
-  assert.equal(m('plan-1'), 0, "a first step's first task");
-  assert.equal(m('plan-2'), MOMENTUM, 'a try');
+  assert.equal(m('plan-1'), 0, "a first step on its second try: its first try is the step's first filing");
+  assert.equal(m('plan-2'), MOMENTUM, 'a later try');
   assert.equal(m('plan-1-check'), MOMENTUM, "an earlier try's check");
   assert.equal(m('plan-2-check'), MOMENTUM, 'a check');
-  assert.equal(m('impl-1'), MOMENTUM, 'an after-step');
+  assert.equal(m('impl-1'), MOMENTUM, 'a step after another, its first filing');
   assert.equal(m('review-1'), MOMENTUM, "an after-step's first task");
-  assert.equal(m('review-2'), MOMENTUM, 'a round');
+  assert.equal(m('review-2'), MOMENTUM, "a round of the review: its round's task is a later filing of the step");
   assert.equal(m('nobody'), 0, 'an id no run names');
 });
 

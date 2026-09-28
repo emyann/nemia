@@ -1,14 +1,14 @@
 /**
  * Other projects are described, never named.
  *
- * Before the repository went public (`docs/plan-github-ci.md`) the owner decided that two groups of other projects are said by what
- * they do, in a few words, with no name and no link: an agent kanban this design was compared with, and a Go agent SDK, the sandbox
- * runtime it reaches through one file, and an A2A adapter for Claude Code that the thin runtime's evaluation read (2026-09-25). So
- * every file the repository holds is read, as `names.test.ts` reads them, and a line that names one is refused, history included:
- * history was rewritten too, and the Jev experiments whose recorded quotes named them left the tree on 2026-09-25.
+ * Two groups of other projects are said by what they do, in a few words, with no name and no link (`docs/plan-github-ci.md`): an
+ * agent kanban this design was compared with, and a Go agent SDK, the sandbox runtime it reaches through one file, and an A2A adapter
+ * for Claude Code that the thin runtime's evaluation read. Every file the repository holds is read, as `names.test.ts` reads them, and
+ * a line that names one is refused.
  *
  * The names are kept here in base64, so this file does not name them either, and a search of the repository finds none. What we
- * integrate — Claude Code, Codex, A2A and its SDK — and what is compared by name on purpose are not on the list.
+ * integrate — Claude Code, Codex, A2A and its SDK — and what is compared by name on purpose are not on the list: TypeSafe's Jev is
+ * compared by name, since the dated docs of its experiments name it.
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
@@ -68,7 +68,6 @@ test('a description, what we integrate and what is compared by name pass', () =>
     'An agent kanban we compared with runs a decomposer in its dispatcher every tick.',
     'as a Go agent SDK reaches its sandbox runtime through one file of its own',
     'the pattern of an A2A adapter that keeps one Claude Code process per session',
-    // TypeSafe's Jev stays compared by name though its judge package was removed on 2026-09-28: the dated docs of its experiments name it.
     "Claude Code, Codex, A2A and `@a2a-js/sdk`; TypeSafe's Jev; Tekton, Argo, n8n, Kubernetes",
     'The harness kanban board, rebuilt on the two libraries that replaced its core. `.kanban/` and `kb-*` worktrees',
     'const max = Math.max(ax, 1); // a word that only contains a short name',

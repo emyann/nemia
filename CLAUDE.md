@@ -1,6 +1,6 @@
 # hkb-v2 — contributor guide
 
-Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/domain.ts` is
+Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/core/domain.ts` is
 the whole judgement). `packages/agent-orchestrator` sequences runtime tasks into runs of steps — a folder of markdown is a workflow (the
 `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, talks to it. Dependencies point down that list, never up.
 Read `README.md` and each package's README for the model before changing behaviour. The `wf` and `ae` commands and the stores
@@ -56,7 +56,7 @@ holds what every change needs.
 ## Rules the code keeps
 
 - **The runtime is finished.** It runs one workload on one harness; anything that knows about a second workload is the upper layer.
-  `decide` (`agent-runtime/src/domain.ts`) is pure and stays a screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect`
+  `decide` (`agent-runtime/src/core/domain.ts`) is pure and stays a screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect`
   (`src/index.ts`) are the export lists, and neither exports `decide`. A knob on the workload is a field carried on the task and read by a
   runner, never a callback into `decide`, and no `if` in `engine.ts` belongs in `decide`.
 - **Three rules hold the layers, each a test** (`docs/architecture.md`):
@@ -82,7 +82,6 @@ holds what every change needs.
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
   - A block is off while its `excludeFiles` names its package. The card that cleans a package switches its guards on by deleting that
     one line, and edits nothing shared. The runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it.
-    one line, and edits nothing shared.
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc. `oxfmt`
     rewraps no comment, so a line you join stays within its 140 columns; a `(` `)` it drops once a comment inside them goes is its own.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?

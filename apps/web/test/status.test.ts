@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 import { isGate, satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
 
-test('each word wf ls prints reads as the state a person acts on', () => {
-  // Every word `listing` in agent-orchestrator can say: `waiting`, `rounds exhausted`, the run's verdicts, and the engine's
-  // own word for the step's task with how it signed off beside it.
+test("each word wf ls prints reads as the state a person acts on: waiting, rounds exhausted, the run's verdicts, and the engine's own word for the step's task with how it signed off beside it", () => {
   const cases: Array<[string, StepState]> = [
     ['running (working)', 'working'],
     ['working (quiescent)', 'working'],
@@ -69,42 +67,55 @@ test('only verified and unverified are work done; a refused check, a failed sess
   ];
   for (const status of notDone) assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
   for (const status of ['verified ✓', 'unverified · done']) assert.equal(satisfiesAfter(stepState(status, false, false)), true, status);
-  // A refused check is its own state, not a session that failed: the colour says which to read, the check's output or the log.
-  assert.notEqual(stepState('failed ✗ check (exit 1)', false, false), stepState('failed', false, false));
+  assert.notEqual(
+    stepState('failed ✗ check (exit 1)', false, false),
+    stepState('failed', false, false),
+    "a refused check is its own state, not a session that failed: the colour says which to read, the check's output or the log",
+  );
 });
 
 test('a step that signed off blocked is not shown as done, though its session succeeded', () => {
   assert.equal(stepState('succeeded · BLOCKED', false, false), 'blocked');
   assert.equal(stepState('succeeded · BLOCKED', true, false), 'blocked');
-  // Held open, the engine's word for the same session is `input-required`: waiting for the word, with nothing running.
-  assert.equal(stepState('input-required · BLOCKED', false, false), 'blocked');
+  assert.equal(
+    stepState('input-required · BLOCKED', false, false),
+    'blocked',
+    "held open, the engine's word for the same session is `input-required`: waiting for the word, with nothing running",
+  );
   assert.notEqual(stepState('input-required', false, false), 'working', 'a session that signed and waits is not drawn as still going');
 });
 
 test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {
   assert.equal(stepState('waiting', true, false), 'cancelled');
   assert.equal(stepState('pending', true, false), 'cancelled');
-  // A step still running when the run was called off is running until the stop lands.
-  assert.equal(stepState('running (working)', true, false), 'working');
+  assert.equal(
+    stepState('running (working)', true, false),
+    'working',
+    'a step still running when the run was called off is running until the stop lands',
+  );
 });
 
 test('a loop out of rounds waits on a person, in amber like a step that signed off blocked, and says so on hover', () => {
   assert.equal(stepState('rounds exhausted', false, false), 'exhausted');
-  // Its own state, not `blocked`: nothing was left unfinished, the loop asked for more than its workflow allows.
-  assert.notEqual(stepState('rounds exhausted', false, false), stepState('succeeded · BLOCKED', false, false));
+  assert.notEqual(
+    stepState('rounds exhausted', false, false),
+    stepState('succeeded · BLOCKED', false, false),
+    'its own state, not `blocked`: nothing was left unfinished, the loop asked for more than its workflow allows',
+  );
   assert.equal(stateClass.exhausted, stateClass.blocked);
   assert.match(stateClass.exhausted, /\bbg-amber-100\b/);
   assert.equal(
     stateMeaning.exhausted,
     'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
   );
-  // Final, so a run somebody called off does not make it read as a step that never started.
-  assert.equal(stepState('rounds exhausted', true, false), 'exhausted');
+  assert.equal(
+    stepState('rounds exhausted', true, false),
+    'exhausted',
+    'final, so a run somebody called off does not make it read as a step that never started',
+  );
 });
 
 test('a word the board does not know reads as working, on purpose: never as done, and never as waiting on you', () => {
-  // What `rounds exhausted` read as before the board knew it. A word `wf ls` gains after this was written is shown
-  // as still going until the board is taught it, rather than as a verdict the run never gave.
   for (const status of [
     'a word wf ls has gained since',
     'rounds exhausted, and more',
@@ -114,7 +125,11 @@ test('a word the board does not know reads as working, on purpose: never as done
     'budget exhaustedness',
     'over budget',
   ]) {
-    assert.equal(stepState(status, false, false), 'working', status);
+    assert.equal(
+      stepState(status, false, false),
+      'working',
+      `${status}: a word the board has not been taught is still going, rather than a verdict the run never gave`,
+    );
     assert.equal(satisfiesAfter(stepState(status, false, false)), false, status);
   }
 });
@@ -127,8 +142,11 @@ test('a step past its budget waits on a person in amber, as a loop out of rounds
   }
   assert.match(stateMeaning['over-budget'], /^over budget: its tries have cost its budget: or more/);
   assert.match(stateMeaning['budget-exhausted'], /^budget exhausted: its harness ended its session at its budget:/);
-  // Final, so a run somebody called off does not make it read as a step that never started.
-  assert.equal(stepState('over budget $4.20 of $3', true, false), 'over-budget');
+  assert.equal(
+    stepState('over budget $4.20 of $3', true, false),
+    'over-budget',
+    'final, so a run somebody called off does not make it read as a step that never started',
+  );
 });
 
 test('a human gate is a step a person decides: signed off blocked, a loop out of rounds, or a step past its budget — and on a cancelled run, none', () => {
@@ -140,10 +158,8 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
     'budget exhausted $3.02 of $3',
   ]) {
     assert.equal(isGate(stepState(status, false, false), false), true, status);
-    // Nobody waits for the answer on a run somebody called off.
-    assert.equal(isGate(stepState(status, true, false), true), false, `${status}, on a cancelled run`);
+    assert.equal(isGate(stepState(status, true, false), true), false, `${status}, on a cancelled run: nobody waits for the answer`);
   }
-  // Waiting on you too, but work to try again, not a decision; and every state that waits on nobody.
   const notGates = [
     'failed ✗ check (exit 1)',
     'failed ✗ check (unfinished)',
@@ -160,15 +176,26 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
     'unreadable',
     'unknown',
   ];
-  for (const status of notGates) assert.equal(isGate(stepState(status, false, false), false), false, status);
+  for (const status of notGates)
+    assert.equal(
+      isGate(stepState(status, false, false), false),
+      false,
+      `${status}: work to try again, not a decision, or a state that waits on nobody`,
+    );
 });
 
 test('a step waiting at its gate waits on a person in amber, as a step signed off blocked does — a human gate, not work done — and says on hover how to approve it or send it back', () => {
   assert.equal(stepState('awaiting approval', false, false), 'awaiting-approval');
-  // Final, so a run somebody called off does not make it read as a step that never started.
-  assert.equal(stepState('awaiting approval', true, false), 'awaiting-approval');
-  // Its work is signed off, and nothing after it may be filed on it until a person says so: `satisfiesAfter` in the package says no too.
-  assert.equal(satisfiesAfter('awaiting-approval'), false);
+  assert.equal(
+    stepState('awaiting approval', true, false),
+    'awaiting-approval',
+    'final, so a run somebody called off does not make it read as a step that never started',
+  );
+  assert.equal(
+    satisfiesAfter('awaiting-approval'),
+    false,
+    'nothing after it may be filed on it until a person says so, as `satisfiesAfter` in the package says',
+  );
   assert.equal(stateClass['awaiting-approval'], stateClass.blocked);
   assert.equal(isGate('awaiting-approval', false), true);
   assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
@@ -176,8 +203,7 @@ test('a step waiting at its gate waits on a person in amber, as a step signed of
     stateMeaning['awaiting-approval'],
     /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message$/,
   );
-  // Not a word that merely starts like it: before the board knew the word, it read as working, and a spinner drew on a step nobody runs.
-  assert.equal(stepState('awaiting approvals', false, false), 'working');
+  assert.equal(stepState('awaiting approvals', false, false), 'working', 'not a word that merely starts like it');
 });
 
 test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting — whatever runs it names, and why — and cancelled on a run called off', () => {
@@ -190,8 +216,7 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
     assert.equal(stepState(word, false, false), 'waiting', word);
     assert.equal(stepState(word, true, false), 'cancelled', word);
   }
-  // Not a word that merely starts like one.
-  assert.equal(stepState('waitingroom', false, false), 'working');
+  assert.equal(stepState('waitingroom', false, false), 'working', 'not a word that merely starts like one');
 });
 
 test('a root of a run the cap on runs in flight holds reads `waiting for a run slot`, a wait nobody is asked about — never working — and cancelled on a run called off', () => {
@@ -207,8 +232,7 @@ test('a root of a run the cap on runs in flight holds reads `waiting for a run s
   }
   assert.match(stateMeaning['waiting-for-slot'], /^waiting for a run slot: not filed yet — the cap on runs in flight \(WF_MAX_RUNS\)/);
   assert.notEqual(stateClass['waiting-for-slot'], stateClass.working, 'drawn as the wait it is, not as a session at work');
-  // Not a word that merely starts like it.
-  assert.equal(stepState('waiting for a run slotted', false, false), 'working');
+  assert.equal(stepState('waiting for a run slotted', false, false), 'working', 'not a word that merely starts like it');
 });
 
 test('on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves', () => {
@@ -225,11 +249,12 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
   ];
   for (const status of held) {
     assert.equal(stepState(status, false, true), 'held', status);
-    // Nobody is asked while the hold stands: every verb that would answer the gate is refused.
-    assert.equal(isGate(stepState(status, false, true), false), false, status);
+    assert.equal(
+      isGate(stepState(status, false, true), false),
+      false,
+      `${status}: nobody is asked while the hold stands, and every verb that would answer the gate is refused`,
+    );
   }
-  // What is in flight runs on, a session asking through its harness still asks, and a verdict is a verdict: the hold stops what is
-  // filed next and the answers to a gate, not these. `needs-human` above all, which four places compare exactly.
   const unmoved: Array<[string, StepState]> = [
     ['running (working)', 'working'],
     ['needs-human', 'needs-human'],
@@ -244,9 +269,13 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
     ['unreadable', 'unreadable'],
     ['unknown', 'unknown'],
   ];
-  for (const [status, state] of unmoved) assert.equal(stepState(status, false, true), state, status);
-  // A run called off is called off, held or not.
-  assert.equal(stepState('waiting', true, true), 'cancelled');
+  for (const [status, state] of unmoved)
+    assert.equal(
+      stepState(status, false, true),
+      state,
+      `${status}: the hold stops what is filed next and the answers to a gate, not what is in flight, a session asking through its harness, or a verdict`,
+    );
+  assert.equal(stepState('waiting', true, true), 'cancelled', 'a run called off is called off, held or not');
   assert.equal(stepState('awaiting approval', true, true), 'awaiting-approval');
   assert.equal(satisfiesAfter('held'), false);
   assert.match(stateMeaning.held, /^held: .*wf hold/);

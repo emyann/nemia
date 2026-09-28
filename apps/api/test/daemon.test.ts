@@ -1,6 +1,7 @@
 /**
  * GET /api/daemon (app.ts, daemon.ts): whether a `wf up` ticks the store, judged by the package off `daemon.json` and the process table as
- * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it.
+ * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it. In a scratch store, set in `WF_ROOT` before the api
+ * loads: agent-orchestrator locates its store as its module loads.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -9,7 +10,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store as its module loads: set first.
 process.env.WF_ROOT = scratch('hkb-api-daemon-');
 const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
 

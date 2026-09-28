@@ -21,10 +21,12 @@ export const Route = createFileRoute('/workflows')({
 const where = <code className="font-mono text-xs">workflows/</code>;
 const yours = <code className="font-mono text-xs">~/.agent-workflows/workflows/</code>;
 
-/** Every workflow the repository carries, then yours: a card each, drawn, and startable — and yours built on the board, a new one included. */
+/**
+ * Every workflow the repository carries, then yours: a card each, drawn, and startable — and yours built on the board, the one just made
+ * opened in its builder.
+ */
 function WorkflowsPage() {
   const { data: workflows } = useSuspenseQuery(workflowsQuery);
-  // The workflow just made, whose card opens in its builder.
   const [made, setMade] = useState<string | null>(null);
 
   return (

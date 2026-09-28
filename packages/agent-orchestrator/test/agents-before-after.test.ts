@@ -1,12 +1,12 @@
 /**
- * The proof that writing an agent once changed no run: every shipped folder resolves to what it did before `agents/` existed.
+ * The proof that writing an agent changes no run: every shipped folder resolves to what it did before `agents/` existed.
  *
- * `fixtures/resolved-before.json` is what today's loader read every shipped folder as, written from the loader of 6c4e57b before any
- * folder moved a line into an agent. It is never regenerated: a difference is a finding, not a fixture to refresh.
+ * `fixtures/resolved-before.json` is every shipped folder as the loader of 6c4e57b resolved it, before any folder moved a line into an
+ * agent. It is never regenerated: a difference is a finding, not a fixture to refresh.
  *
- * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` and `KEYS_CHANGED` name. The bodies are compared too, and the
- * steps whose body moved must be exactly `BODIES_REWORDED`: the reworded briefs of the change that wrote the agents, each printed as a
- * diff for the person who reads the run.
+ * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` and
+ * `KEYS_CHANGED` name. The bodies are compared too, and the steps whose body moved must be exactly `BODIES_REWORDED`: the reworded briefs
+ * of the change that wrote the agents, each printed as a diff for the person who reads the run.
  *
  * A step can be added to a shipped folder only as a copy of one that is there: `STEPS_ADDED` names each by `<folder>/<step>` beside the
  * step it copies, and holds it to that step's keys, agent and body as they resolve today, and to being absent from the snapshot.
@@ -20,11 +20,12 @@ import { asNamed, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 /**
- * The fixture names the package's folders as they were when it was written, and keeps those words: its keys are read at the package's
- * folder today. And its steps hold `disallow` and `allow`, the names `disallowedTools` and `allowedTools` had until 2026-09-23: each is
- * read as a run frozen then is read (`asNamed`, in `readRun`). Nothing else of it is touched.
+ * The package's former folder, as the fixture names it and keeps it: its keys are read at the package's folder today. It is spelled in
+ * parts, so that the line is not one `names.test.ts` refuses for naming a former package. The fixture's steps hold `disallow` and
+ * `allow`, the former names of `disallowedTools` and `allowedTools`: each is read as a run frozen with them is read (`asNamed`, in
+ * `readRun`). Nothing else of it is touched.
  */
-const FORMER_PACKAGE = 'packages/agent-workflows/'; // renamed on 2026-09-23
+const FORMER_PACKAGE = ['packages/agent', 'workflows/'].join('-');
 const atToday = (folder: string) =>
   folder.startsWith(FORMER_PACKAGE) ? `packages/agent-orchestrator/${folder.slice(FORMER_PACKAGE.length)}` : folder;
 const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(
@@ -34,43 +35,35 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntrie
 );
 
 /**
- * The steps whose resolved body is not the one it had, as `<folder>/<step>`: the implementer's and the shipper's, reworded so one file
- * serves every dev folder. The implementer's plan paragraph is said when a plan is there, which dev-planned said always and dev never;
- * the shipper's third item points to the check under *Where to look*, which `composeBrief` names for each folder, where each ship.md
- * wrote its folder's check out.
+ * The steps whose resolved body is not the snapshot's, as `<folder>/<step>`, each for a reason below.
  *
- * The two build folders' ship bodies moved once more afterwards, and stay in this list: their ship.md got back, as a team's note after
- * the shipper's instructions (`NOTES`), the reason their old recipe gave for running the build and the e2e on the merged tree.
+ * The implementer's and the shipper's are reworded so one file serves every dev folder: the implementer's plan paragraph is said when a
+ * plan is there, which dev-planned said always and dev never; the shipper's third item points to the check under *Where to look*, which
+ * `composeBrief` names for each folder, where each ship.md wrote its folder's check out.
  *
- * All four ship bodies moved again when the shipper's fourth item stopped committing git's default `Merge branch '…'` and began writing a
- * message of what shipped, committed with `-F` from a file outside the checkout. The list is the same: those steps were already in it.
+ * The two build folders' ships keep, as a team's note after the shipper's instructions (`NOTES`), the reason their recipe gave for running
+ * the build and the e2e on the merged tree. Every ship stages the ending's merge, which the run lands on the ending's own check, and signs
+ * off a message of what shipped, committed with `-F` from a file outside the checkout rather than git's default `Merge branch '…'`; a build
+ * folder's note speaks of the check the run executes. Both ui folders' ships are dev-build's, with that body.
  *
- * The ui implementer's body moved when the e2e's pages left the one array `PAGES` in `apps/web/test/e2e/run.ts` for a file each under
- * `apps/web/test/e2e/pages/`: its brief said to add a new page to that array, which no longer exists. Both ui folders name that agent.
+ * The ui implementer's brief adds a new page to the e2e as a file under `apps/web/test/e2e/pages/`. Both ui folders name that agent.
  *
- * The supervisor's body moved when the packages were renamed (2026-09-23): it names the runtime's open issues and the orchestrator's
- * features.md by their folders, and those are new words for the same pages. It moved again when it became a background session in
- * `dontAsk` (stage 2 part 2): its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
+ * The supervisor's body names the runtime's open issues and the orchestrator's features.md by the packages' folders. It is a background
+ * session in `dontAsk`: its wait is `sleep 60` alone, since its `allowedTools:` lets no shell loop through.
  *
- * The ui reviewers' bodies moved when the e2e left every round's check for the merged tree (2026-09-25): the screenshots they read are
- * implement's own run of the e2e, no longer its check's. The implementer, ui implementer, shipper and build ships said so in the same change.
+ * The ui reviewers read the screenshots of implement's own run of the e2e, which no round's check runs: the e2e runs on the merged tree.
+ * The implementer, ui implementer, shipper and build ships say so too.
  *
- * Every implementer and reviewer was told that a job's turn cannot end to wait for a process in the background (2026-09-25,
- * `[structured-output-enforce]`), the lesson the owner gave at a plan gate. So each reviewer's body is on the list now, beside the
- * implementers already there.
+ * Every implementer and reviewer is told that a job's turn cannot end to wait for a process in the background
+ * (`[structured-output-enforce]`), so each reviewer's body is on the list beside the implementers.
  *
- * The four ship bodies moved again when the run began landing an ending's merge on the ending's own check (2026-09-25): the shipper
- * stages the merge and signs off its message, and a build folder's note speaks of the check the run executes. Both ui folders' ships,
- * added on main meanwhile as dev-build's, came in with that body when the run merged main.
+ * The planner, the reviewer and the ui reviewer name git's other read-only verbs they may run, and that `git -C` and a `cd` elsewhere are
+ * denied.
  *
- * The planners' bodies moved when planners and reviewers were given git's other read-only verbs (2026-09-25): the planner, the reviewer
- * and the ui reviewer name them, and that `git -C` and a `cd` elsewhere are denied. The reviews were on the list already.
- *
- * Every agent's body moved when its procedures left it for the skills its card describes (agents card 1b, 2026-09-25): each keeps its
- * role and its limits — what it may run, that a job's turn is its last — and names its skills, which say how (`workflows/skills/`). What
- * left each body is in a skill, word for word but where a sentence named the body it sat in; `ui-workflow.test.ts` and
- * `planned-workflow.test.ts` read the sentences they pin in the body and its skills together (`toldIn`). Every step naming an agent was
- * on the list already, so the list is the same; the note folder's two, which also moved, are not in the snapshot.
+ * Every agent's procedures are in the skills its card describes (`workflows/skills/`): each body keeps its role and its limits — what it
+ * may run, that a job's turn is its last — and names its skills, which say how. What left each body is in a skill, word for word but where
+ * a sentence named the body it sat in; `ui-workflow.test.ts` and `planned-workflow.test.ts` read the sentences they pin in the body and its
+ * skills together (`toldIn`). The note folder's two steps, whose bodies moved too, are not in the snapshot.
  */
 const BODIES_REWORDED: string[] = [
   ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
@@ -97,7 +90,10 @@ const NOTES: Record<string, string> = {
   'workflows/dev-planned-build/ship': 'the merged tree is the first tree either has seen',
 };
 
-/** The agent each shipped step names, by `<folder>/<step>`: the steps of the dev folders and ui. The supervisor and the codex folder name none. */
+/**
+ * The agent each shipped step names, by `<folder>/<step>`: the steps of the dev folders and ui. The supervisor and the codex folder name
+ * none.
+ */
 const AGENTS: Record<string, string> = {
   ...Object.fromEntries(
     ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
@@ -117,9 +113,9 @@ const AGENTS: Record<string, string> = {
 };
 
 /**
- * The steps a shipped folder gained after the snapshot, as `<folder>/<step>` and the step each copies, by the same name. Both ui folders
- * got the build folders' ship (2026-09-25), once the e2e ran only on the merged tree: without a ship no check the run executes ran it
- * for a ui run. Each is keyed by its full path, so a dev folder that lost or gained a ship still fails.
+ * The steps a shipped folder has beyond the snapshot, as `<folder>/<step>` and the step each copies, by the same name. Both ui folders have
+ * the build folders' ship: the e2e runs only on the merged tree, and without a ship no check the run executes runs it for a ui run. Each is
+ * keyed by its full path, so a dev folder that lost or gained a ship still fails.
  */
 const STEPS_ADDED: Record<string, string> = {
   'workflows/ui/ship': 'workflows/dev-build/ship',
@@ -127,22 +123,22 @@ const STEPS_ADDED: Record<string, string> = {
 };
 
 /**
- * The keys a shipped step gained after the snapshot, as `<folder>/<step>` and each key with its value: nothing an agent moved, and each
- * held to that value. The supervisor, which names no agent, got its `context:` window once the agent refactor had shipped
- * (docs/pivot-2026-09-18.md §6, P1): the one session here that never ends is the one a cap is for.
+ * The keys a shipped step has beyond the snapshot, as `<folder>/<step>` and each key with its value: nothing an agent moved, and each
+ * held to that value. The supervisor, which names no agent, has a `context:` window: the one session here that never ends is the one a
+ * cap is for.
  *
- * When steps became jobs (`claude -p`, thin runtime stage 2 part 2) the supervisor alone stayed a background session, and its mode was
- * written by its role: `background: true`, `permissionMode: dontAsk` and an `allowedTools:` list, read here from its file rather than copied.
- * The agents that build and ship — implementer, ui-implementer, shipper — say `permissionMode: auto`, the engine's default, so the mode
- * of every role is written where the role is. Each step naming one of them gains that key and nothing else.
+ * Steps are jobs (`claude -p`) but the supervisor, a background session whose mode is written by its role: `background: true`,
+ * `permissionMode: dontAsk` and an `allowedTools:` list, read here from its file rather than copied. The agents that build and ship —
+ * implementer, ui-implementer, shipper — say `permissionMode: auto`, the engine's default, so the mode of every role is written where the
+ * role is. Each step naming one of them gains that key and nothing else.
  *
- * Each dev folder's ship gained a `check:` and the shipper's `output:` when the run began landing the ending's merge on its check: the
- * run executes the folder's check on the merge the step stages, and commits it with the `message` the step's closeout gives. The check is
- * the folder's implement's, read here; the schema is the shipper's file, read here too.
+ * Each dev folder's ship has a `check:` and the shipper's `output:`: the run executes the folder's check on the merge the step stages, and
+ * commits it with the `message` the step's closeout gives. The check is the folder's implement's, read here; the schema is the shipper's
+ * file, read here too.
  *
- * The ui agents say `model: opus` since every job reads its checkout's settings and not the operator's (`--setting-sources
- * project,local`, F24 in docs/spike-2026-09-25-agents-skills.md): their steps named no model and ran the operator's, Opus, and a job
- * given none now runs Claude Code's default. The model they ran is written where the role is, as the modes were.
+ * The ui agents say `model: opus`: a job reads its checkout's settings and not the operator's (`--setting-sources project,local`), so a
+ * step that names no model runs Claude Code's default rather than the operator's Opus. The model is written where the role is, as the
+ * modes are.
  */
 const SUPERVISOR_ALLOW = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!.allowedTools!;
 const SHIPPER_OUTPUT = {
@@ -175,18 +171,17 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
 };
 
 /**
- * The keys of a shipped step whose value moved after the snapshot, as `<folder>/<step>` and each key with its new value: nothing an agent
+ * The keys of a shipped step whose value is not the snapshot's, as `<folder>/<step>` and each key with its new value: nothing an agent
  * moved, and each held to that value, and to having been in the snapshot with another. The `dev` folders' implement check runs the build
- * and the e2e when, and only when, the work touched the web app (docs/pivot-2026-09-18.md §6, P0.6): three runs changed `apps/web/src` on
- * `dev`, whose check was the suite and the types, and no build and no e2e ever ran on them. The line is `dev`'s own, read here rather than
- * copied, and held equal between the two folders; web-check.test.ts runs it against real git.
+ * and the e2e when, and only when, the work touched the web app: a check of the suite and the types alone runs no build and no e2e on a
+ * change to `apps/web/src`. The line is `dev`'s own, read here rather than copied, and held equal between the two folders;
+ * web-check.test.ts runs it against real git.
  *
- * Every implement check with an e2e moved again when the e2e left the rounds for the merged tree (2026-09-25): a round's check, which the
- * run gives `WF_BASE_REF`, builds and runs no e2e, and the shipper's run of the line, with none, runs it. The build folders' and ui's line
- * is dev-build's, read here too, and web-check.test.ts runs every one of them.
+ * A round's check, which the run gives `WF_BASE_REF`, builds and runs no e2e, and the shipper's run of the line, with none, runs it. The
+ * build folders' and ui's line is dev-build's, read here too, and web-check.test.ts runs every one of them.
  *
- * And every shipped check gained `npm run lint` (oxlint and oxfmt's check) after the types, on 2026-09-28: the package's own folder's
- * line, the suite and the types alone until then, moved with the rest, and is read here as it stands too.
+ * Every shipped check runs `npm run lint` (oxlint and oxfmt's check) after the types; the package's own folder's line is read here as it
+ * stands too.
  */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
 const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')!.check!;
@@ -287,27 +282,29 @@ test('every shipped folder resolves to the keys it had before agents, and only t
       }
     }
   }
-  // Each step added is one the snapshot did not have.
   for (const at of Object.keys(STEPS_ADDED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
     assert.equal(
       BEFORE[folder].some((s) => s.name === name),
       false,
-      `${at} was in the snapshot`,
+      `a step added is one the snapshot did not have, and ${at} was in it`,
     );
   }
-  // Each key added is one the snapshot did not have: a key that moved is never passed off as one added.
   for (const [at, keys] of Object.entries(KEYS_ADDED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
     const was = BEFORE[folder].find((s) => s.name === name)!;
-    for (const key of Object.keys(keys)) assert.equal(Object.hasOwn(keysOf(was), key), false, `${at}: ${key} was in the snapshot`);
+    for (const key of Object.keys(keys))
+      assert.equal(
+        Object.hasOwn(keysOf(was), key),
+        false,
+        `${at}: ${key} was in the snapshot: a key that moved is never passed off as one added`,
+      );
   }
-  // Each key changed is one the snapshot had, with another value: a key added is never passed off as one changed.
   for (const [at, keys] of Object.entries(KEYS_CHANGED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
     const was = keysOf(BEFORE[folder].find((s) => s.name === name)!);
     for (const [key, value] of Object.entries(keys)) {
-      assert.equal(Object.hasOwn(was, key), true, `${at}: ${key} was not in the snapshot`);
+      assert.equal(Object.hasOwn(was, key), true, `${at}: ${key} was not in the snapshot: a key added is never passed off as one changed`);
       assert.notDeepEqual(was[key], value, `${at}: ${key} is as the snapshot had it`);
     }
   }

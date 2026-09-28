@@ -230,8 +230,8 @@ export function keptAfterCopy(
 
 /**
  * What the page keeps once a save has been read back: the form a copy kept is let go only when the agent reads at another version than the one
- * the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form was drawn again from the file as it
- * was before the save — and stayed so where the read failed.
+ * the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form would be drawn again from the
+ * file as it was before the save, and would stay so where the read failed.
  */
 export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null =>
   kept && now !== undefined && now !== kept.version ? null : kept;

@@ -10,12 +10,14 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // A finished run pruned on the board, as `wf prune <run> --unmerged --artifacts --yes` prunes it (`POST /api/runs/:id/prune`): UNMERGED, its
-  // branch ahead of main and nobody has merged it, given a worktree on that branch and a file in its files directory for the visit. Its page
-  // offers three choices, the first two unavailable since nobody merged it, and the third said plainly as leaving its branch the only copy
-  // of its work; the prune is asked twice. Then the worktree and the files are gone, the branch stays, and the run's page, its row on Runs
-  // and its card on the Factory say pruned. What the api refuses — a run not over, one already pruned, one nobody merged without the third
-  // choice — is proven in its own tests (`apps/api/test/prune.test.ts`), since the e2e's watch counts every 4xx.
+  /**
+   * A finished run pruned on the board, as `wf prune <run> --unmerged --artifacts --yes` prunes it (`POST /api/runs/:id/prune`): UNMERGED, its
+   * branch ahead of main and nobody has merged it, given a worktree on that branch and a file in its files directory for the visit. Its page
+   * offers three choices, the first two unavailable since nobody merged it, and the third said plainly as leaving its branch the only copy
+   * of its work; the prune is asked twice. Then the worktree and the files are gone, the branch stays, and the run's page, its row on Runs
+   * and its card on the Factory say pruned. What the api refuses — a run not over, one already pruned, one nobody merged without the third
+   * choice — is proven in its own tests (`apps/api/test/prune.test.ts`), since the e2e's watch counts every 4xx.
+   */
   name: 'prune',
   route: '/',
   expect: async (page) => {
@@ -31,7 +33,6 @@ export default {
     const theme = await themeOf(page);
 
     try {
-      // What a run that finished leaves on disk: its worktree, on its branch, and what its step handed on.
       if (fs.existsSync(marker) || fs.existsSync(lane) || fs.existsSync(files))
         throw new Refused(`${id} is seeded unpruned, with no worktree and no files`);
       git('worktree', 'add', '-q', lane, branch);
@@ -99,7 +100,6 @@ export default {
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `prune-pruned-${theme}.png`), fullPage: true });
 
-      // On Runs, beside where a row says `cancelled`.
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const row = page.locator('li', { has: page.locator(`a[href="/runs/${id}"]`) });
@@ -116,7 +116,6 @@ export default {
       await settled(page);
       await row.screenshot({ path: path.join(OUT, `prune-row-${theme}.png`) });
 
-      // On the Factory, in its card's footer: still to decide, since nobody merged it, and pruned.
       await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       await page.getByRole('button', { name: 'Reset layout' }).click();

@@ -4,7 +4,12 @@
  * sends refused in the package's words (`heldRefusal`). Each held to what `wf ls` and `wf decide` say of the same run.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on ships by its branch being
- * merged, and the harness's fake `claude` (test/harness.ts) first on PATH.
+ * merged, `WF_ROOT` set before the orchestrator is imported, as it locates its store as its modules load, and the harness's fake `claude`
+ * (test/harness.ts) first on PATH.
+ *
+ * The runs held on: `p-live`, still working, its branch not merged, which may ship yet; `p-shipped`, signed off and its branch merged into
+ * main; `p-cancelled`, called off before anything of it was filed; `p-gone`, signed off on a branch deleted unmerged before any tick
+ * recorded its tip.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -18,7 +23,6 @@ import type { RunDetail } from '../src/detail.ts';
 import type { RunHolding } from '../src/judged.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-hold-');
 process.env.WF_ROOT = root;
 
@@ -116,18 +120,14 @@ const holdOn = (id: string, until: string[]) => write(holdFile(id), JSON.stringi
 const implement = { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' };
 const review = { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex' };
 
-// The runs held on. Still working, its branch not merged: it may ship yet.
 branch('wf/p-live/implement', false);
 working('t-p-live');
 writeRun('p-live', [implement], { implement: { taskId: 't-p-live', branch: 'wf/p-live/implement' } });
-// Signed off, and its branch merged into main: shipped.
 branch('wf/p-shipped/implement', true);
 signedOff('t-p-shipped', DONE);
 writeRun('p-shipped', [implement], { implement: { taskId: 't-p-shipped', branch: 'wf/p-shipped/implement' } });
-// Called off before anything of it was filed.
 const cancelledAt = at(20);
 writeRun('p-cancelled', [implement], { implement: { taskId: null } }, { cancelledAt });
-// Signed off on a branch somebody deleted unmerged, before any tick recorded its tip.
 signedOff('t-p-gone', DONE);
 writeRun('p-gone', [implement], { implement: { taskId: 't-p-gone', branch: 'wf/p-gone/implement' } });
 
@@ -282,13 +282,11 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
     assert.deepEqual(asWaits(api.holding), cli.holding, id);
     assert.equal(api.holding.word, holdWord(cli.holding!), id);
     assert.equal(api.holding.advice, holdAdvice(run, cli.holding!), id);
-    // And `wf decide`'s reading, which is `list`'s.
-    assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, id);
-    // Each step as `wf ls` words it.
+    assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, `${id}: wf decide's reading, which is list's`);
     assert.deepEqual(
       api.steps.map((s) => [s.name, s.status, s.note]),
       cli.steps.map((s) => [s.name, s.status, s.note ?? null]),
-      id,
+      `${id}: each step as wf ls words it`,
     );
     const page = await detail(id);
     assert.deepEqual(
@@ -304,8 +302,11 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
     advice: `nothing of ${GATE} is filed, and nothing is asked of you, until wf decide says p-live has shipped; to go on before then: wf hold ${GATE} --off`,
     onYou: false,
   });
-  // A run nobody holds says so with an empty list and a null, not a missing field.
-  assert.deepEqual([runs.get('p-live')!.heldUntil, runs.get('p-live')!.holding], [[], null]);
+  assert.deepEqual(
+    [runs.get('p-live')!.heldUntil, runs.get('p-live')!.holding],
+    [[], null],
+    'a run nobody holds says so with an empty list and a null, not a missing field',
+  );
   assert.deepEqual([(await detail('p-live')).heldUntil, (await detail('p-live')).holding], [[], null]);
 });
 
@@ -322,14 +323,17 @@ test('REFUSED while held: no step of a held run waits on you, none is offered an
     );
     assert.doesNotMatch(JSON.stringify(api.steps.map((s) => s.note)), VERBS, id);
   }
-  // The rule, not the fixture: each of these waits on you once the hold is lifted.
   const unheld: Record<string, string[]> = { [GATE]: ['approve plan'], [LOOP]: ['review'], [BUDGET]: ['palette'], [BLOCKS]: ['implement'] };
   for (const [id, onYou] of Object.entries(unheld)) {
     const hold = fs.readFileSync(holdFile(id), 'utf8');
     fs.rmSync(holdFile(id));
     try {
       const run = (await listed()).get(id)!;
-      assert.deepEqual([run.heldUntil, run.holding, run.onYou], [[], null, onYou], id);
+      assert.deepEqual(
+        [run.heldUntil, run.holding, run.onYou],
+        [[], null, onYou],
+        `${id}: the rule, not the fixture: it waits on you once the hold is lifted`,
+      );
     } finally {
       write(holdFile(id), hold);
     }
@@ -349,7 +353,6 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
     assert.deepEqual(said.answering, {}, id);
     assert.doesNotMatch(JSON.stringify(said.gates), VERBS, id);
   }
-  // Lifted, each is offered the verb the hold refused: the decision reads the hold, not the run's steps.
   const offered: Record<string, RegExp> = {
     [GATE]: /^wf approve h-gate plan$/,
     [LOOP]: /^wf (round|accept) h-loop review/,
@@ -365,7 +368,7 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
       const { commands } = decided;
       assert.ok(
         commands.some((c) => command.test(c.command)),
-        `${id}: ${JSON.stringify(commands)}`,
+        `${id}, lifted, is offered the verb the hold refused: the decision reads the hold, not the run's steps: ${JSON.stringify(commands)}`,
       );
     } finally {
       write(holdFile(id), hold);
@@ -436,10 +439,13 @@ test("a hold that lifts only by a person's hand says so (`onYou`) — one naming
   const runs = await listed();
   const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.onYou]));
   assert.deepEqual(onYou, { live: false, shipped: false, cancelled: true, gone: true, missing: true, none: true });
-  // Held to `wf decide`'s own words rather than a copy of its rule: its advice names the way out exactly when a person has to act.
   for (const kind of Object.keys(ON)) {
     const holding = runs.get(`h-on-${kind}`)!.holding!;
-    assert.equal(holding.onYou, holding.advice.includes('yours to'), kind);
+    assert.equal(
+      holding.onYou,
+      holding.advice.includes('yours to'),
+      `${kind}: held to wf decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
+    );
   }
   assert.deepEqual(runs.get('h-on-shipped')!.holding!.runs, [
     { run: 'p-shipped', missing: false, cancelledAt: null, gone: [], shipped: true },
@@ -462,21 +468,23 @@ test('a held run moves as it would unheld while its hold may lift on its own —
   const moving = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.moving]));
   assert.deepEqual(moving, { live: true, shipped: true, cancelled: false, gone: false, missing: false, none: false });
   for (const kind of Object.keys(ON)) assert.equal(runs.get(`h-on-${kind}`)!.status, 'running', kind);
-  // A run that would wait on you unheld moves no more for being held.
-  for (const id of [GATE, LOOP, BUDGET, BLOCKS]) assert.equal(runs.get(id)!.moving, false, id);
+  for (const id of [GATE, LOOP, BUDGET, BLOCKS])
+    assert.equal(runs.get(id)!.moving, false, `${id}: a run that would wait on you unheld moves no more for being held`);
 
-  // A try asked by hand beside the verb that refuses it is not asked yet: it is filed once the hold lifts, so the run moves while it may.
   const ask = path.join(root, 'runs', `${BLOCKS}.asks`, 'retry-implement-2');
   write(ask, JSON.stringify({ mode: 'nudge' }));
   try {
     const page = await detail(BLOCKS);
-    assert.equal(page.steps.find((s) => s.name === 'implement')!.asked, null);
+    assert.equal(
+      page.steps.find((s) => s.name === 'implement')!.asked,
+      null,
+      'a try asked by hand beside the verb that refuses it is not asked yet',
+    );
     assert.deepEqual(page.waitingOnYou, []);
-    assert.equal(page.moving, true);
+    assert.equal(page.moving, true, 'it is filed once the hold lifts, so the run moves while it may');
     assert.deepEqual(await decisionOf(BLOCKS), { holding: page.holding });
-    // On a hold only a person lifts, it does not.
     holdOn(BLOCKS, ['no-such-run']);
-    assert.equal((await detail(BLOCKS)).moving, false);
+    assert.equal((await detail(BLOCKS)).moving, false, 'on a hold only a person lifts, it does not');
   } finally {
     fs.rmSync(path.dirname(ask), { recursive: true });
     holdOn(BLOCKS, ['p-live']);
@@ -565,9 +573,8 @@ test('a hold lifted on the board is lifted as `wf hold --off` lifts it: its file
   const decided = await decisionOf(LIFT);
   assert.ok('commands' in decided, JSON.stringify(decided));
   assert.ok(decided.commands.some((c) => c.command === `wf approve ${LIFT} plan`));
-  // Lifted, it is held no more: a second lift is the package's refusal.
   const again = await lift(LIFT);
-  assert.equal(again.status, 409);
+  assert.equal(again.status, 409, "lifted, it is held no more: a second lift is the package's refusal");
   assert.equal(((await again.json()) as { error: string }).error, await refusal(async () => unhold(LIFT)));
 });
 
@@ -593,7 +600,6 @@ test('REFUSED at shipped defaults: a lift of a run nobody holds — one never he
 });
 
 test('REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written', async () => {
-  // Removed: `wf rm` took the record, and a hold file stands where it was.
   write(holdFile('h-removed'), JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
   for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
     const before = fs.readdirSync(path.join(root, 'runs')).sort();
@@ -602,7 +608,10 @@ test('REFUSED at shipped defaults: a lift of a run the store has not — none by
     assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
     assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
   }
-  assert.ok(fs.existsSync(holdFile('h-removed')), 'the stray hold file is left for `wf hold --off` or a person');
+  assert.ok(
+    fs.existsSync(holdFile('h-removed')),
+    'the stray hold file, standing where wf rm took the record, is left for `wf hold --off` or a person',
+  );
 });
 
 test('REFUSED at shipped defaults: a lift from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the hold stands', async () => {

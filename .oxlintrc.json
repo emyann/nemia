@@ -112,7 +112,8 @@
     },
     {
       "files": ["apps/web/**"],
-      "excludeFiles": ["apps/web/**"],
+      // The scratch helper and its test are held byte for byte to the runtime's copy; the runtime's cleanup card cleans them in every package.
+      "excludeFiles": ["apps/web/test/scratch.ts", "apps/web/test/scratch.test.ts"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

@@ -4,7 +4,8 @@
  * At shipped defaults: the api's own engine over a store this file seeds, reading a transcript file where Claude Code keeps
  * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The harness's fake `claude`
  * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running, and notes
- * every call, so a test can count what the stream costs.
+ * every call, so a test can count what the stream costs. `WF_ROOT` and `CLAUDE_CONFIG_DIR` are set before the orchestrator is imported, as
+ * it locates its store, and the Claude runner where transcripts are, as their modules load.
  */
 import { observations, registry } from './harness.ts';
 import { test } from 'node:test';
@@ -18,7 +19,6 @@ import type { StepTranscript } from '../src/steps.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-transcript-${label}-`);
 
-// agent-orchestrator locates its store, and the Claude runner where transcripts are, as their modules load: both are set first.
 const root = tmp('root');
 process.env.WF_ROOT = root;
 const config = tmp('claude');
@@ -130,7 +130,7 @@ fs.writeFileSync(
     ),
     steps: {
       implement: { taskId: 't-implement' },
-      // Held open (thin runtime stage 2 part 4b), their one turn signed: waiting on a person's word, closed on it, and answered.
+      /** `held`, `closed` and `answered`: held open, their one turn signed, and waiting on a person's word, closed on it, and answered. */
       held: { taskId: 't-held' },
       closed: { taskId: 't-closed' },
       answered: { taskId: 't-answered' },
@@ -140,7 +140,7 @@ fs.writeFileSync(
       broken: { taskId: 't-broken' },
       flaky: { taskId: 't-flaky' },
       vanishing: { taskId: 't-vanishing' },
-      // Filed, and the engine has no record of its task.
+      /** Filed, and the engine has no record of its task. */
       lost: { taskId: 't-lost' },
       review: { taskId: null },
     },
@@ -276,9 +276,8 @@ test("the stream of a settled task sends each event, the read's cursor as the id
   const res = await app.request(streamUrl('implement'));
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
-  // Resolves only once the api closes the stream.
   const said = blocks(await res.text());
-  assert.deepEqual(eventsIn(said), engines.events);
+  assert.deepEqual(eventsIn(said), engines.events, 'every event, off a body that resolves only once the api closes the stream');
   const sent = said.filter((b) => b.event === 'transcript');
   assert.deepEqual(
     sent.map((b) => b.id),
@@ -294,9 +293,8 @@ test('a stream reconnected with Last-Event-ID resumes from that cursor, over any
   const lines = conversation(sessionId);
   journal('t-resumed', [...started, ...ending('t-resumed', sessionId)]);
   writeTranscript(sessionId, lines.slice(0, 4));
-  // The first connection was sent up to here, and was cut off; the session's transcript went on.
   const first = await engine().transcript('t-resumed');
-  assert.equal(first.events.length, 3);
+  assert.equal(first.events.length, 3, "the first connection was sent up to here, and was cut off; the session's transcript went on");
   writeTranscript(sessionId, lines.slice(4));
 
   const whole = await engine().transcript('t-resumed');
@@ -344,7 +342,6 @@ test(
     );
     assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
 
-    // The session goes on, and its task settles.
     writeTranscript(sessionId, lines.slice(4));
     await sleep(1_500);
     journal('t-live', ending('t-live', sessionId));
@@ -363,20 +360,22 @@ test('the stream stops asking the engine once its reader goes away', { timeout: 
   const reader = res.body!.getReader();
   await readUntil(reader, { value: '' }, (said) => eventsIn(said).length >= 1);
   await reader.cancel();
-  // A read already under way when the reader left may finish; after it, nothing.
   await sleep(1_500);
   const before = observations();
   await sleep(3_000);
-  assert.equal(observations(), before, 'no `claude agents` call once the reader has gone: the task is still live, and nobody is reading');
+  assert.equal(
+    observations(),
+    before,
+    'no `claude agents` call once the reader has gone, past a read already under way when it left: the task is still live, and nobody is reading',
+  );
 });
 
 test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
   const sessionId = settledTask('t-broken');
-  // A directory where the transcript should be: found, opened, and not read.
   fs.rmSync(transcriptFile(sessionId));
   fs.mkdirSync(transcriptFile(sessionId));
   const res = await app.request(url('broken'));
-  assert.equal(res.status, 502);
+  assert.equal(res.status, 502, 'a directory where the transcript should be: found, opened, and not read');
   const { error } = (await res.json()) as { error: string };
   assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
   assert.match(error, /`wf logs r-talk broken` reads its output from the command line\.$/);
@@ -394,7 +393,6 @@ test(
     const text = { value: '' };
     await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
 
-    // The task's journal cannot be read for a while — a directory where the file was — as a read that fails would find it.
     const aside = `${journalFile('t-flaky')}.aside`;
     fs.renameSync(journalFile('t-flaky'), aside);
     fs.mkdirSync(journalFile('t-flaky'));
@@ -402,7 +400,11 @@ test(
       (b) => b.event === 'unreadable',
     );
     const { error, retrying } = JSON.parse(failing[0].data!);
-    assert.equal(retrying, true, 'said as a read that will be tried again');
+    assert.equal(
+      retrying,
+      true,
+      "the task's journal, a directory where the file was, cannot be read for a while: said as a read that will be tried again",
+    );
     assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
     const answered = await app.request(url('flaky'));
     assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
@@ -410,10 +412,8 @@ test(
       ((await answered.json()) as { error: string }).error,
       /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/,
     );
-    // Some beats of it.
     await sleep(2_500);
 
-    // Readable again, and the session went on, then its task settled.
     fs.rmdirSync(journalFile('t-flaky'));
     fs.renameSync(aside, journalFile('t-flaky'));
     writeTranscript(sessionId, lines.slice(4));
@@ -445,10 +445,13 @@ test(
     const text = { value: '' };
     await readUntil(reader, text, (said) => eventsIn(said).length >= 1);
     fs.rmSync(journalFile('t-vanishing'));
-    // Resolves only once the api closes the stream; a stream that went on trying would time the test out.
     const said = await readUntil(reader, text, () => false);
     const last = said.at(-1)!;
-    assert.equal(last.event, 'unreadable');
+    assert.equal(
+      last.event,
+      'unreadable',
+      'the read resolves only once the api closes the stream: one that went on trying would time the test out',
+    );
     const { error, retrying } = JSON.parse(last.data!);
     assert.equal(retrying, false);
     assert.match(error, /was filed as task t-vanishing, and the engine has no record of it/);

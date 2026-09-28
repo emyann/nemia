@@ -1,8 +1,13 @@
 /**
- * An agent of yours tried on a short brief (agents card 3c): the try's folder written in the store's `tries/`, and a run of it started with no
- * repository — a folder run, its one step naming the agent and fenced to its folder with a dollar to spend. The run is listed as a try, one at a
- * time, and the board removes it. Every refusal is made to refuse, and leaves no run behind: a repository agent, an empty brief, a try while
- * one moves, a name a try's folder cannot take, a skill only the repository has, and the guard's.
+ * An agent of yours tried on a short brief: the try's folder written in the store's `tries/`, and a run of it started with no repository — a
+ * folder run, its one step naming the agent and fenced to its folder with a dollar to spend. The run is listed as a try, one at a time, and
+ * the board removes it. Every refusal is made to refuse, and leaves no run behind: a repository agent, an empty brief, a try while one
+ * moves, a name a try's folder cannot take, a skill only the repository has, and the guard's.
+ *
+ * `WF_ROOT` points at a scratch directory before the api loads: agent-orchestrator locates its store when the module loads. Your agents are
+ * `scribe`, with a result schema beside it; `borrower`, which gives a skill only the repository's .claude/skills has; `agents` and
+ * `skills`, whose names a try's folder cannot take; and those a try's fence does not reach: `coder` on codex, `faraway`, a remote A2A agent,
+ * and `bridged`, bridged to claude.ai. The repository's own agents are `critic` and `grader`, the second with a result schema beside it.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -11,10 +16,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
 const root = scratch('hkb-api-try-');
 process.env.WF_ROOT = root;
-// The board's repository: a plain directory, with an agent of its own and a skill only it has.
+/** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('hkb-api-try-repo-');
 process.env.HKB_REPO = repo;
 
@@ -30,7 +34,6 @@ fs.writeFileSync(
   path.join(YOURS, 'scribe.schema.json'),
   JSON.stringify({ type: 'object', additionalProperties: false, required: ['notes'], properties: { notes: { type: 'string' } } }),
 );
-// An agent of yours that gives a skill only the repository's .claude/skills has.
 fs.writeFileSync(
   path.join(YOURS, 'borrower.md'),
   '---\ndescription: Use this to borrow.\ntools: Read, Skill\nskills: theirs\n---\nBorrow it.\n',
@@ -40,14 +43,11 @@ fs.writeFileSync(
   path.join(repo, '.claude', 'skills', 'theirs', 'SKILL.md'),
   "---\nname: theirs\ndescription: The repository's own.\n---\nDo it their way.\n",
 );
-// Agents whose names a try's folder cannot take.
 for (const name of ['agents', 'skills'])
   fs.writeFileSync(path.join(YOURS, `${name}.md`), `---\ndescription: Use this as ${name}.\n---\nDo it.\n`);
-// Agents of yours a try's fence does not reach: one on codex, a remote A2A agent, and one bridged to claude.ai.
 fs.writeFileSync(path.join(YOURS, 'coder.md'), '---\ndescription: Use this to code.\nharness: codex\n---\nCode it.\n');
 fs.writeFileSync(path.join(YOURS, 'faraway.md'), '---\ndescription: Use this far away.\nharness: a2a:faraway\n---\nDo it there.\n');
 fs.writeFileSync(path.join(YOURS, 'bridged.md'), '---\ndescription: Use this from a phone.\nremote: true\n---\nDo it.\n');
-// The repository's own agents, one with a result schema beside it.
 fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'critic.md'), '---\ndescription: Use this to criticise.\n---\nCriticise it.\n');
 fs.writeFileSync(
@@ -58,7 +58,7 @@ fs.writeFileSync(
   path.join(repo, 'workflows', 'agents', 'grader.schema.json'),
   JSON.stringify({ type: 'object', properties: { grade: { type: 'string' } } }),
 );
-// And a run that is no try, to hold the two apart.
+/** A workflow folder whose run is no try, to hold the two apart. */
 const other = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(other, { recursive: true });
 fs.writeFileSync(
@@ -189,10 +189,9 @@ test('a run that is no try says so', async () => {
   try {
     assert.equal((await listed()).find((r) => r.id === run.id)!.try, null);
     assert.equal(((await (await app.request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);
-    // And the board removes only a try: another run is `wf rm`'s, which says what it leaves.
     const res = await remove(run.id);
     const body = (await res.json()) as { error: string };
-    assert.equal(res.status, 409);
+    assert.equal(res.status, 409, "the board removes only a try: another run is `wf rm`'s, which says what it leaves");
     assert.match(body.error, /removes only a try/);
     assert.match(body.error, new RegExp(`wf rm ${run.id}`));
     assert.ok(fs.existsSync(path.join(RUNS, `${run.id}.json`)), 'and it is still there');
@@ -219,11 +218,13 @@ test('once the try has ended, the agent can be tried again, and its folder is wr
   ended(second);
   assert.equal((await remove(second)).status, 200);
 
-  // The agent edited: its version moves, and the next try's folder is written at the new one.
   fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
   const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;
   const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
-  assert.ok(fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`), 'written again at the version the agent is at');
+  assert.ok(
+    fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
+    "the agent edited, its version moves: the next try's folder is written again at the version the agent is at",
+  );
   ended(third);
   assert.equal((await remove(third)).status, 200);
 });

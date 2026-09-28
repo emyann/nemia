@@ -1,7 +1,8 @@
 /**
  * GET /api/quota: the plan's usage asked of Claude Code with its `get_usage` control request — here of the harness's `claude`, which answers
  * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
- * in a sentence; and the pure judgement under it (`quotaOf`).
+ * in a sentence; and the pure judgement under it (`quotaOf`). `WF_ROOT` is set before the orchestrator is imported, as it locates its store
+ * as its module loads.
  */
 import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
@@ -11,7 +12,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store as its module loads: set first.
 process.env.WF_ROOT = scratch('hkb-api-quota-');
 
 const { app } = await import('../src/app.ts');
@@ -46,7 +46,10 @@ const plan = (five = 38.4, week = 86) =>
     nimbus_quill: { utilization: 0, resets_at: null },
   });
 const heard = (response: unknown, at = NOW): Held => ({ asked: { kind: 'answer', response }, at });
-/** A recorded answer's control_response, as `askUsage` hands it on. */
+/**
+ * A recorded answer's control_response, as `askUsage` hands it on: `plan`; `no-plan`, signed in with no subscription; `unsupported`, as
+ * 2.1.278 refuses a subtype it does not have, a Claude Code without get_usage; `unanswered`, when Anthropic's usage service gave it nothing.
+ */
 const fixture = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered') => (JSON.parse(recorded(name)) as { response: unknown }).response;
 
 const get = async (): Promise<Quota> => {
@@ -78,7 +81,6 @@ test("an answer with the plan's windows: the five-hour and the week, in that ord
   );
   assert.equal(q.markAt, QUOTA_MARK_PERCENT);
   assert.equal(q.last, null);
-  // The order is the board's, not the answer's.
   const reversed = quotaOf(
     heard(
       success({
@@ -93,6 +95,7 @@ test("an answer with the plan's windows: the five-hour and the week, in that ord
   assert.deepEqual(
     reversed.windows.map((w) => w.label),
     ['5-hour', 'week', 'week, Sonnet'],
+    "the order is the board's, not the answer's",
   );
 });
 
@@ -137,7 +140,6 @@ test('REFUSED: an answer in a shape this code does not read is unknown, and says
     assert.match(q.said!, what);
     assert.match(q.said!, /get_usage is experimental: see README\.md, The quota on the board\./);
   };
-  // As 2.1.278 refuses a subtype it does not have: a Claude Code without get_usage.
   unknown(fixture('unsupported'), /it refused the request \(Unsupported control request subtype: get_usage_nope\)/);
   unknown(null, /its response is not an object/);
   unknown({ subtype: 'pending', response: {} }, /neither a success nor an error/);
@@ -165,10 +167,13 @@ test("Claude Code 2.1.278's answer when Anthropic's usage service gave it nothin
     q.last?.windows.map((w) => w.usedPercentage),
     [38.4, 86],
   );
-  // Only null is the service's silence: rate_limits that are there and not an object, or missing, are still a shape not read.
-  assert.equal(quotaOf(heard(success(null)), null, NOW).state, 'unanswered');
-  assert.equal(quotaOf(heard(success([1])), null, NOW).state, 'unknown');
-  assert.equal(quotaOf(heard(success(undefined)), null, NOW).state, 'unknown');
+  assert.equal(quotaOf(heard(success(null)), null, NOW).state, 'unanswered', "only null is the service's silence");
+  assert.equal(
+    quotaOf(heard(success([1])), null, NOW).state,
+    'unknown',
+    'rate_limits that are there and not an object are still a shape not read',
+  );
+  assert.equal(quotaOf(heard(success(undefined)), null, NOW).state, 'unknown', 'and missing ones too');
   assert.equal(quotaOf(heard(success(null, false)), null, NOW).state, 'no-plan');
   assert.match(quotaOf({ ...heard(success(null)), keptMs: 80 * 60e3 }, null, NOW).said!, /Asked again in 1 h 20 min\.$/);
 });
@@ -253,13 +258,12 @@ test('REFUSED: a second read inside the keep asks nothing; one past it asks agai
   assert.equal(kept.state, 'fresh');
   assert.equal(kept.ageMs, QUOTA_KEEP_MS - 1);
   assert.equal(asks(), before + 1, 'held for the keep');
-  // A failure is held as long.
   usageAnswer('', 'exit');
   clock += 1;
   assert.equal((await readQuota({ now })).state, 'failed');
   clock += 60_000;
   assert.equal((await readQuota({ now })).state, 'failed');
-  assert.equal(asks(), before + 2);
+  assert.equal(asks(), before + 2, 'a failure is held as long');
 });
 
 test('REFUSED: after an unanswered answer no read asks inside the wait, however many boards read; the waits grow, and a good reading begins them again', async () => {
@@ -268,12 +272,15 @@ test('REFUSED: after an unanswered answer no read asks inside the wait, however 
   const now = () => clock;
   const before = asks();
   const many = async () => (await Promise.all(Array.from({ length: 12 }, () => readQuota({ now })))).map((q) => q.state);
-  /** Read at `offset` past the last ask, by twelve boards at once: every one of them says `state`, and the asks so far are `asked`. */
   const readsAt = async (offset: number, state: string, asked: number, why: string) => {
     const from = clock;
     clock = from + offset;
-    assert.deepEqual(await many(), Array(12).fill(state), why);
-    assert.equal(asks(), before + asked, why);
+    assert.deepEqual(
+      await many(),
+      Array(12).fill(state),
+      `${why}: read by twelve boards at once, ${offset} ms past the last ask, each says ${state}`,
+    );
+    assert.equal(asks(), before + asked, `${why}: ${asked} asks so far`);
     clock = from;
   };
   usageAnswer(recorded('unanswered'));
@@ -291,20 +298,26 @@ test('REFUSED: after an unanswered answer no read asks inside the wait, however 
   clock += 40 * 60e3;
   assert.match((await readQuota({ now })).said!, /Asked again in 1 h 20 min\.$/);
   assert.equal(asks(), before + 3);
-  // A failure in between is kept the keep, and neither ends the row nor adds to it.
   usageAnswer('', 'exit');
   clock += 80 * 60e3;
   assert.equal((await readQuota({ now })).state, 'failed');
   usageAnswer(recorded('unanswered'));
   clock += QUOTA_KEEP_MS;
-  assert.match((await readQuota({ now })).said!, /Asked again in 2 h 40 min\.$/);
+  assert.match(
+    (await readQuota({ now })).said!,
+    /Asked again in 2 h 40 min\.$/,
+    'a failure in between is kept the keep, and neither ends the row nor adds to it',
+  );
   assert.equal(asks(), before + 5);
-  // The first good reading begins the waits again, and is kept the keep.
   usageAnswer(recorded('plan'));
   clock += 160 * 60e3;
   const good = await readQuota({ now });
   assert.equal(good.state, 'fresh');
-  assert.equal(good.againAt, new Date(clock + QUOTA_KEEP_MS).toISOString());
+  assert.equal(
+    good.againAt,
+    new Date(clock + QUOTA_KEEP_MS).toISOString(),
+    'the first good reading begins the waits again, and is kept the keep',
+  );
   assert.equal(asks(), before + 6);
   await readsAt(QUOTA_KEEP_MS - 1, 'fresh', 6, 'a good reading is kept ten minutes');
   usageAnswer(recorded('unanswered'));
@@ -380,8 +393,8 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
   assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
   assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
+  // oxlint-disable-next-line no-inline-comments, comments/no-code-comments -- scratch.test.ts lets a tmpdir line through only with this marker
   assert.equal(ran.cwd, fs.realpathSync(os.tmpdir())); // not a root: where askUsage runs its claude
-  // Started without the user's settings — their plugins, hooks and skills' sync — without MCP servers, and writing no session.
   const started = fs
     .readFileSync(calls, 'utf8')
     .split('\n')
@@ -390,16 +403,19 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(
     started,
     '-p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ',
+    "started without the user's settings, their plugins, hooks and skills' sync, without MCP servers, and writing no session",
   );
 });
 
 test('an answered ask closes its stdin, and the process ends of its own', async () => {
   fresh();
   assert.equal((await askUsage()).kind, 'answer');
-  // This ask's own process, by the pid it wrote as it started: every ask before it has answered, so its line is the last.
   const pid = Number(lastAskEnv().pid);
   for (let i = 0; i < 50 && !askEnded(pid); i++) await new Promise((r) => setTimeout(r, 20));
-  assert.ok(askEnded(pid), `the ask's claude (pid ${pid}) ended of its own once its stdin was closed`);
+  assert.ok(
+    askEnded(pid),
+    `the ask's claude (pid ${pid}, the last written as it started, every ask before it having answered) ended of its own once its stdin was closed`,
+  );
 });
 
 test('REFUSED: no claude on PATH is no-claude', async () => {

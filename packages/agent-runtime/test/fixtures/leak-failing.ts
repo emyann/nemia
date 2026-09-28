@@ -1,7 +1,7 @@
 /**
  * Run by `leaks.test.ts` alone, under a TMPDIR of its own: two tests that each start a detached worker and fail before
- * they stop it — one on a harness that reads its stdin for ever, as the test harness a failed test left for hours did,
- * and one on a harness that ignores SIGTERM, which only the last resort ends. `scratch` must leave nothing behind.
+ * they stop it — one on a harness that reads its stdin for ever, and one on a harness that ignores SIGTERM, which only the
+ * last resort ends. `scratch` must leave nothing behind.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

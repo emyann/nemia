@@ -1,8 +1,28 @@
 /**
- * The detached runner, against the REAL worker — using `sh` as the harness, so it costs nothing.
+ * The detached runner, against the REAL worker — using `sh` as the harness, so it costs nothing. The worker needs a command and
+ * an exit code, so anything that runs and exits is a harness to it.
  *
- * That substitution is the point of the design: the worker needs a command and an exit code, so
- * anything that runs and exits is a harness as far as this code is concerned.
+ * What the tests below rest on:
+ * - A worker frozen by an `--import` hook, `SIGSTOP` around its first rename, stands for a stop that lands in a narrow window:
+ *   the engine re-issues its stop every pass, and under load one can land the moment the worker has published its pid, or
+ *   before. A worker that heard SIGTERM only later would die of it, and its harness run on under a run file that says
+ *   `working` until the lease calls it dead. A worker continued before it has frozen freezes for good, so each test sees it
+ *   stopped (`ps -o stat=`) first.
+ * - A stop that finds no pid leaves its marker on disk, and the worker reads it before it starts the harness; a stop whose
+ *   marker lands after the worker looked for it reads the pid again after it. That test holds the marker's write until the
+ *   worker has gone on and started its harness, by which time the stop has read `pid: 0`.
+ * - `stop` finds a worker by its run file, so a worker whose run file or store is taken away ends its harness itself. A harness
+ *   that dies on SIGTERM can leave a child that ignores it holding its stdout past the worker's two-second drain: the worker
+ *   kills it too, on a stop as on a run file taken away, within a heartbeat and five seconds of SIGTERM.
+ * - Half a line, as a writer caught mid-append leaves it, is never written on as a line of its own; a wait longer than the
+ *   worker's look at the inbox can only let that test pass wrongly under load, never fail it.
+ * - A test that ticks the engine puts a fake `claude` on PATH: the `claude` harness is observed on every tick, and must not
+ *   read this machine's registry.
+ * - A resumed `claude -p` prints a `usage` of its own process, a cache rebuilt from nothing, beside a `modelUsage` that carries
+ *   its parent's counts on.
+ * - A filesystem's clock may keep time to the second, so a time read off a file is compared with a second's slack either side.
+ * - A process a test kills in its `finally` may be gone already, and a file it polls may be mid-write or not there yet: the
+ *   kill or the read that fails is passed over.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,14 +75,16 @@ test('a non-zero exit is a failure — the only signal a generic harness has to 
 });
 
 test('the worker outlives the process that spawned it', async () => {
-  // `spawn` returns as soon as the child is unref'd; the session is still going. If the worker
-  // were tied to this process it could not still be `working` after spawn resolved.
   const dir = root();
   const ops = detachedOps(sh('sleep 2; exit 0'), dir);
   await Effect.runPromise(ops.spawn(req('ae/t3/1', dir)));
 
   await new Promise((r) => setTimeout(r, 500));
-  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t3/1')?.state, 'working');
+  assert.equal(
+    (await Effect.runPromise(ops.observe)).get('ae/t3/1')?.state,
+    'working',
+    "`spawn` returns as soon as the child is unref'd: a worker tied to this process could not still be working",
+  );
   await settle(ops, 'ae/t3/1', 'completed');
 });
 
@@ -72,22 +94,20 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
   await settle(ops, 'ae/t4/1', 'working');
 
-  // Re-issued every pass, exactly as the engine does. The first is heard wherever it lands (the tests below make the
-  // window before the pid happen); asking again is what a level-triggered loop does anyway.
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
     if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled') break;
     await new Promise((r) => setTimeout(r, 200));
   }
-  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state, 'canceled');
+  assert.equal(
+    (await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state,
+    'canceled',
+    'a stop re-issued every pass, as the engine issues it, is heard',
+  );
 });
 
 test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', async () => {
-  // The worker is frozen right after its first write — the pid on disk, nothing after it run yet — and stopped
-  // while frozen, so the stop waits for it to go on. The engine's re-issued stop can land in that moment under
-  // load; a worker that hears SIGTERM only later dies of it, and its harness runs on under a run file that says
-  // `working` until the lease calls it dead.
   const dir = root();
   const hook = path.join(dir, 'freeze-after-publish.mjs');
   fs.writeFileSync(
@@ -127,7 +147,6 @@ test('a stop that lands the moment the worker has published its pid is heard, no
       return false;
     }
   };
-  /** Wait until `ok` holds, under a bound of seconds: for what it counts, never a length of time. */
   const until = async (ok: () => boolean, what: string) => {
     for (const bound = performance.now() + 10_000; !ok();) {
       if (performance.now() > bound) assert.fail(`${what}, in 10s`);
@@ -138,21 +157,17 @@ test('a stop that lands the moment the worker has published its pid is heard, no
   let heard = false;
   try {
     await until(() => (pid = pidOf()) > 0, 'the worker publishes its pid');
-    // Continued before it has frozen, it would freeze for good: wait to see it stopped.
     await until(() => frozen(pid), 'the worker freezes after its first write');
     await Effect.runPromise(ops.stop('ae/t4/2'));
     process.kill(pid, 'SIGCONT');
     await settle(ops, 'ae/t4/2', 'canceled');
     heard = true;
   } finally {
-    // Only a worker that did not hear the stop is still there to take away.
     if (pid > 0 && !heard)
       for (const sig of ['SIGCONT', 'SIGKILL'] as const)
         try {
           process.kill(pid, sig);
-        } catch {
-          /* gone */
-        }
+        } catch {}
   }
 });
 
@@ -179,8 +194,6 @@ for (const [what, takeAway] of [
   ['the whole store', (dir: string) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 })],
 ] as const) {
   test(`a worker whose session is taken away — ${what} removed — ends its harness and exits, and makes no run file again`, async () => {
-    // Nobody could stop it otherwise: `stop` finds a worker by its run file, and a store removed under a running
-    // session left the worker beating into nothing and its harness running for as long as it liked.
     const dir = root();
     const cwd = scratch('ae-harness-');
     const ops = detachedOps(sh('echo $$ > pid; exec sleep 30'), dir);
@@ -191,14 +204,10 @@ for (const [what, takeAway] of [
     await within(() => {
       try {
         worker = (JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number }).pid;
-      } catch {
-        /* mid-write */
-      }
+      } catch {}
       try {
         harness = Number(fs.readFileSync(path.join(cwd, 'pid'), 'utf8'));
-      } catch {
-        /* not yet */
-      }
+      } catch {}
       return worker > 0 && harness > 0;
     }, 'the worker and its harness started');
 
@@ -209,8 +218,6 @@ for (const [what, takeAway] of [
 }
 
 test('a worker whose run file is taken away kills what of its harness ignored SIGTERM before it exits, holding its output or not', async () => {
-  // The harness dies on SIGTERM and leaves a child that ignores it holding its stdout: the worker's drain gives up at
-  // two seconds, and a worker that exited then left the child running, with no run file left to find it by.
   const dir = root();
   const cwd = scratch('ae-harness-');
   const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
@@ -218,12 +225,10 @@ test('a worker whose run file is taken away kills what of its harness ignored SI
   await within(() => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
   const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
   fs.rmSync(path.join(dir, 'runs', 'sh', 'ae_g3_1.json'));
-  // A heartbeat to notice, then five seconds for SIGTERM to be enough.
   await within(() => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and all of its harness ended', 25_000);
 });
 
 test('a stop kills what of its harness ignored SIGTERM before the worker exits, holding its output or not', async () => {
-  // The same child, left by an ordinary stop: the worker exited after its drain, and the child ran on under init.
   const dir = root();
   const cwd = scratch('ae-harness-');
   const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir);
@@ -248,7 +253,8 @@ test('a worker whose run file is taken away while it writes words on ends its ha
 
 /**
  * A worker spawned under a hook that freezes it just BEFORE its first rename: its status, pid and all, is in the run
- * file's `.tmp`, and the run file still says `pid: 0`. Answers the worker's pid, read off that `.tmp`, once it is frozen.
+ * file's `.tmp`, and the run file still says `pid: 0`. Answers the worker's pid, read off that `.tmp`, once it is seen frozen:
+ * continued before it has frozen, it would freeze for good.
  */
 const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir: string, name: string) => {
   const hook = path.join(dir, 'freeze-before-publish.mjs');
@@ -280,7 +286,6 @@ const spawnFrozenBeforePublish = async (ops: ReturnType<typeof detachedOps>, dir
   };
   let pid = 0;
   await until(() => (pid = read(`${runFile}.tmp`)) > 0, 'the worker writes its status');
-  // Continued before it has frozen, it would freeze for good: wait to see it stopped.
   await until(() => isFrozen(pid), 'the worker freezes before it publishes its pid');
   assert.equal(read(runFile), 0, 'the run file has no pid while the worker is frozen');
   return pid;
@@ -304,8 +309,6 @@ const isAlive = (pid: number) => {
 };
 
 test('a stop that lands before the worker has published its pid is heard: the harness never starts', async () => {
-  // Open issue 30: a stop that found no pid did nothing, so a direct A2A caller answered CANCELED had stopped nothing,
-  // and the harness ran to its end. The stop is left on disk now, and the worker reads it before it starts the harness.
   const dir = root();
   const ran = path.join(dir, 'ran');
   const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
@@ -322,16 +325,13 @@ test('a stop that lands before the worker has published its pid is heard: the ha
       for (const sig of ['SIGCONT', 'SIGKILL'] as const)
         try {
           process.kill(pid, sig);
-        } catch {
-          /* gone */
-        }
+        } catch {}
       await Effect.runPromise(ops.stop('ae/t4/3'));
     }
   }
   assert.equal(fs.existsSync(ran), false, 'the harness never ran');
   const seen = (await Effect.runPromise(ops.observe)).get('ae/t4/3')!;
   assert.equal(seen.exitCode, undefined, 'a harness never started has no exit code');
-  // Spawned again under the name, it runs: the stop asked of the one before is not asked of it.
   const again = detachedOps(sh(`touch ${ran}; exit 0`), dir);
   await Effect.runPromise(again.spawn(req('ae/t4/3', dir)));
   await settle(again, 'ae/t4/3', 'completed');
@@ -339,15 +339,12 @@ test('a stop that lands before the worker has published its pid is heard: the ha
 });
 
 test('a stop whose marker lands after the worker looked for it finds the pid it published, and is heard', async () => {
-  // The other order: the stop reads no pid, the worker publishes, finds no marker and starts the harness, and only then
-  // is the marker written. The stop reads the pid again after its marker, so it signals the worker all the same.
   const dir = root();
   const ran = path.join(dir, 'ran');
   const ops = detachedOps(sh(`touch ${ran}; sleep 30`), dir);
   const pid = await spawnFrozenBeforePublish(ops, dir, 'ae/t4/4');
   const write = fs.writeFileSync;
   let held = false;
-  // The marker's write, held until the worker has gone on and started its harness: the stop has read `pid: 0` by then.
   (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = (f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
     if (typeof f === 'string' && f.endsWith('.stop') && !held) {
       held = true;
@@ -376,9 +373,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
       for (const sig of ['SIGCONT', 'SIGKILL'] as const)
         try {
           process.kill(pid, sig);
-        } catch {
-          /* gone */
-        }
+        } catch {}
       await Effect.runPromise(ops.stop('ae/t4/4'));
     }
   }
@@ -416,8 +411,6 @@ test('logs come back from the worker capture', async () => {
   await settle(ops, 'ae/t6/1', 'completed');
   assert.match(await Effect.runPromise(ops.logs('ae/t6/1')), /hello-from-the-harness/);
 });
-
-// ─── words on a harness's stdin ─────────────────────────────────────────────
 
 /**
  * A harness that reads its messages on its stdin: each line it reads is appended to `heard` in its cwd; `end` makes it
@@ -485,9 +478,10 @@ const runOf = (dir: string, name: string) =>
 const inboxOf = (dir: string, name: string) => path.join(dir, 'runs', 'in', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.inbox.jsonl`);
 const say = (ops: ReturnType<typeof detachedOps>, name: string, text: string) =>
   Effect.runPromise(ops.say!({ name, sessionId: name }, text));
-const sayRefused = async (ops: ReturnType<typeof detachedOps>, name: string, text: string, pattern: RegExp) => {
+/** Says `text` to `name`, and asserts it is refused with a message that matches `pattern`, for the reason `why`. */
+const sayRefused = async (ops: ReturnType<typeof detachedOps>, name: string, text: string, pattern: RegExp, why?: string) => {
   const e = await Effect.runPromise(Effect.flip(ops.say!({ name, sessionId: name }, text)));
-  assert.match(e.message, pattern);
+  assert.match(e.message, pattern, why);
 };
 const stopped = async (ops: ReturnType<typeof detachedOps>, name: string) => {
   await Effect.runPromise(ops.stop(name));
@@ -505,8 +499,6 @@ test("a harness that reads its stdin is given its brief's line first, then each 
   assert.deepEqual(heardIn(dir), ['the brief', 'first', 'second']);
   assert.equal(runOf(dir, 'ae/i1/1').inputAt, fs.statSync(inboxOf(dir, 'ae/i1/1')).size, 'how far it has written on, on the run file');
 
-  // Half a line, as a writer caught mid-append leaves it: never written on as a line of its own. Waiting longer than the
-  // worker's look at the inbox can only let this pass wrongly under load, never fail it.
   fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), '{"said":"par');
   await new Promise((r) => setTimeout(r, 1_200));
   fs.appendFileSync(inboxOf(dir, 'ae/i1/1'), 'ted"}\n');
@@ -528,7 +520,6 @@ test('the closing line closes its input: said on the run file, its stdin ended, 
 
   await sayRefused(ops, 'ae/i2/1', 'more', /^in: `ae\/i2\/1` has given its result and reads no more words/);
   const size = fs.statSync(inboxOf(dir, 'ae/i2/1')).size;
-  // Appended by hand past the refusal: the worker has stopped looking.
   fs.appendFileSync(inboxOf(dir, 'ae/i2/1'), '{"said":"behind its back"}\n');
   await new Promise((r) => setTimeout(r, 1_200));
   assert.deepEqual(heardIn(dir), ['b', 'end and linger', 'EOF'], 'nothing written on after the close');
@@ -558,7 +549,6 @@ test('a worker started again on its run file writes no word twice: it goes on fr
   await until(() => heardIn(first).length === 2, 'one read');
   await stopped(ops, 'ae/i4/1');
 
-  // The same run file, its worker started again by hand, somewhere else to hear it.
   const file = path.join(dir, 'runs', 'in', 'ae_i4_1.json');
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), cwd: again }));
   const worker = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'bin', 'ae-worker.ts');
@@ -567,7 +557,7 @@ test('a worker started again on its run file writes no word twice: it goes on fr
     `require('node:child_process').spawn(process.execPath, [${JSON.stringify(worker)}, ${JSON.stringify(file)}], { detached: true, stdio: 'ignore' }).unref()`,
   ]);
   await until(() => heardIn(again).length === 1, 'the brief read again');
-  assert.equal(runOf(dir, 'ae/i4/1').inputClosed, undefined);
+  assert.equal(runOf(dir, 'ae/i4/1').inputClosed, undefined, 'its worker started again by hand on the same run file: its input open');
   await say(ops, 'ae/i4/1', 'two');
   await until(() => heardIn(again).length === 2, 'two read');
   assert.deepEqual(heardIn(again), ['b', 'two'], 'the words the one before wrote on are not written again');
@@ -586,8 +576,13 @@ test('a run spawned again under the name starts past what was said to the one be
   await say(ops, 'ae/i5/1', 'one');
   await until(() => heardIn(first).length === 2, 'one read');
   await stopped(ops, 'ae/i5/1');
-  // Said while nothing ran: refused, so there is nothing appended for the next run to read.
-  await sayRefused(ops, 'ae/i5/1', 'between', /is `stopped`, not running/);
+  await sayRefused(
+    ops,
+    'ae/i5/1',
+    'between',
+    /is `stopped`, not running/,
+    'said while nothing ran: nothing appended for the next run to read',
+  );
 
   await Effect.runPromise(ops.spawn({ name: 'ae/i5/1', brief: 'b2', cwd: again }));
   assert.equal(runOf(dir, 'ae/i5/1').input?.from, fs.statSync(inboxOf(dir, 'ae/i5/1')).size, 'from the end of the inbox as it was');
@@ -606,15 +601,18 @@ test('say is refused, with nothing appended, where no worker would write the wor
   await sayRefused(ops, 'ae/i6/1', 'hello', /^in: no session `ae\/i6\/1` is running to hear anything: there is no run of it/);
   const runs = path.join(dir, 'runs', 'in');
   fs.mkdirSync(runs, { recursive: true });
-  // A run started before its harness took words: working, beating, and nothing on it to write words on with.
   fs.writeFileSync(
     path.join(runs, 'ae_i6_1.json'),
     JSON.stringify({ name: 'ae/i6/1', state: 'working', pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString() }),
   );
-  await sayRefused(ops, 'ae/i6/1', 'hello', /was started with no way in/);
-  // A run file another name folds onto is not the run asked for.
-  await sayRefused(ops, 'ae-i6/1', 'hello', /there is no run of it/);
-  // A run whose worker stopped beating is not working.
+  await sayRefused(
+    ops,
+    'ae/i6/1',
+    'hello',
+    /was started with no way in/,
+    'a run started before its harness took words: working, beating, and nothing on it to write words on with',
+  );
+  await sayRefused(ops, 'ae-i6/1', 'hello', /there is no run of it/, 'a run file another name folds onto is not the run asked for');
   fs.writeFileSync(
     path.join(runs, 'ae_i6_1.json'),
     JSON.stringify({
@@ -626,9 +624,8 @@ test('say is refused, with nothing appended, where no worker would write the wor
       input: { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } },
     }),
   );
-  await sayRefused(ops, 'ae/i6/1', 'hello', /is `failed`, not running/);
+  await sayRefused(ops, 'ae/i6/1', 'hello', /is `failed`, not running/, 'a run whose worker stopped beating is not working');
 
-  // A line break the harness's line keeps would reach it as two lines.
   const raw = detachedOps({ ...listener(dir), input: { line: (t) => t, closesOn: { key: 'kind', value: 'end' } } }, dir);
   fs.writeFileSync(
     path.join(runs, 'ae_i6_1.json'),
@@ -642,7 +639,7 @@ test('say is refused, with nothing appended, where no worker would write the wor
     }),
   );
   const e = await Effect.runPromise(Effect.flip(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one\ntwo')));
-  assert.match(e.message, /a line break in it/);
+  assert.match(e.message, /a line break in it/, "a line break the harness's line keeps would reach it as two lines");
   await Effect.runPromise(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one line'));
   assert.equal(fs.readFileSync(inboxOf(dir, 'ae/i6/1'), 'utf8'), 'one line\n', 'only the words that make one line were appended');
 });
@@ -683,17 +680,15 @@ test('a run file in no shape a worker writes is no session: not seen, not found,
   assert.equal(fs.existsSync(inboxOf(dir, 'ae/i7/1')), false, 'and nothing was appended');
 });
 
-// ─── the composite ──────────────────────────────────────────────────────────
-
 test('the composite sends each task to the harness it asked for', async () => {
   const a = new Map<string, Sighting>();
   const b = new Map<string, Sighting>();
   const ops = composite({ alpha: testOps({ sessions: a }), beta: testOps({ sessions: b }) }, 'alpha');
 
   await Effect.runPromise(ops.spawn({ name: 'ae/x/1', brief: '', cwd: '/', harness: 'beta' }));
-  await Effect.runPromise(ops.spawn({ name: 'ae/y/1', brief: '', cwd: '/' })); // no harness -> fallback
+  await Effect.runPromise(ops.spawn({ name: 'ae/y/1', brief: '', cwd: '/' }));
 
-  assert.deepEqual([...a.keys()], ['ae/y/1']);
+  assert.deepEqual([...a.keys()], ['ae/y/1'], 'a task that names no harness goes to the fallback');
   assert.deepEqual([...b.keys()], ['ae/x/1']);
 });
 
@@ -785,7 +780,7 @@ test('the composite routes stop to whichever harness owns that session', async (
   const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'working' }]]);
   const ops = composite({ alpha: testOps({ sessions: a }), beta: testOps({ sessions: b }) }, 'alpha');
 
-  await Effect.runPromise(ops.observe); // learn who owns what
+  await Effect.runPromise(ops.observe);
   await Effect.runPromise(ops.stop('s-b'));
 
   assert.equal(b.get('ae/y/1')?.state, 'canceled', 'beta was told');
@@ -823,8 +818,6 @@ test('the composite sends a release only to the harness that reported the sessio
   assert.deepEqual(released, ['s-a']);
 });
 
-// ─── isolation: the flag shapes differ per harness, which is what a spec is for ──
-
 test('a worktree is always NAMED for Claude — a bare --worktree would eat the prompt', async () => {
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const args = claudeDetached.command({ name: 'ae/t-abc/2', brief: 'the prompt', cwd: '/r', config: { worktree: true } }).args;
@@ -848,11 +841,13 @@ test("codex's worktree flag takes no value, so the prompt still follows it safel
 });
 
 test('the default permission mode is `auto` — a fleet cannot wait for a person', async () => {
-  // `acceptEdits` looks safer and is worse here: it approves edits but not `npm test`, so an
-  // unattended session blocks the moment it wants to run its own tests.
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const args = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
-  assert.equal(args[args.indexOf('--permission-mode') + 1], 'auto');
+  assert.equal(
+    args[args.indexOf('--permission-mode') + 1],
+    'auto',
+    '`acceptEdits` approves edits but not `npm test`: an unattended session would block the moment it runs its own tests',
+  );
 
   const chosen = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { permissionMode: 'dontAsk' } }).args;
   assert.equal(chosen[chosen.indexOf('--permission-mode') + 1], 'dontAsk', 'and a task may still choose');
@@ -867,8 +862,7 @@ test('codex runs read-only when the task says read-only — never widened to wor
   assert.equal(sandbox('read-only'), 'read-only');
   assert.equal(sandbox(), 'workspace-write', 'the shipped default is unchanged');
   assert.equal(sandbox('bypassPermissions'), 'danger-full-access');
-  // Codex's own words are its own sandboxes. `danger-full-access` used to become workspace-write.
-  assert.equal(sandbox('danger-full-access'), 'danger-full-access');
+  assert.equal(sandbox('danger-full-access'), 'danger-full-access', "Codex's own words are its own sandboxes");
   assert.equal(sandbox('workspace-write'), 'workspace-write');
 });
 
@@ -881,8 +875,6 @@ test("codex refuses a permission mode that is not one of its sandboxes; Claude's
   assert.equal(codex.refuses!(task('read-only')), undefined);
   assert.equal(claudeDetached.refuses!(task('auto')), undefined);
 });
-
-// ─── the closing statement ──────────────────────────────────────────────────
 
 test('codex is given the schema and an output file, and the prompt still comes last', async () => {
   const { codex } = await import('../src/runner-codex.ts');
@@ -925,22 +917,18 @@ test('a re-spawn of the same attempt does not find the last answer waiting for i
 });
 
 test('a resumed codex task puts every flag before `resume`, then the id, then the prompt', async () => {
-  // `codex exec resume <id> -C … -s …` fails to parse: the subcommand takes only `[SESSION_ID]
-  // [PROMPT]`. Verified against 0.154.0. The spec emitted exactly that shape until this test.
   const { codex } = await import('../src/runner-codex.ts');
   const args = codex.command(
     { name: 'ae/t/2', brief: 'answer the review', cwd: '/wt', resumeFrom: 'abc-123', config: { worktree: true }, closeoutSchema: {} },
     { closeoutSchemaFile: '/b/s.json', closeoutFile: '/b/o.json' },
   ).args;
   const at = args.indexOf('resume');
-  assert.notEqual(at, -1);
+  assert.notEqual(at, -1, '`codex exec resume` takes only `[SESSION_ID] [PROMPT]`: a flag after it fails to parse');
   assert.deepEqual(args.slice(at), ['resume', 'abc-123', 'answer the review'], 'nothing but the id and the prompt after it');
   for (const flag of ['-C', '-s', '--output-schema', '-o', '--worktree']) {
     assert.ok(args.indexOf(flag) !== -1 && args.indexOf(flag) < at, `${flag} before resume`);
   }
 });
-
-// ─── trust: extended from your own Codex config, never granted ──────────────
 
 test('trusted projects are read the way Codex writes them, and only those', () => {
   const toml = [
@@ -987,11 +975,10 @@ test('a worktree of a repository you trust in Codex is trusted for the run, repo
 });
 
 test('a repository you never trusted gets no trust from the engine', async () => {
-  // Trusting it would also load whatever Codex settings it ships. Not the engine's call.
   const { codex } = await import('../src/runner-codex.ts');
   const { wt, home } = repoWithWorktree(false);
   const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
-  assert.equal(io.trustedDirs, undefined);
+  assert.equal(io.trustedDirs, undefined, "trusting it would also load whatever Codex settings it ships: not the engine's call");
 });
 
 test('outside a repository there is nothing to extend', async () => {
@@ -1026,8 +1013,6 @@ test('the runner merges what a spec prepares into what its command is given', as
   assert.deepEqual(given?.trustedDirs, ['/somewhere']);
   assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
 });
-
-// ─── the fence and the effort, per harness ──────────────────────────────────
 
 test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
   const { codex } = await import('../src/runner-codex.ts');
@@ -1082,13 +1067,14 @@ test('an effort a harness does not have is refused by that harness, in its own w
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const task = (effort: string) => ({ brief: 'b', cwd: '/r', config: { effort } });
   assert.match(codex.refuses!(task('extreme')) ?? '', /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/);
-  // Claude Code would only warn and run at its default, so the engine refuses what the CLI ignores.
-  assert.match(claudeDetached.refuses!(task('minimal')) ?? '', /not an effort Claude Code has.*low, medium, high, xhigh, max/);
+  assert.match(
+    claudeDetached.refuses!(task('minimal')) ?? '',
+    /not an effort Claude Code has.*low, medium, high, xhigh, max/,
+    'Claude Code would only warn and run at its default: the engine refuses what the CLI ignores',
+  );
   assert.equal(codex.refuses!(task('minimal')), undefined);
   assert.equal(claudeDetached.refuses!(task('xhigh')), undefined);
 });
-
-// ─── the exit code: a fact about the process ────────────────────────────────
 
 test("a detached session's exit code is on its sighting, and no usage is invented beside it", async () => {
   const dir = root();
@@ -1141,8 +1127,6 @@ test('a detached spawn that throws says nothing started — the worker is never 
 });
 
 test('a detached worker aimed at a directory that is not there is refused, and cannot take the engine down', async () => {
-  // Before, `spawn` returned, the child emitted ENOENT a moment later, and nobody heard it: the
-  // process that launched the worker — the engine, and this test runner — died.
   const e = await Effect.runPromise(
     detachedOps(sh('true'), root())
       .spawn(req('ae/t18/1', path.join(root(), 'gone')))
@@ -1151,15 +1135,12 @@ test('a detached worker aimed at a directory that is not there is refused, and c
         Effect.catchTag('RunnerError', (err) => Effect.succeed(err)),
       ),
   );
-  assert.equal(e?.refused, true);
+  assert.equal(e?.refused, true, 'refused before the worker is launched: no ENOENT arrives later, unheard, to take its launcher down');
   assert.match(e?.message ?? '', /is not a directory/);
   await new Promise((r) => setTimeout(r, 300));
 });
 
 test('a relative cwd is resolved where the worker is launched — the harness runs in repo, not repo/repo', async () => {
-  // Measured before: the worker was launched in `repo`, then launched the harness in `repo` again,
-  // from inside it, and the attempt failed with `spawn sh ENOENT`. `file()` refuses a relative cwd;
-  // this is a caller of the runner itself, the way `claude --bg` has always resolved one.
   const was = process.cwd();
   const parent = root();
   fs.mkdirSync(path.join(parent, 'repo'));
@@ -1182,13 +1163,15 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   await settle(ops, 'ae/t19/1', 'completed');
   const repo = fs.realpathSync(path.join(parent, 'repo'));
   assert.equal(given && fs.realpathSync(given), repo, 'the spec is handed the resolved directory, so a `-C` names it too');
-  assert.equal(fs.realpathSync(fs.readFileSync(path.join(repo, 'where.txt'), 'utf8').trim()), repo);
+  assert.equal(
+    fs.realpathSync(fs.readFileSync(path.join(repo, 'where.txt'), 'utf8').trim()),
+    repo,
+    '`file()` refuses a relative cwd; a caller of the runner itself has it resolved once, as `claude --bg` resolves one',
+  );
 });
 
-// ─── claude -p: the answer it prints ────────────────────────────────────────
-
-/** A `result` object as `claude -p --output-format json` prints it, on one line (2.1.270; keys trimmed). */
 const SESSION = '5e551011-0000-4000-8000-000000000001';
+/** A `result` object as `claude -p --output-format json` prints it, on one line (keys trimmed), with `o` over its fields. */
 const resultLine = (o: object) =>
   JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
 
@@ -1214,11 +1197,13 @@ test('claude-detached is asked for JSON, and for the schema as --json-schema whe
 });
 
 test("claude -p's answer is its result object's structured_output, and nothing else in its output is one", () => {
-  // Measured on 2.1.270: `-p --output-format json --json-schema` printed one line, a `result` whose
-  // `structured_output` held the answer.
-  assert.deepEqual(claudeResultOutput(['a warning on stderr', resultLine({ structured_output: { outcome: 'done' } }), ''].join('\n')), {
-    closeout: { payload: { outcome: 'done' } },
-  });
+  assert.deepEqual(
+    claudeResultOutput(['a warning on stderr', resultLine({ structured_output: { outcome: 'done' } }), ''].join('\n')),
+    {
+      closeout: { payload: { outcome: 'done' } },
+    },
+    '`-p --output-format json --json-schema` prints one line, a result whose structured_output holds the answer',
+  );
   assert.deepEqual(claudeResultOutput(resultLine({})), {}, 'a result without it: no schema was given, or none was answered');
   assert.deepEqual(claudeResultOutput(resultLine({ structured_output: null })), {}, 'null is no answer');
   assert.deepEqual(
@@ -1283,7 +1268,6 @@ test('a context window reaches claude -p as --autocompact, which it keeps — an
 });
 
 test('claude -p that stopped at its budget says so in its result — the limit `budget`, a fact — and one that failed another way does not', () => {
-  // Measured on 2.1.272 with `--max-budget-usd 0.01` and haiku: exit 1, and this result (keys trimmed).
   const spent = resultLine({
     subtype: 'error_max_budget_usd',
     is_error: true,
@@ -1292,7 +1276,11 @@ test('claude -p that stopped at its budget says so in its result — the limit `
     total_cost_usd: 0.01804,
     duration_api_ms: 718,
   });
-  assert.deepEqual(claudeResultOutput(spent), { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget' });
+  assert.deepEqual(
+    claudeResultOutput(spent),
+    { usage: { costUsd: 0.01804, apiMs: 718 }, limit: 'budget' },
+    '`claude -p` at its `--max-budget-usd` exits 1 with this result (keys trimmed)',
+  );
   assert.equal(
     claudeResultOutput(resultLine({ subtype: 'error_max_turns', is_error: true })).limit,
     undefined,
@@ -1306,8 +1294,6 @@ test('claude -p that stopped at its budget says so in its result — the limit `
 });
 
 test("claude -p's tokens are its result's usage, in their three classes, and none from a usage that counted nothing", () => {
-  // Measured on 2.1.278: a resumed `claude -p` printed this `usage` — its own process's, a cache rebuilt from nothing —
-  // beside a `modelUsage` that carried its parent's counts on.
   const resumed = {
     input_tokens: 10,
     cache_creation_input_tokens: 21392,
@@ -1343,10 +1329,10 @@ test("claude -p's tokens are its result's usage, in their three classes, and non
 });
 
 test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
-  // Measured on 2.1.272: a result carries both, beside a `usage` whose token counts read 0 where `modelUsage` counted thousands.
   assert.deepEqual(
     claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })),
     { usage: { costUsd: 0.01804, apiMs: 718 } },
+    'a result carries both, beside a usage whose token counts can read 0 where modelUsage counts thousands',
   );
   assert.deepEqual(
     claudeResultOutput(resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.2 })),
@@ -1362,9 +1348,7 @@ test("what claude -p cost is its result's total_cost_usd, and its API time durat
   assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
 });
 
-// ─── claude -p: what it was denied ──────────────────────────────────────────
-
-/** Lines of `claude -p --output-format stream-json --verbose`, shaped as 2.1.280 printed them (M1; keys trimmed). */
+/** Lines of `claude -p --output-format stream-json --verbose`, shaped as Claude Code prints them (keys trimmed). */
 const stream = {
   init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
   calls: (...uses: Array<[string, string, object]>) =>
@@ -1458,9 +1442,12 @@ test("claude -p's stream says what it was denied as it happens, the input off th
     'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it',
   );
 
-  // Killed before its result — a stop, a signal — the events are all it says, and every denial is still read.
   const killed = log.split('\n').slice(0, -1).join('\n');
-  assert.deepEqual(claudeStreamOutput(killed), { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }] });
+  assert.deepEqual(
+    claudeStreamOutput(killed),
+    { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }] },
+    'killed before its result, by a stop or a signal, the events are all it says: every denial is still read',
+  );
   assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
 });
 
@@ -1516,8 +1503,11 @@ test("a spec that reads its harness's output reports the answer found there, sta
 
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-  // A filesystem's clock, which some keep to the second: that much slack either side of the run.
-  assert.ok(seen.closeout.at >= before - 1_000 && seen.closeout.at <= Date.now() + 1_000, `stamped ${seen.closeout.at}, spawned ${before}`);
+  const filesystemClockSlackMs = 1_000;
+  assert.ok(
+    seen.closeout.at >= before - filesystemClockSlackMs && seen.closeout.at <= Date.now() + filesystemClockSlackMs,
+    `stamped ${seen.closeout.at}, spawned ${before}`,
+  );
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 
@@ -1538,8 +1528,6 @@ test("what a harness's output says it denied the session is on the session's sig
 });
 
 test("a run is not called over before the harness's last output is in its log — the answer read from it would be lost", async () => {
-  // `exit` can come before the pipes drain, and the first pass that sees `done` is the one the engine
-  // records the end on. A child still printing when the harness exits makes that deterministic.
   const dir = root();
   const late: HarnessSpec = {
     name: 'sh',
@@ -1559,7 +1547,11 @@ test("a run is not called over before the harness's last output is in its log �
     if (seen && seen.state !== 'working') break;
     await new Promise((r) => setTimeout(r, 20));
   }
-  assert.equal(seen?.state, 'completed');
+  assert.equal(
+    seen?.state,
+    'completed',
+    'a child still prints when the harness exits: `exit` comes before the pipes drain, and the engine records the end on the first pass that sees done',
+  );
   assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' }, 'the first sighting that says done already has the answer');
 });
 
@@ -1585,8 +1577,6 @@ test('a re-spawn of the same attempt does not find the last answer in the output
 });
 
 test('claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id', async () => {
-  // A fake `claude` on PATH that answers the way `claude -p --output-format json` does — and, asked for
-  // the `claude` harness's registry, as `claude agents` does when nothing of its own is running.
   const bin = scratch('ae-fake-claude-');
   fs.writeFileSync(
     path.join(bin, 'claude'),
@@ -1700,8 +1690,6 @@ test('REFUSED: an allow list on codex, for the same reason and in the same shape
   );
 });
 
-// ─── codex: what it consumed, from its stream ───────────────────────────────
-
 test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async () => {
   const bin = scratch('ae-fake-codex-');
   const stream = [
@@ -1721,7 +1709,6 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
     ),
     { mode: 0o755 },
   );
-  // The `claude` harness is observed on every tick too, and must not read this machine's registry.
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; fi\n`, { mode: 0o755 });
   const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
   process.env.PATH = `${bin}:${prev.PATH}`;
@@ -1750,10 +1737,7 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   }
 });
 
-// ─── A resume's printed totals carry its parent's ───────────────────────────
-
 test("a resumed run of a spec whose totals carry the parent's reports its own cost and API time — the parent's taken off, the last run before it under that id", async () => {
-  // M2's totals, as 2.1.280 printed them: a session, its resume, and a resume of that, all under one id.
   const dir = root();
   const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
   const ops = detachedOps(spec, dir);
@@ -1779,7 +1763,6 @@ test("a resumed run of a spec whose totals carry the parent's reports its own co
     fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
   };
   const tokens = { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 };
-  // Written latest first, so an order read off the directory proves nothing.
   write('ae/r/3', t0 + 2_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0284121, duration_api_ms: 8132, usage: tokens });
   write('ae/r/2', t0 + 1_000, { resumeFrom: SESSION }, { total_cost_usd: 0.0257381, duration_api_ms: 7142, usage: tokens });
   write('ae/r/1', t0, {}, { total_cost_usd: 0.0209649, duration_api_ms: 6069, usage: tokens });
@@ -1789,8 +1772,16 @@ test("a resumed run of a spec whose totals carry the parent's reports its own co
   assert.equal(seen.get('ae/r/1')?.usage?.costUsd, 0.0209649, 'a run that resumed nothing is its own total');
   near(seen.get('ae/r/2')?.usage?.costUsd, 0.0047732);
   near(seen.get('ae/r/3')?.usage?.costUsd, 0.002674);
-  assert.equal(seen.get('ae/r/2')?.usage?.apiMs, 1073);
-  assert.equal(seen.get('ae/r/3')?.usage?.apiMs, 990);
+  assert.equal(
+    seen.get('ae/r/2')?.usage?.apiMs,
+    1073,
+    "a session, its resume and a resume of that, all under one id, as Claude Code prints their totals: the parent's taken off each",
+  );
+  assert.equal(
+    seen.get('ae/r/3')?.usage?.apiMs,
+    990,
+    'written latest first: the parent taken off is the run started last before it, whatever order the directory lists',
+  );
   assert.equal(seen.get('ae/r/2')?.usage?.inputTokens, 10, "tokens are the process's own already, and kept as printed");
 });
 
@@ -1818,7 +1809,6 @@ test("a resume whose parent is not a run of this spec, or printed no total, carr
     fs.writeFileSync(path.join(runs, `${file}.log`), resultLine(result));
   };
   const OTHER = '11111111-2222-3333-4444-555555555555';
-  // Resumed from a session no run of this spec started — a `claude --bg` one, say.
   write(
     'ae/u/2',
     { nativeId: OTHER, resumeFrom: OTHER },
@@ -1828,7 +1818,6 @@ test("a resume whose parent is not a run of this spec, or printed no total, carr
       usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 5 },
     },
   );
-  // Resumed from a run that printed nothing it cost.
   write('ae/v/1', { nativeId: SESSION, startedAt: '2026-09-23T12:00:00Z' }, { usage: { input_tokens: 1, output_tokens: 1 } });
   write('ae/v/2', { nativeId: SESSION, resumeFrom: SESSION }, { total_cost_usd: 0.03, duration_api_ms: 7000 });
   const seen = await Effect.runPromise(ops.observe);
@@ -1839,9 +1828,12 @@ test("a resume whose parent is not a run of this spec, or printed no total, carr
   );
   assert.equal(seen.get('ae/v/2')?.usage, undefined, 'a parent with no total: nothing left to say');
 
-  // A spec whose harness prints its own totals keeps them, resumed or not.
   const plain = detachedOps({ ...spec, resumeCostCarried: undefined }, dir);
-  assert.equal((await Effect.runPromise(plain.observe)).get('ae/u/2')?.usage?.costUsd, 0.03);
+  assert.equal(
+    (await Effect.runPromise(plain.observe)).get('ae/u/2')?.usage?.costUsd,
+    0.03,
+    'a spec whose harness prints its own totals keeps them, resumed or not',
+  );
 });
 
 test("the id a run resumed is kept on its run file only by a spec whose totals carry the parent's", async () => {

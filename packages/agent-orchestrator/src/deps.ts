@@ -168,8 +168,15 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * difference: it is a platform build this machine did not take, as all 84 of this repository's were at
  * 2026-09-13. A package main has and the lockfile does not name is not looked for. A lockfile that did
  * not parse parts at `package-lock.json`.
+ *
+ * `inPlace` is for a tree read where the lockfile is — the repository's checkout, against the merge staged in it
+ * (`checkoutParts`): no link is made, so a nested package parts only as a top-level one does.
  */
-export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>): string | null {
+export function lockfileParting(
+  wanted: unknown,
+  installed: Readonly<Record<string, Installed | null | undefined>>,
+  inPlace = false,
+): string | null {
   const want = lockfilePackages(wanted);
   if (!want) return 'package-lock.json';
   for (const [key, entry] of Object.entries(want)) {
@@ -179,7 +186,7 @@ export function lockfileParting(wanted: unknown, installed: Readonly<Record<stri
       if (entry?.optional) continue;
       return key;
     }
-    if (!key.startsWith('node_modules/')) return key;
+    if (!inPlace && !key.startsWith('node_modules/')) return key;
     if (entry?.link ? !there.link || there.resolved !== entry.resolved : there.link || there.version !== entry?.version) return key;
   }
   return null;

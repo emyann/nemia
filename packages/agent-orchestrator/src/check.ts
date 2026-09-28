@@ -66,23 +66,27 @@ export type CheckEnv = {
 };
 
 /**
- * The check task's brief: the command, and the environment it runs in.
+ * The check task's brief: the command, the environment it runs in, and — for an ending's check whose staged merge asks for packages the
+ * checkout has not installed (`checkoutParts`) — `install`, the first package path that differs, which makes the script install first.
  *
  * The engine's task carries no environment, and the engine does not change for this, so the brief —
  * the one free-text field a harness is handed — carries both. JSON rather than a shell preamble: it
- * is exact for any value, and it is read back by a function rather than by a shell.
+ * is exact for any value, and it is read back by a function rather than by a shell. The engine journals
+ * it, so it is the check's record of why it installed.
  */
-export const checkBrief = (command: string, env: CheckEnv): string => JSON.stringify({ check: command, env });
+export const checkBrief = (command: string, env: CheckEnv, install?: string): string =>
+  JSON.stringify({ check: command, env, ...(install ? { install } : {}) });
 
 /**
  * A check brief, read back.
  *
  * Only `WF_` names are carried into the environment: the names become `env` arguments, and a name
- * that began with `-` would be read as an option. A brief that is not a check brief — a task filed
- * on this harness by hand — is taken as the bare command with no environment, rather than throwing:
- * a harness whose `command` throws rejects the engine's whole tick, and every other run with it.
+ * that began with `-` would be read as an option. `install` is kept only when it is a string that is
+ * not empty. A brief that is not a check brief — a task filed on this harness by hand — is taken as
+ * the bare command with no environment, rather than throwing: a harness whose `command` throws rejects
+ * the engine's whole tick, and every other run with it.
  */
-export function readCheckBrief(brief: string): { command: string; env: Record<string, string> } {
+export function readCheckBrief(brief: string): { command: string; env: Record<string, string>; install?: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(brief);
@@ -92,14 +96,24 @@ export function readCheckBrief(brief: string): { command: string; env: Record<st
   if (!parsed || typeof parsed !== 'object' || typeof (parsed as { check?: unknown }).check !== 'string') {
     return { command: brief, env: {} };
   }
-  const { check, env } = parsed as { check: string; env?: unknown };
+  const { check, env, install } = parsed as { check: string; env?: unknown; install?: unknown };
   const carried = Object.entries(env && typeof env === 'object' ? env : {}).filter(
     (kv): kv is [string, string] => /^WF_[A-Z_]+$/.test(kv[0]) && typeof kv[1] === 'string',
   );
-  return { command: check, env: Object.fromEntries(carried) };
+  return { command: check, env: Object.fromEntries(carried), ...(typeof install === 'string' && install ? { install } : {}) };
 }
 
 const TRAILER = '[wf check] exit';
+
+/**
+ * The install an ending's check runs first where the merge asks for packages the checkout lacks. `npm install` rather than `npm ci`,
+ * which empties `node_modules` under a dev server running from the checkout; `--no-save`, so npm writes neither `package.json` nor
+ * `package-lock.json`, which the merge owns (measured on npm 11.19: the working tree still matches the staged merge).
+ */
+export const INSTALL = 'npm install --no-save --no-audit --no-fund';
+
+/** What the log says of an install that failed, before the check ends with no exit code. */
+const INSTALL_FAILED = '[wf check] install failed, exit';
 
 /**
  * What `sh` runs.
@@ -124,10 +138,20 @@ const TRAILER = '[wf check] exit';
  *   starts inherits (turbo, the build, the e2e's browser and servers). The shell decides rather than this file, since this
  *   file is pure and the machine that runs the check is the one that knows whether it has `ionice`: one without it
  *   (macOS), or one that refuses it (a container), runs the check as before, and says nothing.
+ * - **An install first, when `install` is set** (`INSTALL`): what the staged merge's lockfile asks for, into the checkout's own
+ *   `node_modules`, both its streams in the log. An install that fails is no verdict on the work, so the script says so and kills
+ *   itself, printing no trailer: the worker records no exit code for a process a signal ended, and the run reads a check that did
+ *   not finish (`exitVerdicts`, `refusedCheck`). The text is fixed here: nothing of the checkout's reaches the script.
  */
-export const checkScript = (command: string): string =>
+export const checkScript = (command: string, install = false): string =>
   [
     'if command -v ionice >/dev/null 2>&1; then ionice -c3 -p $$ >/dev/null 2>&1 || :; fi',
+    ...(install
+      ? [
+          `echo '[wf check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`,
+          `${INSTALL} 2>&1 || { printf '\\n${INSTALL_FAILED} %d: no verdict on the work\\n' "$?"; kill -s KILL $$; }`,
+        ]
+      : []),
     'wf_check() {',
     '(',
     command,
@@ -148,11 +172,11 @@ export const checkScript = (command: string): string =>
 export const CHECK = {
   name: 'check',
   command: (r: { brief: string }): { cmd: string; args: string[] } => {
-    const { command, env } = readCheckBrief(r.brief);
+    const { command, env, install } = readCheckBrief(r.brief);
     // `nice -n 10 env NAME=value … sh -c script`: values reach the shell without being quoted by anyone. `nice` execs
     // `env`, which execs `sh`, so the pid, the process group a stop ends and the exit status are the command's own.
     const pairs = Object.entries(env).map(([k, v]) => `${k}=${v}`);
-    return { cmd: 'nice', args: ['-n', String(CHECK_NICENESS), 'env', ...pairs, 'sh', '-c', checkScript(command)] };
+    return { cmd: 'nice', args: ['-n', String(CHECK_NICENESS), 'env', ...pairs, 'sh', '-c', checkScript(command, install !== undefined)] };
   },
 };
 

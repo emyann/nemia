@@ -250,6 +250,37 @@ What it leaves:
 - **Node resolves a third-party package's real path in the worktree, not in main.** The tree's shape is the same; a tool that caches
   by real path across checkouts sees a copy per worktree.
 
+## Shipped: the ending's check installs what the merge brings (2026-09-28)
+
+An ending's check runs in the repository's own checkout, whose `node_modules` was installed from main's lockfile. Twice a branch that
+added a dependency failed its ship there: `n54w` on 2026-09-26 (`@types/express`) and `typecheck-the-tests-of-the-o-obpx` on
+2026-09-28 (TS7016 on `js-yaml`: the branch added `@types/js-yaml`). Both times the operator installed the package into main's
+`node_modules` by hand and asked for the ship again. A round's check never met this, since `provisionDeps` gives each worktree its own
+tree.
+
+Now the tick, filing the ending's check, compares the staged lockfile with the checkout's own tree (`checkoutParts`, `lockfileParting`
+in place). Where they differ, the check's brief carries `install` and its script runs `npm install --no-save --no-audit --no-fund`
+before the command. The README bullet *The ending's check runs with the packages the merge brings* is the account.
+
+- **In the orchestrator, not in the shipped `check:` lines.** A shell exit is always a number, so an install that failed there would
+  be a refusal of the work. The comparison is TypeScript's already, over what is on disk. A line in five shipped `ship.md` copies is
+  prose, and the run could not say on the check's record what it did.
+- **Compared in place.** `lockfileParts(repo, repo)`, the worktree's comparison, parts on every package nested in a workspace
+  (`apps/web/node_modules/@rolldown/plugin-babel` in this repository), so every ship would have installed.
+- **A failed install ends by a signal.** The run reads a check's verdict off the process's exit code, not the log's trailer
+  (`exitVerdicts`), so the script kills itself: no exit code, a check that did not finish.
+
+What it leaves:
+
+- **A dev server running from the checkout sees `node_modules` change.** `npm install` is the least disruptive install, not a
+  disruption-free one: vite may re-optimize, the api under `node --watch` restart.
+- **An aborted or refused merge leaves the branch's packages installed**, until the next `npm install` on main removes them.
+- **The install needs the network for a new third-party package**, and counts against the check's 1200 s deadline. Offline, the ship
+  is offered again each time, never refused.
+- **A person running `npm install` in the checkout while the check installs races it.** Nothing guards against that.
+- **A try after an install that failed is told the check "was stopped, or killed"** (`refusalSection`): imprecise, though the stdout
+  tail it carries shows the install line.
+
 ## Shipped: trying again — `retries:` and `wf retry`
 
 A step whose check did not pass can now be tried again without hand surgery. Before, the only remedy for

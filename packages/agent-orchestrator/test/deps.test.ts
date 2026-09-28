@@ -164,6 +164,18 @@ test("what parts a worktree's lockfile from what main has on disk: a package mis
     'apps/web/node_modules/third',
     'nested in a workspace, links to the root tree cannot give it, though main has it',
   );
+  // In place — the checkout against the merge staged in it — nothing is linked, so a package nested in a workspace is what is on disk there.
+  assert.equal(lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk, true), null, 'installed where it is named');
+  assert.equal(
+    lockfileParting(lock({ ...base, 'apps/web/node_modules/third': { ...third, version: '2.0.0' } }), onDisk, true),
+    'apps/web/node_modules/third',
+    'in place, another version nested in a workspace still parts',
+  );
+  assert.equal(
+    lockfileParting(lock({ ...base, 'apps/api/node_modules/y': { version: '1.0.0' } }), onDisk, true),
+    'apps/api/node_modules/y',
+    'and so does one it does not have',
+  );
   assert.equal(
     lockfileParting(lock({ ...base, 'packages/x': { version: '9.9.9' } }), onDisk),
     null,
@@ -519,4 +531,32 @@ test('an npm ci that fails is reported, not hidden, and tried again on the next 
   fs.rmSync(path.join(bare.main, 'node_modules'), { recursive: true });
   assert.deepEqual(await provisionDeps(bare.main, bare.wt), { tree: 'absent' });
   assert.ok(!fs.existsSync(path.join(bare.wt, 'node_modules')));
+});
+
+test("the checkout against the merge staged in it: a package nested in a workspace is read where it is installed, and parts only when it is not the lockfile's", async () => {
+  const { checkoutParts, lockfileParts } = await import('../src/worktree.ts');
+  const repo = fs.mkdtempSync(path.join(ROOT, 'checkout-'));
+  const lock = (nested: string) => ({
+    name: 'fixture',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'fixture', workspaces: ['apps/*'] },
+      'apps/app': { version: '1.0.0' },
+      'node_modules/app': { resolved: 'apps/app', link: true },
+      'node_modules/third': { version: '1.0.0' },
+      'apps/app/node_modules/third': { version: nested },
+    },
+  });
+  write(path.join(repo, 'package-lock.json'), JSON.stringify(lock('2.0.0')));
+  assert.equal(checkoutParts(repo), null, 'no node_modules: nobody installed a tree here');
+  link('../apps/app', path.join(repo, 'node_modules/app'));
+  write(path.join(repo, 'node_modules/third/package.json'), JSON.stringify({ name: 'third', version: '1.0.0' }));
+  write(path.join(repo, 'apps/app/node_modules/third/package.json'), JSON.stringify({ name: 'third', version: '2.0.0' }));
+
+  assert.equal(checkoutParts(repo), null, 'every package the lockfile names is installed where it names it');
+  assert.equal(lockfileParts(repo, repo), 'apps/app/node_modules/third', "a worktree's comparison would install on every ship");
+  write(path.join(repo, 'package-lock.json'), JSON.stringify(lock('3.0.0')));
+  assert.equal(checkoutParts(repo), 'apps/app/node_modules/third', 'the merge asks for another version of it');
+  fs.rmSync(path.join(repo, 'package-lock.json'));
+  assert.equal(checkoutParts(repo), null, 'no lockfile: not an npm checkout');
 });

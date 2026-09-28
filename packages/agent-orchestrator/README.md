@@ -1638,6 +1638,21 @@ dropped. **Nothing in the packages knows what shipping means.**
   after it, to resolve what stopped it or on trial, is theirs: no pass takes it back, and `wf rm` does not wait on it.
   A folder whose ending has no `check:` lands nothing: the shipper's brief then has it run the check
   and commit itself, as before.
+- **The ending's check runs with the packages the merge brings.** The checkout's `node_modules` was installed from the
+  base's lockfile, so a branch that adds a dependency (`@types/js-yaml`, `@types/express`, both on a live ship) failed
+  its check there through no fault of the work. When the tick files the check, it compares the staged
+  `package-lock.json` with what the checkout has on disk at each package path it names (`checkoutParts`, in place:
+  a package nested in a workspace is read where it is installed). Where they differ, the brief carries `install` —
+  the first path that differs, the check's record of why — the tick's note says so, and the script runs
+  `npm install --no-save --no-audit --no-fund` in the checkout before the command (`checkScript`, `INSTALL`): the text
+  is the run's, never the checkout's. `npm install` rather than `npm ci`, which empties `node_modules` under a dev
+  server running from it; `--no-save`, so the manifests stay as the merge staged them. An unchanged lockfile runs no
+  npm at all. An install that fails prints `[wf check] install failed, exit N` and ends the check by a signal, with no
+  exit code: a check that did not finish, never a refusal, so `retries:` spends nothing and `wf decide` offers
+  `wf retry <run> ship`. The install counts against the check's deadline. A merge its check refused, or that was
+  aborted, leaves the branch's packages installed: the checkout's `node_modules` is then ahead of main's lockfile until
+  the next `npm install` on main, which removes what main's lockfile does not name (measured on npm 11.19,
+  `ship.test.ts`). A merge that lands leaves `node_modules` matching the new lockfile.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated

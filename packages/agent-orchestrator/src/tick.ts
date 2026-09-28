@@ -110,7 +110,7 @@ import {
 } from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
-import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
+import { abortMerge, checkoutParts, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
@@ -882,20 +882,31 @@ async function advanceRun(
       // Made here as well as at filing: a step filed before the run made these has none.
       const files = artifactsDir(run, name);
       fs.mkdirSync(files, { recursive: true });
+      // An ending's check runs in the repository's checkout, whose `node_modules` was installed from the base's lockfile: where the
+      // merge staged there asks for packages it lacks, the check installs them first (`checkScript`), and the brief says why.
+      const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
+      if (install)
+        notes.push(
+          `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
+        );
       await e.file({
         id: taskId,
         harness: 'check',
         // The command from the workflow this run froze — never from the workspace it is about to judge.
-        brief: checkBrief(step.check!, {
-          // No base to diff against in the repository's checkout: an ending's check judges the merge staged there, against HEAD, which a
-          // check reads from MERGE_HEAD itself, and the run's base is by then an older commit of the branch it merges onto.
-          WF_RUN: run.id,
-          WF_STEP: name,
-          ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
-          WF_WORKSPACE: workspace,
-          WF_STDERR: checkStderr(taskId),
-          WF_ARTIFACTS: files,
-        }),
+        brief: checkBrief(
+          step.check!,
+          {
+            // No base to diff against in the repository's checkout: an ending's check judges the merge staged there, against HEAD, which a
+            // check reads from MERGE_HEAD itself, and the run's base is by then an older commit of the branch it merges onto.
+            WF_RUN: run.id,
+            WF_STEP: name,
+            ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+            WF_WORKSPACE: workspace,
+            WF_STDERR: checkStderr(taskId),
+            WF_ARTIFACTS: files,
+          },
+          install,
+        ),
         cwd: workspace,
         // One attempt, as every task is (the runtime makes one a start): a check that refused has said what it has to say, and running
         // a suite until it passes would let a flaky suite decide what ships.

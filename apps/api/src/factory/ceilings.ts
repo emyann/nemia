@@ -21,7 +21,7 @@ import {
 } from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { everyView, judgedUnlessUnreadable, seenBy } from './store.ts';
+import { everyView, judgedUnlessUnreadable, seenBy } from '../store.ts';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.

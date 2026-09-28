@@ -2221,7 +2221,8 @@ export const AGENT_KEYS = [
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
  * The agent keys that are the agent's own and no step's: what it is for, the skills it is given and its system prompt. A step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
- * (`apps/api/src/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by hand).
+ * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
+ * hand).
  */
 export const AGENT_OWN_KEYS = ['description', 'skills', 'systemPrompt'] as const;
 export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];

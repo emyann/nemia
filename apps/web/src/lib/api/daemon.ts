@@ -1,12 +1,12 @@
-/** Whether a `wf up` ticks the store (`GET /api/daemon`, apps/api/src/daemon.ts). */
+/** Whether a `wf up` ticks the store (`GET /api/daemon`, apps/api/src/factory/daemon.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
 
 /**
- * Mirrors `Daemon` in apps/api/src/daemon.ts: whether a `wf up` ticks the store, as the package judges `daemon.json` — `ticking` alone moves
- * the runs; `none`, `unreadable`, `stopped`, `gone` and `stalled` (alive, silent past `staleAfterMs`) do not. Times are ISO, null where the file
- * says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is `wf ls`'s own sentence.
+ * Mirrors `Daemon` in apps/api/src/factory/daemon.ts: whether a `wf up` ticks the store, as the package judges `daemon.json` — `ticking`
+ * alone moves the runs; `none`, `unreadable`, `stopped`, `gone` and `stalled` (alive, silent past `staleAfterMs`) do not. Times are ISO,
+ * null where the file says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is `wf ls`'s own sentence.
  */
 export type Daemon = {
   kind: 'none' | 'unreadable' | 'stopped' | 'gone' | 'stalled' | 'ticking';

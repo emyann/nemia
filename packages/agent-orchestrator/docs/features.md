@@ -1726,7 +1726,7 @@ left for later. Read first: the apps/web lines of CLAUDE.md, the exports above, 
 
 What was built:
 
-- **`GET /api/inbox`** (`apps/api/src/inbox.ts`) lists `readInbox()` as it is, read from disk on each request. Each entry also carries `body`,
+- **`GET /api/inbox`** (`apps/api/src/inbox/inbox.ts`) lists `readInbox()` as it is, read from disk on each request. Each entry also carries `body`,
   parsed again from its file with `parseInboxCard`, since the listing has only the first line and a start's brief is prefilled with the whole
   body. It carries `filedAt` too, the file's mtime, since a card has no time of its own and the page orders cards newest first.
 - **`POST /api/inbox`** takes `{ "body", "workflow"?, "from"?, "repo"? }` and files through `addToInbox`. The request named `body`, `workflow`
@@ -2029,7 +2029,7 @@ that leaves its timer holds `node --test` open, so run that mutant under `timeou
 
 ### Shipped: the api streams the feed
 
-The api's half of what was sketched here. What was built, in `apps/api/src/feed.ts` beside the transcript stream (`steps.ts`):
+The api's half of what was sketched here. What was built, in `apps/api/src/factory/feed.ts` beside the transcript stream (`steps.ts`):
 
 - **`GET /api/feed/stream`**, server-sent events over `watchFeed` from the package root: pushed by its `fs.watch` and backed by its 1 s
   timer, so the api keeps no poll of its own. One event a line: its name what the line is about (`feedEventOf`) — `step` for a line with
@@ -2115,7 +2115,7 @@ deleted in turn and failed a test; the link claim's retry on `EEXIST` is not cov
 The api and the board could not tell `waiting` from nothing ticking: on 2026-09-22 cards read `waiting` for minutes because the daemon was
 stopped, and it was read as the machine being slow. What was built, in `apps/`:
 
-- **`GET /api/daemon`** (`apps/api/src/daemon.ts`) judges it as `wf ls` does: `daemonStanding()` from the package's root, one file read,
+- **`GET /api/daemon`** (`apps/api/src/factory/daemon.ts`) judges it as `wf ls` does: `daemonStanding()` from the package's root, one file read,
   one `kill(pid, 0)` and one `/proc/<pid>/stat` read per request, never per run, and never a write. It answers the kind, `ticking`, the
   pid, `cwd`, `every`, `startedAt` (since when), `passedAt` (the last pass), `lastHeardAt` (the latest of start, pass and beat), `stoppedAt`,
   `staleAfterMs`, the process table's `identity`, and `line`, which is `daemonLine`'s. A file that is there and cannot be read is a 500
@@ -2356,7 +2356,7 @@ Left for later: **lifting a hold from the board**, which needs a route on the ap
 
 ## Shipped: a hold lifted from the board
 
-- **`DELETE /api/runs/:id/hold`** (`apps/api/src/runs.ts`) lifts a run's hold with the package's own `unhold`, the code `wf hold <run>
+- **`DELETE /api/runs/:id/hold`** (`apps/api/src/runs/runs.ts`) lifts a run's hold with the package's own `unhold`, the code `wf hold <run>
   --off` runs, behind the same guard as every other write (a name that is not this machine and another site's page are refused 403, a
   body not sent as JSON 415). It refuses what `wf hold --off` refuses, in its words: a run nobody holds, a pruned one among them, is 409;
   a run not in the store, or one removed with its hold file left behind, is 404. A hold written by hand on a pruned run is lifted, since
@@ -2544,13 +2544,13 @@ What it leaves:
 ### The board half
 
 The queue was the package's, and the board showed none of it: a card's place, a start the tick refused, the cap. Read first: the apps/web lines
-of CLAUDE.md, the section above, `InboxListing`, `queueInInbox`, `runSlots` and `lastCeilings`, and `apps/api/src/inbox.ts` and `guard.ts`.
+of CLAUDE.md, the section above, `InboxListing`, `queueInInbox`, `runSlots` and `lastCeilings`, and `apps/api/src/inbox/inbox.ts` and `guard.ts`.
 
 What was built:
 
 - **`GET /api/inbox` already carried `queued` and `tried`.** Each entry is the package's `InboxListing` spread, with `body` and `filedAt` beside
   it, so a queued card's time and place and the tick's last try of its start reached the board untouched. A test now says so.
-- **`POST /api/inbox/:name/queue`** and **`DELETE /api/inbox/:name/queue`** (`apps/api/src/inbox.ts`) are `wf inbox queue <name>` and its
+- **`POST /api/inbox/:name/queue`** and **`DELETE /api/inbox/:name/queue`** (`apps/api/src/inbox/inbox.ts`) are `wf inbox queue <name>` and its
   `--off`, through `queueInInbox`. They are the seventh and eighth guarded writes. The name is refused first, in the package's words (400,
   `inboxNameRefusal`), and so is a body that is not empty or `{}` (400). A `workflow` sent is refused by name, not ignored: the board queues a
   card on the workflow it names, and `--workflow` stays the command line's. The package's refusals keep its sentence, with a status for what is
@@ -2559,7 +2559,7 @@ What was built:
   a DELETE of a card not in the queue, which writes nothing. The card's file keeps its mtime across the write: the package renames a new file
   over the card, and the mtime is the `filedAt` the Inbox page orders the cards by, so a card queued or taken back from the board would have
   jumped to the top of the list with the queue's time as its own. From review, round 2.
-- **`GET /api/ceilings`** (`apps/api/src/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
+- **`GET /api/ceilings`** (`apps/api/src/factory/ceilings.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
   before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
   whose non-count is a 500 in `runCapOf`'s sentence. `inFlight` lists the runs counted against the cap, oldest first. `held` lists the runs
   it holds, each with its count and `slotWord`'s words. With no cap nothing is read, as `runSlots` reads nothing. With a cap there is one
@@ -3048,7 +3048,7 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
 
 A person builds a workflow of theirs on the Workflows page, and Save writes the folder through `writeWorkflow`. Apps only: nothing in
 `packages/` changed but this file. Read first: the apps/web lines of CLAUDE.md, the package half above, `STEP_KEYS`, `STEP_KEY_MEANINGS`
-and `COUNTS` in workflow.ts, `listWorkflows` and `folderOf` in `apps/api/src/workflows.ts`, and `WorkflowCanvas.tsx`.
+and `COUNTS` in workflow.ts, `listWorkflows` and `folderOf` in `apps/api/src/workflows/workflows.ts`, and `WorkflowCanvas.tsx`.
 
 **The decision made in the request: the builder writes yours only**, the store's `workflows/`. A write to the repository's is refused with a
 sentence that says to copy the folder into the repository by hand, and the api writes nothing into a checkout. `writeWorkflow` would take a
@@ -3489,11 +3489,11 @@ What it leaves:
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
   into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
   now what its brief tells it (round 4, above).
-- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/decision.ts`) prints the hand-driven `git merge
+- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/decide/decision.ts`) prints the hand-driven `git merge
   --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
   folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
   belongs with the board half above.
-- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/judged.ts`, `decision.ts`), so
+- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/runs/judged.ts`, `decision.ts`), so
   an ending held for the checkout draws as plain `waiting` — and a held try as one the next tick files — where `wf ls` says `waiting on the
   checkout (<run>'s ship has it)`.
 - **Answered: work that does not hold on the base branch once the ending has run.** `ship.md` aborts a trial merge that conflicts and signs
@@ -3523,7 +3523,7 @@ What the board calls:
   show this one all the same. `onYou` says `approve ship`, through `onYouWords`, and Approve on the run page reaches it — `needsOf` reads
   the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. It is also what tells
   such a gate from §6's on the board: a gate awaiting approval with no task is an ending's (`actsOnly` in apps/web).
-- **`resultSteps(steps)`** is the run's result, which `apps/api/src/decision.ts` reads for a run's branches: `terminalSteps` there named, for a
+- **`resultSteps(steps)`** is the run's result, which `apps/api/src/decide/decision.ts` reads for a run's branches: `terminalSteps` there named, for a
   folder with an ending step, a step with no branch.
 - **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for
   §6's gate; `sendBackTo(step, run)` says which step the send-back names, and `approvalRefusal` greys the button out in its words.
@@ -3654,7 +3654,7 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
 
 - **`wf inbox queue` keeps the card file's time.** `queueInInbox` writes a card whole, through a hidden file renamed over it, so a pass never
   reads half a card — and the rename gave the file the time of the queue. A card has no filing time of its own but its mtime (`filedAt`,
-  `apps/api/src/inbox.ts`), which the Inbox page orders the cards by, so a card queued or taken back at the command line jumped to the top of
+  `apps/api/src/inbox/inbox.ts`), which the Inbox page orders the cards by, so a card queued or taken back at the command line jumped to the top of
   the list with the queue's time as its own. A queue is no edit of the idea: `queueInInbox` reads the time before the rename and sets it back
   after, and a failure to set it back is not a failure of the queue — the card is queued all the same, and lists at the queue's time until it
   is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
@@ -3920,7 +3920,7 @@ the page says which nodes, and never words a node as an agent.
   the steps (`in-use`, `agentUsers`). The result schema `output:` names travels with it: written first, put back if the agent is refused,
   removed with it unless another agent names it, and refused when it is another agent's to change. `agentVersion` covers the file and its
   schema.
-- **The api serves them** (`apps/api/src/agents.ts`): every agent of the repository's and of yours, with its description, role keys,
+- **The api serves them** (`apps/api/src/agents/agents.ts`): every agent of the repository's and of yours, with its description, role keys,
   body, schema, source, version, the nodes that name it and the parser's refusal when it does not read; one read; one made, put back —
   renamed — or removed. Refusals are 4xx in the package's words — 404 gone, 409 stale, taken or still named (with `users`), 422 refused,
   403 for the repository's, which the board never writes. Nothing touches a run: an edit changes what a later `wf start` freezes.
@@ -4077,7 +4077,7 @@ What it leaves:
 P0.7 of `docs/pivot-2026-09-18.md`, then its source changed: the quota comes from the harness. Apps only: nothing in `packages/`
 changed but this file.
 
-- **The ask** (`apps/api/src/quota.ts`, `askUsage`). The api starts the `claude` on its PATH as `claude -p --input-format stream-json
+- **The ask** (`apps/api/src/factory/quota.ts`, `askUsage`). The api starts the `claude` on its PATH as `claude -p --input-format stream-json
   --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ''`, writes one
   `control_request` with subtype `get_usage`, reads stdout for the `control_response` whose `request_id` is its own, and closes stdin,
   which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with the variables a Claude Code session around
@@ -4266,7 +4266,7 @@ The fix is a copy, and the brief names the copy.
   file the parent has since deleted or renamed, which is the brief's sentence made false and a step raising findings about work that
   is gone. A round is not such a filing: `validateLoops` holds a loop's steps to a chain, so each continues the one before in its
   folder, and the round files the target itself in the folder its record keeps.
-- **And the board leaves it out.** `folderFiles` (`apps/api/src/artifacts.ts`) lists everything a folder step's folder holds, by name
+- **And the board leaves it out.** `folderFiles` (`apps/api/src/steps/artifacts.ts`) lists everything a folder step's folder holds, by name
   where the route serves it and by path where it cannot — a directory, a link — so that *the folder is empty* is never said of a step
   whose work went into `notes/`. The run's own `given/` is not that step's work, and listed it would stand in the folder of every step
   of every run started with `--input`: it is left out, under the name the package exports (`GIVEN`), and a regular file a step wrote
@@ -4335,7 +4335,7 @@ the try ended, in words, and draws each field by its shape (`apps/web/src/lib/ou
   a string is dropped), so the parsed closeout is not the statement. A statement `parseCloseout` refuses outright — JSON cut off, an
   array — has no closeout at all: the head says `unreadable`, said by the agent, with the parser's reason, and shows the statement whole
   beneath it (review, round 2: it had said only that a closeout could not be read, and hid what was said).
-- **Three api fields the tab lacked** (`apps/api/src/tries.ts`): on `StepCloseout`, `schema`, each declared field's schema off the
+- **Three api fields the tab lacked** (`apps/api/src/detail/tries.ts`): on `StepCloseout`, `schema`, each declared field's schema off the
   workflow the run froze, for a boolean's description and an empty array's item type, and `raw`, the statement as it came; and on each
   try, `unreadable`, the parser's error and the statement, where there is a statement and no closeout. Nothing else changed in the api,
   and nothing in this package.
@@ -4864,7 +4864,7 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
   harnesses told the last attempt of each task in flight among them (`observeFor`) — one look however many, and none with none in flight.
   This meets the operator's fallback (one `list()` when several `claude --bg` tasks are in flight) differently: one observation that asks
   `claude agents` only for a background session, with no journal read that was not named.
-- **The api answers a run at rest from memory** (`apps/api/src/resting.ts`), keyed as the tick's memo is: `restStamps`, the record as
+- **The api answers a run at rest from memory** (`apps/api/src/runs/resting.ts`), keyed as the tick's memo is: `restStamps`, the record as
   read, the feed since (`evictedBy`), and the tips of the branches git was asked about that are not on the base, with the base's. What it
   keeps is what the list says, not what a pass would file: a final status or a pruned run, nothing moving, waited on or held, every task
   settled, the workflow frozen, every git question answered. `startedAt` is read per request, so a kept answer holds no clock. The runs it
@@ -5003,7 +5003,7 @@ blocks, and have the builder amend the folder's files to match. To be written as
 
 **What exists.** The Workflows page draws a folder with React Flow (`apps/web/src/components/WorkflowCanvas.tsx`:
 `SpecNode`, `stepEdges`, `nodesDraggable` off), read-only: no handles, no `onConnect`. The api lists folders from two
-sources, the repository's `workflows/` and the store's (`sourcesOf` in `apps/api/src/workflows.ts`), and writes nothing
+sources, the repository's `workflows/` and the store's (`sourcesOf` in `apps/api/src/workflows/workflows.ts`), and writes nothing
 into the checkout; its six writes all go through the package. The package parses a folder (`loadWorkflows`, `STEP_KEYS`
 the closed list of a step's keys, `COUNTS` what each count means, every refusal by name) and has no writer: nothing in
 the packages renders a step back to markdown.

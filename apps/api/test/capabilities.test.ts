@@ -13,10 +13,10 @@ import { scratch } from './scratch.ts';
 process.env.WF_ROOT = scratch('hkb-api-capabilities-');
 const { app } = await import('../src/app.ts');
 const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } =
-  await import('../src/capabilities.ts');
-const { DISALLOW, askDenierOf, bashCovers } = await import('../src/reach.ts');
-type CapabilitiesWithSteps = import('../src/reach.ts').CapabilitiesWithSteps;
-type StepReach = import('../src/reach.ts').StepReach;
+  await import('../src/capabilities/capabilities.ts');
+const { DISALLOW, askDenierOf, bashCovers } = await import('../src/capabilities/reach.ts');
+type CapabilitiesWithSteps = import('../src/capabilities/reach.ts').CapabilitiesWithSteps;
+type StepReach = import('../src/capabilities/reach.ts').StepReach;
 assert.equal(
   DISALLOW,
   'disallowedTools:',

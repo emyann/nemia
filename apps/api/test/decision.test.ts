@@ -27,11 +27,11 @@ process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
 const { app } = await import('../src/app.ts');
-const { diffFiles, DIFF_LINES } = await import('../src/decision.ts');
-type DecideCommand = import('../src/decision.ts').DecideCommand;
-type Decidable = import('../src/decision.ts').Decidable;
-type RunDecision = import('../src/decision.ts').RunDecision;
-type RunDetail = import('../src/detail.ts').RunDetail;
+const { diffFiles, DIFF_LINES } = await import('../src/decide/decision.ts');
+type DecideCommand = import('../src/decide/decision.ts').DecideCommand;
+type Decidable = import('../src/decide/decision.ts').Decidable;
+type RunDecision = import('../src/decide/decision.ts').RunDecision;
+type RunDetail = import('../src/detail/detail.ts').RunDetail;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

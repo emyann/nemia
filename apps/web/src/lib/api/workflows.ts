@@ -1,10 +1,10 @@
-/** The workflows, a step's page, and a run started from one (apps/api/src/workflows.ts). */
+/** The workflows, a step's page, and a run started from one (apps/api/src/workflows/workflows.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { AgentSkill } from './agents.ts';
 import type { RunGraph } from './graph.ts';
 
-/** Mirrors `WorkflowStepSpec` in apps/api/src/workflows.ts: every key a step of a workflow sets, before any run froze it. */
+/** Mirrors `WorkflowStepSpec` in apps/api/src/workflows/workflows.ts: every key a step of a workflow sets, before any run froze it. */
 export type WorkflowStepSpec = {
   harness: string | null;
   model: string | null;
@@ -45,16 +45,19 @@ export type WorkflowStepSpec = {
 };
 
 /**
- * Mirrors `ListedStep` in apps/api/src/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back. `spec` and `body`
- * are the step resolved; `own` is what a step with an agent sets itself, null for a step with none.
+ * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back.
+ * `spec` and `body` are the step resolved; `own` is what a step with an agent sets itself, null for a step with none.
  */
 export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
 
-/** Mirrors `StepOwn` in apps/api/src/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its own note. */
+/**
+ * Mirrors `StepOwn` in apps/api/src/workflows/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its
+ * own note.
+ */
 export type StepOwn = { keys: Array<keyof WorkflowStepSpec>; body: string };
 
 /**
- * Mirrors `WorkflowListing` in apps/api/src/workflows.ts: a folder of steps, where it is read from — the repository's
+ * Mirrors `WorkflowListing` in apps/api/src/workflows/workflows.ts: a folder of steps, where it is read from — the repository's
  * `workflows/`, or yours — its README's description, its steps, its graph and the schemas beside its steps; or, for a folder
  * that does not read as a workflow, the loader's refusal and no steps.
  */
@@ -84,14 +87,14 @@ export const workflowsQuery = queryOptions({
 });
 
 /**
- * Mirrors `KeyRow` in apps/api/src/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as the package
- * read it, null where the file does not set it, and the package's one line of what it means.
+ * Mirrors `KeyRow` in apps/api/src/workflows/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as
+ * the package read it, null where the file does not set it, and the package's one line of what it means.
  */
 export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /**
- * Mirrors `WorkflowStepPage` in apps/api/src/workflows.ts: one step of a workflow — its body, its file as written, and every key a step may set,
- * in the package's order, with its value as the loader read it.
+ * Mirrors `WorkflowStepPage` in apps/api/src/workflows/workflows.ts: one step of a workflow — its body, its file as written, and every key
+ * a step may set, in the package's order, with its value as the loader read it.
  */
 export type WorkflowStepPage = {
   workflow: string;

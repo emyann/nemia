@@ -23,18 +23,18 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { listWorkflows, versionOf: versionIn } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf: versionIn } = await import('../src/workflows/workflows.ts');
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
-const { HOME_REPO } = await import('../src/capabilities.ts');
+const { HOME_REPO } = await import('../src/capabilities/capabilities.ts');
 const { loadWorkflows, parentRecord, readRun } = await import('agent-orchestrator');
 const { afterRefusal } = await import('agent-orchestrator/run');
 const { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
-type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
-type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
-type WorkflowListing = import('../src/workflows.ts').WorkflowListing;
-type RunSummary = import('../src/runs.ts').RunSummary;
-type RunDetail = import('../src/detail.ts').RunDetail;
+type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
+type WorkflowStepPage = import('../src/workflows/workflows.ts').WorkflowStepPage;
+type WorkflowListing = import('../src/workflows/workflows.ts').WorkflowListing;
+type RunSummary = import('../src/runs/runs.ts').RunSummary;
+type RunDetail = import('../src/detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

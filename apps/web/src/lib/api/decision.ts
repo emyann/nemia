@@ -1,4 +1,4 @@
-/** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`, apps/api/src/decision.ts). */
+/** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`, apps/api/src/decide/decision.ts). */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { RunHolding, RunWaiting } from './judged.ts';
@@ -13,19 +13,22 @@ export type Group = { name: string; files: number; added: number; removed: numbe
 /** Mirrors `Radius` in agent-orchestrator's radius.ts: what a branch touched, and among it what an agent reads and what decides a check. */
 export type Radius = { changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[]; lessons: Change[] };
 
-/** Mirrors `Touched` in apps/api/src/decision.ts: a branch, and its radius or why git could not read it. */
+/** Mirrors `Touched` in apps/api/src/decide/decision.ts: a branch, and its radius or why git could not read it. */
 export type Touched = { branch: string; radius: Radius | { error: string } };
 
-/** Mirrors `DiffFile` in apps/api/src/decision.ts: one file's unified diff, cut to the api's cap, and how many lines were cut. */
+/** Mirrors `DiffFile` in apps/api/src/decide/decision.ts: one file's unified diff, cut to the api's cap, and how many lines were cut. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
 
-/** Mirrors `SensitiveDiff` in apps/api/src/decision.ts. */
+/** Mirrors `SensitiveDiff` in apps/api/src/decide/decision.ts. */
 export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
 
-/** Mirrors `Lesson` in apps/api/src/decision.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
+/** Mirrors `Lesson` in apps/api/src/decide/decision.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
-/** Mirrors `DecideCommand` in apps/api/src/decision.ts: a command `wf decide` prints. The board runs one of them itself, `accept` (`acceptLoop`). */
+/**
+ * Mirrors `DecideCommand` in apps/api/src/decide/decision.ts: a command `wf decide` prints. The board runs one of them itself, `accept`
+ * (`acceptLoop`).
+ */
 export type DecideCommand = {
   label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
   command: string;
@@ -33,9 +36,9 @@ export type DecideCommand = {
 };
 
 /**
- * Mirrors `Standing` in apps/api/src/decision.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
- * by N commits, or gone — with the fact in the package's words and how much it changed, as `wf decide` prints beside the branch (git's
- * `--shortstat`); `stat` is null where git said nothing of it.
+ * Mirrors `Standing` in apps/api/src/decide/decision.ts: where one result branch stands against the base branch as git says it now — on it,
+ * ahead of it by N commits, or gone — with the fact in the package's words and how much it changed, as `wf decide` prints beside the branch
+ * (git's `--shortstat`); `stat` is null where git said nothing of it.
  */
 export type Standing = (
   | { branch: string; where: 'on' }
@@ -44,12 +47,13 @@ export type Standing = (
 ) & { said: string; stat: string | null; merge: StandingMerge | null };
 
 /**
- * Mirrors `StandingMerge` in apps/api/src/decision.ts: whether a branch ahead of the base still merges onto it as the base is now, as git's
- * `merge-tree` answers it — clean, the files it conflicts in, or why git could not say — and that in words. Null for a branch not ahead.
+ * Mirrors `StandingMerge` in apps/api/src/decide/decision.ts: whether a branch ahead of the base still merges onto it as the base is now,
+ * as git's `merge-tree` answers it — clean, the files it conflicts in, or why git could not say — and that in words. Null for a branch not
+ * ahead.
  */
 export type StandingMerge = ({ clean: true } | { clean: false; conflicts: string[] } | { error: string }) & { said: string };
 
-/** Mirrors `Decidable` in apps/api/src/decision.ts. */
+/** Mirrors `Decidable` in apps/api/src/decide/decision.ts. */
 export type Decidable = {
   /** Where each result branch stands, and how much it changed: the facts under the run's result, as `wf decide` prints them. */
   standings: Standing[];
@@ -71,9 +75,9 @@ export type Decidable = {
 };
 
 /**
- * Mirrors `RunDecision` in apps/api/src/decision.ts: `waiting` for a run whose roots wait on runs not shipped — with `holding` beside it for
- * one a person holds too — `holding` alone for a run a person holds (`wf hold`), which offers nothing, `running` while nobody is waited on,
- * `nothing` for a run called off or shipped.
+ * Mirrors `RunDecision` in apps/api/src/decide/decision.ts: `waiting` for a run whose roots wait on runs not shipped — with `holding`
+ * beside it for one a person holds too — `holding` alone for a run a person holds (`wf hold`), which offers nothing, `running` while nobody
+ * is waited on, `nothing` for a run called off or shipped.
  */
 export type RunDecision =
   | { waiting: RunWaiting; holding?: RunHolding }

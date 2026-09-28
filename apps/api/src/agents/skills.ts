@@ -46,10 +46,10 @@ import {
   type SkillCost,
   type SkillDraft,
 } from 'agent-orchestrator/workflow';
-import { readBody, valueAt, type BodyIssue, type Words } from './body.ts';
-import { HOME_REPO, repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { placesOf } from './workflows.ts';
+import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
+import { HOME_REPO, repoOf } from '../capabilities/capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { placesOf } from '../workflows/workflows.ts';
 
 /** Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its agents), or what HKB ships. */
 export type SkillSource = 'yours' | 'repo' | 'shipped';

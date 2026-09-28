@@ -18,8 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { Pruning } from 'agent-orchestrator';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-prune-');

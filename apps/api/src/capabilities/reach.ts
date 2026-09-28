@@ -25,7 +25,7 @@ import {
   type Capabilities,
   type DeniedRule,
 } from './capabilities.ts';
-import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from './workflows.ts';
+import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 
 /** The harnesses that are Claude Code, as the engine names them: its jobs and background sessions (`claude`), and `claude -p` detached. */
 const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);

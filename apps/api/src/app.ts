@@ -1,18 +1,18 @@
 import { Hono } from 'hono';
-import { repoOf } from './capabilities.ts';
-import { capabilitiesWithSteps } from './reach.ts';
-import { readDaemon } from './daemon.ts';
-import { inbox } from './inbox.ts';
-import { readQuota } from './quota.ts';
-import { agents } from './agents.ts';
-import { skills } from './skills.ts';
-import { builder } from './builder.ts';
-import { workflows } from './workflows.ts';
-import { asks } from './asks.ts';
-import { ceilingsOf } from './ceilings.ts';
-import { feed } from './feed.ts';
-import { runs } from './runs.ts';
-import { steps } from './steps.ts';
+import { repoOf } from './capabilities/capabilities.ts';
+import { capabilitiesWithSteps } from './capabilities/reach.ts';
+import { readDaemon } from './factory/daemon.ts';
+import { inbox } from './inbox/inbox.ts';
+import { readQuota } from './factory/quota.ts';
+import { agents } from './agents/agents.ts';
+import { skills } from './agents/skills.ts';
+import { builder } from './workflows/builder.ts';
+import { workflows } from './workflows/workflows.ts';
+import { asks } from './asks/asks.ts';
+import { ceilingsOf } from './factory/ceilings.ts';
+import { feed } from './factory/feed.ts';
+import { runs } from './runs/runs.ts';
+import { steps } from './steps/steps.ts';
 
 /**
  * The api: every route the board reads and writes, its groups each in a router of their own.

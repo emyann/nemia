@@ -23,10 +23,10 @@ import {
   touchedBy,
 } from 'agent-orchestrator';
 import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
-import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from './judged.ts';
+import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from '../runs/judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
-import { e, judgedSteps, stepNames, viewsOf, workflowsOf } from './store.ts';
-import { type StepUsed, totalOf, usedOf } from './usage.ts';
+import { e, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
+import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };

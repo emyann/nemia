@@ -8,9 +8,9 @@
  * `WF_ROOT` is set before the api loads: agent-orchestrator locates its store as its modules load.
  */
 import { stops } from './harness.ts';
-import type { DecideCommand, Decidable } from '../src/decision.ts';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { DecideCommand, Decidable } from '../src/decide/decision.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

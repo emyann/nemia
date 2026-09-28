@@ -1,11 +1,12 @@
-/** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox.ts). */
+/** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox/inbox.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { KeyRow, WorkflowListing } from './workflows.ts';
 
 /**
- * Mirrors `InboxEntry` in apps/api/src/inbox.ts: a card as `wf inbox` lists it — or an entry of the inbox that does not read as one, `error`
- * saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the cards by.
+ * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as `wf inbox` lists it — or an entry of the inbox that does not read as one,
+ * `error` saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the cards
+ * by.
  */
 export type InboxEntry = {
   name: string;
@@ -42,8 +43,8 @@ export const inboxQuery = queryOptions({
 });
 
 /**
- * Mirrors `InboxCardPage` in apps/api/src/inbox.ts: a card as the inbox lists it, its file as written, frontmatter included, and each key a card
- * may set, a row each — none for an entry that does not read as a card.
+ * Mirrors `InboxCardPage` in apps/api/src/inbox/inbox.ts: a card as the inbox lists it, its file as written, frontmatter included, and each
+ * key a card may set, a row each — none for an entry that does not read as a card.
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
@@ -93,7 +94,10 @@ export async function dropCard(name: string): Promise<void> {
   throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
 }
 
-/** Mirrors `InboxQueueAnswer` in apps/api/src/inbox.ts: what `wf inbox queue` did, the card's `queued:` as it now reads, and its place once queued. */
+/**
+ * Mirrors `InboxQueueAnswer` in apps/api/src/inbox/inbox.ts: what `wf inbox queue` did, the card's `queued:` as it now reads, and its place
+ * once queued.
+ */
 export type Queued = {
   name: string;
   file: string;

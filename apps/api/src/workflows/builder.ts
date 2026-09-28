@@ -45,9 +45,9 @@ import {
   type StepDraft,
   type StepKey,
 } from 'agent-orchestrator/workflow';
-import { readBody, valueAt, type BodyIssue, type Words } from './body.ts';
-import { repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
+import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
+import { repoOf } from '../capabilities/capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**

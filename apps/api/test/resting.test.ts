@@ -14,16 +14,16 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-resting-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { resting } = await import('../src/runs.ts');
+const { resting } = await import('../src/runs/runs.ts');
 const { e, findRun } = await import('../src/store.ts');
-const { restingRead } = await import('../src/resting.ts');
+const { restingRead } = await import('../src/runs/resting.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

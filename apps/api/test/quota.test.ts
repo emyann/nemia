@@ -26,9 +26,9 @@ const {
   quotaOf,
   readQuota,
   usageEnv,
-} = await import('../src/quota.ts');
-type Quota = import('../src/quota.ts').Quota;
-type Held = import('../src/quota.ts').Held;
+} = await import('../src/factory/quota.ts');
+type Quota = import('../src/factory/quota.ts').Quota;
+type Held = import('../src/factory/quota.ts').Held;
 
 const NOW = Date.parse('2026-09-19T10:00:00.000Z');
 /** A success answer, as Claude Code's control_response carries it, with these `rate_limits`. */

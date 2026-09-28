@@ -1,4 +1,4 @@
-/** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs.ts). */
+/** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs/runs.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
@@ -8,7 +8,7 @@ import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds }
 /** Mirrors `PlaceKind` in agent-orchestrator's run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
 
-/** Mirrors `RunSummary` in apps/api/src/runs.ts. */
+/** Mirrors `RunSummary` in apps/api/src/runs/runs.ts. */
 export type RunSummary = {
   id: string;
   /** The repository a git run is about; null for a folder run (`place`), which has none. */

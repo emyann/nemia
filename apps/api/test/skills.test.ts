@@ -24,9 +24,9 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-type SkillPlace = import('../src/skills.ts').SkillPlace;
-type SkillRow = import('../src/skills.ts').SkillRow;
-type SkillAdded = import('../src/skills.ts').SkillAdded;
+type SkillPlace = import('../src/agents/skills.ts').SkillPlace;
+type SkillRow = import('../src/agents/skills.ts').SkillRow;
+type SkillAdded = import('../src/agents/skills.ts').SkillAdded;
 
 /** What HKB ships: the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
@@ -245,7 +245,7 @@ test('an agent is listed with each skill it gives, where it is found and what it
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'lost.md'), '---\ndescription: Lost.\nskills: always, gone\n---\nLook.\n');
   try {
     const res = await app.request('/api/agents/yours/scribe');
-    const scribe = (await res.json()) as import('../src/agents.ts').AgentListing;
+    const scribe = (await res.json()) as import('../src/agents/agents.ts').AgentListing;
     assert.deepEqual(
       scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]),
       [
@@ -254,7 +254,7 @@ test('an agent is listed with each skill it gives, where it is found and what it
         ['review', 'repo', 'Reviews a change.'],
       ],
     );
-    const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('../src/agents.ts').AgentListing;
+    const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('../src/agents/agents.ts').AgentListing;
     assert.equal(lost.given[0].preload, true);
     assert.equal(lost.given[0].cost!.perTurn, lost.given[0].cost!.listed + lost.given[0].cost!.body);
     assert.deepEqual([lost.given[1].from, lost.given[1].cost], [null, null]);
@@ -264,8 +264,8 @@ test('an agent is listed with each skill it gives, where it is found and what it
   }
 });
 
-type SkillDetail = import('../src/skills.ts').SkillDetail;
-type SkillSaved = import('../src/skills.ts').SkillSaved;
+type SkillDetail = import('../src/agents/skills.ts').SkillDetail;
+type SkillSaved = import('../src/agents/skills.ts').SkillSaved;
 
 const put = (url: string, body: unknown, headers: Record<string, string> = json) =>
   app.request(url, { method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
@@ -487,7 +487,7 @@ test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is
 });
 
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet, in a checkout whose path has a space and a quote", async () => {
-  const { copyCommand } = await import('../src/skills.ts');
+  const { copyCommand } = await import('../src/agents/skills.ts');
   const checkout = path.join(scratch('hkb-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');

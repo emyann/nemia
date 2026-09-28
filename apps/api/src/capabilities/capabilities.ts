@@ -63,7 +63,7 @@ export type Capabilities = {
 };
 
 /** The checkout this api's source is in: the repository a person started it from. */
-export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..');
+export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /** The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — and its own checkout otherwise. */
 export const repoOf = (env: NodeJS.ProcessEnv = process.env): string => path.resolve(env.HKB_REPO?.trim() || HOME_REPO);

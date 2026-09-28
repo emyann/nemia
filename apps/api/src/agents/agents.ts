@@ -43,13 +43,13 @@ import {
   type RoleKey,
   type SkillsFound,
 } from 'agent-orchestrator/workflow';
-import { readBody, valueAt, type BodyIssue, type Words } from './body.ts';
-import { repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { judgedNow } from './runs.ts';
+import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
+import { repoOf } from '../capabilities/capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
-import { placesOf, sourcesOf, type WorkflowSource } from './workflows.ts';
+import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
 export type AgentUser = { from: WorkflowSource; workflow: string; step: string };

@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 const root = scratch('hkb-api-');
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */

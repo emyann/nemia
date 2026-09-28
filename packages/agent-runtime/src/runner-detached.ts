@@ -147,7 +147,8 @@ export type HarnessOutput = {
 /** How long a run file may go unbeaten before `observe` calls it dead. The worker beats every 5s. */
 export const STALE_MS = 30_000;
 
-const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
+/** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
+export const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
 const isDirectory = (p: string) => {
   try {

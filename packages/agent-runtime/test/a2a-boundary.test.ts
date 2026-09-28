@@ -48,9 +48,9 @@ function sdkBreaches(file: string, text: string): string[] {
 const sourceFiles = () =>
   ['src', 'bin'].flatMap((dir) =>
     fs
-      .readdirSync(path.join(PKG, dir))
-      .filter((f) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(f))
-      .map((f) => `${dir}/${f}`),
+      .readdirSync(path.join(PKG, dir), { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(ts|mts|cts|js|mjs|cjs)$/.test(f) && !f.endsWith('.test.ts'))
+      .map((f) => `${dir}/${f.split(path.sep).join('/')}`),
   );
 
 test('the scan reads the seam and the rest of the package — or it would pass by reading nothing', () => {

@@ -1158,7 +1158,8 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     brief: `${UNMERGED.title}\n\nA run seeded by npm run e2e: it finished, and its branch is ahead of the base with nothing asking for a merge.`,
     workflowDir: aloneDir, workflow: [{ name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' }],
     createdAt: ago(0.7),
-    steps: { implement: { taskId: `${UNMERGED.id}-implement`, workspace: aloneLane, branch: UNMERGED.branch } },
+    // Handed off, as the tick writes it once the step signed off: the `prune` page cuts its worktree, and a hand-off owed would hold the prune.
+    steps: { implement: { taskId: `${UNMERGED.id}-implement`, workspace: aloneLane, branch: UNMERGED.branch, handedOff: `${UNMERGED.id}-implement` } },
   }, null, 2));
 }
 

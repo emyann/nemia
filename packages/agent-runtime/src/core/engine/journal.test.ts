@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Journal, type JournalError } from '../src/core/engine/journal.ts';
-import type { Event, Usage } from '../src/core/domain.ts';
-import { HarnessArgsSchema, type StoredEvent } from '../src/core/event-schema.ts';
-import type { HarnessArgs } from '../src/harness/args.ts';
-import { scratch } from './scratch.ts';
+import { Journal, type JournalError } from './journal.ts';
+import type { Event, Usage } from '../domain.ts';
+import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
+import type { HarnessArgs } from '../../harness/args.ts';
+import { scratch } from '../../../test/scratch.ts';
 
 const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
@@ -233,7 +233,7 @@ test("an old filed event is read with the harness's arguments under config, and 
 
 test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
   const dir = legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] });
-  const { createEngine } = await import('../src/facade.ts');
+  const { createEngine } = await import('../../facade.ts');
   const engine = createEngine({ root: dir });
 
   const old = await engine.view('t-old');
@@ -280,7 +280,7 @@ test("config is the newer word: a value there is kept over one beside it, and an
 });
 
 test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
-  const { createEngine } = await import('../src/facade.ts');
+  const { createEngine } = await import('../../facade.ts');
   const events = [LEGACY as unknown as Event];
   const engine = createEngine({
     journal: {
@@ -362,7 +362,7 @@ test("a journal from a runtime that judged the spend cap reads its caps under co
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { createEngine } = await import('../src/facade.ts');
+  const { createEngine } = await import('../../facade.ts');
   const { state } = await createEngine({ root: dir }).view('t-capped');
   assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
   assert.deepEqual(
@@ -432,7 +432,7 @@ test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, 
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { createEngine } = await import('../src/facade.ts');
+  const { createEngine } = await import('../../facade.ts');
   const { state } = await createEngine({ root: dir }).view('under');
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
 });
@@ -571,7 +571,7 @@ test('the in-memory store is decoded the same: an event appended in no shape the
 });
 
 test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
-  const { createEngine } = await import('../src/facade.ts');
+  const { createEngine } = await import('../../facade.ts');
   const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
   const engine = createEngine({
     journal: {

@@ -26,7 +26,7 @@ import {
   type Action,
   type Event,
   type Sighting,
-} from '../src/core/domain.ts';
+} from './domain.ts';
 import {
   diagram,
   edgesOf,
@@ -38,8 +38,8 @@ import {
   withoutEdge,
   type LifecycleEvent,
   type LifecycleState,
-} from '../src/core/lifecycle.ts';
-import { at, corpusOf, ended, filed, JOURNALS, S, spawned, starting, T0, TASK, type Case } from './lifecycle-corpus.ts';
+} from './lifecycle.ts';
+import { at, corpusOf, ended, filed, JOURNALS, S, spawned, starting, T0, TASK, type Case } from '../../test/lifecycle-corpus.ts';
 
 /**
  * What a harness can say of the name, keyed by the name of the record's last attempt: every one of A2A's states a sighting
@@ -289,7 +289,7 @@ test('the machine: its states are the ones named, each edge names one action, ev
 });
 
 test("the README's lifecycle diagram is the machine's, generated", () => {
-  const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const readme = fs.readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
   const block = readme.match(/<!-- lifecycle:begin.*-->\n```mermaid\n([\s\S]*?)\n```\n<!-- lifecycle:end -->/);
   assert.ok(block, 'the README holds the diagram between its markers');
   assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/core/lifecycle.ts\').then((m) => console.log(m.diagram()))"');

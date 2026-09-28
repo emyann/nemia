@@ -666,7 +666,7 @@ after its first** (`src/core/engine/memo.ts`): an engine keeps a cursor into its
 pass folds only the tasks not settled, the tasks the feed named since the last pass, and the ones this engine never folded.
 A settled task it skips is still let go of its sessions off what the memo kept, and a `measured` that writes goes through
 the feed, so the next pass folds it again. `decide` of a settled task is nothing in every journal shape, whatever is appended
-after (`test/lifecycle.test.ts`), and a check mode in `test/engine.test.ts` folds each skipped task again and fails the pass
+after (`src/core/lifecycle.test.ts`), and a check mode in `test/engine.test.ts` folds each skipped task again and fails the pass
 on a difference. Over a copy of this machine's store (1,200 tasks) a pass read 27.4 MB before, and 0.08 MB after its first.
 What is left:
 
@@ -726,7 +726,7 @@ its registry). `decide` reads an unread name as `UNREAD` — nothing in `working
 (found in review); in `stopping`, nothing until the deadline and then the operator's cut, so a stop is bounded — and `releaseFinished` counts an unread
 finished session as listed, so the memo keeps it. Each observe that left something unread is counted (`ObserveCount.unread`, on
 `wf up --stats`). The tests are in `test/engine.test.ts` (a refused release asked again after a failed read; no `lost` on one),
-`test/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
+`src/core/lifecycle.test.ts`, `test/detached.test.ts`, `test/claude-code.test.ts`, the two A2A files and `test/io.test.ts`. What is left:
 
 - **The full `observe`, and every view, still read a harness that cannot be read as nothing.** A view of a task in flight on a
   harness whose registry times out prints its phase as if the session were not registered; the next read corrects it, and nothing
@@ -1065,7 +1065,7 @@ for a long implement: the model summarises and stops.
 and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
 Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
 cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/core/domain.ts`). The words are the
-fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
+fix, so `src/core/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
 
@@ -1239,7 +1239,7 @@ first fixture had no prompt line. Every `--bg` transcript seen starts with its p
 machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `reason: harness`, no closeout, and settled
 `succeeded` (implement steps of four runs, among them `the-web-app-s-components-on-3xq9` and
 `the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
-as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
+as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`src/core/decide.test.ts`, and a fake `claude`
 listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
 it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
 engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
@@ -1271,7 +1271,7 @@ over this machine's store that day: of 511 settled tasks, 4 settled with their l
 note `operator`, all on tasks with a schema — so no `ended`, no reason, and a statement given before the stop, had there
 been one, dropped. A deadline did the same (none on the record). `decide` now ends such an attempt `operator` (recorded
 `stopped`) or `deadline` (recorded `failed`) before its task settles, or as its harness ended it if it had, statement
-untouched. The contract test in `test/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
+untouched. The contract test in `src/core/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
 settle; it found a third: an attempt cut at its budget and listed `done` (or quiet) was recorded `done`, reason `budget`,
 and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
 Each of the three fails the contract test when reverted. agent-orchestrator reads a check ended `deadline` or `operator` as

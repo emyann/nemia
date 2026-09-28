@@ -86,8 +86,8 @@
     },
     {
       // What a test prints is read by the developer who runs it, from raw harness JSON and fetch mocks; the messages a person reads are
-      // made in src, where a value that could be an object is never stringified as `[object Object]`.
-      "files": ["**/test/**"],
+      // made in src, where a value that could be an object is never stringified as `[object Object]`. A test beside its code is one too.
+      "files": ["**/test/**", "**/*.test.ts"],
       "rules": {
         "typescript/no-base-to-string": "off",
         "typescript/restrict-template-expressions": "off"

@@ -1,7 +1,7 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
  * nothing of A2A or of the doors, and the CLI reaches the runtime through `src/facade.ts` alone. No two files need each other's
- * values, no source file imports a test, and a face re-exports by name.
+ * values, no source file imports a test, a face re-exports by name, and only the two entries sit flat in `src/`.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -182,6 +182,24 @@ test('REFUSED: the core reaching a driver, A2A or a door; a harness reaching A2A
     ['src/core/domain.ts', "// import { nameParts } from '../a2a/map.ts';"],
   ];
   for (const [file, line] of allowed) assert.deepEqual(pathBreaches(file, importsIn(line)), [], `not refused: ${file}: ${line}`);
+});
+
+/** The files that sit flat in `src/` and are not one of the two entries, each worded with what to do instead. */
+const flatBreaches = (files: readonly string[]): string[] =>
+  files
+    .filter((f) => !f.slice('src/'.length).includes('/') && !DOORS.includes(f))
+    .map((f) => `${f} sits flat in src/: only the entries ${DOORS.join(' and ')} do — put it in its feature's folder`);
+
+test('REFUSED: a source file flat in src/ that is not an entry', () => {
+  assert.deepEqual(flatBreaches(['src/facade.ts', 'src/index.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']), [
+    "src/runner.ts sits flat in src/: only the entries src/facade.ts and src/index.ts do — put it in its feature's folder",
+  ]);
+});
+
+test('only the two entries sit flat in src/', () => {
+  const files = sourceFiles();
+  assert.ok(files.includes('src/facade.ts') && files.includes('src/core/domain.ts'), 'the scan reads the source and its folders');
+  assert.deepEqual(flatBreaches(files), []);
 });
 
 test('each file imports only what its folder may', () => {

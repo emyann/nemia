@@ -403,7 +403,7 @@ export const MACHINE = machineOf(CONFIG);
 
 /**
  * A machine's move: `can` is asked first, since XState stays where it was on an event with no edge, and the event is
- * refused. Every edge names one action (`test/lifecycle.test.ts`): anything else is the table's mistake, not the task's, and
+ * refused. Every edge names one action (`src/core/lifecycle.test.ts`): anything else is the table's mistake, not the task's, and
  * is thrown.
  */
 const moveOn =
@@ -464,7 +464,7 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
 
 /**
  * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,
- * and `test/lifecycle.test.ts` fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
+ * and `src/core/lifecycle.test.ts` fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
  * drawn under its own name, by an id without one.
  */
 export const diagram = (machine = MACHINE): string => {

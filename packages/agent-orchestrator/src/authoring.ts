@@ -3,8 +3,8 @@
  * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`), and the agents of the two places the board lists them from (`agentPlaces`,
  * `listAgents`, `findAgent`).
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what it exported of
- * this before. A run is changed by none of it: it froze its folder, and its agents, at `wf start`.
+ * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run is
+ * changed by none of it: it froze its folder, and its agents, at `wf start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,7 +53,7 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
  * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
  *
- * Then the `.md` of each step no longer in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
+ * Then the `.md` of each step not in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
  * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
  * its old name, which is the same file. After that each step's `<name>.md` is written, but for one whose file already reads as the step,
  * which is left as it is, comments and all, since a render has none. A `*.schema.json` is left as it is: a step names one, and the builder
@@ -63,9 +63,13 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
  * linked README is refused only when a `readme` is given, since that is when it would be written.
  *
+ * A draft on codex by its agent's `harness:` alone that sends its sandbox as `permissionMode` is refused (`codexModeWritten`), as
+ * `renderStep` refuses one that says `harness: codex`: it would be written under the former name, which the parser still reads.
+ *
  * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
- * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. A run
- * is not changed by any of it: it froze its folder at `wf start`.
+ * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. Its
+ * agents and skills are found where a run of it would look (`lookupRoots`): in `places`, or else the repository its folder is in and the
+ * store (`placesAround`). A run is not changed by any of it: it froze its folder at `wf start`.
  */
 export function writeWorkflow(
   dir: string,
@@ -81,13 +85,10 @@ export function writeWorkflow(
   if (!anywhere) refuse(workflowPlaceRefusal(at));
   if (fs.existsSync(at) && !isDirectory(at))
     refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
-  // The folder as it is, read before a byte is written — and a workflow's files are its own, so a `.md` among them that is a link is refused.
   let entries: fs.Dirent[] = [];
   try {
     entries = fs.readdirSync(at, { withFileTypes: true });
-  } catch {
-    /* not there: a new workflow's folder is made below */
-  }
+  } catch {}
   const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
   if (linked) {
     refuse(
@@ -109,13 +110,9 @@ export function writeWorkflow(
       return undefined;
     }
   };
-  // Its agents and skills where a run of it would look for them (`lookupRoots`): the repository its folder is in, when it is in one, then the store.
   const where = places ?? placesAround(at);
   const agents = agentsFor(at, where);
   const parsed = parseFolder(texts, read, agents, skillsFor(at, where));
-  // A draft on codex by its agent's `harness:` alone, sending its sandbox as `permissionMode` — a page opened before `sandbox:` — would be
-  // written in the former name, which the parser still reads: `renderStep` refuses it on a draft that says `harness: codex`, and this on one
-  // whose agent says it.
   const onCodex = steps.find(
     (step) =>
       step.permissionMode != null &&
@@ -127,15 +124,12 @@ export function writeWorkflow(
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const kept: string[] = [];
-  /** Write `text` to `file`, unless what is there already reads as `same` does. */
   const put = (file: string, text: string, same: (there: string) => boolean) => {
     const there = read(file);
     if (there !== undefined && same(there)) return kept.push(file);
     fs.writeFileSync(path.join(at, file), text);
     return written.push(file);
   };
-  // The steps the folder no longer has lose their files first: where the filesystem does not tell case apart, a step renamed by case is
-  // written to the file its old name names, and removing that name afterwards would remove what was just written.
   const names = new Set(texts.map(([name]) => `${name}.md`));
   const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
   for (const file of removed) fs.rmSync(path.join(at, file));
@@ -199,8 +193,8 @@ export type AgentSidecar = { file: string; text: string };
 export type AgentSchema = AgentSidecar;
 
 /**
- * The agent keys that name a file beside the agent, and what a refusal calls each. `card:` named one until agents card 2 generated the card
- * from the agent's skills: a `.skills.json` left beside an agent is nobody's, and the load's refusal of the line names it (`cardRetired`).
+ * The agent keys that name a file beside the agent, and what a refusal calls each. `card:` is not one: an agent's card is generated from its
+ * skills, and the load refuses a `card:` line, naming the file it points at as nobody's (`cardRetired`).
  */
 const SIDECARS = [
   { key: 'output' as const, what: 'result schema', a: 'the result schema', suggest: (name: string) => `${name}.schema.json` },
@@ -250,15 +244,20 @@ const inUseByRepo = (name: string, users: readonly string[], repo: string, does:
  *
  * `version` is the agent's as it was read (`agentVersion`), or `null` for a new agent; `from` names the agent the draft was read from, when
  * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's
- * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent no longer there or changed
+ * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent not there or changed
  * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
- * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words. With `repo`, the
- * version is read with the skills a start on `repo` finds (`agentSkillsFound`), as the board lists it; without, with those beside the folder.
+ * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words. A `card` option is
+ * refused: the card is generated from the agent's skills, and a card file sent would be dropped unsaid. With `repo`, the version is read
+ * with the skills a start on `repo` finds (`agentSkillsFound`), as the board lists it; without, with those beside the folder.
  *
- * `schema` is the result schema the agent's `output:` names, written beside it with it: a
- * `.json` file's name with no folder, the one that key names, and not a file another agent names — that one is its agent's to change.
- * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
- * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
+ * `schema` is the result schema the agent's `output:` names, written beside it with it: a `.json` file's name with no folder, the one that
+ * key names, not a link, and not a file another agent names — that one is its agent's to change. Without one, the file that key names is
+ * read from the folder as it is. A key whose line is taken off, or pointed at another file, leaves the file it named where it is, so a field
+ * cleared by mistake costs no one the schema they wrote; removing the agent takes its files with it (`removeAgent`).
+ *
+ * Renamed by case where the filesystem does not tell case apart, the file it is renamed from is removed before the one it is renamed to
+ * is written, as in `writeWorkflow`.
+ * A write that fails puts each file beside the agent back as it was, so an agent not written leaves nothing of itself behind.
  */
 export function writeAgent(
   dir: string,
@@ -276,7 +275,6 @@ export function writeAgent(
   const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => {
     if (why) throw new AgentWriteError(why, kind, users);
   };
-  // A caller written before agents card 2 still hands the card file it would write: refused, since written nowhere it would be lost unsaid.
   if (Object.hasOwn(rest, 'card'))
     refuse('`card` is not written with an agent since agents card 2: its card is generated from its skills. Send the agent without it.');
   refuse(agentPlaceRefusal(at, anywhere));
@@ -320,8 +318,6 @@ export function writeAgent(
     if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), 'in-use', theirs);
   }
   const text = renderAgent(draft);
-  // Each file the agent names beside it, judged whole before a byte is written: its name, that the agent's own key names it, that it is not
-  // a link, and that it is not another agent's to change.
   const given = SIDECARS.map((kind) => ({ ...kind, sidecar: schema ?? null, named: frontmatterKey(text, kind.key) }));
   for (const { key, what, a, suggest, sidecar, named: mine } of given) {
     if (!sidecar) continue;
@@ -385,7 +381,6 @@ export function writeAgent(
       fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
       written.push(sidecar.file);
     }
-    // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
     if (renamed && sameFile(file(name), file(old))) {
       fs.rmSync(file(old));
       removed.push(`${old}.md`);
@@ -393,8 +388,6 @@ export function writeAgent(
     fs.writeFileSync(file(name), text);
     written.push(`${name}.md`);
   } catch (err) {
-    // Each file beside it goes back to what it was, so an agent that was not written leaves nothing of itself behind — including a write
-    // that failed part-way through those files, which is why they are written in here too.
     for (const { sidecar, was } of before) {
       if (!written.includes(sidecar.file)) continue;
       if (was === undefined) fs.rmSync(path.join(at, sidecar.file), { force: true });
@@ -406,9 +399,6 @@ export function writeAgent(
     fs.rmSync(file(old));
     removed.push(`${old}.md`);
   }
-  // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
-  // the board by mistake must not cost a person the schema they wrote: a file nothing names is harmless, and a person
-  // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
   return { dir: at, agent, version: versionOf(name)!, written, removed };
 }
 
@@ -575,7 +565,7 @@ export type SkillWritten = { dir: string; name: string; version: string; written
  * that is not a file of the folder's own — a link — which the write would follow; for a skill made, a name already taken (`exists`), and a
  * change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`missing`) and one whose files moved since
  * the version was read (`stale`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words. A skill whose SKILL.md
- * no longer reads may be written — that is how it is mended — so only what is written must read. A skill made is written in a hidden folder
+ * does not read may be written — that is how it is mended — so only what is written must read. A skill made is written in a hidden folder
  * beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails leaves no half a skill.
  */
 export function writeSkill(

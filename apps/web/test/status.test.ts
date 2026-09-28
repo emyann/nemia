@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isGate, satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
+import { isLive, movingInto } from '../src/lib/canvas.ts';
 
 test('each word wf ls prints reads as the state a person acts on', () => {
   // Every word `listing` in agent-orchestrator can say: `waiting`, `rounds exhausted`, the run's verdicts, and the engine's
@@ -191,6 +192,23 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
   }
   // Not a word that merely starts like one.
   assert.equal(stepState('waitingroom', false, false), 'working');
+});
+
+test('a root of a run the cap on runs in flight holds reads `waiting for a run slot`, a wait nobody is asked about — never working — and cancelled on a run called off', () => {
+  for (const word of ['waiting for a run slot (2 of 2 in flight)', 'waiting for a run slot']) {
+    const state = stepState(word, false, false);
+    assert.equal(state, 'waiting-for-slot', word);
+    assert.equal(isLive(state), false, `${word}: no session of it is at work`);
+    assert.equal(movingInto(state), false, `${word}: nothing moves into it`);
+    assert.equal(isGate(state, false), false, `${word}: nobody is asked`);
+    assert.equal(satisfiesAfter(state), false, `${word}: not work done`);
+    assert.equal(stepState(word, true, false), 'cancelled', `${word}, on a run called off`);
+    assert.equal(stepState(word, false, true), 'held', `${word}, on a run a person holds`);
+  }
+  assert.match(stateMeaning['waiting-for-slot'], /^waiting for a run slot: not filed yet — the cap on runs in flight \(WF_MAX_RUNS\)/);
+  assert.notEqual(stateClass['waiting-for-slot'], stateClass.working, 'drawn as the wait it is, not as a session at work');
+  // Not a word that merely starts like it.
+  assert.equal(stepState('waiting for a run slotted', false, false), 'working');
 });
 
 test('on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves', () => {

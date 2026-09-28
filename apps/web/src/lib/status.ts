@@ -27,6 +27,7 @@ export type StepState =
   | 'failed'
   | 'failed-check'
   | 'waiting'
+  | 'waiting-for-slot'
   | 'held'
   | 'cancelled'
   | 'unreadable'
@@ -44,6 +45,7 @@ export function stepState(status: string, runCancelled: boolean, runHeld: boolea
 /** What a hold makes `held`: a step not filed yet, and one at a human gate (`isGate`), whose answer is refused while the hold stands. */
 const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
   'waiting',
+  'waiting-for-slot',
   'blocked',
   'awaiting-approval',
   'exhausted',
@@ -86,6 +88,9 @@ function wordState(status: string, runCancelled: boolean): StepState {
   if (word === 'unreadable') return 'unreadable';
   if (word === 'unknown') return 'unknown';
   // `waiting on a-1x2y (cancelled), b-3z4w`: a root of a run started `--after` runs that have not shipped. Not filed, as `waiting` is.
+  // `waiting for a run slot (2 of 2 in flight)`, and on the feed without the count: a root of a run the cap on runs in flight holds.
+  if (word === 'waiting for a run slot' || word.startsWith('waiting for a run slot ('))
+    return runCancelled ? 'cancelled' : 'waiting-for-slot';
   if (word === 'waiting' || word.startsWith('waiting on ') || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
   // `running (working)`, `working (quiescent)`, `starting`, `between attempts` — and, on purpose, a word `wf ls` has
   // gained since this was written: a step the board cannot name is shown as still going, never as done or as needing you.
@@ -132,6 +137,8 @@ export const stateMeaning: Record<StepState, string> = {
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',
+  'waiting-for-slot':
+    'waiting for a run slot: not filed yet — the cap on runs in flight (WF_MAX_RUNS) holds the run, and the tick files it once a run in flight settles, oldest held first',
   held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
   unreadable:
@@ -162,6 +169,7 @@ export const stateClass: Record<StepState, string> = {
   'failed-check':
     'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  'waiting-for-slot': 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
   // Nobody is asked, as with `waiting`, and not grey: a person's word stops it, not the order of the steps.
   held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',

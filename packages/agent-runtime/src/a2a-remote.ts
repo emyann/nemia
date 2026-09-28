@@ -96,6 +96,12 @@ export const cardUrlOf = (address: string): URL => {
   return new URL('.well-known/agent-card.json', url);
 };
 
+/** An address as its words show it: origin and path, never the query, which can carry a key (as the api's `remoteOf` shows one). */
+const shownUrl = (u: string | URL | Request): string => {
+  const url = new URL(u instanceof Request ? u.url : u);
+  return `${url.origin}${url.pathname}`;
+};
+
 /** The bindings this runtime speaks, as a card names them. gRPC is part 3's. */
 const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
 const SPOKEN_WORDS = 'JSON-RPC (`JSONRPC`) and REST (`HTTP+JSON`), at A2A 1.0';
@@ -369,7 +375,7 @@ export const remoteOps = (
     try {
       return await fetch(input, { ...init, signal: init.signal ? AbortSignal.any([init.signal, bound]) : bound });
     } catch (e) {
-      if (bound.aborted) throw new Late(`${input instanceof Request ? input.url : String(input)} did not answer within ${ms / 1000} s`);
+      if (bound.aborted) throw new Late(`${shownUrl(input)} did not answer within ${ms / 1000} s`);
       throw e;
     }
   };
@@ -380,11 +386,11 @@ export const remoteOps = (
     let response: Response;
     // The card carries no secret, so a redirect to it is followed: what it names is held to the address's origin below.
     try { response = await bounded(at, { headers: { accept: 'application/json' } }); } catch (e) {
-      throw new Refusal(`the agent's card could not be read at ${at} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`);
+      throw new Refusal(`the agent's card could not be read at ${shownUrl(at)} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`);
     }
-    if (!response.ok) throw new Refusal(`the agent's card could not be read at ${at}: it answered ${response.status} ${response.statusText}, and nothing was sent.`);
+    if (!response.ok) throw new Refusal(`the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`);
     const json = await response.json().catch(() => undefined);
-    if (typeof json !== 'object' || json === null) throw new Refusal(`what ${at} serves is not an agent card, and nothing was sent.`);
+    if (typeof json !== 'object' || json === null) throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
     return cardOfJson(json as Record<string, unknown>);
   };
 

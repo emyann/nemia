@@ -164,6 +164,19 @@ test('an agent that is not there: unstartable, since its card could not be read 
   assert.match(a.error ?? '', /could not be read at .*agent-card\.json .*not reachable/);
 });
 
+test('a card that could not be read is named by its origin and path, never its query, which can carry a key', async () => {
+  const s = await serve();
+  const url = `${s.url}/agent.json?key=SECRET-in-the-query`;
+  await s.close();
+  servers.splice(servers.indexOf(s), 1);
+  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
+  const id = await e.file(task());
+  const a = (await settled(e, id)).state.attempts[0]!;
+  assert.equal(a.reason, 'unstartable');
+  assert.match(a.error ?? '', /could not be read at http:\/\/[^ ]*\/agent\.json \(/, 'the card is still named, by its path');
+  assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
+});
+
 test('createEngine refuses a remote agent it could never reach, or whose address carries a secret', async () => {
   const cases: Array<[unknown, RegExp]> = [
     [{ url: 'https://user:pw@agent.example' }, /carries a user name or password/],

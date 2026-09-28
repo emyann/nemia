@@ -121,8 +121,8 @@ test("every word the parser takes, the engine's own refusal takes too — asked 
   ] as const) {
     // The engine's task names either fence `permissionMode`: what the tick files a step's sandbox as (`modeOf`).
     for (const permissionMode of [...(PERMISSION_MODES[h] ?? []), ...(SANDBOXES[h] ?? [])])
-      assert.equal(refuses({ brief: 'b', cwd: '/w', permissionMode }), undefined, `${h} ${permissionMode}`);
-    for (const effort of EFFORTS[h]!) assert.equal(refuses({ brief: 'b', cwd: '/w', effort }), undefined, `${h} ${effort}`);
+      assert.equal(refuses({ brief: 'b', cwd: '/w', config: { permissionMode } }), undefined, `${h} ${permissionMode}`);
+    for (const effort of EFFORTS[h]!) assert.equal(refuses({ brief: 'b', cwd: '/w', config: { effort } }), undefined, `${h} ${effort}`);
   }
   // `claude` is the engine's `claude`, whose refusal is Claude Code's lists in either mode — the same `claudeDetached.refuses` is.
   assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached']);

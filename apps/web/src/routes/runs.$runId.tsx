@@ -94,10 +94,12 @@ function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
   const { step: linked } = Route.useSearch();
   const [selected, setSelected] = useState<string | null>(linked ?? null);
-  // A link to another step of the run while its page is open opens that one.
-  useEffect(() => {
+  // A link to another step of the run while its page is open opens that one: seen as the render that reads the new link runs.
+  const [seen, setSeen] = useState(linked);
+  if (linked !== seen) {
+    setSeen(linked);
     if (linked) setSelected(linked);
-  }, [linked]);
+  }
   const steps = useRef<HTMLElement>(null);
   useLanding(steps, linked);
   const close = useCallback(() => setSelected(null), []);

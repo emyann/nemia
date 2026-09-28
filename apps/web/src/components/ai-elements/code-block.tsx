@@ -62,15 +62,18 @@ const PRE =
   'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm';
 
 export const CodeBlock = ({ code, language, className, children, ...props }: CodeBlockProps) => {
-  const [html, setHtml] = useState<readonly [light: string, dark: string] | null>(null);
+  // The highlight kept with the code and language it was made for: shown only while they are still what is drawn.
+  const [highlight, setHighlight] = useState<{ code: string; language: CodeLanguage; html: readonly [light: string, dark: string] } | null>(
+    null,
+  );
+  const html = highlight?.code === code && highlight.language === language ? highlight.html : null;
 
   useEffect(() => {
-    setHtml(null);
     if (language === 'text' || code.length > HIGHLIGHT_LIMIT) return;
     let cancelled = false;
     highlightCode(code, language).then(
       (highlighted) => {
-        if (!cancelled) setHtml(highlighted);
+        if (!cancelled) setHighlight({ code, language, html: highlighted });
       },
       // Unhighlighted is still the code.
       () => {},
@@ -125,20 +128,21 @@ export const CodeBlockCopyButton = ({ onCopy, onError, timeout = 2000, children,
   const [isCopied, setIsCopied] = useState(false);
   const { code } = useContext(CodeBlockContext);
 
-  const copyToClipboard = async () => {
+  // Handled on the promise rather than in a try: the compiler compiles no optional call inside a try.
+  const copyToClipboard = () => {
     if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
       onError?.(new Error('Clipboard API not available'));
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(code);
-      setIsCopied(true);
-      onCopy?.();
-      setTimeout(() => setIsCopied(false), timeout);
-    } catch (error) {
-      onError?.(error as Error);
-    }
+    navigator.clipboard.writeText(code).then(
+      () => {
+        setIsCopied(true);
+        onCopy?.();
+        setTimeout(() => setIsCopied(false), timeout);
+      },
+      (error: unknown) => onError?.(error as Error),
+    );
   };
 
   const Icon = isCopied ? CheckIcon : CopyIcon;

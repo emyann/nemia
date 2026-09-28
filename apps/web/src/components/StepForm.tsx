@@ -314,6 +314,8 @@ function Meaning({ children }: { children: string }) {
   return <Markdown className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">{children}</Markdown>;
 }
 
+const asIs = (value: string) => value;
+
 /** A select of `options`, `unset` first; a value the options lack is kept as one, said by `stray`, so what the file says is never hidden. */
 function Choose({
   id,
@@ -321,7 +323,8 @@ function Choose({
   onChange,
   options,
   unset,
-  stray = (v) => v,
+  // Declared once: the compiler cannot reorder an arrow function written as a default.
+  stray = asIs,
 }: {
   id: string;
   value: string;

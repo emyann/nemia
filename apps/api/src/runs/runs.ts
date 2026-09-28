@@ -5,8 +5,8 @@ import { Hono } from 'hono';
 import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, unjudgedWord } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { readBody, type BodyIssue } from '../body.ts';
-import { decisionOf } from '../decide/decision.ts';
-import { detail } from '../detail/detail.ts';
+import { decisionOf } from '../decide/index.ts';
+import { detail } from '../detail/index.ts';
 import {
   type Asked,
   holdsIn,

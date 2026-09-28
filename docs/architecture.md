@@ -72,6 +72,15 @@ agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates t
 passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI imports it, and it
 imports no controller.
 
+**The api's folders.** The api has no kinds: it is routes over readers, and its `src/` is a folder per page or verb a
+person uses — `runs/`, `detail/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
+`agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts` and `body.ts` (the request-body reader
+every folder uses) and nothing else. A folder holds at most six source files; one of two or more has a face, `index.ts`,
+which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
+import between two folders names the file it needs wherever the face would close a cycle — `agents/` reads the runs'
+judgement and `runs/` an agent's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
+files need each other's values. Test: `apps/api/test/layout.test.ts`.
+
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package, so a change elsewhere alone is not in their package's turbo cache
 key: run `npx turbo run test --force` after one.

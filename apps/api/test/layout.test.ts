@@ -1,6 +1,8 @@
 /**
- * The api's layout, held by path (`docs/architecture.md`): no two source files need each other's values, no source file imports a test,
- * a face re-exports by name, and every api path `.oxlintrc.json` names is a file that is there.
+ * The api's layout, held by path (`docs/architecture.md`): the root of `src` holds the process, the mount, the guard, the store and the
+ * body reader; every other file sits in a feature folder of at most six source files, which has a face (`index.ts`) when it has two or
+ * more and none when it has one; `app.ts` mounts a folder through its face; a face holds nothing but re-exports by name. No two source
+ * files need each other's values, no source file imports a test, and every api path `.oxlintrc.json` names is a file that is there.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -192,6 +194,120 @@ test('every api path .oxlintrc.json names is there', () => {
   assert.ok(apiPathsIn(config).includes('apps/api/src/body.ts'), 'the scan reads the decode override');
   assert.deepEqual(
     missingPaths(config, (f) => fs.existsSync(path.join(ROOT, f))),
+    [],
+  );
+});
+
+/** What the root of `src` holds: the process, the mount, the port, the guard every route passes, the shared store, the body reader. */
+const ROOT_FILES = ['src/app.ts', 'src/body.ts', 'src/guard.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
+
+/** The most source files a feature folder holds, its face included: a folder that needs another holds two features. */
+const FOLDER_MAX = 6;
+
+/** The folder of `src` a file sits in, or undefined for a file at the root. */
+const folderOf = (file: string): string | undefined => /^src\/([^/]+)\//.exec(file)?.[1];
+
+/** Where the tree breaks the layout: a stray file at the root, a folder too big, a folder with a face it needs not or without one it needs. */
+function layoutBreaches(files: string[]): string[] {
+  const out = files
+    .filter((f) => folderOf(f) === undefined && !ROOT_FILES.includes(f))
+    .map((f) => `${f} sits at the root of src, which holds ${ROOT_FILES.join(', ')}: move it into its feature's folder`);
+  const byFolder = new Map<string, string[]>();
+  for (const f of files) {
+    const folder = folderOf(f);
+    if (folder !== undefined) byFolder.set(folder, [...(byFolder.get(folder) ?? []), f]);
+  }
+  for (const [folder, inside] of [...byFolder].sort(([a], [b]) => a.localeCompare(b))) {
+    const face = inside.includes(`src/${folder}/index.ts`);
+    if (inside.length > FOLDER_MAX) {
+      out.push(`src/${folder}/ holds ${inside.length} source files, more than ${FOLDER_MAX}: it holds two features — split it`);
+    }
+    if (!face && inside.length > 1) out.push(`src/${folder}/ has ${inside.length} source files and no index.ts: give it a face`);
+    if (face && inside.length < 3) out.push(`src/${folder}/index.ts re-exports one file: import that file, and remove the face`);
+  }
+  return out;
+}
+
+/** Where `app.ts` mounts a folder past its face: a folder with an `index.ts` is reached through it. */
+const pastFaces = (file: string, imports: Import[], files: string[]): string[] =>
+  imports.flatMap(({ spec }) => {
+    const target = resolved(file, spec);
+    const folder = target === undefined ? undefined : folderOf(target);
+    if (folder === undefined || target === `src/${folder}/index.ts` || !files.includes(`src/${folder}/index.ts`)) return [];
+    return [`${file} imports ${target}: mount src/${folder}/ through its face, src/${folder}/index.ts`];
+  });
+
+/** Where a face holds more than re-exports by name: a face is a door, and what it does lives in the folder's files. */
+const faceBody = (file: string, text: string): string[] =>
+  withoutComments(text)
+    .split(/;\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s !== '' && !/^export\s+(type\s+)?\{[^}]*\}\s*from\s*['"][^'"]+['"]$/.test(s))
+    .map((s) => `${file} holds \`${s.split('\n')[0]}\`: a face holds only re-exports by name`);
+
+test('REFUSED: a stray file at the root, a seventh source file in a folder, a folder of two without a face, a face over one file', () => {
+  const tree = [...ROOT_FILES, 'src/runs/index.ts', 'src/runs/runs.ts', 'src/runs/graph.ts', 'src/asks/asks.ts'];
+  assert.deepEqual(layoutBreaches(tree), []);
+  assert.deepEqual(layoutBreaches([...tree, 'src/tries.ts']), [
+    `src/tries.ts sits at the root of src, which holds ${ROOT_FILES.join(', ')}: move it into its feature's folder`,
+  ]);
+  const seven = ['a', 'b', 'c', 'd', 'e'].map((f) => `src/runs/${f}.ts`);
+  assert.deepEqual(layoutBreaches([...tree, ...seven]), ['src/runs/ holds 8 source files, more than 6: it holds two features — split it']);
+  assert.deepEqual(layoutBreaches([...tree, ...seven.slice(0, 3)]), []);
+  assert.deepEqual(layoutBreaches([...tree, ...seven.slice(0, 4)]), [
+    'src/runs/ holds 7 source files, more than 6: it holds two features — split it',
+  ]);
+  assert.deepEqual(layoutBreaches([...tree, 'src/asks/said.ts']), ['src/asks/ has 2 source files and no index.ts: give it a face']);
+  assert.deepEqual(layoutBreaches([...tree, 'src/asks/index.ts']), [
+    'src/asks/index.ts re-exports one file: import that file, and remove the face',
+  ]);
+});
+
+test('the root of src holds its six files, and each folder is a feature of at most six source files with a face where it has two', () => {
+  const files = sourceFiles();
+  assert.ok(files.includes('src/runs/runs.ts') && files.includes('src/app.ts'), 'the scan reads the folders');
+  assert.deepEqual(layoutBreaches(files), []);
+});
+
+test('REFUSED: app.ts mounting a folder past its face; a folder with one file and no face is reached by that file', () => {
+  const files = ['src/app.ts', 'src/runs/index.ts', 'src/runs/runs.ts', 'src/asks/asks.ts'];
+  assert.deepEqual(pastFaces('src/app.ts', importsIn("import { runs } from './runs/runs.ts';"), files), [
+    'src/app.ts imports src/runs/runs.ts: mount src/runs/ through its face, src/runs/index.ts',
+  ]);
+  assert.deepEqual(pastFaces('src/app.ts', importsIn("import { runs } from './runs/index.ts';"), files), []);
+  assert.deepEqual(pastFaces('src/app.ts', importsIn("import { asks } from './asks/asks.ts';"), files), []);
+  assert.deepEqual(pastFaces('src/app.ts', importsIn("import { Hono } from 'hono';\nimport { e } from './store.ts';"), files), []);
+});
+
+test('app.ts mounts every folder that has a face through it', () => {
+  const files = sourceFiles();
+  const imports = importsIn(read('src/app.ts'));
+  assert.ok(
+    imports.some(({ spec }) => spec === './runs/index.ts'),
+    'the scan reads app.ts',
+  );
+  assert.deepEqual(pastFaces('src/app.ts', imports, files), []);
+});
+
+test('REFUSED: a face that declares, imports or computes anything but re-exports by name', () => {
+  assert.deepEqual(
+    faceBody('src/runs/index.ts', "/** The runs. */\nexport { runs } from './runs.ts';\nexport type { RunSummary } from './runs.ts';"),
+    [],
+  );
+  assert.deepEqual(faceBody('src/runs/index.ts', "export { runs } from './runs.ts';\nexport const kept = new Map();"), [
+    'src/runs/index.ts holds `export const kept = new Map()`: a face holds only re-exports by name',
+  ]);
+  assert.deepEqual(faceBody('src/runs/index.ts', "import { runs } from './runs.ts';\nexport { runs };"), [
+    "src/runs/index.ts holds `import { runs } from './runs.ts'`: a face holds only re-exports by name",
+    'src/runs/index.ts holds `export { runs }`: a face holds only re-exports by name',
+  ]);
+});
+
+test('every face holds only re-exports by name', () => {
+  const faces = sourceFiles().filter((f) => f.endsWith('/index.ts'));
+  assert.ok(faces.length >= 8, 'the scan reads the faces');
+  assert.deepEqual(
+    faces.flatMap((f) => faceBody(f, read(f))),
     [],
   );
 });

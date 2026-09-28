@@ -33,5 +33,8 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   runtime always writes fails the read, not the assertion you meant.
 - **A test sets `WF_ROOT` (and `CLAUDE_CONFIG_DIR`) before it imports the api or the package**: the orchestrator reads them as its
   modules load, so the imports after the assignment are dynamic (`test/app.test.ts`).
+- **A folder's face (`index.ts`) is the door `app.ts` mounts**: an import between folders names the file where the face would close a
+  value cycle (`runs/` ↔ `agents/`), which tsc passes and the load fails on (`test/layout.test.ts`). `body.ts` stays at the root:
+  every folder decodes its bodies there.
 - **A route's contract is an entry in the JSDoc of its exported router** (`asks` in `asks/asks.ts`): the comment guard refuses a JSDoc on
   `.post(`. In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.

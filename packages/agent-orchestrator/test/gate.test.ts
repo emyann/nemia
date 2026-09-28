@@ -1,7 +1,10 @@
 /**
- * A gate on disk: a step's handoff that waits for a person, as `wf start --gate`, a card's `gate:` and a step's `gate: true` freeze it on a
- * run, and as the tick holds it. What a gate means to `assess`, `listing`, `decision` and a brief is pure, and lives in run.test.ts. This is
- * the part that is not: the record `wf start` writes, the files a person writes beside it, and a tick that reads both on every pass.
+ * A gate on disk: a step's handoff that waits for a person, as `wf start --gate`, a card's `gate:` and a step's `gate: true` freeze it on
+ * a run, and as the tick holds it. What a gate means to `assess`, `listing`, `decision` and a brief is pure, and lives in run.test.ts.
+ * This is the part that is not: the record `wf start` writes, the files a person writes beside it, and a tick that reads both on every
+ * pass.
+ *
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +18,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { advance, approve, cancel, forget, inboxDir, list, markCancelled, parentOf, readRun, retry, start, startFromInbox } =
   await import('../src/runner.ts');
@@ -130,8 +132,6 @@ const printedBy = async (
   return printed.join('\n').split('\n');
 };
 
-// ─── a gate frozen at start ─────────────────────────────────────────────────
-
 test("`wf start --gate <step>` freezes `gates` on the record, once per step; a step's own `gate: true` is frozen with its workflow; a run given none has no `gates`", async (t) => {
   const repo = aRepo();
   const run = start({ brief: 'plan the flag', repo, workflowDir: planned({ review: 'gate: true' }), isolate: false, gates: ['plan'] });
@@ -229,8 +229,6 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
   );
 });
 
-// ─── held by the tick ───────────────────────────────────────────────────────
-
 test("REFUSED at shipped defaults, pass after pass: a gated step that signed off files nothing after it — `wf ls` says awaiting approval and `waiting on you: approve plan` — and no approval but the try's own opens it: not another try's, not a file that is not one; the try's own does, on the next pass, and is never written into the record", async (t) => {
   const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] });
   const { e, filings, settle } = board();
@@ -321,19 +319,19 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   assert.equal((await parentOf(b.e, parent.id)).shipped, true);
   assert.deepEqual((await advance(b.e, readRun(child.id))).filed, ['plan']);
 
-  // Approved, its one step has handed on: nothing waits on it, and a send-back would file a session on a run a person merged.
   await assert.rejects(
     retry(b.e, parent.id, 'implement', { mode: 'nudge', message: 'one more thing' }),
     refusedWith(/^implement signed off done and declares no check: what waits on it has been filed, and there is nothing to try again\.$/),
+    'approved, its one step has handed on: nothing waits on it, and a send-back would file a session on a run a person merged',
   );
   assert.ok(!fs.existsSync(path.join(asksDir(parent.id), 'retry-implement-2')), 'no ask written');
   assert.deepEqual((await advance(b.e, readRun(parent.id))).filed.concat((await advance(b.e, readRun(parent.id))).tried), []);
   assert.equal((await parentOf(b.e, parent.id)).shipped, true, 'still shipped');
 });
 
-// ─── `wf approve`, and sending back ─────────────────────────────────────────
-
-/** `wf start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits at its gate. */
+/**
+ * `wf start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits at its gate.
+ */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
   const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(keys), isolate: false, gates: ['plan'] });
   const b = board();
@@ -368,10 +366,9 @@ test("`wf approve` writes the person's approval beside the retry asks — the tr
   assert.equal(filings.filter((f) => f === `${run.id}-implement`).length, 1);
   assert.deepEqual(asksOf(run.id), ['approve-plan-1'], 'not consumed: it opens the gate on every pass');
 
-  // With no words, the approval has none.
   const bare = await atItsGate();
   const { approval } = await approve(bare.e, bare.run.id, 'plan');
-  assert.deepEqual(Object.keys(approval).sort(), ['at', 'step', 'try']);
+  assert.deepEqual(Object.keys(approval).sort(), ['at', 'step', 'try'], 'with no words, the approval has none');
 });
 
 test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not signed off yet, one already approved, a cancelled run, a run not there, a step the run does not have, empty words, and while a send-back is asked for — exit 2, by name, nothing written; the CLI refuses a flag it does not take, --message with no words or twice, before it reads a run', async () => {
@@ -431,7 +428,6 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
   );
   assert.deepEqual(asksOf(called.run.id), []);
 
-  // A file at the approval's name that is not one: named, with how to clear it — never "already approved".
   const stray = await atItsGate();
   fs.mkdirSync(asksDir(stray.run.id), { recursive: true });
   fs.writeFileSync(path.join(asksDir(stray.run.id), 'approve-plan-1'), 'yes please');
@@ -440,6 +436,7 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
     refusedWith(
       /^try 1 of plan cannot be approved: .*approve-plan-1 is already there, and it is not an approval — unreadable .*Delete it \(rm .*\), then approve again/,
     ),
+    "a file at the approval's name that is not one is named, with how to clear it, and never read as already approved",
   );
 
   const typed = (...flags: string[]) => main(['approve', 'no-such-run-zz9z', 'plan', ...flags]);
@@ -476,9 +473,12 @@ test("REFUSED at shipped defaults: a send-back spends the approval given before 
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
   assert.match(l.steps[0].note ?? '', /^try 2, nudged on your word, answered · approve it: wf approve /);
 
-  // The approval moved into done/ opens nothing, put back by hand or not: it names try 1.
   fs.copyFileSync(path.join(asksDir(run.id), 'done', 'approve-plan-1'), path.join(asksDir(run.id), 'approve-plan-1'));
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, []);
+  assert.deepEqual(
+    (await advance(e, readRun(run.id))).filed,
+    [],
+    'the approval moved into done/ opens nothing, put back by hand or not: it names try 1',
+  );
 
   const { approval } = await approve(e, run.id, 'plan');
   assert.equal(approval.try, 2);
@@ -505,8 +505,6 @@ test('REFUSED at shipped defaults: `wf cancel` calls a run waiting at its gate o
   assert.equal((await cancel(gate.e, gate.run.id)).plan.kind, 'already-cancelled');
   assert.equal((await forget(gate.e, gate.run.id)).kind, 'forgotten');
 });
-
-// ─── what the steps after a gate are told, and what the screens say ─────────
 
 test('`wf decide` at a gate says AWAITING APPROVAL and, under the step, the approval and the send-back to give; approved with words, the tick hands them to implement and to review after it under `## Approved`, as data, and `wf decide` prints the gate `approved <time> — "<words>"`', async (t) => {
   const { run, e, tasks, settle } = await atItsGate();
@@ -555,11 +553,10 @@ test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated ste
   const { ask, stopFirst } = await retry(e, run.id, 'plan', { mode: 'nudge' }, { stopBlocked: true });
   assert.deepEqual([ask.try, ask.message, stopFirst], [2, undefined, true], 'a wordless try of a blocked session is allowed');
 
-  // The session works again, signs off and settles before any tick stops it.
   settle(`${run.id}-plan`, 'succeeded', SIGNED);
   for (let pass = 1; pass <= 3; pass++) {
     const after = await advance(e, readRun(run.id));
-    assert.deepEqual([after.tried, after.filed], [[], []], `pass ${pass}`);
+    assert.deepEqual([after.tried, after.filed], [[], []], `pass ${pass}: the session worked again and settled before any tick stopped it`);
   }
   assert.deepEqual([filings, stopped], [[`${run.id}-plan`], []], 'no try filed, no session stopped');
   assert.equal(tasks.has(`${run.id}-plan-try2`), false);
@@ -584,7 +581,6 @@ test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated ste
   await approve(e, run.id, 'plan');
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['implement']);
 
-  // Handed on, a second approval says so, and offers no send-back that would be refused.
   await assert.rejects(
     approve(e, run.id, 'plan'),
     refusedWith(
@@ -592,5 +588,6 @@ test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated ste
         `^try 1 of plan is already approved, at .*, and it has handed on: what waits on it has been filed, so there is nothing to approve, nor to send back\\. See where the run stands: wf ls ${run.id}\\.$`,
       ),
     ),
+    'handed on, a second approval says so, and offers no send-back that would be refused',
   );
 });

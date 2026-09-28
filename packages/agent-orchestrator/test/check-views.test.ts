@@ -3,9 +3,12 @@
  * `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's meter, the
  * `observed, by harness` lines of `wf up --stats`.
  *
- * Read by hand on 2026-09-25 before the change, off the live store's last pass (`wf up --stats`, 197 runs): `check: 172 observes, 799 ms,
- * 52976 sessions or run files listed`. A view of a settled check observed the check harness, which lists every run file it ever ran. It is
- * read off its record now (`agent-runtime`'s `settled-view.test.ts`), so the count falls to one for the pass and one for each check in flight.
+ * A view of a settled check is read off its record (`agent-runtime`'s `settled-view.test.ts`), never by observing the check harness,
+ * which lists every run file it ever ran: on a live store of 197 runs, one pass that observed it for each view listed 52976 of them in
+ * 799 ms. So the count is one for the pass and one for each check in flight.
+ *
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST` has every run a pass answers from its memo
+ * of runs at rest judged in full as well, and a difference throws (`verifyRest` in tick.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,9 +19,7 @@ import { checkBrief } from '../src/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-check-views-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 const { engine, tick } = await import('../src/runner.ts');
 const { taskPhases } = await import('../src/views.ts');
@@ -28,7 +29,10 @@ const e = engine();
 const gates = scratch('wf-check-views-gates-');
 const calls = () => e.io().observed.check?.calls ?? 0;
 
-/** A check filed as the tick files one, through the client; `held` runs until its gate is opened, and every other exits 0 at once. */
+/**
+ * A check filed as the tick files one, through the client; `held` runs until its gate is opened, and every other exits 0 at once. It has
+ * no stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+ */
 const file = (id: string, held = false) =>
   e.file({
     id,
@@ -36,7 +40,6 @@ const file = (id: string, held = false) =>
     harness: 'check',
     brief: checkBrief(
       held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
-      // No stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
       { WF_RUN: 'r', WF_STEP: id, WF_WORKSPACE: '', WF_STDERR: '', WF_ARTIFACTS: '' },
     ),
   });
@@ -59,13 +62,16 @@ test("a pass that views a run's every check observes the check harness once, and
   await file('live', true);
   await until(['live'], (p) => p.startsWith('running'));
 
-  // A run whose steps name the checks, as a run record does; `taskPhases` views each, as `advance` does every pass.
   const run = { steps: Object.fromEntries([...settled, 'live'].map((id) => [id, { check: { taskId: id } }])) } as unknown as Run;
   const before = calls();
   const { cost } = await tick(e);
   const { phaseOf } = await taskPhases(e, run);
   assert.equal(cost?.harnesses.check?.calls, 1, 'the pass observes the check harness once, as `wf up --stats` counts it');
-  assert.deepEqual([...settled, 'live'].map(phaseOf), [...settled.map(() => 'succeeded'), 'running'], 'every check viewed, and read right');
+  assert.deepEqual(
+    [...settled, 'live'].map(phaseOf),
+    [...settled.map(() => 'succeeded'), 'running'],
+    "every check a run's steps name is viewed, as advance does every pass, and read right",
+  );
   assert.equal(calls() - before, 2, 'the pass, and the one check in flight: none for the five settled');
 
   fs.writeFileSync(path.join(gates, 'live'), '');

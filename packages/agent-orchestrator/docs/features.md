@@ -2141,6 +2141,42 @@ Left for later:
 - **A cancelled run whose branch is not merged prunes without `--unmerged`**: nothing of it could be tried again anyway, but its branch is
   still the one place its work is.
 
+## Shipped: a landed ending keeps no pictures of the merged tree
+
+Measured read-only on the owner's store on 2026-09-28: `runs/` was 3.81 GB, almost all of it the e2e's PNGs (18,176 files, 3.73 GB) under
+`runs/*/artifacts`, 3.26 GB of it in `implement/` (182 runs) and 0.54 GB in `ship/` (115). The request read the two sets as copies. They
+are not: nothing copies them. `collectArtifacts` copies only what a closeout names, and a ship's closeout names no picture. They are two
+photographs of two trees: implement's, which the implementer takes of its branch with `WF_ARTIFACTS=<artifacts/implement> npm run e2e`
+before it signs off (its skill `look-at-a-page`), and ship's, which the ship's check takes of the merge staged in the checkout (the
+shipped check line runs the e2e only where no `WF_BASE_REF` is set, and the tick gives that check `WF_ARTIFACTS=<artifacts/ship>`). In
+the latest web run, agents card 3c, 202 of its 252 pictures differ byte for byte between the two.
+
+Who reads each: implement's are the ui reviewer's (`screenshots`, `input: implement`), the board's (a file a closeout names, `artifactOf`)
+and `wf decide`'s list. Ship's are taken after the ship's gate, so no person reads them before; when the check fails, its headline names
+`<page>-<theme>-failed.png` and the pages before it show how far it got. When it passes, the run commits, and nothing shows them but
+`wf decide`'s list of names and sizes.
+
+What was built: on the pass that writes a landing's `{ commit }` — the commit made on the check's exit 0, or found on HEAD after a restart
+— `landEnding` removes every regular `.png` directly in the ending's directory that its closeout does not name, never through a link, and
+writes `e2e-pictures.txt` in their place: why, where the check's output and stderr are, and each name with its size (`dropLandedPictures`
+in artifacts.ts). The note is written before anything is removed and left as it is after, so a pass that dies halfway leaves the whole list
+and the next removes the rest. An abort, an untouched landing, a refused check and one that did not finish keep every picture.
+
+Why not a hardlink of byte-identical files: once a landed ship keeps no pictures there is no pair across steps left on a pass, and within
+a step the files are still written to — `collectArtifacts` copies onto a file that has a link, which would write through it into the
+other name. The pairs within one set (`builder` and `builder-saved`, and a few more, about 2.7 MB a set) are left.
+
+The saving, measured on a fixture of the store's shape (`ship.test.ts`: 252 pictures of 194 KB): 48.9 MB freed a landed web run, less a
+note of a few KB. On the owner's store as it is, the 21 runs whose ship landed a commit hold 453 MB of such pictures: that much would
+have been freed, 12% of `runs/`. Forward only: runs landed before this keep them, and nothing reclaims them yet.
+
+Left for later:
+
+- **The pictures already on the store** (453 MB of landed ships, and the ships of runs from before the run landed its merges): a reclaim,
+  by `wf prune` or a one-off, is a decision of its own, since `wf prune` promises to keep a run's files.
+- **Implement's own e2e is the larger cost**: about 44 MB on nearly every run, web or not, since the implementer runs it before it signs
+  off. What a finished run needs of those after its reviewer has read them is the next question.
+
 ## Shipped: holding a run that has started — `wf hold`, the orchestrator's half
 
 `--after` is given at `wf start`. Two runs found to collide once both had started had no such word: a person could only cancel one and

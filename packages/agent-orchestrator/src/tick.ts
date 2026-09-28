@@ -15,7 +15,7 @@ import { isRemoteHarness, modeOf, sessionContext, type Workflow } from './workfl
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
 import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
-import { feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
+import { sizeOf, feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
 import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, remoteBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
@@ -23,7 +23,7 @@ import { agentFilesDir, artifactsDir, cancelFile, skillsAgain, isDirectory, chec
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
-import { collectArtifacts } from './artifacts.ts';
+import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
 import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, reportedEngine, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
@@ -850,8 +850,14 @@ function landEnding(
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
   const write = (landed: Landed, note: string) => {
+    // Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): removed before the
+    // record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
+    const dropped = 'commit' in landed ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId }) : undefined;
     run.steps[name] = { ...record, landed };
-    return { notes: [`${name}: ${note}`], landed: true };
+    const freed = dropped?.removed.length
+      ? [`${name}: removed the ${dropped.removed.length} ${dropped.removed.length === 1 ? 'picture' : 'pictures'} its check took of the merged tree (${sizeOf(dropped.bytes)}); ${LANDED_PICTURES} says what they were`]
+      : [];
+    return { notes: [`${name}: ${note}`, ...freed], landed: true };
   };
   if (due.act === 'record') return write(due.landed, landedWords(run, due.landed));
   if (due.act === 'commit') {

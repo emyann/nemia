@@ -5,7 +5,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createEngine, type Sighting } from '../src/facade.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createEngine, type PromiseJournal, type Sighting } from '../src/facade.ts';
 import { scratch } from './scratch.ts';
 
 /** A harness whose sessions are what the test says, counting its observes. */
@@ -31,7 +33,8 @@ const harness = () => {
 /** Three tasks settled, two in flight, one filed and never started. */
 const board = async () => {
   const h = harness();
-  const engine = createEngine({ root: scratch('ae-list-some-root-'), harnesses: { mine: h.runner } });
+  const root = scratch('ae-list-some-root-');
+  const engine = createEngine({ root, harnesses: { mine: h.runner } });
   const cwd = scratch('ae-list-some-cwd-');
   const settled = [await engine.file({ brief: 'a', cwd }), await engine.file({ brief: 'b', cwd }), await engine.file({ brief: 'c', cwd })];
   await engine.tick();
@@ -40,7 +43,7 @@ const board = async () => {
   const flying = [await engine.file({ brief: 'd', cwd }), await engine.file({ brief: 'e', cwd })];
   await engine.tick();
   const queued = await engine.file({ brief: 'f', cwd, queued: true });
-  return { engine, ...h, settled, flying, queued };
+  return { engine, root, ...h, settled, flying, queued };
 };
 
 test('the views of some tasks are their views, each journal read once and the harness observed once for all those in flight', async () => {
@@ -51,7 +54,7 @@ test('the views of some tasks are their views, each journal read once and the ha
 
   const reads = engine.io().reads;
   const observes = counts.observe;
-  const views = await engine.list(asked);
+  const { views } = await engine.list(asked);
   assert.deepEqual(
     views.map((v) => v.id),
     [flying[1], settled[0], queued, flying[0]],
@@ -76,21 +79,62 @@ test('the views of some tasks are their views, each journal read once and the ha
 test('the views of tasks none of which is in flight observe nothing', async () => {
   const { engine, counts, settled, queued } = await board();
   const observes = counts.observe;
-  const views = await engine.list([...settled, queued]);
+  const { views } = await engine.list([...settled, queued]);
   assert.deepEqual(
     views.map((v) => v.phase),
     ['succeeded', 'succeeded', 'succeeded', 'pending'],
   );
   assert.equal(counts.observe - observes, 0);
-  assert.deepEqual(await engine.list([]), []);
+  assert.deepEqual(await engine.list([]), { views: [], unreadable: [] });
 });
 
 test('with no ids, every task on the board over one observation, as before', async () => {
   const { engine, counts, settled, flying, queued } = await board();
   const observes = counts.observe;
-  const views = await engine.list();
+  const { views } = await engine.list();
   assert.deepEqual(new Set(views.map((v) => v.id)), new Set([...settled, ...flying, queued]));
   assert.equal(counts.observe - observes, 1);
+});
+
+/** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
+const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
+
+test('a task whose journal holds an entry no runtime wrote is left out of `list()` and `list(ids)` and named once, as the pass says it; the others are answered', async () => {
+  const { engine, root, settled, flying, queued } = await board();
+  const [bad, other] = [flying[1], flying[0]];
+  const file = path.join(root, 'tasks', `${bad}.jsonl`);
+  fs.appendFileSync(file, MISWRITTEN);
+  const said = (await engine.tick()).unreadable;
+  assert.equal(said.length, 1);
+  assert.ok(said[0].startsWith(`${bad}'s journal (${file}), entry `), said[0]);
+
+  const some = await engine.list([other, bad, settled[0], bad]);
+  assert.deepEqual(
+    some.views.map((v) => v.id),
+    [other, settled[0]],
+  );
+  assert.deepEqual(some.unreadable, [{ taskId: bad, why: said[0] }], 'named once, though asked twice, in the words of the pass');
+
+  const every = await engine.list();
+  assert.deepEqual(new Set(every.views.map((v) => v.id)), new Set([...settled, other, queued]));
+  assert.deepEqual(every.unreadable, [{ taskId: bad, why: said[0] }]);
+});
+
+test('any other failure of a read fails `list()`: a store that cannot be listed', async () => {
+  const journal: PromiseJournal = {
+    async append() {},
+    async read() {
+      return [];
+    },
+    async list() {
+      throw new Error('fake: the store is gone');
+    },
+    async feed() {
+      return { entries: [], cursor: 0 };
+    },
+  };
+  const engine = createEngine({ journal, harnesses: { mine: harness().runner } });
+  await assert.rejects(engine.list(), (err: Error) => err.message.includes('fake: the store is gone'));
 });
 
 test('REFUSED: `list` handed anything but a list of task ids, or more than one argument, says what it takes', async () => {

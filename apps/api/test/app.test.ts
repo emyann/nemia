@@ -234,6 +234,8 @@ test('runs are read from the workflow store and summarized, with what each step 
       onYou: [],
       // Called off: nothing to decide about a result nobody is waiting for.
       toDecide: null,
+      // Every task of it reads, or has no journal at all: judged as ever.
+      unreadable: null,
     },
   ]);
 });
@@ -2431,7 +2433,7 @@ test("the detail carries where each step's time went — per try and per check, 
 
   // Held to the package: its `timeline` over the engine's own views and the feed's filings, word for word.
   const e = engine();
-  const views = new Map((await e.list()).map((view) => [view.id, view]));
+  const views = new Map((await e.list()).views.map((view) => [view.id, view]));
   const { filed } = await readFilings(e);
   const theirs = timeline(readRun('r-60'), views, filed);
   // The totals carry what their sessions cost beside it, which the package's `timeline` does not: nobody priced these.

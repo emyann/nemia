@@ -13,6 +13,8 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.
 - **A run's tasks are every step's, every check's, and every earlier try's and its check's** (`tasksOf` in `store.ts`); `list(taskIds)`
   looks at no harness when nothing among them is in flight.
+- **A run whose task's journal does not read is answered off its record** (`judgedOrNot` in `runs.ts`), never judged, and not kept:
+  `list` names the task in `unreadable`, and a parent's task read to see if it shipped rejects with the `JournalError`.
 - **A transcript of an attempt in flight asks its harness**: read it on a run's detail, never on the list the Factory polls.
 - **Read a `Wait` by the key you mean**: a hold's `Wait` carries `shipped`, which an `--after` wait never does (`holdNeedsYou`, not
   `neverShips`, in `judged.ts`).

@@ -110,7 +110,7 @@ test('the start, the stop and the list all work through the facade — and every
   const report = await engine.tick();
   assert.equal(sessions.size, 5, 'the runtime holds nothing back: a layer above files `queued: true` to');
   assert.deepEqual(report.running, { fake: 5 }, 'counted under the harness that ran it, not "default"');
-  assert.equal((await engine.list()).length, 5);
+  assert.equal((await engine.list()).views.length, 5);
 
   await engine.stop('task-0');
   await engine.tick();

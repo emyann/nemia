@@ -43,6 +43,8 @@ export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
  * dependency of it — and the runtime client (`runtime-client.ts`) is the only file in the workspace that knows the engine exists.
  */
 export { nameFor } from './runtime-client.ts';
+/** Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure (`unreadableJournal`). */
+export { unreadableJournal } from './runtime-client.ts';
 export {
   filesPrunedWords,
   pruneLines,

@@ -1507,6 +1507,10 @@ registration, `~/.claude/sessions/<pid>.json`, which a running session writes fo
 | `transcript(id)`, attempt ended | the id on the record | nothing |
 | `say(id)` | its state, and its process | `observe`, then the registration by the pid listed |
 
+`list()` and `list(ids)` answer `{ views, unreadable }`: a task whose journal does not read is left out of `views` and named once in
+`unreadable`, with why in the words the pass says it with (`TickReport.unreadable`), so one bad journal costs the tasks that read it and
+not the list. Any other failure rejects the call.
+
 A harness may also answer `observeFor(expected)`: `observe`, told the sessions the journal expects it to list — every attempt of every
 task the pass folds, by name, with the harness its task was filed on, and of every settled task its memo keeps whose harness listed a
 finished session of it on the last pass that looked — and answering at least those. A release the harness refuses is so asked again on

@@ -63,7 +63,19 @@ import {
   waitsIn,
 } from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
-import { bare, e, filedTimes, judgedSteps, stepNames, type TaskView, type Views, viewsFor, workflowsOf, workFolderOf } from './store.ts';
+import {
+  bare,
+  e,
+  filedTimes,
+  judgedSteps,
+  judgedUnlessUnreadable,
+  stepNames,
+  type TaskView,
+  type Views,
+  viewsFor,
+  workflowsOf,
+  workFolderOf,
+} from './store.ts';
 import {
   attemptsIn,
   closeoutIn,
@@ -537,7 +549,11 @@ const specOf = (step: Workflow): StepSpec => ({
  */
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
-export async function detail(run: Run): Promise<RunDetail> {
+/**
+ * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
+ * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
+ */
+export async function detail(run: Run): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
@@ -546,10 +562,14 @@ export async function detail(run: Run): Promise<RunDetail> {
   // made that seconds a poll. Until 2026-09-25 it was every task in the store (1,850 journals on the live store), for one run's handful.
   // The record is read first, as the list reads it. One more observation for each refused check's output (`checksOf`) and each blocked
   // session's last line (`lastLineOf`), which only a run's own detail reads.
-  const { views, reader: seen } = await viewsFor([run]);
-  const judged = judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
-    standingsOf(run, steps, status),
+  const { views, reader: seen, unreadable } = await viewsFor([run]);
+  const read = await judgedUnlessUnreadable(run, unreadable, async () =>
+    judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
+      standingsOf(run, steps, status),
+    ),
   );
+  if ('unreadable' in read) return { unjudged: read.unreadable };
+  const judged = read.judged;
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);

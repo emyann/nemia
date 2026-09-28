@@ -47,16 +47,17 @@ import {
   answer,
   answerRefusalOf,
   close,
+  everyView,
   file,
   filingOf,
   refusalOf,
   requestStop,
   tick,
   tickRefusalOf,
-  view,
   viewOfState,
   viewsOf,
   type RefusedMove,
+  type TaskList,
   type TaskView,
 } from './engine.ts';
 
@@ -260,8 +261,12 @@ export type Engine = {
    * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
    * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
    * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
+   *
+   * A task whose journal does not read — an entry no runtime wrote — is left out of `views` and named in `unreadable`, once, with why in
+   * the words the pass says it with (`TickReport.unreadable`): every other task is answered all the same. Any other failure, a store that
+   * cannot be listed or a harness that cannot be observed for `list()`, rejects the call.
    */
-  list: (taskIds?: readonly string[]) => Promise<TaskView[]>;
+  list: (taskIds?: readonly string[]) => Promise<TaskList>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
   stop: (taskId: string) => Promise<void>;
   logs: (taskId: string) => Promise<string>;
@@ -637,15 +642,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       return { ...v, sessionId: handleOf(events, last.n) ?? v.sessionId };
     });
 
-  const everyTask = () =>
-    go(
-      Effect.gen(function* () {
-        const observed = yield* (yield* Runner).observe;
-        const ids = yield* (yield* Journal).list;
-        return yield* Effect.forEach(ids, (id) => view(id, observed));
-      }),
-    );
-
   const engine: Engine = {
     // The harness is RESOLVED here, never left implicit: a task filed without one would otherwise read
     // `default` on its record and its view, and a layer above that pools by harness would count it apart
@@ -699,7 +695,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
           { exitCode: 2 },
         );
       }
-      return taskIds === undefined ? everyTask() : go(viewsOf(taskIds));
+      return go(taskIds === undefined ? everyView() : viewsOf(taskIds));
     },
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) =>
@@ -957,4 +953,4 @@ export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, FeedRefusal, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';
-export type { RefusedMove, TaskView } from './engine.ts';
+export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './engine.ts';

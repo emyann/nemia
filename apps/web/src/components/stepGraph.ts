@@ -37,6 +37,7 @@ export const stepMinimapFill: Record<StepState, string> = {
   waiting: 'var(--color-neutral-400)',
   held: 'var(--color-violet-400)',
   cancelled: 'var(--color-neutral-400)',
+  unreadable: 'var(--color-red-400)',
   unknown: 'var(--color-neutral-400)',
 };
 

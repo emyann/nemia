@@ -200,6 +200,7 @@ test('an edge runs while work moves along it — into a step at work or at its c
     'unsigned',
     'denied',
     'failed',
+    'unreadable',
     'unknown',
     'cancelled',
     'waiting',

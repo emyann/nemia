@@ -134,6 +134,12 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
             to decide: {decide.said}
           </p>
         )}
+        {/* Why the run is not judged: a task it reads does not, in the api's words (`RunSummary.unreadable`). */}
+        {run.unreadable && (
+          <p data-unreadable className="mt-1 text-xs font-medium break-words text-red-700 dark:text-red-400">
+            {run.unreadable}
+          </p>
+        )}
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {run.steps.map((step) => (
             <li key={step.name} className="flex items-center gap-1.5">

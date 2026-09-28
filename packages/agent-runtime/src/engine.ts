@@ -22,6 +22,7 @@ import {
   turnOf,
   waitsForInput,
   type Action,
+  type Event,
   type Input,
   type SessionState,
   type Sighting,
@@ -810,18 +811,45 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
   return viewOfState(fold(taskId, yield* journal.read(taskId)), observed);
 });
 
+/** A task a read left out because its journal does not read, and why, in the words the pass says it with (`TickReport.unreadable`). */
+export type UnreadableTask = { taskId: string; why: string };
+
+/** Some tasks' views, and each task among them whose journal did not read, named once and left out of `views`. */
+export type TaskList = { views: TaskView[]; unreadable: UnreadableTask[] };
+
+/**
+ * The events of each of `taskIds`, in that order, a task whose journal fails to read (`JournalError`) left out and named, as the pass
+ * leaves it out; any other failure fails the read.
+ */
+const readEach = Effect.fn('readEach')(function* (taskIds: Iterable<string>) {
+  const journal = yield* Journal;
+  const read: Array<{ taskId: string; events: Event[] }> = [];
+  const unreadable: UnreadableTask[] = [];
+  for (const taskId of taskIds) {
+    const one = yield* journal.read(taskId).pipe(
+      Effect.map((events) => ({ events })),
+      Effect.catchTag('JournalError', (e) => Effect.succeed({ why: e.message })),
+    );
+    if ('why' in one) unreadable.push({ taskId, why: one.why });
+    else read.push({ taskId, events: one.events });
+  }
+  return { read, unreadable };
+});
+
 /**
  * The views of `taskIds`, over one look at the harnesses: each journal read once, and the harnesses told the last attempt of each task not
  * settled (`observeFor`), which is all a view reads of a sighting — so a look for Claude Code jobs alone lists their run files and asks no
  * `claude agents`, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
  * caller that shows some of the board reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
  * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it.
+ *
+ * A task whose journal does not read is left out of `views` and named in `unreadable`, once, as the pass leaves it out: one entry no
+ * runtime wrote in one journal costs the caller that task, never the others.
  */
 export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[]) {
-  const journal = yield* Journal;
   const runner = yield* Runner;
-  const states: State[] = [];
-  for (const id of new Set(taskIds)) states.push(fold(id, yield* journal.read(id)));
+  const { read, unreadable } = yield* readEach(new Set(taskIds));
+  const states = read.map(({ taskId, events }) => fold(taskId, events));
   const open = states.filter((state) => !state.settled && state.attempts.length);
   const observed = open.length
     ? yield* (
@@ -832,7 +860,18 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
           : runner.observe
       ).pipe(Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())))
     : new Map<string, Sighting>();
-  return states.map((state) => viewOfState(state, observed));
+  return { views: states.map((state) => viewOfState(state, observed)), unreadable } satisfies TaskList;
+});
+
+/**
+ * Every task on the board, each journal read, over one observation of every harness — what `list()` answers. A task whose journal does
+ * not read is left out of `views` and named in `unreadable`, once, as `viewsOf` leaves it out; a store that cannot be listed, or a
+ * harness that cannot be observed, fails the read.
+ */
+export const everyView = Effect.fn('everyView')(function* () {
+  const observed = yield* (yield* Runner).observe;
+  const { read, unreadable } = yield* readEach(yield* (yield* Journal).list);
+  return { views: read.map(({ taskId, events }) => viewOfState(fold(taskId, events), observed)), unreadable } satisfies TaskList;
 });
 
 /** A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the fold it made. */

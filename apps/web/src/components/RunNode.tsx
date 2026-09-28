@@ -236,6 +236,17 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
                 pruned
               </Badge>
             )}
+            {/* Why the run is not judged (`RunSummary.unreadable`), whole on hover, in the footer so the card is no taller for it. */}
+            {run.unreadable && (
+              <Badge
+                variant="outline"
+                data-unreadable
+                title={run.unreadable}
+                className="border-red-400 text-red-700 dark:border-red-700 dark:text-red-400"
+              >
+                unreadable
+              </Badge>
+            )}
           </span>
         </div>
       </div>

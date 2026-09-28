@@ -13,7 +13,7 @@ import type { Sighting } from './domain.ts';
 import { RunnerError, type Observation, type RunnerOps } from './runner.ts';
 
 export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
-  const pick = (name?: string) => harnesses[name ?? fallback] ?? harnesses[fallback]!;
+  const pick = (name?: string) => harnesses[name ?? fallback] ?? harnesses[fallback];
 
   /**
    * Which harness is running which session, learned from the last `observe`.
@@ -86,14 +86,14 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
   return {
     spawn: (r) => {
       const route = routeOf(r.harness);
-      return route === undefined ? notHere(r.harness ?? fallback) : harnesses[route]!.spawn(r);
+      return route === undefined ? notHere(r.harness ?? fallback) : harnesses[route].spawn(r);
     },
 
     // To the harness the task names, as a spawn is: its vocabulary is its own. One this engine does not have is refused
     // at the door that files (`harnessRefusalOf`), which names the harnesses it has.
     refuses: (task) => {
       const route = routeOf(task.harness);
-      return route === undefined ? undefined : harnesses[route]!.refuses?.(task);
+      return route === undefined ? undefined : harnesses[route].refuses?.(task);
     },
 
     // A harness that cannot be read contributes nothing here: a full listing is read by views and verbs, which read an

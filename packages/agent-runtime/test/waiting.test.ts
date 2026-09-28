@@ -73,7 +73,7 @@ test("a blocked session carries what its harness says it waits for, in the harne
   await onPath(claude.bin, async () => {
     const { engine, id } = await blocked();
     const [row] = claude.rows();
-    claude.set(row!.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
+    claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
 
     const v = await engine.view(id);
     assert.equal(v.phase, 'needs-human', 'the phase is the word everything above judges on, and it is unchanged');
@@ -86,16 +86,16 @@ test('a blocked session whose harness says nothing carries nothing: the field is
   await onPath(claude.bin, async () => {
     const { engine, id } = await blocked();
     const [row] = claude.rows();
-    claude.set(row!.name, { state: 'blocked', status: 'waiting' });
+    claude.set(row.name, { state: 'blocked', status: 'waiting' });
 
     const v = await engine.view(id);
     assert.equal(v.phase, 'needs-human');
     assert.equal(Object.hasOwn(v, 'waitingFor'), false, 'nothing said is nothing carried');
 
     // Nor does a harness that says it in a shape we have no reading of, or says it blank.
-    claude.set(row!.name, { waitingFor: '   ' });
+    claude.set(row.name, { waitingFor: '   ' });
     assert.equal(Object.hasOwn(await engine.view(id), 'waitingFor'), false, 'a blank word is no word');
-    claude.set(row!.name, { waitingFor: { reason: 'permission prompt' } });
+    claude.set(row.name, { waitingFor: { reason: 'permission prompt' } });
     assert.equal(Object.hasOwn(await engine.view(id), 'waitingFor'), false, 'and neither is one that is not a string');
   });
 });
@@ -106,16 +106,16 @@ test('level-triggered: the word is read afresh each pass — the second pass sho
     const { engine, id } = await blocked();
     const [row] = claude.rows();
 
-    claude.set(row!.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
+    claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
     assert.equal((await engine.view(id)).waitingFor, 'permission prompt');
 
-    claude.set(row!.name, { waitingFor: 'workspace trust dialog' });
+    claude.set(row.name, { waitingFor: 'workspace trust dialog' });
     const second = await engine.view(id);
     assert.equal(second.waitingFor, 'workspace trust dialog', 'the second pass shows the new word');
     assert.equal(second.waitingFor?.includes('permission'), false, 'and none of the old: nothing is carried between passes');
 
     // It moved again. Nobody is waiting on anybody, so there is no question for the word to answer.
-    claude.set(row!.name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
+    claude.set(row.name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
     const third = await engine.view(id);
     assert.equal(third.phase.startsWith('needs-human'), false, 'it is working again');
     assert.equal(Object.hasOwn(third, 'waitingFor'), false, 'and carries no word: the field rides on needs-human alone');

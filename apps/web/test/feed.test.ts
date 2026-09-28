@@ -73,7 +73,7 @@ function followed() {
   );
   return {
     streams,
-    stream: () => streams[streams.length - 1]!,
+    stream: () => streams[streams.length - 1],
     invalidated,
     statuses,
     stop,
@@ -117,7 +117,7 @@ test('a run removed has its record read again, exactly: the read that finds none
   f.stream().opens();
   f.stream().send('removed', line('r-1'), '10');
   f.frame();
-  const keys = f.invalidated[0]!.map((k) => JSON.stringify(k));
+  const keys = f.invalidated[0].map((k) => JSON.stringify(k));
   assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
   // Its record, and never its decision or another run's: invalidated exactly, a key of two.
   assert.deepEqual(
@@ -177,10 +177,10 @@ test('the events that arrive together are read again once a frame, each key once
   f.frame();
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
   assert.deepEqual(
-    new Set(f.invalidated[0]!.map((k) => JSON.stringify(k))),
+    new Set(f.invalidated[0].map((k) => JSON.stringify(k))),
     new Set([['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon'], ['runs', 'r-2']].map((k) => JSON.stringify(k))),
   );
-  assert.equal(f.invalidated[0]!.length, 6, 'each key once');
+  assert.equal(f.invalidated[0].length, 6, 'each key once');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'an empty frame invalidates nothing');
   f.stop();

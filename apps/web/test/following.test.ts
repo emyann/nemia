@@ -138,7 +138,7 @@ test("REFUSED: the page's frames are the browser's own functions, called as the 
   stream.send('transcript', said('e1', 1, 'Said while it ran.'));
   stream.send('transcript', said('e2', 2, 'And again.'));
   assert.equal(flushes.length, 1, 'the two events wait for one frame');
-  flushes[0]!();
+  flushes[0]();
   assert.deepEqual(
     state.events.map((e) => e.id),
     ['e1', 'e2'],

@@ -710,7 +710,7 @@ export function findAgent(name: string, repo: string, from?: AgentPlace): { from
   }
   if (found.length > 1)
     throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
-  const one = found[0]!;
+  const one = found[0];
   if (one.agent instanceof Error) throw one.agent;
   return { from: one.from, dir: one.dir, agent: one.agent };
 }

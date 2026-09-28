@@ -38,7 +38,7 @@ function pinProblems(specs: Spec[]): string[] {
     .filter((s) => s.spec !== first?.spec)
     .map(
       (s) =>
-        `effect is ${first!.spec} in ${first!.where} and ${s.spec} in ${s.where}: one version in every package — change them together, with the lockfile`,
+        `effect is ${first.spec} in ${first.where} and ${s.spec} in ${s.where}: one version in every package — change them together, with the lockfile`,
     );
   return [...ranges, ...differ];
 }
@@ -71,7 +71,7 @@ test('every package that depends on effect pins it exactly, to one version', () 
 });
 
 test('the lockfile installs effect once, at the pin', () => {
-  const pin = effectSpecs(manifests())[0]!.spec;
+  const pin = effectSpecs(manifests())[0].spec;
   const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8')) as {
     packages: Record<string, { version?: string }>;
   };
@@ -132,7 +132,7 @@ const SKILL = '.claude/skills/effect/SKILL.md';
 /** Whether `effect`'s barrel has a name as the skill writes it: `Either`, or `Context.Tag` for `Tag` on the `Context` module. */
 const has = (barrel: Record<string, unknown>, name: string): boolean => {
   const [mod, member] = name.split('.');
-  const at = barrel[mod!];
+  const at = barrel[mod];
   return member === undefined ? at !== undefined : typeof at === 'object' && at !== null && member in at;
 };
 
@@ -151,7 +151,7 @@ function renameProblems(skill: string, barrel: Record<string, unknown>, pin: str
       line
         .split('|')
         .slice(1, 3)
-        .map((cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]!)),
+        .map((cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1])),
     );
   return [
     ...(measured === pin
@@ -170,14 +170,14 @@ function renameProblems(skill: string, barrel: Record<string, unknown>, pin: str
 test("the effect skill's table of Effect 3 names holds for the pinned version", async () => {
   const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
   const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
-  assert.deepEqual(renameProblems(skill, barrel, effectSpecs(manifests())[0]!.spec), []);
+  assert.deepEqual(renameProblems(skill, barrel, effectSpecs(manifests())[0].spec), []);
   assert.ok((skill.match(/^\|\s*`/gm) ?? []).length >= 11, 'every row read');
 });
 
 test('REFUSED: a table measured on another version, a name it says is gone that is there, a replacement that is not', async () => {
   const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
   const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
-  const pin = effectSpecs(manifests())[0]!.spec;
+  const pin = effectSpecs(manifests())[0].spec;
   assert.deepEqual(renameProblems(skill, barrel, '4.0.0'), [
     `${SKILL} was measured on ${pin}, and effect is pinned to 4.0.0: measure the table again, then say 4.0.0`,
   ]);

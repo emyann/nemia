@@ -45,7 +45,7 @@ const processes = (): Proc[] => {
       .split('\n')
       .flatMap((line) => {
         const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
-        return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3]!, args: m[4]! }] : [];
+        return m ? [{ pid: Number(m[1]), pgid: Number(m[2]), state: m[3], args: m[4] }] : [];
       });
   }
   const found: Proc[] = [];
@@ -68,7 +68,7 @@ const processes = (): Proc[] => {
       } catch {
         /* another user's */
       }
-      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0]!, args, cwd, env });
+      found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0], args, cwd, env });
     } catch {
       /* gone while read */
     }

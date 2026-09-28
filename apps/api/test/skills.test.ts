@@ -106,16 +106,16 @@ test("the skills are listed by place — yours, the repository's, then what HKB 
     ],
   );
   assert.deepEqual(
-    places[0]!.skills.map((s) => s.name),
+    places[0].skills.map((s) => s.name),
     ['always', inLibrary, 'mine', 'shared'].sort(),
   );
   assert.deepEqual(
-    places[1]!.skills.map((s) => s.name),
+    places[1].skills.map((s) => s.name),
     [inRepo, 'review', 'scratch'].sort(),
     'the name in both is in yours alone',
   );
   assert.deepEqual(
-    places[2]!.skills.map((s) => s.name),
+    places[2].skills.map((s) => s.name),
     shipped,
   );
   assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
@@ -133,7 +133,7 @@ test('a skill is listed with its card entry, whether it is loaded every turn, wh
   assert.equal(mine.error, null);
   assert.equal(mine.preload, false);
   assert.deepEqual(mine.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
-  assert.equal(mine.cost!.perTurn, mine.cost!.listed, 'named, it costs its listing');
+  assert.equal(mine.cost.perTurn, mine.cost.listed, 'named, it costs its listing');
   assert.deepEqual(mine.usedBy, ['clerk', 'scribe'], 'the agents of yours that give it, and not one that does not read');
   const always = rowOf(places, 'yours', 'always')!;
   assert.equal(always.preload, true);
@@ -167,7 +167,7 @@ test('a shipped skill says where an agent of yours already finds its name: in yo
   assert.equal(rowOf(places, 'shipped', toCopy)!.found, null);
   assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every shipped skill reads');
   assert.ok(
-    places[2]!.skills.every((s) => s.usedBy.length === 0),
+    places[2].skills.every((s) => s.usedBy.length === 0),
     'no agent of yours is given a skill from where HKB ships it',
   );
 });
@@ -254,10 +254,10 @@ test('an agent is listed with each skill it gives, where it is found and what it
       ],
     );
     const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('../src/agents.ts').AgentListing;
-    assert.equal(lost.given[0]!.preload, true);
-    assert.equal(lost.given[0]!.cost!.perTurn, lost.given[0]!.cost!.listed + lost.given[0]!.cost!.body);
-    assert.deepEqual([lost.given[1]!.from, lost.given[1]!.cost], [null, null]);
-    assert.match(lost.given[1]!.error ?? '', /^No skills folder has `gone` — looked in /);
+    assert.equal(lost.given[0].preload, true);
+    assert.equal(lost.given[0].cost!.perTurn, lost.given[0].cost!.listed + lost.given[0].cost!.body);
+    assert.deepEqual([lost.given[1].from, lost.given[1].cost], [null, null]);
+    assert.match(lost.given[1].error ?? '', /^No skills folder has `gone` — looked in /);
   } finally {
     fs.rmSync(path.join(root, 'workflows', 'agents', 'lost.md'));
   }

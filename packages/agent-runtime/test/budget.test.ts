@@ -84,12 +84,12 @@ process.exitCode = 1;
     assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     const [a] = state.attempts;
     assert.deepEqual(
-      [a!.ended, a!.reason, a!.limit, a!.exitCode],
+      [a.ended, a.reason, a.limit, a.exitCode],
       ['failed', 'harness', 'budget', 1],
       'it ended at its cap, as its harness said',
     );
-    assert.deepEqual(a!.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
-    assert.equal(a!.nativeId, result.session_id, 'a session a new filing could continue');
+    assert.deepEqual(a.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
+    assert.equal(a.nativeId, result.session_id, 'a session a new filing could continue');
     const settled = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
     const note = settled?.kind === 'settled' ? (settled.note ?? '') : '';
     assert.equal(note, '1 attempt(s), none succeeded', 'settled as any failed attempt is');
@@ -97,7 +97,7 @@ process.exitCode = 1;
 
     const argvs = runsIn(runs);
     assert.equal(argvs.length, 1, 'claude -p ran once');
-    assert.equal(valueOf(argvs[0]!, '--max-budget-usd'), '0.01', 'with the cap');
+    assert.equal(valueOf(argvs[0], '--max-budget-usd'), '0.01', 'with the cap');
   });
 });
 

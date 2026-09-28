@@ -52,6 +52,8 @@
     // (`holdOpen: 'yes'`), and its fix to `!x` let that caller through; the refusal's own test caught it. On in the files that decode
     // what they read (the first override).
     "typescript/no-unnecessary-type-arguments": "error",
+    // An `as T` or a `!` that tells tsc what it already knows is noise that hides the casts that matter.
+    "typescript/no-unnecessary-type-assertion": "error",
     "unicorn/no-array-fill-with-reference-type": "error"
   },
   "overrides": [

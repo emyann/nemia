@@ -677,7 +677,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
 function askedModelOf(record: StepRecord | undefined): string | null {
   const tries = record?.tries ?? [];
   let i = tries.length - 1;
-  while (i >= 0 && tries[i]!.then === 'recheck') i--;
+  while (i >= 0 && tries[i].then === 'recheck') i--;
   return tries[i]?.model ?? null;
 }
 
@@ -718,7 +718,7 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
  * mode.
  */
 function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
-  const name = state.harness ?? Object.keys(HARNESSES)[0]!;
+  const name = state.harness ?? Object.keys(HARNESSES)[0];
   if (!Object.hasOwn(HARNESSES, name)) return null;
   const harness = HARNESSES[name as keyof typeof HARNESSES];
   const { permissionMode, tools: filedTools } = state.config ?? {};

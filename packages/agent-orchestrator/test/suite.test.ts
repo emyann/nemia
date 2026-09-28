@@ -19,7 +19,7 @@ test("the root's test script lets every package finish when one fails, so a fail
   const root = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as {
     scripts: Record<string, string>;
   };
-  const words = root.scripts.test!.split(/\s+/);
+  const words = root.scripts.test.split(/\s+/);
   assert.deepEqual(words.slice(0, 3), ['turbo', 'run', 'test'], root.scripts.test);
   assert.ok(
     words.includes('--continue') || words.includes('--continue=always'),
@@ -59,7 +59,7 @@ function typecheckedBy(dir: string, script: string): string[] {
   return script.split('&&').flatMap((command) => {
     const words = command.trim().split(/\s+/);
     if (words[0] !== 'tsc') return [];
-    const project = words.includes('-p') ? words[words.indexOf('-p') + 1]! : '.';
+    const project = words.includes('-p') ? words[words.indexOf('-p') + 1] : '.';
     const file = project.endsWith('.json') ? path.join(dir, project) : path.join(dir, project, 'tsconfig.json');
     const read = ts.readConfigFile(file, (f) => ts.sys.readFile(f));
     assert.equal(read.error, undefined, `${file} does not parse`);

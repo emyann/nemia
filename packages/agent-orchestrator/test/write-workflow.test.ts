@@ -36,13 +36,14 @@ function devIn(name: string): string {
 function snapshot(dir: string): Record<string, string> {
   if (!fs.existsSync(dir)) return {};
   return Object.fromEntries(
-    (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+    fs
+      .readdirSync(dir, { recursive: true, withFileTypes: true })
       .filter((e) => e.isFile())
       .map((e) => {
         const at = path.join(e.parentPath, e.name);
         return [path.relative(dir, at), fs.readFileSync(at, 'utf8')];
       })
-      .sort(([a], [b]) => (a! < b! ? -1 : 1)),
+      .sort(([a], [b]) => (a < b ? -1 : 1)),
   );
 }
 

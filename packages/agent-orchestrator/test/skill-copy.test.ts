@@ -25,7 +25,8 @@ const LIBRARY = path.join(ROOT, 'workflows', 'skills');
 function snapshot(dir: string): Record<string, string> {
   if (!fs.existsSync(dir)) return {};
   return Object.fromEntries(
-    (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+    fs
+      .readdirSync(dir, { recursive: true, withFileTypes: true })
       .filter((e) => e.isFile() || e.isSymbolicLink())
       .map((e) => {
         const at = path.join(e.parentPath, e.name);
@@ -63,7 +64,7 @@ function source(skills: Record<string, string>): string {
 
 test('a shipped skill is copied whole into the library, and the store finds it there', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
-  const name = fs.readdirSync(SHIPPED).sort()[0]!;
+  const name = fs.readdirSync(SHIPPED).sort()[0];
   const copied = copySkill(SHIPPED, LIBRARY, name);
   assert.equal(copied.dir, path.join(LIBRARY, name));
   assert.deepEqual(snapshot(copied.dir), snapshot(path.join(SHIPPED, name)), 'byte for byte');
@@ -77,7 +78,7 @@ test('a shipped skill is copied whole into the library, and the store finds it t
 
 test('a copy is refused where the library has the name already, and the library is left as it was', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
-  const name = fs.readdirSync(SHIPPED).sort()[0]!;
+  const name = fs.readdirSync(SHIPPED).sort()[0];
   fs.mkdirSync(path.join(LIBRARY, name), { recursive: true });
   fs.writeFileSync(path.join(LIBRARY, name, 'SKILL.md'), '---\ndescription: mine\n---\nMine.\n');
   refuses(
@@ -127,7 +128,7 @@ test('a copy is refused for a skill holding a link, and for a skill that is one:
 
 test('a copy is refused into a folder that is not a skills/ the board lists, unless anywhere', () => {
   const elsewhere = path.join(scratch('wf-skill-elsewhere-'), 'skills');
-  const name = fs.readdirSync(SHIPPED).sort()[0]!;
+  const name = fs.readdirSync(SHIPPED).sort()[0];
   assert.throws(
     () => copySkill(SHIPPED, elsewhere, name),
     (err: unknown) =>

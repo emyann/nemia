@@ -34,7 +34,8 @@ const DRAFT: SkillDraft = {
 function snapshot(dir: string): Record<string, string> {
   if (!fs.existsSync(dir)) return {};
   return Object.fromEntries(
-    (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+    fs
+      .readdirSync(dir, { recursive: true, withFileTypes: true })
       .filter((e) => e.isFile() || e.isSymbolicLink())
       .map((e) => {
         const at = path.join(e.parentPath, e.name);

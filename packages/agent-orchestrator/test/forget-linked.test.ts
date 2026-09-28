@@ -52,7 +52,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
 
   const run = start({ brief: 'under a link', repo, workflowDir: folder });
   await advance(e, readRun(run.id));
-  const wt = readRun(run.id).steps.implement!.workspace!;
+  const wt = readRun(run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
   assert.match(
     git(repo, 'worktree', 'list', '--porcelain'),

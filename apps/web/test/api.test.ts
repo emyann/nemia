@@ -8,8 +8,7 @@ import { decisionStamp } from '../src/lib/decide.ts';
 /** GET /api/runs/:id answering `body`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: object) {
   const before = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
   t.after(() => {
     globalThis.fetch = before;
   });
@@ -138,10 +137,10 @@ const { startRun } = await import('../src/lib/api.ts');
 function starting(t: { after: (fn: () => void) => void }, answer: () => Response) {
   const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), init });
     return answer();
-  }) as typeof fetch;
+  };
   t.after(() => {
     globalThis.fetch = before;
   });
@@ -222,10 +221,10 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   // GET /decision, answered when the test says: each ask waits on a resolver of its own.
   const answers: Array<(body: object) => void> = [];
   const before = globalThis.fetch;
-  globalThis.fetch = (async () => {
+  globalThis.fetch = async () => {
     const body = await new Promise<object>((resolve) => answers.push(resolve));
     return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  }) as typeof fetch;
+  };
   const client = new QueryClient();
   t.after(() => {
     globalThis.fetch = before;
@@ -248,7 +247,7 @@ test("a run's decision is asked for once while a live step's engine word moves, 
 
   const first = { touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' } };
   await until(() => answers.length === 1);
-  answers[0]!(first);
+  answers[0](first);
   await until(() => observer.getCurrentResult().data !== undefined);
 
   // The poll brings tokens' word as the engine has it, each time a little different.
@@ -266,7 +265,7 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   assert.deepEqual([meanwhile.data, meanwhile.isPlaceholderData], [first, true]);
 
   const second = { touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } };
-  answers[1]!(second);
+  answers[1](second);
   await until(() => !observer.getCurrentResult().isPlaceholderData);
   assert.deepEqual(observer.getCurrentResult().data, second);
   // From the first answer on, never nothing: the section does not blink out. The observer hands back its own copy of what was answered, so
@@ -303,15 +302,15 @@ test("an answer is asked for as the api takes it — POST, JSON, the step by nam
     stopFirst: false,
   });
   assert.equal(sent.length, 1);
-  assert.equal(sent[0]!.url, '/api/runs/r%201/steps/implement/retry');
-  assert.equal(sent[0]!.init.method, 'POST');
-  assert.deepEqual(sent[0]!.init.headers, { 'content-type': 'application/json' });
-  assert.deepEqual(JSON.parse(String(sent[0]!.init.body)), { mode: 'nudge', message: '--flag stays' });
+  assert.equal(sent[0].url, '/api/runs/r%201/steps/implement/retry');
+  assert.equal(sent[0].init.method, 'POST');
+  assert.deepEqual(sent[0].init.headers, { 'content-type': 'application/json' });
+  assert.deepEqual(JSON.parse(String(sent[0].init.body)), { mode: 'nudge', message: '--flag stays' });
 
   // Continue on a session the harness blocked: the tick stops it before it files the try, and the api says so.
   asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true }), sent);
   assert.deepEqual(await askTry('r-1', 'held', { mode: 'nudge' }), { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true });
-  assert.deepEqual(JSON.parse(String(sent[1]!.init.body)), { mode: 'nudge' });
+  assert.deepEqual(JSON.parse(String(sent[1].init.body)), { mode: 'nudge' });
 });
 
 test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an answer without the try it asked for, or without JSON, says so", async (t) => {
@@ -321,7 +320,7 @@ test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an
   asking(t, 409, JSON.stringify({ error: refusal }), sent);
   await assert.rejects(askTry('r-1', 'working', { mode: 'nudge' }), (err: Error) => err.message === refusal);
 
-  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true }), { status: 202 })) as typeof fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 202 });
   await assert.rejects(
     askTry('r-1', 'implement', { mode: 'nudge' }),
     (err: Error) =>
@@ -329,7 +328,7 @@ test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an
       /before asking again/.test(err.message),
   );
 
-  globalThis.fetch = (async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })) as typeof fetch;
+  globalThis.fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' });
   await assert.rejects(
     askTry('r-1', 'implement', { mode: 'nudge' }),
     (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway',

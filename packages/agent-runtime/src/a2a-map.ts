@@ -26,7 +26,7 @@ import type { SpawnRequest } from './runner.ts';
 export const nameParts = (name: string): { taskId: string; n: number } | undefined => {
   const m = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name);
   if (!m) return undefined;
-  const parts = { taskId: m[1]!, n: Number(m[2]) };
+  const parts = { taskId: m[1], n: Number(m[2]) };
   return nameFor(parts.taskId, parts.n) === name ? parts : undefined;
 };
 
@@ -147,7 +147,7 @@ export const messageRefusal = (m: Message): string | undefined => {
   const named = sessionRefusal(m.taskId);
   if (named) return named;
   if (m.role !== Role.ROLE_USER) return 'a spawn is a message from the user: its role is ROLE_USER.';
-  if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
+  if (m.parts.length !== 1 || m.parts[0].content?.$case !== 'text') {
     return `the brief is one text part, and this message has ${m.parts.length === 1 ? 'one part that is not text' : `${m.parts.length} parts`}.`;
   }
   if (typeof m.metadata?.cwd !== 'string' || !m.metadata.cwd) return "the message's metadata has no `cwd`: say where the session works.";
@@ -165,15 +165,15 @@ export const followUpRefusal = (m: Message): string | undefined => {
   const named = sessionRefusal(m.taskId);
   if (named) return named;
   if (m.role !== Role.ROLE_USER) return 'words said to a session are a message from the user: its role is ROLE_USER.';
-  if (m.parts.length !== 1 || m.parts[0]!.content?.$case !== 'text') {
+  if (m.parts.length !== 1 || m.parts[0].content?.$case !== 'text') {
     return `words said to a session are one text part, and this message has ${m.parts.length === 1 ? 'one part that is not text' : `${m.parts.length} parts`}.`;
   }
-  if (!m.parts[0]!.content.value.trim()) return 'the words are empty: give the words the session should hear.';
+  if (!m.parts[0].content.value.trim()) return 'the words are empty: give the words the session should hear.';
   return undefined;
 };
 
 /** The words a message `followUpRefusal` passed says. */
-export const followUpText = (m: Message): string => (m.parts[0]!.content as { $case: 'text'; value: string }).value;
+export const followUpText = (m: Message): string => (m.parts[0].content as { $case: 'text'; value: string }).value;
 
 /**
  * The spawn a message asks for, every key of the request present, as the engine builds it: a harness is handed the same
@@ -181,7 +181,7 @@ export const followUpText = (m: Message): string => (m.parts[0]!.content as { $c
  */
 export const spawnOf = (m: Message): SpawnRequest => {
   const md = m.metadata ?? {};
-  const brief = m.parts[0]!.content as { $case: 'text'; value: string };
+  const brief = m.parts[0].content as { $case: 'text'; value: string };
   return {
     name: m.taskId,
     brief: brief.value,

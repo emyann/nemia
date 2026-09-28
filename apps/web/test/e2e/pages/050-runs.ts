@@ -106,7 +106,7 @@ export default {
     const ordered = [...listed].sort(
       (a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id),
     );
-    if (listed.some((r, i) => r.id !== ordered[i]!.id) || listed.some((r) => r.inFlight !== (r.group === 'in-flight'))) {
+    if (listed.some((r, i) => r.id !== ordered[i].id) || listed.some((r) => r.inFlight !== (r.group === 'in-flight'))) {
       const said = (rs: typeof listed) =>
         rs.map((r) => `${r.id} (${r.group}, ${r.inFlight ? 'in flight' : 'not'}, ${r.at})`).join('\n    ');
       throw new Refused(

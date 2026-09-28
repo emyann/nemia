@@ -33,7 +33,7 @@ test('a tick says what it took and what each harness listed, and a directory of 
   assert.equal(typeof report.ms, 'number');
   assert.ok(report.ms >= 0);
   assert.deepEqual(Object.keys(report.observed), ['quick'], 'one entry per harness observed in the pass');
-  const o = report.observed.quick!;
+  const o = report.observed.quick;
   assert.ok(o.calls >= 1, 'the pass observed the harness');
   assert.equal(o.listed, o.calls, 'each observe listed the one run file there is');
   assert.equal(o.spawned, 0, 'reading run files starts nothing');
@@ -58,18 +58,18 @@ test('a tick counts the observes that could not read their harness (`unread`), a
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   await engine.tick();
   const read = await engine.tick();
-  assert.equal(read.observed.flaky!.unread, 0, 'a read that answered left nothing unread');
+  assert.equal(read.observed.flaky.unread, 0, 'a read that answered left nothing unread');
   failing = true;
   const unread = await engine.tick();
   assert.deepEqual(
-    [unread.observed.flaky!.calls, unread.observed.flaky!.listed, unread.observed.flaky!.unread],
+    [unread.observed.flaky.calls, unread.observed.flaky.listed, unread.observed.flaky.unread],
     [1, 0, 1],
     'one observe, nothing listed, one unread',
   );
-  assert.equal(engine.io().observed.flaky!.unread, 1, 'and the running total has it');
+  assert.equal(engine.io().observed.flaky.unread, 1, 'and the running total has it');
   failing = false;
-  assert.equal((await engine.tick()).observed.flaky!.unread, 0);
-  assert.equal((await engine.view(id)).state.attempts[0]!.ended, null, 'the attempt still runs');
+  assert.equal((await engine.tick()).observed.flaky.unread, 0);
+  assert.equal((await engine.view(id)).state.attempts[0].ended, null, 'the attempt still runs');
 });
 
 test("a tick counts only the observes made during it; io() counts every observe, a view's too", async () => {
@@ -77,13 +77,13 @@ test("a tick counts only the observes made during it; io() counts every observe,
   // A settled task is viewed off its record (`settled-view.test.ts`); one not settled, on a harness that cannot find, is observed.
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   const first = await engine.tick();
-  const before = engine.io().observed.quick!;
+  const before = engine.io().observed.quick;
   await engine.view(id);
-  const afterView = engine.io().observed.quick!;
+  const afterView = engine.io().observed.quick;
   assert.ok(afterView.calls > before.calls, 'a view observes, and is counted');
   const second = await engine.tick();
-  assert.equal(second.observed.quick!.calls, first.observed.quick!.calls, "the view's observe is not charged to the next pass");
-  assert.equal(engine.io().observed.quick!.calls, afterView.calls + second.observed.quick!.calls, 'the running total has both');
+  assert.equal(second.observed.quick.calls, first.observed.quick.calls, "the view's observe is not charged to the next pass");
+  assert.equal(engine.io().observed.quick.calls, afterView.calls + second.observed.quick.calls, 'the running total has both');
   const until = Date.now() + 20_000;
   while (!(await engine.view(id)).state.settled && Date.now() < until) {
     await engine.tick();

@@ -31,11 +31,11 @@ const unreadEnv = (readme: string, code: string) =>
 
 /** Package paths the README names, in backticks as it names its own files, that do not exist. */
 const missingFiles = (readme: string, exists: (p: string) => boolean) =>
-  unique([...readme.matchAll(/`((?:src|bin|test|docs)\/[\w.-]+\.(?:ts|md))(?::[\d-]+)?`/g)].map((m) => m[1]!)).filter((p) => !exists(p));
+  unique([...readme.matchAll(/`((?:src|bin|test|docs)\/[\w.-]+\.(?:ts|md))(?::[\d-]+)?`/g)].map((m) => m[1])).filter((p) => !exists(p));
 
 /** `ae <verb>` uses — at a line's start, after a backtick or a prompt — with no case in the CLI. */
 const unknownVerbs = (readme: string, cli: string) =>
-  unique([...readme.matchAll(/(?:^|`|\$ )(?:ae|node bin\/ae\.ts) ([a-z]+)/gm)].map((m) => m[1]!)).filter(
+  unique([...readme.matchAll(/(?:^|`|\$ )(?:ae|node bin\/ae\.ts) ([a-z]+)/gm)].map((m) => m[1])).filter(
     (verb) => !cli.includes(`case '${verb}'`),
   );
 

@@ -64,10 +64,10 @@ test('each task admitted is counted at once: a full pool admits nothing more, an
   const waiting = [queued('c-1', 1), queued('c-2', 2), queued('c-3', 3)];
   assert.deepEqual(toAdmit({ views: waiting, momentum: none, ceiling: 2 }), ['c-1', 'c-2']);
   // The pass after: those two admitted hold their slots, and the third is refused one.
-  const next = [{ ...waiting[0]!, admission: 'admitted' as const }, { ...waiting[1]!, admission: 'admitted' as const }, waiting[2]!];
+  const next = [{ ...waiting[0], admission: 'admitted' as const }, { ...waiting[1], admission: 'admitted' as const }, waiting[2]];
   assert.deepEqual(toAdmit({ views: next, momentum: none, ceiling: 2 }), []);
   // One ended: exactly one more.
-  assert.deepEqual(toAdmit({ views: [next[0]!, next[2]!], momentum: none, ceiling: 2 }), ['c-3']);
+  assert.deepEqual(toAdmit({ views: [next[0], next[2]], momentum: none, ceiling: 2 }), ['c-3']);
   assert.deepEqual(toAdmit({ views: waiting, momentum: none, ceiling: 0 }), []);
 });
 

@@ -331,7 +331,7 @@ test("a journal from before stage 4b reads its caps under config and a capped en
   );
   assert.deepEqual(events[0], {
     kind: 'filed',
-    at: CAPPED[0]!.at,
+    at: CAPPED[0].at,
     brief: 'b',
     cwd: '/r',
     holdOpen: true,
@@ -339,7 +339,7 @@ test("a journal from before stage 4b reads its caps under config and a capped en
   });
   assert.deepEqual(
     events[4],
-    { kind: 'input', at: CAPPED[4]!.at, text: 'shorter', config: { budgetUsd: 0.5 } },
+    { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } },
     "a turn's cap is that turn's configuration",
   );
   assert.deepEqual(
@@ -362,7 +362,7 @@ test("a journal from before stage 4b reads its caps under config and a capped en
 
   const { createEngine } = await import('../src/facade.ts');
   const { state } = await createEngine({ root: dir }).view('t-capped');
-  assert.deepEqual(state.inputs, [{ at: CAPPED[4]!.at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
+  assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
   assert.deepEqual(
     state.attempts.map((a) => [a.ended, a.reason, a.limit]),
     [
@@ -379,7 +379,7 @@ test("an input's cap is laid under a config it already has, never over it: confi
     dir,
     Effect.flatMap(Journal, (j) => j.read('t')),
   );
-  assert.deepEqual(input, { kind: 'input', at: CAPPED[4]!.at, text: 'shorter', config: { budgetUsd: 2 } });
+  assert.deepEqual(input, { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 2 } });
 });
 
 // ─── a journal written while a bridge to claude.ai was a harness argument of its own (until 2026-09-25) ───

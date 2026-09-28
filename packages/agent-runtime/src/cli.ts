@@ -123,7 +123,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   if (contextTokens !== undefined && !(/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens)))) {
     const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
     throw refuse(
-      `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2]!.toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
+      `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2].toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
     );
   }
   const background = meta.get('background');
@@ -314,7 +314,7 @@ export const taskLine = (v: TaskView) => {
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0].slice(0, 44)}`;
 };
 
 /**
@@ -342,13 +342,13 @@ export const entryLine = (taskId: string, event: Event) => {
       : event.kind === 'measured'
         ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
         : event.kind === 'ended'
-          ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+          ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0].slice(0, 160)}` : ''}`
           : event.kind === 'spawned' && event.error
-            ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
+            ? `  but the call failed: ${event.error.split('\n')[0].slice(0, 160)}`
             : event.kind === 'said'
-              ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
+              ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0].slice(0, 160)}`
               : event.kind === 'input'
-                ? `  ${event.text.trim().split('\n')[0]!.slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
+                ? `  ${event.text.trim().split('\n')[0].slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
                 : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };

@@ -65,7 +65,7 @@ test('wf agents lists both places, each agent by what it is for and what it says
   const repo = repoAt('repo');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   anAgent(YOURS, 'archivist', 'Files it away.');
-  const { out } = await printedBy(t as Mock, 'agents', '--repo', repo);
+  const { out } = await printedBy(t, 'agents', '--repo', repo);
   assert.match(out, /^scribe {2}repo {2}Writes it down\.$/m);
   assert.match(out, /^ {3}read-a-thing {2}Read a thing — Reads it\.$/m);
   assert.match(out, /^archivist {2}yours {2}Files it away\.$/m);
@@ -79,7 +79,7 @@ test('wf agents lists an agent with no skills by the one thing its description s
   const repo = repoAt('bare');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'plain.md'), '---\ndescription: Does one thing.\n---\nDo it.\n');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'mute.md'), '---\nmodel: opus\n---\nDo it.\n');
-  const { out } = await printedBy(t as Mock, 'agents', '--repo', repo);
+  const { out } = await printedBy(t, 'agents', '--repo', repo);
   assert.match(out, /^ {3}plain {2}plain — Does one thing\.$/m);
   assert.match(out, /^ {3}says nothing it can do — agents\/mute\.md has no `description:`/m);
 });
@@ -87,7 +87,7 @@ test('wf agents lists an agent with no skills by the one thing its description s
 test('wf agents card prints the card alone on stdout, and what it is not on stderr', async (t) => {
   const repo = repoAt('card');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
-  const { out, err } = await printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo);
+  const { out, err } = await printedBy(t, 'agents', 'card', 'scribe', '--repo', repo);
   const card = JSON.parse(out) as { name: string; skills: Array<{ id: string }>; capabilities: Record<string, boolean>; version: string };
   assert.equal(card.name, 'scribe');
   assert.deepEqual(
@@ -106,7 +106,7 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
   anAgent(path.join(repo, 'workflows', 'agents'), 'twin', 'The repository’s.');
   const refused = async (pattern: RegExp, ...argv: string[]) => {
     await assert.rejects(
-      () => printedBy(t as Mock, ...argv),
+      () => printedBy(t, ...argv),
       (err: Error & { exitCode?: number }) => {
         assert.match(err.message, pattern);
         return true;
@@ -126,7 +126,7 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
     repo,
   );
   // Said which, each place answers for its own.
-  const mine = JSON.parse((await printedBy(t as Mock, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as {
+  const mine = JSON.parse((await printedBy(t, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as {
     description: string;
   };
   assert.equal(mine.description, 'Yours.');
@@ -137,7 +137,7 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
   const repo = repoAt('broken');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.', '---\nname: read-a-thing\n---\nRead it.\n');
   await assert.rejects(
-    () => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo),
+    () => printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
     (err: Error) => {
       assert.match(err.message, /read-a-thing\/SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
       return true;
@@ -149,7 +149,7 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
     '---\ndescription: Writes it down.\nskills: gone-away\ntools: Read, Skill\n---\nDo it.\n',
   );
   await assert.rejects(
-    () => printedBy(t as Mock, 'agents', 'card', 'scribe', '--repo', repo),
+    () => printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
     (err: Error) => {
       assert.match(err.message, /gives the skill `gone-away`, and no skills folder has it — looked in /);
       return true;

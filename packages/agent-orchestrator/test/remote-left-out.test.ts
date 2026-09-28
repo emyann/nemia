@@ -65,7 +65,7 @@ async function started(): Promise<string> {
   };
   try {
     await main(['start', 'a note on tides', '--workflows', DIR]);
-    return out.join('\n').split(/\s+/)[0]!;
+    return out.join('\n').split(/\s+/)[0];
   } finally {
     console.log = log;
     process.chdir(cwd);
@@ -128,8 +128,8 @@ for (const [what, text] of [
       );
       const refused = ended(queued);
       assert.equal(refused.length, 1, JSON.stringify(journal(queued)));
-      assert.equal(refused[0]!.reason, 'unstartable');
-      assert.match(String(refused[0]!.error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
+      assert.equal(refused[0].reason, 'unstartable');
+      assert.match(String(refused[0].error), /^`harness: a2a:reviewer` is not a harness this engine has, so nothing was started/);
       assert.equal(server.sent.length, 1, 'and nothing more was sent to the agent');
 
       // Fixed, the step at work is followed again where it is: on the agent, waiting on its question.

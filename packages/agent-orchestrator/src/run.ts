@@ -622,7 +622,7 @@ export function approvalRefusal(
   const { status } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   // An ending step is approved before it is filed (`approvedFirst`), so its gate holds on the work it would act on, not on its own
   // closeout: refused while that work is unfinished, and while a send-back of it is asked for, which would change what is approved.
-  if (approvedFirst(step, run) && !run.steps[name]!.taskId) {
+  if (approvedFirst(step, run) && !run.steps[name].taskId) {
     const back = asks.find((a) => step.after.includes(a.step));
     if (back) {
       return (
@@ -2433,7 +2433,7 @@ export function retryRefusal(
     }
     // An ending step waiting at its gate with nothing of it filed (`approvedFirst`): there is no try of it to replace, and the two things
     // there are to say to it are the approval that files it and an objection to the work it would act on (`sendBackTo`).
-    if (status === 'awaiting approval' && !run.steps[name]!.taskId) {
+    if (status === 'awaiting approval' && !run.steps[name].taskId) {
       const back = sendBackTo(step, run)
         .map((s) => `wf retry ${run.id} ${s} --message "<objection>"`)
         .join(' or ');
@@ -2455,7 +2455,7 @@ export function retryRefusal(
     return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
   }
   if (!modes.includes(how.mode) && landsOnCheck(step, run) && status === 'failed (check)') {
-    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name]!.check!.taskId) : 'unknown', verdictOf(name))
+    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
       ? 'refused it'
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
@@ -2652,7 +2652,7 @@ export function retryLines(
       );
     } else if (status === 'denied') {
       lines.push(
-        `${step.name}: ${deniedOffer(spendOf(run.steps[step.name]!.taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name]!.workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`,
+        `${step.name}: ${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
       // A remote agent's try is a new Task, never its session continued, and takes no `--model` (`remoteRetryRefusal`).
@@ -2784,7 +2784,7 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
   if (run.cancelledAt) {
     return `${run.id} was cancelled at ${run.cancelledAt}: its sessions are being stopped, not steered, and a cancelled run files nothing more. Start a new run for the work with wf start.`;
   }
-  const taskId = run.steps[name]!.taskId;
+  const taskId = run.steps[name].taskId;
   if (!taskId) return `${name} has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls ${run.id}.`;
   const phase = phaseOf(taskId);
   if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
@@ -3023,7 +3023,7 @@ export function roundAsk(
         : `no step of ${run.id} has \`loop:\`, so there is no round to run. To try a step again: wf retry ${run.id} <step>.`,
     );
   }
-  const looping = named ?? loops[0]!;
+  const looping = named ?? loops[0];
   const now = roundOf(run, looping.name);
   const accepted = acceptanceOf(run, looping.name);
   // What waits on the loop and has a task of its own. Nothing does while the loop asks for another round — `assess` holds them — so this
@@ -3220,7 +3220,7 @@ export function acceptAsk(
         : `no step of ${run.id} has \`loop:\`, so there is no loop to end. To approve a step at its gate: wf approve ${run.id} <step>.`,
     );
   }
-  const looping = named ?? loops[0]!;
+  const looping = named ?? loops[0];
   const now = roundOf(run, looping.name);
   const n = tryOf(run, looping.name);
   const given = acceptanceOf(run, looping.name);
@@ -3720,7 +3720,7 @@ export function runWorktrees(
     .filter((w) => ours(w.path))
     .map((w) => {
       const working = names.filter(
-        (name) => run.steps[name]?.workspace && path.resolve(run.steps[name]!.workspace!) === path.resolve(w.path),
+        (name) => run.steps[name]?.workspace && path.resolve(run.steps[name].workspace) === path.resolve(w.path),
       );
       return { ...w, step: working.at(-1) ?? path.basename(w.path) };
     });
@@ -4459,7 +4459,7 @@ export function decision(
       .filter(
         (s) =>
           statusOf.get(s.name) === 'checking' ||
-          (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))),
+          (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name].taskId!))),
       )
       .map((s) => s.name);
     // An ending step waiting for the repository's own checkout is waited on too: a person's word that files it is given, and what holds it
@@ -4522,7 +4522,7 @@ export function decision(
   // A check that refused and one that never finished are both `failed (check)`, and both stop what follows. They
   // ask different things of a person: read what the suite said, or run it again.
   const checkFailed = named('failed (check)');
-  const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name]!.check!.taskId), verdictOf(name)));
+  const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name].check!.taskId), verdictOf(name)));
   const failedCheck = checkFailed.filter((name) => !unfinishedCheck.includes(name));
   const unsigned = named('unsigned');
   const unverified = named('unverified');
@@ -6053,10 +6053,10 @@ export function workspacePlan(steps: readonly Workflow[], step: Workflow): Works
   if (step.after.length === 0) return { kind: 'fork', from: null };
   if (step.after.length > 1) {
     const [first, ...also] = [...step.after].sort();
-    return { kind: 'merge', from: first!, also };
+    return { kind: 'merge', from: first, also };
   }
 
-  const parent = step.after[0]!;
+  const parent = step.after[0];
   const siblings = steps.filter((s) => s.after.includes(parent));
   return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
 }

@@ -71,8 +71,8 @@ test("a refused start or drop stays on the page after the inbox is read again: o
     ['oldest-a1b2', 'gone', 'remove'],
     ['started-e5f6', 'listed', 'start'],
   ]);
-  assert.equal(lines[3]!.entry, kept, 'a card still listed is drawn as the inbox now lists it, not as it was refused');
-  assert.equal(lines[1]!.refusal!.message, 'no card dropped-k2q9 in the inbox.', "with the api's words");
+  assert.equal(lines[3].entry, kept, 'a card still listed is drawn as the inbox now lists it, not as it was refused');
+  assert.equal(lines[1].refusal!.message, 'no card dropped-k2q9 in the inbox.', "with the api's words");
 
   // Before the inbox is read again, each refused card is still listed: its refusal on it, and no line of its own.
   assert.deepEqual(cardLines([newest, middle, oldest, kept], refusals).map(line), [
@@ -185,7 +185,7 @@ test("a card's start is preset to the workflow it names, found as a start finds 
     WORKFLOWS[0],
     'an absolute path on a card about another repository is that folder',
   );
-  assert.equal(workflowKey(WORKFLOWS[2]!), 'yours:dev');
+  assert.equal(workflowKey(WORKFLOWS[2]), 'yours:dev');
 });
 
 test('REFUSED: no preset for a card that names no workflow, a workflow nobody here has, one that does not read, a name only yours has, or a relative path', () => {
@@ -228,7 +228,7 @@ test("a card's repository on a team that works in folders: the start form says i
   assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
   // The board says it before the start because a start the api takes opens the run's page: the api answers the same fact on the start
   // (`ignoredRepo`), which a person would never read here.
-  assert.match(said!, /\/code\/app/, 'and it names the repository the card named, not a repository in general');
+  assert.match(said, /\/code\/app/, 'and it names the repository the card named, not a repository in general');
 });
 
 test('REFUSED: nothing is said of a repository a run does look at, nor of a card that names none', () => {
@@ -255,10 +255,10 @@ test('REFUSED: a start of a team that works in folders sends none, whatever the 
 function sending(t: { after: (fn: () => void) => void }, answer: () => Response) {
   const before = globalThis.fetch;
   const sent: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(url), init });
     return answer();
-  }) as typeof fetch;
+  };
   t.after(() => {
     globalThis.fetch = before;
   });
@@ -332,7 +332,7 @@ test('a card is started through POST /api/runs with `card` beside the workflow a
     card: 'show-what-a-step-cost-c3cw',
   };
   assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6', removed: true });
-  assert.deepEqual(JSON.parse(String(sent[0]!.init?.body)), asked);
+  assert.deepEqual(JSON.parse(String(sent[0].init?.body)), asked);
 
   answer = answered(201, {
     id: 'show-each-step-s-cost-42g6',

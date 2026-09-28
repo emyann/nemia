@@ -171,8 +171,8 @@ test("a session that ends with no statement where one was asked: ended as its ha
   const events = (await b.record(id)) as Event[];
   const without = events.map((e) => (e.kind === 'ended' ? (({ stated: _, ...rest }) => rest)(e) : e)) as Event[];
   const old = fold(id, without);
-  assert.equal('stated' in old.attempts[0]!, false, 'a journal from before stage 4a carries no key');
-  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0]!, stated: false }] });
+  assert.equal('stated' in old.attempts[0], false, 'a journal from before stage 4a carries no key');
+  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0], stated: false }] });
 });
 
 test('a spawn the harness refused: the attempt ends unstartable in its words, and the task settles failed', async () => {
@@ -276,9 +276,9 @@ test('what the harness denied the session is written on its end, as it said it, 
   const without = events.map((e) => (e.kind === 'ended' ? (({ denials: _, ...rest }) => rest)(e) : e)) as Event[];
   const none = events.map((e) => (e.kind === 'ended' ? { ...e, denials: undefined } : e)) as Event[];
   const old = fold(id, without);
-  assert.equal('denials' in old.attempts[0]!, false, 'an attempt whose end names no denial carries no key');
+  assert.equal('denials' in old.attempts[0], false, 'an attempt whose end names no denial carries no key');
   assert.deepEqual(fold(id, none), old);
-  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0]!, denials }] });
+  assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0], denials }] });
 });
 
 test('a task held open: it signs and waits, an answer is a turn that continues its session, a close settles it', async () => {

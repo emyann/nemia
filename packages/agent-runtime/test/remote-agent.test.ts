@@ -129,7 +129,7 @@ test('a card that asks for a bearer token, with no credentials to give one: unst
   const id = await e.file(task());
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed');
-  const a = v.state.attempts[0]!;
+  const a = v.state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none/);
   assert.match(a.error ?? '', /Nothing was sent/);
@@ -153,7 +153,7 @@ test('what the runtime cannot send refuses too: an API key in a query, mutual TL
     const s = await serve({ security, script: HELD });
     const { e } = engineOn(s, { credentials: () => 'a secret it has' });
     const id = await e.file(task());
-    const a = (await settled(e, id)).state.attempts[0]!;
+    const a = (await settled(e, id)).state.attempts[0];
     assert.equal(a.reason, 'unstartable');
     assert.match(a.error ?? '', said);
     assert.equal(s.paths.length, 0);
@@ -173,15 +173,15 @@ test('a card with two requirements is met by the first the secrets meet whole', 
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'key' ? 'k-1' : undefined) });
   const id = await e.file(task());
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
-  assert.equal(s.headers[0]!['x-api-key'], 'k-1');
-  assert.equal(s.headers[0]!.authorization, undefined);
+  assert.equal(s.headers[0]['x-api-key'], 'k-1');
+  assert.equal(s.headers[0].authorization, undefined);
 });
 
 test('a secret the agent refuses: unstartable, in words that say to check it, and the agent did nothing', async () => {
   const s = await serve({ security: bearer('right'), script: HELD });
   const { e, root } = engineOn(s, { credentials: () => 'wrong' });
   const id = await e.file(task());
-  const a = (await settled(e, id)).state.attempts[0]!;
+  const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /refused the request's authentication \(401/);
   assert.equal(s.counts.sendMessage ?? 0, 0);
@@ -192,7 +192,7 @@ test('a card that offers only gRPC: unstartable, naming what the runtime speaks'
   const s = await serve({ bindings: ['GRPC'], script: HELD });
   const { e } = engineOn(s);
   const id = await e.file(task());
-  const a = (await settled(e, id)).state.attempts[0]!;
+  const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /offers GRPC 1\.0, and this runtime speaks JSON-RPC \(`JSONRPC`\) and REST \(`HTTP\+JSON`\)/);
   assert.equal(s.paths.length, 0);
@@ -205,7 +205,7 @@ test('an agent that is not there: unstartable, since its card could not be read 
   servers.splice(servers.indexOf(s), 1);
   const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
   const id = await e.file(task());
-  const a = (await settled(e, id)).state.attempts[0]!;
+  const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /could not be read at .*agent-card\.json .*not reachable/);
 });
@@ -217,7 +217,7 @@ test('a card that could not be read is named by its origin and path, never its q
   servers.splice(servers.indexOf(s), 1);
   const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
   const id = await e.file(task());
-  const a = (await settled(e, id)).state.attempts[0]!;
+  const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /could not be read at http:\/\/[^ ]*\/agent\.json \(/, 'the card is still named, by its path');
   assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
@@ -289,16 +289,16 @@ for (const bindings of BINDINGS) {
     const v = await running(e, id);
     assert.equal(v.phase, 'running (working)');
     assert.equal(v.sessionId, s.tasks()[0]);
-    assert.deepEqual(s.sent[0]!.metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: SCHEMA } });
-    s.move(s.tasks()[0]!, { data: { painted: 'white' }, state: 'completed' });
+    assert.deepEqual(s.sent[0].metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: SCHEMA } });
+    s.move(s.tasks()[0], { data: { painted: 'white' }, state: 'completed' });
     const done = await settled(e, id);
     assert.equal(done.state.settled, 'succeeded');
-    assert.deepEqual(done.state.attempts[0]!.closeout, { painted: 'white' });
-    assert.equal(done.state.attempts[0]!.stated, true);
-    assert.equal(done.state.attempts[0]!.nativeId, s.sent[0]!.contextId || done.state.attempts[0]!.nativeId);
+    assert.deepEqual(done.state.attempts[0].closeout, { painted: 'white' });
+    assert.equal(done.state.attempts[0].stated, true);
+    assert.equal(done.state.attempts[0].nativeId, s.sent[0].contextId || done.state.attempts[0].nativeId);
     assert.equal(s.counts.sendMessage, 1);
     assert.ok(
-      s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0]!)),
+      s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0])),
       `every call on the card's first binding: ${s.paths.join(', ')}`,
     );
   });
@@ -315,11 +315,11 @@ for (const bindings of BINDINGS) {
     assert.equal(v.waitingFor, 'input');
     const said = await e.say(id, 'blue');
     assert.equal(said.text, 'blue');
-    assert.equal(s.sent[1]!.taskId, s.tasks()[0], 'on the same Task');
-    assert.equal(s.sent[1]!.contextId, v.state.attempts[0]!.nativeId ?? s.sent[1]!.contextId);
+    assert.equal(s.sent[1].taskId, s.tasks()[0], 'on the same Task');
+    assert.equal(s.sent[1].contextId, v.state.attempts[0].nativeId ?? s.sent[1].contextId);
     const done = await settled(e, id);
     assert.equal(done.state.settled, 'succeeded');
-    assert.deepEqual(done.state.attempts[0]!.closeout, { colour: 'blue' });
+    assert.deepEqual(done.state.attempts[0].closeout, { colour: 'blue' });
     assert.equal(s.tasks().length, 1, 'one Task, two turns');
     assert.ok(journalOf(root, id).some((ev) => ev.kind === 'said'));
   });
@@ -341,7 +341,7 @@ for (const bindings of BINDINGS) {
     const id = await e.file(task());
     const done = await settled(e, id);
     assert.equal(done.state.settled, 'failed');
-    assert.equal(done.state.attempts[0]!.reason, 'harness');
+    assert.equal(done.state.attempts[0].reason, 'harness');
     assert.match(await e.logs(id), /FAILED — the paint ran out/);
   });
 
@@ -350,8 +350,8 @@ for (const bindings of BINDINGS) {
     const { e } = engineOn(s);
     const id = await e.file(task());
     const done = await settled(e, id);
-    assert.equal(done.state.attempts[0]!.stated, false);
-    assert.equal(done.state.attempts[0]!.closeout, undefined);
+    assert.equal(done.state.attempts[0].stated, false);
+    assert.equal(done.state.attempts[0].closeout, undefined);
   });
 }
 
@@ -362,12 +362,12 @@ test('a task held open: its answer is a new Task in the same context, as A2A con
   const first = await until(e, id, (v) => v.phase === 'input-required', 'waited for an answer');
   await e.answer(id, 'once more');
   const second = await until(e, id, (v) => v.phase === 'input-required' && v.state.attempts.length === 2, 'took its answer');
-  assert.equal(s.sent[1]!.contextId, first.state.attempts[0]!.nativeId, 'sent into the context of the first');
-  assert.equal(s.sent[1]!.taskId, '');
+  assert.equal(s.sent[1].contextId, first.state.attempts[0].nativeId, 'sent into the context of the first');
+  assert.equal(s.sent[1].taskId, '');
   assert.equal(s.tasks().length, 2);
-  assert.deepEqual(second.state.attempts[1]!.closeout, { turn: 1, heard: 'once more' });
+  assert.deepEqual(second.state.attempts[1].closeout, { turn: 1, heard: 'once more' });
   // Settled on the context, the view's session is the conversation, and its logs are the latest Task in it.
-  assert.equal(second.sessionId, first.state.attempts[0]!.nativeId);
+  assert.equal(second.sessionId, first.state.attempts[0].nativeId);
   assert.match(await e.logs(id), /^user: once more\n/);
   await e.close(id);
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
@@ -379,7 +379,7 @@ test('an agent that answers with a Message, not a Task: the session is its reply
   const id = await e.file(task());
   const done = await settled(e, id);
   assert.equal(done.state.settled, 'succeeded');
-  assert.deepEqual(done.state.attempts[0]!.closeout, { answer: 42 });
+  assert.deepEqual(done.state.attempts[0].closeout, { answer: 42 });
   assert.match(await e.logs(id), /agent: here you are/);
   assert.equal(s.counts.getTask ?? 0, 0, 'no Task to ask about');
 });
@@ -387,7 +387,7 @@ test('an agent that answers with a Message, not a Task: the session is its reply
 test("a card served as the SDK's own objects is read with its security schemes whole", async () => {
   const s = await serve({ cardForm: 'sdk', security: bearer('sdk-token'), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const bare = engineOn(s);
-  const refused = (await settled(bare.e, await bare.e.file(task()))).state.attempts[0]!;
+  const refused = (await settled(bare.e, await bare.e.file(task()))).state.attempts[0];
   assert.equal(refused.reason, 'unstartable');
   assert.match(refused.error ?? '', /`token` needs a secret/);
   assert.equal(s.paths.length, 0, 'refused off the card, before any request: the scheme was read');
@@ -435,7 +435,7 @@ test('restart after `spawned`: a new engine over the same root reads the Task by
   await running(e, id);
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const gets = s.counts.getTask ?? 0;
-  s.move(s.tasks()[0]!, { data: { ok: true }, state: 'completed' });
+  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(again, id)).state.settled, 'succeeded');
   assert.ok((s.counts.getTask ?? 0) > gets);
   assert.equal(s.counts.sendMessage, 1);
@@ -457,7 +457,7 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const v = await running(again, id);
   assert.equal(v.sessionId, s.tasks()[0]);
-  s.move(s.tasks()[0]!, { data: { ok: true }, state: 'completed' });
+  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(again, id)).state.settled, 'succeeded');
   assert.equal(s.counts.sendMessage, 1);
 });
@@ -489,7 +489,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   );
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const done = await settled(again, id);
-  assert.equal(done.state.attempts[0]!.reason, 'lost');
+  assert.equal(done.state.attempts[0].reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0);
 });
 
@@ -559,8 +559,8 @@ test("a registry written before sightings spoke A2A's names is read in them, in 
     views.map((v) => v.state.settled),
     ['succeeded', 'stopped', null, 'failed'],
   );
-  assert.equal(views[2]!.phase, 'needs-human');
-  assert.equal(views[2]!.waitingFor, 'authentication');
+  assert.equal(views[2].phase, 'needs-human');
+  assert.equal(views[2].waitingFor, 'authentication');
   assert.ok(!fs.existsSync(entryFile(root, `ae/${signed}/1`)), 'an ended entry is let go of into `remote/done/`');
   assert.ok(fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${signed}/1`)}.json`)));
 });
@@ -590,7 +590,7 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
   const v = await dead.view(id);
   assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
   assert.equal(v.sessionId, entry.taskId);
-  s.move(s.tasks()[0]!, { data: { ok: true }, state: 'completed' });
+  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
 });
 
@@ -610,7 +610,7 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   const { e, root } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? token : undefined) });
   const id = await e.file(task());
   await running(e, id);
-  s.move(s.tasks()[0]!, { data: { ok: true }, state: 'completed' });
+  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');
   assert.ok(
@@ -632,7 +632,7 @@ test('a card served at one origin that names its interfaces on another: unstarta
   const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const s = await serve({ security: apiKey(key), interfacesAt: elsewhere.url, script: HELD });
   const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await e.file(task()))).state.attempts[0]!;
+  const a = (await settled(e, await e.file(task()))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(
     a.error ?? '',
@@ -651,7 +651,7 @@ test('a redirect from the agent is not followed: the send is refused, and the ad
   const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const s = await serve({ security: apiKey(key), redirectTo: elsewhere.url, script: HELD });
   const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await e.file(task()))).state.attempts[0]!;
+  const a = (await settled(e, await e.file(task()))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', new RegExp(`answered 307 to ${elsewhere.url}/a2a/jsonrpc, and a redirect is not followed`));
   assert.equal(elsewhere.paths.length, 0, 'the address it named was sent nothing');
@@ -709,7 +709,7 @@ test('a request the agent holds is given up after its bound: a card not read ref
   s.hanging.a2a = false;
 
   await Effect.runPromise(ops.spawn({ name: 'ae/seen/1', brief: 'b', cwd: '/w' }));
-  const taskId = s.tasks()[0]!;
+  const taskId = s.tasks()[0];
   s.hanging.a2a = true;
   const [observeMs, seen] = await timed(() => Effect.runPromise(ops.observe));
   assert.ok(observeMs < 3_000, `${observeMs} ms`);
@@ -754,7 +754,7 @@ test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} 
   assert.equal(s.replies(), 1);
   const done = await settled(e, id);
   assert.equal(done.state.settled, 'succeeded');
-  assert.deepEqual(done.state.attempts[0]!.closeout, { verdict: 'fine' });
+  assert.deepEqual(done.state.attempts[0].closeout, { verdict: 'fine' });
   assert.equal(done.state.attempts.length, 1);
   assert.equal(s.counts.sendMessage, 1, 'sent once');
   assert.match(await e.logs(id), /agent: slow and sure/);
@@ -792,7 +792,7 @@ test('a pass returns while the agent holds the send, and the next task in it is 
   g.open();
   const v = await settled(e, a);
   assert.equal(v.state.settled, 'succeeded');
-  assert.deepEqual(v.state.attempts[0]!.closeout, { ok: 'held' });
+  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'held' });
   assert.equal(held.counts.sendMessage, 1, 'sent once');
 });
 
@@ -861,7 +861,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
   );
   const done = await settled(createEngine({ root, harnesses: { remote: { url: s.url } } }), id);
-  assert.equal(done.state.attempts[0]!.reason, 'lost');
+  assert.equal(done.state.attempts[0].reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
 });
 
@@ -892,11 +892,7 @@ test('a refusal that comes after the spawn returned ends the session `rejected`,
   const id = await e.file(task());
   const v = await until(e, id, (x) => x.state.settled !== null, 'settled', 400);
   assert.equal(v.state.settled, 'failed');
-  assert.equal(
-    v.state.attempts[0]!.reason,
-    'harness',
-    'the agent refused the work once it had the send: a failed end, not a spawn refused',
-  );
+  assert.equal(v.state.attempts[0].reason, 'harness', 'the agent refused the work once it had the send: a failed end, not a spawn refused');
   assert.match(await e.logs(id), /REJECTED — the agent refused the request's authentication \(401/);
   assert.equal(s.counts.sendMessage ?? 0, 0, 'the agent did nothing');
   assert.ok(
@@ -922,7 +918,7 @@ test("credentials is asked by the harness's name too, and missingCredential word
   });
   assert.equal((await settled(e, await e.file(task({ harness: 'reviewer' })))).state.settled, 'succeeded');
   assert.deepEqual(asked[0], ['token', s.url, 'reviewer']);
-  const a = (await settled(e, await e.file(task({ harness: 'other' })))).state.attempts[0]!;
+  const a = (await settled(e, await e.file(task({ harness: 'other' })))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none: set WF_A2A_OTHER_TOKEN\./);
   assert.equal(s.counts.sendMessage, 1, 'only the task with its secret was sent');
@@ -961,7 +957,7 @@ test('a pass makes one GetTask per open remote task, and none once they settle',
     for (let pass = 1; pass <= 4; pass++) {
       const gets = s.counts.getTask ?? 0;
       const report = await e.tick();
-      const o = report.observed.remote!;
+      const o = report.observed.remote;
       assert.equal(o.calls, 1, `${n} tasks, pass ${pass}: one observe`);
       assert.equal(o.listed, n);
       assert.equal((s.counts.getTask ?? 0) - gets, n, 'one GetTask each');

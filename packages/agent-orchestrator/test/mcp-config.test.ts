@@ -32,11 +32,11 @@ const refusals = (config: unknown, repo: string): string[] => {
   if (!servers || typeof servers !== 'object' || Array.isArray(servers)) return ['names no map of servers under `mcpServers`'];
   const names = Object.keys(servers);
   if (names.length !== 1 || names[0] !== 'playwright') return [`names ${JSON.stringify(names)}, not exactly one server, \`playwright\``];
-  const { command, args } = (servers as Record<string, { command?: unknown; args?: unknown }>).playwright!;
+  const { command, args } = (servers as Record<string, { command?: unknown; args?: unknown }>).playwright;
   const out: string[] = [];
   if (command !== 'node') out.push(`runs ${JSON.stringify(command)}, not node: npx downloads at every spawn`);
   if (!Array.isArray(args) || !args.every((a) => typeof a === 'string')) return [...out, 'gives no list of string arguments'];
-  const [script, ...flags] = args as string[];
+  const [script, ...flags] = args;
   if (!script || path.isAbsolute(script))
     out.push(`names its script ${JSON.stringify(script)}, not by a path relative to the repository: an absolute one is one checkout`);
   else if (!fs.statSync(path.join(repo, script), { throwIfNoEntry: false })?.isFile())
@@ -63,9 +63,9 @@ const onPath = (command: string) =>
 test('the root .mcp.json parses and names exactly one server, playwright, run from disk as headless, isolated chromium', () => {
   const config = shipped();
   assert.deepEqual(Object.keys(config.mcpServers), ['playwright']);
-  const { command, args } = config.mcpServers.playwright!;
+  const { command, args } = config.mcpServers.playwright;
   assert.ok(onPath(command), `${command} is on PATH`);
-  assert.ok(fs.statSync(path.join(REPO, args[0]!)).isFile(), `${args[0]} is on disk under ${REPO}`);
+  assert.ok(fs.statSync(path.join(REPO, args[0])).isFile(), `${args[0]} is on disk under ${REPO}`);
   assert.ok(args.includes('--headless'));
   assert.equal(args[args.indexOf('--browser') + 1], 'chromium');
   assert.deepEqual(refusals(config, REPO), []);
@@ -84,7 +84,7 @@ test('each way out of that shape is refused', () => {
     [
       'an absolute script',
       (s) => {
-        s.args[0] = path.join(REPO, s.args[0]!);
+        s.args[0] = path.join(REPO, s.args[0]);
       },
       /an absolute one is one checkout/,
     ],
@@ -154,7 +154,7 @@ test('each way out of that shape is refused', () => {
   ];
   for (const [label, change, why] of cases) {
     const config = structuredClone(shipped());
-    change(config.mcpServers.playwright!, config);
+    change(config.mcpServers.playwright, config);
     assert.match(refusals(config, REPO).join('; '), why, label);
   }
   assert.deepEqual(refusals({ servers: {} }, REPO), ['names no map of servers under `mcpServers`']);
@@ -166,7 +166,7 @@ test('an interactive session in the checkout is given the same server, and it is
   assert.equal([exact('^0.0.80'), exact('latest'), exact('0.0.80')].join(), 'false,false,true', 'the pin check refuses a range');
   const pinned = read('package.json').devDependencies['@playwright/mcp'];
   assert.ok(exact(pinned), `@playwright/mcp is pinned exactly, not ${pinned}`);
-  const script = shipped().mcpServers.playwright!.args[0]!;
+  const script = shipped().mcpServers.playwright.args[0];
   assert.equal(
     read(path.join(path.dirname(script), 'package.json')).version,
     pinned,
@@ -184,7 +184,7 @@ test('the ui implement step is told it has the browser', () => {
 test('the server starts as configured, from the repository root, and offers browser_navigate', async () => {
   // What Claude Code does with the entry: spawn it in the session's cwd and speak JSON-RPC on stdio.
   // Listing tools launches no browser, so this costs nothing and needs no install.
-  const { command, args } = shipped().mcpServers.playwright!;
+  const { command, args } = shipped().mcpServers.playwright;
   const child = spawn(command, args, { cwd: REPO, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', (d) => {

@@ -131,7 +131,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 const aDone = async (b: ReturnType<typeof board>, repo: string, { merged = false } = {}) => {
   const run = start({ brief: 'add a flag', repo, workflowDir: oneStep() });
   await advance(b.e, readRun(run.id));
-  const wt = readRun(run.id).steps.implement!.workspace!;
+  const wt = readRun(run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, `fix-${run.id}.ts`), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'add fix');
@@ -382,7 +382,7 @@ test('a held run files nothing — the next step, nor on a hold written between 
   assert.ok(!b.filings.includes(`${other.id}-implement`), 'the file on disk holds, whatever the run read said');
 
   // The target ships: its work committed, signed off, handed off, and merged.
-  const wt = readRun(target.id).steps.implement!.workspace!;
+  const wt = readRun(target.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'target.ts'), 'export const t = 1;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'target');
@@ -460,10 +460,10 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(loop.id));
   const roundTwo = readRun(loop.id);
-  const implement2 = roundTwo.steps.implement!.taskId!;
+  const implement2 = roundTwo.steps.implement.taskId!;
   b.settle(implement2, 'succeeded', SIGNED);
   await advance(b.e, readRun(loop.id));
-  const review2 = readRun(loop.id).steps.review!.taskId!;
+  const review2 = readRun(loop.id).steps.review.taskId!;
   b.settle(review2, 'succeeded', { ...SIGNED, again: true });
   await advance(b.e, readRun(loop.id));
   const before = (await typed(t, b.e, 'decide', loop.id)).printed;
@@ -505,7 +505,7 @@ test("a blocked step's question stays on its record while the run is held, asked
   assert.doesNotMatch(screen, /waiting on you|BLOCKED/, screen);
   assert.doesNotMatch(screen, VERBS, screen);
   assert.equal((await decide(b.e, run.id)).decision.kind, 'running');
-  assert.equal(readRun(run.id).steps.implement!.taskId, `${run.id}-implement`, 'the step and its closeout are untouched');
+  assert.equal(readRun(run.id).steps.implement.taskId, `${run.id}-implement`, 'the step and its closeout are untouched');
   // A try written by hand beside the hold is no try due: nothing is filed, and what the blocked step stops is still read as stopped.
   const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
   fs.mkdirSync(asks, { recursive: true });
@@ -624,7 +624,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
 
   // Finished and never merged, then its worktree and branch deleted: git finds its work nowhere.
   const dropped = await aDone(b, repo);
-  git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement!.workspace!);
+  git(repo, 'worktree', 'remove', '--force', readRun(dropped.id).steps.implement.workspace!);
   git(repo, 'branch', '-q', '-D', `wf/${dropped.id}/implement`);
   await refused(
     t,
@@ -653,7 +653,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   await hold(b.e, run.id, [other.id]);
   const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
   assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
-  const wt = readRun(target.id).steps.implement!.workspace!;
+  const wt = readRun(target.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'target.ts'), 'export const t = 1;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'target');

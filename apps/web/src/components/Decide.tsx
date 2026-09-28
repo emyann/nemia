@@ -108,7 +108,7 @@ export function DecideSection({
             <p className="text-sm text-neutral-500">
               Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.
             </p>
-            <Facts rows={[['work', pathRow(run!.work)]]} />
+            <Facts rows={[['work', pathRow(run.work)]]} />
           </div>
         ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)

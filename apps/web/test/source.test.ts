@@ -18,7 +18,7 @@ const CONTROL = new RegExp(
     [14, 31],
     [127, 127],
   ]
-    .map(([from, to]) => `${String.fromCharCode(from!)}-${String.fromCharCode(to!)}`)
+    .map(([from, to]) => `${String.fromCharCode(from)}-${String.fromCharCode(to)}`)
     .join('')}]`,
 );
 

@@ -54,7 +54,7 @@ function byteAt(file: string, at: number): number {
   try {
     const one = Buffer.alloc(1);
     countRead(fs.readSync(fd, one, 0, 1, at));
-    return one[0]!;
+    return one[0];
   } finally {
     fs.closeSync(fd);
   }
@@ -265,7 +265,7 @@ function watchFeedFile(
           cursor = got.cursor;
           for (const [i, line] of got.lines.entries()) {
             if (stopped) return;
-            await onLine(line, got.ends[i]!);
+            await onLine(line, got.ends[i]);
           }
         }
         // oxlint-disable-next-line no-unmodified-loop-condition -- a drain called during an await sets `again`, and `stop()` sets `stopped`

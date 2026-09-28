@@ -121,7 +121,7 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
   // The one thing a person needs to find what it made, where a git run has a repository and a branch.
   assert.equal(run.work, work);
   const [write] = run.steps;
-  assert.deepEqual([write!.name, write!.workspace, write!.branch], ['write', path.join(work, 'write'), null]);
+  assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
   // And the sentences it carries — what the board reads out loud — name no git.
   for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {
     if (typeof said === 'string') assert.doesNotMatch(said, GIT_WORD, said);
@@ -193,7 +193,7 @@ test('a folder step carries everything its folder holds: what a name reaches wit
   // work too, and a board that turns an empty list into *the folder is empty* must not say that of a folder holding only `scratch/`.
   // The run's own `given/` is the one thing left out: it is not the step's work, and listed it would stand in the folder of every
   // step of every run started with `--input`, so no step could ever be read as having made nothing.
-  assert.deepEqual(write!.files, [
+  assert.deepEqual(write.files, [
     { path: path.join(wrote, '..hidden.md') },
     {
       path: path.join(wrote, 'bundle.zip'),
@@ -352,7 +352,7 @@ test("a file a step wrote called `given` is its own work, and is listed — only
 
   const run = (await (await app.request('/api/runs/f-given')).json()) as { steps: { files: { path: string; name?: string }[] }[] };
   assert.deepEqual(
-    run.steps[0]!.files.map((f) => f.name ?? f.path),
+    run.steps[0].files.map((f) => f.name ?? f.path),
     ['given', 'note.md'],
   );
 });

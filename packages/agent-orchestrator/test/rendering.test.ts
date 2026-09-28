@@ -175,8 +175,8 @@ test('REFUSED at shipped defaults: a codex agent with skills or a system prompt,
   );
   // A codex agent that says only `default`, or nothing, is what it was: its instructions in the brief.
   const [codex] = loadWorkflows(team('---\nharness: codex\nsystemPrompt: default\n---\nYou build.\n', {}));
-  assert.equal(rendersAgent(codex!), false);
-  assert.match(briefBody(codex!), /^You build\./);
+  assert.equal(rendersAgent(codex), false);
+  assert.match(briefBody(codex), /^You build\./);
 });
 
 test('REFUSED at shipped defaults: skills or a system prompt on a step that continues another session, which keeps its own (F13)', () => {
@@ -273,7 +273,7 @@ test("an agent Claude Code's /agents wizard wrote into .claude/agents/ runs as i
   const repo = tree({ '.claude/agents/code-reviewer.md': WIZARD });
   const home = tree({ 'workflows/team/review.md': '---\nagent: code-reviewer\n---\nReview the change.\n' });
   const [step] = loadWorkflows(path.join(home, 'workflows', 'team'), { repo, home });
-  assert.deepEqual([step!.model, step!.tools, step!.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
+  assert.deepEqual([step.model, step.tools, step.permissionMode], ['sonnet', ['Read', 'Grep', 'Glob', 'Bash'], undefined]);
   const agent = agentsFor(path.join(home, 'workflows', 'team'), { repo, home }).get('code-reviewer') as Agent;
   assert.equal(agent.description, 'Use this agent when a change needs a second look. Example: after a feature is written.');
   assert.equal(agent.body.trim(), 'You are a careful code reviewer.');
@@ -378,8 +378,7 @@ test("an agent's version moves with each skill it gives, and not with one it doe
 });
 
 /** A step as the parser resolves it, for the pure functions. */
-const resolved = (agent: string, files: Record<string, string> = {}, step?: string): Workflow =>
-  loadWorkflows(team(agent, files, step))[0]!;
+const resolved = (agent: string, files: Record<string, string> = {}, step?: string): Workflow => loadWorkflows(team(agent, files, step))[0];
 
 test('the prompt is the instructions, then each skill by its namespaced name, then each skill that asks to be told whole', () => {
   const step = resolved('---\nskills: write-a-note, review-a-change\n---\nYou build.\n', {
@@ -411,7 +410,7 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
   // Nothing to render: an agent with no instructions, no skills and the default prompt, and a step with no agent.
   assert.equal(flags('---\nmodel: opus\n---\n'), undefined);
   assert.equal(
-    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': 'Just a step.\n' }), 'workflows', 'team'))[0]!, dir),
+    renderedFlags(loadWorkflows(path.join(tree({ 'workflows/team/build.md': 'Just a step.\n' }), 'workflows', 'team'))[0], dir),
     undefined,
   );
 });

@@ -445,7 +445,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   const repo = aRepoWith('dev');
   const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
   const queued = await printedBy(t, b.e, 'inbox', 'queue', card.name);
-  const at = /^queued: (.*)$/m.exec(fs.readFileSync(file, 'utf8'))![1]!;
+  const at = /^queued: (.*)$/m.exec(fs.readFileSync(file, 'utf8'))![1];
   assert.deepEqual(
     fs.readFileSync(file, 'utf8'),
     `---\nworkflow: dev\nrepo: ${repo}\nqueued: ${at}\n---\nCache the views between passes\n`,
@@ -455,7 +455,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
     `the tick starts it on its own once its turn comes and a run slot is free — take it back with wf inbox queue ${card.name} --off`,
   ]);
   assert.match(
-    (await printedBy(t, b.e, 'inbox'))[0]!,
+    (await printedBy(t, b.e, 'inbox'))[0],
     new RegExp(`^${card.name}  Cache the views between passes  workflow: dev  repo: \\S+  queued 1 of 1$`),
   );
 
@@ -497,7 +497,7 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   }
   const [upRun] = fromCard(again.card.name);
   assert.ok(
-    printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun!.id}$`).test(l)),
+    printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun.id}$`).test(l)),
     printed.join('\n'),
   );
 });
@@ -534,7 +534,7 @@ test('a queued card that names no repository starts on the repository the daemon
   const [run] = fromCard(card.name);
   assert.deepEqual(
     [pass.queue, run?.repo, run?.workflowDir],
-    [{ card: card.name, run: run!.id, removed: true }, daemons, path.join(daemons, 'workflows', 'dev')],
+    [{ card: card.name, run: run.id, removed: true }, daemons, path.join(daemons, 'workflows', 'dev')],
   );
 });
 
@@ -553,13 +553,10 @@ test('REFUSED at a cap of 1 at shipped defaults: with one run in flight a queued
   b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
   const freed = await tick(b.e);
   const [first] = fromCard('first-a1b2');
-  assert.deepEqual(freed.queue, { card: 'first-a1b2', run: first!.id, removed: true });
+  assert.deepEqual(freed.queue, { card: 'first-a1b2', run: first.id, removed: true });
   // The card's run has nothing filed: the next pass admits it into the slot, and the second card waits behind it.
   const counted = await tick(b.e);
-  assert.deepEqual(
-    [counted.queue, b.filings, fromCard('second-c3d4')],
-    [undefined, [`${busy.id}-implement`, `${first!.id}-implement`], []],
-  );
+  assert.deepEqual([counted.queue, b.filings, fromCard('second-c3d4')], [undefined, [`${busy.id}-implement`, `${first.id}-implement`], []]);
 });
 
 test('the oldest queued card starts first — by when it was queued, not by its name — one card a pass', async () => {
@@ -692,7 +689,7 @@ test(
     }
     assert.deepEqual([fs.existsSync(stuck.file), fromCard(stuck.card.name).length], [true, 1], 'still in the inbox, and started once');
     assert.deepEqual(readInbox().find((l) => l.name === stuck.card.name)!.queued, {
-      at: /^queued: (.*)$/m.exec(fs.readFileSync(stuck.file, 'utf8'))![1]!,
+      at: /^queued: (.*)$/m.exec(fs.readFileSync(stuck.file, 'utf8'))![1],
       place: null,
     });
     assert.deepEqual(
@@ -713,9 +710,9 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
 
   const ticked = await printedBy(t, b.e, 'tick');
   const why = `gone-a1b2.md: \`workflow: nope\` — no workflow folder at ${path.join(INBOX, 'nope')}, nor a workflow named nope in ${path.join(repo, 'workflows')}.`;
-  assert.ok(ticked[0]!.startsWith(`gone-a1b2 not started: ${why}`), ticked.join('\n'));
+  assert.ok(ticked[0].startsWith(`gone-a1b2 not started: ${why}`), ticked.join('\n'));
   assert.ok(
-    ticked[0]!.endsWith(
+    ticked[0].endsWith(
       ' — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue gone-a1b2 --off, then wf inbox queue gone-a1b2)',
     ),
     ticked[0],
@@ -730,7 +727,7 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   // The next pass does not try it again: the card behind it starts.
   const next = await tick(b.e);
   const [behind] = fromCard('behind-c3d4');
-  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind!.id, removed: true });
+  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true });
   assert.deepEqual([(await tick(b.e)).queue, fromCard('gone-a1b2')], [undefined, []], 'nothing more: the refused card waits for a person');
 
   // The workflow put back, and the card queued again: the next pass tries it, and starts it.
@@ -740,7 +737,7 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2');
   const retried = await tick(b.e);
   const [back] = fromCard('gone-a1b2');
-  assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back!.id, removed: true });
+  assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back.id, removed: true });
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
 });
 
@@ -769,7 +766,7 @@ test('REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
 
   const next = await tick(b.e);
   const [behind] = fromCard('behind-c3d4');
-  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind!.id, removed: true });
+  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true });
 
   // Taken back though its repository is gone, and listed with why, out of the queue.
   assert.deepEqual(await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off'), [
@@ -830,7 +827,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   const named = printed.filter((l) => l.includes('no-git-a1b2'));
   assert.equal(named.length, 1, printed.join('\n'));
   assert.match(
-    named[0]!,
+    named[0],
     /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await tick(b.e);
@@ -848,7 +845,7 @@ test('a queued card whose start fails without a refusal — its repository no gi
   git('commit', '-q', '--allow-empty', '-m', 'base');
   const cleared = await tick(b.e);
   const [run] = fromCard('no-git-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run!.id, removed: true });
+  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run.id, removed: true });
   const behind = await tick(b.e);
   assert.deepEqual(
     [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],
@@ -917,9 +914,9 @@ test('a `wf up` at a cap of 1 names the card its queue is stuck on once a slot f
 
   const named = printed.filter((l) => l.includes('no-git-a1b2'));
   assert.equal(named.length, 1, printed.join('\n'));
-  assert.match(named[0]!, /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  assert.match(named[0], /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
-  assert.ok(filed >= 0 && filed < printed.indexOf(named[0]!), `the pass that held the slot came first: ${printed.join('\n')}`);
+  assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);
 });
 
 test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {
@@ -941,13 +938,13 @@ test("REFUSED at shipped defaults, on the repository it was tried on: a queued c
   );
   assert.deepEqual([(await tick(b.e, { repo: none })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
   assert.match(
-    (await printedBy(t, b.e, 'inbox'))[0]!,
+    (await printedBy(t, b.e, 'inbox'))[0],
     new RegExp(` — not started at \\S+ on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: `),
   );
 
   const started = await tick(b.e, { repo: dev });
   const [run] = fromCard(card.name);
-  assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run!.id, removed: true }, dev]);
+  assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run.id, removed: true }, dev]);
 });
 
 test('a record that does not read as a run stops no other run: the pass files the rest, and says once, on stderr, which record it left out and why', async (t) => {
@@ -977,7 +974,7 @@ test('a record that does not read as a run stops no other run: the pass files th
   }
   const leftOut = errs.filter((l) => l.startsWith('left out: run r-broken: its record, '));
   assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs.join('')}`);
-  assert.ok(leftOut[0]!.includes('does not read as a run: its `workspace` is missing'), leftOut[0]);
+  assert.ok(leftOut[0].includes('does not read as a run: its `workspace` is missing'), leftOut[0]);
 });
 
 test('a try the tick wrote down is read only as the tick writes it: a file whose `refused` is no boolean, or missing, or that is no try at all, is none — the card is tried again — and a key beside the five is left unread', () => {

@@ -201,7 +201,7 @@ export async function decide(
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
     if (!answer) continue;
-    const before = run.steps[name]!.tries!.at(-1)!.taskId;
+    const before = run.steps[name].tries!.at(-1)!.taskId;
     const closeout = (views.get(before) ?? (await e.view(before))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
@@ -222,7 +222,7 @@ export async function decide(
     for (const [i, taskId] of tasks.entries()) {
       // A recheck replaced only a check: the try after it has the same task, whose words are the try's that ran its session, said once.
       if (tasks.indexOf(taskId) !== i) continue;
-      for (const s of saidIn(everyTry.get(taskId)!)) told.push({ ...s, try: i + 1 });
+      for (const s of saidIn(everyTry.get(taskId))) told.push({ ...s, try: i + 1 });
     }
     if (told.length) said[name] = told;
   }

@@ -53,7 +53,7 @@ export function layers(steps: readonly StepEdges[]): string[][] {
   const taken = names.filter((name) => waiting.get(name) === 0);
   for (const name of taken) depthOf.set(name, 0);
   for (let i = 0; i < taken.length; i++) {
-    const name = taken[i]!;
+    const name = taken[i];
     for (const child of children.get(name)!) {
       depthOf.set(child, Math.max(depthOf.get(child) ?? 0, depthOf.get(name)! + 1));
       waiting.set(child, waiting.get(child)! - 1);

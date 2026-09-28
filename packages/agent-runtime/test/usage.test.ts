@@ -338,7 +338,7 @@ test("a boundary its session wrote before the attempt began is not the attempt's
   const compactedToo = [
     ...jsonl.split('\n').slice(0, 4),
     boundary('2026-09-19T04:01:18Z'),
-    jsonl.split('\n')[4]!,
+    jsonl.split('\n')[4],
     costStateWith(1.6757343, first, { 'claude-sonnet-5': [100000, 500000, 375784, 19745] }),
   ].join('\n');
   const u = transcriptUsage(compactedToo, since);
@@ -475,7 +475,7 @@ test('a journal written before the classes were measured folds as it did: inputT
     '{"kind":"measured","at":"2026-09-18T09:05:02Z","attempt":1,"usage":{"costUsd":14.72,"apiMs":679931,"toolMs":29305}}',
   ].map((l) => JSON.parse(l) as Event);
   const [a] = fold('t', journal).attempts;
-  assert.deepEqual(a!.usage, {
+  assert.deepEqual(a.usage, {
     turns: 85,
     toolCalls: 40,
     inputTokens: 21861234,
@@ -485,9 +485,9 @@ test('a journal written before the classes were measured folds as it did: inputT
     toolMs: 29305,
   });
   for (const key of ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens', 'peakContextTokens'])
-    assert.equal(key in a!.usage!, false, key);
+    assert.equal(key in a.usage, false, key);
   assert.equal(
-    usageLine(a!.usage),
+    usageLine(a.usage),
     '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · cache not measured · peak not measured',
     'and ae show names what it did not count',
   );
@@ -517,13 +517,13 @@ test('fold carries a cost onto the attempt — on its end, or measured after it 
     ...begun,
     { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: counted },
   ]);
-  assert.deepEqual(legacy.attempts[0]!.usage, counted, 'as recorded: no cost, and nothing standing in for one');
+  assert.deepEqual(legacy.attempts[0].usage, counted, 'as recorded: no cost, and nothing standing in for one');
 
   const printed = fold('t', [
     ...begun,
     { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { costUsd: 0.018, apiMs: 718 } },
   ]);
-  assert.deepEqual(printed.attempts[0]!.usage, { costUsd: 0.018, apiMs: 718 }, 'on its end, as claude -p printed it');
+  assert.deepEqual(printed.attempts[0].usage, { costUsd: 0.018, apiMs: 718 }, 'on its end, as claude -p printed it');
 
   const measured = fold('t', [
     ...begun,
@@ -531,7 +531,7 @@ test('fold carries a cost onto the attempt — on its end, or measured after it 
     { kind: 'measured', at, attempt: 1, usage: { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 } },
     { kind: 'measured', at, attempt: 2, usage: { costUsd: 9 } },
   ]);
-  assert.deepEqual(measured.attempts[0]!.usage, { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 }, 'measured once its session exited');
+  assert.deepEqual(measured.attempts[0].usage, { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 }, 'measured once its session exited');
   assert.equal(measured.attempts.length, 1, 'and one for an attempt that never started changes nothing');
 
   const unmeasuredEnd = fold('t', [
@@ -539,7 +539,7 @@ test('fold carries a cost onto the attempt — on its end, or measured after it 
     { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' },
     { kind: 'measured', at, attempt: 1, usage: { costUsd: 1 } },
   ]);
-  assert.deepEqual(unmeasuredEnd.attempts[0]!.usage, { costUsd: 1 });
+  assert.deepEqual(unmeasuredEnd.attempts[0].usage, { costUsd: 1 });
 });
 
 test('an attempt its runner measured nothing about records null, and a person reads "not measured"', () => {
@@ -550,9 +550,9 @@ test('an attempt its runner measured nothing about records null, and a person re
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' },
   ];
   const [a] = fold('t', events).attempts;
-  assert.equal(a!.usage, null);
-  assert.equal(a!.exitCode, null);
-  assert.equal(attemptLine(a!), 'attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  usage not measured');
+  assert.equal(a.usage, null);
+  assert.equal(a.exitCode, null);
+  assert.equal(attemptLine(a), 'attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  usage not measured');
 });
 
 test('a measured attempt prints what was measured, and names what was not', () => {
@@ -605,7 +605,7 @@ test('a measured attempt prints what was measured, and names what was not', () =
     },
   ]).attempts;
   assert.equal(
-    attemptLine(a!),
+    attemptLine(a),
     'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured',
   );
 });
@@ -645,7 +645,7 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
     },
   ]);
   assert.equal(
-    attemptLine(spent.attempts[0]!),
+    attemptLine(spent.attempts[0]),
     'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02',
   );
 
@@ -675,7 +675,7 @@ test('ae show prints what the harness denied an attempt, as the rules that would
     fold('t-1', [
       ...base,
       { kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra },
-    ]).attempts[0]!;
+    ]).attempts[0];
   assert.equal(
     attemptLine(ended({ denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }] })),
     'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured  denied: Skill(look), Bash(pytest), WebFetch',
@@ -702,7 +702,7 @@ test('ae show and ae feed say an end gave no statement where its task asked for 
     reason: 'harness',
     ...extra,
   });
-  const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]!), entryLine('t-1', end(extra))];
+  const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]), entryLine('t-1', end(extra))];
   assert.deepEqual(shown({ stated: false }), [
     'attempt 1  done (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
     `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done (no statement)`,
@@ -730,7 +730,7 @@ test('ae show prints the budget and the context window a task was filed with, an
 });
 
 test('ae ls prints no priority, even of an old journal that carries one: the runtime keeps no order since stage 4c part 2', () => {
-  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra }) as Event;
+  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra });
   const shown = (extra: object) => taskLine({ id: 't-1', state: fold('t-1', [filed(extra)]), phase: 'pending', sessionId: null });
   for (const extra of [{ priority: 3 }, { priority: -1 }, {}])
     assert.match(shown(extra), /pending {11}  review it$/, JSON.stringify(extra));
@@ -788,8 +788,8 @@ test("a Codex run's usage is read from its stream: tokens from turn.completed, t
     cacheReadTokens: 313856,
     outputTokens: 1082,
   });
-  assert.equal('turns' in read.usage!, false, "Codex's turns are prompts, not model responses");
-  assert.equal('costUsd' in read.usage!, false);
+  assert.equal('turns' in read.usage, false, "Codex's turns are prompts, not model responses");
+  assert.equal('costUsd' in read.usage, false);
 });
 
 test('a Codex stream that cannot say is not made to: a turn cut short gives no tokens, an unknown item no tool-call count', () => {
@@ -836,7 +836,7 @@ const ranAt = (startedAt: string, endedAt?: string) => {
     { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: startedAt, attempt: 1 },
     ...ended,
-  ]).attempts[0]!;
+  ]).attempts[0];
 };
 
 test('ae show says when each attempt ran: its start, its end, and how long that took', () => {

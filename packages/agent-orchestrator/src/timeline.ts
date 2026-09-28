@@ -327,7 +327,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
     spans.some((s) => s.at === 'unknown' || (s.at === 'ended' && !s.endedAt)) ||
     !lasts.length
       ? null
-      : between([...(firsts as string[])].sort()[0]!, lasts.sort().at(-1)!);
+      : between([...(firsts as string[])].sort()[0], lasts.sort().at(-1)!);
   // A sum over the times that are known, then what it leaves out — and never a sum of none, which would read as nothing spent.
   const said = (known: number, ms: number, pending: [number, string], unknown: number): string =>
     [
@@ -382,7 +382,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   };
   const rows = tries.flatMap((t): Array<[string, string]> => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
-    const used = usedLines(t.used)[0]!.replace(/^used\s+/, '');
+    const used = usedLines(t.used)[0].replace(/^used\s+/, '');
     // What the session cost, beside what it used, where the engine measured it.
     const cost = t.used?.costUsd !== undefined ? `  cost ${dollars(t.used.costUsd)}` : '';
     return [

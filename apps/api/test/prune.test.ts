@@ -252,7 +252,7 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   const run = (await listed()).get('p-merged')!;
   assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
   assert.match(
-    run.pruned!.said,
+    run.pruned.said,
     /its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/,
   );
   const page = await detail('p-merged');

@@ -93,38 +93,37 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
 });
 
 test('a remote step whose Task waits on its caller is answered with wf say, and its question read with wf logs — not in Claude Code', () => {
-  const view = (harness: string): TaskView =>
-    ({
-      id: 't-asks',
-      phase: 'needs-human',
-      waitingFor: 'input',
-      sessionId: 'ctx-1',
-      state: {
-        taskId: 't-asks',
-        brief: 'Ask it.',
-        cwd: root,
-        harness,
-        attempts: [
-          {
-            n: 1,
-            startedAt: at(1),
-            spawnedAt: at(1),
-            ended: null,
-            endedAt: null,
-            reason: null,
-            nativeId: 'ctx-1',
-            usage: null,
-            exitCode: null,
-          },
-        ],
-        said: [],
-        inputs: [],
-        closed: false,
-        stopRequested: false,
-        settled: null,
-        filedAt: at(0),
-      },
-    }) as unknown as TaskView;
+  const view = (harness: string): TaskView => ({
+    id: 't-asks',
+    phase: 'needs-human',
+    waitingFor: 'input',
+    sessionId: 'ctx-1',
+    state: {
+      taskId: 't-asks',
+      brief: 'Ask it.',
+      cwd: root,
+      harness,
+      attempts: [
+        {
+          n: 1,
+          startedAt: at(1),
+          spawnedAt: at(1),
+          ended: null,
+          endedAt: null,
+          reason: null,
+          nativeId: 'ctx-1',
+          usage: null,
+          exitCode: null,
+        },
+      ],
+      said: [],
+      inputs: [],
+      closed: false,
+      stopRequested: false,
+      settled: null,
+      filedAt: at(0),
+    },
+  });
   const run = oneStep('r-asks', 'a2a:reviewer', 't-asks');
   const judged = { words: new Map([['ask', 'needs-human']]), waitingOnYou: [] as string[] };
   assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {

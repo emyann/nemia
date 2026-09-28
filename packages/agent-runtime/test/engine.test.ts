@@ -97,7 +97,7 @@ test('a failed attempt settles the task failed: one attempt per start, and no se
   const id = await b.run(file(spec));
 
   await b.run(tick());
-  const first = [...b.sessions.keys()][0]!;
+  const first = [...b.sessions.keys()][0];
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
 
   await b.run(tick());
@@ -222,7 +222,7 @@ test('a LOST attempt settles the task failed, its session on the record for the 
   await b.run(tick());
 
   // The session vanishes from the harness entirely — nobody ever said how it ended.
-  const first = [...b.sessions.keys()][0]!;
+  const first = [...b.sessions.keys()][0];
   const nativeId = b.sessions.get(first)!.nativeId!;
   b.sessions.delete(first);
 
@@ -245,14 +245,14 @@ test('a LOST attempt settles the task failed, its session on the record for the 
   const { state } = await b.run(view(id, new Map()));
   assert.equal(state.settled, 'failed');
   assert.equal(b.spawned.length, 1, 'no attempt 2, resumed or clean');
-  assert.equal(state.attempts[0]!.nativeId, nativeId, 'the session a new filing would continue, with `resumeFrom`');
+  assert.equal(state.attempts[0].nativeId, nativeId, 'the session a new filing would continue, with `resumeFrom`');
 });
 
 test('a HARNESS failure settles the task failed, and nothing is started after it', async () => {
   const b = board();
   const id = await b.run(file(spec));
   await b.run(tick());
-  const first = [...b.sessions.keys()][0]!;
+  const first = [...b.sessions.keys()][0];
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
 
   await b.run(tick());
@@ -274,7 +274,7 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
   assert.equal(b.spawned.length, 0, 'a journal from before stage 4c waits to be admitted');
   await b.run(admit([id]));
   await b.run(tick());
-  const first = [...b.sessions.keys()][0]!;
+  const first = [...b.sessions.keys()][0];
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed' });
   await b.run(tick());
   await b.run(tick());
@@ -322,7 +322,7 @@ test('a session that finished before the pass past its deadline read it settles 
   const events = await b.run(Effect.flatMap(Journal, (j) => j.read(id)));
   const state = fold(id, events);
   assert.equal(state.settled, 'succeeded', 'the deadline did not overrule a session that finished');
-  assert.deepEqual([state.attempts[0]!.ended, state.attempts[0]!.reason, state.attempts[0]!.exitCode], ['done', 'harness', 0]);
+  assert.deepEqual([state.attempts[0].ended, state.attempts[0].reason, state.attempts[0].exitCode], ['done', 'harness', 0]);
   assert.deepEqual(
     events.slice(before).map((e) => e.kind),
     ['ended', 'settled'],
@@ -352,7 +352,7 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
 
 /** File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote. */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
-  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields } as Event)));
+  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
 
 test('running counts the sessions at work on each harness as the pass left them: working, and started this pass — not blocked, ended or queued', async () => {
   const b = board();
@@ -387,15 +387,16 @@ test('a pass walks the board in the order the store lists it, and starts every t
   );
   assert.deepEqual(report.running, { default: 3 });
   assert.equal('priority' in (await b.run(view('b', new Map()))).state, false, 'the old key is folded unread: history, not state');
-  assert.equal('priority' in b.spawned[1]!, false, 'and no harness is told it');
+  assert.equal('priority' in b.spawned[1], false, 'and no harness is told it');
 });
 
 test('the pass refuses any argument — an old ceiling, pools, anything — and reads nothing', async () => {
   const b = board();
   await b.run(file(spec));
+  // Untyped, as a caller built against the old door calls it.
+  const untyped: (...a: unknown[]) => ReturnType<typeof tick> = tick;
   for (const args of [[3], [3, { claude: 'claude' }], [undefined]] as const) {
-    // Untyped, as a caller built against the old door calls it.
-    const refused = await b.run(Effect.flip((tick as (...a: unknown[]) => ReturnType<typeof tick>)(...args)));
+    const refused = await b.run(Effect.flip(untyped(...args)));
     assert.equal(refused._tag, 'TickRefused');
     assert.match(
       refused.message,
@@ -457,7 +458,7 @@ const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' } }, re
 const running = async (b: ReturnType<typeof board>, s: Parameters<typeof file>[0]) => {
   const id = await b.run(file(s));
   await b.run(tick());
-  const startedAt = Date.parse((await b.run(view(id, new Map()))).state.attempts[0]!.startedAt);
+  const startedAt = Date.parse((await b.run(view(id, new Map()))).state.attempts[0].startedAt);
   return { id, name: nameFor(id, 1), startedAt };
 };
 
@@ -663,13 +664,13 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
   const plain = board();
   await plain.run(file(spec));
   await plain.run(tick());
-  assert.equal(plain.spawned[0]!.config?.tools, undefined, 'no list, no fence');
-  assert.equal(plain.spawned[0]!.config?.disallowedTools, undefined, 'no deny list');
-  assert.equal(plain.spawned[0]!.config?.effort, undefined);
-  assert.equal(plain.spawned[0]!.config?.mcp, undefined, 'no map, no servers of its own');
-  assert.equal(plain.spawned[0]!.config?.budgetUsd, undefined, 'no budget, no cap');
-  assert.equal(plain.spawned[0]!.config?.contextTokens, undefined, "no window: the harness's own");
-  assert.equal(plain.spawned[0]!.config?.claude, undefined, 'no Remote Control unless asked');
+  assert.equal(plain.spawned[0].config?.tools, undefined, 'no list, no fence');
+  assert.equal(plain.spawned[0].config?.disallowedTools, undefined, 'no deny list');
+  assert.equal(plain.spawned[0].config?.effort, undefined);
+  assert.equal(plain.spawned[0].config?.mcp, undefined, 'no map, no servers of its own');
+  assert.equal(plain.spawned[0].config?.budgetUsd, undefined, 'no budget, no cap');
+  assert.equal(plain.spawned[0].config?.contextTokens, undefined, "no window: the harness's own");
+  assert.equal(plain.spawned[0].config?.claude, undefined, 'no Remote Control unless asked');
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
@@ -699,7 +700,7 @@ test('a session its harness ended at its budget ends failed, as its harness said
   const b = board();
   const id = await b.run(file({ ...spec, config: { budgetUsd: 0.01 } }));
   await b.run(tick());
-  const first = [...b.sessions.keys()][0]!;
+  const first = [...b.sessions.keys()][0];
   b.sessions.set(first, {
     ...b.sessions.get(first)!,
     state: 'failed',
@@ -712,11 +713,11 @@ test('a session its harness ended at its budget ends failed, as its harness said
   const { state } = await b.run(view(id, new Map()));
   const [a] = state.attempts;
   assert.deepEqual(
-    [a!.ended, a!.reason, a!.limit, a!.exitCode],
+    [a.ended, a.reason, a.limit, a.exitCode],
     ['failed', 'harness', 'budget', 1],
     'the limit written beside the end, off the same sighting',
   );
-  assert.deepEqual(a!.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
+  assert.deepEqual(a.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
   assert.equal(state.settled, 'failed');
   assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
   assert.equal(b.spawned.length, 1, 'and nothing spawned for one');
@@ -738,8 +739,8 @@ test('what a session consumed and how it exited go on the attempt, from the sigh
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed', usage, exitCode: 0 });
   await b.run(tick());
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
-  assert.deepEqual(a!.usage, usage);
-  assert.equal(a!.exitCode, 0);
+  assert.deepEqual(a.usage, usage);
+  assert.equal(a.exitCode, 0);
 });
 
 test('what a release reads once it has stopped a session is written on the attempt once, as measured — a session left listed is asked on every pass', async () => {
@@ -769,7 +770,7 @@ test('what a release reads once it has stopped a session is written on the attem
     [{ turns: 2, costUsd: 0.5, apiMs: 900 }],
     'written once',
   );
-  assert.deepEqual(fold(id, events).attempts[0]!.usage, { turns: 2, costUsd: 0.5, apiMs: 900 });
+  assert.deepEqual(fold(id, events).attempts[0].usage, { turns: 2, costUsd: 0.5, apiMs: 900 });
 });
 
 test('an attempt nobody measured records null — not zeros that would read as free', async () => {
@@ -779,8 +780,8 @@ test('an attempt nobody measured records null — not zeros that would read as f
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' }); // the fake harness measures nothing
   await b.run(tick());
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
-  assert.equal(a!.usage, null);
-  assert.equal(a!.exitCode, null);
+  assert.equal(a.usage, null);
+  assert.equal(a.exitCode, null);
 });
 
 // ─── when an attempt ended: the time the engine wrote it down ───────────────
@@ -789,7 +790,7 @@ test('the settled view carries when its attempt ended, as journalled — and nul
   const b = board();
   const id = await b.run(file(spec));
   await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.attempts[0]!.endedAt, null, 'in flight, it has not ended');
+  assert.equal((await b.run(view(id, new Map()))).state.attempts[0].endedAt, null, 'in flight, it has not ended');
 
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
   await b.run(tick());
@@ -797,8 +798,8 @@ test('the settled view carries when its attempt ended, as journalled — and nul
   const ended = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'ended');
   assert.equal(v.state.settled, 'succeeded');
   assert.ok(ended, 'the end was journalled');
-  assert.equal(v.state.attempts[0]!.endedAt, ended.at);
-  assert.ok(Date.parse(v.state.attempts[0]!.startedAt) <= Date.parse(ended.at), 'and it ended after it started');
+  assert.equal(v.state.attempts[0].endedAt, ended.at);
+  assert.ok(Date.parse(v.state.attempts[0].startedAt) <= Date.parse(ended.at), 'and it ended after it started');
 });
 
 // ─── what counts as live ────────────────────────────────────────────────────
@@ -905,8 +906,8 @@ test('a spawn error that does not say nothing started is recorded as spawned, an
   let v = await b.run(view(id, new Map()));
   assert.equal(v.state.settled, null, 'not failed: a session may exist under the name');
   assert.equal(v.state.attempts.length, 1, 'and no second attempt beside it');
-  assert.ok(v.state.attempts[0]!.spawnedAt, 'recorded as spawned, so the grace window applies');
-  assert.match(v.state.attempts[0]!.error ?? '', /lost the acknowledgement/);
+  assert.ok(v.state.attempts[0].spawnedAt, 'recorded as spawned, so the grace window applies');
+  assert.match(v.state.attempts[0].error ?? '', /lost the acknowledgement/);
 
   await b.run(tick());
   assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'running (working)', 'adopted');
@@ -1202,7 +1203,7 @@ test("a pass's views are what `view` reads after it: an attempt's measure, writt
   const id = await run(file({ ...spec, holdOpen: true, closeoutSchema: SCHEMA }));
   await run(tick());
   const name = nameFor(id, 1);
-  const startedAt = Date.parse((await run(view(id, new Map()))).state.attempts[0]!.startedAt);
+  const startedAt = Date.parse((await run(view(id, new Map()))).state.attempts[0].startedAt);
   sessions.set(name, { ...sessions.get(name)!, state: 'completed', closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
   const report = await run(tick());
   const reported = report.views.find((v) => v.id === id);
@@ -1296,7 +1297,7 @@ test('a pass that could not read the harness does not end an attempt `lost`, its
   failing = false;
   await run(tick());
   const v = await run(view(id, new Map(sessions)));
-  assert.equal(v.state.attempts[0]!.ended, null);
+  assert.equal(v.state.attempts[0].ended, null);
   assert.equal(v.phase, 'running (working)', 'followed as it runs');
 });
 
@@ -1331,7 +1332,7 @@ test('a pass that could not read the harness does not spawn again an intent a cr
   await run(tick());
   assert.deepEqual(spawns, [], 'the next good read finds the session under the name');
   const v = await run(view(id, new Map(sessions)));
-  assert.equal(v.state.attempts[0]!.ended, null);
+  assert.equal(v.state.attempts[0].ended, null);
   assert.equal(v.phase, 'running (working)', 'adopted, and followed as it runs');
 });
 

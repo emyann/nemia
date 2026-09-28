@@ -433,7 +433,7 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
     const approved = /^approve-(.+)-(\d+)$/.exec(name);
     if (!approved) continue;
     const file = path.join(asksDir(id), name);
-    const read = approvalIn(file, approved[1]!, Number(approved[2]));
+    const read = approvalIn(file, approved[1], Number(approved[2]));
     if (typeof read === 'string') notes.push(`${file}: ${read}, so it opens no gate — remove it, and approve with wf approve`);
     else approvals.push(read);
   }
@@ -524,7 +524,7 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
     const took = /^accept-(.+)-(\d+)$/.exec(name);
     if (!took) continue;
     const file = path.join(asksDir(id), name);
-    const read = acceptanceIn(file, took[1]!, Number(took[2]));
+    const read = acceptanceIn(file, took[1], Number(took[2]));
     if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with wf accept`);
     else acceptances.push(read);
   }
@@ -579,11 +579,11 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
     const again = /^round-(.+)-(\d+)$/.exec(name);
     const file = path.join(asksDir(id), name);
     if (tried) {
-      const ask = askIn(file, tried[1]!, Number(tried[2]));
+      const ask = askIn(file, tried[1], Number(tried[2]));
       if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf retry`);
       else asks.push(ask);
     } else if (again) {
-      const ask = roundAskIn(file, again[1]!, Number(again[2]));
+      const ask = roundAskIn(file, again[1], Number(again[2]));
       if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf round`);
       else rounds.push(ask);
     }
@@ -655,7 +655,7 @@ function readAnswersNow(id: string): RetryAsk[] {
     }
     for (const name of names) {
       const tried = /^retry-(.+)-(\d+)$/.exec(name);
-      const ask = tried ? askIn(path.join(dir, name), tried[1]!, Number(tried[2])) : undefined;
+      const ask = tried ? askIn(path.join(dir, name), tried[1], Number(tried[2])) : undefined;
       if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
     }
   }

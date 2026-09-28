@@ -82,7 +82,7 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
  */
 const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i]!;
+    const line = lines[i];
     if (!line.trim() || !line.includes('"type"')) continue;
     let entry: { type?: string; message?: { content?: unknown } };
     try {
@@ -289,7 +289,7 @@ const costStateOf = (line: string): CostState | undefined => {
     return undefined;
   }
   if (e?.type !== 'cost-state') return undefined;
-  const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? (e[key] as number) : undefined);
+  const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? e[key] : undefined);
   return {
     costUsd: n('totalCostUSD'),
     apiMs: n('totalAPIDuration'),
@@ -448,7 +448,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     const message = entry.message;
     if (entry.type !== 'assistant' || !message?.id || !(Date.parse(entry.timestamp ?? '') >= since)) continue;
     const u = message.usage;
-    const n = (key: string) => (typeof u?.[key] === 'number' ? (u[key] as number) : 0);
+    const n = (key: string) => (typeof u?.[key] === 'number' ? u[key] : 0);
     responses.set(
       message.id,
       typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'

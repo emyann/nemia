@@ -203,9 +203,9 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
   assert.deepEqual(cost.harnesses, { claude: { calls: 1, ms: 20, listed: 4, spawned: 1 } });
   // What could not be read is counted per pass, and said only when there was some.
   const e = fake({ observeMs: 20, unread: 1 });
-  assert.equal((await tick(e)).cost!.harnesses.claude!.unread, 1, 'an observe that could not read its harness');
-  assert.equal((await tick(e)).cost!.harnesses.claude!.unread, 1, 'counted for the pass, not the running total');
-  assert.equal(Object.hasOwn((await tick(fake({ unread: 0 }))).cost!.harnesses.claude!, 'unread'), false, 'none unread, nothing said');
+  assert.equal((await tick(e)).cost!.harnesses.claude.unread, 1, 'an observe that could not read its harness');
+  assert.equal((await tick(e)).cost!.harnesses.claude.unread, 1, 'counted for the pass, not the running total');
+  assert.equal(Object.hasOwn((await tick(fake({ unread: 0 }))).cost!.harnesses.claude, 'unread'), false, 'none unread, nothing said');
   assert.equal(cost.phases.observe.ms, 20, "the observe's time, as the runtime reported it");
   assert.equal(cost.phases.observe.calls, 1);
   assert.equal(cost.phases.observe.spawned, 1, "the process the observe started is observe's");
@@ -261,9 +261,9 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   const [run] = started(1);
   const outside = await metered(async () => 'none');
   assert.equal(outside.tallies!.records, 0);
-  readRun(run!.id); // not metered: nothing is open to count it in
+  readRun(run.id); // not metered: nothing is open to count it in
   const outer = await metered(async () => {
-    readRun(run!.id);
+    readRun(run.id);
     within('act', () => busy(2));
     const inner = await tick(fake());
     assert.equal(inner.cost, undefined, "a pass inside another's meter carries no cost of its own");

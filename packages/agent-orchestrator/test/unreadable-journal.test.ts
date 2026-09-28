@@ -107,9 +107,9 @@ test('a run whose task journal holds an entry no runtime wrote is left out of th
   const bad = start({ brief: 'the bad one', repo: REPO, workflowDir: FOLDER });
   const good = start({ brief: 'the good one', repo: REPO, workflowDir: FOLDER });
   for (let k = 0; k < 3; k++) await tick(e, { repo: ROOT });
-  const badTask = readRun(bad.id).steps.work!.taskId!;
+  const badTask = readRun(bad.id).steps.work.taskId!;
   assert.match((await e.view(badTask)).phase, /^running/, 'both runs at work before the journal is spoiled');
-  assert.match((await e.view(readRun(good.id).steps.work!.taskId!)).phase, /^running/);
+  assert.match((await e.view(readRun(good.id).steps.work.taskId!)).phase, /^running/);
 
   tasks.get(badTask)!.push(MISWRITTEN);
   signAll();

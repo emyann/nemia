@@ -35,7 +35,7 @@
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
-const runFile = process.argv[2]!;
+const runFile = process.argv[2];
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   cmd: string;
   args: string[];

@@ -108,7 +108,7 @@ test("an agent's card moves with its version when a skill's SKILL.md changes", (
     '---\nname: File it away\ndescription: File it somewhere else.\n---\n',
   );
   assert.notEqual(agentVersion(agents, 'scribe', found), before, 'the version is what a card says it describes');
-  assert.equal(cardSkills(agent, found)[1]!.description, 'File it somewhere else.');
+  assert.equal(cardSkills(agent, found)[1].description, 'File it somewhere else.');
 });
 
 test('an agent with no skills says one thing it can do: what its own description says', () => {
@@ -202,10 +202,10 @@ test('every shipped agent has a generated card, and every entry on it the fields
   const ids = new Set<string>();
   for (const [name, agent] of agents) {
     assert.ok(!(agent instanceof Error), `${name} reads: ${agent instanceof Error ? agent.message : ''}`);
-    const card = agentCard(agent as Agent, agentVersion(path.join(SHIPPED, 'agents'), name, found)!, cardSkills(agent as Agent, found));
+    const card = agentCard(agent, agentVersion(path.join(SHIPPED, 'agents'), name, found)!, cardSkills(agent, found));
     assert.deepEqual(
       card.skills.map((s) => s.id),
-      (agent as Agent).skills,
+      agent.skills,
       `${name}'s card lists its skills, and nothing else`,
     );
     for (const skill of card.skills) {

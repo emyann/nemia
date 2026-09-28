@@ -19,7 +19,7 @@ export function valueImports(text: string): string[] {
     ...text.matchAll(/^(import|export)\s+(type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?|\w+(?:\s*,\s*\{[^}]*\})?)\s+from\s+['"]([^'"]+)['"]/gm),
   ]
     .filter((m) => !m[2])
-    .map((m) => m[3]!);
+    .map((m) => m[3]);
 }
 
 test('REFUSED: a value import of the re-exporting file or of a sibling is found; a type import is not', () => {

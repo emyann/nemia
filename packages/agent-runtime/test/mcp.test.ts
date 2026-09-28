@@ -150,12 +150,12 @@ test("a task's mcp is written outside the workspace and named after the checkout
     assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
     assert.equal(configs[0], path.join(cwd, '.mcp.json'), `${harness}: the repository's servers first`);
     assert.deepEqual(
-      JSON.parse(fs.readFileSync(configs[1]!, 'utf8')),
+      JSON.parse(fs.readFileSync(configs[1], 'utf8')),
       { mcpServers: MCP },
       `${harness}: the task's servers, exactly, and no other`,
     );
-    assert.ok(path.relative(cwd, configs[1]!).startsWith('..'), `${harness}: written outside the workspace`);
-    assert.equal(fs.statSync(configs[1]!).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
+    assert.ok(path.relative(cwd, configs[1]).startsWith('..'), `${harness}: written outside the workspace`);
+    assert.equal(fs.statSync(configs[1]).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
     assert.equal(next, '--strict-mcp-config', harness);
     assert.ok(args.includes('--no-chrome'), `${harness}: a task's servers do not bring the operator's Chrome back`);
   }

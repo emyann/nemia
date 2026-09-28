@@ -243,10 +243,10 @@ test('what each branch touched is said under the branch, and a branch that could
 test('the files in full: the heading says why, then the diff — or none, said — or why it was not read', () => {
   const t = on('wf/a', '3\t1\tsrc/index.ts');
   const [heading, ...body] = inFullLines(t, parseGlobs('nothing/**'), '');
-  assert.match(heading!, /^── in full: the files --sensitive names \(nothing\/\*\*\)/);
+  assert.match(heading, /^── in full: the files --sensitive names \(nothing\/\*\*\)/);
   assert.deepEqual(body, ['none']);
   assert.match(
-    inFullLines(t, undefined, '')[0]!,
+    inFullLines(t, undefined, '')[0],
     /^── in full: the check-affecting files — what a change could edit to make its check pass ─+$/,
   );
   assert.deepEqual(inFullLines(t, undefined, 'diff --git a/x.test.ts b/x.test.ts\n-assert.equal(1, 1);\n+assert.ok(true);\n\n').slice(1), [
@@ -256,7 +256,7 @@ test('the files in full: the heading says why, then the diff — or none, said �
   ]);
   assert.deepEqual(inFullLines(t, undefined, undefined).slice(1), ['not read: git could not diff wf/a']);
   assert.deepEqual(inFullLines(gone('wf/gone'), undefined, undefined).slice(1), ['not read: git could not diff abc123...wf/gone']);
-  assert.match(inFullLines(t, undefined, '', true)[0]!, /, on wf\/a /);
+  assert.match(inFullLines(t, undefined, '', true)[0], /, on wf\/a /);
 });
 
 test('a step with no usage says used not measured, and cost never prints a number no runner measured', () => {
@@ -275,7 +275,7 @@ test('a step with no usage says used not measured, and cost never prints a numbe
     'cost  not measured',
   ]);
   for (const u of [undefined, {}, { turns: 1, toolCalls: 1, inputTokens: 1, outputTokens: 1 }]) {
-    assert.doesNotMatch(usedLines(u)[1]!, /\d/, JSON.stringify(u));
+    assert.doesNotMatch(usedLines(u)[1], /\d/, JSON.stringify(u));
   }
   // Only a runner told the cost has one, and only then is there a number to print.
   assert.equal(usedLines({ costUsd: 0.00412 })[1], 'cost  $0.00412');

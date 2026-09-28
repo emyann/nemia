@@ -34,7 +34,7 @@ function firstLeaf(issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>): 
     case 'Composite':
       return firstLeaf(issue.issues[0], path);
     case 'AnyOf':
-      return issue.issues.length ? firstLeaf(issue.issues[0]!, path) : { path, kind: 'type' };
+      return issue.issues.length ? firstLeaf(issue.issues[0], path) : { path, kind: 'type' };
     case 'Encoding':
       return firstLeaf(issue.issue, path);
     case 'Filter':

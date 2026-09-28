@@ -147,7 +147,7 @@ const board = () => {
 test('a queued task is started by the pass after the word, not before it and not by the pass that reported it', async () => {
   const b = board();
   const id = await b.engine.file({ brief: 'b', cwd: '/r', queued: true });
-  assert.equal(b.journal.tasks.get(id)![0]!.kind === 'filed' && (b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, true);
+  assert.equal(b.journal.tasks.get(id)![0].kind === 'filed' && (b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, true);
   const first = await b.engine.tick();
   assert.equal(b.sessions.size, 0, 'nothing starts without the word');
   assert.deepEqual(

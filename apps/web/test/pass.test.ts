@@ -88,7 +88,7 @@ function packagePhases(pass: PassCost): string[] {
       0,
       rows.findIndex((l) => !l.startsWith('  ')),
     )
-    .map((l) => l.trim().split(/ +/)[0]!);
+    .map((l) => l.trim().split(/ +/)[0]);
 }
 
 test("the phases are the package's, in its order: a phase added there is drawn here", () => {

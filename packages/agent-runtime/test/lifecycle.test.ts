@@ -112,7 +112,7 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
   }
   assert.ok(cases > 1000, `the corpus is the product it says (${cases} cases)`);
   // The engine's one event, which only the spawn call can know: from the intent, the attempt's unstartable end.
-  const intent = fold(TASK, JOURNALS['intent, no spawn']!);
+  const intent = fold(TASK, JOURNALS['intent, no spawn']);
   const end = spawnRefused(intent, 1, 'no such model');
   assert.deepEqual(end, {
     do: 'record-end',
@@ -122,7 +122,7 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
     reason: 'unstartable',
     error: 'no such model',
   });
-  assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn']!, ...journalled(end, 2 * S)])), 'ending');
+  assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn'], ...journalled(end, 2 * S)])), 'ending');
   taken.add(edgeKey('starting', 'SPAWN_REFUSED', 'ending'));
   assert.deepEqual(
     [...edges].filter((e) => !taken.has(e)),
@@ -132,7 +132,7 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
 });
 
 test('ADOPTION after a crash: an intent with no spawn and a session under its name is followed, not spawned again, and its end recorded', () => {
-  const events = JOURNALS['intent, no spawn']!;
+  const events = JOURNALS['intent, no spawn'];
   const state = fold(TASK, events);
   const live = new Map([[nameFor(TASK, 1), { sessionId: 'adopted', state: 'working' as const }]]);
   const now = { at: new Date(T0.getTime() + 60 * S), graceMs: 30_000 };
@@ -182,7 +182,7 @@ test('REFUSED: an event with no edge in the state it meets is refused, at shippe
 });
 
 test('REFUSED: decide answers a missing edge with nothing, and says which — it never guesses a move', () => {
-  const state = fold(TASK, JOURNALS.spawned!);
+  const state = fold(TASK, JOURNALS.spawned);
   const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'completed' as const }]]);
   const now = { at: new Date(T0.getTime() + 5 * S), graceMs: 30_000 };
   assert.equal(decide(state, observed, now).do, 'record-end', 'the shipped lifecycle ends it');
@@ -191,7 +191,7 @@ test('REFUSED: decide answers a missing edge with nothing, and says which — it
     why: 'refused: no edge from working on SESSION_ENDED',
     refused: { state: 'working', event: 'SESSION_ENDED' },
   });
-  assert.deepEqual(spawnRefused(fold(TASK, JOURNALS['intent, no spawn']!), 1, 'e', withoutEdge('starting', 'SPAWN_REFUSED')), {
+  assert.deepEqual(spawnRefused(fold(TASK, JOURNALS['intent, no spawn']), 1, 'e', withoutEdge('starting', 'SPAWN_REFUSED')), {
     do: 'nothing',
     why: 'refused: no edge from starting on SPAWN_REFUSED',
     refused: { state: 'starting', event: 'SPAWN_REFUSED' },
@@ -202,7 +202,7 @@ test('REFUSED: decide answers a missing edge with nothing, and says which — it
 
 test('a settled task is decided nothing before anything is observed of it, on any pass — its state is final and would refuse every event', () => {
   for (const outcome of ['succeeded', 'failed', 'stopped'] as const) {
-    const state = fold(TASK, [...JOURNALS.spawned!, { kind: 'settled', at: at(3 * S), outcome }]);
+    const state = fold(TASK, [...JOURNALS.spawned, { kind: 'settled', at: at(3 * S), outcome }]);
     assert.equal(settledQuiet(state), true);
     const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
     const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
@@ -213,7 +213,7 @@ test('a settled task is decided nothing before anything is observed of it, on an
       refused: { state: lifecycleOf(state), event: 'SETTLED' },
     });
   }
-  assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned!)), false);
+  assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned)), false);
 });
 
 /** Every entry a writer can append to a settled task: the verbs' (`requestStop`, `say`, `file` again under its id), a pass's (`measured`, an end), a hand's. */
@@ -299,7 +299,7 @@ test("the README's lifecycle diagram is the machine's, generated", () => {
 
 test('UNREAD: a pass that could not read the harness does nothing to an attempt in flight, past its grace too, and never reads it lost', () => {
   const unread = new Set([nameFor(TASK, 1)]);
-  const state = fold(TASK, JOURNALS.spawned!);
+  const state = fold(TASK, JOURNALS.spawned);
   for (const ms of [2 * S, 45 * S, 3600 * S]) {
     const now = { at: new Date(T0.getTime() + ms), graceMs: 30_000, unread };
     assert.deepEqual(observe(state, new Map(), now), { type: 'UNREAD', attempt: 1, overdue: false });

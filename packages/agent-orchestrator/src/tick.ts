@@ -176,7 +176,7 @@ export async function adoptChecks(
     const view = await e.view(taskId);
     if (!view.state.brief) continue; // not filed: due, and this pass's to file
     views.set(taskId, view);
-    run.steps[step.name] = { ...run.steps[step.name]!, check: { taskId } };
+    run.steps[step.name] = { ...run.steps[step.name], check: { taskId } };
     adopted.push(step.name);
   }
   return adopted;
@@ -209,7 +209,7 @@ export async function adoptTries(
     // here, it is the turn it is, and nothing is stopped and nothing filed.
     const current = run.steps[r.step]?.taskId;
     if (r.by === 'ask' && r.mode === 'nudge' && current && answersIn(views.get(current)) > turnsOf(run.steps[r.step])) {
-      run.steps[r.step] = nextTry(run.steps[r.step]!, r, current);
+      run.steps[r.step] = nextTry(run.steps[r.step], r, current);
       adopted.push(r.step);
       continue;
     }
@@ -217,9 +217,9 @@ export async function adoptTries(
     const view = await e.view(taskId);
     if (!view.state.brief) continue; // not filed: due, and this pass's to file
     views.set(taskId, view);
-    const record = run.steps[r.step]!;
+    const record = run.steps[r.step];
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
-    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]!);
+    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
     adopted.push(r.step);
   }
   return adopted;
@@ -490,7 +490,7 @@ async function advanceRun(
   const collected = within('act', () =>
     handOffOwed(steps, run, phaseOf).flatMap((name) => {
       if (!fs.existsSync(runFile(run.id))) return [];
-      const record = run.steps[name]!;
+      const record = run.steps[name];
       let handed: ReturnType<typeof handOff>;
       if (isGitRun(run)) handed = handOff(record.workspace!, name);
       else folderPlace(runsDir()).handOff(run, name);
@@ -623,7 +623,7 @@ async function advanceRun(
   };
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
-    const record = run.steps[r.step]!;
+    const record = run.steps[r.step];
     // A try of a step whose task has not settled — its session blocked by its harness, or asked for while it was and working again since: the
     // session is stopped first, and nothing is filed. Asked once — a task the engine already holds the request for is not asked again — and a
     // later pass, once the task has settled, reads the try due as one of a stopped step, and files it. Nothing is carried between the two: a
@@ -777,7 +777,7 @@ async function advanceRun(
     notes.push(said);
     run.steps[r.step] = nextTry(record, r, taskId);
     // Sent back from an ending that stopped on the base branch: its try moves behind in the same write, so it waits for the work again.
-    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]!);
+    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
   }
 
   // Another round: a looping step said `again: true` with rounds left, or a person's `wf round` took a loop out of rounds once more. The
@@ -789,7 +789,7 @@ async function advanceRun(
     if (!mayFile()) break;
     const looping = steps.find((s) => s.name === r.step)!;
     const target = steps.find((s) => s.name === r.target)!;
-    const record = run.steps[r.target]!;
+    const record = run.steps[r.target];
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
     // A round is a task of its own, never a turn: a target whose task still waits for a word is closed first. It signed off verified to be
     // looped at all, so the sweep above has closed it already, unless the engine refused.
@@ -873,7 +873,7 @@ async function advanceRun(
   for (const name of [...check, ...rechecked]) {
     if (!mayFile()) break;
     const step = steps.find((s) => s.name === name)!;
-    const workspace = run.steps[name]!.workspace ?? run.workspace;
+    const workspace = run.steps[name].workspace ?? run.workspace;
     const taskId = checkTaskId(run, name);
     // A check an earlier pass filed and never wrote down was adopted above, before this list was made.
     // Looked up once more all the same: filing an id the engine already holds would journal it twice.
@@ -913,7 +913,7 @@ async function advanceRun(
         deadlineSeconds: CHECK_DEADLINE_SECONDS,
       });
     }
-    run.steps[name] = { ...run.steps[name]!, check: { taskId } };
+    run.steps[name] = { ...run.steps[name], check: { taskId } };
     checked.push(name);
   }
 
@@ -1088,7 +1088,7 @@ async function advanceRun(
  * the run as still owed one. What the pass hands off, what its memo judges, and what `wf prune` waits for, read off this one function.
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
-  run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name]!.workspace!));
+  run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));
 
 /**
  * The commit each of a run's result branches is at, as git has it — or, for one git no longer has, the tip the run last saw (`tipsSeen`):
@@ -1291,7 +1291,7 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
       else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
       else said.push({ step, said: c });
     }
-    out.push({ run: id, asked: record.brief.split('\n')[0]!, steps: said });
+    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said });
   }
   return out;
 }

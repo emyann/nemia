@@ -11,11 +11,11 @@ import type { StepNodeData } from './StepNode';
  * `waitingOnYou` decides the human gate beside the step's own word.
  */
 export const stepData = (run: RunDetail, index: number): StepNodeData => ({
-  step: run.steps[index]!,
+  step: run.steps[index],
   index,
   runCancelled: run.cancelledAt !== null,
   runHeld: run.holding != null,
-  waitingOnYou: run.waitingOnYou.includes(run.steps[index]!.name),
+  waitingOnYou: run.waitingOnYou.includes(run.steps[index].name),
 });
 
 /** The minimap in the chips' colours, so a glance at it says what the nodes say. */

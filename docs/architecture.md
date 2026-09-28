@@ -1,6 +1,6 @@
 # Architecture
 
-Two packages and two apps, in layers, and one package beside them. Each layer owns one thing and is reached through a
+Two packages and two apps, in layers. Each layer owns one thing and is reached through a
 short list of entries, its public contract. Three rules keep it that way, and each is a test that fails the suite when
 broken. This page says what the tests hold; the tests are the rules.
 
@@ -12,7 +12,6 @@ broken. This page says what the tests hold; the tests are the rules.
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess`, and the words a run is described in. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP and imports no package. | Its pages. |
-| `packages/agent-judge` | Beside the layers, and optional: asks one typed question once and records the answer. The `judge` command. | Its own entries; nothing in the workspace uses them. |
 
 Dependencies point down the table and never up: the web app talks to the api, the api imports the orchestrator, and
 the orchestrator imports the runtime. A test of the api may import the runtime's entries too. Spawning a package's
@@ -43,12 +42,12 @@ restart, so it never decides what a full pass would not; the tests that tick jud
 a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and
 `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk is exported
-from `agent-orchestrator`. The judge imports nothing from the workspace, and nothing imports it. XState is a dependency
+from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by.
 
-Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
-`packages/agent-judge/test/boundary.test.ts` and `packages/agent-runtime/test/xstate-boundary.test.ts`.
+Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and
+`packages/agent-runtime/test/xstate-boundary.test.ts`.
 
 **2. Inside the orchestrator, every file is of one of four kinds**, named in
 `packages/agent-orchestrator/test/boundary.test.ts`.

@@ -11,12 +11,13 @@ export type ArtifactKind = 'image' | 'text' | 'other';
  * that name, where the api serves it, its kind and its size. Anything else is the path as the closeout gave it: a path on the
  * step's branch, a file the directory does not have, one in a directory under it, or an absolute path anywhere else — which
  * is not looked at, as `wf decide` does not look at it (`artifactPlace`). A file of the files directory that is not there on a run
- * `wf prune --artifacts` pruned is the path and what removed it, when (`filesPrunedWords`): gone, not missing.
+ * `wf prune --artifacts` pruned is the path and what removed it, when (`filesPrunedWords`): gone, not missing. `prunedAt` is
+ * that moment alone, for a page that draws it as it draws every other time.
  */
 export type StepArtifact =
   | { path: string }
   | { path: string; name: string; url: string; kind: ArtifactKind; size: number }
-  | { path: string; pruned: string };
+  | { path: string; pruned: string; prunedAt: string };
 
 /** By extension: the type a file is served with, and what the board does with it. */
 const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
@@ -62,11 +63,11 @@ export function artifactOf(run: Pick<Run, 'id' | 'pruned'>, step: string, file: 
   const files = run.pruned?.artifacts;
   if (artifactPlace(file, dir) !== 'files') return { path: file };
   // A file anywhere under the directory went with it, one in a directory beneath it included.
-  if (files && !fs.existsSync(dir)) return { path: file, pruned: filesPrunedWords(files) };
+  if (files && !fs.existsSync(dir)) return { path: file, pruned: filesPrunedWords(files), prunedAt: files.at };
   if (path.dirname(path.resolve(file)) !== path.resolve(dir)) return { path: file };
   const name = path.basename(file);
   const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
-  if (!stat) return files ? { path: file, pruned: filesPrunedWords(files) } : { path: file };
+  if (!stat) return files ? { path: file, pruned: filesPrunedWords(files), prunedAt: files.at } : { path: file };
   const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/artifacts/${encodeURIComponent(name)}`;
   return { path: file, name, url, kind: typeOf(name).kind, size: stat.size };
 }

@@ -895,7 +895,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
 
 const { Artifacts, TryCloseouts } = await import('../src/components/Closeout.tsx');
 const facts = await import('../src/components/Facts.tsx');
-const { Facts, specRows } = facts;
+const { Facts, specRows, when } = facts;
 type StepTry = import('../src/lib/api.ts').StepTry;
 type StepCloseout = import('../src/lib/api.ts').StepCloseout;
 type StepSpec = import('../src/lib/api.ts').StepSpec;
@@ -1082,15 +1082,18 @@ test("a closeout's image is drawn inline, its name its alt, opening full-size in
   assert.match(renderToStaticMarkup(createElement(Artifacts, { artifacts: [] })), />none named</);
 });
 
-test("a closeout's file `wf prune --artifacts` removed is its path and when it went — no link, no image, and not a bare path that reads as never made", () => {
-  const said = 'its files were removed at 2026-09-28T09:00:00.000Z (wf prune --artifacts)';
+test("a closeout's file `wf prune --artifacts` removed is its path and when it went, in the form the run's pruned row gives that moment — no link, no image, and not a bare path that reads as never made", () => {
+  const at = '2026-09-28T09:00:00.000Z';
+  const said = `its files were removed at ${at} (wf prune --artifacts)`;
   const html = renderToStaticMarkup(createElement(Artifacts, {
-    artifacts: [{ path: '/wf/runs/r-1/artifacts/shoot/shot.png', pruned: said }, { path: 'RESPONSE.md' }],
+    artifacts: [{ path: '/wf/runs/r-1/artifacts/shoot/shot.png', pruned: said, prunedAt: at }, { path: 'RESPONSE.md' }],
   }));
   const [pruned, bare] = html.split('<li ').slice(1);
   assert.match(pruned!, /data-artifact="pruned"/);
   assert.ok(pruned!.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
-  assert.ok(pruned!.includes(`> — ${said}</span>`), pruned);
+  const time = renderToStaticMarkup(when(at));
+  assert.ok(pruned!.includes(`> — its files were removed at ${time} (wf prune --artifacts)</span>`), pruned);
+  assert.ok(!textsOf(pruned!).join(' ').includes(at), 'the moment is drawn as `when` draws it, never as the api spells it');
   assert.doesNotMatch(pruned!, /<a |<img /);
   assert.match(bare!, /data-artifact="path"/, 'a path the prune did not reach is the path, as before');
 });

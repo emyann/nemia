@@ -1,4 +1,5 @@
 import type { StepArtifact } from '../lib/api';
+import { when } from './Facts';
 
 /** Bytes as a person reads them, as `wf decide` prints a file's size and `wf prune` a worktree's (`sizeOf`). */
 export const bytesWord = (bytes: number): string =>
@@ -32,12 +33,13 @@ const linkClass = 'font-mono font-medium text-neutral-900 underline underline-of
 
 /** One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. */
 export function ArtifactView({ artifact, size = false }: { artifact: StepArtifact; size?: boolean }) {
-  // Gone with the run's files, not missing: the path it had, and when `wf prune --artifacts` removed it.
+  // Gone with the run's files, not missing: the path it had, and when `wf prune --artifacts` removed it, in the form the run's
+  // `pruned` row gives the same moment (`when`), not the api's ISO words.
   if ('pruned' in artifact) {
     return (
       <span data-artifact="pruned">
         <span className="font-mono text-neutral-500">{artifact.path}</span>
-        <span className="text-neutral-500"> — {artifact.pruned}</span>
+        <span className="text-neutral-500"> — its files were removed at {when(artifact.prunedAt)} (wf prune --artifacts)</span>
       </span>
     );
   }

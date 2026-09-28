@@ -1,5 +1,5 @@
 import { sidebar } from '../board.ts';
-import { expectCount, expectVisible, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
 import { SHIPPED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -37,7 +37,11 @@ export default {
     // A file a step named in its files directory is said gone, by the prune — not drawn as a path, as if it had never been made.
     const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: SHIPPED.shot });
     await expectVisible(shot, `review's ${SHIPPED.shot} reads as removed by wf prune --artifacts`);
-    await expectVisible(shot.getByText(/ — its files were removed at \S+ \(wf prune --artifacts\)$/), 'with when, and by what');
+    await expectVisible(shot.getByText(/ — its files were removed at .+ \(wf prune --artifacts\)$/), 'with when, and by what');
+    // One moment, one form: the file says when it went as the run's pruned row says it, never as the api spells it.
+    const moment = (await page.locator('article [data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();
+    await expectTexts(shot.locator('time'), [moment], `and says that moment as the run's pruned row does (${moment})`);
+    await expectCount(shot.getByText(/\d{4}-\d\d-\d\dT/), 0, 'not as an ISO time');
     await settled(page);
   },
 } satisfies PageSpec;

@@ -1421,10 +1421,10 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
     const [shoot] = page.steps;
     assert.deepEqual(shoot.closeout.artifacts, [
       // Every file named in the directory went with it, one beneath it and one the route would refuse by name included.
-      ...[0, 1, 2, 3].map((i) => ({ path: named[i], pruned: said })),
+      ...[0, 1, 2, 3].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
       // Beside the directory is not in it: the path alone, as before.
       { path: named[4] },
-      ...[5, 6, 7, 8].map((i) => ({ path: named[i], pruned: said })),
+      ...[5, 6, 7, 8].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
       { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
     ]);
     assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);

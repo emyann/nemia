@@ -429,9 +429,10 @@ export async function main(argv: string[]): Promise<void> {
     }
 
     case 'ls': {
-      const views = await engine.list();
-      if (!views.length) return console.log('no tasks');
+      const { views, unreadable } = await engine.list();
+      if (!views.length && !unreadable.length) return console.log('no tasks');
       for (const v of views) console.log(taskLine(v));
+      for (const u of unreadable) console.error(`left out: ${u.why}`);
       return;
     }
 

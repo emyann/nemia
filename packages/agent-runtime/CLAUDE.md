@@ -33,7 +33,7 @@ One session run to completion, durably, on one harness. `decide` (`src/domain.ts
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`): declare the field and assign it.
 - **A journal is decoded before `upgrade`, as any store gives it back** (`Journal.layer`, `event-schema.ts`): an entry no runtime
   wrote fails that task's read with a `JournalError` naming the file, the entry and its first wrong field (`entryWords`); the pass
-  leaves the task out and says why on every report while it lasts (`TickReport.unreadable`), and a feed entry is skipped, said
+  leaves the task out and says why on every report while it lasts (`TickReport.unreadable`), as `list` does (`readEach`), and a feed entry is skipped, said
   once, with the cursor past it (`FeedRefusal`). A former shape is accepted by the schema, rewritten by `upgrade`, and read by a
   test; a field added to `Event` in `domain.ts` is added to its struct, or `tsc` refuses the assignment in `journal.ts` (the
   struct's rest is `unknown`). Each event keeps the keys it does not name (`StructWithRest`: a `Struct` strips them), and a decoded

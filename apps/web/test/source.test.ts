@@ -1,7 +1,6 @@
 /**
- * The board's own files hold no raw control character. One in a regular expression's class reads as a blank to a person, and a NUL makes
- * ripgrep take the whole file for binary and search none of it. The step form's pasted-schema option was first written as a NUL, and the api's
- * builder.ts held two in a class, which a search of `apps/api/src` did not find. Name them with escapes. Tab, line feed and carriage return are text.
+ * The board's own files hold no raw control character: one in a regular expression's class reads as a blank to a person, and a NUL makes
+ * ripgrep take the whole file for binary and search none of it. Name them with escapes. Tab, line feed and carriage return are text.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

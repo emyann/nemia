@@ -37,8 +37,11 @@ test('every file in pages/ but NAMES is a page the e2e visits, once, named as it
 
 test('the runner visits what loadPages reads, and no list of its own', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  // And the store the api serves, so a store swept from under the e2e is said, not blamed on a page (`storeGone`).
-  assert.match(runner, /visitAll\(browser, base, pages, OUT, store\)/);
+  assert.match(
+    runner,
+    /visitAll\(browser, base, pages, OUT, store\)/,
+    'the runner hands the store the api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
+  );
   assert.match(runner, /const pages = await loadPages\(\);/);
   assert.doesNotMatch(runner, /from '\.\/pages\//, 'run.ts imports no page by its file');
   assert.doesNotMatch(runner, /PageSpec\[\]/, 'run.ts keeps no array of pages');
@@ -55,13 +58,13 @@ test('the pages are visited by their numbers, then their names — not by name a
 });
 
 test('the pages are visited in that order whatever order the directory lists them in', async () => {
-  // The names disagree with the numbers, and the directory lists them backwards: only a sort by the file's name puts them right.
   const names = Array.from({ length: 12 }, (_, i) => `${String((i + 1) * 10).padStart(3, '0')}-p${12 - i}`);
   const dir = dirOf(Object.fromEntries(names.map((name) => [`${name}.ts`, page(name.slice(4))])));
   const backwards = (d: string) => fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? 1 : -1));
   assert.deepEqual(
     pageFiles(dir, backwards),
     names.map((name) => `${name}.ts`),
+    "the names disagree with the numbers, and the directory lists them backwards: only a sort by the file's name puts them right",
   );
   assert.deepEqual(
     (await loadPages(dir)).map((p) => p.name),
@@ -100,8 +103,7 @@ test('a page deleted by mistake is refused: its line in NAMES is still there', a
   await assert.rejects(loadPages(dir), refusal);
 });
 
-test('the shipped pages are refused with one of theirs deleted', () => {
-  // The real NAMES, over a copy of the real pages less one: the list is what knows it is gone.
+test('the shipped pages are refused with one of theirs deleted: the real NAMES, over a copy of the real pages less one, knows it is gone', () => {
   const dir = scratch('hkb-e2e-pages-');
   fs.cpSync(PAGES_DIR, dir, { recursive: true });
   const gone = pageFiles(dir)[0];

@@ -144,11 +144,11 @@ test("each harness has its own fence on the form: Claude Code a permission mode,
   assert.equal(hasKey(form, 'remote', 'codex'), true, "a key that is not a harness word is every harness's");
   assert.equal(hasKey(form, 'sandbox', 'nowhere'), true, 'a harness the form does not know is judged on save, not here');
   assert.equal(hasKey(undefined, 'sandbox', 'claude'), true, 'and nothing is hidden before the form is read');
-  // An agent on a remote A2A agent has none of the keys the package refuses there.
   const remote = { ...form, remote: { prefix: 'a2a:', refuses: ['permissionMode', 'sandbox', 'remote'] } } as unknown as KeyForm;
   assert.deepEqual(
     [hasKey(remote, 'permissionMode', 'a2a:reviewer'), hasKey(remote, 'sandbox', 'a2a:reviewer'), hasKey(remote, 'remote', 'a2a:reviewer')],
     [false, false, false],
+    'an agent on a remote A2A agent has none of the keys the package refuses there',
   );
   assert.deepEqual(
     [hasKey(remote, 'permissionMode', 'claude'), hasKey(remote, 'remote', 'codex')],
@@ -204,10 +204,9 @@ test('the skills line is edited as a list and sent as the line the package reads
   assert.equal(withSkill('write-a-note ', 'write-a-note'), 'write-a-note ', 'a name given already leaves the line as it was: no edit');
   assert.equal(withoutSkill('review-a-change, write-a-note', 'review-a-change'), 'write-a-note');
   assert.equal(withoutSkill('write-a-note', 'write-a-note'), '');
-  // Added and removed through the form, the draft is what the typed line was.
   const form = formOf(listing());
   form.skills = withSkill(withSkill(form.skills, 'review-a-change'), 'write-a-note');
-  assert.equal(draftOf(form).skills, 'review-a-change, write-a-note');
+  assert.equal(draftOf(form).skills, 'review-a-change, write-a-note', 'added through the form, the draft is the typed line');
   form.skills = withoutSkill(withoutSkill(form.skills, 'write-a-note'), 'review-a-change');
   assert.equal(draftOf(form).skills, null, 'every skill removed is the line unset');
   assert.equal(edited(form, listing()), false);
@@ -291,9 +290,8 @@ test("a save lets the form a copy kept go only once the agent reads at the save'
   );
   assert.deepEqual(keptAfterSave(kept, undefined), kept, 'nothing read: the form stays');
   assert.equal(keptAfterSave(null, 'v3'), null);
-  // What the key is meanwhile: the form the person typed in, and after the read the saved version's.
-  assert.equal(formKeyOf('v2', keptAfterSave(kept, 'v2')), 'v1');
-  assert.equal(formKeyOf('v3', keptAfterSave(kept, 'v3')), 'v3');
+  assert.equal(formKeyOf('v2', keptAfterSave(kept, 'v2')), 'v1', 'the key meanwhile is the form the person typed in');
+  assert.equal(formKeyOf('v3', keptAfterSave(kept, 'v3')), 'v3', "after the read, the key is the saved version's");
 });
 
 test('REFUSED to let the kept form go before the reads a save changes are read again: rename, then read, then release', async () => {

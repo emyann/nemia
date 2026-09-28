@@ -21,12 +21,10 @@ const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
 test("a reset is said in the person's own time zone: the time on the same day, the weekday before it on another", () => {
   assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'UTC'), '12:30');
   assert.equal(clockWord(new Date('2026-09-19T12:30:00Z'), NOW, 'Asia/Tokyo'), '21:30');
-  // Tuesday in UTC, and still Monday in New York.
-  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'UTC'), 'Tue 02:00');
-  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'America/New_York'), 'Mon 22:00');
-  // The same instant is today in one zone and tomorrow in another.
-  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'UTC'), '20:00');
-  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'Asia/Tokyo'), 'Sun 05:00');
+  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'UTC'), 'Tue 02:00', 'Tuesday in UTC');
+  assert.equal(clockWord(new Date('2026-09-22T02:00:00Z'), NOW, 'America/New_York'), 'Mon 22:00', 'still Monday in New York');
+  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'UTC'), '20:00', 'the same instant is today in one zone');
+  assert.equal(clockWord(new Date('2026-09-19T20:00:00Z'), NOW, 'Asia/Tokyo'), 'Sun 05:00', 'and tomorrow in another');
 });
 
 test('the age of a reading', () => {

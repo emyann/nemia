@@ -2774,7 +2774,7 @@ in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts
 other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
 `CLIENT`. **Pure** files (`run.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
-no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`
+no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`,
 `meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the bottom, `store.ts` on those, `worktree.ts` on `store.ts` and
 the two others — and outside the store only the client and the controllers beneath the CLI import them.
 **Controllers** use the runtime through the client: `runner.ts`, the root, which re-exports; `views.ts`, `start.ts`,

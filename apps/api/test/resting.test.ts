@@ -299,6 +299,23 @@ test('two requests at once: the first reads the feed and judges the run succeede
   resting.runs.delete('r-raced');
 });
 
+test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is refused by name, exit 2, and fails the list, never read as off', async (t) => {
+  t.after(() => {
+    process.env.WF_VERIFY_REST = '1';
+  });
+  process.env.WF_VERIFY_REST = 'true';
+  await assert.rejects(
+    restingRead(resting),
+    (err: Error & { exitCode?: number }) =>
+      err.exitCode === 2 &&
+      err.message ===
+        'WF_VERIFY_REST=true is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.',
+  );
+  const error = t.mock.method(console, 'error', () => {});
+  assert.equal((await app.request('/api/runs')).status, 500);
+  error.mock.restore();
+});
+
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {
   aFinishedRun('r-poisoned');
   await list();

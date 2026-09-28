@@ -429,6 +429,21 @@ test("a deny rule refuses a server's tool by the tool's name, the server's, or e
   }
 });
 
+/** Whether `dir` is the checkout: the folder whose `package.json` declares the workspaces. */
+const isCheckout = (dir: string): boolean => {
+  const file = path.join(dir, 'package.json');
+  return fs.existsSync(file) && Array.isArray((JSON.parse(fs.readFileSync(file, 'utf8')) as { workspaces?: unknown }).workspaces);
+};
+
+test("HOME_REPO, built from capabilities.ts's own place, is the checkout: a `..` too few or too many is refused", () => {
+  assert.equal(isCheckout(path.join(HOME_REPO, 'apps', 'api')), false, "the api's own package.json declares no workspaces");
+  assert.equal(isCheckout(path.join(HOME_REPO, 'apps')), false, 'apps/ has no package.json');
+  assert.ok(
+    isCheckout(HOME_REPO),
+    `${HOME_REPO} is not the checkout: capabilities.ts builds it from its own folder, so a move changes its \`..\``,
+  );
+});
+
 test("unset, the api serves its own checkout: Playwright's server lists browser_run_code_unsafe, and the rule that denies it", async () => {
   assert.equal(repoOf({}), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: '  ' }), HOME_REPO);

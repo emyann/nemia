@@ -10,6 +10,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDecision } from '../src/decision.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
 const root = scratch('hkb-api-after-');
@@ -135,22 +138,7 @@ fs.writeFileSync(
     .join(''),
 );
 
-type Listed = {
-  id: string;
-  after: string[];
-  status: string;
-  moving: boolean;
-  waitingOnYou: string[];
-  createdAt: string;
-  startedAt: string | null;
-  waiting: {
-    runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
-    word: string;
-    advice: string;
-    onYou: boolean;
-  } | null;
-  steps: Array<{ name: string; status: string }>;
-};
+type Listed = RunSummary;
 
 const listedRuns = async (): Promise<Map<string, Listed>> => {
   const res = await app.request('/api/runs');
@@ -257,7 +245,7 @@ test("a run's detail carries the same `after`, `waiting` and `moving`", async ()
   for (const id of ['d-waits', 'e-cancelled-parent', 'i-started']) {
     const res = await app.request(`/api/runs/${id}`);
     assert.equal(res.status, 200);
-    const detail = await res.json();
+    const detail = (await res.json()) as RunDetail;
     const listed = runs.get(id)!;
     assert.deepEqual(
       { after: detail.after, waiting: detail.waiting, moving: detail.moving },
@@ -265,7 +253,7 @@ test("a run's detail carries the same `after`, `waiting` and `moving`", async ()
       id,
     );
     assert.deepEqual(
-      detail.steps.map((s: { status: string }) => s.status),
+      detail.steps.map((s) => s.status),
       listed.steps.map((s) => s.status),
       id,
     );
@@ -282,7 +270,7 @@ test("a run started when its first task was filed, off the engine's feed, not wh
   // Waiting on runs, whether they may still ship or never will, or with its parents shipped and the tick yet to file it: not started.
   for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled']) assert.equal(runs.get(id)!.startedAt, null, id);
   for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
-    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
     assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
   }
 });
@@ -305,8 +293,9 @@ test('the decision of a run waiting on runs is `waiting`, and nothing else: what
   for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {
     const res = await app.request(`/api/runs/${id}/decision`);
     assert.equal(res.status, 200);
-    const body = await res.json();
+    const body = (await res.json()) as RunDecision;
     assert.deepEqual(body, { waiting: runs.get(id)!.waiting }, id);
+    assert.ok('waiting' in body, id);
     const { run, waiting } = await decide(e, id);
     assert.deepEqual(asWaits(body.waiting), waiting, id);
     assert.equal(body.waiting.word, waitWord(waiting), id);

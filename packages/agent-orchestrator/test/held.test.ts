@@ -18,6 +18,7 @@ import {
   type Engine,
   type PromiseJournal,
   type PromiseRunner,
+  type PromiseSighting,
   type Sighting,
   type SpawnRequest,
   type TaskView,
@@ -86,7 +87,8 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
  * the run's.
  */
 const engine = () => {
-  const sessions = new Map<string, Sighting>();
+  // A harness's own words (`done`, `stopped`), as a runner written in Promises may still report them: the runtime reads them as A2A's.
+  const sessions = new Map<string, PromiseSighting>();
   const spawned: SpawnRequest[] = [];
   /** Names whose spawn the harness refuses, as it refuses a start that ran nothing: the attempt ends `unstartable`. */
   const refusing = new Set<string>();
@@ -600,7 +602,9 @@ test("a step's closeout, its denials and whether its closeout was asked for are 
   );
   assert.deepEqual(deniedOf(answered)('t'), [], 'nor its denials');
   const waiting = new Map([['t', view([signed], 0, 'input-required')]]);
-  assert.equal(closeoutOf(waiting, run, 'plan')?.outcome, 'blocked', 'the turn that signed, read while it waits');
+  const read = closeoutOf(waiting, run, 'plan');
+  assert.ok(read && !('error' in read), `the turn that signed is read while it waits: ${JSON.stringify(read)}`);
+  assert.equal(read.outcome, 'blocked', 'the turn that signed, read while it waits');
   assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']);
   assert.equal(phaseOfView(waiting.get('t')!), 'succeeded', 'waiting reads settled, as it signed');
   assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true, "an unsigned attempt of the last turn is not this turn's");

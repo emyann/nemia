@@ -15,6 +15,9 @@ import net from 'node:net';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { scratch } from './scratch.ts';
+import type { Said } from 'agent-orchestrator';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-say-${label}-`);
 
@@ -158,8 +161,8 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
   return assert.fail(`say() took ${JSON.stringify(text)} for ${run} ${step}, and should have refused`);
 };
 
-type Step = { name: string; said: unknown[]; note: string | null };
-const detailSteps = async (id = R): Promise<Step[]> => (await (await app.request(`/api/runs/${id}`)).json()).steps;
+const detailSteps = async (id = R): Promise<RunDetail['steps']> =>
+  ((await (await app.request(`/api/runs/${id}`)).json()) as RunDetail).steps;
 
 test('REFUSED at shipped defaults: words another site could send — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and JSON that is not the words (400): nothing said, nothing written', async () => {
   const before = written();
@@ -168,7 +171,7 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
     const res = await sayTo('implement', body, { ...BOARD, 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
     assert.equal(
-      (await res.json()).error,
+      ((await res.json()) as { error: string }).error,
       `POST /api/runs/${R}/steps/implement/say refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the words go into the session of a step at work in this repository, as a person's, and its agent acts on them. Say it from the step's session page on the board, or with \`wf say ${R} implement "<words>"\`.`,
     );
   }
@@ -176,7 +179,7 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
     const res = await sayTo('implement', body, { ...BOARD, host });
     assert.equal(res.status, 403, host);
     assert.ok(
-      (await res.json()).error.startsWith(
+      ((await res.json()) as { error: string }).error.startsWith(
         `POST /api/runs/${R}/steps/implement/say refuses a request addressed to ${host}: the api hands a person's words to a step's running session only for a request to this machine`,
       ),
     );
@@ -185,7 +188,9 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
     const res = await sayTo('implement', body, { ...BOARD, 'content-type': type });
     assert.equal(res.status, 415, type);
     assert.ok(
-      (await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/say takes its body as \`content-type: application/json\``),
+      ((await res.json()) as { error: string }).error.startsWith(
+        `POST /api/runs/${R}/steps/implement/say takes its body as \`content-type: application/json\``,
+      ),
     );
   }
   const bodies: Array<[unknown, RegExp]> = [
@@ -198,7 +203,7 @@ test('REFUSED at shipped defaults: words another site could send — a page on a
   for (const [sent, words] of bodies) {
     const res = await sayTo('implement', sent);
     assert.equal(res.status, 400, JSON.stringify(sent));
-    assert.match((await res.json()).error, words);
+    assert.match(((await res.json()) as { error: string }).error, words);
   }
   assert.deepEqual(box.lines, [], 'nothing reached the inbox');
   assert.deepEqual(written(), before, 'nothing written');
@@ -226,16 +231,16 @@ test("REFUSED at shipped defaults: empty words (the engine's sentence), a settle
   for (const [run, step, text, words] of cases) {
     const res = await sayTo(step, { text }, BOARD, run);
     assert.equal(res.status, 409, `${run} ${step} ${JSON.stringify(text)}`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, words);
     assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `wf say` prints them");
   }
   const noRun = await sayTo('implement', { text: 'Widen the scope.' }, BOARD, 'r-nope');
   assert.equal(noRun.status, 404);
-  assert.match((await noRun.json()).error, /^No run 'r-nope' in this store/);
+  assert.match(((await noRun.json()) as { error: string }).error, /^No run 'r-nope' in this store/);
   const noStep = await sayTo('deploy', { text: 'Ship it.' });
   assert.equal(noStep.status, 404);
-  assert.match((await noStep.json()).error, /^Run 'r-say' has no step 'deploy'/);
+  assert.match(((await noStep.json()) as { error: string }).error, /^Run 'r-say' has no step 'deploy'/);
   assert.deepEqual(box.lines, [], 'nothing reached the inbox');
   assert.deepEqual(written(), before, 'nothing written');
 });
@@ -244,7 +249,7 @@ test("words the harness could not be given come back in the engine's words, 502 
   const before = written();
   const res = await sayTo('deaf', { text: 'Widen the scope.' });
   assert.equal(res.status, 502);
-  const { error } = await res.json();
+  const { error } = (await res.json()) as { error: string };
   assert.match(error, /^say: ae\/t-deaf\/1 was not given the words \([\s\S]*is not there[\s\S]*\)\. Nothing was journalled\.$/);
   assert.deepEqual(written(), before, 'nothing written');
 });
@@ -255,7 +260,7 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   const sent = Date.now();
   const res = await sayTo('implement', { text: words });
   assert.equal(res.status, 202, await res.clone().text());
-  const said = await res.json();
+  const said = (await res.json()) as Said;
   assert.deepEqual(Object.keys(said).sort(), ['at', 'attempt', 'text']);
   assert.deepEqual([said.attempt, said.text], [1, words]);
   assert.ok(Date.parse(said.at) >= sent - 1000, said.at);
@@ -272,8 +277,8 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   for (const other of steps.filter((s) => s.name !== 'implement'))
     assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
   assert.equal((await list(engine(), readRun(R))).steps.find((s) => s.name === 'implement')!.note, 'said to 1×', "`wf ls`'s words");
-  const summary = (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === R);
-  assert.equal(summary.steps.find((s: Step) => s.name === 'implement').note, 'said to 1×', 'and on the list');
+  const summary = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
+  assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
   assert.deepEqual(
     Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir))),
     records,

@@ -24,8 +24,9 @@ pure, store, controller or the client (`test/boundary.test.ts`).
   (`splitFrontmatter`, trimmed; `frontmatterValue`).
 - **`fixtures/argv-shipped.json` pins dev's implement argv**: after changing what a shipped agent gives, record it with `ARGV_RECORD=1`
   and read the diff. `fixtures/git-runs-before.json` is refreshed with `everything()` of `git-runs-pin.ts`; read its diff line by line.
-- **The api's tests import `agent-orchestrator/run` and `agent-orchestrator/workflow` with `await import`**: before moving a name out of
-  `run.ts` or `workflow.ts`, grep the workspace for both, and re-export from `run.ts` what the api reads there.
+- **The api reads `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with `await import`: the api's typecheck fails
+  on a name a subpath no longer exports, so before moving a name out of `run.ts` or `workflow.ts`, re-export from `run.ts` what the api
+  reads there.
 
 ## Runs, phases and asks
 

@@ -11,7 +11,7 @@ import {
   mostLines,
   touchedSummary,
 } from '../src/lib/decide.ts';
-import type { Decidable, Radius, Touched } from '../src/lib/api.ts';
+import type { Decidable, Radius, RunStatus, Touched } from '../src/lib/api.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 
@@ -113,12 +113,26 @@ test('a run is asked for its decision once it finished or waits on a person — 
 
 test("only the api's decision is shown: not `running`, not `nothing`, not an answer still to come", () => {
   const decidable: Decidable = {
+    standings: [],
     touched: [read],
     lesson: { said: 'CLAUDE.md +2 −0', state: 'written' },
     sensitive: [],
     used: {},
-    total: { usage: null, used: 'not measured', cost: 'not measured' },
+    total: {
+      usage: null,
+      used: 'not measured',
+      cost: 'not measured',
+      costUsd: null,
+      apiMs: null,
+      toolMs: null,
+      read: null,
+      peak: null,
+      rebuilt: 0,
+    },
+    cost: null,
+    overBudget: null,
     commands: [],
+    awaiting: null,
   };
   assert.equal(isDecidable(decidable), true);
   assert.equal(isDecidable({ running: true }), false);
@@ -127,7 +141,7 @@ test("only the api's decision is shown: not `running`, not `nothing`, not an ans
 });
 
 /** A fan-out as the api gives it: implement signed off blocked, and tokens in `tokens`' word. The run `assess` calls failed. */
-const fanOut = (tokens: string, over: { status?: string; waitingOnYou?: string[]; tokensTask?: string | null } = {}) => ({
+const fanOut = (tokens: string, over: { status?: RunStatus; waitingOnYou?: string[]; tokensTask?: string | null } = {}) => ({
   status: over.status ?? 'failed',
   cancelledAt: null,
   waitingOnYou: over.waitingOnYou ?? ['implement'],

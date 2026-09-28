@@ -15,7 +15,8 @@ holds what every change needs.
 - `npm test` — turbo runs `node --test test/*.test.ts` in every package, in parallel, with `--continue`. Not bare `node --test` from the
   root. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:` first: a
   file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
-- `npm run typecheck` — `tsc --noEmit` per package.
+- `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);
+  `agent-orchestrator/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e`, when you touch `apps/web`, and read the pictures the e2e writes (`apps/web/CLAUDE.md`).
@@ -46,6 +47,9 @@ holds what every change needs.
 - **A file written through a tool can turn an escape into the character it names**: a raw NUL, DEL or byte order mark. Build such a
   character with `String.fromCharCode`, and after writing an escape of one, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`): the
   apps' `source.test.ts` refuses a raw control character, and no test refuses a BOM.
+- **A field moved to another key still passes the typecheck where it is read through a cast, a `Record` or JSON**: grep the tests for
+  the old key, read the passing ones too, and check a comparison still fails with a mutant. A wrong type passed on purpose to prove a
+  refusal says so with `as never` where it does.
 - **An optional field added to a returned type is dropped by every caller that rebuilds the answer field by field.** Grep for each
   place that spreads or rebuilds the type, and give the new fact one writer.
 

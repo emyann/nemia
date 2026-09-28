@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-decide-');
@@ -17,10 +17,28 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { AGENT_FACING, CHECK_AFFECTING, LESSON, advance, consumption, lessonLine, readRun, retry, sensitiveDiff, start, touchedBy } =
-  await import('../src/runner.ts');
+const {
+  AGENT_FACING,
+  CHECK_AFFECTING,
+  LESSON,
+  advance,
+  consumption,
+  isGitRun,
+  lessonLine,
+  readRun,
+  retry,
+  sensitiveDiff,
+  start,
+  touchedBy,
+} = await import('../src/runner.ts');
 const { metered } = await import('../src/tally.ts');
 const { main } = await import('../src/cli.ts');
+
+/** A run this file started on a repository, as `touchedBy` and `sensitiveDiff` read one: a git run. */
+const gitRun = (run: Run): GitRun => {
+  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+  return run;
+};
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' });
@@ -337,7 +355,7 @@ test('`wf decide --help` prints the lists the screen uses, from the one place th
 
 test('what a branch touched is read out of git: a rename at both ends, a binary file, a file in no directory — and a branch that is gone is not read as nothing', () => {
   const repo = aRepo();
-  const run = start({ brief: 'move the test', repo, workflowDir: folder(), isolate: false });
+  const run = gitRun(start({ brief: 'move the test', repo, workflowDir: folder(), isolate: false }));
   branchOff(repo, 'wf/moved', () => {
     fs.mkdirSync(path.join(repo, 'packages/x/spec'));
     git(repo, 'mv', 'packages/x/test/add.test.ts', 'packages/x/spec/add.test.ts');
@@ -376,7 +394,7 @@ test('what a branch touched is read out of git: a rename at both ends, a binary 
 
 test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", () => {
   const repo = aRepo();
-  const run = start({ brief: 'document it', repo, workflowDir: folder(), isolate: false });
+  const run = gitRun(start({ brief: 'document it', repo, workflowDir: folder(), isolate: false }));
   branchOff(repo, 'wf/source-docs', () => write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n'));
   branchOff(repo, 'wf/package-docs', () => {
     write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
@@ -715,7 +733,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
   // That diff is there to be read: what is refused is reading it AS this run's work.
-  const moved = touchedBy(readRun(run.id), 'main');
+  const moved = touchedBy(gitRun(readRun(run.id)), 'main');
   assert.ok(!('error' in moved) && moved.changes.length === 2, JSON.stringify(moved));
 
   const lines = await screen(t, e, run.id);

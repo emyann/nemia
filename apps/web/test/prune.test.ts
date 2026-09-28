@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { Decidable } from '../src/lib/api.ts';
 import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type Awaiting } from '../src/lib/prune.ts';
 
 type Prunable = Parameters<typeof pruneOffer>[0];
@@ -91,19 +92,20 @@ test('a failed run whose branch a person merged by hand shipped, as the package 
 });
 
 test('the decision is read for its `awaiting` alone: null for every answer but a decidable one, and for an api older than the field', () => {
-  const decidable = {
+  const decidable: Omit<Decidable, 'awaiting'> = {
     standings: [],
     touched: [],
-    lesson: { said: '', state: 'nothing' as const },
+    lesson: { said: '', state: 'nothing' },
     sensitive: [],
     used: {},
-    total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null },
+    total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
     cost: null,
     overBudget: null,
     commands: [],
   };
   assert.deepEqual(awaitingOf({ ...decidable, awaiting: unmerged }), unmerged);
   assert.equal(awaitingOf({ ...decidable, awaiting: null }), null);
+  // Cast on purpose: an api older than `awaiting` sends a decision without it, which the type does not allow.
   assert.equal(awaitingOf(decidable as never), null);
   assert.equal(awaitingOf({ nothing: 'cancelled at 2026-09-28T09:00:00.000Z — nothing to decide' }), null);
   assert.equal(awaitingOf({ running: true }), null);

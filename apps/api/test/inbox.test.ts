@@ -23,6 +23,11 @@ const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, no
   await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 type InboxCardPage = import('../src/inbox.ts').InboxCardPage;
+type InboxFiled = import('../src/inbox.ts').InboxFiled;
+type RunDetail = import('../src/detail.ts').RunDetail;
+/** What POST /api/runs answers a card it started (201): the run, the card, and whether the card left the inbox — and why not. */
+type CardStarted = { id: string; card: string; removed: boolean; why?: string; ignoredRepo?: string };
+type Refused = { error: string };
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -51,7 +56,7 @@ const startCard = (body: unknown, headers: Record<string, string> = JSON_TYPE) =
 const listed = async (): Promise<InboxEntry[]> => {
   const res = await app.request('/api/inbox');
   assert.equal(res.status, 200);
-  return res.json();
+  return (await res.json()) as InboxEntry[];
 };
 
 /** Every card and record gone, so each test starts from an empty inbox and store. */
@@ -69,7 +74,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   clear();
   const bare = await file({ body: 'Cache the views between passes\n\nThe tick reads each task twice.' });
   assert.equal(bare.status, 201, await bare.clone().text());
-  const filed = await bare.json();
+  const filed = (await bare.json()) as InboxFiled;
   assert.match(filed.name, /^cache-the-views-between-pass-[a-z0-9]+$/);
   assert.deepEqual(filed, {
     name: filed.name,
@@ -85,20 +90,23 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   );
 
   // The repository's, on a card about the api's repository: by name, as `wf inbox add --workflow dev` writes it.
-  const named = await (await file({ body: 'Show what a step cost', workflow: 'dev', repo })).json();
+  const named = (await (await file({ body: 'Show what a step cost', workflow: 'dev', repo })).json()) as InboxFiled;
   assert.equal(fs.readFileSync(named.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nShow what a step cost\n`);
   // Yours: its folder, since a name on a card is looked for under the repository's workflows/, where yours is not.
-  const yours = await (await file({ body: 'Plan the inbox', workflow: 'mine' })).json();
+  const yours = (await (await file({ body: 'Plan the inbox', workflow: 'mine' })).json()) as InboxFiled;
   assert.deepEqual([yours.workflow, yours.repo], [mine, null]);
   // One both have, said which: the repository's by name, yours by folder.
-  assert.equal((await (await file({ body: 'Both, the repository', workflow: 'both', from: 'repo' })).json()).workflow, 'both');
   assert.equal(
-    (await (await file({ body: 'Both, yours', workflow: 'both', from: 'yours' })).json()).workflow,
+    ((await (await file({ body: 'Both, the repository', workflow: 'both', from: 'repo' })).json()) as InboxFiled).workflow,
+    'both',
+  );
+  assert.equal(
+    ((await (await file({ body: 'Both, yours', workflow: 'both', from: 'yours' })).json()) as InboxFiled).workflow,
     path.join(root, 'workflows', 'both'),
   );
   // The repository's, on a card about another repository: its folder, since the name would be looked for in that one.
   const elsewhere = scratch('hkb-api-inbox-elsewhere-');
-  assert.equal((await (await file({ body: 'Elsewhere', workflow: 'dev', repo: elsewhere })).json()).workflow, dev);
+  assert.equal(((await (await file({ body: 'Elsewhere', workflow: 'dev', repo: elsewhere })).json()) as InboxFiled).workflow, dev);
 
   // Listed in the package's order, each with its body and a filing time; `started as` none.
   const old = new Date('2026-09-01T10:00:00.000Z');
@@ -135,17 +143,17 @@ test("POST /api/inbox writes an absolute repo as `wf inbox add --repo` does — 
   ]) {
     const res = await file({ body: `About ${given}`, workflow: 'dev', repo: given });
     assert.equal(res.status, 201, `${given}: ${await res.clone().text()}`);
-    const filed = await res.json();
+    const filed = (await res.json()) as InboxFiled;
     // The api's own repository once written as it is, so its workflow is written by name, as for the repository given plainly.
     assert.deepEqual([filed.repo, filed.workflow], [repo, 'dev'], given);
     assert.equal(fs.readFileSync(filed.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nAbout ${given}\n`, given);
   }
 
   // Started, the run names the repository as the api does, so the board lists it with the runs on it.
-  const { name } = await (await file({ body: 'Started from a slash', repo: `${repo}/` })).json();
+  const { name } = (await (await file({ body: 'Started from a slash', repo: `${repo}/` })).json()) as InboxFiled;
   const started = await startCard({ workflow: 'dev', card: name });
   assert.equal(started.status, 201, await started.clone().text());
-  assert.equal(readRun((await started.json()).id).repo, repo);
+  assert.equal(readRun(((await started.json()) as CardStarted).id).repo, repo);
 });
 
 test('GET /api/inbox lists an entry that does not read as a card with its refusal and no body, a card started with its run, and reads the folder on each request', async () => {
@@ -184,7 +192,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
 
   const res = await cardPage('cache-the-views-k2q9');
   assert.equal(res.status, 200, await res.clone().text());
-  const page: InboxCardPage = await res.json();
+  const page = (await res.json()) as InboxCardPage;
   const listedAs = (await listed()).find((e) => e.name === 'cache-the-views-k2q9')!;
   assert.deepEqual(
     { ...page, source: undefined, keys: undefined },
@@ -201,7 +209,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
   ]);
 
   // A card that sets no key: every key, none set.
-  const bare: InboxCardPage = await (await cardPage('bare-idea-a1b2')).json();
+  const bare = (await (await cardPage('bare-idea-a1b2')).json()) as InboxCardPage;
   assert.deepEqual([bare.body, bare.source], ['A bare idea', 'A bare idea\n']);
   assert.deepEqual(bare.keys, [
     { key: 'workflow', value: null, meaning: INBOX_KEY_MEANINGS.workflow },
@@ -212,7 +220,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
 
   // An entry that does not read as a card: its refusal and its file, and no keys to lay out.
   write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
-  const broken: InboxCardPage = await (await cardPage('broken')).json();
+  const broken = (await (await cardPage('broken')).json()) as InboxCardPage;
   assert.match(broken.error!, /^broken\.md: `colour` is not a key an inbox card has/);
   assert.deepEqual([broken.body, broken.source, broken.keys], [null, '---\ncolour: red\n---\nPaint it.\n', null]);
 
@@ -234,17 +242,17 @@ test("REFUSED at shipped defaults: a card's page for a name that is not a card's
   ] as const) {
     const res = await cardPage(sent);
     assert.equal(res.status, 400, sent);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.equal(error, inboxNameRefusal(name), sent);
     assert.ok(!JSON.stringify(error).includes('"id":"r-1"'), `${sent}: nothing of the file it names`);
   }
   const missing = await cardPage('no-such-card');
   assert.equal(missing.status, 404);
-  assert.equal((await missing.json()).error, noCardLine('no-such-card', [card.name]));
+  assert.equal(((await missing.json()) as Refused).error, noCardLine('no-such-card', [card.name]));
   const withMd = await cardPage(`${card.name}.md`);
   assert.equal(withMd.status, 404);
   assert.equal(
-    (await withMd.json()).error,
+    ((await withMd.json()) as Refused).error,
     noCardLine(`${card.name}.md`, [card.name]),
     'a card is named without its .md, and the sentence says so',
   );
@@ -267,24 +275,24 @@ test("REFUSED at shipped defaults: a card's page for a name that is not there, i
 
   const missing = await cardPage('no-such-card');
   assert.equal(missing.status, 404);
-  const { error } = await missing.json();
+  const { error } = (await missing.json()) as Refused;
   // The sentence `wf inbox rm` gives for the same name, word for word: the package's own list of cards.
   const dropped = await drop('no-such-card');
   assert.equal(dropped.status, 404);
-  assert.equal(error, (await dropped.json()).error);
+  assert.equal(error, ((await dropped.json()) as Refused).error);
   assert.equal(error, noCardLine('no-such-card', ['broken', card.name]));
   assert.ok(!error.includes('notes.txt') && !error.includes('sub/'), error);
 
   // `notes.md` and a stray `notes` both list as `notes`: the page is the card's.
   write(path.join(inbox, 'notes'), 'a stray file\n');
   write(path.join(inbox, 'notes.md'), '---\nworkflow: dev\n---\nThe card called notes\n');
-  const notes: InboxCardPage = await (await cardPage('notes')).json();
+  const notes = (await (await cardPage('notes')).json()) as InboxCardPage;
   assert.deepEqual(
     [notes.file, notes.body, notes.source, notes.keys?.[0]?.value],
     ['notes.md', 'The card called notes', '---\nworkflow: dev\n---\nThe card called notes\n', 'dev'],
   );
   // A stray file with no card of its name has a page all the same: its refusal and its text.
-  const stray: InboxCardPage = await (await cardPage('notes.txt')).json();
+  const stray = (await (await cardPage('notes.txt')).json()) as InboxCardPage;
   assert.deepEqual([stray.body, stray.source, stray.keys], [null, 'not a card\n', null]);
   assert.match(stray.error!, /^notes\.txt: not a card/);
 });
@@ -294,40 +302,43 @@ test("REFUSED at shipped defaults: a filing of the wrong shape is a 400 in the a
   for (const body of ['not json', '[]', '"an idea"']) {
     const res = await file(body);
     assert.equal(res.status, 400, body);
-    assert.ok((await res.json()).error.startsWith('POST /api/inbox takes a JSON'), body);
+    assert.ok(((await res.json()) as Refused).error.startsWith('POST /api/inbox takes a JSON'), body);
   }
   for (const idea of [undefined, 42, null, ['an idea']]) {
     const res = await file({ body: idea });
     assert.equal(res.status, 400, JSON.stringify(idea));
-    assert.ok((await res.json()).error.startsWith('`body` is the idea, as `wf inbox add "<idea>"` takes it: text.'), JSON.stringify(idea));
+    assert.ok(
+      ((await res.json()) as Refused).error.startsWith('`body` is the idea, as `wf inbox add "<idea>"` takes it: text.'),
+      JSON.stringify(idea),
+    );
   }
   // A name, as the workflows are listed: never a path, which a card would carry to a start from the command line.
   for (const workflow of ['', 42, '../workflows/dev', '/tmp/dev', 'dev/implement.md', 'a\\b']) {
     const res = await file({ body: 'An idea', workflow });
     assert.equal(res.status, 400, JSON.stringify(workflow));
-    assert.ok((await res.json()).error.startsWith('`workflow` names what runs the card'), JSON.stringify(workflow));
+    assert.ok(((await res.json()) as Refused).error.startsWith('`workflow` names what runs the card'), JSON.stringify(workflow));
   }
   const from = await file({ body: 'An idea', workflow: 'dev', from: 'elsewhere' });
   assert.equal(from.status, 400);
-  assert.ok((await from.json()).error.startsWith("`from` is where the card's workflow is read from"));
+  assert.ok(((await from.json()) as Refused).error.startsWith("`from` is where the card's workflow is read from"));
   const alone = await file({ body: 'An idea', from: 'repo' });
   assert.equal(alone.status, 400);
-  assert.ok((await alone.json()).error.includes('names no `workflow`'));
+  assert.ok(((await alone.json()) as Refused).error.includes('names no `workflow`'));
   for (const about of [42, null, ['/tmp']]) {
     const res = await file({ body: 'An idea', repo: about });
     assert.equal(res.status, 400, JSON.stringify(about));
-    assert.ok((await res.json()).error.startsWith('`repo` is the repository the idea is about'), JSON.stringify(about));
+    assert.ok(((await res.json()) as Refused).error.startsWith('`repo` is the repository the idea is about'), JSON.stringify(about));
   }
 
   const unknown = await file({ body: 'An idea', workflow: 'nope' });
   assert.equal(unknown.status, 404);
-  assert.ok((await unknown.json()).error.startsWith("No workflow 'nope' in "));
+  assert.ok(((await unknown.json()) as Refused).error.startsWith("No workflow 'nope' in "));
   // Found among the folders, never joined: a hidden folder is none of them.
   write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
   assert.equal((await file({ body: 'An idea', workflow: '.draft' })).status, 404);
   const both = await file({ body: 'An idea', workflow: 'both' });
   assert.equal(both.status, 409);
-  assert.ok((await both.json()).error.startsWith("Both the repository and yours have a workflow named 'both'"));
+  assert.ok(((await both.json()) as Refused).error.startsWith("Both the repository and yours have a workflow named 'both'"));
 
   assert.deepEqual(cards(), []);
 });
@@ -357,7 +368,7 @@ test("REFUSED at shipped defaults: what the package refuses to file is a 422 car
     const expected = packageRefusal({ text: asked.body, ...(asked.repo !== undefined ? { repo: asked.repo } : {}) });
     const res = await file(asked);
     assert.equal(res.status, 422, JSON.stringify(asked));
-    assert.equal((await res.json()).error, expected, JSON.stringify(asked));
+    assert.equal(((await res.json()) as Refused).error, expected, JSON.stringify(asked));
   }
   assert.deepEqual(cards(), []);
 });
@@ -378,11 +389,11 @@ test("REFUSED at shipped defaults: a drop of a card that is not there is a 404, 
 
   const missing = await drop('no-such-card');
   assert.equal(missing.status, 404);
-  assert.equal((await missing.json()).error, noCardLine('no-such-card', [card.name]));
+  assert.equal(((await missing.json()) as Refused).error, noCardLine('no-such-card', [card.name]));
   // Given with its .md: the sentence names the card without it.
   const withMd = await drop(`${card.name}.md`);
   assert.equal(withMd.status, 404);
-  assert.equal((await withMd.json()).error, noCardLine(`${card.name}.md`, [card.name]));
+  assert.equal(((await withMd.json()) as Refused).error, noCardLine(`${card.name}.md`, [card.name]));
   assert.ok(noCardLine(`${card.name}.md`, [card.name]).includes(`A card is named without its .md: \`${card.name}\`.`));
 
   // A hidden name, and names with a slash sent encoded, which the route decodes: refused before the inbox is read.
@@ -394,7 +405,7 @@ test("REFUSED at shipped defaults: a drop of a card that is not there is a 404, 
   ] as const) {
     const res = await drop(sent);
     assert.equal(res.status, 400, sent);
-    assert.equal((await res.json()).error, inboxNameRefusal(name), sent);
+    assert.equal(((await res.json()) as Refused).error, inboxNameRefusal(name), sent);
   }
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });
@@ -414,7 +425,7 @@ test('REFUSED at shipped defaults: a filing or a drop another site could make �
     for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
       const res = await send({ 'content-type': type });
       assert.equal(res.status, 415, `${route} ${type}`);
-      const { error } = await res.json();
+      const { error } = (await res.json()) as Refused;
       assert.ok(
         error.startsWith(`${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``),
         error,
@@ -424,7 +435,7 @@ test('REFUSED at shipped defaults: a filing or a drop another site could make �
     const none = await send({});
     assert.equal(none.status, 415, `${route} with no content-type`);
     assert.ok(
-      (await none.json()).error.includes(
+      ((await none.json()) as Refused).error.includes(
         route.startsWith('DELETE') ? 'this request sent no content-type' : 'this request sent `text/plain`',
       ),
     );
@@ -432,14 +443,14 @@ test('REFUSED at shipped defaults: a filing or a drop another site could make �
     for (const site of ['cross-site', 'same-site', 'none']) {
       const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': site });
       assert.equal(res.status, 403, `${route} ${site}`);
-      const { error } = await res.json();
+      const { error } = (await res.json()) as Refused;
       assert.ok(error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`), error);
     }
 
     for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
       const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
       assert.equal(res.status, 403, `${route} ${host}`);
-      assert.ok((await res.json()).error.startsWith(`${route} refuses a request addressed to ${host}:`));
+      assert.ok(((await res.json()) as Refused).error.startsWith(`${route} refuses a request addressed to ${host}:`));
     }
   }
   assert.deepEqual(cards(), before);
@@ -472,7 +483,7 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
     after: [parent.run.id],
   });
   assert.equal(res.status, 201, await res.clone().text());
-  const answered = await res.json();
+  const answered = (await res.json()) as CardStarted;
   assert.deepEqual(answered, { id: answered.id, card: card.name, removed: true });
   assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
@@ -495,7 +506,7 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
   const { card: plain } = addToInbox({ text: 'Keep the brief\n\nAs the card says it.' });
   const bodied = await startCard({ workflow: 'mine', card: plain.name });
   assert.equal(bodied.status, 201, await bodied.clone().text());
-  const bodiedRun = readRun((await bodied.json()).id);
+  const bodiedRun = readRun(((await bodied.json()) as CardStarted).id);
   assert.deepEqual(
     [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
     ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }],
@@ -512,17 +523,17 @@ test(
     try {
       const res = await startCard({ workflow: 'dev', card: card.name });
       assert.equal(res.status, 201, await res.clone().text());
-      const answered = await res.json();
+      const answered = (await res.json()) as CardStarted;
       assert.deepEqual(Object.keys(answered).sort(), ['card', 'id', 'removed', 'why']);
       assert.deepEqual([answered.card, answered.removed], [card.name, false]);
-      assert.ok(answered.why.startsWith(`${cardFile} could not be removed — `), answered.why);
+      assert.ok(answered.why?.startsWith(`${cardFile} could not be removed — `), answered.why);
       assert.deepEqual(readRun(answered.id).from, { inbox: card.name });
       assert.deepEqual(cards(), [`${card.name}.md`], 'the card is still there');
       assert.deepEqual((await listed()).find((e) => e.name === card.name)?.startedAs, [answered.id]);
 
       const again = await startCard({ workflow: 'dev', card: card.name });
       assert.equal(again.status, 409);
-      assert.ok((await again.json()).error.includes(`this card was started as ${answered.id}`));
+      assert.ok(((await again.json()) as Refused).error.includes(`this card was started as ${answered.id}`));
     } finally {
       fs.chmodSync(inbox, 0o755);
     }
@@ -536,10 +547,10 @@ test("GET /api/runs/:id says a run came from a card — the record's `from`, and
   const { card } = addToInbox({ text: 'Say where a run came from' });
   const started = await startCard({ workflow: 'dev', card: card.name });
   assert.equal(started.status, 201, await started.clone().text());
-  const { id } = await started.json();
+  const { id } = (await started.json()) as CardStarted;
   const res = await app.request(`/api/runs/${id}`);
   assert.equal(res.status, 200, await res.clone().text());
-  const detail = await res.json();
+  const detail = (await res.json()) as RunDetail;
   assert.deepEqual(detail.from, { inbox: card.name });
   assert.equal(detail.fromNote, fromNote(readRun(id)));
   assert.equal(detail.fromNote, `from inbox card ${card.name}`);
@@ -547,8 +558,8 @@ test("GET /api/runs/:id says a run came from a card — the record's `from`, and
   // Typed at the board's start, as at `wf start`: no card, so no `from` — absent, not null — and no sentence.
   const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });
   assert.equal(typed.status, 201, await typed.clone().text());
-  const typedId = (await typed.json()).id;
-  const plain = await (await app.request(`/api/runs/${typedId}`)).json();
+  const typedId = ((await typed.json()) as { id: string }).id;
+  const plain = (await (await app.request(`/api/runs/${typedId}`)).json()) as RunDetail;
   assert.equal(plain.id, typedId);
   assert.deepEqual(['from' in plain, 'fromNote' in plain], [false, false]);
 });
@@ -572,11 +583,11 @@ test("REFUSED at shipped defaults: a `card` that is not there is a 404 carrying 
 
   const res = await startCard({ workflow: 'dev', card: 'no-such-card', brief: 'Do it.' });
   assert.equal(res.status, 404);
-  assert.equal((await res.json()).error, expected);
+  assert.equal(((await res.json()) as Refused).error, expected);
   // Given with its .md, as a path would name it: the package's sentence names the card without it.
   const withMd = await startCard({ workflow: 'dev', card: `${card.name}.md`, brief: 'Do it.' });
   assert.equal(withMd.status, 404);
-  assert.equal((await withMd.json()).error, startRefusal(`${card.name}.md`));
+  assert.equal(((await withMd.json()) as Refused).error, startRefusal(`${card.name}.md`));
   assert.deepEqual(runFiles(), []);
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });
@@ -591,24 +602,24 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
 
   const again = await startCard({ workflow: 'dev', card: started.name, brief: 'Do it again.' });
   assert.equal(again.status, 409);
-  const { error: startedError } = await again.json();
+  const { error: startedError } = (await again.json()) as Refused;
   assert.equal(startedError, startRefusal(started.name));
   assert.ok(startedError.includes('this card was started as started-once-k2q9'), startedError);
 
   for (const brief of ['', '  \n']) {
     const res = await startCard({ workflow: 'dev', card: card.name, brief });
     assert.equal(res.status, 422, JSON.stringify(brief));
-    assert.equal((await res.json()).error, startRefusal(card.name, { brief }));
+    assert.equal(((await res.json()) as Refused).error, startRefusal(card.name, { brief }));
   }
 
   const broken = await startCard({ workflow: 'dev', card: 'broken', brief: 'Do it.' });
   assert.equal(broken.status, 422);
-  assert.equal((await broken.json()).error, startRefusal('broken'));
+  assert.equal(((await broken.json()) as Refused).error, startRefusal('broken'));
 
   const waits = await startCard({ workflow: 'dev', card: card.name, brief: 'Wait for it.', after: ['no-such-run'] });
   assert.equal(waits.status, 422);
   assert.equal(
-    (await waits.json()).error,
+    ((await waits.json()) as Refused).error,
     '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.',
   );
 
@@ -623,18 +634,21 @@ test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 i
     // A workflow nobody has: the name is refused first.
     const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
     assert.equal(res.status, 400, name);
-    assert.equal((await res.json()).error, inboxNameRefusal(name), name);
+    assert.equal(((await res.json()) as Refused).error, inboxNameRefusal(name), name);
   }
   for (const name of [42, null, ['a']]) {
     const res = await startCard({ workflow: 'nope', card: name, brief: 'Do it.' });
     assert.equal(res.status, 400, JSON.stringify(name));
-    assert.ok((await res.json()).error.startsWith('`card` names the inbox card to start, as `wf inbox` lists it'), JSON.stringify(name));
+    assert.ok(
+      ((await res.json()) as Refused).error.startsWith('`card` names the inbox card to start, as `wf inbox` lists it'),
+      JSON.stringify(name),
+    );
   }
   for (const brief of [42, null]) {
     const res = await startCard({ workflow: 'dev', card: card.name, brief });
     assert.equal(res.status, 400, JSON.stringify(brief));
     assert.ok(
-      (await res.json()).error.startsWith("`brief` is what the run is asked to do in place of the card's body"),
+      ((await res.json()) as Refused).error.startsWith("`brief` is what the run is asked to do in place of the card's body"),
       JSON.stringify(brief),
     );
   }
@@ -651,10 +665,10 @@ test('REFUSED at shipped defaults: a card start another site could make is refus
   const body = { workflow: 'dev', card: card.name, brief: 'Do it.' };
   const site = await startCard(body, { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
   assert.equal(site.status, 403);
-  assert.ok((await site.json()).error.includes("Start it from the board's Workflows or Inbox page, or with `wf start`."));
+  assert.ok(((await site.json()) as Refused).error.includes("Start it from the board's Workflows or Inbox page, or with `wf start`."));
   const type = await startCard(body, { 'content-type': 'text/plain;charset=UTF-8' });
   assert.equal(type.status, 415);
-  assert.ok((await type.json()).error.includes('`"card": "<name>"`'), 'the shape it takes names `card`');
+  assert.ok(((await type.json()) as Refused).error.includes('`"card": "<name>"`'), 'the shape it takes names `card`');
   assert.deepEqual(runFiles(), []);
   assert.deepEqual(cards(), [`${card.name}.md`]);
 });

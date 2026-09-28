@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDetail } from '../src/detail.ts';
 
 // agent-orchestrator locates its store as its module loads: set first.
 const root = scratch('hkb-api-read-');
@@ -124,10 +125,12 @@ task('t-implement', 'claude', [USAGE.cold, USAGE.rebuilt]);
 task('t-review', 'claude', [USAGE.review]);
 task('t-plan', 'codex', [USAGE.plan]);
 
-type Used = { cost: string; read: string | null; peak: string | null; rebuilt: number };
-type Step = { name: string; used: Used | null; timeline: Array<{ used: Used | null }> };
-const stepOf = async (name: string): Promise<Step> =>
-  (await (await app.request(`/api/runs/${R}`)).json()).steps.find((s: Step) => s.name === name);
+const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const stepOf = async (name: string) => {
+  const step = (await detailOf(R)).steps.find((s) => s.name === name);
+  assert.ok(step, name);
+  return step;
+};
 
 test("a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache", async () => {
   const implement = await stepOf('implement');
@@ -160,7 +163,7 @@ test('a runner that counted the input as one number says nothing of what it read
 });
 
 test("the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them", async () => {
-  const run = await (await app.request(`/api/runs/${R}`)).json();
+  const run = await detailOf(R);
   // `plan` counted its input as one number: a sum over the others would read as the whole run's. The rebuilt cache is still a fact.
   assert.deepEqual(run.read, {
     said: 'a resumed session wrote its context to the cache again instead of reading it',
@@ -179,7 +182,7 @@ test("the run's reads are every try's of every step, beside its cost — no clas
       steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' } },
     }),
   );
-  const all = await (await app.request(`/api/runs/${R2}`)).json();
+  const all = await detailOf(R2);
   // The largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it.
   assert.deepEqual(all.read, {
     said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
@@ -227,14 +230,16 @@ test("a session that compacted reached its cap, short of it in tokens — and th
     task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
   };
   run(RC, 120_000);
-  const detail = await (await app.request(`/api/runs/${RC}`)).json();
-  const implement = detail.steps.find((s: Step) => s.name === 'implement').used as Used;
+  const detail = await detailOf(RC);
+  const implement = detail.steps.find((s) => s.name === 'implement')?.used;
+  assert.ok(implement);
   assert.deepEqual(
     [implement.read, implement.peak],
     ['read 5.7M · wrote 300k · peak 174k, compacted twice at its 200k cap', 'cap'],
     'its peak is short of its cap, and it reached it',
   );
-  const review = detail.steps.find((s: Step) => s.name === 'review').used as Used;
+  const review = detail.steps.find((s) => s.name === 'review')?.used;
+  assert.ok(review);
   assert.deepEqual([review.read, review.peak], ['read 2.9M · wrote 100k · peak 120k, compacted', null], 'no cap to reach');
   assert.deepEqual(
     detail.read,
@@ -244,7 +249,7 @@ test("a session that compacted reached its cap, short of it in tokens — and th
 
   const RL = 'r-read-compacted-larger';
   run(RL, 180_000);
-  const larger = await (await app.request(`/api/runs/${RL}`)).json();
+  const larger = await detailOf(RL);
   assert.deepEqual(
     larger.read,
     { said: 'read 8.6M · wrote 400k · peak 180k, compacted', peak: null, rebuilt: 0 },

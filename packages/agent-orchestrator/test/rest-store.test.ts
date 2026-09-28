@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type PromiseJournal, type PromiseRunner, type Sighting } from 'agent-runtime';
-import type { Run } from '../src/run.ts';
+import { createEngine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
+import type { GitRun, Run } from '../src/run.ts';
 import type { PassCost } from '../src/meter.ts';
 import { scratch } from './scratch.ts';
 
@@ -25,7 +25,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approve, forget, listRuns, prune, readRun, retry, start } = await import('../src/runner.ts');
+const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = await import('../src/runner.ts');
 const { tick, freshRestMemo } = await import('../src/tick.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
   await import('../src/store.ts');
@@ -81,7 +81,8 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 
 /** The runtime, with a harness whose sessions work until `signAll` ends them. */
 const engine = () => {
-  const sessions = new Map<string, Sighting>();
+  // A harness's own words (`done`, `stopped`), as a runner written in Promises may still report them: the runtime reads them as A2A's.
+  const sessions = new Map<string, PromiseSighting>();
   let n = 0;
   const runner: PromiseRunner = {
     async spawn(r) {
@@ -232,11 +233,12 @@ const rested = async (): Promise<number> => (await verified()).cost!.rested ?? 0
 const answered = async (id: string) => (await verified()).runs.find((a) => a.run.id === id)!;
 /** A finished run worked in place, from the store built above, not yet touched by a test. */
 const touched = new Set<string>();
-const aResting = (isolate = false): Run => {
+const aResting = (isolate = false): GitRun => {
   const run = listRuns().find(
     (r) => Boolean(r.isolate) === isolate && !touched.has(r.id) && !inFlight.some((f) => f.id === r.id) && MEMO.runs.has(r.id),
   );
   assert.ok(run, 'a run at rest is left to touch');
+  assert.ok(isGitRun(run), `${run.id} works on a repository`);
   touched.add(run.id);
   return run;
 };
@@ -245,7 +247,7 @@ const aResting = (isolate = false): Run => {
  * `change` made to a run at rest takes that run, and no other, out of the memo for the pass that reads it — for `afresh` passes, where the
  * first writes the record — and then it rests again.
  */
-const evicts = async (what: string, change: (run: Run) => void | Promise<void>, run = aResting(), afresh = 1) => {
+const evicts = async (what: string, change: (run: Run) => void | Promise<void>, run: Run = aResting(), afresh = 1) => {
   const before = await rested();
   assert.ok(MEMO.runs.has(run.id), `${what}: the run is at rest before`);
   await change(run);

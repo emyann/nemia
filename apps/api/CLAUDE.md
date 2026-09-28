@@ -4,6 +4,7 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 
 - **Every test file imports `test/harness.ts` first**: a fake `claude` first on PATH, so no test asks this machine's live registry
   (`harness.test.ts` refuses a file that does not).
+- **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
 - **The list answers a finished run from memory** (`resting.ts`) while its record, its stamps, the feed for its tasks and its branch tips

@@ -20,13 +20,18 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { listWorkflows, versionOf } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf: versionIn } = await import('../src/workflows.ts');
+/** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
+const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 const { HOME_REPO } = await import('../src/capabilities.ts');
 const { loadWorkflows, parentRecord, readRun } = await import('agent-orchestrator');
 const { afterRefusal } = await import('agent-orchestrator/run');
 const { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
+type WorkflowListing = import('../src/workflows.ts').WorkflowListing;
+type RunSummary = import('../src/runs.ts').RunSummary;
+type RunDetail = import('../src/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -130,7 +135,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
   const refused = loaderRefusal(broken);
   assert.match(refused, /review: `afer` is not a key a step has/);
 
-  const listing = await res.json();
+  const listing = (await res.json()) as WorkflowListing[];
   // Each at the version its files are at: what a save from the board carries.
   for (const w of listing) assert.equal(w.version, versionOf(w.dir), w.name);
   assert.deepEqual(listing, [
@@ -202,7 +207,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
 const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/${step}`);
 
 /** Every key a step may set, in the package's order, with the values `set` gives and the package's line of meaning. */
-const rows = (set: Record<string, string>) => STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
+const rows = (set: Record<string, string | null>) =>
+  STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
 
 /** A folder as it is: each file's name and text, to show a read wrote nothing. */
 const filesOf = (dir: string): Array<[string, string]> =>
@@ -216,7 +222,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
 
   const res = await stepPage('repo', 'good', 'review');
   assert.equal(res.status, 200, await res.clone().text());
-  const review: WorkflowStepPage = await res.json();
+  const review = (await res.json()) as WorkflowStepPage;
   assert.deepEqual(
     { ...review, keys: undefined },
     {
@@ -251,7 +257,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   );
 
   // Yours, and a step that sets counts: each in digits.
-  const plan: WorkflowStepPage = await (await stepPage('yours', 'mine', 'plan')).json();
+  const plan = (await (await stepPage('yours', 'mine', 'plan')).json()) as WorkflowStepPage;
   assert.deepEqual(
     [plan.from, plan.dir, plan.body, plan.source],
     ['yours', mine, 'Write PLAN.md.', '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
@@ -260,13 +266,13 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
 
   // A step that sets nothing: every key, none set.
   write(path.join(mine, 'notes.md'), 'Take notes.\n');
-  const notes: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  const notes = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
   assert.deepEqual([notes.body, notes.keys], ['Take notes.', rows({})]);
   fs.rmSync(path.join(mine, 'notes.md'));
 
   // A context window, however the file writes it, in the package's one form — the one `renderStep` writes.
   write(path.join(mine, 'notes.md'), '---\ncontext: 150000\n---\nTake notes.\n');
-  const windowed: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  const windowed = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
   assert.deepEqual(windowed.keys, rows({ context: '150k' }));
   fs.rmSync(path.join(mine, 'notes.md'));
 
@@ -281,7 +287,7 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
     '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n',
   );
   write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
-  const attached: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  const attached = (await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage;
   assert.deepEqual(attached.agentSkills, said);
   assert.deepEqual(
     attached.keys.find((k) => k.key === 'harness'),
@@ -306,11 +312,11 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
 test("REFUSED at shipped defaults: a step's page from somewhere that is not repo or yours (400), for a workflow there is not (404, in a start's words), a folder the loader refuses (422, in its words), and a step the folder does not have (404, naming its steps) — nothing read outside the folder", async () => {
   const from = await stepPage('elsewhere', 'good', 'review');
   assert.equal(from.status, 400);
-  assert.match((await from.json()).error, /`repo` or `yours`.*This request's was 'elsewhere'\./);
+  assert.match(((await from.json()) as { error: string }).error, /`repo` or `yours`.*This request's was 'elsewhere'\./);
 
   const unknown = await stepPage('repo', 'nope', 'review');
   assert.equal(unknown.status, 404);
-  const { error } = await unknown.json();
+  const { error } = (await unknown.json()) as { error: string };
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   // Found among the folders a source has, never joined onto a path; and yours is not the repository's.
   for (const [where, name] of [
@@ -325,12 +331,12 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
 
   const broken = await stepPage('repo', 'broken', 'implement');
   assert.equal(broken.status, 422);
-  assert.equal((await broken.json()).error, loaderRefusal(path.join(repo, 'workflows', 'broken')));
+  assert.equal(((await broken.json()) as { error: string }).error, loaderRefusal(path.join(repo, 'workflows', 'broken')));
 
   for (const step of ['nope', 'README', 'review.md', '..%2F..%2Fbroken%2Freview', '..%2Freview.json']) {
     const res = await stepPage('repo', 'good', step);
     assert.equal(res.status, 404, step);
-    const said = (await res.json()).error as string;
+    const said = ((await res.json()) as { error: string }).error as string;
     assert.ok(said.startsWith(`No step '${decodeURIComponent(step)}' in workflow good (${good}). Its steps are: implement, review.`), said);
     assert.ok(!said.includes('afer') && !said.includes('"again"'), `${step}: nothing of another file`);
   }
@@ -340,7 +346,7 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
   assert.deepEqual(runFiles(), []);
   const res = await post({ workflow: 'good', brief: 'Add a cache\n\nKeep it small.\n' });
   assert.equal(res.status, 201);
-  const { id } = await res.json();
+  const { id } = (await res.json()) as { id: string };
   assert.match(id, /^add-a-cache-keep-it-small-[a-z0-9]+$/);
   assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
@@ -378,10 +384,10 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
   assert.equal(fs.existsSync(path.join(root, 'worktrees')), false);
 
   // The board lists it, with the folder it was started from.
-  const listed = (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+  const listed = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
   assert.equal(listed.workflowDir, good);
   assert.deepEqual(
-    listed.steps.map((s: { status: string }) => s.status),
+    listed.steps.map((s) => s.status),
     ['waiting', 'waiting'],
   );
 });
@@ -391,7 +397,7 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
 
   const unknown = await post({ workflow: 'nope', brief: 'Do it.' });
   assert.equal(unknown.status, 404);
-  const { error } = await unknown.json();
+  const { error } = (await unknown.json()) as { error: string };
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   assert.ok(error.includes('The workflows there are: broken (repo), good (repo), mine (yours).'), error);
   // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included,
@@ -402,13 +408,13 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   for (const brief of [undefined, '', '  \n', 42]) {
     const res = await post({ workflow: 'good', brief });
     assert.equal(res.status, 422, String(brief));
-    assert.ok((await res.json()).error.startsWith('A run needs a brief'), String(brief));
+    assert.ok(((await res.json()) as { error: string }).error.startsWith('A run needs a brief'), String(brief));
   }
 
   for (const body of ['not json', [], { brief: 'Do it.' }, { workflow: 'good', brief: 'Do it.', from: 'elsewhere' }]) {
     const res = await post(body);
     assert.equal(res.status, 400, JSON.stringify(body));
-    assert.match((await res.json()).error, /POST \/api\/runs|`from`/, JSON.stringify(body));
+    assert.match(((await res.json()) as { error: string }).error, /POST \/api\/runs|`from`/, JSON.stringify(body));
   }
 
   assert.deepEqual(runFiles(), before);
@@ -435,7 +441,7 @@ test('REFUSED at shipped defaults: a start another site could make — a body no
   ]) {
     const res = await sentWith({ 'content-type': type });
     assert.equal(res.status, 415, type);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith(
         `POST /api/runs takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
@@ -448,7 +454,7 @@ test('REFUSED at shipped defaults: a start another site could make — a body no
   for (const site of ['cross-site', 'same-site', 'none']) {
     const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith('POST /api/runs refuses a request made by a page on another site') && error.includes(`(Sec-Fetch-Site: ${site})`),
       error,
@@ -459,7 +465,7 @@ test('REFUSED at shipped defaults: a start another site could make — a body no
   for (const host of ['evil.example', 'evil.example:8787', '172.23.196.168:8787', 'localhost.evil.example:8787']) {
     const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
     assert.equal(res.status, 403, host);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(error.startsWith(`POST /api/runs refuses a request addressed to ${host}:`), error);
   }
 
@@ -474,7 +480,7 @@ test("a start as the board sends it is not refused: same-origin through vite's p
     { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
     { 'content-type': 'application/json; charset=utf-8', host: 'localhost:8787' },
     { 'content-type': 'Application/JSON', host: '[::1]:8787' },
-  ]) {
+  ] as Array<Record<string, string>>) {
     const res = await sentWith(headers);
     assert.equal(res.status, 201, `${JSON.stringify(headers)}: ${await res.clone().text()}`);
   }
@@ -486,7 +492,7 @@ test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its 
 
   const broke = await post({ workflow: 'broken', brief: 'Do it.' });
   assert.equal(broke.status, 422);
-  assert.equal((await broke.json()).error, loaderRefusal(broken));
+  assert.equal(((await broke.json()) as { error: string }).error, loaderRefusal(broken));
 
   // The loader reads this folder; `wf start` refuses it, since the run files build's check as `build-check`.
   const clash = path.join(root, 'workflows', 'clash');
@@ -495,7 +501,7 @@ test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its 
   assert.equal(listWorkflows(repo, root).find((w) => w.name === 'clash')?.error, null);
   const res = await post({ workflow: 'clash', brief: 'Do it.' });
   assert.equal(res.status, 422);
-  const { error } = await res.json();
+  const { error } = (await res.json()) as { error: string };
   assert.ok(error.startsWith("build-check: a step may not be named for another step's check. build has a `check:`"), error);
 
   assert.deepEqual(runFiles(), before);
@@ -509,14 +515,14 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
 
   const both = await post({ workflow: 'good', brief: 'Do it.' });
   assert.equal(both.status, 409);
-  const { error } = await both.json();
+  const { error } = (await both.json()) as { error: string };
   assert.ok(error.includes(`(${good} and ${yours})`), error);
   assert.ok(error.includes('"from": "repo"'), error);
   assert.deepEqual(runFiles(), before);
 
   const chosen = await post({ workflow: 'good', from: 'yours', brief: 'Do it my way.' });
   assert.equal(chosen.status, 201);
-  const run = readRun((await chosen.json()).id);
+  const run = readRun(((await chosen.json()) as { id: string }).id);
   assert.equal(run.workflowDir, yours);
   assert.deepEqual(Object.keys(run.steps), ['implement']);
 });
@@ -711,17 +717,17 @@ test('POST /api/runs takes `after` and passes it to `start()`, which freezes it 
   parents();
   const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
   assert.equal(res.status, 201, await res.clone().text());
-  const { id } = await res.json();
+  const { id } = (await res.json()) as { id: string };
   assert.deepEqual(readRun(id).after, ['p-running']);
   assert.deepEqual(filedTasks(), [], 'nothing filed');
 
-  const detail = await (await app.request(`/api/runs/${id}`)).json();
+  const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
   assert.deepEqual([detail.after, detail.waiting?.word], [['p-running'], 'waiting on p-running']);
 
   // None to wait on is a run that waits on none: the record `wf start` wrote before there was an `after`.
   const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
   assert.equal(none.status, 201);
-  assert.equal(Object.hasOwn(readRun((await none.json()).id), 'after'), false);
+  assert.equal(Object.hasOwn(readRun(((await none.json()) as { id: string }).id), 'after'), false);
 });
 
 test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 400, before the workflow is looked for — and nothing is written', async () => {
@@ -729,7 +735,7 @@ test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 40
   for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
     const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
     assert.equal(res.status, 400, JSON.stringify(after));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith('`after` is the runs this one waits on, by id, as `wf start --after <runId>` takes each: a list of run ids'),
       error,
@@ -748,7 +754,7 @@ test("REFUSED at shipped defaults: a run `wf start --after` will not wait on is 
   const refusedBy = async (after: string[]): Promise<string> => {
     const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
     assert.equal(res.status, 422, JSON.stringify(after));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, afterRefusal(after, { repo, branch: 'main' }, parentRecord), JSON.stringify(after));
     return error;
   };
@@ -775,13 +781,13 @@ test('REFUSED at shipped defaults: a start with `after` that another site could 
   const sent = (headers: Record<string, string>) => app.request('/api/runs', { method: 'POST', headers, body });
   const site = await sent({ 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
   assert.equal(site.status, 403);
-  assert.ok((await site.json()).error.startsWith('POST /api/runs refuses a request made by a page on another site'));
+  assert.ok(((await site.json()) as { error: string }).error.startsWith('POST /api/runs refuses a request made by a page on another site'));
   const host = await sent({ 'content-type': 'application/json', host: 'evil.example:8787' });
   assert.equal(host.status, 403);
-  assert.ok((await host.json()).error.startsWith('POST /api/runs refuses a request addressed to evil.example:8787'));
+  assert.ok(((await host.json()) as { error: string }).error.startsWith('POST /api/runs refuses a request addressed to evil.example:8787'));
   const type = await sent({ 'content-type': 'text/plain;charset=UTF-8' });
   assert.equal(type.status, 415);
-  assert.ok((await type.json()).error.includes('`"after": ["<runId>", …]`'), 'the shape it takes names `after`');
+  assert.ok(((await type.json()) as { error: string }).error.includes('`"after": ["<runId>", …]`'), 'the shape it takes names `after`');
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);
 });

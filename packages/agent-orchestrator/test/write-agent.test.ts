@@ -168,7 +168,7 @@ test("with `repo`, a write's and a removal's version is read with the skills a s
   const courier: AgentDraft = {
     name: 'courier',
     description: 'Carries notes.',
-    skills: ['pass-a-note'],
+    skills: 'pass-a-note',
     keys: { tools: 'Read, Skill' },
     body: 'Carry it.',
   };

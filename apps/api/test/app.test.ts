@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
 const root = scratch('hkb-api-');
@@ -140,7 +142,13 @@ const filedBare = {
 };
 
 /** A run as GET /api/runs lists it. */
-const listed = async (id: string) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+const listed = async (id: string) => {
+  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  assert.ok(run, `${id} is on the list`);
+  return run;
+};
+/** A run as GET /api/runs/:id answers it. */
+const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
 
 test('health answers', async () => {
   const res = await app.request('/api/health');
@@ -306,7 +314,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
 
   const res = await app.request('/api/runs/r-2');
   assert.equal(res.status, 200);
-  const run = await res.json();
+  const run = (await res.json()) as RunDetail;
   const [implement, review] = run.steps;
   assert.deepEqual(
     { ...run, steps: undefined },
@@ -472,6 +480,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     },
   );
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
+  assert.ok(review.told);
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
   assert.match(review.told, /already been worked in by: implement/);
   assert.match(review.told, /git diff def456/);
@@ -491,13 +500,13 @@ test('a task the engine has no record of is unknown on both endpoints, not queue
   queuedTask('t-5');
   writeRun({ ...r2, id: 'r-5', steps: { implement: { taskId: 't-5', branch: 'wf/r-5/implement' }, review: { taskId: null } } });
 
-  const lost = await (await app.request('/api/runs/r-4')).json();
+  const lost = await detailOf('r-4');
   assert.equal(lost.steps[0].status, 'unknown');
   assert.equal(lost.steps[0].told, null);
   assert.equal((await listed('r-4')).steps[0].status, 'unknown');
 
   // The case it must not swallow: a task filed and waiting for a slot is still `pending`.
-  const queued = await (await app.request('/api/runs/r-5')).json();
+  const queued = await detailOf('r-5');
   assert.equal(queued.steps[0].status, 'pending');
   assert.equal(queued.steps[0].told, filedBrief('t-5'));
   assert.equal((await listed('r-5')).steps[0].status, 'pending');
@@ -524,7 +533,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
 
   const res = await app.request('/api/runs/r-3');
   assert.equal(res.status, 200);
-  const run = await res.json();
+  const run = (await res.json()) as RunDetail;
+  assert.ok(run.warning);
   assert.match(run.warning, /is gone/);
   assert.ok(run.warning.includes(gone), run.warning);
   assert.match(run.warning, /without their spec or prose/);
@@ -649,7 +659,8 @@ test('a folder changed since the run started keeps the steps that ran, and names
   fs.renameSync(path.join(changed, 'original.md'), path.join(changed, 'replacement.md'));
   fs.writeFileSync(path.join(changed, 'review.md'), '---\nafter: replacement\n---\nReview it.\n');
 
-  const run = await (await app.request('/api/runs/r-6')).json();
+  const run = await detailOf('r-6');
+  assert.ok(run.warning);
   assert.match(run.warning, /no longer has original/);
   assert.match(run.warning, /has replacement, which the run did not start with/);
   assert.deepEqual(run.waitingOnYou, ['original']);
@@ -706,7 +717,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     tries: firstTry(originalTry),
     timeline: settledTimeline('t-6'),
   });
-  assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
+  assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual(
     [replacement.body, replacement.taskId, replacement.status, replacement.closeout],
     ['Do the original thing.', null, 'waiting', null],
@@ -797,14 +808,15 @@ test('a run that froze its workflow draws from it when its folder does not read:
     steps: { implement: { taskId: null }, review: { taskId: null } },
   });
 
-  const run = await (await app.request('/api/runs/r-40')).json();
+  const run = await detailOf('r-40');
+  assert.ok(run.warning);
   assert.match(run.warning, /no longer reads as a workflow/);
   assert.match(run.warning, /someNewerKey/);
   // Not the pre-freeze record's warning, which would say the page has no spec to show.
   assert.doesNotMatch(run.warning, /without their spec or prose/);
   assert.match(run.warning, /the workflow the run froze/);
   assert.deepEqual(
-    run.steps.map((s: { name: string; spec: unknown; body: string }) => [s.name, s.spec, s.body]),
+    run.steps.map((s) => [s.name, s.spec, s.body]),
     [
       ['implement', frozenSpecs.implement, 'Implement it, as frozen.'],
       ['review', frozenSpecs.review, 'Review it, as frozen.'],
@@ -814,7 +826,7 @@ test('a run that froze its workflow draws from it when its folder does not read:
   // The list draws the card's flow off the same graph, with no read of the run.
   assert.deepEqual((await listed('r-40')).graph, frozenGraph);
   // Not filed: what the tick would file it with, composed from the frozen workflow.
-  assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), run.steps[0].told);
+  assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), String(run.steps[0].told));
 
   // And with no folder at all: the same page.
   writeRun({
@@ -824,10 +836,11 @@ test('a run that froze its workflow draws from it when its folder does not read:
     workflow: frozenLoop,
     steps: { implement: { taskId: null }, review: { taskId: null } },
   });
-  const gone = await (await app.request('/api/runs/r-41')).json();
+  const gone = await detailOf('r-41');
+  assert.ok(gone.warning);
   assert.match(gone.warning, /is gone\. Nothing here is read from it/);
   assert.deepEqual(
-    gone.steps.map((s: { spec: unknown }) => s.spec),
+    gone.steps.map((s) => s.spec),
     [frozenSpecs.implement, frozenSpecs.review],
   );
   assert.deepEqual(gone.graph, frozenGraph);
@@ -845,11 +858,12 @@ test('a run frozen before stage 4a part 2 with a step of `maxAttempts: 2` still 
   });
   const response = await app.request('/api/runs/r-44');
   assert.equal(response.status, 200);
-  const run = await response.json();
+  const run = (await response.json()) as RunDetail;
   assert.deepEqual(
-    run.steps.map((s: { spec: unknown }) => s.spec),
+    run.steps.map((s) => s.spec),
     [frozenSpecs.implement, frozenSpecs.review],
   );
+  assert.ok(run.steps[1].spec);
   assert.equal('maxAttempts' in run.steps[1].spec, false);
   assert.ok(await listed('r-44'), 'and it lists');
 });
@@ -868,20 +882,20 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
     steps: { implement: { taskId: null }, review: { taskId: null } },
   });
 
-  const run = await (await app.request('/api/runs/r-42')).json();
+  const run = await detailOf('r-42');
   assert.equal(run.warning, null);
   assert.deepEqual(
-    run.steps.map((s: { spec: unknown }) => s.spec),
+    run.steps.map((s) => s.spec),
     [frozenSpecs.implement, frozenSpecs.review],
   );
   assert.deepEqual(
-    run.steps.map((s: { body: string }) => s.body),
+    run.steps.map((s) => s.body),
     ['Implement it, as frozen.', 'Review it, as frozen.'],
   );
   assert.deepEqual(run.graph, frozenGraph);
   // And so is its card: not the edited folder's graph, which has no edge at all.
   assert.deepEqual((await listed('r-42')).graph, frozenGraph);
-  assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), run.steps[1].told);
+  assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), String(run.steps[1].told));
 });
 
 test('a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn', async () => {
@@ -899,20 +913,21 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
     steps: { implement: { taskId: null }, review: { taskId: null } },
   });
 
-  const run = await (await app.request('/api/runs/r-43')).json();
+  const run = await detailOf('r-43');
+  assert.ok(run.warning);
   assert.match(
     run.warning,
     /has changed since this run started: it has docs, which the run did not start with and will never file, so it is not shown\./,
   );
   assert.deepEqual(
-    run.steps.map((s: { name: string }) => s.name),
+    run.steps.map((s) => s.name),
     ['implement', 'review'],
   );
   // Not a root beside implement: the graph is the one the run froze.
   assert.deepEqual(run.graph, frozenGraph);
   assert.deepEqual((await listed('r-43')).graph, frozenGraph);
   assert.deepEqual(
-    (await listed('r-43')).steps.map((s: { name: string }) => s.name),
+    (await listed('r-43')).steps.map((s) => s.name),
     ['implement', 'review'],
   );
   // The steps `wf ls` lists, and no other.
@@ -926,7 +941,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
 test('an unknown run is refused with a 404 that says where to look', async () => {
   const res = await app.request('/api/runs/no-such-run');
   assert.equal(res.status, 404);
-  const { error } = await res.json();
+  const { error } = (await res.json()) as { error: string };
   assert.match(error, /No run 'no-such-run'/);
   assert.match(error, /GET \/api\/runs/);
 });
@@ -944,7 +959,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
   retryingTask('t-7');
   writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
 
-  const run = await (await app.request('/api/runs/r-7')).json();
+  const run = await detailOf('r-7');
   assert.deepEqual(
     run.steps.map((s: { attempts: unknown }) => s.attempts),
     [
@@ -963,7 +978,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
     { kind: 'settled', at: later, outcome: 'succeeded' },
   ]);
   writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
-  assert.deepEqual((await (await app.request('/api/runs/r-8')).json()).steps[0].attempts, {
+  assert.deepEqual((await detailOf('r-8')).steps[0].attempts, {
     count: 1,
     latest: { startedAt: at, ended: 'done', endedAt: later, reason: 'harness' },
   });
@@ -981,12 +996,12 @@ test('each step says how many attempts it has had, when the latest began, and ho
   const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
   quiet('t-8u', { observed: 'done', reason: 'harness', stated: false }, 'succeeded');
   writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
-  const unsigned = await (await app.request('/api/runs/r-8u')).json();
+  const unsigned = await detailOf('r-8u');
   assert.deepEqual([unsigned.steps[0].attempts, unsigned.steps[0].status], [unsignedWords, 'unsigned']);
   // As a journal from before stage 4a has it: the runtime's own word.
   quiet('t-8o', { observed: 'failed', reason: 'unsigned' }, 'failed');
   writeRun({ ...r2, id: 'r-8o', steps: { implement: { taskId: 't-8o', branch: 'wf/r-8o/implement' }, review: { taskId: null } } });
-  const old = await (await app.request('/api/runs/r-8o')).json();
+  const old = await detailOf('r-8o');
   assert.deepEqual([old.steps[0].attempts, old.steps[0].status], [unsignedWords, 'unsigned']);
 
   // A session its harness cut at its spend cap: since stage 4b the runtime carries the cut as a fact, `limit: 'budget'`, on an end that is
@@ -995,15 +1010,15 @@ test('each step says how many attempts it has had, when the latest began, and ho
   const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
   quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
   writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
-  const capped = await (await app.request('/api/runs/r-8b')).json();
+  const capped = await detailOf('r-8b');
   assert.deepEqual([capped.steps[0].attempts, capped.steps[0].status], [cappedWords, 'budget exhausted']);
   quiet('t-8c', { observed: 'failed', reason: 'budget', exitCode: 1 }, 'failed');
   writeRun({ ...r2, id: 'r-8c', steps: { implement: { taskId: 't-8c', branch: 'wf/r-8c/implement' }, review: { taskId: null } } });
-  const cappedBefore = await (await app.request('/api/runs/r-8c')).json();
+  const cappedBefore = await detailOf('r-8c');
   assert.deepEqual([cappedBefore.steps[0].attempts, cappedBefore.steps[0].status], [cappedWords, 'budget exhausted']);
 
   // A task the engine has no record of has had no attempts it can speak for.
-  assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
+  assert.deepEqual((await detailOf('r-4')).steps[0].attempts, { count: 0, latest: null });
 
   // The list is kept as it was, with the note `wf ls` prints beside a step — none, for a step on its first try — and what a person
   // has to know to act on it.
@@ -1062,13 +1077,15 @@ test("a step with no task has no log yet, and one filed but not started has the 
 test('a log for a run or a step that does not exist is refused with a 404 that says where to look', async () => {
   const noRun = await logOf('/api/runs/no-such-run/steps/implement/log');
   assert.equal(noRun.status, 404);
-  assert.match(noRun.body.error, /No run 'no-such-run'/);
-  assert.match(noRun.body.error, /GET \/api\/runs/);
+  const { error: noRunError } = noRun.body as { error: string };
+  assert.match(noRunError, /No run 'no-such-run'/);
+  assert.match(noRunError, /GET \/api\/runs/);
 
   const noStep = await logOf('/api/runs/r-8/steps/deploy/log');
   assert.equal(noStep.status, 404);
-  assert.match(noStep.body.error, /Run 'r-8' has no step 'deploy'/);
-  assert.match(noStep.body.error, /GET \/api\/runs\/r-8 lists the steps/);
+  const { error: noStepError } = noStep.body as { error: string };
+  assert.match(noStepError, /Run 'r-8' has no step 'deploy'/);
+  assert.match(noStepError, /GET \/api\/runs\/r-8 lists the steps/);
 
   // Names every object answers to are not steps, and a run id is not a path out of the store.
   for (const url of [
@@ -1087,8 +1104,9 @@ test('output the engine cannot read is a 502 that says how to read it from the c
 
   const { status, body } = await logOf('/api/runs/r-10/steps/implement/log');
   assert.equal(status, 502);
-  assert.match(body.error, /Could not read the output of step 'implement' \(task t-10\)/);
-  assert.match(body.error, /`wf logs r-10 implement`/);
+  const { error } = body as { error: string };
+  assert.match(error, /Could not read the output of step 'implement' \(task t-10\)/);
+  assert.match(error, /`wf logs r-10 implement`/);
 });
 
 // ─── what the run established ────────────────────────────────────────────────
@@ -1197,8 +1215,6 @@ function seedChecks() {
   });
 }
 
-type Said = { name: string; status: string; branch: string | null };
-
 test("each step says what the run established, in `wf ls`'s words, on both endpoints", async () => {
   seedChecks();
   const words = [
@@ -1211,14 +1227,14 @@ test("each step says what the run established, in `wf ls`'s words, on both endpo
     ['plan', 'starting'],
     ['ship', 'waiting'],
   ];
-  const detail = await (await app.request('/api/runs/r-20')).json();
+  const detail = await detailOf('r-20');
   const summary = await listed('r-20');
   assert.deepEqual(
-    detail.steps.map((s: Said) => [s.name, s.status]),
+    detail.steps.map((s) => [s.name, s.status]),
     words,
   );
   assert.deepEqual(
-    summary.steps.map((s: Said) => [s.name, s.status]),
+    summary.steps.map((s) => [s.name, s.status]),
     words,
   );
   // The refusals and the step that never signed; not a check still running, nor a step done on its own word.
@@ -1231,13 +1247,13 @@ test("the api's words, and who it says is waited on, are `list`'s — a refused 
   const e = engine();
   for (const id of ['r-20', 'r-21']) {
     const words = await list(e, readRun(id));
-    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    const detail = await detailOf(id);
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', detail],
-    ]) {
+    ] as const) {
       assert.deepEqual(
-        run.steps.map(({ name, status, branch }: Said) => ({ name, status, branch })),
+        run.steps.map(({ name, status, branch }) => ({ name, status, branch })),
         words.steps,
         `${id}, ${where}`,
       );
@@ -1260,7 +1276,7 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
   ];
   for (const [id, status, why] of cases) {
     assert.equal((await listed(id)).status, status, `${id} listed: ${why}`);
-    assert.equal((await (await app.request(`/api/runs/${id}`)).json()).status, status, `${id} in full: ${why}`);
+    assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
   }
 });
 
@@ -1284,7 +1300,7 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
     steps: { a: { taskId: 't-24-a', check: { taskId: 'r-24-a-check' } }, b: { taskId: 't-24-b' }, c: { taskId: null } },
   });
   assert.deepEqual(
-    (await listed('r-24')).steps.map((s: Said) => [s.name, s.status]),
+    (await listed('r-24')).steps.map((s) => [s.name, s.status]),
     [
       ['a', 'failed ✗ check (exit 1)'],
       ['b', 'starting'],
@@ -1338,7 +1354,7 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
   ];
   for (const [id, status, moving, why] of cases) {
     const summary = await listed(id);
-    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    const detail = await detailOf(id);
     assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
     assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
   }
@@ -1381,7 +1397,7 @@ test('a check that refused with `retries:` left reads as the tick has it — run
     assert.deepEqual((await list(e, readRun(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
     for (const [where, run] of [
       ['list', await listed(id)],
-      ['detail', await (await app.request(`/api/runs/${id}`)).json()],
+      ['detail', await detailOf(id)],
     ] as const) {
       assert.deepEqual(
         [run.status, run.moving, run.waitingOnYou, run.steps[0].status],
@@ -1439,7 +1455,8 @@ function askFor(id: string, name: string, ask: object) {
   fs.writeFileSync(path.join(dir, name), `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
 }
 
-type Row = Said & { note: string | null };
+/** A step row as the list and the detail both carry it. */
+type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note'>;
 
 /** A step row as `list` has it: a note only where it prints one. */
 const asListed = ({ name, status, branch, note }: Row) => ({ name, status, branch, ...(note === null ? {} : { note }) });
@@ -1460,11 +1477,11 @@ async function expectJudged(cases: readonly Judgement[]) {
     const words = await list(e, readRun(id));
     for (const [where, run] of [
       ['list', await listed(id)],
-      ['detail', await (await app.request(`/api/runs/${id}`)).json()],
+      ['detail', await detailOf(id)],
     ] as const) {
       assert.deepEqual([run.status, run.moving, run.waitingOnYou], [status, moving, waitingOnYou], `${id}, ${where}: ${why}`);
       assert.deepEqual(
-        run.steps.map((s: Row) => [s.name, s.status, s.note]),
+        run.steps.map((s) => [s.name, s.status, s.note]),
         rows,
         `${id}, ${where}: ${why}`,
       );
@@ -1551,8 +1568,8 @@ test('a round the loop asked for, and a try a person asked for, read as the tick
 });
 
 test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
-  const run = await (await app.request('/api/runs/r-20')).json();
-  const checkOf = (name: string) => run.steps.find((s: Said) => s.name === name).check;
+  const run = await detailOf('r-20');
+  const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
   assert.deepEqual(checkOf('build'), { command: 'npm run build', taskId: 'r-20-build-check', verdict: 'passed', refused: null });
   assert.deepEqual(checkOf('lint'), { command: 'npm run lint', taskId: 'r-20-lint-check', verdict: 'checking', refused: null });
   assert.deepEqual(checkOf('test'), {
@@ -1598,10 +1615,12 @@ test('a refused check whose output cannot be read still answers, and says how to
 
   const res = await app.request('/api/runs/r-22');
   assert.equal(res.status, 200);
-  const [test] = (await res.json()).steps;
+  const [test] = ((await res.json()) as RunDetail).steps;
   assert.equal(test.status, 'failed ✗ check (exit 2)');
+  const refused = test.check?.refused;
+  assert.ok(refused);
   assert.deepEqual(
-    { ...test.check.refused, unreadable: undefined },
+    { ...refused, unreadable: undefined },
     {
       exit: 'exit 2',
       stdout: { lines: [], truncated: false },
@@ -1609,8 +1628,9 @@ test('a refused check whose output cannot be read still answers, and says how to
       unreadable: undefined,
     },
   );
-  assert.match(test.check.refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
-  assert.match(test.check.refused.unreadable, /`wf decide r-22`/);
+  assert.ok(refused.unreadable);
+  assert.match(refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
+  assert.match(refused.unreadable, /`wf decide r-22`/);
 });
 
 test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
@@ -1632,7 +1652,7 @@ test('the list of runs observes the engine at most once, however many runs and s
   }
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  const runs: Array<{ steps: Array<{ taskId: string | null; status: string }> }> = await res.json();
+  const runs = (await res.json()) as RunSummary[];
   // A view per filed step would have observed once for each of these, and reading a refused check's log once more for each of those.
   assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
   assert.ok(
@@ -1731,7 +1751,7 @@ test('a step on its third try, in the second round of its loop, carries every tr
   });
 
   const observations = countingObservations(t);
-  const run = await (await app.request('/api/runs/r-50')).json();
+  const run = await detailOf('r-50');
   // Eight tasks — implement's three and their checks, review's two — read over one look at the harnesses, and no refused check of the
   // current try to read the output of. A `view` each was eight observations, one after another, on a page polled every five seconds; and
   // with every one of them settled, the look is not made (`list(taskIds)`).
@@ -1868,8 +1888,9 @@ test("a closeout carries each declared field's schema off the workflow the run f
     workflow: [{ name: 'plan', after: [], body: 'Plan it.', output: { file: 'plan.json', schema } }],
     steps: { plan: { taskId: 'r-51-plan' } },
   });
-  const run = await (await app.request('/api/runs/r-51')).json();
+  const run = await detailOf('r-51');
   const { closeout } = run.steps[0];
+  assert.ok(closeout);
   assert.deepEqual(
     [closeout.outcome, closeout.artifacts, closeout.output, closeout.missing],
     ['done', [{ path: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']],
@@ -1900,15 +1921,17 @@ test('a statement that could not be read reaches the board as it came, with why 
     ],
     steps: { cut: { taskId: 'r-52-cut' }, list: { taskId: 'r-52-list' }, fine: { taskId: 'r-52-fine' } },
   });
-  const [c, l, f] = (await (await app.request('/api/runs/r-52')).json()).steps;
+  const [c, l, f] = (await detailOf('r-52')).steps;
   assert.equal(c.closeout, null);
+  assert.ok(c.unreadable);
   assert.equal(c.unreadable.raw, cut);
   assert.match(c.unreadable.error, /\S/);
-  assert.deepEqual(c.tries.at(-1).unreadable, c.unreadable, 'the try carries it too');
+  assert.deepEqual(c.tries.at(-1)?.unreadable, c.unreadable, 'the try carries it too');
   assert.equal(l.closeout, null);
+  assert.ok(l.unreadable);
   assert.deepEqual(l.unreadable.raw, ['done']);
   assert.equal(f.unreadable, null);
-  assert.equal(f.closeout.summary, 'Fine.');
+  assert.equal(f.closeout?.summary, 'Fine.');
 });
 
 test("a step says what it runs with: the workflow's effort, context window and tools, and what the engine filed its try with where the workflow says nothing", async () => {
@@ -1931,7 +1954,7 @@ test("a step says what it runs with: the workflow's effort, context window and t
     steps: { implement: { taskId: 'r-51-implement' }, review: { taskId: null } },
   });
 
-  const [implement, review] = (await (await app.request('/api/runs/r-51')).json()).steps;
+  const [implement, review] = (await detailOf('r-51')).steps;
   assert.deepEqual(implement.spec, {
     harness: 'claude',
     model: null,
@@ -1963,7 +1986,7 @@ test("a step says what it runs with: the workflow's effort, context window and t
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);
   // Nor for a task the engine has no record of.
-  assert.equal((await (await app.request('/api/runs/r-4')).json()).steps[0].filed, null);
+  assert.equal((await detailOf('r-4')).steps[0].filed, null);
 });
 
 test('a step says the mode its session runs in, as its harness decides it — a Codex sandbox narrowed by its tools — at shipped defaults', async () => {
@@ -1990,8 +2013,8 @@ test('a step says the mode its session runs in, as its harness decides it — a 
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }],
       steps: { implement: { taskId: `${id}-implement` } },
     });
-    const [implement] = (await (await app.request(`/api/runs/${id}`)).json()).steps;
-    assert.deepEqual(implement.filed.runsIn, runsIn, id);
+    const [implement] = (await detailOf(id)).steps;
+    assert.deepEqual(implement.filed?.runsIn, runsIn, id);
   }
 });
 
@@ -2022,7 +2045,9 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
     });
     const res = await app.request(`/api/runs/${id}`);
     assert.equal(res.status, 200, id);
-    said.set(id, (await res.json()).steps[0].filed.runsIn.mode);
+    const { filed } = ((await res.json()) as RunDetail).steps[0];
+    assert.ok(filed?.runsIn, id);
+    said.set(id, filed.runsIn.mode);
   }
 
   // The engine's Effect surface, where its runners are: the Promise one has none.
@@ -2084,7 +2109,8 @@ test("a model a person's `wf retry --model` asked for is on the try it was asked
       workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
       steps: { implement: { taskId: 'r-55-implement-try2', tries } },
     });
-    const { filed } = (await (await app.request(`/api/runs/${id}`)).json()).steps[0];
+    const { filed } = (await detailOf(id)).steps[0];
+    assert.ok(filed, id);
     assert.deepEqual([filed.model, filed.askedModel], ['sonnet', askedModel], id);
   }
 });
@@ -2146,7 +2172,8 @@ function seedFiles() {
 
 test("a closeout's files in the step's files directory carry where the api serves them, their kind and size — any other path is the path alone", async () => {
   const { dir, named } = seedFiles();
-  const [shoot] = (await (await app.request('/api/runs/r-52')).json()).steps;
+  const [shoot] = (await detailOf('r-52')).steps;
+  assert.ok(shoot.closeout);
   const served = (name: string, kind: string, size: number) => ({
     path: path.join(dir, name),
     name,
@@ -2169,7 +2196,7 @@ test("a closeout's files in the step's files directory carry where the api serve
     { path: 'RESPONSE.md' },
     { path: '/etc/hosts' },
   ]);
-  assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
+  assert.deepEqual(shoot.tries[0].closeout?.artifacts, shoot.closeout.artifacts);
 });
 
 test("a step's file is served by name, with its type and no caching — and a name that is a path, or not in the directory, is refused", async () => {
@@ -2205,17 +2232,18 @@ test("a step's file is served by name, with its type and no caching — and a na
   for (const name of ['..%2Foutside.png', 'sub%2Fdeep.png', 'a%5Cb.png', '..shot.png']) {
     const res = await app.request(`${base}/${name}`);
     assert.equal(res.status, 400, name);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(/is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/.test(error), `${name}: ${error}`);
   }
   // Not a regular file in the directory: absent, a directory, and a link that leads out of it.
   for (const name of ['gone.png', 'sub', 'link.png']) {
     const res = await app.request(`${base}/${name}`);
     assert.equal(res.status, 404, name);
-    assert.match((await res.json()).error, /has no file .* in its files directory/, name);
+    assert.match(((await res.json()) as { error: string }).error, /has no file .* in its files directory/, name);
   }
   // No such run, and no such step.
-  assert.match((await (await app.request('/api/runs/no-such-run/steps/shoot/artifacts/shot.png')).json()).error, /No run 'no-such-run'/);
+  const noRun = (await (await app.request('/api/runs/no-such-run/steps/shoot/artifacts/shot.png')).json()) as { error: string };
+  assert.match(noRun.error, /No run 'no-such-run'/);
   assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404);
 });
 
@@ -2228,10 +2256,11 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
   try {
     const res = await app.request('/api/runs/r-52');
     assert.equal(res.status, 200);
-    const page = await res.json();
+    const page = (await res.json()) as RunDetail;
     assert.deepEqual(page.pruned, { at: files.at, worktrees: [], artifacts: files });
     const said = `its files were removed at ${files.at} (wf prune --artifacts)`;
     const [shoot] = page.steps;
+    assert.ok(shoot.closeout);
     assert.deepEqual(shoot.closeout.artifacts, [
       // Every file named in the directory went with it, one beneath it and one the route would refuse by name included.
       ...[0, 1, 2, 3].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
@@ -2241,13 +2270,13 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
       { path: 'RESPONSE.md' },
       { path: '/etc/hosts' },
     ]);
-    assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
+    assert.deepEqual(shoot.tries[0].closeout?.artifacts, shoot.closeout.artifacts);
 
     const base = '/api/runs/r-52/steps/shoot/artifacts';
     for (const name of ['shot.png', 'gone.png']) {
       const gone = await app.request(`${base}/${name}`);
       assert.equal(gone.status, 410, name);
-      const body = await gone.json();
+      const body = (await gone.json()) as { error: string; pruned: string };
       assert.equal(
         body.error,
         `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`wf decide r-52\` reads them.`,
@@ -2266,7 +2295,7 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
   seedFiles();
   const missing = await app.request('/api/runs/r-52/steps/shoot/artifacts/gone.png');
   assert.equal(missing.status, 404);
-  assert.match((await missing.json()).error, /has no file 'gone\.png' in its files directory/);
+  assert.match(((await missing.json()) as { error: string }).error, /has no file 'gone\.png' in its files directory/);
   assert.ok(fs.existsSync(path.join(dir, 'shot.png')));
 });
 
@@ -2342,7 +2371,7 @@ test("the detail carries where each step's time went — per try and per check, 
   writeRun(record);
 
   const observations = countingObservations(t);
-  const run = await (await app.request('/api/runs/r-60')).json();
+  const run = await detailOf('r-60');
   assert.equal(observations(), 0, 'the feed is a read of the store: the detail observes no harness for it, and none for tasks all settled');
   const [implement, review] = run.steps;
   const words = (
@@ -2428,7 +2457,7 @@ test("the detail carries where each step's time went — per try and per check, 
       },
     },
   });
-  const again = await (await app.request('/api/runs/r-60')).json();
+  const again = await detailOf('r-60');
   assert.deepEqual(words(again.steps[0].timeline[2].session), {
     at: 'running',
     filedAt: T(40),
@@ -2490,6 +2519,6 @@ test("a step whose attempts were denied calls says which, on the list and on the
   );
   assert.equal(implement.note, null, 'nor in the note: the board says it once, from its own field');
   assert.equal(review.denied, null, 'a step denied nothing: null, not an empty list');
-  const page = (await (await app.request('/api/runs/r-denied')).json()).steps;
+  const page = (await detailOf('r-denied')).steps;
   assert.deepEqual([page[0].status, page[0].denied, page[1].denied], ['unverified · done', denied, null]);
 });

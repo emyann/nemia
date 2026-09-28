@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-held-');
@@ -118,23 +120,26 @@ journal('h-rechecked-plan-try3', [
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-type Step = { name: string; status: string; needs: string | null };
-const detail = async (id: string) => (await app.request(`/api/runs/${id}`)).json();
-const summary = async (id: string) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+const detail = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const summary = async (id: string) => {
+  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  assert.ok(run, `${id} is on the list`);
+  return run;
+};
 
 test('a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `wf ls` says', async () => {
   assert.equal((await engine().view('h-blocked-plan')).phase, 'input-required', "the seed is the engine's held task, waiting");
   const listed = await list(engine(), readRun('h-blocked'));
   for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
     assert.deepEqual(
-      run.steps.map(({ name, status, needs }: Step) => ({ name, status, needs })),
+      run.steps.map(({ name, status, needs }) => ({ name, status, needs })),
       [
         { name: 'plan', status: 'input-required · BLOCKED', needs: BLOCKED.needs },
         { name: 'implement', status: 'waiting', needs: null },
       ],
     );
     assert.deepEqual(
-      run.steps.map((s: Step) => s.status),
+      run.steps.map((s) => s.status),
       listed.steps.map((s) => s.status),
     );
     assert.deepEqual(run.waitingOnYou, ['plan']);
@@ -144,7 +149,7 @@ test('a held step that signed off blocked reads `input-required · BLOCKED` with
 test("a held step at its gate reads `awaiting approval`, never the engine's word for a session still going, and waits on you", async () => {
   for (const run of [await detail('h-gate'), await summary('h-gate')]) {
     assert.deepEqual(
-      run.steps.map((s: Step) => s.status),
+      run.steps.map((s) => s.status),
       ['awaiting approval', 'waiting'],
     );
     assert.deepEqual(run.waitingOnYou, ['plan']);
@@ -157,7 +162,7 @@ test("a held step closed and not yet settled reads as it signed, never the engin
   const listed = await list(engine(), readRun('h-closed'));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
-      run.steps.map((s: Step) => s.status),
+      run.steps.map((s) => s.status),
       listed.steps.map((s) => s.status),
     );
     assert.doesNotMatch(run.steps[0].status, /between attempts|running/);
@@ -166,23 +171,15 @@ test("a held step closed and not yet settled reads as it signed, never the engin
 
 test('each try of a held task a person answered is its own turn: the try answered keeps its sign-off and its end, and the turn it started reads none of them', async () => {
   const plan = (await detail('h-answered')).steps[0];
-  type Try = {
-    try: number;
-    current: boolean;
-    taskId: string;
-    status: string;
-    attempts: { count: number; latest: { ended: string | null } | null };
-    closeout: { needs: string | null } | null;
-  };
   assert.deepEqual(
-    plan.tries.map((t: Try) => [t.try, t.current, t.taskId]),
+    plan.tries.map((t) => [t.try, t.current, t.taskId]),
     [
       [1, false, 'h-answered-plan'],
       [2, true, 'h-answered-plan'],
     ],
     'one task, two tries',
   );
-  const [answered, going] = plan.tries as Try[];
+  const [answered, going] = plan.tries;
   assert.deepEqual(
     [answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
     ['succeeded', 1, 'done', BLOCKED.needs],
@@ -197,21 +194,15 @@ test('each try of a held task a person answered is its own turn: the try answere
 
 test("a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did", async () => {
   const plan = (await detail('h-rechecked')).steps[0];
-  type Try = {
-    try: number;
-    taskId: string;
-    attempts: { count: number; latest: { ended: string | null } | null };
-    closeout: { summary: string } | null;
-  };
   assert.deepEqual(
-    plan.tries.map((t: Try) => [t.try, t.taskId]),
+    plan.tries.map((t) => [t.try, t.taskId]),
     [
       [1, 'h-rechecked-plan'],
       [2, 'h-rechecked-plan'],
       [3, 'h-rechecked-plan-try3'],
     ],
   );
-  for (const t of plan.tries.slice(0, 2) as Try[]) {
+  for (const t of plan.tries.slice(0, 2)) {
     assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'done', DONE.summary], `try ${t.try}`);
   }
 });

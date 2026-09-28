@@ -70,6 +70,7 @@ const { app } = await import('../src/app.ts');
 const { start } = await import('agent-orchestrator');
 type RunSummary = import('../src/runs.ts').RunSummary;
 type RunDetail = import('../src/detail.ts').RunDetail;
+type AgentListing = import('../src/agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
@@ -86,7 +87,7 @@ const records = (): string[] =>
     : [];
 
 /** A request refused with `status` and words `pattern` matches, with no run written and the tries as they were. */
-async function refused(res: Promise<Response>, status: number, pattern: RegExp): Promise<string> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<string> {
   const runs = records();
   const tries = fs.existsSync(TRIES) ? fs.readdirSync(TRIES).sort() : [];
   const answer = await res;
@@ -156,7 +157,7 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   for (const line of ['workspace: folder', 'agent: scribe', 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
     assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
   }
-  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as { version: string };
+  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;
   assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
 
   const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8'));
@@ -220,7 +221,7 @@ test('once the try has ended, the agent can be tried again, and its folder is wr
 
   // The agent edited: its version moves, and the next try's folder is written at the new one.
   fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
-  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as { version: string };
+  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;
   const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
   assert.ok(fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`), 'written again at the version the agent is at');
   ended(third);
@@ -293,11 +294,7 @@ test("an agent a try's fence does not reach is refused before anything is writte
 });
 
 test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {
-  const agents = (await (await app.request('/api/agents')).json()) as Array<{
-    from: string;
-    name: string;
-    untried: { why: string; copy: string | null } | null;
-  }>;
+  const agents = (await (await app.request('/api/agents')).json()) as AgentListing[];
   const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
   assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
   assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);

@@ -72,7 +72,7 @@ const snapshot = (): Record<string, string> =>
       .map((f) => [f, fs.readFileSync(path.join(LIBRARY, f), 'utf8')]),
   );
 
-async function refused(res: Promise<Response>, status: number, pattern: RegExp): Promise<void> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<void> {
   const before = snapshot();
   const answer = await res;
   const body = (await answer.json()) as { error: string };

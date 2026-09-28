@@ -14,6 +14,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { Pruning } from 'agent-orchestrator';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-prune-');
@@ -163,19 +166,25 @@ const BOARD = {
 const pruneOn = (id: string, body: unknown = {}, headers: Record<string, string> = BOARD) =>
   app.request(`/api/runs/${id}/prune`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
-type Summary = { id: string; pruned: { said: string } | null };
-const listed = async (): Promise<Map<string, Summary>> => {
+/** Each run on the list, by id. */
+const listed = async (): Promise<Map<string, RunSummary>> => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  return new Map(((await res.json()) as Summary[]).map((r) => [r.id, r]));
+  return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
 };
 const detail = async (id: string) => {
   const res = await app.request(`/api/runs/${id}`);
   assert.equal(res.status, 200);
-  return res.json() as Promise<{
-    pruned: { at: string; worktrees: Array<{ path: string }>; artifacts: { at: string } | null } | null;
-    onDisk: { worktrees: boolean; files: boolean };
-  }>;
+  return (await res.json()) as RunDetail;
+};
+/** What a prune that went through answers (`runs.ts`), the package's `Pruning` as the route words it. */
+type PruneAnswer = {
+  id: string;
+  pruned: true;
+  lines: string[];
+  worktrees: Pruning['worktrees'];
+  artifacts: NonNullable<Pruning['artifacts']> | null;
+  left: Pruning['left'];
 };
 
 /**
@@ -205,7 +214,7 @@ test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`:
     const body = (await res.json()) as { awaiting?: unknown };
     awaiting.set(id, body.awaiting ?? null);
     const said = await packageSays(id, { artifacts: true });
-    const refusedUnmerged = said.kind === 'refused' && said.refusal.includes(`wf prune ${id} --unmerged`);
+    const refusedUnmerged = said.kind === 'refused' && said.refusal!.includes(`wf prune ${id} --unmerged`);
     assert.equal(body.awaiting != null, refusedUnmerged, `${id}: ${JSON.stringify(body)} beside ${JSON.stringify(said)}`);
   }
   assert.deepEqual(Object.fromEntries(awaiting), {
@@ -223,13 +232,13 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
   const res = await pruneOn('p-merged', { artifacts: true });
   assert.equal(res.status, 200);
-  const body = await res.json();
+  const body = (await res.json()) as PruneAnswer;
   assert.equal(body.pruned, true);
   assert.deepEqual(
-    body.worktrees.map((w: { path: string }) => w.path),
+    body.worktrees.map((w) => w.path),
     [worktreeOf('p-merged')],
   );
-  assert.equal(body.artifacts.path, filesDir('p-merged'));
+  assert.equal(body.artifacts!.path, filesDir('p-merged'));
   assert.deepEqual(body.left, []);
   assert.match(body.lines[0], /^p-merged {2}pruned: removed 1 worktree and its files, .* freed; its record and branches are kept$/);
   assert.equal(fs.existsSync(worktreeOf('p-merged')), false, 'its worktree is gone');
@@ -263,7 +272,7 @@ test('REFUSED at shipped defaults: a run pruned already, with its files, is a 40
     assert.equal(said.kind, 'nothing');
     const res = await pruneOn('p-merged', how);
     assert.equal(res.status, 409, JSON.stringify(how));
-    assert.equal((await res.json()).error, `Nothing to prune: ${said.nothing}.`);
+    assert.equal(((await res.json()) as { error: string }).error, `Nothing to prune: ${said.nothing}.`);
     assert.deepEqual(stateOf('p-merged'), before, JSON.stringify(how));
   }
 });
@@ -275,7 +284,7 @@ test('REFUSED at shipped defaults: a finished run nobody merged, pruned without 
     assert.equal(said.kind, 'refused');
     const res = await pruneOn('p-unmerged', how);
     assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, said.refusal);
     assert.match(
       error,
@@ -307,7 +316,7 @@ test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf p
     assert.equal(said.kind, 'refused');
     const res = await pruneOn('p-running', how);
     assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, said.refusal);
     assert.match(error, /^it is not over — wf decide p-running says it is still running/);
     assert.deepEqual(stateOf('p-running'), before, JSON.stringify(how));
@@ -318,7 +327,7 @@ test('REFUSED at shipped defaults: a folder run is a 409 in the words of `wf pru
   const said = await packageSays('p-folder', { artifacts: true, unmerged: true });
   const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
   assert.equal(res.status, 409);
-  const { error } = await res.json();
+  const { error } = (await res.json()) as { error: string };
   assert.equal(error, said.refusal);
   assert.match(error, /^a folder run: its steps' folders are its work/);
   assert.ok(fs.existsSync(path.join(work, 'write')));
@@ -330,7 +339,7 @@ test('REFUSED at shipped defaults: a prune of a run the store has not — none b
     const before = fs.readdirSync(path.join(root, 'runs')).sort();
     const res = await pruneOn(id, { artifacts: true });
     assert.equal(res.status, 404, id);
-    assert.match((await res.json()).error, new RegExp(`^No run '${id}' in this store`), id);
+    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
     assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
   }
 });
@@ -349,7 +358,7 @@ test("REFUSED at shipped defaults: a body that is not `wf prune`'s two switches 
     const before = stateOf('p-body');
     const res = await pruneOn('p-body', body);
     assert.equal(res.status, 400, JSON.stringify(body));
-    assert.match((await res.json()).error, words);
+    assert.match(((await res.json()) as { error: string }).error, words);
     assert.deepEqual(stateOf('p-body'), before, JSON.stringify(body));
   }
   // The same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone.
@@ -368,7 +377,7 @@ test('REFUSED at shipped defaults: a prune from a page on another site, addresse
     const before = stateOf('p-guard');
     const res = await pruneOn('p-guard', { artifacts: true }, headers);
     assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, words);
     assert.match(error, /^POST \/api\/runs\/p-guard\/prune /);
     assert.deepEqual(stateOf('p-guard'), before, JSON.stringify(headers));

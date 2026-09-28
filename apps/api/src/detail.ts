@@ -64,7 +64,16 @@ import {
 } from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
 import { bare, e, filedTimes, judgedSteps, stepNames, type TaskView, type Views, viewsFor, workflowsOf, workFolderOf } from './store.ts';
-import { attemptsIn, closeoutIn, type StepAttempts, type StepCloseout, type StepTry, triesOf, unreadableIn } from './tries.ts';
+import {
+  attemptsIn,
+  closeoutIn,
+  type StepAttempts,
+  type StepCloseout,
+  type StepTry,
+  type StepUnreadable,
+  triesOf,
+  unreadableIn,
+} from './tries.ts';
 import { tryOf } from './try.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
@@ -300,6 +309,8 @@ export type RunDetail = {
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
+    /** Why its current try's closeout could not be read (`unreadableIn`), where `closeout` is null; null when it was read or there is none. */
+    unreadable: StepUnreadable | null;
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
     attempts: StepAttempts;

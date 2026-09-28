@@ -234,7 +234,7 @@ test("a run's decision is asked for once while a live step's engine word moves, 
 
   // A fan-out `assess` calls failed: implement signed off blocked, and tokens still working.
   const run = (tokens: string) => ({
-    status: 'failed',
+    status: 'failed' as const,
     cancelledAt: null,
     waitingOnYou: ['implement'],
     steps: [
@@ -466,7 +466,8 @@ test('a run removed while its page is open is said as gone on the one read that 
   await client.invalidateQueries({ queryKey: ['runs', 'r-1'], exact: true });
   const result = observer.getCurrentResult();
   assert.equal(runGone(result.error), true, `the read that found none is told apart: ${String(result.error)}`);
-  assert.equal(result.error?.message, said, "in the api's words");
+  assert.ok(result.error instanceof ReadRefusal);
+  assert.equal(result.error.message, said, "in the api's words");
   assert.equal(result.data, last, 'the last read is kept by the query — the page, not the query, stops drawing it');
   assert.deepEqual(asked, ['/api/runs/r-1'], 'read once: a run gone is said at once, not after three tries');
 });

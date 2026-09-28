@@ -537,7 +537,7 @@ test('createEngine refuses a harness that names a `pool`, a spec or a Promise ru
   for (const [name, harness] of withPool) {
     assert.throws(() => createEngine({ journal: memoryJournal(), harnesses: { [name]: harness } as unknown as Record<string, PromiseRunner> }), (e: Error & { exitCode?: number }) => {
       assert.equal(e.exitCode, 2, e.message);
-      assert.match(e.message, new RegExp(`^createEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\. Take \`pool\` off it`));
+      assert.match(e.message, new RegExp(`^createEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\\. Take \`pool\` off it`));
       assert.match(e.message, /the orchestrator's `POOLS` in `admission\.ts`/);
       return true;
     });
@@ -592,7 +592,7 @@ test('file() refuses background on every harness with no such mode, and remoteCo
   const { journal, engine } = shipped();
   for (const harness of ['codex', 'claude-detached']) {
     await refused(engine, { brief: 'b', cwd: '/r', harness, config: { background: true } },
-      new RegExp(`\`background: true\` asks for a Claude Code background session, and the \`${harness}\` harness has no such mode\. File the task on \`claude\`, or leave \`background\` off`));
+      new RegExp(`\`background: true\` asks for a Claude Code background session, and the \`${harness}\` harness has no such mode\\. File the task on \`claude\`, or leave \`background\` off`));
   }
   const bg = createEngine({ journal: memoryJournal(), harnesses: { claude: 'claude-bg' } });
   await refused(bg, { brief: 'b', cwd: '/r', config: { background: true } }, /the `claude` harness has no such mode: every session of it is one already\. Leave `background` off/);

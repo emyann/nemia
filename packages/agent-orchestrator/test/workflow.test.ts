@@ -465,7 +465,7 @@ test('`renderStep` writes a context window in one canonical form, whatever the f
 test('REFUSED: a context: that is not a number of tokens, one outside what the harness takes, and any on codex — by name, saying what to write', () => {
   for (const bad of ['lots', '200 k', '1.5M', '200,000', '0', '-1', '200kb', '0k']) {
     assert.throws(() => fm('implement', `context: ${bad}`),
-      refusedWith(new RegExp(`^implement: \`context: ${bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\` is not a number of tokens\. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example \`context: 200k\`, or \`context: 150000\`\.$`)), bad);
+      refusedWith(new RegExp(`^implement: \`context: ${bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\` is not a number of tokens\\. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example \`context: 200k\`, or \`context: 150000\`\\.$`)), bad);
   }
   assert.throws(() => fm('implement', 'context: 50k'),
     refusedWith(/^implement: `context: 50k` is 50000 tokens, and claude takes a window from 100k to 1000k tokens \(there is no `harness:` line, so the step runs on claude\)\. Give one in that range — `context: 200k`, or `context: 150000` — or delete the line for the model's whole window\.$/));
@@ -1108,8 +1108,8 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
   assert.equal(fm('implement', 'check: npm test').workspace, undefined, 'a worktree unless it says otherwise');
   const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
   refused('workspace: worktree', /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: main` to run the step in the repository's own checkout\.$/);
-  for (const word of ['Main', 'repo', '\/tmp\/x', 'true']) {
-    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\` or \`folder\`\.`));
+  for (const word of ['Main', 'repo', '/tmp/x', 'true']) {
+    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\` or \`folder\`\\.`));
   }
   refused('workspace:', /^ship: `workspace` has no value\. Delete the line rather than leaving it blank/);
   refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
@@ -1120,7 +1120,7 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
   assert.equal(fm('review', 'workspace: folder\ncheck: test -s note.md').workspace, 'folder', 'a check runs in the step\'s folder');
   assert.equal(fm('review', 'workspace: folder\nresume: write').workspace, 'folder', 'and a resumed session works in the folder of the step it continues');
   const refusedWord = (lines: string, pattern: RegExp) => assert.throws(() => fm('write', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
-  for (const word of ['Folder', 'folders', 'dir']) refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\. `));
+  for (const word of ['Folder', 'folders', 'dir']) refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\\. `));
 
   const team = (...words: Array<'folder' | 'main' | undefined>): Workflow[] => words.map((workspace, i) =>
     ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', permissionMode: 'dontAsk', ...(workspace ? { workspace } : {}) }) as Workflow);
@@ -1210,7 +1210,7 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
   assert.deepEqual(DENIALS, ['fail']);
   for (const word of ['true', 'stop', 'Fail', 'record']) {
     assert.throws(() => fm('review', `denials: ${word}`),
-      refusedWith(new RegExp(`^review: \`denials: ${word}\` is not \`fail\`\. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing\. Write \`denials: fail\`, or delete the line\.$`)), word);
+      refusedWith(new RegExp(`^review: \`denials: ${word}\` is not \`fail\`\\. \`denials: fail\` stops the step when the harness denied its try a call — it reads \`denied\` and waits on a person — rather than passing it on; without the line, what was denied is said beside the step and decides nothing\\. Write \`denials: fail\`, or delete the line\\.$`)), word);
   }
   assert.throws(() => fm('review', 'denials:'), refusedWith(/^review: `denials` has no value|^review: `denials: ` is not `fail`/));
   assert.throws(() => fm('review', 'denials: fail\ndenials: fail'), refusedWith(/^review: `denials` is set twice/));
@@ -1346,7 +1346,7 @@ test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` doe
   assert.equal(fm('review', 'harness: codex\nremote: true').remote, true);
   const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('implement', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
   for (const word of ['yes', 'no', 'on', 'True', '1', 'claude']) {
-    refused(`remote: ${word}`, new RegExp(`^implement: \`remote: ${word}\` is not \`true\` or \`false\`\. \`remote: true\` bridges every session of the step to claude\.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not\. Write one of the two, or delete the line\.$`));
+    refused(`remote: ${word}`, new RegExp(`^implement: \`remote: ${word}\` is not \`true\` or \`false\`\\. \`remote: true\` bridges every session of the step to claude\\.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not\\. Write one of the two, or delete the line\\.$`));
   }
   refused('remote:', /^implement: `remote` has no value\. Delete the line rather than leaving it blank/);
   refused('remote: true\nremote: false', /^implement: `remote` is set twice/);

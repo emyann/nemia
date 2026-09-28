@@ -18,7 +18,9 @@ import {
   type ParentRun,
   type Run,
   type Said,
+  stepTasks,
   type SpendOf,
+  type StepRecord,
   type TaskPhase,
 } from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
@@ -334,6 +336,20 @@ export const engineWord =
  */
 export const wordOfView = (v: TaskView | undefined): string =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
+
+/**
+ * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —
+ * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own filed,
+ * and the engine's word for that task (`wordOfView`). What `wf ls` prints beside such a step, and the board's chip.
+ */
+export const unjudgedWord =
+  (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
+  (step: StepRecord | undefined): string =>
+    step && stepTasks(step).some((id) => unreadable.has(id))
+      ? 'unreadable'
+      : !step?.taskId
+        ? 'pending'
+        : wordOfView(views.get(step.taskId));
 
 /**
  * How many times a person said something to each step's current try while it ran (`wf say`): the engine's `said` on the try's task, off

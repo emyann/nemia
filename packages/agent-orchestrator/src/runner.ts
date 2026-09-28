@@ -283,6 +283,7 @@ export {
   saidCount,
   spendReader,
   viewedOnce,
+  unjudgedWord,
   waitingOf,
   wordOfView,
 } from './views.ts';
@@ -294,5 +295,5 @@ export type { Advanced, Pass } from './tick.ts';
 export { accept, approve, cancel, hold, retry, round, say, unhold } from './verbs.ts';
 export type { Accepted, Approved, Asked, Cancelled, Holding, RoundAsked, Told } from './verbs.ts';
 export { forget, prune } from './forget.ts';
-export { decide, list } from './decide.ts';
-export type { Answered } from './decide.ts';
+export { decide, list, unjudgedOf } from './decide.ts';
+export type { Answered, Unjudged } from './decide.ts';

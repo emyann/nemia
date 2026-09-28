@@ -16,7 +16,8 @@ left out. This page gives the evidence to decide from. It changes no code. Every
 - **The largest error defect needs no Effect to fix.** `wf` exits 1 on every refusal, whatever `exitCode` the thrown error
   carries (`packages/agent-orchestrator/bin/wf.ts:4-6`, measured below). The api then maps that same `exitCode: 2` to a
   409 in some routes and a 422 in others (13 checks in 5 files). Typed errors are the part of Effect that fixes this class
-  of defect for good, and they can come first: a `Schema.TaggedError` is an `Error`, so plain code can throw one.
+  of defect for good, and they can come first: a `Data.TaggedError` is an `Error`, so plain code can throw one, and the
+  `effect/Data` subpath it comes from loads 14 modules in 6 ms, where the barrel loads 203.
 - **Cost.** Start-up is already paid. Every controller and the api load the whole `effect` barrel today, through
   `agent-runtime` (203 modules, about 105–130 ms of a 290 ms import). What it would really cost is knowledge. Effect 4 renamed
   much of Effect 3, which is what an agent has mostly read (`Context.Tag`, `Effect.catchAll`, `Either`: all absent here).
@@ -108,9 +109,11 @@ the beat (a forked fiber), the watcher, the child process, the MCP client. Inter
 going, a deadline — then runs every finalizer in order. For `wf up` that buys one release path instead of two, and an order
 of release the code states; it does not buy a pass that stops cleanly part-way. The store's calls are synchronous, so an
 interruption on a signal also stops the pass at its next `await`, as `process.exit` does now, and the level-triggered pass is
-built to be dropped there. The real gains are in `wf watch`, which has no way to stop at all, and in the api's child process
-and MCP ask, whose 60 and about 25 lines of hand-kept flags and timers become an acquire, a use and a release. `quota.ts` and
-`capabilities.ts` shrink to an acquire, a use under `Effect.timeout`, and a release. `effect/unstable/process` has a
+built to be dropped there. In `wf watch` the gain is as small: a signal already ends it and the OS frees its watcher, so what
+a scope adds is a watch that can be stopped from inside the process — by a test, or by a caller that embeds it — where the
+command's promise today never settles and its `stop()` is out of reach. The real gains are in the api's child process and MCP
+ask: `quota.ts` and `capabilities.ts`, 60 and about 25 lines of hand-kept flags and timers, shrink to an acquire, a use under
+`Effect.timeout`, and a release. `effect/unstable/process` has a
 `ChildProcess` module, but it is *unstable* and needs a platform layer from `@effect/platform-node`, which is not installed.
 The runtime's own pattern, `Effect.callback` around `execFile` with `child.kill()` as the interrupt (`runner.ts:795-814`),
 needs neither.
@@ -246,9 +249,11 @@ Effect.provide(layer)))` inside a `node:test` case (22 of the runtime's 45 test 
 The three rules of `docs/architecture.md` survive. Each needs a line more in its test, not a new rule.
 
 - **Pure stays pure, and stays plain.** `assess`, `workflow.ts` and the other 14 pure files are data in, data out, tested as
-  data. The pure kind's test gains one refusal: a pure file
-  imports nothing from `effect` but `Schema`, which the boundary-parsing card will need to describe records and which runs
-  no effect.
+  data. The pure kind's test gains one refusal: a pure file imports nothing from `effect` but the `effect/Data` subpath, for
+  the tagged refusals two pure files throw (`runCapOf` in `run.ts:1217-1228`, `WorkflowError` in `workflow.ts:533`). Not the
+  barrel and not `Schema`: measured, `effect/Schema` alone loads 109 modules in about 75 ms, and `effect/Data` 14 in 6 ms,
+  against the 9 modules and 55 ms of `agent-orchestrator/run` today (*Start-up*, below). A schema the boundary-parsing card
+  writes for a record lives with the store that reads the record, not in a pure file.
 - **The store stays plain, synchronous functions.** A handful of synchronous file calls gains nothing from being an Effect
   each; a controller wraps what it calls in `Effect.try`, and a test calls the store as it does today. Two
   things change: `HOME` stops being read at load and comes from a root the controller passes, and the store's refusals are
@@ -336,8 +341,9 @@ streams, `Config` and `ManagedRuntime`, which a release candidate is freer to re
 - `wf ls` on an empty store takes 0.33 s and 176 MB.
 
 Only the pure entries load none: `agent-orchestrator/run` loads 9 modules in 55 ms, and `agent-orchestrator/workflow` loads
-2. Effect in the controllers and the api adds no module the process does not already load. Effect in a pure file would add
-about 100 ms to every consumer of `/run` and `/workflow`, which is one more reason for the pure rule above.
+2. Effect in the controllers and the api adds no module the process does not already load. The `effect` barrel in a pure
+file would add about 100 ms to every consumer of `/run` and `/workflow`, and `effect/Schema` about 75 ms; `effect/Data`, the
+one import the pure rule above allows, adds 14 modules and about 6 ms.
 
 **What an agent step needs to write Effect well.**
 
@@ -364,20 +370,21 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
 (Effect Schema for records, journals and the api's bodies) and do not overlap it.
 
 1. **One version, and the skill.** Pin `effect` exactly, and the same, in every package that depends on it, with a test
-   that refuses two ranges. It lands after the judge's removal, or it pins the judge's range as well. Add `.claude/skills/effect/` and the CLAUDE.md lines. No code.
+   that refuses two ranges. It lands after the judge's removal, or it pins the judge's range as well. Add
+   `.claude/skills/effect/` and the CLAUDE.md lines. No code.
 2. **`wf` exits with the refusal's code.** `bin/wf.ts` honours `exitCode`, and a test runs `wf` and asserts 2. Plain code.
-3. **Tagged refusals in the orchestrator.** `Schema.TaggedError` classes that are `Error`s and carry `exitCode: 2`: `Missing`,
-   `Conflict`, `Invalid`. The 31 `Object.assign` sites move over, file by file, and the pure kind's boundary test allows
-   `Schema` alone.
+3. **Tagged refusals in the orchestrator.** `Data.TaggedError` classes, imported from `effect/Data`, that are `Error`s and
+   carry `exitCode: 2`: `Missing`, `Conflict`, `Invalid` (checked on rc.116: `yield*` fails with one, `Effect.catchTag`
+   catches it, and `exitCode` survives). The 31 `Object.assign` sites move over, file by file, and the pure kind's boundary
+   test allows `effect/Data` alone, and a test pins `agent-orchestrator/run`'s module count so the barrel cannot creep in.
 4. **`Config` for the `WF_` environment.** Covers `WF_ROOT`, `WF_MAX_CONCURRENT`, `WF_MAX_RUNS` and `WF_VERIFY_REST`, with a
    refusal test for each at the shipped defaults, and one for `WF_MAX_CONCURRENT=-3`.
 5. **`Engine` as a service.** The client's layer wraps the Promise facade, and `test/engine-board.ts` provides
    `Engine.test`. The 13 `board()` copies move over as their files are touched, not in one sweep.
 6. **The daemon's lifetime.** `wf up` and `wf watch` run as Effects: the claim scoped, the beat forked, both interrupted on a
    signal, so the claim has one release path. The existing real-process test (`daemon-store.test.ts:332`) still asserts the
-   store is let go with the signal's exit code, and a new one sends `wf watch` a signal and asserts it exits and leaves no
-   watcher. Decide
-   here between `@effect/platform-node`'s `NodeRuntime.runMain` (a new dependency, also rc) and a small `runMain` of our own.
+   store is let go with the signal's exit code. A new one interrupts `wf watch`'s program in the process and asserts no
+   watcher is left, which cannot be written today, since the command's promise never settles. Decide here between `@effect/platform-node`'s `NodeRuntime.runMain` (a new dependency, also rc) and a small `runMain` of our own.
 
    *Stop here and measure:* lines added and removed, test lines touched, typecheck time, and review rounds per card. Then
    decide A or B, and whether to go on.
@@ -401,9 +408,12 @@ Not on the list: the store as Effects, the tick as a `Schedule`, `Effect.log`, `
 - **The exit status.** `WF_ROOT=$(mktemp -d)/wf AE_ROOT=…/ae node packages/agent-orchestrator/bin/wf.ts approve nope step;
   echo $?` printed the refusal and `1`.
 - **The tagged error through `runPromise`.** A `Schema.TaggedError` failed in `Effect.runPromise` was caught and was the
-  same instance, `instanceof Error`, with no `exitCode`.
+  same instance, `instanceof Error`, with no `exitCode`. A class `extends TaggedError('Invalid') { exitCode = 2 }` from
+  `effect/Data` was an `Error` with its `_tag` and `exitCode`, failed a program by `yield*`, and was caught by
+  `Effect.catchTag`, with `exitCode` still 2.
 - **Start-up.** Node 24.20.0 on WSL2. A dynamic `import()` of each entry was timed three times. Modules were counted with a
-  `module.registerHooks` load hook passed by `--import`. `wf ls` was timed with `/usr/bin/time`.
+  `module.registerHooks` load hook passed by `--import`. The `effect/Schema` and `effect/Data` subpaths were imported alone,
+  twice each, the same way. `wf ls` was timed with `/usr/bin/time`.
 - **Bundle.** `esbuild --bundle --minify --format=esm --platform=browser` of two ten-line files, gzipped at `-9`. The web's
   figures are from `npm run build --workspace web`.
 - **The upgrade.** In `/tmp`, a copy of `packages/agent-runtime` beside a `node_modules` of links to

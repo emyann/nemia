@@ -65,17 +65,16 @@ import { isRemoteHarness } from './workflow.ts';
  * What `wf ls` shows for one run — the pure call, over one read of each task.
  *
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the
- * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
+ * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail. Only a refused check's log is read, as its exit
+ * code is the one number on its line. Where the run's result stands against the base branch is read off git on this call: it is what says
+ * a finished run is one nobody has decided.
  */
 export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReader = branchReader()): Promise<Listing> {
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
   const { asks, rounds } = readAsks(run.id);
-  // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
   const standings = standingsOf(run, git);
-  // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
   const parent = await parentsOf(e, run, git);
   return listing(
@@ -106,6 +105,9 @@ export type Answered = { try: number; message: string; needs?: string };
 /**
  * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
  * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both.
+ *
+ * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
+ * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
  */
 export async function decide(
   engine: Engine,
@@ -114,7 +116,10 @@ export async function decide(
   run: Run;
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
-  /** Every settled check, by step: what the run's own fact about the step says. */
+  /**
+   * Every settled check, by step: what the run's own fact about the step says. Its verdict, off the log, tells a refusal from a check that
+   * did not finish.
+   */
   checks: Record<string, CheckReport>;
   /** The tries the next tick files: asked for, or covered by `retries:`. */
   retrying: Retry[];
@@ -130,7 +135,10 @@ export async function decide(
   costs: Record<string, string>;
   /** The run's `cost` line, after its steps (`runCostLines`): every step's tries together. None before any attempt has ended. */
   runCost: string[];
-  /** For each step whose current try a person answered, the answer beside the `needs` it answers (`Answered`). */
+  /**
+   * For each step whose current try a person answered, the answer beside the `needs` it answers (`Answered`): the answer off the person's
+   * ask file, the `needs` off the engine's record of the try before, as the run's record keeps neither.
+   */
   answers: Record<string, Answered>;
   /** For each step that signed off blocked and may be tried again, the `wf retry --message` that answers it (`answerLines`). */
   answering: Record<string, string>;
@@ -141,12 +149,15 @@ export async function decide(
   /**
    * For each step whose session the harness blocked and that says what it waits for, the sentence a person acts on (`harnessWaitLine`):
    * `waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/<task>/1`. Off the views already read, so it
-   * costs no observation; empty for a harness that says nothing, which is every harness but Claude Code's.
+   * costs no observation; empty for a harness that says nothing, which is every harness but Claude Code's. The session named is the
+   * engine's name for the task's current attempt (`nameFor`), which `claude agents` lists it under. Read on this call and kept nowhere, so a
+   * step that stops waiting says nothing here on the next.
    */
   waitingOn: Record<string, string>;
   /**
    * For each step whose current try's sessions were denied a call, the line that names them (`deniedWords`): `denied: Skill(look),
    * Bash(pytest)`. Off the engine's record of each ended attempt (`deniedOf`); empty for a step denied nothing, or whose harness cannot say.
+   * A denied call is a tool the session was not allowed, which a job carries on without.
    */
   denied: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
@@ -156,20 +167,31 @@ export async function decide(
    * None on a run nobody holds.
    */
   holding: Wait[];
-  /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
+  /**
+   * For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task
+   * (`saidLines`). Every try, as words said to a try that was replaced bear on the work the step hands on; a recheck's try shares its task
+   * with the try before, and its words are said once.
+   */
   said: Record<string, SaidTo[]>;
   /**
-   * Where the run's time went, per try and per check (`timeline`): off the engine's view of every try's task and check, and the filing times
-   * on its feed. A feed that cannot be read leaves every queue time `not known`, and the screen printed all the same.
+   * Where the run's time went, per try and per check (`timeline`): off the engine's view of every try's task and check, each viewed once,
+   * and the filing time each view carries (`State.filedAt`), never the engine's feed, which holds every task ever filed. A task with no
+   * filing time leaves its queue time `not known`, and the screen printed all the same.
    */
   timeline: Timeline;
-  /** The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`runSlots`); absent when it holds none. */
+  /**
+   * The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`runSlots`); absent when it holds
+   * none. Asked only of a run not cancelled with nothing filed, which is all the cap holds, as the answer reads every run in the store.
+   */
   held?: RunSlot;
   /** Where each result branch stands against the base branch, as git says it now (`branchStandings`): the fact under the run's result. */
   standings: BranchStanding[];
   /** The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds it. */
   checkout?: CheckoutHold;
-  /** What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged. */
+  /**
+   * What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged (`assess`, on
+   * the same `standings`).
+   */
   toDecide?: ToDecide;
 }> {
   const e = viewedOnce(engine);
@@ -184,18 +206,13 @@ export async function decide(
   const { asks, rounds } = readAsks(id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
-  // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  // Which run's ending step has the repository's own checkout, when this run's waits for it: a run still running for that, and nothing else.
   const checkout = await checkoutHold(e, run, steps);
   const d = decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
-  // Where the result stands against the base branch, read off git now — and what that leaves a person to decide (`assess`, on the same facts).
   const standings = standingsOf(run, git);
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
-  // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
-  // try: the run's record keeps neither.
   const given = readAnswers(id);
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
@@ -206,28 +223,22 @@ export async function decide(
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
-  // Every try's task and check, the tries behind the current one too, each viewed once: what a person said to each try, and the timeline.
   const everyTry = new Map(views);
   for (const record of Object.values(run.steps)) {
     for (const t of record.tries ?? []) {
       for (const taskId of [t.taskId, t.check?.taskId]) if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, await e.view(taskId));
     }
   }
-  // What a person said to each try's sessions while they ran, off the engine's journal of the try's task: every try, since words said to a try
-  // that was replaced still bear on the work the step hands on.
   const said: Record<string, SaidTo[]> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const tasks = [...(record.tries ?? []).map((t) => t.taskId), ...(record.taskId ? [record.taskId] : [])];
     const told: SaidTo[] = [];
     for (const [i, taskId] of tasks.entries()) {
-      // A recheck replaced only a check: the try after it has the same task, whose words are the try's that ran its session, said once.
       if (tasks.indexOf(taskId) !== i) continue;
       for (const s of saidIn(everyTry.get(taskId))) told.push({ ...s, try: i + 1 });
     }
     if (told.length) said[name] = told;
   }
-  // When each try's task and check was filed, off the views just read (`State.filedAt`, the `at` of each journal's `filed` entry): the
-  // engine's feed says the same of every task ever filed, and was read whole for one run — 15 MB of the live store's, on 2026-09-25.
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const used = consumption(views, run);
   const costs = Object.fromEntries(
@@ -244,9 +255,6 @@ export async function decide(
         ),
       ]),
   );
-  // What each blocked session's harness says it waits for, and the session a person answers it in: the engine's name for the task's
-  // current attempt, which is the name `claude agents` lists it under. Level-triggered like the phase beside it — read this pass, kept
-  // nowhere — so a step that stops waiting says nothing here on the next.
   const waitingOn: Record<string, string> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const word = record.taskId ? waitingOf(views)(record.taskId) : undefined;
@@ -255,18 +263,12 @@ export async function decide(
     const remote = isRemoteHarness(views.get(record.taskId)?.state.harness) ? { run: id, step: name } : undefined;
     waitingOn[name] = harnessWaitLine(word, attempt === undefined ? null : nameFor(record.taskId, attempt), remote);
   }
-  // What each step's current try was denied, off the same views: a tool it was not allowed, which a job carries on without.
   const denied: Record<string, string> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const words = record.taskId ? deniedWords(deniedOf(views)(record.taskId)) : '';
     if (words) denied[name] = words;
   }
-  // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
   const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
-  // A pruned run files nothing more (`advance`), and every verb that would is refused (`prunedRefusal`): nothing is due, and nothing is
-  // offered — each line below that would offer a verb says so itself (`retryLines`, `roundLines`, `answerLines`, `overBudgetLine`, `gateLines`),
-  // so the api's decision, which calls the same functions, says the same. A held run files nothing while the hold stands, the same way
-  // (`heldRefusal`).
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
   const parent = await parentsOf(e, run, git);
   return {

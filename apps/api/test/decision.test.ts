@@ -11,13 +11,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
 const root = scratch('hkb-api-decision-');
 process.env.WF_ROOT = root;
 
-// Ahead of the real one on PATH, beside the harness's `claude`: a `git` that notes each call and runs the real one, so a test can count
-// what the route asked of git.
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+/**
+ * A folder ahead of the real `git` on PATH, beside the harness's `claude`, holding a `git` that notes each call in `gitCalls` and runs
+ * the real one, so a test counts what the route asked of git (`gitCount`).
+ */
 const bin = scratch('hkb-api-decision-bin-');
 const gitCalls = path.join(bin, 'git-calls');
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
@@ -42,7 +44,7 @@ const write = (repo: string, file: string, text: string) => {
   fs.writeFileSync(path.join(repo, file), text);
 };
 
-/** A repository whose base has a workspace package with a source file and its test, and a CLAUDE.md. Its base's sha. */
+/** A repository whose base has a workspace package with a source file and its test, and a CLAUDE.md; returns it with its base's sha. */
 function aRepo(): { repo: string; base: string } {
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   git(repo, 'init', '-q', '-b', 'main');
@@ -183,60 +185,99 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
     'commands',
     'awaiting',
   ]);
-  // Finished, and nobody merged it: what `wf prune` refuses without `--unmerged`.
-  assert.deepEqual(body.awaiting, { branches: [branch], direct: false });
+  assert.deepEqual(
+    body.awaiting,
+    { branches: [branch], direct: false },
+    'finished, and nobody merged it: what `wf prune` refuses without `--unmerged`',
+  );
 
-  // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run: git's own
-  // `--shortstat`, trimmed.
-  assert.deepEqual(body.standings, [
-    {
-      branch,
-      where: 'ahead',
-      commits: 1,
-      said: `${branch} is ahead of main by 1 commit`,
-      stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
-      // And whether it still merges onto the base as the base is now: git's `merge-tree`, a merge in the object store alone.
-      merge: { clean: true, said: 'merges cleanly onto main' },
-    },
-  ]);
+  assert.deepEqual(
+    body.standings,
+    [
+      {
+        branch,
+        where: 'ahead',
+        commits: 1,
+        said: `${branch} is ahead of main by 1 commit`,
+        stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+        /** Whether it still merges onto the base as the base is now: git's `merge-tree`, a merge in the object store alone. */
+        merge: { clean: true, said: 'merges cleanly onto main' },
+      },
+    ],
+    "where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run: git's own `--shortstat`, trimmed",
+  );
 
-  // The package and the root, each once, with the files an agent reads and those a check is decided by named.
   assert.equal(body.touched.length, 1);
   const [touched] = body.touched;
   assert.equal(touched.branch, branch);
   assert.ok(!('error' in touched.radius), JSON.stringify(touched.radius));
-  assert.deepEqual(touched.radius.groups, [
-    { name: '(root)', files: 2, added: 3, removed: 1, binary: 0 },
-    { name: 'packages/x', files: 2, added: 453, removed: 1, binary: 0 },
-  ]);
-  assert.deepEqual(touched.radius.agentFacing, ['CLAUDE.md']);
-  assert.deepEqual(touched.radius.checkAffecting, ['package.json', 'packages/x/test/add.test.ts']);
+  assert.deepEqual(
+    touched.radius.groups,
+    [
+      { name: '(root)', files: 2, added: 3, removed: 1, binary: 0 },
+      { name: 'packages/x', files: 2, added: 453, removed: 1, binary: 0 },
+    ],
+    'the package and the root, each once',
+  );
+  assert.deepEqual(touched.radius.agentFacing, ['CLAUDE.md'], 'the files an agent reads, named');
+  assert.deepEqual(
+    touched.radius.checkAffecting,
+    ['package.json', 'packages/x/test/add.test.ts'],
+    'the files a check is decided by, named',
+  );
 
   assert.deepEqual(body.lesson, { said: 'CLAUDE.md +2 −0', state: 'written' });
 
-  // Only the check-affecting files, a file each, in git's order; the source file is in the radius, not in full.
   const [sensitive] = body.sensitive;
   assert.equal(body.sensitive.length, 1);
   assert.deepEqual([sensitive.branch, sensitive.error], [branch, null]);
   assert.deepEqual(
     sensitive.files.map((f: { path: string }) => f.path),
     ['package.json', 'packages/x/test/add.test.ts'],
+    "only the check-affecting files, a file each, in git's order; the source file is in the radius, not in full",
   );
   const [pkg, testFile] = sensitive.files;
   assert.deepEqual(pkg, { path: 'package.json', lines: diffOf('package.json'), cut: 0 });
-  // The test's diff is longer than the board is given: the first DIFF_LINES of it, and how many more there were.
   const whole = diffOf('packages/x/test/add.test.ts');
   assert.ok(whole.length > DIFF_LINES, `the seeded test's diff is longer than the cap: ${whole.length} lines`);
   assert.equal(testFile.lines.length, DIFF_LINES);
-  assert.deepEqual(testFile.lines, whole.slice(0, DIFF_LINES));
-  assert.equal(testFile.cut, whole.length - DIFF_LINES);
+  assert.deepEqual(testFile.lines, whole.slice(0, DIFF_LINES), 'a diff longer than the board is given: the first DIFF_LINES of it');
+  assert.equal(testFile.cut, whole.length - DIFF_LINES, 'and how many more there were');
   assert.match(testFile.lines[0], /^diff --git a\/packages\/x\/test\/add\.test\.ts b\/packages\/x\/test\/add\.test\.ts$/);
 
-  // `wf decide`'s words beside each check: a count nobody measured says so, and so does the total that one step lacks.
-  assert.deepEqual(body.used, {
-    implement: {
-      usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 },
-      used: '12 turns · 30 tool calls · 112k in · 6.35k out',
+  assert.deepEqual(
+    body.used,
+    {
+      implement: {
+        usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 },
+        used: '12 turns · 30 tool calls · 112k in · 6.35k out',
+        cost: 'not measured',
+        costUsd: null,
+        apiMs: null,
+        toolMs: null,
+        read: null,
+        peak: null,
+        rebuilt: 0,
+      },
+      review: {
+        usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 },
+        used: 'turns not measured · 4 tool calls · 8k in · 650 out',
+        cost: '$0.004',
+        costUsd: 0.004,
+        apiMs: null,
+        toolMs: null,
+        read: null,
+        peak: null,
+        rebuilt: 0,
+      },
+    },
+    "`wf decide`'s words beside each step: a count nobody measured says so",
+  );
+  assert.deepEqual(
+    body.total,
+    {
+      usage: { toolCalls: 34, inputTokens: 120_000, outputTokens: 7_000 },
+      used: 'turns not measured · 34 tool calls · 120k in · 7k out',
       cost: 'not measured',
       costUsd: null,
       apiMs: null,
@@ -245,48 +286,34 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
       peak: null,
       rebuilt: 0,
     },
-    review: {
-      usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 },
-      used: 'turns not measured · 4 tool calls · 8k in · 650 out',
-      cost: '$0.004',
-      costUsd: 0.004,
-      apiMs: null,
-      toolMs: null,
-      read: null,
-      peak: null,
-      rebuilt: 0,
-    },
-  });
-  assert.deepEqual(body.total, {
-    usage: { toolCalls: 34, inputTokens: 120_000, outputTokens: 7_000 },
-    used: 'turns not measured · 34 tool calls · 120k in · 7k out',
-    cost: 'not measured',
-    costUsd: null,
-    apiMs: null,
-    toolMs: null,
-    read: null,
-    peak: null,
-    rebuilt: 0,
-  });
-  // The run's cost after its steps, as `wf decide` prints it: review's session was priced, implement's was not. And no step held on a budget.
-  assert.equal(body.cost, 'run $0.004 measured · 1 attempt not measured');
-  assert.equal(body.overBudget, null);
+    'the total says not measured of a count one step lacks',
+  );
+  assert.equal(
+    body.cost,
+    'run $0.004 measured · 1 attempt not measured',
+    "the run's cost after its steps, as `wf decide` prints it: review's session was priced, implement's was not",
+  );
+  assert.equal(body.overBudget, null, 'no step held on a budget');
 
-  // Printed, never run: the branch is still where it was, and main has not moved.
-  assert.deepEqual(body.commands, [
-    { label: 'ship it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null },
-    { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null },
-  ]);
-  assert.equal(git(repo, 'rev-parse', 'main').trim(), base);
+  assert.deepEqual(
+    body.commands,
+    [
+      { label: 'ship it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null },
+      { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null },
+    ],
+    'printed, never run',
+  );
+  assert.equal(git(repo, 'rev-parse', 'main').trim(), base, 'the branch is still where it was, and main has not moved');
 
-  // The run's page carries the same words on each step, off the views it already reads.
   const detail = await detailOf('r-d1');
-  assert.deepEqual(Object.fromEntries(detail.steps.map((s: { name: string; used: unknown }) => [s.name, s.used])), body.used);
+  assert.deepEqual(
+    Object.fromEntries(detail.steps.map((s: { name: string; used: unknown }) => [s.name, s.used])),
+    body.used,
+    "the run's page carries the same words on each step, off the views it already reads",
+  );
 });
 
 test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {
-  // `implement` ran under a 1M cap and peaked at 831k, which is no mark there; `review` had no cap and stayed small. Read against no cap, the
-  // total's 831k would say `past 200k with no cap`, of a session that had one.
   const classes = (read: number, wrote: number, peak: number) => ({
     inputTokens: read + wrote,
     cacheReadTokens: read,
@@ -304,17 +331,23 @@ test("the run's total reads its peak against the cap of the step that reached it
     steps: { implement: { taskId: 't-dr-implement', branch }, review: { taskId: 't-dr-review', branch } },
   });
   const body = await decidable('r-dr');
-  assert.deepEqual([body.used.implement.read, body.used.implement.peak], ['read 9M · wrote 900k · peak 831k', null]);
-  assert.deepEqual([body.total.read, body.total.peak], ['read 10M · wrote 1M · peak 831k', null]);
+  assert.deepEqual(
+    [body.used.implement.read, body.used.implement.peak],
+    ['read 9M · wrote 900k · peak 831k', null],
+    'implement ran under a 1M cap and peaked at 831k, which is no mark there',
+  );
+  assert.deepEqual(
+    [body.total.read, body.total.peak],
+    ['read 10M · wrote 1M · peak 831k', null],
+    "the total's 831k is read against implement's 1M cap, not as past 200k with no cap: review had no cap and stayed small",
+  );
 });
 
 test('a run still running is `running` and nothing else, and not one `git` is run for it', async () => {
   journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
-  // On a branch git can read, so a route that asked would have had an answer.
   writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
   const detail = await detailOf('r-d2');
   assert.deepEqual([detail.status, detail.waitingOnYou], ['running', []]);
-  // A step not filed has consumed nothing, which is not `not measured`.
   assert.deepEqual(
     detail.steps.map((s: { used: unknown }) => s.used),
     [
@@ -331,19 +364,18 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
       },
       null,
     ],
+    'a step not filed has consumed nothing, which is not `not measured`',
   );
 
   const before = gitCount();
   assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });
-  assert.equal(gitCount(), before, 'no git call for a running run');
+  assert.equal(gitCount(), before, 'no git call for a running run, on a branch git can read: a route that asked would have had an answer');
 
-  // The count counts: a decidable run's decision is read out of git.
   await decisionOf('r-d1');
-  assert.ok(gitCount() > before, 'a decidable run runs git, through the same PATH');
+  assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");
 });
 
 test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {
-  // `implement ⇄ review`, rounds: 2, both rounds spent, and review asked for a third.
   const looping = [
     { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
     {
@@ -351,6 +383,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       after: ['implement'],
       body: 'Review it.',
       harness: 'codex',
+      /** `implement ⇄ review`, two rounds: both spent, and review asks for a third. */
       loop: 'implement',
       rounds: 2,
       output: {
@@ -374,8 +407,6 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   });
 
   const body = await decidable('r-d9');
-  // Both offers are parsed to the command a person runs. An offer this route's ONCE_MORE does not know is handed over whole, and the
-  // board would give a person a paragraph of English to copy under a button that says `once more`.
   assert.deepEqual(
     body.commands
       .filter((c: { label: string }) => c.label !== 'ship it' && c.label !== 'drop it')
@@ -385,6 +416,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       { label: 'accept', command: 'wf accept r-d9 review --message "<why>"' },
       { label: 'once more', command: 'wf retry r-d9 implement' },
     ],
+    'both offers are parsed to the command a person runs: an offer ONCE_MORE does not know is handed over whole, a paragraph under a button that says `once more`',
   );
   const accept = body.commands.find((c) => c.label === 'accept');
   assert.ok(accept?.said, JSON.stringify(body.commands));
@@ -393,8 +425,6 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
     /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept r-d9 review --message "<why>"$/,
   );
 
-  // Before a person accepts, no step of the run says an acceptance; after, the looping step does — the try, when, and their words — and no
-  // other step. The board's gate reads it: the closeout still says `again: true`, and without this it would say the loop asks another round.
   const stepsOf = async () => (await detailOf('r-d9')).steps;
   assert.deepEqual(
     (await stepsOf()).map((s) => [s.name, s.accepted]),
@@ -402,10 +432,10 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       ['implement', null],
       ['review', null],
     ],
+    'before a person accepts, no step of the run says an acceptance',
   );
   const asks = path.join(root, 'runs', 'r-d9.asks');
   fs.mkdirSync(asks, { recursive: true });
-  // The looping step is on its second try (one round behind it), so the acceptance is of try 2: one of try 1 would be spent, and said of nothing.
   fs.writeFileSync(
     path.join(asks, 'accept-review-1'),
     JSON.stringify({ at: '2026-09-20T01:00:00.000Z', message: 'spent: of the try before' }),
@@ -416,7 +446,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       ['implement', null],
       ['review', null],
     ],
-    'an acceptance of an earlier try is spent',
+    'the looping step is on its second try, one round behind it: an acceptance of try 1 is spent, and said of nothing',
   );
   fs.writeFileSync(
     path.join(asks, 'accept-review-2'),
@@ -428,6 +458,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       ['implement', null],
       ['review', { try: 2, at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }],
     ],
+    "the looping step says the try, when and their words, and no other step: the board's gate reads it, the closeout still saying `again: true`",
   );
 });
 
@@ -453,7 +484,6 @@ test('an ending whose check did not finish on the merge it staged is offered the
   ];
   settledTask('t-d20-implement', done);
   settledTask('t-d20-ship', { ...done, message: 'Add sub\n\nsub beside add.' });
-  // Killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`).
   journal('t-d20-ship-check', [
     { kind: 'filed', at, brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: repo, maxAttempts: 1, harness: 'check' },
     { kind: 'starting', at, attempt: 1 },
@@ -473,6 +503,7 @@ test('an ending whose check did not finish on the merge it staged is offered the
         workspace: repo,
         branch: 'main',
         check: { taskId: 't-d20-ship-check' },
+        /** Its check was killed at its deadline: no exit code, so no verdict on the merge, and the run aborted it (`landingDue`). */
         landed: { aborted: 'its check did not finish' },
       },
     },
@@ -539,24 +570,29 @@ test('a step `denials: fail` stopped is offered the bare `wf retry <run> <step> 
 });
 
 test('a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers', async () => {
-  // implement signed off blocked on a branch nobody made, and review is never filed: the branch a step worked on is read.
   settledTask('t-d3-implement', blocked);
   const gone = 'wf/r-d3/gone';
   writeRun({ id: 'r-d3', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } } });
 
   const body = await decidable('r-d3');
   const unread = `git could not diff ${base.slice(0, 12)}...${gone}`;
-  assert.deepEqual(body.touched, [{ branch: gone, radius: { error: unread } }]);
+  assert.deepEqual(
+    body.touched,
+    [{ branch: gone, radius: { error: unread } }],
+    'implement signed off blocked on a branch nobody made, and review is never filed: the branch a step worked on is read',
+  );
   assert.deepEqual(body.lesson, { said: `not known — ${gone} could not be read`, state: 'unknown' });
   assert.deepEqual(body.sensitive, [{ branch: gone, files: [], error: unread }]);
-  // No result branch to ship or drop; implement may be tried again, with the command `wf decide` prints for it.
-  assert.equal(body.commands.length, 1);
-  assert.deepEqual({ ...body.commands[0], said: undefined }, { label: 'once more', command: 'wf retry r-d3 implement', said: undefined });
+  assert.equal(body.commands.length, 1, 'no result branch to ship or drop');
+  assert.deepEqual(
+    { ...body.commands[0], said: undefined },
+    { label: 'once more', command: 'wf retry r-d3 implement', said: undefined },
+    'implement may be tried again, with the command `wf decide` prints for it',
+  );
   const [retried] = body.commands;
   assert.ok(retried?.said, JSON.stringify(retried));
   assert.match(retried.said, /^implement: .*:  wf retry r-d3 implement {2}\(--fresh/);
 
-  // And a repository that is not there at all.
   writeRun({
     id: 'r-d3b',
     repo: path.join(root, 'no-such-repo'),
@@ -564,16 +600,16 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
     steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
   });
   const nowhere = await decidable('r-d3b');
-  assert.deepEqual(nowhere.touched, [{ branch: gone, radius: { error: unread } }]);
+  assert.deepEqual(nowhere.touched, [{ branch: gone, radius: { error: unread } }], 'a repository that is not there at all');
   assert.equal(nowhere.lesson.state, 'unknown');
 });
 
 test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
-  // As r-d3: implement signed off blocked, and may be tried again — until the run is pruned.
   writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
   assert.deepEqual(
     (await decidable('r-d10')).commands.map((c: DecideCommand) => c.command),
     ['wf retry r-d10 implement'],
+    'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
   );
   assert.deepEqual((await detailOf('r-d10')).waitingOnYou, ['implement']);
   const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
@@ -584,16 +620,18 @@ test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no tr
   const page = await detailOf('r-d10');
   assert.deepEqual(page.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
   assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
-  // A try asked by hand, beside the verb that refuses it, is no try coming: the board says nothing is on its way.
   const asks = path.join(root, 'runs', 'r-d10.asks');
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
   const asked = await detailOf('r-d10');
-  assert.equal(asked.steps.find((s) => s.name === 'implement')?.asked, null);
-  assert.equal(asked.moving, false);
+  assert.equal(
+    asked.steps.find((s) => s.name === 'implement')?.asked,
+    null,
+    'a try asked by hand, beside the verb that refuses it, is no try coming',
+  );
+  assert.equal(asked.moving, false, 'the board says nothing is on its way');
   fs.rmSync(asks, { recursive: true });
-  // And a run never pruned says so with a null, not a missing field.
-  assert.equal((await detailOf('r-d1')).pruned, null);
+  assert.equal((await detailOf('r-d1')).pruned, null, 'a run never pruned says so with a null, not a missing field');
 });
 
 test("a run called off, or whose branch is already on its base, has nothing to decide, in `wf decide`'s words", async () => {
@@ -659,16 +697,14 @@ test("a diff is cut a file at a time: named by its header, a rename as both ends
     [
       ['logo.png', 3, 0],
       ['test/a.test.ts → spec/a.test.ts', 7, 0],
-      // Five header lines and DIFF_LINES + 5 added: ten past the cap.
       ['new file.test.ts', DIFF_LINES, 10],
     ],
+    'the new file has five header lines and DIFF_LINES + 5 added: ten past the cap',
   );
   assert.equal(files[2].lines.at(-1), long[DIFF_LINES - 6]);
 });
 
 test("a run `assess` calls running while a step waits on a person is decided on: its terminal steps' branches read, and no command yet", async () => {
-  // The one way there: a record from before runs froze their workflow, whose folder has since lost implement. The tick judges
-  // the folder, whose tokens still runs; implement, on the record and signed off blocked, waits on you all the same.
   const folder = fs.mkdtempSync(path.join(root, 'workflow-'));
   fs.writeFileSync(path.join(folder, 'tokens.md'), '---\nharness: codex\n---\nPick the colour tokens.\n');
   branchOff(repo, 'wf/r-d6/implement', () =>
@@ -682,6 +718,10 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     repo,
     baseRef: base,
     workflowDir: folder,
+    /**
+     * A record with no frozen workflow, whose folder has no implement: the tick judges the folder, whose tokens still runs, and implement,
+     * on the record and signed off blocked, waits on you all the same.
+     */
     workflow: undefined,
     steps: {
       implement: { taskId: 't-d6-implement', branch: 'wf/r-d6/implement' },
@@ -693,26 +733,27 @@ test("a run `assess` calls running while a step waits on a person is decided on:
 
   const body = await decidable('r-d6');
   assert.ok(!('running' in body), 'waiting on you is decidable, whatever `assess` calls the run');
-  // The branch of the terminal step the tick judges, as `wf decide` reads a run once it stops — not implement's.
   assert.deepEqual(
     body.touched.map((t: { branch: string }) => t.branch),
     ['wf/r-d6/tokens'],
+    "the branch of the terminal step the tick judges, as `wf decide` reads a run once it stops, not implement's",
   );
   const [tokens] = body.touched;
   assert.ok(tokens && !('error' in tokens.radius), JSON.stringify(tokens));
   assert.deepEqual(tokens.radius.groups, [{ name: 'packages/x', files: 1, added: 1, removed: 0, binary: 0 }]);
   assert.deepEqual(body.lesson, { said: 'packages/x/docs/notes.md +1 −0', state: 'written' });
   assert.deepEqual(body.sensitive, [{ branch: 'wf/r-d6/tokens', files: [], error: null }]);
-  // `decision` is still `running`: no ship, drop or once more is offered while its steps move.
-  assert.deepEqual(body.commands, []);
+  assert.deepEqual(body.commands, [], '`decision` is still `running`: no ship, drop or once more is offered while its steps move');
   assert.equal(body.awaiting, null, 'still running: not yet a run nobody decided');
 
-  // The fan-out the same steps make when the run froze them is not this: implement blocked with tokens still spawned is
-  // `failed` to `assess`, so the decision is `wf decide`'s own, its result branches both roots'.
   writeRun({
     id: 'r-d7',
     repo,
     baseRef: base,
+    /**
+     * The same steps frozen on the record fan out: implement blocked with tokens still spawned is `failed` to `assess`, so the decision
+     * is `wf decide`'s own, its result branches both roots'.
+     */
     workflow: [
       { name: 'implement', after: [], body: 'Implement it.' },
       { name: 'tokens', after: [], body: 'Pick the colour tokens.' },

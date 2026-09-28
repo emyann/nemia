@@ -26,14 +26,17 @@ test('a two-step loop: the card leads to the target only, an `after` edge forwar
     },
     { 'review.json': again },
   );
-  assert.deepEqual(graphOf(steps), {
-    roots: ['implement'],
-    edges: [
-      { from: 'implement', to: 'review', kind: 'after' },
-      // From the looping step back to its target, with the rounds the parser set for a loop that does not say.
-      { from: 'review', to: 'implement', kind: 'loop', rounds: DEFAULT_ROUNDS },
-    ],
-  });
+  assert.deepEqual(
+    graphOf(steps),
+    {
+      roots: ['implement'],
+      edges: [
+        { from: 'implement', to: 'review', kind: 'after' },
+        { from: 'review', to: 'implement', kind: 'loop', rounds: DEFAULT_ROUNDS },
+      ],
+    },
+    'the loop edge runs from the looping step back to its target, with the rounds the parser set for a loop that does not say',
+  );
 
   const capped = workflow(
     {
@@ -66,7 +69,7 @@ test('a chain with a fan-out: one root, an edge per `after`, and a fan-in reache
 test('a workflow with no loop has no `loop` edge, and every step that waits on none is a root', () => {
   const steps = workflow({
     implement: 'Implement it.\n',
-    // `resume:` implies `after:`: a step that continues another waits on it.
+    /** `resume:` implies `after:`: a step that continues another waits on it. */
     respond: '---\nafter: review\nresume: implement\n---\nAnswer the review.\n',
     review: '---\nafter: implement\n---\nReview it.\n',
     tokens: 'Pick the colour tokens.\n',
@@ -84,13 +87,13 @@ test('a workflow with no loop has no `loop` edge, and every step that waits on n
 });
 
 test('an edge naming a step not in the graph is not drawn, and does not make its step unreachable', () => {
-  // Only a record edited by hand has one: `validate` refuses a workflow that names a step it does not have.
   assert.deepEqual(
     graphOf([
       { name: 'review', after: ['gone', 'gone'], loop: 'gone', rounds: 2 },
       { name: 'self', after: ['self'] },
     ]),
     { roots: ['review', 'self'], edges: [] },
+    'a record edited by hand, the one place such an edge is: `validate` refuses a workflow that names a step it does not have',
   );
   assert.deepEqual(graphOf([]), { roots: [], edges: [] });
 });
@@ -101,6 +104,9 @@ test("a run's graph: the judged steps' edges, and a root for each step the run s
     roots: ['implement', 'docs'],
     edges: [{ from: 'implement', to: 'review', kind: 'after' }],
   });
-  // A name the steps have adds nothing: the run's order of them is not the graph's.
-  assert.deepEqual(runGraph(steps, ['review', 'implement']), graphOf(steps));
+  assert.deepEqual(
+    runGraph(steps, ['review', 'implement']),
+    graphOf(steps),
+    "a name the steps have adds nothing: the run's order of them is not the graph's",
+  );
 });

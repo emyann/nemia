@@ -99,7 +99,6 @@
     // reads these blocks.
     {
       "files": ["apps/api/**"],
-      "excludeFiles": ["apps/api/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

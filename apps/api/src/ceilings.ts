@@ -51,7 +51,7 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
 
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), judged as `runSlots` judges them — every run read as a pass reads it,
- * a record whose workflow no longer reads left out — off one observation of the harnesses (`everyView`), which the package's `runSlots` would
+ * a record whose workflow does not read left out — off one observation of the harnesses (`everyView`), which the package's `runSlots` would
  * make once per task. `runSlots` answers the held runs alone, and the count in flight is what the board says; so its judgement is made here
  * with the package's own pure parts (`slotNeed`, `heldRuns`), and the api's test holds `held` to what `runSlots` answers on the same store.
  * A run a task of which does not read, its own or a run's it waits on, is counted in flight unjudged, as the tick counts it (`UNJUDGED`).

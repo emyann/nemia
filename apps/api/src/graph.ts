@@ -16,7 +16,8 @@ export type RunGraph = { roots: string[]; edges: GraphEdge[] };
  * `roots` are the steps with no `after`, in the workflow's order. An `after` edge per step a step waits on, a `loop` edge
  * from each looping step back to its target. Only between the steps given: an `after` or `loop:` naming anything else
  * draws nothing and makes no root of the step — which on a workflow `validate` accepts never happens, and on a record
- * edited by hand keeps every step reachable from the card. Pure.
+ * edited by hand keeps every step reachable from the card. A loop that does not say how many rounds runs the default (`DEFAULT_ROUNDS`),
+ * as `capOf` in agent-orchestrator's run.ts reads it. Pure.
  */
 export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop' | 'rounds'>[]): RunGraph {
   const names = new Set(steps.map((s) => s.name));
@@ -27,7 +28,6 @@ export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop'
     if (!after.length) roots.push(step.name);
     for (const from of after) edges.push({ from, to: step.name, kind: 'after' });
     if (step.loop && names.has(step.loop) && step.loop !== step.name) {
-      // `capOf` in agent-orchestrator's run.ts: a loop that does not say runs the default.
       edges.push({ from: step.name, to: step.loop, kind: 'loop', rounds: step.rounds ?? DEFAULT_ROUNDS });
     }
   }

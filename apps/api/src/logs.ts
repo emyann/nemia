@@ -45,10 +45,9 @@ export type StepLog = {
   truncated: boolean;
 };
 
-/** The last `max` lines of a session's output, and whether there were more. */
+/** The last `max` lines of a session's output, and whether there were more. Output that ends in a newline has not begun another line. */
 export function tailOf(output: string, max: number): StepLog {
   const lines = output.split(/\r?\n/);
-  // Output that ends in a newline has not begun another line.
   if (lines.at(-1) === '') lines.pop();
   return lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false };
 }

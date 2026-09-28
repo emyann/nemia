@@ -66,7 +66,6 @@ test('PORT=0 starts the api on a free port, and it prints the port it got', asyn
 });
 
 test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this machine's other addresses, where anyone on the network could start a run", async (t) => {
-  // Before it listened on loopback alone, a text/plain POST /api/runs to this address answered 201 and wrote a run.
   const outward = Object.values(os.networkInterfaces())
     .flat()
     .find((a) => a?.family === 'IPv4' && !a.internal)?.address;

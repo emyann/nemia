@@ -1,5 +1,5 @@
 /**
- * An agent of yours tried on a short brief, from its page (agents card 3c): a hidden one-step folder team of the store's own,
+ * An agent of yours tried on a short brief, from its page: a hidden one-step folder team of the store's own,
  * `tries/<agent>/try.md`, started as any folder run is — with no repository, in folders the run makes under `runs/<id>/`, and a budget of
  * a dollar. Its step names the agent and fences it: `dontAsk` with `Edit(**)`, whatever the agent's own mode says, so every read outside
  * its folder is denied and nothing it writes lands outside the run. A rehearsal, not the agent's own permissions.
@@ -105,8 +105,8 @@ export function untriedOf(
 }
 
 /**
- * The agent's try folder, written when it is not there or was written at another version of the agent, and left as it is otherwise. A
- * folder or a step file that is a link is refused: written through, it would change whatever it points at.
+ * The agent's try folder, written when its step file does not read or was written at another version of the agent, and left as it is
+ * otherwise. A folder or a step file that is a link is refused: written through, it would change whatever it points at.
  */
 export function writeTryFolder(name: string, version: string, home: string = HOME): string {
   const dir = tryDir(name, home);
@@ -123,9 +123,7 @@ export function writeTryFolder(name: string, version: string, home: string = HOM
   let was: string | undefined;
   try {
     was = fs.readFileSync(file, 'utf8');
-  } catch {
-    /* not written yet */
-  }
+  } catch {}
   if (was === text) return dir;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, text);

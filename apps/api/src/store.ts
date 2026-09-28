@@ -73,9 +73,8 @@ export async function judgedUnlessUnreadable<T>(
  * A task whose journal does not read is in `unreadable` and in no view, as the runtime leaves it out: one entry no runtime wrote costs the
  * runs that read that task (`unreadableOf`), never the others. A run's tasks are every try's and every check's (`runTasks`).
  *
- * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at
- * rest. And a run waited on was read a `view` a task, its journal once more: 632 journals on the second request of the live store, where
- * reading the parents here too reads what the runs moving and their parents have filed, once.
+ * A request reads the journals of the runs it judges and of their parents, once, and no other: never every journal in the store
+ * (`everyView`), and never a run waited on a `view` a task, its journal once more.
  */
 export async function viewsFor(
   runs: readonly Run[],
@@ -115,14 +114,13 @@ export const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) 
  * The run's workflow folder, read now.
  *
  * The run record is the truth about what ran; the folder is only where the prose came from, and it
- * can be edited or deleted after `wf start`. So a folder that no longer reads is a warning on the
+ * can be edited or deleted after `wf start`. So a folder that does not read is a warning on the
  * run, not a failure of the request — and on a run that froze its workflow, nothing the page draws
- * comes from it. The case that made this so: an api older than the package's parser refused the
- * folder's newer keys, and every step of a run whose record had the whole graph read as a root.
+ * comes from it. Its agents and skills are looked for where the start looked: the run's repository's
+ * `.claude/`, then yours.
  */
 export function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   try {
-    // Its agents and skills looked for where the start looked: the run's repository's `.claude/`, then yours.
     return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home: HOME }), warning: null };
   } catch (err) {
     const why = fs.existsSync(run.workflowDir)
@@ -145,8 +143,8 @@ export function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { 
  * the record too. Then any step the workflow the tick reads (`stepsOf` in store.ts) has and the record
  * does not. On a run that froze its workflow that is the frozen one, so a step the folder gained since is
  * not shown: the tick never files it, and drawn, it would wait for ever and make a root of the graph the
- * run froze — `driftOf` names it instead. On a record from before runs froze one, the folder, whose added
- * steps the tick does file.
+ * run froze — `driftOf` names it instead. On a record that froze none, the folder, whose added steps the
+ * tick does file.
  */
 export function stepNames(run: Run, workflows: readonly Workflow[] | null): string[] {
   const added = (run.workflow ?? workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -155,13 +153,13 @@ export function stepNames(run: Run, workflows: readonly Workflow[] | null): stri
 
 /**
  * The steps a run is judged by: the workflow it froze at `wf start`, which the tick reads (`stepsOf` in
- * store.ts), and for a record from before runs froze one, the folder. A record whose folder no longer
- * reads is judged from the record alone, a `bare` step each.
+ * store.ts), and for a record that froze none, the folder. A record whose folder does not read is
+ * judged from the record alone, a `bare` step each.
  */
 export const judgedSteps = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] =>
   run.workflow ?? folder ?? Object.keys(run.steps).map(bare);
 
-/** A step nothing defines any more. All the record says of it is its name: no `after`, `check:` or `output:`. */
+/** A step nothing defines: all the record says of it is its name, with no `after`, `check:` or `output:`. */
 export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
 
 /**
@@ -172,13 +170,14 @@ export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
  */
 const filings = { filed: new Map<string, string>(), cursor: 0 };
 
-/** Every task's filing time the feed has, read on from where the last read stopped. A feed that cannot be read this time leaves what was read before. */
+/**
+ * Every task's filing time the feed has, read on from where the last read stopped. A feed that cannot be read this time leaves what was
+ * read before: the queue times of tasks filed since say `not known` until a read works.
+ */
 export async function filedTimes(): Promise<ReadonlyMap<string, string>> {
   try {
     filings.cursor = (await readFilings(e, filings.cursor, filings.filed)).cursor;
-  } catch {
-    // The queue times of tasks filed since say `not known` until a read works.
-  }
+  } catch {}
   return filings.filed;
 }
 
@@ -196,12 +195,11 @@ export const noSuchRun = (id: string) =>
 
 /**
  * The run and the task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by
- * that id, or no step by that name on the run's page.
+ * that id, or no step by that name on the run's page, which shows those on the record and any the folder has gained (`stepNames`).
  */
 export function taskOfStep(id: string, step: string): { run: Run; taskId: string | null } | { error: string } {
   const run = findRun(id);
   if (!run) return { error: noSuchRun(id) };
-  // The steps the run's page shows: those on the record, and any the folder has gained since.
   if (!stepNames(run, workflowsOf(run).steps).includes(step)) {
     return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` };
   }

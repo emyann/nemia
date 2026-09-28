@@ -12,8 +12,8 @@ export const HOST = '127.0.0.1';
  * `PORT`, read. Unset or empty is 8787. `0` is any free port, and main.ts prints the one it got — which
  * is how `npm run e2e` starts an api beside a person's `npm run dev`, and beside another worktree's e2e.
  *
- * Anything else is refused rather than read as 8787. `Number(PORT) || 8787` did that: `PORT=0` meant
- * 8787, and so did `PORT=80a` — each a server on the port the person was trying to stay off.
+ * Anything else is refused rather than read as 8787, which for `PORT=80a` would be a server on the port the person was trying to stay
+ * off.
  */
 export function portOf(value: string | undefined): number {
   const text = value?.trim() ?? '';

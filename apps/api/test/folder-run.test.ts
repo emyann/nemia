@@ -14,21 +14,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
 const root = scratch('hkb-api-folder-');
 process.env.WF_ROOT = root;
-// What the board is pointed at: a plain directory, no git, no `workflows/` of its own. The api reads it as any repository.
+/** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
 const notARepo = scratch('hkb-api-folder-here-');
 process.env.HKB_REPO = notARepo;
 
-// A folder team of the store's own, as `workflows/note` is: every step says `workspace: folder`, so it looks at no repository.
+/** A folder team of the store's own, as workflows/note is: every step says `workspace: folder`, so it looks at no repository. */
 const team = path.join(root, 'workflows', 'notes');
 fs.mkdirSync(team, { recursive: true });
 fs.writeFileSync(
   path.join(team, 'write.md'),
   '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n',
 );
-// And one that works on a repository, to hold the two apart.
+/** A team of the store's own that works on a repository, to hold the two apart. */
 const onRepo = path.join(root, 'workflows', 'change');
 fs.mkdirSync(onRepo, { recursive: true });
 fs.writeFileSync(path.join(onRepo, 'implement.md'), '---\n---\nMake the change.\n');
@@ -63,13 +63,13 @@ function signedOff(taskId: string, cwd: string): void {
   );
 }
 
-// A folder run whose one step signed off: its record as `wf start` writes one, with `place` and none of a git run's fields.
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
 signedOff('t-write', path.join(work, 'write'));
 fs.writeFileSync(
   path.join(root, 'runs', 'f-notes.json'),
   JSON.stringify({
     id: 'f-notes',
+    /** A folder run whose one step signed off: its record as `wf start` writes one, with `place` and none of a git run's fields. */
     place: { kind: 'folder' },
     workspace: work,
     brief: 'Write a note.',
@@ -80,9 +80,14 @@ fs.writeFileSync(
   }),
 );
 
-// What the step left in its folder: the note it named in its closeout and the sketch it did not, a file of bytes, a directory,
-// a link that leads out of the folder, and a name the files route refuses. All but the first three are things the folder holds
-// that no name can reach: the listing carries them by their path, since they are the work too, and serves none of them.
+/**
+ * The folder of f-notes' step: the note it named in its closeout and the sketch it did not, a file of bytes, a directory, a link that
+ * leads out of the folder, and a name the files route refuses. All but the first three are things the folder holds that no name can
+ * reach: the listing carries them by their path, since they are the work too, and serves none of them.
+ *
+ * And given/, what the run itself copies in before the step starts, which is not what the step made: the files `wf start --input`
+ * gives it and a copy of each folder it waits on (`givenPlan` in the package). Every folder run started with `--input` has one.
+ */
 const wrote = path.join(work, 'write');
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 fs.writeFileSync(path.join(wrote, 'note.md'), 'The tides.\n');
@@ -92,8 +97,6 @@ fs.writeFileSync(path.join(wrote, '..hidden.md'), 'not reachable by name');
 fs.mkdirSync(path.join(wrote, 'scratch'), { recursive: true });
 fs.writeFileSync(path.join(root, 'runs', 'f-notes', 'outside.md'), 'outside the folder');
 fs.symlinkSync(path.join(root, 'runs', 'f-notes', 'outside.md'), path.join(wrote, 'link.md'));
-// And what the run itself copied in before the step started, which is not what the step made: the files `wf start --input` gave it
-// and a copy of each folder it waits on (`givenPlan` in the package). Every folder run started with `--input` has one.
 fs.mkdirSync(path.join(wrote, 'given', 'inputs'), { recursive: true });
 fs.writeFileSync(path.join(wrote, 'given', 'inputs', 'mock.png'), PNG);
 fs.mkdirSync(path.join(wrote, 'given', 'from', 'sketch'), { recursive: true });
@@ -118,13 +121,12 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
     steps: { name: string; workspace: string | null; branch: string | null; note: string | null; status: string }[];
   };
   assert.deepEqual([run.repo, run.baseRef, run.branch, run.isolate, run.place], [null, null, null, null, 'folder']);
-  // The one thing a person needs to find what it made, where a git run has a repository and a branch.
-  assert.equal(run.work, work);
+  assert.equal(run.work, work, 'the one thing a person needs to find what it made, where a git run has a repository and a branch');
   const [write] = run.steps;
   assert.deepEqual([write.name, write.workspace, write.branch], ['write', path.join(work, 'write'), null]);
-  // And the sentences it carries — what the board reads out loud — name no git.
   for (const said of [run.warning, run.fromNote, ...run.steps.map((s) => s.note)]) {
-    if (typeof said === 'string') assert.doesNotMatch(said, GIT_WORD, said);
+    if (typeof said === 'string')
+      assert.doesNotMatch(said, GIT_WORD, `the sentences it carries, what the board reads out loud, name no git: ${said}`);
   }
 });
 
@@ -139,16 +141,18 @@ test("a folder run's decision reads, with nothing to merge and nothing about git
     lesson: { said: string };
     overBudget: string | null;
   };
-  // No branch to stand against a base, none touched to diff, and none read in full.
-  assert.deepEqual([decision.standings, decision.touched, decision.sensitive], [[], [], []]);
-  // What `wf decide` offers instead: the one command, and nothing to merge or delete (cli.ts, `!git`).
-  assert.deepEqual(decision.commands, [
-    { label: 'forget it', command: 'wf rm f-notes', said: 'forgets the run with its folders and files' },
-  ]);
-  // Every sentence the board shows out of this answer, read for a git word. The lesson line is about a branch's diff, so the board
-  // does not draw it for a folder run; it is checked here so a change that starts drawing it fails.
+  assert.deepEqual(
+    [decision.standings, decision.touched, decision.sensitive],
+    [[], [], []],
+    'no branch to stand against a base, none touched to diff, and none read in full',
+  );
+  assert.deepEqual(
+    decision.commands,
+    [{ label: 'forget it', command: 'wf rm f-notes', said: 'forgets the run with its folders and files' }],
+    'what `wf decide` offers instead: the one command, and nothing to merge or delete (cli.ts, !git)',
+  );
   for (const said of [...decision.commands.flatMap((c) => [c.command, c.said ?? '']), decision.overBudget ?? '']) {
-    assert.doesNotMatch(said, GIT_WORD, said);
+    assert.doesNotMatch(said, GIT_WORD, `a sentence the board shows out of this answer names no git: ${said}`);
   }
 });
 
@@ -156,9 +160,12 @@ test('the workflows listing says which teams work in folders, with the repositor
   const res = await app.request('/api/workflows');
   assert.equal(res.status, 200);
   const listed = (await res.json()) as { name: string; from: string; folderTeam: boolean; error: string | null }[];
-  // The board runs pointed at a directory that is no repository: `repoOf` resolves a path and never asks git, so the store's own list.
   const folderTeams = listed.filter((w) => w.folderTeam).map((w) => w.name);
-  assert.deepEqual(folderTeams, ['notes'], listed.map((w) => `${w.name} (${w.from}) ${w.folderTeam}`).join(', '));
+  assert.deepEqual(
+    folderTeams,
+    ['notes'],
+    `the store's own list, the board pointed at a directory that is no repository: ${listed.map((w) => `${w.name} (${w.from}) ${w.folderTeam}`).join(', ')}`,
+  );
   assert.equal(listed.find((w) => w.name === 'change')?.folderTeam, false, 'a team that works on a repository is not one');
 });
 
@@ -189,35 +196,33 @@ test('a folder step carries everything its folder holds: what a name reaches wit
     steps: { files: { path: string; name?: string; url?: string; kind?: string; size?: number }[] }[];
   };
   const [write] = run.steps;
-  // In name order. A directory, a link out of the folder and a name the route refuses carry a path and nothing else — they are the
-  // work too, and a board that turns an empty list into *the folder is empty* must not say that of a folder holding only `scratch/`.
-  // The run's own `given/` is the one thing left out: it is not the step's work, and listed it would stand in the folder of every
-  // step of every run started with `--input`, so no step could ever be read as having made nothing.
-  assert.deepEqual(write.files, [
-    { path: path.join(wrote, '..hidden.md') },
-    {
-      path: path.join(wrote, 'bundle.zip'),
-      name: 'bundle.zip',
-      url: '/api/runs/f-notes/steps/write/files/bundle.zip',
-      kind: 'other',
-      size: 2,
-    },
-    { path: path.join(wrote, 'link.md') },
-    { path: path.join(wrote, 'note.md'), name: 'note.md', url: '/api/runs/f-notes/steps/write/files/note.md', kind: 'text', size: 11 },
-    { path: path.join(wrote, 'scratch') },
-    {
-      path: path.join(wrote, 'sketch.png'),
-      name: 'sketch.png',
-      url: '/api/runs/f-notes/steps/write/files/sketch.png',
-      kind: 'image',
-      size: PNG.length,
-    },
-  ]);
+  assert.deepEqual(
+    write.files,
+    [
+      { path: path.join(wrote, '..hidden.md') },
+      {
+        path: path.join(wrote, 'bundle.zip'),
+        name: 'bundle.zip',
+        url: '/api/runs/f-notes/steps/write/files/bundle.zip',
+        kind: 'other',
+        size: 2,
+      },
+      { path: path.join(wrote, 'link.md') },
+      { path: path.join(wrote, 'note.md'), name: 'note.md', url: '/api/runs/f-notes/steps/write/files/note.md', kind: 'text', size: 11 },
+      { path: path.join(wrote, 'scratch') },
+      {
+        path: path.join(wrote, 'sketch.png'),
+        name: 'sketch.png',
+        url: '/api/runs/f-notes/steps/write/files/sketch.png',
+        kind: 'image',
+        size: PNG.length,
+      },
+    ],
+    "in name order: a directory, a link out of the folder and a name the route refuses carry a path and nothing else, since they are the work too and a board that says an empty list is an empty folder must not say it of a folder holding only scratch/; the run's own given/ is the one thing left out: it is not the step's work, and listed it would stand in the folder of every step of every run started with --input, so no step could ever be read as having made nothing",
+  );
 });
 
 test('a folder the api cannot read says why, where one not there is an empty list', async () => {
-  // Two folders neither of which lists: one that is a regular file where a folder should be, which `readdirSync` refuses with ENOTDIR
-  // as a folder removed under the run or one nobody may read refuses with ENOENT or EACCES; and one the run has not made yet.
   const notAFolder = path.join(root, 'runs', 'f-gone', 'not-a-folder');
   fs.mkdirSync(path.dirname(notAFolder), { recursive: true });
   fs.writeFileSync(notAFolder, 'a file where a folder should be');
@@ -235,7 +240,12 @@ test('a folder the api cannot read says why, where one not there is an empty lis
         { name: 'review', after: ['write'], body: 'Read it.', harness: 'claude', workspace: 'folder' },
       ],
       steps: {
+        /**
+         * A regular file where a folder should be, which `readdirSync` refuses with ENOTDIR as a folder removed under the run or one
+         * nobody may read refuses with ENOENT or EACCES.
+         */
         write: { taskId: 't-gone-write', workspace: notAFolder },
+        /** A folder the run has not made yet. */
         review: { taskId: 't-gone-review', workspace: path.join(root, 'runs', 'f-gone', 'review') },
       },
     }),
@@ -269,21 +279,24 @@ test("a folder step's file is served by name, and a name that is a path, or not 
     ],
     [200, 'text/plain; charset=utf-8', 'no-store', 'nosniff', 'The tides.\n'],
   );
-  // An agent's text on the board's origin runs no script of its, as a step's named file does not.
-  assert.ok((note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'));
+  assert.ok(
+    (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
+    "an agent's text on the board's origin runs no script of its, as a step's named file does not",
+  );
   assert.deepEqual(Buffer.from(await (await app.request(`${base}/sketch.png`)).arrayBuffer()), PNG);
 
-  // Every one of these names a file on disk: only the refusal stands between it and the response. An encoded `..` alone never
-  // reaches the route — a URL resolves it — so the path is spelled with the separator encoded instead.
   for (const name of ['..%2Foutside.md', 'scratch%2Fnothing.md', 'a%5Cb.md', '..hidden.md']) {
     const res = await app.request(`${base}/${name}`);
-    assert.equal(res.status, 400, name);
+    assert.equal(
+      res.status,
+      400,
+      `${name} names a file on disk: only the refusal stands between it and the response (an encoded .. alone is resolved before the route, so the separator is encoded instead)`,
+    );
     assert.match(((await res.json()) as { error: string }).error, /is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/, name);
   }
-  // Not a regular file in the folder: absent, a directory, and a link that leads out of it.
   for (const name of ['gone.md', 'scratch', 'link.md']) {
     const res = await app.request(`${base}/${name}`);
-    assert.equal(res.status, 404, name);
+    assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
     assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
   }
 });
@@ -294,8 +307,10 @@ test('a card started on a folder team carries the repository it named and the ru
     const res = await app.request('/api/inbox', {
       method: 'POST',
       headers: json,
-      // Filed for the team that works on a repository, which takes a `repo:`; started below on the one that works in folders, as the
-      // board's start form lets a person pick another. This is how a card comes to name a repository no run will look at.
+      /**
+       * Filed for the team that works on a repository, which takes a `repo:`, and started on the one that works in folders, as the
+       * board's start form lets a person pick another: how a card comes to name a repository no run looks at.
+       */
       body: JSON.stringify({ body, workflow: 'change', from: 'yours', ...(repo !== undefined ? { repo } : {}) }),
     });
     const filed = (await res.json()) as { name?: string; error?: string };
@@ -318,19 +333,23 @@ test('a card started on a folder team carries the repository it named and the ru
     [named, true, notARepo],
     "the api says what `wf start` prints and a tick's line carries: the card's `repo:` was not looked at",
   );
-  // And the run it started looked at none: no repository on its record, and its work is in a folder.
   const run = (await (await app.request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
-  assert.deepEqual([run.repo, run.place], [null, 'folder']);
+  assert.deepEqual(
+    [run.repo, run.place],
+    [null, 'folder'],
+    'the run it started looked at none: no repository on its record, and its work is in a folder',
+  );
 
-  // The other way round, at the same shipped defaults: a card that names no repository has nothing to say, and the field is absent.
   const plain = await file('a note on the moon, from a card that names none');
   const next = (await (await startOn(plain)).json()) as Record<string, unknown>;
-  assert.equal('ignoredRepo' in next, false, `a card that names no repository has nothing to say: ${JSON.stringify(next)}`);
+  assert.equal(
+    'ignoredRepo' in next,
+    false,
+    `the other way round, at the same shipped defaults: a card that names no repository has nothing to say, and the field is absent: ${JSON.stringify(next)}`,
+  );
 });
 
 test("a file a step wrote called `given` is its own work, and is listed — only the run's own `given/` directory is left out", async () => {
-  // The narrowing on the line above: what the run makes is a directory, so a regular file of that name is the step's, and hiding it
-  // would be work made invisible on the one surface a person who never opens a terminal has.
   const folder = path.join(root, 'runs', 'f-given', 'work', 'write');
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(path.join(folder, 'given'), 'what I was given, in my own words');
@@ -354,5 +373,6 @@ test("a file a step wrote called `given` is its own work, and is listed — only
   assert.deepEqual(
     run.steps[0].files.map((f) => f.name ?? f.path),
     ['given', 'note.md'],
+    "what the run makes is a directory, so a regular file named given is the step's: hiding it would be work made invisible on the one surface a person who never opens a terminal has",
   );
 });

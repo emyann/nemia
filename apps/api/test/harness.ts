@@ -1,15 +1,15 @@
 /**
- * The harness every api test runs against, and never this machine's: a fake `claude` first on PATH that lists the sessions in `registry` and
- * notes every call, and a scratch directory where Claude Code keeps its sessions and transcripts (CLAUDE_CONFIG_DIR). The api reads through the
- * package's `engine()`, whose `claude` harness is the engine's own — a job (`claude -p`), or a background session (`claude --bg`) — and
- * that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's own tests hand theirs. So the runner itself — the registry it observes, the transcripts it
- * reads, the flags it spawns with — is what the api's tests exercise, and not a stand-in for it.
+ * The harness every api test runs against, and never this machine's: a fake `claude` first on PATH that lists the sessions in `registry`
+ * and notes every call, and a scratch directory where Claude Code keeps its sessions and transcripts (`CLAUDE_CONFIG_DIR`). The api reads
+ * through the package's `engine()`, whose `claude` harness is the engine's own — a job (`claude -p`), or a background session (`claude
+ * --bg`) — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's own tests hand
+ * theirs. So the runner itself — the registry it observes, the transcripts it reads, the flags it spawns with — is what the api's tests
+ * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
+ * judged afresh too, and a difference fails the request.
  *
  * Installed as this module loads, so every api test file imports it first, before the api, the package or the engine, which read both as they
  * load and run; `harness.test.ts` refuses a file that does not (`unharnessed`). A file that keeps its sessions elsewhere points
- * CLAUDE_CONFIG_DIR there before it imports the api. Before this, `app.test.ts` asked this machine's registry 154 times a run (measured
- * 2026-09-14, a `claude` in front of PATH that noted which test file called it), and the api's test process died beside other packages' tests
- * under parallel turbo (plan §4b).
+ * `CLAUDE_CONFIG_DIR` there before it imports the api.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +35,6 @@ export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'
     .readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 
-// Every answer the list's memo of runs at rest gives (`resting.ts`) is judged afresh too, and a difference fails the request.
 process.env.WF_VERIFY_REST = '1';
 
 fs.writeFileSync(registry, '[]');

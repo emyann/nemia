@@ -2,8 +2,8 @@
  * What a repository offers a step, read from its checkout: its skills, its agents, its MCP servers with the
  * tools each lists, and the tools its settings deny.
  *
- * The inventory half of B1 (docs/plan-hold-the-bar.md). What a step was actually given is on the engine's
- * record, shown on the run's page; a toggle is a key in the workflow folder. Nothing here writes.
+ * What a step was actually given is on the engine's record, shown on the run's page; a toggle is a key in the workflow folder. Nothing
+ * here writes.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,7 +74,11 @@ export const ASK_MS = 15_000;
 export const SETTINGS = '.claude/settings.json';
 const MCP_JSON = '.mcp.json';
 
-/** Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning. */
+/**
+ * Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning.
+ * A server not enabled is not started: a GET does not run a command the person has not turned on, which is what enabling a project
+ * server is for.
+ */
 export async function capabilitiesOf(
   repo: string,
   { deadlineMs = ASK_MS, env = process.env }: { deadlineMs?: number; env?: NodeJS.ProcessEnv } = {},
@@ -107,7 +111,6 @@ export async function capabilitiesOf(
           ...entry,
           notAsked: `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
         };
-      // A GET does not run a command the person has not turned on: that is what enabling a project server is for.
       if (!entry.enabled) {
         return {
           ...entry,
@@ -150,14 +153,14 @@ export type Dated = { harness: string; version: string; measuredAt: string; sour
 
 /**
  * `measurement`, refused unless it says what it was taken on and when: a harness named, a version numbered as Claude Code numbers its own
- * (`2.1.272`), a day that is on the calendar (`2026-09-15`), and where it is recorded. A list without them reads as a claim about today, which
- * nothing here can check: the page says which day and which version, and those are all that hold it to what was measured.
+ * (`2.1.272`), a day that is on the calendar, written `YYYY-MM-DD` — not the 30th of February — and where it is recorded. A list without
+ * them reads as a claim about today, which nothing here can check: the page says which day and which version, and those are all that hold
+ * it to what was measured.
  */
 export function dated<T extends Dated>(name: string, measurement: T): T {
   const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
   const said = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
   const at = said(measuredAt) && /^\d{4}-\d{2}-\d{2}$/.test(measuredAt) ? new Date(`${measuredAt}T00:00:00Z`) : null;
-  // A day the calendar has: `2026-02-30` parses to no time, or to another day.
   const day = at !== null && !Number.isNaN(at.getTime()) && at.toISOString().startsWith(measuredAt as string);
   const wrong = [
     ...(said(harness) ? [] : ['no `harness`']),
@@ -210,9 +213,9 @@ const EDITS_WITH = 'Not named by any measurement. Every implement step of this r
 
 /**
  * What a Claude Code step with no `tools:` has: the harness's own set, as measured — `claude -p` spawned with the engine's flags, as an
- * `implement` step, on 2026-09-14, Claude Code 2.1.270 (docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"). Data with its date and
- * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version this
- * was measured, and never that it is current.
+ * `implement` step, on the day and the version it names (`measuredAt`, `version`), recorded where `source` says. Data with its date and
+ * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version
+ * this was measured, and never that it is current.
  *
  * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's test
  * refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no unfenced
@@ -254,10 +257,10 @@ export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
  * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
  * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
  *
- * `measured` ran in B9's last review (docs/plan-hold-the-bar.md §6 item 30): its session, `c342ce08`, in `dontAsk` under this repository's
- * settings of that day, 2026-09-15, which allowed none of them, ran `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while
- * `node -e` was denied. That is what was measured, and it stays so whatever the settings allow since: a rule allowing `ls` today proves nothing
- * of that day's run, and takes nothing from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its
+ * `measured` are what a session in `dontAsk` ran, under this repository's settings of the day `measuredAt` names, which allowed none of
+ * them, recorded where `source` says: `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. That is
+ * what was measured, and it stays so whatever the settings allow: a rule allowing `ls` proves nothing of that day's run, and takes nothing
+ * from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its
  * date, and the page says the day. `documented` are the rest of what Claude Code's docs name, which say the set includes them, not that it is
  * all of it; `git` is its read-only forms, which they do not list.
  */
@@ -279,8 +282,6 @@ export function denyingRule(deny: readonly string[], server: string, tool: strin
   const prefix = `mcp__${server}`;
   return deny.find((rule) => rule === `${prefix}__${tool}` || rule === prefix || rule === `${prefix}__*`) ?? null;
 }
-
-// ─── skills and agents ──────────────────────────────────────────────────────
 
 /** `.claude/skills/*\/SKILL.md`, by directory. A directory without a SKILL.md is not a skill. */
 function skillsOf(repo: string, warnings: string[]): Described[] {
@@ -343,12 +344,14 @@ export function frontmatterOf(text: string): Record<string, string> | null {
   return fields;
 }
 
-/** A value from the rest of its key's line and the indented lines under it. Null for a nested map or list. */
+/**
+ * A value from the rest of its key's line and the indented lines under it. Null for a nested map or list. A `>` block folds each line break
+ * between two lines of text into a space; a blank line stays a line break.
+ */
 function valueOf(first: string, more: string[]): string | null {
   const block = /^([|>])[+-]?\d*\s*(#.*)?$/.exec(first);
   if (block) {
     const body = dedent(more).join('\n').trim();
-    // `>` folds each line break between two lines of text into a space; a blank line stays a line break.
     return block[1] === '|' ? body : body.replace(/([^\n])\n(?=[^\n])/g, '$1 ').replace(/\n\n/g, '\n');
   }
   if (!first && more.some((line) => /^\s*(-|[\w.-]+:)(\s|$)/.test(line))) return null;
@@ -370,8 +373,6 @@ function dedent(lines: string[]): string[] {
   const indent = indents.length ? Math.min(...indents) : 0;
   return lines.map((line) => line.slice(indent).trimEnd());
 }
-
-// ─── settings and .mcp.json ─────────────────────────────────────────────────
 
 type Json = Record<string, unknown>;
 
@@ -465,8 +466,6 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
   });
 }
 
-// ─── asking a server for its tools ──────────────────────────────────────────
-
 /** What starts a stdio server: the command, its args, and the whole environment it is given. */
 type Launch = { command: string; args: string[]; env: Record<string, string> };
 
@@ -514,8 +513,14 @@ function answerOf(repo: string, server: Declared & { command: string }, launch: 
 const SAID_LINES = 20;
 
 /**
+ * How long a server that failed to list its tools is given for the last of its stderr to arrive before the error quotes it: the transport
+ * closes a server that exits before its stderr has been read to the end.
+ */
+const STDERR_SETTLE_MS = 50;
+
+/**
  * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Resolves with the
- * tools, or with why not and what it printed, quoting the entry as `.mcp.json` writes it; never rejects.
+ * tools, or with why not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never rejects.
  */
 async function ask(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
   const transport = new StdioClientTransport({ command: launch.command, args: launch.args, env: launch.env, cwd: repo, stderr: 'pipe' });
@@ -530,8 +535,7 @@ async function ask(repo: string, server: Declared & { command: string }, launch:
     const tools = await Promise.race([listTools(client, transport), late]);
     return { tools, error: null, checkedAt: new Date().toISOString() };
   } catch (err) {
-    // A server that exits is closed before the last of its stderr has been read: give that a turn to arrive.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, STDERR_SETTLE_MS));
     const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
     return {
       tools: null,
@@ -544,10 +548,12 @@ async function ask(repo: string, server: Declared & { command: string }, launch:
   }
 }
 
+/**
+ * The tools a connected server lists, every page of them. A server that offers no tools — only prompts or resources — has no `tools/list`
+ * to answer, and says so with -32601: it lists none, rather than a working server being reported as broken.
+ */
 async function listTools(client: Client, transport: StdioClientTransport): Promise<NonNullable<Answer['tools']>> {
   await client.connect(transport);
-  // A server that offers no tools — only prompts or resources — has no `tools/list` to answer, and says so with
-  // -32601. It lists none: asking would report a working server as broken.
   if (!client.getServerCapabilities()?.tools) return [];
   const tools: NonNullable<Answer['tools']> = [];
   let cursor: string | undefined;

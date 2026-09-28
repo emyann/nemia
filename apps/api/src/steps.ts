@@ -15,7 +15,7 @@ const served = (type: string) => ({
   'Content-Type': type,
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
-  // An SVG or an HTML file opened in a tab runs no script of its.
+  /** An SVG or an HTML file opened in a tab runs no script of its own. */
   'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
 });
 
@@ -44,12 +44,19 @@ class Unread extends Error {
 
 /**
  * One read of a step's conversation from `after`: the events and cursor as the engine's `transcript` gives them, and whether
- * the task is live — pending or running as the run reads it (`phaseOfView`), which a task held open and signed is not.
+ * the task is live — pending or running as the run reads it (`phaseOfView`), while something of it runs or is to. A task held open
+ * that signed and waits on a person's word, or was closed on it, is not live: nothing of it runs, for hours at a gate, though it is not
+ * `settled` until closed. Answered, its next turn is live again under the same id, and the board reads the conversation again.
  *
  * Live is read first. A task that settles between the two reads reads as live once more, and its last lines are read on the
  * next pass; read the other way round, it could read as settled before them. A read costs an observation of every harness
- * (`view`, a `claude agents` call among them, ~0.2 s here) and, while the attempt runs, one of the task's own harness
- * (`transcript` finds the session through it); once the attempt has ended, `transcript` reads by the session's id on the record.
+ * (`view`, a `claude agents` call among them) and, while the attempt runs, one of the task's own harness (`transcript` finds the
+ * session through it); after the attempt has ended, `transcript` reads by the session's id on the record.
+ *
+ * Throws `Unread`: 502 when the task or its conversation could not be read; 404 for a task the engine has no record of, or a harness
+ * that keeps no conversation it can read; 400 for a cursor none of the engine's reads gave. The engine refuses the last two alike, so a
+ * refused read from a cursor is asked again from the start, which refuses only the harness: the words of the engine's refusal are the
+ * engine's to change, and are never parsed.
  */
 async function readTranscript(id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
   let view: TaskView;
@@ -71,9 +78,6 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
   }
   try {
     const { events, cursor } = await e.transcript(taskId, after);
-    // Live while something runs or is to: not a task held open that signed and waits on a person's word, or was closed on it — nothing
-    // runs of it, for hours at a gate, and it is not `settled` until closed (`phaseOfView` reads it as it signed). Answered, its next turn
-    // is live again, under the same id: the board reads the conversation again when the step stops waiting on a person.
     return { events, cursor, live: phase === 'running' || phase === 'pending' };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -83,8 +87,6 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
         `Could not read the conversation of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads its output from the command line.`,
       );
     }
-    // Refused. The engine refuses a cursor none of its reads gave, and a harness that keeps no conversation it can read — and
-    // asked again from the start, only the second. The words of the refusal are the engine's to change; this is not.
     if (
       after !== undefined &&
       (await e.transcript(taskId).then(
@@ -104,7 +106,7 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
   }
 }
 
-/** How often the stream reads a live step's conversation again: once a second, as the plan asks (§4 S). */
+/** How often the stream reads a live step's conversation again: once a second. */
 const STREAM_EVERY_MS = 1_000;
 
 /**
@@ -122,8 +124,31 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
   }
 }
 
+/**
+ * A step's own reads. Each answers 404 for a run or a step the run does not have.
+ *
+ * - `GET /api/runs/:id/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), for `wf logs` parity; empty for a
+ *   step not filed yet; 502 when the engine could not read it. The board reads the conversation from the transcript routes.
+ * - `GET /api/runs/:id/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (artifacts.ts),
+ *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
+ *   400 for a name that is not one; 410 for a file gone because `wf prune --artifacts` removed the run's files, leaving its record,
+ *   closeouts and branches; 404 for a file the directory does not have.
+ * - `GET /api/runs/:id/steps/:step/files/:name` — one file of a folder step's own folder, by name and never by path, as `files` on the
+ *   step links it: what the step made, named in its closeout or not. Read on each request and never kept: the folder is the step's, and
+ *   it may write in it again. 400 for a name that is not one; 404 for a step that works on a branch, or a file the folder does not have.
+ * - `GET /api/runs/:id/steps/:step/transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read
+ *   from the start): the engine's events for the step's current task, and whether it is live. A step not filed yet has nothing to read,
+ *   and nothing of it moves until a tick files it. Refusals are `readTranscript`'s.
+ * - `GET /api/runs/:id/steps/:step/transcript/stream` — the same conversation followed, as server-sent events: read again every second
+ *   while the task is live, each new event sent as `transcript`, then `settled` when the task is, or is held open and signed and so waits
+ *   on a person, and the stream closed. It starts after the Last-Event-ID an EventSource sends when it reconnects, else after `after`.
+ *   The first read is made before the stream opens, so a refused cursor or a lost task is an answer with a status (`readTranscript`'s),
+ *   not an event; a step not filed yet is 404. It stops asking the engine when nobody reads, since each read observes the harnesses. On
+ *   the stream, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying:
+ *   false`, and ends it. Any other failure is of that read, not the conversation: it is said once as `unreadable` with `retrying: true`,
+ *   read again on the next beat from the same cursor, and cleared with `readable` by the first read that works.
+ */
 export const steps = new Hono()
-  // A step's session output as text, for `wf logs` parity. The board reads the conversation from the transcript routes below.
   .get('/api/runs/:id/steps/:step/log', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -143,8 +168,6 @@ export const steps = new Hono()
       );
     }
   })
-  // One file of a step's files directory, by name and never by path (artifacts.ts), as its closeout's `artifacts` link it. Read on
-  // each request and never kept: a step that runs again writes its files again.
   .get('/api/runs/:id/steps/:step/artifacts/:name', (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -154,7 +177,6 @@ export const steps = new Hono()
     const refused = refusedName(name);
     if (refused) return c.json({ error: refused }, 400);
     const file = readArtifactFile(found.run, step, name);
-    // Gone, not missing: `wf prune --artifacts` removed the run's files, and its record, closeouts and branches are what is left.
     const pruned = found.run.pruned?.artifacts;
     if (!file && pruned) {
       return c.json(
@@ -175,8 +197,6 @@ export const steps = new Hono()
     }
     return c.body(new Uint8Array(file.body), 200, served(file.type));
   })
-  // One file of a folder step's own folder, by name and never by path, as `files` on the step links it: what the step made,
-  // named in its closeout or not. Read on each request and never kept — the folder is the step's, and it may write in it again.
   .get('/api/runs/:id/steps/:step/files/:name', (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -205,25 +225,19 @@ export const steps = new Hono()
     }
     return c.body(new Uint8Array(file.body), 200, served(file.type));
   })
-  // A step's conversation, read once from a cursor: the engine's events for the step's current task, and whether it is live.
   .get('/api/runs/:id/steps/:step/transcript', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
     const found = taskOfStep(id, step);
     if ('error' in found) return c.json({ error: found.error }, 404);
-    // Not filed yet: nothing to read, and nothing of it moves until a tick files it.
     if (!found.taskId) return c.json({ events: [], cursor: null, live: false } satisfies StepTranscript);
     try {
-      // An empty `after` is none: a reader with no cursor yet, read from the start.
       return c.json((await readTranscript(id, step, found.taskId, c.req.query('after') || undefined)) satisfies StepTranscript);
     } catch (err) {
       if (err instanceof Unread) return c.json({ error: err.message }, err.status);
       throw err;
     }
   })
-  // The same conversation followed, as server-sent events: read again every second while the task is live, each new event sent
-  // as `transcript`, then `settled` once the task is, or is held open and signed and so waits on a person, and the stream closed. A
-  // reconnect resumes from its Last-Event-ID.
   .get('/api/runs/:id/steps/:step/transcript/stream', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -238,11 +252,9 @@ export const steps = new Hono()
         404,
       );
     }
-    // An EventSource that reconnects sends the id of the last event it was sent; a first connection can say where to start.
     const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
     let read: Read;
     try {
-      // Read before the stream opens, so a refused cursor or a lost task is an answer with a status, not an event.
       read = await readTranscript(id, step, taskId, after);
     } catch (err) {
       if (err instanceof Unread) return c.json({ error: err.message }, err.status);
@@ -250,23 +262,18 @@ export const steps = new Hono()
     }
     return streamSSE(c, async (stream) => {
       await send(stream, read);
-      // Whether the last read failed. A failure is said once, and cleared with `readable` by the first read that works.
       let failing = false;
       while (read.live) {
         await stream.sleep(STREAM_EVERY_MS);
-        // Nobody is reading: stop asking the engine. Each read observes the harnesses.
         if (stream.aborted) return;
         try {
           read = await readTranscript(id, step, taskId, read.cursor);
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          // An answer about the conversation — its task gone from the engine's record — ends the stream: no read will change it.
           if (err instanceof Unread && err.status !== 502) {
             await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
             return;
           }
-          // Anything else is this read, not the conversation: a journal or a transcript that could not be opened this second
-          // most likely can be the next. Read again on the next beat, from the same cursor, as a tick would.
           if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
           failing = true;
           continue;

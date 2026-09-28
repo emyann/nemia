@@ -15,7 +15,7 @@ import type { Acceptance } from 'agent-orchestrator';
 import type { RunDecision } from '../src/decision.ts';
 import type { RunDetail } from '../src/detail.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-accept-');
 process.env.WF_ROOT = root;
 
@@ -50,6 +50,8 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
 /**
  * A run of `implement ⇄ review`, `rounds: 2`, on round `on` of its loop — the tries before it moved aside with `then: 'round'`, as the run
  * moves them when it files a round — whose review signed off saying `again`. On round 2 with `again: true`, the loop is out of rounds.
+ * From round 2 its implement signs off with `replies`: a loop's target owes an answer to the findings it was handed (`owesReplies`), and
+ * an empty list is no answer. Returns the record as written.
  */
 const loopingRun = (id: string, on: number, again: boolean): string => {
   const tries = (name: string) => Array.from({ length: on - 1 }, (_, i) => ({ taskId: `${id}-${name}-${i + 1}`, then: 'round' }));
@@ -85,7 +87,6 @@ const loopingRun = (id: string, on: number, again: boolean): string => {
       steps: { implement: step('implement'), review: step('review') },
     }),
   );
-  // From round 2 a loop's target owes an answer to the findings it was handed (`owesReplies`), and an empty list is no answer.
   const replies = [{ finding: 'src/flag.ts — the flag is not stored', answer: 'fixed', why: 'It is stored now.' }];
   signedOff(`${id}-implement-${on}`, on > 1 ? { ...DONE, replies } : DONE);
   signedOff(`${id}-review-${on}`, { ...DONE, again });
@@ -198,19 +199,21 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
   assert.equal(noStep.status, 404);
   assert.match(((await noStep.json()) as { error: string }).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
 
-  // Required, as `--message` is: left out, empty, or nothing but whitespace — on a loop the package would otherwise accept.
   for (const [body, words] of [
     [{}, /^--message says why the work is good enough with its findings open/],
     [{ message: '' }, /^--message is empty, and an acceptance's words are the whole reason the loop ended with findings open/],
     [{ message: ' \n ' }, /^--message is empty/],
   ] as const) {
     const res = await acceptOver('review', body);
-    assert.equal(res.status, 422, JSON.stringify(body));
+    assert.equal(
+      res.status,
+      422,
+      `words are required, as --message is: left out, empty, or nothing but whitespace, on a loop the package would otherwise accept: ${JSON.stringify(body)}`,
+    );
     const { error } = (await res.json()) as { error: string };
     const message = (body as { message?: string }).message;
-    assert.equal(error, acceptWordsRefusal(message, `wf accept ${R} review`));
-    // The package's own sentence, and the one `accept()` refuses with.
-    assert.equal(error, await acceptRefuses('review', message));
+    assert.equal(error, acceptWordsRefusal(message, `wf accept ${R} review`), "the package's own sentence");
+    assert.equal(error, await acceptRefuses('review', message), 'and the one `accept()` refuses with');
     assert.match(error, words);
   }
   nothingWritten('a body that is not an acceptance');
@@ -244,11 +247,14 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
     nothingWritten(`${run} ${step}, which the package will not accept`, run);
   }
 
-  // A round asked for, which the next tick files: the package's own `round()` writes it, as `wf round` does.
   const { file } = await round(engine(), R, 'review');
   try {
     const res = await acceptOver('review', { message: WHY });
-    assert.equal(res.status, 409);
+    assert.equal(
+      res.status,
+      409,
+      "a round asked for, which the next tick files, written by the package's own `round()` as `wf round` writes it",
+    );
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, await acceptRefuses('review', WHY));
     assert.match(error, /^round 3 of review's loop is already asked for \(at [^)]+\), and the next tick files it/);
@@ -273,12 +279,11 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
   const review = run.steps.find((s) => s.name === 'review')!;
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
-  // As `wf ls` has it until the tick files what waits: the loop over on the person's word, and nobody waited on.
   const words = await list(engine(), readRun(R));
   const listed = words.steps.find((s) => s.name === 'review')!;
-  assert.equal(review.status, listed.status);
-  assert.notEqual(review.status, 'exhausted');
-  assert.deepEqual(run.waitingOnYou, []);
+  assert.equal(review.status, listed.status, 'as `wf ls` has it until the tick files what waits');
+  assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");
+  assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
   const decision = (await (await app.request(`/api/runs/${R}/decision`)).json()) as RunDecision;
   const commands = 'commands' in decision ? decision.commands : [];
   assert.ok(!commands.some((c) => c.label === 'accept'), `accept is offered no more: ${JSON.stringify(commands)}`);

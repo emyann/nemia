@@ -16,7 +16,7 @@ import { scratch } from './scratch.ts';
 import type { Ceilings } from '../src/ceilings.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-unreadable-');
 process.env.WF_ROOT = root;
 

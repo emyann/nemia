@@ -1,7 +1,7 @@
 /**
  * The api's own files hold no raw control character. One in a regular expression's class reads as a blank to a person, and a NUL makes
- * ripgrep take the whole file for binary and search none of it: the builder's refusals of a control character were written so once, and a
- * search of `apps/api/src` did not find builder.ts at all. A class names them with escapes. Tab, line feed and carriage return are text.
+ * ripgrep take the whole file for binary and search none of it, so a search of `apps/api/src` misses every line of that file. A class names
+ * them with escapes. Tab, line feed and carriage return are text.
  */
 import './harness.ts';
 import { test } from 'node:test';

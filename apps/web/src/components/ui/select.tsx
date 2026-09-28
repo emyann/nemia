@@ -174,6 +174,7 @@ function SelectInput({ className, ...props }: SearchFieldProps) {
   return (
     <SearchField
       {...props}
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the list's search field, which the person opened the list to type into
       autoFocus
       data-slot="select-input-wrapper"
       className={cn("p-1 pb-0", className)}

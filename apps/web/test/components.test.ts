@@ -540,7 +540,7 @@ test("REFUSED: a closed fold draws none of its calls, and a closed call none of 
 const { Markdown } = await import('../src/components/Markdown.tsx');
 
 /** A text, as the board renders it. */
-const md = (text: string): string => renderToStaticMarkup(createElement(Markdown, { children: text }));
+const md = (text: string): string => renderToStaticMarkup(createElement(Markdown, null, text));
 
 test("markdown is drawn as GFM: headings two levels down, lists, a table, a task list, strikethrough, an autolink and a footnote", () => {
   const html = md(
@@ -612,7 +612,7 @@ test("a fenced block is the board's code block in its fence's language; one it h
 
 test("two texts with footnotes on one page name theirs apart — no id twice, each reference to its own note", () => {
   const html = renderToStaticMarkup(
-    createElement('div', null, createElement(Markdown, { children: 'One[^1].\n\n[^1]: First.' }), createElement(Markdown, { children: 'Two[^1].\n\n[^1]: Second.' })),
+    createElement('div', null, createElement(Markdown, null, 'One[^1].\n\n[^1]: First.'), createElement(Markdown, null, 'Two[^1].\n\n[^1]: Second.')),
   );
   const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]!);
   assert.equal(ids.length, 6, 'a reference, a label and a note, in each');

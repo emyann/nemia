@@ -154,7 +154,7 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   const text = costText(step);
   if (!text) return [['spent', step.taskId ? 'not measured' : null]];
   const over = pastBudget(step);
-  return [['spent', <span data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>{text}</span>]];
+  return [['spent', <span key="spent" data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>{text}</span>]];
 }
 
 /**
@@ -162,7 +162,7 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
  * None where nothing did — a runner that counted its input as one number has nothing to say here, which is not 0.
  */
 export function readRows(used: StepUsed | null | undefined): Array<[string, ReactNode]> {
-  return used?.read ? [['read', <Read said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
+  return used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
 }
 
 const WARN = 'text-amber-700 dark:text-amber-400';
@@ -218,7 +218,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
         rows={[
           ['command', code(command)],
           ...(refused
-            ? [['refused', <span className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">{refused.exit}</span>] as [string, ReactNode]]
+            ? [['refused', <span key="refused" className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">{refused.exit}</span>] as [string, ReactNode]]
             : []),
         ]}
       />

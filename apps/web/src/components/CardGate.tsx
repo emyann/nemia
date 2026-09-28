@@ -41,7 +41,7 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
 
   return (
     // The stop keeps a press on the gate, or in its popovers, from toggling the card, which listens to clicks anywhere on it.
-    <div className="nodrag space-y-1.5 px-3" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+    <div role="presentation" className="nodrag space-y-1.5 px-3" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
       {/* One row whatever the names: a card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`). */}
       <p data-to-decide={gate.ends ? 'approve' : undefined} data-gate-line={gate.step} title={`${line}\n${title}`} className="truncate text-[11px] text-amber-800 dark:text-amber-300">
         {line}

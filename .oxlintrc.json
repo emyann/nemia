@@ -6,7 +6,9 @@
   "plugins": [
     "typescript",
     "unicorn",
-    "oxc"
+    "oxc",
+    "react",
+    "jsx-a11y"
   ],
   "categories": {
     "correctness": "error"
@@ -29,9 +31,25 @@
       }
     ],
     // A bare sort of strings is in code-unit order, which is what a test comparing two lists as sets wants; one of numbers or tuples is not.
-    "typescript/require-array-sort-compare": ["error", { "ignoreStringArrays": true }]
+    "typescript/require-array-sort-compare": ["error", { "ignoreStringArrays": true }],
+    // An ARIA role is the right tool where the tag the rule names is the wrong element: a drawn status dot is no `<img>`, and a live
+    // message is no form's `<output>`.
+    "jsx-a11y/prefer-tag-over-role": "off",
+    // The React Compiler's own rules, off until the card that adopts the compiler turns them on with it: without the compiler they judge
+    // an optimisation nothing performs.
+    "react/preserve-manual-memoization": "off",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off"
   },
   "overrides": [
+    {
+      // The canvases key their memos and effects on content strings (`idsKey`, `readsKey`, `layoutKey`) where the arrays are new on every
+      // render. The compiler card rewrites them with honest dependencies and removes this.
+      "files": ["apps/web/src/components/FactoryCanvas.tsx", "apps/web/src/components/RunCanvas.tsx", "apps/web/src/components/WorkflowCanvas.tsx"],
+      "rules": {
+        "react-hooks/exhaustive-deps": "off"
+      }
+    },
     {
       // What a test prints is read by the developer who runs it, from raw harness JSON and fetch mocks; the messages a person reads are
       // made in src, where a value that could be an object is never stringified as `[object Object]`.

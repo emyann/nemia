@@ -163,7 +163,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
             ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
             ['attempts', attempts.count],
             ['latest began', latest && when(latest.startedAt)],
-            ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
+            ['latest ended', latest && (latest.ended ? <Ended key="latest ended" at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
             // Only with an end on the record: one from before the engine kept it says how, and not when.
             ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
             // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.

@@ -175,7 +175,7 @@ function Run({ run }: { run: RunDetail }) {
             ['started', startedRow(run)],
             ['cancelled', run.cancelledAt && when(run.cancelledAt)],
             // Only once `wf prune` removed its worktrees: the run is read as it ended, and nothing of it can be tried again.
-            ...(run.pruned ? ([['pruned', <Pruned pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
+            ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
             ['workflow', code(run.workflowDir)],
           ]}
         />

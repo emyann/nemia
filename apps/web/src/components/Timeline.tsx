@@ -103,6 +103,7 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
       ) : (
         <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>not measured</td>
       )}
+      {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- the run's row has no `used` of its own: an empty cell */}
       <td className={CELL} />
     </tr>
   );

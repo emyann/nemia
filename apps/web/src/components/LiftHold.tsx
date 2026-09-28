@@ -77,7 +77,7 @@ export function LiftHold({ id }: { id: string }) {
  */
 export function CardLift({ id }: { id: string }) {
   return (
-    <span className="nodrag" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+    <span role="presentation" className="nodrag" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
       <DialogTrigger>
         <AriaButton
           data-lift={id}

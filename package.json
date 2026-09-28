@@ -21,6 +21,7 @@
   "devDependencies": {
     "@playwright/mcp": "0.0.80",
     "@types/node": "^22.20.2",
+    "oxfmt": "^0.71.0",
     "oxlint": "^1.86.0",
     "oxlint-tsgolint": "^7.0.2003",
     "turbo": "^2.10.12",

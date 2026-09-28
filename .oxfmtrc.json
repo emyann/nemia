@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // 140 is how most of the code, and CLAUDE.md, already wrap: 90% of the lines were under 138 when it was adopted.
+  "printWidth": 140,
+  "singleQuote": true,
+  "trailingComma": "all",
+  // Code only. Markdown is prose (briefs, agents, docs, and CLAUDE.md merged by union); JSON holds test fixtures pinned byte for byte
+  // and agent schemas whose bytes are digested into versions; the route tree is generated; the skills are vendored.
+  "ignorePatterns": [
+    "**/*.md",
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.html",
+    "**/routeTree.gen.ts",
+    "**/fixtures/**",
+    ".claude/**",
+    "workflows/**",
+    "packages/*/workflows/**"
+  ]
+}

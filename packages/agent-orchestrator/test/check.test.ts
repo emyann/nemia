@@ -14,6 +14,7 @@ import { codex, createEngine, type Engine } from 'agent-runtime';
 import {
   CHECK,
   CHECK_NICENESS,
+  INSTALL,
   checkBrief,
   checkContract,
   checkScript,
@@ -24,6 +25,8 @@ import {
   stdoutTail,
   type CheckEnv,
 } from '../src/check.ts';
+import { refusedCheck } from '../src/run.ts';
+import { exitVerdicts } from '../src/views.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { modeOf } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
@@ -114,6 +117,76 @@ test('a machine without ionice still runs the check, to its own exit code', () =
   assert.equal(r.status, 7, r.stderr);
   assert.match(r.stdout, /^no-ionice$/m, 'the check really ran with no ionice on its PATH');
   assert.match(r.stdout, /\[wf check\] exit 7\n$/);
+});
+
+test("a brief carries the install an ending's check owes, and reads back only one that is a string", () => {
+  const brief = checkBrief('npm test', ENV, 'node_modules/b');
+  assert.deepEqual(readCheckBrief(brief), { command: 'npm test', env: ENV, install: 'node_modules/b' });
+  assert.equal(JSON.parse(checkBrief('npm test', ENV)).install, undefined, 'no install, no field');
+  for (const install of [7, '', null, ['node_modules/b']]) {
+    const read = readCheckBrief(JSON.stringify({ check: 'npm test', env: ENV, install }));
+    assert.deepEqual(read, { command: 'npm test', env: ENV }, `install ${JSON.stringify(install)} is dropped`);
+  }
+});
+
+/**
+ * A PATH directory whose `npm` writes its arguments to `npm.args` beside it and exits `code`, before this machine's PATH: the check's
+ * install, seen without a registry.
+ */
+const fakeNpm = (code: number): { bin: string; args: string; PATH: string } => {
+  const bin = scratch('wf-check-npm-');
+  const args = path.join(bin, 'npm.args');
+  fs.writeFileSync(
+    path.join(bin, 'npm'),
+    `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(args)}\necho npm said this >&2\nexit ${code}\n`,
+    { mode: 0o755 },
+  );
+  return { bin, args, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` };
+};
+
+/** `CHECK.command` for a brief, run to its end with `npm` faked, in a workspace of its own: what came back, and the workspace. */
+const checked = (npm: ReturnType<typeof fakeNpm>, install: string | undefined) => {
+  const workspace = scratch('wf-check-install-');
+  const { cmd, args } = CHECK.command({
+    brief: checkBrief(
+      'echo command ran > ran.txt',
+      { ...ENV, WF_WORKSPACE: workspace, WF_STDERR: path.join(npm.bin, 'x.stderr') },
+      install,
+    ),
+  });
+  return { r: spawnSync(cmd, args, { cwd: workspace, encoding: 'utf8', env: { ...process.env, PATH: npm.PATH } }), workspace };
+};
+
+test("a check that owes an install runs `npm install --no-save` first, in its workspace, and then its command, to the command's exit code", () => {
+  const npm = fakeNpm(0);
+  const { r, workspace } = checked(npm, 'node_modules/b');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.deepEqual(fs.readFileSync(npm.args, 'utf8').trim().split('\n'), ['install', '--no-save', '--no-audit', '--no-fund']);
+  assert.equal(INSTALL, 'npm install --no-save --no-audit --no-fund');
+  assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')), 'the command ran after it');
+  assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
+  assert.match(r.stdout, /^npm said this$/m, "the install's stderr is in the log");
+  assert.equal(readVerdict(r.stdout), 0);
+});
+
+test('REFUSED: an install that fails runs no command and prints no exit code — the process ends by a signal, so the check did not finish', () => {
+  const npm = fakeNpm(3);
+  const { r, workspace } = checked(npm, 'node_modules/b');
+  // The worker records no exit code for a process a signal ended (`code ?? -1` in ae-worker.ts), which the run reads as unfinished.
+  assert.deepEqual([r.status, r.signal], [null, 'SIGKILL'], r.stdout + r.stderr);
+  assert.equal(fs.existsSync(path.join(workspace, 'ran.txt')), false, 'the command never ran');
+  assert.match(r.stdout, /^\[wf check\] install failed, exit 3: no verdict on the work$/m);
+  assert.equal(readVerdict(r.stdout), 'unfinished');
+});
+
+test('a check that owes no install never calls npm', () => {
+  const npm = fakeNpm(0);
+  const { r, workspace } = checked(npm, undefined);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(fs.existsSync(npm.args), false, 'npm was not called');
+  assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')));
+  assert.doesNotMatch(r.stdout, /npm install/);
+  assert.equal(checkScript('npm test'), checkScript('npm test', false));
 });
 
 test('a step is told the command before it is judged by it, and that it comes from the run', () => {
@@ -280,6 +353,37 @@ test('LIVE: a failing check still fails through `nice`, with its own exit code',
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed');
   assert.equal(readVerdict(await e.logs(id)), 5);
+});
+
+test("LIVE: an ending's check whose install fails settles failed with no exit code, which the run reads as a check that did not finish", async (t) => {
+  const { e, workspace } = rig();
+  const npm = fakeNpm(3);
+  // The worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled.
+  const PATH = process.env.PATH;
+  t.after(() => {
+    process.env.PATH = PATH;
+  });
+  process.env.PATH = npm.PATH;
+  const id = await e.file({
+    id: 'r-1-ship-check',
+    harness: 'check',
+    cwd: workspace,
+    brief: checkBrief(
+      'echo command ran',
+      { ...ENV, WF_STEP: 'ship', WF_WORKSPACE: workspace, WF_STDERR: path.join(workspace, 'x.stderr') },
+      'node_modules/b',
+    ),
+  });
+  const v = await settled(e, id);
+  process.env.PATH = PATH;
+  assert.equal(v.state.settled, 'failed');
+  assert.equal(v.state.attempts.at(-1)?.exitCode, null, 'no exit code on the attempt');
+  const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
+  assert.equal(verdict, 'unfinished');
+  assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
+  const log = await e.logs(id);
+  assert.match(log, /\[wf check\] install failed, exit 3/);
+  assert.doesNotMatch(log, /command ran/);
 });
 
 // ─── what this repository ships ─────────────────────────────────────────────

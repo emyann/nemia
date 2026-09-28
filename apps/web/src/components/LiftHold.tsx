@@ -32,7 +32,7 @@ function useLift(id: string, onLifted: () => void = () => undefined) {
 
 /**
  * Lift, where the run's page says it is held, asked twice: the first press asks, the second lifts the hold as `wf hold --off` does. A
- * refusal — a run nobody holds any more — is shown in the package's words.
+ * refusal — a run nobody holds — is shown in the package's words.
  */
 export function LiftHold({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);

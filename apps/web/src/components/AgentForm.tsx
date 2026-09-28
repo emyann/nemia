@@ -261,7 +261,7 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
   );
 }
 
-/** A text field: a line, or `area`'s textarea. The skill's form draws its fields with it too. */
+/** A text field: a line, or `area`'s textarea. Read-only, it is drawn as text on a quiet ground, not as a box waiting for words. The skill's form draws its fields with it too. */
 export function Field({
   label,
   hint,
@@ -284,7 +284,6 @@ export function Field({
   className?: string;
 }) {
   const font = mono ? 'font-mono text-xs md:text-xs' : '';
-  // Read-only, a field is drawn as text on a quiet ground, not as a box waiting for words.
   const quiet = readOnly ? 'border-dashed bg-neutral-50 dark:bg-neutral-900/60 focus-visible:ring-0' : '';
   return (
     <TextField value={value} onChange={onChange} isReadOnly={readOnly} className={`space-y-1.5 ${className ?? ''}`}>
@@ -303,7 +302,10 @@ export function Field({
   );
 }
 
-/** A key set to one of the words it may take, or left unset. */
+/**
+ * A key set to one of the words it may take, or left unset. A value the file has that the list does not — an effort off its harness's words —
+ * is shown as written; the package says what is wrong on save.
+ */
 function Choice({
   label,
   hint,
@@ -319,7 +321,6 @@ function Choice({
   onChange: (value: string) => void;
   readOnly: boolean;
 }) {
-  // A value the file has that the list does not — an effort off its harness's words — is shown as written; the package says what is wrong on save.
   const words = value && !choices.includes(value) ? [...choices, value] : choices;
   return (
     <Select

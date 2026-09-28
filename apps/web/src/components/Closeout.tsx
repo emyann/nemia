@@ -8,7 +8,6 @@ import { Artifacts } from './Artifacts';
 import { Markdown } from './Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
 
-// Where they were: the Gate, the run's page and the tests read them from here.
 export { Artifacts, bytesWord } from './Artifacts';
 
 /**
@@ -147,11 +146,13 @@ function YourAnswer({ answer }: { answer: string }) {
   );
 }
 
-/** How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. */
+/**
+ * How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. A statement that could
+ * not be read is shown whole, as the engine recorded it: nothing hidden.
+ */
 function TryOutcome({ t, none }: { t: StepTry; none: string }) {
   const outcome = outcomeOf(t, none);
   if (t.unreadable) {
-    // Nothing to draw, and nothing hidden: the statement whole, as the engine recorded it.
     return (
       <div data-closeout className="space-y-3">
         <OutcomeHead outcome={outcome} />
@@ -165,13 +166,13 @@ function TryOutcome({ t, none }: { t: StepTry; none: string }) {
 
 /**
  * A statement drawn: its outcome and who said it, what it needs, its summary, each declared field by its shape (`outputKind`), its
- * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole.
+ * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole; its word is a
+ * label of its own beside it, naming the switch's input, since React Aria's switch is a label round its input.
  */
 export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; outcome: Outcome }) {
   const [raw, setRaw] = useState(false);
   const switchId = useId();
   const toggle = (
-    // The aria switch is a label of its own, round its input, so its word is a label beside it that names that input.
     <div className="flex shrink-0 items-center gap-1.5 text-xs text-neutral-500">
       <Switch id={switchId} size="sm" isSelected={raw} onChange={setRaw} />
       <label htmlFor={switchId} className="cursor-pointer">

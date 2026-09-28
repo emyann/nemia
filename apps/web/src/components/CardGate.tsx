@@ -17,9 +17,10 @@ export const POPOVER =
   'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
 
 /**
- * A gate on the Factory's card: what approving does and where a send-back goes, in a row (`gateCardLine`), cut short where the names are
- * long and whole on hover and in the inspector; and the answer beside it — Approve and Send back, each a popover over the card, through the same api as the run page's gate
- * (`useApprove`, `useAsk`). The popover is the second press: nothing is sent by the button on the card. At an ending the approval's button
+ * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
+ * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
+ * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — Approve
+ * and Send back, each a popover over the card, through the same api as the run page's gate (`useApprove`, `useAsk`). The popover is the second press: nothing is sent by the button on the card. At an ending the approval's button
  * says what it runs (`Run ship now`), and a send-back needs words, as `wf retry --message` does. A refusal shows in the popover in the
  * api's words, the words kept in the box.
  *
@@ -47,14 +48,12 @@ export function CardGate({
   const read = readLink(gate);
 
   return (
-    // The stop keeps a press on the gate, or in its popovers, from toggling the card, which listens to clicks anywhere on it.
     <div
       role="presentation"
       className="nodrag space-y-1.5 px-3"
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
     >
-      {/* One row whatever the names: a card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`). */}
       <p
         data-to-decide={gate.ends ? 'approve' : undefined}
         data-gate-line={gate.step}
@@ -107,7 +106,6 @@ export function CardGate({
             )}
           </Answer>
         )}
-        {/* What is being approved, a page away: a card has no room for a plan. */}
         <RouteLink
           to="/runs/$runId"
           params={{ runId }}

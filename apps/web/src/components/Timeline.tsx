@@ -5,13 +5,13 @@ import { spentTitle } from '../lib/cost';
 /**
  * Where a run's time went, as `wf decide` prints it: a row for each try's session and each try's check of every step, in the order the run
  * keeps its steps — when it was filed, spawned and ended, how long it queued for a slot and ran, what its session used and what it cost — then
- * each round's total when its loop went round, and the run's, each with what its sessions cost. The words are the api's, which are the
+ * each round's total when its loop went round, named by its looping step where more than one loop did, and the run's, each with what its
+ * sessions cost. The words are the api's, which are the
  * package's; the times are the engine's instants, shown in this browser's clock. Nothing is drawn for a run with nothing filed.
  */
 export function Timeline({ run }: { run: RunDetail }) {
   const steps = run.steps.filter((step) => step.timeline.length > 0);
   if (!steps.length) return null;
-  // Each round of each loop that went round — named by its looping step where more than one did — then the run's, every step's.
   const { rounds } = run.timeline;
   const went = [...new Set(rounds.map((r) => r.loop))].filter((loop) => rounds.filter((r) => r.loop === loop).length > 1);
   const totals = [...rounds.filter((r) => went.includes(r.loop)), run.timeline.run];
@@ -87,7 +87,10 @@ function TryRow({ step, t }: { step: string; t: StepTimelineTry }) {
   );
 }
 
-/** A task's row: its instants and times, and for a session what it used and what it cost, in `wf decide`'s words — `not measured`, never $0. */
+/**
+ * A task's row: its instants and times, and for a session what it used and what it cost, in `wf decide`'s words — `not measured`, never $0.
+ * The cost comes before what it used, which runs long, so a cost is in view without scrolling the table.
+ */
 function SpanRow({
   step,
   label,
@@ -128,7 +131,6 @@ function SpanRow({
           <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>
             {span.ran}
           </td>
-          {/* Before what it used, which runs long: a cost is a few characters, and in view without scrolling the table. */}
           <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>
             {cost ?? ''}
           </td>

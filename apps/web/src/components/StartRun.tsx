@@ -13,8 +13,14 @@ import { afterFor, ignoredRepoNote } from '../lib/inbox';
  * Given a `card`, it starts that inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the card's body,
  * to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told of a
  * start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives none,
- * and says where the run is itself. `repo` is where the run starts, when the card names a
- * repository: what the runs to wait on are listed from.
+ * and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to wait on are listed
+ * from. A card's start sits under the workflow it picks, with no rule of its own above it.
+ *
+ * A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one, since there is no branch to wait
+ * on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks (`afterFor`), none for such
+ * a team. A card that names a repository for such a team is started all the same, its repository unread; the package says so afterwards,
+ * and this form says it before, while the choice is still a person's (`ignoredRepoNote`). A start reads the list of runs again alone
+ * (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
  *
  * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back — a
  * 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it outlives
@@ -36,11 +42,7 @@ export function StartRun({
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
-  // A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one: there is no branch for
-  // a run to wait on. No picker, and nothing about a repository under the button.
   const inFolders = workflow.folderTeam;
-  // A card filed before its team worked in folders still names a repository, and the start looks at none of it. The package starts it all
-  // the same and says so afterwards; said here, a person reads it while the choice is still theirs (`ignoredRepoNote`).
   const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[] }) =>
@@ -57,7 +59,6 @@ export function StartRun({
         setBrief('');
         setAfter([]);
       }
-      // The list alone: a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
       onStarted?.(started);
     },
@@ -71,11 +72,9 @@ export function StartRun({
   return (
     <form
       aria-label={card ? `Start ${card.name}` : `Start a run of ${workflow.name}`}
-      // A card's start sits under the workflow it picks, which has the rule above it.
       className={card ? 'space-y-2' : 'space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800'}
       onSubmit={(event) => {
         event.preventDefault();
-        // Not the picks: what the workflow now picked takes (`afterFor`). The picker is hidden for a folder team, and what it holds is not sent.
         start.mutate({ brief, after: afterFor(workflow, after) });
       }}
     >
@@ -145,7 +144,8 @@ export function StartRun({
  * The runs a new run waits on (`wf start --after`): every run on the repository a start runs in, in flight and finished, newest first,
  * each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which runs it
  * may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when it is not
- * the api's own: an inbox card's `repo:`.
+ * the api's own: an inbox card's `repo:`. The runs are read as the page opens, not on the list's beat: a run started since is listed on the
+ * next visit.
  */
 export function AfterPicker({
   selected,
@@ -157,7 +157,6 @@ export function AfterPicker({
   repo?: string;
 }) {
   const repository = useQuery(repositoryQuery);
-  // Read as the page opens, and not on the list's beat: a run started since is here on the next visit.
   const runs = useQuery({ ...runsQuery, refetchInterval: false });
   const legend = useId();
   const error = repository.error ?? runs.error;

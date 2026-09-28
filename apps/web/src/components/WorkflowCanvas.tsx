@@ -7,8 +7,9 @@ import { StateEdge } from './StateEdge';
 import { stepEdges } from './stepGraph';
 import { SpecNode, type SpecFlowNode } from './StepNode';
 
-// Declared once: a new object per render makes React Flow warn and mount every node afresh.
+/** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { spec: SpecNode };
+/** The canvas's edge types for React Flow, one object for the module's life. */
 const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.15, maxZoom: 1 };
@@ -125,7 +126,9 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
  * per `after` and the edge back a `loop:` makes, as the api's `graph` has them — laid out as a run's page lays a run out.
  *
  * Fitted to its frame and not arranged by hand: it is a card on a page of cards, so the wheel scrolls the page past it
- * rather than zooming, and nothing about it is kept. A block clicked opens its step's page.
+ * rather than zooming, and nothing about it is kept. A block clicked opens its step's page. Its frame holds its rows and the room around
+ * them, 180 px at least and 420 px at most, so one workflow never takes the page; its flow has an id of its own, which scopes its
+ * arrowheads' ids on a page that draws several, and its arrowheads take their edges' colour in both themes.
  */
 export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
   const navigate = useNavigate();
@@ -166,11 +169,9 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
     <div
       aria-label={`The steps of ${workflow.name} as a graph`}
       className="overflow-hidden rounded border border-neutral-200 dark:border-neutral-800"
-      // A row of nodes and the room around it, and never so tall that one workflow takes the page.
       style={{ height: Math.min(Math.max(drawn.height + 40, 180), 420) }}
     >
       <ReactFlow
-        // Marker ids are scoped by the flow's id, and a page of cards draws several flows.
         id={`workflow-${workflow.from}-${workflow.name}`}
         nodes={drawn.nodes}
         edges={drawn.edges}
@@ -189,7 +190,6 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
           void navigate({ to: '/workflows/$from/$workflow/$step', params: { from: workflow.from, workflow: workflow.name, step: node.id } })
         }
         colorMode="system"
-        // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
         defaultMarkerColor={null}
         fitView
         fitViewOptions={FIT}

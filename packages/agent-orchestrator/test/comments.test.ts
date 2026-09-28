@@ -2,9 +2,9 @@
  * The comment guards: a comment is a JSDoc contract, or a lint directive with its reason (CLAUDE.md, "Code reads by itself").
  *
  * `lint/comments.ts` is the oxlint plugin; `.oxlintrc.json` switches the guards on in one override block per package, off while its
- * `excludeFiles` names the package. These tests run the repository's oxlint on fixtures with the repository's own block, so a guard the
+ * `excludeFiles` names the package, and one block that is on also covers `lint/**`, the plugin itself. These tests run the repository's oxlint on fixtures with the repository's own block, so a guard the
  * block names that runs nothing — misspelled, set to `off`, or aimed at other files — fails here. The last part is what a lint rule
- * cannot see across files: a name a comment quotes in backticks is one the code has, in each package whose block is on.
+ * cannot see across files: a name a comment quotes in backticks is one the code has, in each file a block that is on covers.
  *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
@@ -40,7 +40,7 @@ const guardBlocks = (config: Config): Block[] => config.overrides.filter((block)
 /** Whether a block's guards run: no `excludeFiles` takes its package back out. */
 const isOn = (block: Block): boolean => block.excludeFiles === undefined;
 
-/** The package a block covers, from its `files` glob. */
+/** The package a block covers, from its first `files` glob. */
 const packageOf = (block: Block): string => block.files[0].replace(/\/\*\*$/, '');
 
 /** Every workspace package: the folders under packages/ and apps/ with a package.json, from the root. */
@@ -49,6 +49,9 @@ const workspacePackages = (): string[] =>
     .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => `${top}/${name}`))
     .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
     .sort();
+
+/** The glob of the folder beside the packages that one guard block, and one only, lists after its package: the plugin's own. */
+const LINT = 'lint/**';
 
 type Diagnostic = { file: string; line: number; rule: string };
 
@@ -313,12 +316,15 @@ test('REFUSED: no-inline-comments refuses a comment after code, and lets a direc
   assert.deepEqual(refusals('inline.ts'), { 'no-inline-comments': [lineOf(INLINE, 'refused: after code')] });
 });
 
-test('there is one guard block per workspace package, each covering its package alone and either on or off', () => {
+test('there is one guard block per workspace package, each covering its package, one that is on also the plugin, and either on or off', () => {
   const blocks = guardBlocks(readConfig());
   assert.deepEqual(blocks.map(packageOf).sort(), workspacePackages(), 'a package has no guard block, or two, or a block names no package');
+  const withLint = blocks.filter((block) => block.files.includes(LINT));
+  assert.equal(withLint.length, 1, `${LINT} is in ${withLint.length} guard blocks: the plugin's comments are guarded by one block`);
+  assert.ok(isOn(withLint[0]), `${packageOf(withLint[0])}'s block lists ${LINT} while it is off`);
   for (const block of blocks) {
     const glob = [`${packageOf(block)}/**`];
-    assert.deepEqual(block.files, glob);
+    assert.deepEqual(block.files, block === withLint[0] ? [...glob, LINT] : glob);
     if (!isOn(block)) assert.deepEqual(block.excludeFiles, glob, `${packageOf(block)}'s block excludes something else than its package`);
   }
 });
@@ -347,9 +353,9 @@ test("each package's guards are switched on by deleting one line of its own bloc
   }
 });
 
-/** Every source file git lists under packages/ and apps/, tracked or not yet added, that is on disk, from the root. */
+/** Every source file git lists under packages/, apps/ and lint/, tracked or not yet added, that is on disk, from the root. */
 const sourceFiles = (): string[] =>
-  execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps'], {
+  execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint'], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -410,7 +416,7 @@ function namesOf(source: ts.SourceFile, into: Set<string>): Set<string> {
 }
 
 let known: Set<string> | undefined;
-/** Every name the repository's code has, from each source file under packages/ and apps/ but this one, whose fixtures quote stale names. */
+/** Every name the repository's code has, from each source file under packages/, apps/ and lint/ but this one, whose fixtures quote stale names. */
 const knownNames = (): Set<string> =>
   (known ??= sourceFiles()
     .filter((file) => file !== SELF)
@@ -479,16 +485,18 @@ test("no word on the other programs' list is a name the code has already", () =>
   );
 });
 
-test('in every package whose guards are on, a name a comment quotes in backticks is one the code has', () => {
-  const on = guardBlocks(readConfig()).filter(isOn).map(packageOf);
+test('in every file a block that is on covers, a name a comment quotes in backticks is one the code has', () => {
+  const on = guardBlocks(readConfig())
+    .filter(isOn)
+    .flatMap((block) => block.files.map((glob) => glob.replace(/\/\*\*$/, '')));
   const names = knownNames();
   const scanned = new Set<string>();
   const stale = sourceFiles()
-    .filter((file) => on.some((pkg) => file.startsWith(`${pkg}/`)))
+    .filter((file) => on.some((dir) => file.startsWith(`${dir}/`)))
     .flatMap((file) => {
-      scanned.add(on.find((pkg) => file.startsWith(`${pkg}/`)) ?? '');
+      scanned.add(on.find((dir) => file.startsWith(`${dir}/`)) ?? '');
       return staleNames(file, fs.readFileSync(path.join(ROOT, file), 'utf8'), names);
     });
   assert.deepEqual(stale, [], 'rename the quoted name to the one the code has, or reword the comment');
-  assert.deepEqual([...scanned].sort(), [...on].sort(), 'a package switched on had no source file to scan');
+  assert.deepEqual([...scanned].sort(), [...on].sort(), 'a folder switched on had no source file to scan');
 });

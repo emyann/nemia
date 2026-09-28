@@ -117,6 +117,7 @@ const RETRYING = /^(?:\d+ × )?(?:retrying \w+ action|waiting \d+ms|waiting for 
  */
 export function headlineOf(message: string): string[] {
   // Playwright dims its call log in colour, whether or not a terminal reads it.
+  // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
   const lines = message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
   const clip = (line: string) => (line.length > HEADLINE_WIDTH ? `${line.slice(0, HEADLINE_WIDTH - 1)}…` : line);
   const said = [lines[0]!];

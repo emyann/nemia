@@ -1781,6 +1781,7 @@ export function stepNameRefusal(name: unknown): string | undefined {
   if (typeof name !== 'string' || !name.trim()) return `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`;
   const as = `\`${name}\` is not a step's name:`;
   if (/[\\/]/.test(name)) return `${as} a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`;
+  // oxlint-disable-next-line no-control-regex -- a name holding a control character is refused, so the class must name them
   if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
   if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`;
   if (name !== name.trim()) return `${as} \`after:\` trims every name it lists, so no step could wait on it. Write it without the spaces around it.`;
@@ -2219,6 +2220,7 @@ export function agentNameRefusal(name: unknown): string | undefined {
   if (typeof name !== 'string' || !name.trim()) return `An agent has no name, and an agent is named by its file in ${AGENTS_FOLDER}/. ${fix}`;
   const as = `\`${name}\` is not an agent's name:`;
   if (/[\\/]/.test(name)) return `${as} an agent is a file in ${AGENTS_FOLDER}/, and a slash names a file in another folder. ${fix}`;
+  // oxlint-disable-next-line no-control-regex -- a name holding a control character is refused, so the class must name them
   if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
   if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing ${AGENTS_FOLDER}/ does not see. ${fix}`;
   if (name !== name.trim()) return `${as} \`agent:\` is trimmed as it is read, so no step could name it. Write it without the spaces around it.`;

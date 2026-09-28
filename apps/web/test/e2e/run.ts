@@ -86,6 +86,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   });
 }
 
+// oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
 const ANSI = /\x1b\[[0-9;]*m/g;
 
 /** Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. */

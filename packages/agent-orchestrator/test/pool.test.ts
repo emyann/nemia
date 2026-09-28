@@ -14,7 +14,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine } from 'agent-runtime';
 import { checkBrief } from '../src/check.ts';
 import { scratch } from './scratch.ts';
 

@@ -501,7 +501,7 @@ test('wf decide on a held run that also waits --after a run says both, and that 
   assert.match((await typed(t, b.e, 'decide', child.id)).printed, new RegExp(`held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: wf hold ${child.id} --off, or wf cancel ${child.id}$`));
 });
 
-test('REFUSED while held or pruned: wf say to a step that has settled offers no wf retry, which either refuses', async (t) => {
+test('REFUSED while held or pruned: wf say to a step that has settled offers no wf retry, which either refuses', async () => {
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);

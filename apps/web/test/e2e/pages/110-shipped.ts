@@ -9,7 +9,7 @@ export default {
   route: `/runs/${SHIPPED.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const { id, ending } = SHIPPED;
+    const { ending } = SHIPPED;
     const section = page.locator(`article > section#step-${ending}`);
 
     // Nothing to decide, and nobody waited on: its ending answered for its own branch.

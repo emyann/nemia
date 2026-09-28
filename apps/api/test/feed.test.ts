@@ -9,7 +9,6 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { scratch } from './scratch.ts';

@@ -54,19 +54,19 @@ const journal = (taskId: string) => path.join(root, 'engine', 'tasks', `${taskId
 /** A line on the engine's feed, as every append to a journal writes one: what takes a run out of the memo. */
 const fed = (taskId: string, kind: string) => fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event: { kind, at } })}\n`);
 
-const started = (taskId: string) => [
+const started = () => [
   { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
   { kind: 'starting', at, attempt: 1 },
   { kind: 'spawned', at, attempt: 1 },
 ];
 const signedOff = (taskId: string) => write(journal(taskId), jsonl([
-  ...started(taskId),
+  ...started(),
   { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] } },
   { kind: 'settled', at, outcome: 'succeeded' },
 ]));
-const running = (taskId: string) => write(journal(taskId), jsonl(started(taskId)));
+const running = (taskId: string) => write(journal(taskId), jsonl(started()));
 const blocked = (taskId: string) => write(journal(taskId), jsonl([
-  ...started(taskId),
+  ...started(),
   { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'blocked', summary: 'Could not.', needs: 'a key', artifacts: [] } },
   { kind: 'settled', at, outcome: 'failed' },
 ]));

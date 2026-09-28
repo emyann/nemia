@@ -53,7 +53,7 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 };
 
 /** A task whose one session the registry lists blocked, and the engine that reads it. */
-const blocked = async (bin: string) => {
+const blocked = async () => {
   const engine = createEngine({ root: tmp('root') });
   const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
   await engine.tick();
@@ -63,7 +63,7 @@ const blocked = async (bin: string) => {
 test('a blocked session carries what its harness says it waits for, in the harness\'s own words, onto the task\'s view', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked(claude.bin);
+    const { engine, id } = await blocked();
     const [row] = claude.rows();
     claude.set(row!.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
 
@@ -76,7 +76,7 @@ test('a blocked session carries what its harness says it waits for, in the harne
 test('a blocked session whose harness says nothing carries nothing: the field is absent, not empty', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked(claude.bin);
+    const { engine, id } = await blocked();
     const [row] = claude.rows();
     claude.set(row!.name, { state: 'blocked', status: 'waiting' });
 
@@ -95,7 +95,7 @@ test('a blocked session whose harness says nothing carries nothing: the field is
 test('level-triggered: the word is read afresh each pass — the second pass shows the new one and none of the old, and a session that stops waiting loses it', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked(claude.bin);
+    const { engine, id } = await blocked();
     const [row] = claude.rows();
 
     claude.set(row!.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });

@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { agentsFor, agentVersion, cardSkills, HOME, inboxDir, inboxNameRefusal, listRuns, loadWorkflows, lookupRoots, skillsFor, start, startFromInbox, workflowDescription, type Places } from 'agent-orchestrator';
-import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, SKILLS_FOLDER, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, contextText, isFolderTeam, SKILLS_FOLDER, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';

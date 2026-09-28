@@ -8,7 +8,7 @@
 import { Context, Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { admissionOf, atWorkState, awaitsAdmission, decide, fold, nameFor, needsHuman, phaseWordOf, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Event, type Input, type SessionState, type Sighting, type State, type Usage } from './domain.ts';
+import { admissionOf, atWorkState, awaitsAdmission, decide, fold, nameFor, needsHuman, phaseWordOf, settledQuiet, spawnRefused, turnOf, waitsForInput, type Action, type Input, type SessionState, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Runner, type ExpectedSession } from './runner.ts';

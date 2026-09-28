@@ -1,6 +1,6 @@
 import { MarkerType } from '@xyflow/react';
 import type { RunDetail, RunSummary } from '../lib/api';
-import { edgeState, edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
+import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
 import { runEdges } from '../lib/factory';
 import { stepState, type StepState } from '../lib/status';
 import type { StateFlowEdge } from './StateEdge';

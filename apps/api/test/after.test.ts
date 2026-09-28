@@ -45,15 +45,15 @@ const journal = (taskId: string, events: object[]) => {
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
   fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 };
-const filed = (taskId: string) => ({ kind: 'filed', at, brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' });
+const filed = () => ({ kind: 'filed', at, brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' });
 const signedOff = (taskId: string) => journal(taskId, [
-  filed(taskId),
+  filed(),
   { kind: 'starting', at, attempt: 1 },
   { kind: 'spawned', at, attempt: 1 },
   { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] } },
   { kind: 'settled', at, outcome: 'succeeded' },
 ]);
-const working = (taskId: string) => journal(taskId, [filed(taskId), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+const working = (taskId: string) => journal(taskId, [filed(), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
 
 /** One step, frozen on the record as `wf start` freezes it: its branch is the run's result. */
 const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];

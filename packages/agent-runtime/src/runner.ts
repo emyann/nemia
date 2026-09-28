@@ -22,7 +22,6 @@
  */
 import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';

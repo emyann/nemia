@@ -243,7 +243,7 @@ export const git = (repo: string, ...args: string[]) => execCounted('git', args,
  * workflow's shape, not about the harness. Owning it here also means neither harness needs a flag
  * the other one spells differently.
  */
-export function makeWorkspace(repo: string, isolate: boolean): { workspace: string; baseRef: string; branch: string } {
+export function makeWorkspace(repo: string): { workspace: string; baseRef: string; branch: string } {
   // No worktree is cut here. Every step gets its own from `workspaceFor`, including the first —
   // one code path, so the pure plan cannot be quietly overridden by a special case.
   return {

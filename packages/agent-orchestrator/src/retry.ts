@@ -6,7 +6,7 @@
  * the section reads a step's standing — `retryable`, `retriesDue`, `retryRefusal`, `tryNote`, `retryLines`, `answerLines` — stays in
  * run.ts, since it calls `standing`, the gates and the budget there, and importing those here would make a cycle.
  */
-import type { Raise, Run, StepRecord } from './run.ts';
+import type { Run, StepRecord } from './run.ts';
 import type { Workflow } from './workflow.ts';
 
 /**

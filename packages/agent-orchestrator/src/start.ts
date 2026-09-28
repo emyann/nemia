@@ -193,7 +193,7 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
     if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
     run = { id, place: { kind: 'folder' }, workspace: workRoot(runsDir(), id), ...told, steps: stepRecords, createdAt: new Date().toISOString() };
   } else {
-    const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
+    const { workspace, baseRef, branch } = makeWorkspace(opts.repo);
     const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
     if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
     run = {

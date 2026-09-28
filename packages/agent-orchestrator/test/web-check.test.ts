@@ -210,7 +210,7 @@ test('as a check: a branch that touches only the packages, the docs or the workf
 test('as a check: a file moved out of the web app, or one whose name is not ASCII, counts as touching it', () => {
   // A rename is listed by its new path alone under git's default rename detection, and a non-ASCII path is quoted: either would read
   // as a change to the packages only.
-  const { repo, base } = branched(['apps/web/src/lib/shared.ts']);
+  const { repo } = branched(['apps/web/src/lib/shared.ts']);
   git(repo, 'checkout', '-q', '-b', 'moved');
   fs.mkdirSync(path.join(repo, 'packages', 'shared'), { recursive: true });
   git(repo, 'mv', 'apps/web/src/lib/shared.ts', 'packages/shared/shared.ts');

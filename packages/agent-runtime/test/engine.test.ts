@@ -53,13 +53,13 @@ test('the happy path: filed → spawned → running → done → settled', async
 
   await b.run(tick());
   assert.equal(b.sessions.size, 1, 'exactly one session was started');
-  assert.equal(await b.run(phaseOf(id, b)), 'running (working)');
+  assert.equal(await b.run(phaseOf(id)), 'running (working)');
 
   // The harness finishes the work. The engine finds out by asking, not by being told.
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
   await b.run(tick());
 
-  assert.equal(await b.run(phaseOf(id, b)), 'succeeded');
+  assert.equal(await b.run(phaseOf(id)), 'succeeded');
   assert.equal(b.sessions.size, 1, 'and never started a second one');
 });
 
@@ -89,7 +89,7 @@ test('CRASH while the session runs: the restart adopts it and starts nothing', a
   for (let i = 0; i < 5; i++) await b.run(tick());
 
   assert.deepEqual([...b.sessions.keys()], running, 'no second session, five restarts later');
-  assert.equal(await b.run(phaseOf(id, b)), 'running (working)');
+  assert.equal(await b.run(phaseOf(id)), 'running (working)');
 });
 
 test('a failed attempt settles the task failed: one attempt per start, and no second session', async () => {
@@ -102,7 +102,7 @@ test('a failed attempt settles the task failed: one attempt per start, and no se
 
   await b.run(tick());
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'failed');
+  assert.equal(await b.run(phaseOf(id)), 'failed');
   assert.equal(b.sessions.size, 1, 'trying again is the layer above\'s: it files the task again');
 });
 
@@ -113,7 +113,7 @@ test('a blocked session is surfaced as needing a person, not as progress', async
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'input-required' });
 
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'needs-human');
+  assert.equal(await b.run(phaseOf(id)), 'needs-human');
 });
 
 test('stop: one pass asks the harness, the next observes it and settles', async () => {
@@ -125,11 +125,11 @@ test('stop: one pass asks the harness, the next observes it and settles', async 
   // Pass one sends the request and stops there: what the harness did with it is not yet observed.
   await b.run(tick());
   assert.deepEqual([...b.sessions.values()].map((s) => s.state), ['canceled'], 'the harness was actually told');
-  assert.equal(await b.run(phaseOf(id, b)), 'running (stopped)', 'not settled on an assumption');
+  assert.equal(await b.run(phaseOf(id)), 'running (stopped)', 'not settled on an assumption');
 
   // Pass two sees it and writes it down.
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'stopped');
+  assert.equal(await b.run(phaseOf(id)), 'stopped');
 });
 
 test('a pass over many tasks starts each exactly once', async () => {
@@ -140,7 +140,7 @@ test('a pass over many tasks starts each exactly once', async () => {
 
   await b.run(tick());
   assert.equal(b.sessions.size, 12, 'a second pass starts nothing new');
-  const views = await Promise.all(ids.map((id) => b.run(phaseOf(id, b))));
+  const views = await Promise.all(ids.map((id) => b.run(phaseOf(id))));
   assert.ok(views.every((p) => p === 'running (working)'));
 });
 
@@ -153,8 +153,8 @@ test('a finished task settles while another waits to be admitted — settling is
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
 
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'succeeded', 'settling is not an admission');
-  assert.equal(await b.run(phaseOf(waiting, b)), 'pending', 'and nothing it was not told to start has started');
+  assert.equal(await b.run(phaseOf(id)), 'succeeded', 'settling is not an admission');
+  assert.equal(await b.run(phaseOf(waiting)), 'pending', 'and nothing it was not told to start has started');
   assert.equal(b.sessions.size, 1);
 });
 
@@ -186,7 +186,7 @@ test('settleTask is a fixpoint: it stops when nothing moves', async () => {
   assert.deepEqual(actions.map((a) => a.do), ['start', 'spawn', 'nothing']);
 });
 
-const phaseOf = (id: string, b: ReturnType<typeof board>) =>
+const phaseOf = (id: string) =>
   Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => Effect.map(view(id, o), (v) => v.phase)));
 
 test('ADOPTION: a session already running under our name is adopted, not duplicated', async () => {
@@ -301,13 +301,13 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
   await b.run(tick());
   b.sessions.set(nameFor('stuck', 1), { ...b.sessions.get(nameFor('stuck', 1))!, state: 'input-required' });
   await b.run(tick());
-  assert.equal(await b.run(phaseOf('stuck', b)), 'needs-human', 'blocked, and before its deadline nothing ends it');
+  assert.equal(await b.run(phaseOf('stuck')), 'needs-human', 'blocked, and before its deadline nothing ends it');
   await pastIt();
 
   await b.run(tick());                        // deadline stops it
   assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'canceled');
   await b.run(tick());                        // and it settles
-  assert.equal(await b.run(phaseOf('stuck', b)), 'failed');
+  assert.equal(await b.run(phaseOf('stuck')), 'failed');
 });
 
 // ─── what a pass reports, and what it no longer does ────────────────────────
@@ -334,8 +334,8 @@ test('running counts the sessions at work on each harness as the pass left them:
   b.sessions.delete(nameFor('no-harness', 1));  // spawned, and not yet in the registry: at work as far as anyone knows
   const second = await b.run(tick());
   assert.deepEqual(second.running, { claude: 1, codex: 1, default: 1 });
-  assert.equal(await b.run(phaseOf('c-end', b)), 'succeeded');
-  assert.equal(await b.run(phaseOf('x-queued', b)), 'pending', 'queued, and never counted');
+  assert.equal(await b.run(phaseOf('c-end')), 'succeeded');
+  assert.equal(await b.run(phaseOf('x-queued')), 'pending', 'queued, and never counted');
 });
 
 test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and an old priority choose nothing', async () => {
@@ -491,7 +491,7 @@ test('blocked with no statement still needs a person', async () => {
 
   assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'needs-human');
+  assert.equal(await b.run(phaseOf(id)), 'needs-human');
 });
 
 test('blocked with an inherited statement still needs a person, and the statement is not recorded', async () => {
@@ -501,7 +501,7 @@ test('blocked with an inherited statement still needs a person, and the statemen
 
   assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id, b)), 'needs-human');
+  assert.equal(await b.run(phaseOf(id)), 'needs-human');
 
   // When the harness does end it, the parent's statement is not written down as this attempt's.
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'completed' });
@@ -803,12 +803,12 @@ test('a move the lifecycle has no edge for is on every pass\'s report while it l
   for (let pass = 0; pass < 3; pass++) {
     const report = await planted(tick());
     assert.deepEqual(report.refused, [{ taskId: id, state: 'working', event: 'SESSION_LIVE' }, { taskId: other, state: 'working', event: 'SESSION_LIVE' }], `pass ${pass}`);
-    assert.equal(await b.run(phaseOf(id, b)), 'running (working)', 'and nothing was done to it');
+    assert.equal(await b.run(phaseOf(id)), 'running (working)', 'and nothing was done to it');
   }
   b.sessions.set(nameFor(other, 1), { ...b.sessions.get(nameFor(other, 1))!, state: 'completed' });
   const report = await planted(tick());
   assert.deepEqual(report.refused, [{ taskId: id, state: 'working', event: 'SESSION_LIVE' }], 'an ended session has its edge, and leaves the report');
-  assert.equal(await b.run(phaseOf(other, b)), 'succeeded');
+  assert.equal(await b.run(phaseOf(other)), 'succeeded');
   assert.deepEqual((await b.run(tick())).refused, [], 'the shipped machine refuses nothing');
 });
 
@@ -820,7 +820,7 @@ test('a store of settled tasks, ticked again and again, reports no refusal — a
   b.sessions.set(nameFor('broke', 1), { ...b.sessions.get(nameFor('broke', 1))!, state: 'failed' });
   await b.run(requestStop('stopped'));
   for (let i = 0; i < 3; i++) await b.run(tick());
-  assert.deepEqual(await Promise.all(['done', 'broke', 'stopped'].map((id) => b.run(phaseOf(id, b)))), ['succeeded', 'failed', 'stopped']);
+  assert.deepEqual(await Promise.all(['done', 'broke', 'stopped'].map((id) => b.run(phaseOf(id)))), ['succeeded', 'failed', 'stopped']);
   // A final state has no edge, so a settled task observed would be refused on every pass: `settledQuiet` keeps it unobserved.
   for (let pass = 0; pass < 3; pass++) assert.deepEqual((await b.run(tick())).refused, [], `pass ${pass}`);
 });
@@ -859,7 +859,7 @@ const settledBeside = async (j: ReturnType<typeof countedJournal>, memo: { verif
   await b.run(tick());
   b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'completed' });
   await b.run(tick());
-  assert.equal(await b.run(phaseOf('done', b)), 'succeeded');
+  assert.equal(await b.run(phaseOf('done')), 'succeeded');
   // The pass after the settling folds it again, since the feed names the settling: after it, nothing has.
   await b.run(tick());
   return b;

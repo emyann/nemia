@@ -1,10 +1,11 @@
 /**
  * A small stdio MCP server, for the capabilities tests and `npm run e2e`: it lists two tools and does nothing else.
  *
- * `HKB_TEST_STARTS`, when set, names a file it adds its pid to each time it starts, so a test can count how often
- * the api asked it. `HKB_TEST_MODE=silent` starts and never answers; `HKB_TEST_MODE=crash` says why on stderr and exits 3;
- * `HKB_TEST_MODE=prompts` offers a prompt and no tools, so it has no `tools/list` to answer; `HKB_TEST_MODE=env` lists one
- * tool, whose description is what the server was started with.
+ * `HKB_TEST_STARTS`, when set, names a file it adds its pid to each time it starts, so a test can count how often the api asked it.
+ * `HKB_TEST_MODE=silent` starts and never answers: it keeps stdin open and reads nothing from it, until the api gives up and stops it.
+ * `HKB_TEST_MODE=crash` says why on stderr and exits 3. `HKB_TEST_MODE=prompts` registers a prompt and no tools, so it declares no `tools`
+ * capability and has no `tools/list` to answer. `HKB_TEST_MODE=env` lists one tool, whose description is what the server was started with,
+ * so a test reads how the api started it.
  */
 import fs from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,17 +19,14 @@ if (process.env.HKB_TEST_MODE === 'crash') {
 }
 
 if (process.env.HKB_TEST_MODE === 'silent') {
-  // Keeps stdin open and reads nothing from it, until the api gives up and stops it.
   setInterval(() => {}, 60_000);
 } else if (process.env.HKB_TEST_MODE === 'env') {
-  // One tool, whose description is what the server was started with: so a test reads how the api started it.
   const { HKB_TEST_NAMED, HKB_TEST_DEFAULTED, HKB_TEST_INHERITED, CLAUDE_PROJECT_DIR, PORT } = process.env;
   const seen = { argv: process.argv.slice(2), HKB_TEST_NAMED, HKB_TEST_DEFAULTED, HKB_TEST_INHERITED, CLAUDE_PROJECT_DIR, PORT };
   const server = new McpServer({ name: 'fixture-env', version: '1.0.0' });
   server.registerTool('env', { description: JSON.stringify(seen) }, async () => ({ content: [] }));
   await server.connect(new StdioServerTransport());
 } else if (process.env.HKB_TEST_MODE === 'prompts') {
-  // Registering only a prompt, the server declares no `tools` capability and has no handler for `tools/list`.
   const server = new McpServer({ name: 'fixture-prompts', version: '1.0.0' });
   server.registerPrompt('greet', { description: 'Say hello.' }, () => ({ messages: [] }));
   await server.connect(new StdioServerTransport());

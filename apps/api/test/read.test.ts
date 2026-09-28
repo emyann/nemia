@@ -13,7 +13,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail.ts';
 
-// agent-orchestrator locates its store as its module loads: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its module loads. */
 const root = scratch('hkb-api-read-');
 process.env.WF_ROOT = root;
 
@@ -135,8 +135,7 @@ const stepOf = async (name: string) => {
 test("a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache", async () => {
   const implement = await stepOf('implement');
   const { cost, read, peak, rebuilt } = implement.used!;
-  // The cost alone, as it was: what the sessions read is beside it, not in it.
-  assert.equal(cost, '$5.30');
+  assert.equal(cost, '$5.30', 'the cost alone: what the sessions read is beside it, not in it');
   assert.equal(
     read,
     'read 4.4M · wrote 355k · peak 204k, at its 200k cap · a resumed session wrote its context to the cache again instead of reading it',
@@ -164,12 +163,15 @@ test('a runner that counted the input as one number says nothing of what it read
 
 test("the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them", async () => {
   const run = await detailOf(R);
-  // `plan` counted its input as one number: a sum over the others would read as the whole run's. The rebuilt cache is still a fact.
-  assert.deepEqual(run.read, {
-    said: 'a resumed session wrote its context to the cache again instead of reading it',
-    peak: null,
-    rebuilt: 1,
-  });
+  assert.deepEqual(
+    run.read,
+    {
+      said: 'a resumed session wrote its context to the cache again instead of reading it',
+      peak: null,
+      rebuilt: 1,
+    },
+    "`plan` counted its input as one number: a sum over the others would read as the whole run's; the rebuilt cache is still a fact",
+  );
 
   const R2 = 'r-read-all';
   const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'));
@@ -183,22 +185,25 @@ test("the run's reads are every try's of every step, beside its cost — no clas
     }),
   );
   const all = await detailOf(R2);
-  // The largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it.
-  assert.deepEqual(all.read, {
-    said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
-    peak: 'large',
-    rebuilt: 1,
-  });
+  assert.deepEqual(
+    all.read,
+    {
+      said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
+      peak: 'large',
+      rebuilt: 1,
+    },
+    "the largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it",
+  );
 });
 
 test("a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone", async () => {
-  // Measured (engine open issue 26): under --autocompact 200000, compacted at 173,584 and 173,254 tokens, and the boundary's context is the peak.
   const compacted = {
     turns: 60,
     inputTokens: 6_000_000,
     cacheReadTokens: 5_700_000,
     cacheWriteTokens: 299_990,
     uncachedTokens: 10,
+    /** A session under `--autocompact 200000` compacts short of its cap, and the context at the compaction's boundary is its peak. */
     peakContextTokens: 173_584,
     compactions: 2,
     outputTokens: 20_000,
@@ -226,7 +231,6 @@ test("a session that compacted reached its cap, short of it in tokens — and th
       }),
     );
     task(`${id}-implement`, 'claude', [compacted]);
-    // No cap, on the harness's own window: it compacted once, short of 200k.
     task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
   };
   run(RC, 120_000);
@@ -240,7 +244,11 @@ test("a session that compacted reached its cap, short of it in tokens — and th
   );
   const review = detail.steps.find((s) => s.name === 'review')?.used;
   assert.ok(review);
-  assert.deepEqual([review.read, review.peak], ['read 2.9M · wrote 100k · peak 120k, compacted', null], 'no cap to reach');
+  assert.deepEqual(
+    [review.read, review.peak],
+    ['read 2.9M · wrote 100k · peak 120k, compacted', null],
+    "no cap to reach: on the harness's own window it compacted once, short of 200k",
+  );
   assert.deepEqual(
     detail.read,
     { said: 'read 8.6M · wrote 400k · peak 174k, compacted twice at its 200k cap', peak: 'cap', rebuilt: 0 },

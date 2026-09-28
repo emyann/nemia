@@ -31,3 +31,7 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   key named: no schema message reaches a response. A new key goes into the schema and its `*_SHAPE`, with a test that makes it refuse.
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
   runtime always writes fails the read, not the assertion you meant.
+- **A test sets `WF_ROOT` (and `CLAUDE_CONFIG_DIR`) before it imports the api or the package**: the orchestrator reads them as its
+  modules load, so the imports after the assignment are dynamic (`test/app.test.ts`).
+- **A route's contract is an entry in the JSDoc of its exported router** (`asks` in `asks.ts`): the comment guard refuses a JSDoc on
+  `.post(`. In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.

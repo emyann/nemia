@@ -5,7 +5,10 @@
  * already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the board.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run — and
- * the harness's fake `claude` (test/harness.ts) first on PATH.
+ * the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, git runs of one
+ * step; `p-failed-merged`, whose step failed and whose branch a person merged by hand all the same — on the base, however it got there, so
+ * shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your decision all the
+ * same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -18,7 +21,7 @@ import type { Pruning } from 'agent-orchestrator';
 import type { RunDetail } from '../src/detail.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-prune-');
 process.env.WF_ROOT = root;
 
@@ -108,7 +111,6 @@ gitRun('p-merged', { merge: true });
 gitRun('p-unmerged', { merge: false });
 gitRun('p-running', { merge: false, working: true });
 
-// A run whose step failed and whose branch a person merged by hand all the same: on the base, however it got there, so shipped.
 gitRun('p-failed-merged', { merge: true });
 journal('p-failed-merged-implement', [
   filed,
@@ -118,7 +120,6 @@ journal('p-failed-merged-implement', [
   { kind: 'settled', at: at(9), outcome: 'failed' },
 ]);
 
-// A run that worked on main itself (`--no-worktree`): no branch of its own to merge, and it waits on your decision all the same.
 signedOff('p-direct-implement');
 write(path.join(filesDir('p-direct'), 'implement', 'shot.png'), 'a picture');
 write(
@@ -138,7 +139,6 @@ write(
   }),
 );
 
-// A folder run whose one step signed off: its folder is its work, and never pruned.
 const work = path.join(root, 'folders', 'p-folder');
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
 signedOff('p-folder-write');
@@ -261,8 +261,11 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
     page.pruned!.worktrees.map((w) => w.path),
     [worktreeOf('p-merged')],
   );
-  // Nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test).
-  assert.deepEqual(page.onDisk, { worktrees: false, files: false });
+  assert.deepEqual(
+    page.onDisk,
+    { worktrees: false, files: false },
+    'nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test)',
+  );
 });
 
 test('REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `wf prune`, and nothing is touched', async () => {
@@ -305,8 +308,11 @@ test('a finished run nobody merged, pruned with `unmerged`, loses its worktree a
   assert.equal(pruned.artifacts, undefined);
   assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
   assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
-  // Its files are still there to give back, and nothing else.
-  assert.deepEqual((await detail('p-unmerged')).onDisk, { worktrees: false, files: true });
+  assert.deepEqual(
+    (await detail('p-unmerged')).onDisk,
+    { worktrees: false, files: true },
+    'its files are still there to give back, and nothing else',
+  );
 });
 
 test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf prune`, whatever the switches, and nothing is touched', async () => {
@@ -361,8 +367,11 @@ test("REFUSED at shipped defaults: a body that is not `wf prune`'s two switches 
     assert.match(((await res.json()) as { error: string }).error, words);
     assert.deepEqual(stateOf('p-body'), before, JSON.stringify(body));
   }
-  // The same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone.
-  assert.equal((await pruneOn('p-body', { artifacts: false })).status, 200);
+  assert.equal(
+    (await pruneOn('p-body', { artifacts: false })).status,
+    200,
+    'the same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone',
+  );
 });
 
 test('REFUSED at shipped defaults: a prune from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the run stands', async () => {

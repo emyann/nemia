@@ -1,7 +1,12 @@
 /**
- * A step whose task is held open (thin runtime stage 2 part 4b), as the board reads it: signed, and waiting for a person's word with nothing
- * running — the engine's `input-required`. Blocked, it reads `input-required · BLOCKED` with its question, waiting on you; gated, it reads
- * `awaiting approval`. Each held to what `wf ls` says of the same run, and neither read as a session still going.
+ * A step whose task is held open, as the board reads it: signed, and waiting for a person's word with nothing running — the engine's
+ * `input-required`. Blocked, it reads `input-required · BLOCKED` with its question, waiting on you; gated, it reads `awaiting approval`.
+ * Each held to what `wf ls` says of the same run, and neither read as a session still going.
+ *
+ * The runs it seeds: `h-blocked`, signed off blocked; `h-gate`, gated at plan; `h-closed`, approved — closed on the pass that filed
+ * implement, and not yet settled: the engine settles it on its next pass; `h-answered`, blocked, then answered (`wf retry --message`) — the
+ * answer is the task's next turn, under the same id, and its attempt has not ended; and `h-rechecked`, whose task is filed without
+ * `holdOpen` — its check rechecked (`wf retry --recheck`, the same task and turn), then nudged, a task of its own.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, and the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -14,7 +19,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail.ts';
 import type { RunSummary } from '../src/runs.ts';
 
-// agent-orchestrator locates its store as its modules load: set first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
 const root = scratch('hkb-api-held-');
 process.env.WF_ROOT = root;
 
@@ -69,12 +74,10 @@ writeRun('h-blocked');
 waiting('h-blocked-plan', BLOCKED);
 writeRun('h-gate', ['plan']);
 waiting('h-gate-plan', DONE);
-// Approved: closed on the pass that filed implement, and not yet settled — the engine settles it on its next pass.
 writeRun('h-closed', ['plan']);
 waiting('h-closed-plan', DONE);
 fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-closed-plan.jsonl'), `${JSON.stringify({ kind: 'closed', at: at(30) })}\n`);
 
-// Blocked, then answered (`wf retry --message`): the answer is the task's next turn, under the same id, and its attempt has not ended.
 writeRun('h-answered');
 waiting('h-answered-plan', BLOCKED);
 fs.appendFileSync(
@@ -94,7 +97,6 @@ fs.appendFileSync(
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-// Filed before tasks were held open: its check rechecked (`wf retry --recheck`, the same task and turn), then nudged, a task of its own.
 writeRun('h-rechecked');
 journal('h-rechecked-plan', [
   { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },

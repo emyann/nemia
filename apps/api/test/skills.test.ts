@@ -3,6 +3,9 @@
  * beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back from disk,
  * and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one of yours
  * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
+ *
+ * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
+ * your library first: only the lookup does.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -13,7 +16,7 @@ import path from 'node:path';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 
-// agent-orchestrator locates its store when the module loads, so point it at a scratch directory first.
+/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
 const root = scratch('hkb-api-skills-');
 process.env.WF_ROOT = root;
 const repo = scratch('hkb-api-skills-repo-');
@@ -25,7 +28,7 @@ type SkillPlace = import('../src/skills.ts').SkillPlace;
 type SkillRow = import('../src/skills.ts').SkillRow;
 type SkillAdded = import('../src/skills.ts').SkillAdded;
 
-// What HKB ships: the checkout these tests run in, which is the api's own (HOME_REPO). Read, never written.
+/** What HKB ships: the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
 const shipped = fs
   .readdirSync(SHIPPED)
@@ -40,8 +43,6 @@ function skill(dir: string, name: string, text: string): void {
   fs.writeFileSync(path.join(dir, name, 'SKILL.md'), text);
 }
 
-// The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names
-// puts your library first: only the lookup does.
 skill(THEIRS, 'shared', "---\ndescription: The repository's.\n---\nTheirs.\n");
 skill(THEIRS, 'review', '---\nname: code-review\ndescription: Reviews a change.\n---\nReview it.\n');
 skill(THEIRS, 'scratch', '# Scratch\n\nNo frontmatter.\n');
@@ -313,10 +314,13 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     ]);
     assert.deepEqual(mine.skill.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
     assert.equal(mine.copyHint, `mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'mine')}' '${THEIRS}/'`);
-    // `shared` is in both places: the repository's agent finds its own first, and an agent of yours finds yours.
-    assert.deepEqual((await detail('yours', 'shared')).users, [{ from: 'yours', name: 'scribe' }]);
+    assert.deepEqual(
+      (await detail('yours', 'shared')).users,
+      [{ from: 'yours', name: 'scribe' }],
+      '`shared` is in both places: an agent of yours finds yours',
+    );
     const theirs = await detail('repo', 'shared');
-    assert.deepEqual(theirs.users, [{ from: 'repo', name: 'theirs' }]);
+    assert.deepEqual(theirs.users, [{ from: 'repo', name: 'theirs' }], "and the repository's agent finds its own first");
     assert.equal(theirs.copyHint, `mkdir -p '${LIBRARY}' && cp -r '${path.join(THEIRS, 'shared')}' '${LIBRARY}/'`);
     const broken = await detail('repo', 'scratch');
     assert.equal(broken.draft, null);
@@ -482,9 +486,8 @@ test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is
   assert.equal(fs.existsSync(path.join(LIBRARY, 'fresh')), false);
 });
 
-test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet", async () => {
+test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet, in a checkout whose path has a space and a quote", async () => {
   const { copyCommand } = await import('../src/skills.ts');
-  // A checkout with a `.claude/` and no `skills/` in it yet, under a folder whose name has a space and a quote.
   const checkout = path.join(scratch('hkb-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');

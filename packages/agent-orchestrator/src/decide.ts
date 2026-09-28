@@ -4,7 +4,7 @@
  * reads it (`checkoutHold`, in `tick.ts`), and the views are beneath the tick. A controller, reaching the runtime through the client
  * (`runtime-client.ts`).
  */
-import { nameFor, type Engine, type Usage } from './runtime-client.ts';
+import { nameFor, unreadableJournal, type Engine, type Usage } from './runtime-client.ts';
 import {
   acceptedLines,
   answerLines,
@@ -23,6 +23,8 @@ import {
   roundLines,
   roundsDue,
   runCostLines,
+  runTasks,
+  unjudgedWords,
   waitsOf,
   type BranchStanding,
   type CheckoutHold,
@@ -54,6 +56,7 @@ import {
   saidIn,
   spendReader,
   taskPhases,
+  unjudgedWord,
   viewedOnce,
   waitingOf,
   type CheckReport,
@@ -97,6 +100,30 @@ export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReade
     deniedOf(views),
     holdsOf(run, parent),
   );
+}
+
+/** A run left unjudged (`unjudgedOf`): why, in one sentence, and each step's word with the branch it works on. */
+export type Unjudged = { said: string; steps: Array<{ name: string; status: string; branch?: string }> };
+
+/**
+ * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`),
+ * as the tick leaves such a run where it is: why it is not judged, by `by` (`unjudgedWords`), and each step's word (`unjudgedWord`) off one
+ * read of the run's own tasks (`list`), which names every one of them that does not read — a check's and an earlier try's among them.
+ * Undefined for any other failure, which the caller throws.
+ */
+export async function unjudgedOf(e: Engine, run: Run, err: unknown, by: string): Promise<Unjudged | undefined> {
+  const why = unreadableJournal(err);
+  if (why === undefined) return undefined;
+  const tasks = runTasks(run);
+  const listed = await e.list(tasks);
+  const unreadable = new Map(listed.unreadable.map((u) => [u.taskId, u.why]));
+  const named = (err as { taskId: string }).taskId;
+  const own = tasks.find((id) => unreadable.has(id)) ?? tasks.find((id) => id === named);
+  const word = unjudgedWord(new Map(listed.views.map((v) => [v.id, v])), unreadable);
+  return {
+    said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why, by),
+    steps: stepsOf(run).map(({ name }) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch })),
+  };
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */

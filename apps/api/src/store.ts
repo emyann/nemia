@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import { engine, HOME, listRuns, loadWorkflows, readFilings, unreadableJournal } from 'agent-orchestrator';
-import { isGitRun, type Run } from 'agent-orchestrator/run';
+import { isGitRun, runTasks, type Run, unjudgedWords } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
 /**
@@ -37,17 +37,9 @@ export async function viewsOf(run: Run, reader: typeof e = e): Promise<Views> {
   return views;
 }
 
-/** Every task a run has filed: each step's and its check's, and each earlier try's and its check's — what a run's page reads of every try. */
-const tasksOf = (run: Run): string[] =>
-  Object.values(run.steps).flatMap(({ taskId, check, tries }) => [
-    ...(taskId ? [taskId] : []),
-    ...(check ? [check.taskId] : []),
-    ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
-  ]);
-
 /** The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read. */
 export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
-  const taskId = tasksOf(run).find((id) => unreadable.has(id));
+  const taskId = runTasks(run).find((id) => unreadable.has(id));
   return taskId === undefined ? undefined : { taskId, why: unreadable.get(taskId)! };
 }
 
@@ -62,19 +54,15 @@ export async function judgedUnlessUnreadable<T>(
   judge: () => Promise<T>,
 ): Promise<{ judged: T } | { unreadable: string }> {
   const own = unreadableOf(run, unreadable);
-  if (own) return { unreadable: unjudgedWords(run, `the journal of its task ${own.taskId} does not: ${own.why}`) };
+  if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };
   try {
     return { judged: await judge() };
   } catch (err) {
     const why = unreadableJournal(err);
     if (why === undefined) throw err;
-    return { unreadable: unjudgedWords(run, `the journal of a task of a run it waits on does not: ${why}`) };
+    return { unreadable: unjudgedWords(run.id, undefined, why, 'the board') };
   }
 }
-
-/** Why `run` is not judged, whole: what reads, what does not (`why`), and what that costs until it reads. */
-const unjudgedWords = (run: Run, why: string): string =>
-  `${run.id}'s record reads, but ${/[.!?]$/.test(why) ? why : `${why}.`} So the board does not judge the run, and the tick does not advance it, until that journal reads again.`;
 
 /**
  * The views a request judges `runs` by, and the engine it hands the package's `parentOf` for the runs they wait on: the tasks of those runs
@@ -83,7 +71,7 @@ const unjudgedWords = (run: Run, why: string): string =>
  * waited on that the views do not hold, filed since, is viewed (`seenBy`).
  *
  * A task whose journal does not read is in `unreadable` and in no view, as the runtime leaves it out: one entry no runtime wrote costs the
- * runs that read that task (`unreadableOf`), never the others.
+ * runs that read that task (`unreadableOf`), never the others. A run's tasks are every try's and every check's (`runTasks`).
  *
  * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at
  * rest. And a run waited on was read a `view` a task, its journal once more: 632 journals on the second request of the live store, where
@@ -95,7 +83,7 @@ export async function viewsFor(
 ): Promise<{ views: Views; reader: typeof e; unreadable: Unreadable }> {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
-  const listed = await e.list(read.flatMap(tasksOf));
+  const listed = await e.list(read.flatMap(runTasks));
   const views: Views = new Map(listed.views.map((view) => [view.id, view]));
   return { views, reader: seenBy(views), unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) };
 }

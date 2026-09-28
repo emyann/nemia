@@ -93,6 +93,7 @@ import {
   inputsNote,
   lessonLine,
   list,
+  unjudgedOf,
   listRuns,
   messageRefusal,
   missingArtifacts,
@@ -857,12 +858,15 @@ export function watchPrinted(from: number): { stop(): void } {
  *   (`stillHeld`), and a signal that stops it lets the store go, so it reads free at once. It says each failure once while it lasts — a
  *   queued card's start, the feed's, a move the lifecycle refused, a journal left out — going by what it has printed, not by the store.
  * - `wf ls <run>` judges the cap on runs in flight over the whole store. A listing views each task once and asks git of each repository's
- *   branches once (`viewedOnce`, `branchReader`), and says an ending's gate once, on its `to decide` line.
+ *   branches once (`viewedOnce`, `branchReader`), and says an ending's gate once, on its `to decide` line, and what a run has cost so
+ *   far on its line, where the engine measured it. A run a task journal of which does not read is listed with its steps and
+ *   `→ unreadable:` in the runtime's words (`unjudgedOf`), and `wf decide` of it fails with those words.
  * - `wf cancel` prints a line in every case, a run already finished and one with nothing in flight included.
  * - `wf rm`, and `wf prune` of named runs, judge each run on its own, a line each, a refusal included, and fail once every run has had its
  *   say: exit 2, or 1 when one failed otherwise. `wf prune` of every run says the runs not over in one line, and a run with nothing to
  *   prune not at all; each run is judged again before it is pruned, never trusted from the listing.
- * - `wf decide` refuses a flag before the run, which would otherwise print the help and exit 0. A run waiting on others (`--after`), held
+ * - `wf decide` refuses a flag before the run, which would otherwise print the help and exit 0. Every screen names the files a person gave
+ *   the run under its line, as its steps were handed them. A run waiting on others (`--after`), held
  *   (`wf hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a hold beside a wait says
  *   that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for, and the tries and
  *   rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said there and on the
@@ -1202,7 +1206,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const held = await runSlots(viewed, rest[0] ? listRuns() : runs);
       for (const run of runs) {
         const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
-        const { steps, waitingOnYou, waiting, holding, cost, toDecide } = await list(viewed, run, held.get(run.id), git);
+        const listed = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
+          const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
+          if (!unjudged) throw err;
+          return unjudged;
+        });
+        if ('said' in listed) {
+          console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}`);
+          const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
+          for (const s of listed.steps) console.log(`   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`);
+          console.log(`   → unreadable: ${listed.said}`);
+          continue;
+        }
+        const { steps, waitingOnYou, waiting, holding, cost, toDecide } = listed;
         console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         const said = steps.map((s) => `${s.status}${s.cost ? `  ${s.cost}` : ''}`);
         const width = Math.max(20, ...said.map((w) => w.length));
@@ -1378,7 +1394,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         checkout,
         standings,
         toDecide,
-      } = await decide(e, rest[0]);
+      } = await decide(e, rest[0]).catch(async (err: unknown) => {
+        const unjudged = await unjudgedOf(e, readRun(rest[0]), err, 'wf decide');
+        throw unjudged ? new Error(unjudged.said) : err;
+      });
       const given = inputsNote(inputsDir(run), run.inputs);
       const from = fromNote(run);
       const pruned = run.pruned ? `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` : '';

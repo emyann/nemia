@@ -1612,6 +1612,9 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   assert.equal(message(injected), "review: `check` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line — commands joined with `&&`.");
   assert.match(message({ ...step, model: 'opus\r' }), /^review: `model` holds a line break/);
   assert.match(message({ ...step, tools: ['Read', 'Grep\nBash'] }), /^review: `tools` holds a line break/);
+  // A key the draft sends as an object would be written `[object Object]`, a value nobody chose: refused by name instead.
+  assert.equal(message({ ...step, model: { name: 'opus' } }),
+    'review: `model` is {"name":"opus"}, and a frontmatter line holds a word, a number or a list: an object would be written as `[object Object]`.');
 
   assert.equal(message({ ...step, after: ['implement, docs'] }),
     "review: `after` lists `implement, docs`, and a list is split on every comma, so it would be read as `implement`, `docs`. A step's name has no comma: give each step an entry of its own.");

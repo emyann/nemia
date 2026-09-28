@@ -732,8 +732,10 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
   } else if (key === 'output' && typeof value === 'object') {
     // The file it names: the schema is the folder's. An `output` naming no file is written with no value, which the parser refuses.
     text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
+  } else if (typeof value === 'object' || typeof value === 'function') {
+    refuse(`${step}: \`${key}\` is ${JSON.stringify(value) ?? `a ${typeof value}`}, and a frontmatter line holds a word, a number or a list: an object would be written as \`[object Object]\`.`);
   } else {
-    text = String(value);
+    text = String(value as string | number | boolean | bigint | symbol);
   }
   if (/[\r\n]/.test(text)) {
     refuse(`${step}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line${key === 'check' ? ' — commands joined with `&&`' : ''}.`);
@@ -2126,7 +2128,7 @@ export function renderAgent(draft: AgentDraft): string {
   if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined) refuse(codexModeWritten(file, keys.permissionMode));
   // A card file is what a page drawn before agents card 2 sends — as `card`, or as `skills:` from before 2026-09-25 — and is written nowhere now.
   const sent = (draft as { card?: unknown }).card;
-  if (sent != null) refuse(`${cardRetired(file, 'card', String(sent))} A page open since before then sends it: reload it, and save again.`);
+  if (sent != null) refuse(`${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page open since before then sends it: reload it, and save again.`);
   if (draft.skills != null && isCardFile(String(draft.skills))) {
     refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page open since before then sends it: reload it, and save again.`);
   }

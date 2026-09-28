@@ -89,7 +89,7 @@ type Place = (record: Record<string, unknown>) => { place: string; rest: string[
 
 /** A finding's place, `file:line`, or the file alone when its line is null: it is about something absent. */
 const findingPlace: Place = (r) => ({
-  place: r.line === null || r.line === undefined ? String(r.file) : `${String(r.file)}:${String(r.line)}`,
+  place: r.line === null || r.line === undefined ? String(r.file) : `${String(r.file)}:${typeof r.line === 'number' || typeof r.line === 'string' ? r.line : JSON.stringify(r.line)}`,
   rest: Object.keys(r).filter((k) => k !== 'file' && k !== 'line'),
 });
 

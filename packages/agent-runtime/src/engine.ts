@@ -348,7 +348,7 @@ export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
  */
 export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0 ? undefined
-    : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+    : `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps as string | number | bigint | boolean | symbol | undefined)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
 /** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */
 const ALL_READ: ReadonlySet<string> = new Set();

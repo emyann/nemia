@@ -136,7 +136,7 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
   if (!line || !at || line.isSidechain === true) return [];
   const id = typeof line.uuid === 'string' && line.uuid ? line.uuid : `@${offset}`;
   if (line.type === 'system') {
-    return [{ id, at, role: 'system', kind: 'system', text: typeof line.content === 'string' ? line.content : String(line.subtype ?? 'system') }];
+    return [{ id, at, role: 'system', kind: 'system', text: typeof line.content === 'string' ? line.content : typeof line.subtype === 'string' ? line.subtype : 'system' }];
   }
   if (line.type === 'attachment') {
     const a = line.attachment;

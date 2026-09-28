@@ -347,7 +347,7 @@ export function handOff(workspace: string, step: string, when = ''): { commit: s
 /** What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its exit status. */
 function failedWords(err: unknown, lines = 4): string {
   const { stderr, status } = err as { stderr?: unknown; status?: number | null };
-  const said = String(stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const said = (Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '').split('\n').map((l) => l.trim()).filter(Boolean);
   return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 

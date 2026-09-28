@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Ajv } from 'ajv';
 import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
-import { closeoutSchemaOf, type Closeout } from '../src/closeout.ts';
+import { closeoutSchemaOf, type Closeout } from '../src/closeout/closeout.ts';
 import { loopSpan, terminalSteps, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { toldIn } from './told.ts';

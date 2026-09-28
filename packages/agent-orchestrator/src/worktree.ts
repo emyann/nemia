@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { lastLines } from './check.ts';
+import { lastLines } from './check/check.ts';
 import {
   depsPlan,
   inside,
@@ -24,12 +24,12 @@ import {
   type Installed,
   type Provisioned,
   type WorktreeInclude,
-} from './deps.ts';
-import { folderPlace } from './places.ts';
+} from './workspace/workspace.ts';
+import { folderPlace } from './record/places.store.ts';
 import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 import { HOME, lstatOf, runsDir } from './store.ts';
-import { countSpawn, execCounted, readText } from './tally.ts';
+import { countSpawn, execCounted, readText } from './meter/tally.store.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;

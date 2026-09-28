@@ -79,6 +79,7 @@ test('REFUSED: a package whose tests beside the code its test script does not ru
 test("every package's test script runs the tests beside its code", () => {
   const repo = path.join(import.meta.dirname, '..', '..', '..');
   const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  assert.ok(testsBeside(path.join(import.meta.dirname, '..')).length > 0, "the scan finds the tests beside this package's code");
   const refused = packages.flatMap((dir) => {
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
     return unrunBeside(pkg.name, pkg.scripts.test ?? '', testsBeside(dir).length);

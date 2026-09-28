@@ -16,7 +16,7 @@
  * `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree and
  * no cycle can form (`test/boundary.test.ts`).
  */
-export { verdictWord } from './check.ts';
+export { verdictWord } from './check/check.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -103,9 +103,9 @@ export {
   waitAdvice,
   waitWord,
 } from './run.ts';
-export { outputLines } from './closeout.ts';
+export { outputLines } from './closeout/closeout.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry.ts';
-export { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines } from './timeline.ts';
+export { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines } from './timeline/timeline.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
@@ -132,7 +132,7 @@ export type {
   TaskSpend,
   Wait,
 } from './run.ts';
-export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline.ts';
+export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/timeline.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry.ts';
 export {
   agentsFor,
@@ -151,8 +151,8 @@ export {
   workflowsIn,
 } from './workflow-store.ts';
 export type { Places } from './workflow-store.ts';
-export { cardToStart, planLines, planStopped } from './plan.ts';
-export type { Card, Planned } from './plan.ts';
+export { cardToStart, planLines, planStopped } from './plan/plan.ts';
+export type { Card, Planned } from './plan/plan.ts';
 export {
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
@@ -164,10 +164,10 @@ export {
   queueLine,
   queueOrder,
   workflowAt,
-} from './inbox.ts';
-export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
-export { feedLineWords, REMOVED } from './feed.ts';
-export type { FeedLine } from './feed.ts';
+} from './inbox/inbox.ts';
+export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox/inbox.ts';
+export { feedLineWords, REMOVED } from './feed/feed.ts';
+export type { FeedLine } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export {
   DAEMON_FILE,
@@ -180,8 +180,8 @@ export {
   staleAfterMs,
   takenFromLine,
   takeoverLine,
-} from './daemon.ts';
-export type { DaemonFile, DaemonStanding, Identity } from './daemon.ts';
+} from './daemon/daemon.ts';
+export type { DaemonFile, DaemonStanding, Identity } from './daemon/daemon.ts';
 export {
   HOME,
   acceptFile,
@@ -219,11 +219,11 @@ export {
   stillHeld,
   storeRefusal,
   takeStore,
-} from './daemon-store.ts';
-export type { TakenStore } from './daemon-store.ts';
-export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter.ts';
-export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter.ts';
-export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed-store.ts';
+} from './daemon/daemon.store.ts';
+export type { TakenStore } from './daemon/daemon.store.ts';
+export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
+export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
+export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
 export { lockfileParts, provisionDeps } from './worktree.ts';
 export { artifactFiles, missingArtifacts } from './artifacts.ts';
 export {
@@ -240,7 +240,7 @@ export {
   touchedBy,
   type BranchReader,
 } from './branches.ts';
-export { evictedBy } from './rest.ts';
+export { evictedBy } from './rest/rest.ts';
 export {
   AgentWriteError,
   agentPlaces,
@@ -264,10 +264,10 @@ export type {
   SkillWritten,
   WorkflowWritten,
 } from './authoring.ts';
-export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox-store.ts';
-export type { InboxDropped, InboxQueued } from './inbox-store.ts';
+export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
-export { A2A_AGENTS_FILE, envNameOf } from './a2a-agents.ts';
+export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,
   closeoutOf,

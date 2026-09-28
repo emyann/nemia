@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { CHECK, checkBrief } from '../src/check.ts';
+import { CHECK, checkBrief } from '../src/check/check.ts';
 import { composeBrief, type Run } from '../src/run.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';

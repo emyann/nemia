@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { branchReader, branchStandings, headsOf, isShipped, oneByOne, type BranchReader } from '../src/branches.ts';
-import { metered } from '../src/tally.ts';
+import { metered } from '../src/meter/tally.store.ts';
 import type { GitRun } from '../src/run.ts';
 
 const git = (cwd: string, ...args: string[]) =>

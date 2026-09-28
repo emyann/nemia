@@ -34,8 +34,8 @@ import {
   rendersAgent,
   type SkillAgain,
 } from './rendering.ts';
-import { inputsRoot } from './places.ts';
-import { countRecord, readText, within } from './tally.ts';
+import { inputsRoot } from './record/places.store.ts';
+import { countRecord, readText, within } from './meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 

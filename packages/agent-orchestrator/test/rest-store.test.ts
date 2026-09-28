@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
 import type { GitRun, Run } from '../src/run.ts';
-import type { PassCost } from '../src/meter.ts';
+import type { PassCost } from '../src/meter/meter.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-rest-');
@@ -29,7 +29,7 @@ const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = aw
 const { tick, freshRestMemo } = await import('../src/tick.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
   await import('../src/store.ts');
-const { feedFile } = await import('../src/feed-store.ts');
+const { feedFile } = await import('../src/feed/feed.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

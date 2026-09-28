@@ -14,7 +14,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
-import { CHECK } from '../src/check.ts';
+import { CHECK } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-ship-');

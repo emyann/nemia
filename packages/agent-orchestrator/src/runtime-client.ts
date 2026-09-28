@@ -23,8 +23,8 @@ import {
   type MissingCredential,
   type RemoteAgent,
 } from 'agent-runtime';
-import { envNameOf, readRemoteAgents, remoteAgentsFile } from './a2a-agents.ts';
-import { CHECK } from './check.ts';
+import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
+import { CHECK } from './check/check.ts';
 import { HOME } from './store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './workflow.ts';
 

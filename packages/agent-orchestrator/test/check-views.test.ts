@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../src/run.ts';
-import { checkBrief } from '../src/check.ts';
+import { checkBrief } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-check-views-');

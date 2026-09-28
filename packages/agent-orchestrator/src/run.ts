@@ -7,8 +7,8 @@
  * no step's task, and the engine has never heard of the run, so `cancelledAt` lives on the run.
  */
 import path from 'node:path';
-import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
-import { depsLines, inside, type Provisioned } from './deps.ts';
+import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check/check.ts';
+import { depsLines, inside, type Provisioned } from './workspace/workspace.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
@@ -28,9 +28,9 @@ import {
   upstreamOf,
   type Workflow,
 } from './workflow.ts';
-import type { TaskClock } from './timeline.ts';
+import type { TaskClock } from './timeline/timeline.ts';
 import { briefBody } from './rendering.ts';
-import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
+import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout/closeout.ts';
 import {
   answerOf,
   dueNote,
@@ -48,7 +48,7 @@ import {
 } from './retry.ts';
 
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
-export { declaredOutput, parseCloseout } from './closeout.ts';
+export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; retry.ts imports only types from here. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry.ts';
 

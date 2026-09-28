@@ -282,10 +282,7 @@ test('REFUSED: app.ts mounting a folder past its face; a folder with one file an
 test('app.ts mounts every folder that has a face through it', () => {
   const files = sourceFiles();
   const imports = importsIn(read('src/app.ts'));
-  assert.ok(
-    imports.some(({ spec }) => spec === './runs/index.ts'),
-    'the scan reads app.ts',
-  );
+  assert.ok(imports.filter(({ spec }) => spec.startsWith('./')).length >= 8, 'the scan reads app.ts');
   assert.deepEqual(pastFaces('src/app.ts', imports, files), []);
 });
 

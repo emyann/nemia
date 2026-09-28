@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogTrigger, Heading, Popover, Radio, RadioGroup, Text } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
-import { pruneRun, type RunDetail } from '../lib/api';
-import { firstChoice, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../lib/prune.ts';
+import { decisionQuery, pruneRun, type RunDetail } from '../lib/api';
+import { decidableRun, decisionStamp } from '../lib/decide';
+import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type PruneChoice, type PruneOffer } from '../lib/prune.ts';
 import { cn } from '../lib/utils';
 import { DOT, RADIO } from './AgentForm';
 import { POPOVER } from './CardGate';
@@ -11,13 +12,12 @@ import { Refusal } from './Decide';
 
 /**
  * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and, for
- * a run nobody merged, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in words
+ * a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in words
  * that say what goes. The api prunes through the package's `prune`, as `wf prune <run> --yes` does, and refuses in its words, shown here.
- * Nothing is offered where the package would prune nothing (`pruneOffer`).
+ * Nothing is offered where the package would prune nothing (`prunable`).
  */
 export function PruneRun({ run }: { run: RunDetail }) {
-  const offer = pruneOffer(run);
-  if (!offer) return null;
+  if (!prunable(run)) return null;
   return (
     <DialogTrigger>
       <Button variant="outline" size="sm" data-prune-open>
@@ -25,11 +25,39 @@ export function PruneRun({ run }: { run: RunDetail }) {
       </Button>
       <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-96')}>
         <Dialog aria-label={`Prune ${run.id}`} className="space-y-3 outline-none">
-          {({ close }) => <PruneForm id={run.id} offer={offer} onClose={close} />}
+          {({ close }) => <PruneRead run={run} onClose={close} />}
         </Dialog>
       </Popover>
     </DialogTrigger>
   );
+}
+
+/**
+ * Whether anybody decided the run, read off the api's decision (`awaitingOf`) — the package's own reading, which `wf prune` refuses without
+ * `--unmerged` — before anything is offered. The same query as the Decide section's, under the same key, so a page that shows the decision
+ * reads nothing more; a run called off has nothing to decide, and is not asked. A decision read for an earlier state of the run
+ * (`keepPreviousData`) is not taken for this one's.
+ */
+function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
+  const decidable = decidableRun(run);
+  const { data, error, isPlaceholderData } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
+  if (decidable && error) {
+    return (
+      <div className="space-y-3">
+        <div role="alert" data-prune-unread>
+          <Refusal error={error} not="Whether it was merged could not be read" />
+        </div>
+        <Button variant="ghost" size="sm" onPress={onClose}>
+          Close
+        </Button>
+      </div>
+    );
+  }
+  if (decidable && (!data || isPlaceholderData)) {
+    return <p data-prune-reading className="text-xs text-neutral-600 dark:text-neutral-400">Reading whether it was merged…</p>;
+  }
+  const offer = pruneOffer(run, decidable && data ? awaitingOf(data) : null);
+  return offer ? <PruneForm id={run.id} offer={offer} onClose={onClose} /> : null;
 }
 
 /**

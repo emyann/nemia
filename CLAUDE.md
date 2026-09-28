@@ -575,6 +575,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the run and a pass would commit in that worktree. A fixture that gives a finished run a worktree writes `handedOff: <taskId>` on the
   step (UNMERGED in `apps/web/test/e2e/seed.ts`). And a pruned mark's title is `prunedWords`, which opens `pruned at <ISO> — `: a test
   of the words anchors past that (learned by the run that put Prune on the board).
+- **The list's `toDecide` is not the package's decision, and a page that must agree with a verb's refusal reads the decision.** `toDecide`'s
+  git kind is said only of a run that succeeded and cut worktrees (`toDecideBranches` in `apps/api/src/judged.ts`), while `decision`
+  answers `awaiting` for a `--no-worktree` run and for a failed one, and `shipped` for a failed run whose branch was merged by hand. The
+  Prune popover read `toDecide` and the status, offered a succeeded `--no-worktree` run only choices the package refused, and told a run
+  merged by hand its branch was the only copy. It reads `Decidable.awaiting` now, which `apps/api/test/prune.test.ts` holds to `wf prune`'s
+  own answer run by run (learned in review of the same run, round 1).
 - **`wf decide` of a shipped run prints no step's closeout.** It returns on `shipped — … is already on main`, so a test that wants a step's
   artifact lines (`!! not kept`, `!! missing`) reads a run still awaiting a decision; one on a merged run finds none and fails, or passes an
   absence for nothing (learned by the run that added `wf prune --artifacts`).

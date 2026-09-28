@@ -2176,8 +2176,8 @@ Left for later:
 What was built:
 
 - **`POST /api/runs/:id/prune`**, behind the api's write guard, calls the package's `prune` with `yes`, `artifacts` and `unmerged` as
-  the body says, and answers 200 with `wf prune`'s lines, 409 with its refusal in its words (a run not over, one already pruned, one
-  nobody merged without `unmerged`), 404 for a run not in the store. Each refusal is proven in `apps/api/test/prune.test.ts`, the store
+  the body says, and answers 200 with `wf prune`'s lines, 409 with its refusal in its words alone (a run not over, one already pruned, one
+  nobody merged without `unmerged`; the page says *Not pruned* above them), 404 for a run not in the store. Each refusal is proven in `apps/api/test/prune.test.ts`, the store
   unchanged after it; the e2e makes none, since its watch counts every 4xx.
 - **What is on disk**: a run's detail carries `onDisk: {worktrees, files}`, so the page offers only what a prune would find and no button
   that could only be answered *nothing to prune*.
@@ -2186,14 +2186,21 @@ What was built:
   says in red that its branch becomes the only copy of its work and that no branch is ever deleted. For such a run the first two are shown
   unavailable, with why. The prune is asked twice, the second time in words that name what goes, the warning again (`pruneOffer`,
   `pruneQuestion` in `apps/web/src/lib/prune.ts`).
+- **Who decided it is the package's word.** The popover reads the run's decision before it offers anything, and `GET /api/runs/:id/decision`
+  carries `awaiting` — `decision`'s own `awaiting`, the reading `pruneRefusal` refuses without `--unmerged` — with its result branches and
+  whether it worked on its base branch itself. `apps/api/test/prune.test.ts` holds the field to `wf prune`'s answer for a run merged, one
+  nobody merged, one running, a failed run merged by hand and one that worked on main itself.
 - **The marks**: a `pruned` word on the run's row on Runs and a `pruned` badge on its Factory card, each with `wf ls`'s words as its title.
 - **The e2e's `prune` page** prunes the seeded unmerged run through its page, checks the store and the kept branch, reads both marks, and
   takes it all back.
 
 Where it departs from the plan:
 
-- **A failed run is offered the third choice too.** The api's decision says `git` only of a run that succeeded, but `pruneRefusal` asks
-  `--unmerged` of any finished run neither shipped nor called off, so the board reads that off the status (`nobodyMerged`).
+- **The offer reads the decision, not the list's `toDecide`.** The first round read `toDecide` and the status, and was wrong both ways:
+  `toDecide` is never said of a run that worked on its base branch itself, so a succeeded `--no-worktree` run was offered two choices
+  the package refuses and not the one it takes; and a failed run whose branch a person merged by hand is shipped to the package, but was
+  told its branch was the only copy. The decision costs a few `git` calls, so it is read when the popover opens — under the Decide
+  section's key, which a finished run's page has read already.
 
 Left for later:
 

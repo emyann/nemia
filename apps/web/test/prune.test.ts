@@ -1,20 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { firstChoice, nobodyMerged, pruneOffer, pruneQuestion } from '../src/lib/prune.ts';
-import type { RunDetail } from '../src/lib/api.ts';
+import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type Awaiting } from '../src/lib/prune.ts';
 
 type Prunable = Parameters<typeof pruneOffer>[0];
 
-/** A git run that succeeded and shipped: nothing left to decide, nothing moving, its worktree and its files still on disk. */
-const shipped: Prunable = {
-  id: 'r-1', place: 'git', status: 'succeeded', moving: false, cancelledAt: null, toDecide: null,
-  onDisk: { worktrees: true, files: true }, isolate: true, branch: 'main',
-};
-const toMerge: RunDetail['toDecide'] = { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge it', command: 'git merge wf/r-1/implement' };
-const keys = (run: Prunable) => pruneOffer(run)?.choices.map((c) => [c.key, c.label, c.how]);
+/** A git run that succeeded: nothing moving, its worktree and its files still on disk. Whether anybody decided it is the api's to say. */
+const finished: Prunable = { id: 'r-1', place: 'git', status: 'succeeded', moving: false, onDisk: { worktrees: true, files: true } };
+/** The api's decision of a run nobody merged, and of one that worked on its base branch itself (`Decidable['awaiting']`). */
+const unmerged: Awaiting = { branches: ['wf/r-1/implement'], direct: false };
+const direct: Awaiting = { branches: ['main'], direct: true };
+const keys = (run: Prunable, awaiting: Awaiting | null) => pruneOffer(run, awaiting)?.choices.map((c) => [c.key, c.label, c.how]);
 
-test('a shipped run is offered its worktrees, or its files too, and nothing about merging', () => {
-  const offer = pruneOffer(shipped)!;
+test('a run nobody waits on — shipped, or called off — is offered its worktrees, or its files too, and nothing about merging', () => {
+  const offer = pruneOffer(finished, null)!;
   assert.deepEqual(offer.choices.map((c) => [c.key, c.how, c.unavailable]), [
     ['worktrees', { artifacts: false, unmerged: false }, null],
     ['files', { artifacts: true, unmerged: false }, null],
@@ -25,7 +23,7 @@ test('a shipped run is offered its worktrees, or its files too, and nothing abou
 });
 
 test('a run nobody merged is offered the third choice alone, and told its branch becomes the only copy of its work', () => {
-  const offer = pruneOffer({ ...shipped, toDecide: toMerge })!;
+  const offer = pruneOffer(finished, unmerged)!;
   assert.deepEqual(offer.choices.map((c) => c.key), ['worktrees', 'files', 'unmerged']);
   // The first two would be refused by the package: each says why, and neither is chosen first.
   assert.deepEqual(offer.choices.map((c) => c.unavailable), ['Nobody merged it: only the last choice prunes it.', 'Nobody merged it: only the last choice prunes it.', null]);
@@ -37,49 +35,62 @@ test('a run nobody merged is offered the third choice alone, and told its branch
   // Asked twice: the second question says it again.
   const asked = pruneQuestion('r-1', third, offer);
   assert.match(asked, /^Prune r-1: its worktrees and its files, though nobody merged it\? This cannot be undone\. Its work was never merged/);
+  // Two result branches are both named.
+  assert.match(pruneOffer(finished, { branches: ['wf/r-1/a', 'wf/r-1/b'], direct: false })!.warning!, /once pruned, wf\/r-1\/a, wf\/r-1\/b are the only copy of it/);
 });
 
-test('a failed run is one nobody merged, though the api says nothing to decide about it', () => {
-  const failed = { ...shipped, status: 'failed' as const };
-  assert.equal(nobodyMerged(failed), true);
-  const offer = pruneOffer(failed)!;
-  assert.equal(firstChoice(offer).key, 'unmerged');
-  // No branch named by the decision: the run's own result branches, by their pattern.
-  assert.match(firstChoice(offer).says, /wf\/r-1\/… is the only copy/);
-});
-
-test('a run that worked on its base branch itself is told what its decision loses, not that a branch is the only copy', () => {
-  const offer = pruneOffer({ ...shipped, status: 'failed', isolate: false, onDisk: { worktrees: false, files: true } })!;
+test('a run that succeeded on its base branch itself (--no-worktree) is offered the third choice, which the package asks for, and told what its decision loses', () => {
+  // Succeeded, and nothing on the list says it waits (`toDecide` is never said of such a run): the decision says it does, as `wf prune` reads it.
+  const offer = pruneOffer({ ...finished, onDisk: { worktrees: false, files: true } }, direct)!;
   assert.deepEqual(offer.choices.map((c) => [c.key, c.label, c.unavailable]), [
     ['files', 'Its files', 'It waits on your decision: only the last choice prunes it.'],
     ['unmerged', 'Its files, though nobody decided it', null],
   ]);
+  assert.equal(firstChoice(offer).key, 'unmerged');
+  assert.deepEqual(firstChoice(offer).how, { artifacts: true, unmerged: true });
   assert.match(offer.warning!, /^It worked on main itself and nobody has decided it/);
   assert.doesNotMatch(offer.warning!, /only copy/);
 });
 
-test('a run called off is not one nobody merged', () => {
-  assert.equal(nobodyMerged({ ...shipped, status: 'cancelled', cancelledAt: '2026-09-28T09:00:00.000Z' }), false);
-  assert.equal(nobodyMerged({ ...shipped, status: 'failed', cancelledAt: '2026-09-28T09:00:00.000Z' }), false);
-  assert.deepEqual(pruneOffer({ ...shipped, status: 'cancelled', cancelledAt: '2026-09-28T09:00:00.000Z' })!.choices.map((c) => c.key), ['worktrees', 'files']);
+test('a failed run whose branch a person merged by hand shipped, as the package reads it: both choices open, and no branch is said to be the only copy', () => {
+  // The api answers such a run `nothing: shipped …`, and a failed run nobody merged `awaiting`: the status decides neither.
+  const shippedByHand = { nothing: 'shipped — wf/r-1/implement is already on main' };
+  const failed = { ...finished, status: 'failed' as const };
+  const offer = pruneOffer(failed, awaitingOf(shippedByHand))!;
+  assert.deepEqual(offer.choices.map((c) => [c.key, c.unavailable]), [['worktrees', null], ['files', null]]);
+  assert.equal(offer.warning, null);
+  assert.equal(firstChoice(offer).key, 'worktrees');
+  assert.equal(firstChoice(pruneOffer(failed, unmerged)!).key, 'unmerged');
+});
+
+test("the decision is read for its `awaiting` alone: null for every answer but a decidable one, and for an api older than the field", () => {
+  const decidable = { standings: [], touched: [], lesson: { said: '', state: 'nothing' as const }, sensitive: [], used: {}, total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null }, cost: null, overBudget: null, commands: [] };
+  assert.deepEqual(awaitingOf({ ...decidable, awaiting: unmerged }), unmerged);
+  assert.equal(awaitingOf({ ...decidable, awaiting: null }), null);
+  assert.equal(awaitingOf(decidable as never), null);
+  assert.equal(awaitingOf({ nothing: 'cancelled at 2026-09-28T09:00:00.000Z — nothing to decide' }), null);
+  assert.equal(awaitingOf({ running: true }), null);
 });
 
 test('only what is on disk is offered: its files alone once its worktrees are gone, its worktrees alone with no files, and nothing once both are', () => {
-  assert.deepEqual(keys({ ...shipped, onDisk: { worktrees: false, files: true } }), [['files', 'Its files', { artifacts: true, unmerged: false }]]);
-  assert.deepEqual(keys({ ...shipped, toDecide: toMerge, onDisk: { worktrees: false, files: true } }), [
+  assert.deepEqual(keys({ ...finished, onDisk: { worktrees: false, files: true } }, null), [['files', 'Its files', { artifacts: true, unmerged: false }]]);
+  assert.deepEqual(keys({ ...finished, onDisk: { worktrees: false, files: true } }, unmerged), [
     ['files', 'Its files', { artifacts: true, unmerged: false }],
     ['unmerged', 'Its files, though nobody merged it', { artifacts: true, unmerged: true }],
   ]);
   // With no files, the third choice asks none: `--unmerged` alone.
-  assert.deepEqual(keys({ ...shipped, toDecide: toMerge, onDisk: { worktrees: true, files: false } }), [
+  assert.deepEqual(keys({ ...finished, onDisk: { worktrees: true, files: false } }, unmerged), [
     ['worktrees', 'Its worktrees', { artifacts: false, unmerged: false }],
     ['unmerged', 'Its worktrees, though nobody merged it', { artifacts: false, unmerged: true }],
   ]);
-  assert.equal(pruneOffer({ ...shipped, onDisk: { worktrees: false, files: false } }), null);
+  assert.equal(pruneOffer({ ...finished, onDisk: { worktrees: false, files: false } }, null), null);
+  assert.equal(prunable({ ...finished, onDisk: { worktrees: false, files: false } }), false);
 });
 
 test('nothing is offered of a folder run, a run still running, or one with something still moving', () => {
-  assert.equal(pruneOffer({ ...shipped, place: 'folder' }), null);
-  assert.equal(pruneOffer({ ...shipped, status: 'running' }), null);
-  assert.equal(pruneOffer({ ...shipped, moving: true }), null);
+  for (const run of [{ ...finished, place: 'folder' as const }, { ...finished, status: 'running' as const }, { ...finished, moving: true }]) {
+    assert.equal(prunable(run), false, JSON.stringify(run));
+    assert.equal(pruneOffer(run, unmerged), null, JSON.stringify(run));
+  }
+  assert.equal(prunable(finished), true);
 });

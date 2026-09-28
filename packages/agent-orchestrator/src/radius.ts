@@ -71,8 +71,7 @@ export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/
 
 /**
  * A `workspaces` glob as the radius matches it: a leading `./` and a trailing `/` dropped, so `./packages/*` is `packages/*`, with or
- * without a slash after it. npm reads them the same; a regexp built from `./packages/*` as written never matched a path git prints, so every package's
- * change fell into one `packages` group and no package's `docs/` counted as a lesson.
+ * without a slash after it. npm reads them the same, and a regexp built from `./packages/*` as written matches no path git prints.
  */
 export const workspaceGlob = (written: string): string => written.replace(/^(?:\.\/+)+/, '').replace(/\/+$/, '');
 
@@ -123,7 +122,7 @@ const pathsOf = (c: Change): string[] => (c.from ? [c.from, c.path] : [c.path]);
 const nameOf = (c: Change): string => (c.from ? `${c.from} → ${c.path}` : c.path);
 const linesOf = (c: Change): string => (c.added === null || c.removed === null ? 'binary' : `+${c.added} −${c.removed}`);
 
-/** A path git had to quote — a tab, a quote, a backslash in it — as the name it is. */
+/** A path git had to quote — a tab, a quote, a backslash in it — as the name it is: each `\ooo` is one byte of it, in octal. */
 function unquote(s: string): string {
   if (s.length < 2 || !s.startsWith('"') || !s.endsWith('"')) return s;
   const ESCAPED: Record<string, string> = { n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v' };
@@ -137,7 +136,6 @@ function unquote(s: string): string {
       bytes.push(...utf8.encode(ch));
       continue;
     }
-    // Git writes each byte of a name it quotes as three octal digits.
     const octal = /^[0-3][0-7]{2}/.exec(body.slice(i + 1));
     if (octal) {
       bytes.push(parseInt(octal[0], 8));
@@ -277,8 +275,8 @@ export function radiusLines(r: Radius): string[] {
  * `base` is the run's own base branch, given only for a run that cut worktrees (`isolate`): it is dropped from that fallback, because
  * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: main`),
  * where the run commits nothing — so the diff between the run's frozen base and that branch is not the run's work but the base moving
- * under it, which every other run's merge adds to. Read as the work, a workflow of one such step showed a person everything merged
- * since it started, above the question it was asking them. `tipBranches` refuses the same branch for the same reason.
+ * under it, which every other run's merge adds to, and read as the work it would show a person everything merged since the run
+ * started. `tipBranches` refuses the same branch for the same reason.
  *
  * A run that worked on its base branch itself (`--no-worktree`) gives none: there that branch is exactly where its work is.
  */
@@ -408,10 +406,9 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
 /**
  * Whether a resumed attempt rebuilt its cache rather than read it: its first response wrote more than half the context it read to the
  * cache. A continuation's first response reads its parent's whole conversation, which a warm cache serves as reads; written again, it is
- * the same tokens at twenty times a read's price — 43 resumed sessions did, 200k to 640k tokens each, over the week to 2026-09-18, and the
- * one input count hid it. Judged on the first response alone: the attempt's writes in all grow with its work, and a warm continuation from
- * 60k to 150k writes some 90k. Never for an attempt that started cold, whose first writes are its cache, nor one whose runner did not see
- * its first response.
+ * the same tokens at twenty times a read's price, and the one input count hides it. Judged on the first response alone, since the
+ * attempt's writes in all grow with its work, warm or not. Never for an attempt that started cold, whose first writes are its cache, nor
+ * one whose runner did not see its first response.
  */
 export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): boolean =>
   resumed &&
@@ -419,13 +416,13 @@ export const rebuiltCache = (u: Consumed | null | undefined, resumed: boolean): 
   u.firstContextTokens !== undefined &&
   u.firstCacheWriteTokens > u.firstContextTokens / 2;
 
-/** Past this a context is large, cap or no cap: the median worker of 2026-09-18 peaked at 173k, the largest at 831k. */
+/** The peak context, in tokens, past which a step with no `context:` cap is marked `large` (`peakMark`). */
 export const LARGE_CONTEXT = 200_000;
 
 /**
  * Where a peak stands against a step's `context:` cap: `cap` once the session reached it — it compacted, which Claude Code does well short
- * of its window (at 173,584 and 173,254 tokens under a 200k one, engine open issue 26), or its peak got there — and `large` past
- * `LARGE_CONTEXT` on a step with none. Null otherwise, and where nobody measured either.
+ * of its window, or its peak got there — and `large` past `LARGE_CONTEXT` on a step with none. Null otherwise, and where nobody measured
+ * either.
  */
 export function peakMark(u: Consumed | null | undefined, cap: number | undefined): 'cap' | 'large' | null {
   const peak = u?.peakContextTokens;
@@ -503,7 +500,8 @@ export function durationWord(ms: number): string {
  * that means "nobody counted" reads as "cost nothing". Cost prints a number only where the engine measured
  * one: the harness's own figure, read once a session has ended (agent-runtime's README, *What an attempt consumed*).
  * The api and tool time go beside the counts once either was measured, and each says not measured where the
- * other was — `claude-detached` counts api time and no tool time — and neither is said where nothing timed it.
+ * other was — `claude-detached` counts api time and no tool time — and neither is said where nothing timed it. A measured time under a
+ * second reads `<1s`, never `0s`.
  */
 export function usedLines(u: Consumed | undefined): string[] {
   const read = readWords(u);
@@ -511,7 +509,6 @@ export function usedLines(u: Consumed | undefined): string[] {
   if (!u) return ['used  not measured', cost];
   const said = (n: number | undefined, what: string, unmeasured: string) =>
     n === undefined ? `${unmeasured} not measured` : `${count(n)} ${what}`;
-  // A measured moment is not nothing: under a second reads `<1s`, never `0s`.
   const took = (ms: number | undefined, what: string) =>
     ms === undefined ? `${what} not measured` : `${what} ${ms > 0 && ms < 1000 ? '<1s' : durationWord(ms)}`;
   const timed = u.apiMs !== undefined || u.toolMs !== undefined ? [took(u.apiMs, 'api'), took(u.toolMs, 'tools')] : [];

@@ -9,7 +9,7 @@
  * nothing that waits on the step is filed.
  *
  * **The run knows nothing about what the command does, and must not.** No test-runner parsing, no
- * findings, no special case for a framework — the same line hkb draws (`src/check.ts` there).
+ * findings, no special case for a framework.
  *
  * **Where the command comes from is the whole argument.** It is read from the workflow the run
  * froze at `wf start` (`Run.workflow`), never from a folder a step can edit. A step that could
@@ -17,7 +17,7 @@
  *
  * **It runs as an engine task**, on a harness this file defines and the run hands to the engine.
  * The engine does not learn what a check is: to it this is one more command that runs and exits,
- * which is the contract every detached harness already has. What that buys without a line of engine
+ * which is the contract every detached harness has. What that buys without a line of engine
  * code: the check survives a tick that dies, `wf cancel` stops a running suite through `e.stop`, a
  * hung suite ends at the task's deadline, and checks have a concurrency pool of their own, so a
  * suite that runs for minutes never holds an agent's slot or the tick itself.
@@ -28,22 +28,17 @@
 /**
  * The seconds a check may run before the engine stops it. A hung suite must not hold a run for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest check that finished. Measured spawned →
- * ended over the store's checks of 2026-09-20 to 09-24: those that ran the web build and the e2e took 91–443 s, a
- * median of 376 s, and 582 s and 607 s with several runs on the machine; the rest under 25 s. None was ever cut at
- * its deadline while hung; the 607 s one exited 0 and was settled `failed` by the old 600. Durations grow as e2e
- * pages are added. A constant rather than a step key: every shipped check is the same command family and none needs
- * another number, and a step key is three edits outside the package (CLAUDE.md, `STEP_KEYS`).
+ * A guard against a hang, not a budget, so it is set well above the slowest check that finishes: the web build and
+ * its e2e, with several runs on the machine, and longer as e2e pages are added. A constant rather than a step key:
+ * every shipped check is the same command family and none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 1200;
 
 /**
  * The niceness a check starts at, over the orchestrator's own: `nice -n 10`, and where `ionice` works, the idle IO class
- * (`checkScript`'s first line). On 2026-09-24 the owner's Windows desktop froze for moments — video, typing — while several
- * runs' checks ran at once in WSL: vmmemWSL at up to 401% of a core, the System process at up to 82%, in bursts that were the
- * checks (turbo across five packages, the vite build, the e2e's software-GL Chromium). A check is a batch job nobody watches
- * while it runs, so it yields to what someone does: the agent sessions, which are never niced, and a person's own work in the
- * same Linux. It ranks processes inside the VM only: with nothing else busy there, a niced check still uses every CPU it can.
+ * (`checkScript`'s first line). A check is a batch job nobody watches while it runs, so it yields to what someone does: the
+ * agent sessions, which are never niced, and a person's own work on the same kernel. It ranks processes inside that kernel
+ * only — under WSL, the VM's: with nothing else busy there, a niced check still uses every CPU it can.
  */
 export const CHECK_NICENESS = 10;
 
@@ -108,7 +103,7 @@ const TRAILER = '[wf check] exit';
 /**
  * The install an ending's check runs first where the merge asks for packages the checkout lacks. `npm install` rather than `npm ci`,
  * which empties `node_modules` under a dev server running from the checkout; `--no-save`, so npm writes neither `package.json` nor
- * `package-lock.json`, which the merge owns (measured on npm 11.19: the working tree still matches the staged merge).
+ * `package-lock.json`, which the merge owns, so the working tree still matches the staged merge.
  */
 export const INSTALL = 'npm install --no-save --no-audit --no-fund';
 
@@ -122,12 +117,15 @@ const INSTALL_FAILED = '[wf check] install failed, exit';
  *   number is still printed.
  * - **On lines of its own**, so a command ending in a `# comment` cannot comment out the parenthesis.
  * - **stderr to its own file**, when the brief names one. The engine keeps one log for a detached
- *   session, and hkb measured a loud stderr evicting a test runner's stdout verdict from a shared
- *   window. Two streams, both kept.
+ *   session, and a loud stderr can evict a test runner's stdout verdict from a shared window. Two
+ *   streams, both kept.
+ * - **`WF_STDERR` captured and unset before the command runs**: the path is the run's plumbing, not
+ *   the command's, so a command that itself runs a check — this package's own suite — sends its
+ *   stderr to its own log, not into this file.
  * - **No redirection at all when it names none** — a task filed on this harness by hand. Not
  *   `2>/dev/stderr`: the engine's worker hands the process sockets rather than pipes, `/dev/stderr`
- *   cannot be reopened on a socket, and the redirection failed before the command ran. Measured, by
- *   the end-to-end run of this package; stderr simply stays in the log instead.
+ *   cannot be reopened on a socket, and the redirection would fail before the command ran. stderr
+ *   stays in the log instead.
  * - **Inside a function**, so a redirection that fails (a directory that is gone) fails the command
  *   with a status the script can still print, rather than ending the shell before its last line.
  * - **The exit code printed last**, on stdout, so it is the final line of the log whatever the command
@@ -137,7 +135,7 @@ const INSTALL_FAILED = '[wf check] install failed, exit';
  * - **The idle IO class first, where the machine has it.** The shell puts itself in `ionice -c3`, which every process it
  *   starts inherits (turbo, the build, the e2e's browser and servers). The shell decides rather than this file, since this
  *   file is pure and the machine that runs the check is the one that knows whether it has `ionice`: one without it
- *   (macOS), or one that refuses it (a container), runs the check as before, and says nothing.
+ *   (macOS), or one that refuses it (a container), runs the check at its usual IO class, and says nothing.
  * - **An install first, when `install` is set** (`INSTALL`): what the staged merge's lockfile asks for, into the checkout's own
  *   `node_modules`, both its streams in the log. An install that fails is no verdict on the work, so the script says so and kills
  *   itself, printing no trailer: the worker records no exit code for a process a signal ended, and the run reads a check that did
@@ -157,10 +155,6 @@ export const checkScript = (command: string, install = false): string =>
     command,
     ')',
     '}',
-    // The path is the run's plumbing, not the command's: captured and UNSET before the command runs, or
-    // a command that itself runs a check — this package's own suite, under its own check — would see it
-    // and send its stderr into this file instead of its own log. Measured: the check.test.ts case that
-    // asserts "stderr stays in the log when there is no file for it" read an empty log inside a check.
     'if [ -n "${WF_STDERR:-}" ]; then wf_stderr="$WF_STDERR"; unset WF_STDERR; wf_check 2>"$wf_stderr"; else wf_check; fi',
     `c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`,
   ].join('\n');
@@ -171,10 +165,12 @@ export const checkScript = (command: string, install = false): string =>
  */
 export const CHECK = {
   name: 'check',
+  /**
+   * `nice -n 10 env NAME=value … sh -c script`, off the brief: values reach the shell without being quoted by anyone, and `nice` execs
+   * `env`, which execs `sh`, so the pid, the process group a stop ends and the exit status are the command's own.
+   */
   command: (r: { brief: string }): { cmd: string; args: string[] } => {
     const { command, env, install } = readCheckBrief(r.brief);
-    // `nice -n 10 env NAME=value … sh -c script`: values reach the shell without being quoted by anyone. `nice` execs
-    // `env`, which execs `sh`, so the pid, the process group a stop ends and the exit status are the command's own.
     const pairs = Object.entries(env).map(([k, v]) => `${k}=${v}`);
     return { cmd: 'nice', args: ['-n', String(CHECK_NICENESS), 'env', ...pairs, 'sh', '-c', checkScript(command, install !== undefined)] };
   },
@@ -210,8 +206,7 @@ export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfini
  * The check, told to a step BEFORE it is judged by one. Appended to the brief of every step that has
  * a `check:`.
  *
- * A contract a step only learns about by failing it costs a whole session to communicate: hkb measured
- * a worker that ran `npm test`, finished green, and failed the check on the `lint` half. Telling it
+ * A contract a step only learns about by failing it costs a whole session to communicate. Telling it
  * does not weaken the fence — the fence is about who AUTHORS the command, and that stays the run.
  */
 export const checkContract = (command: string): string =>

@@ -10,8 +10,8 @@
  *     Cache the engine's views between passes.
  *
  * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and that
- * is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about, for a board that will
- * serve more than one. And an inbox card has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
+ * is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about. And an inbox card
+ * has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
  *
  * `queued:` marks a card to start on its own (`wf inbox queue`): the time it was queued, which orders the queue. The tick starts the oldest
  * such card when a run slot is free (`queueOrder`, `startQueued` in start.ts).
@@ -212,7 +212,9 @@ export type QueueTry = { at: string; text: string; repo: string; why: string; re
  * The inbox as `wf inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each card
  * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README are
  * not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and, when the
- * tick's last try of its start is of the card as it stands (`tries`, by name), that try.
+ * tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but for a `repo:` naming no
+ * directory keeps its place, with its workflow and repository as written, the repository keying its try: the start refuses it by name, as
+ * it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for another reason is not queued.
  */
 export function inboxListing(
   files: readonly PlanFile[],
@@ -255,15 +257,10 @@ export function inboxListing(
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
       } catch (err) {
-        // A queued card whose `repo:` is gone reads as a card but for that, and keeps its place in the queue: the tick tries it, and the start
-        // refuses it by name, as it refuses a workflow gone — never a card that leaves the queue with nothing said.
-        // Its workflow and repository as it writes them, too: the repository its start is tried on, which keys the try.
         let lenient: InboxCard | undefined;
         try {
           lenient = parseInboxCard(file, text, () => true);
-        } catch {
-          /* not a card for another reason: not in the queue */
-        }
+        } catch {}
         const queued = lenient?.queued;
         return {
           name,
@@ -312,8 +309,8 @@ export type QueueStarted =
   | { card: string; failed: string; again: boolean; on?: string };
 
 /**
- * The card's own `repo:` when the run started from it looks at no repository — a folder team's does not, and a card filed before
- * `cardRepoRefusal`, or by hand, may still carry one. Said and not refused, since a card on disk cannot be edited from the board.
+ * The card's own `repo:` when the run started from it looks at no repository — a folder team's does not, and a card written by hand, or by
+ * a writer that does not ask `cardRepoRefusal`, may carry one. Said and not refused, since a card on disk cannot be edited from the board.
  *
  * One writer, so a person reads the same sentence wherever the card was started: `wf start` prints it under the run, and a tick's
  * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in start.ts is what both are given.
@@ -338,21 +335,20 @@ export function queueLine(q: QueueStarted): string {
   const started = q.removed
     ? `started ${q.card} as ${q.run}`
     : `started ${q.card} as ${q.run} — still in the inbox: ${q.why}. wf inbox lists it as started as ${q.run}, and it is not started again: drop it with wf inbox rm ${q.card}`;
-  // A card the tick started whose `repo:` the run never looked at: said here too, or a daemon's log is the one start that says nothing.
   return q.ignoredRepo ? `${started} (${ignoredRepoLine(q.ignoredRepo)})` : started;
 }
 
 /**
  * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them, and
- * the runs it was started as — or, for an entry that does not read as a card, why.
+ * the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when the
+ * tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries it
+ * again. A reason the entry's own error already says is not said twice.
  */
 export function inboxLines(listing: readonly InboxListing[]): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
-    // Its place in the queue, and, when the tick's start of it did not start it as it stands, why: refused, it waits for a person, not for a
-    // slot; failed otherwise, the tick tries it again. A card that does not read says why beside its name already, and is not told it twice.
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const t = l.tried;
     const on = t && l.error === null && !l.repo ? ` on ${t.repo}` : '';
@@ -370,9 +366,12 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
 /**
  * The file `wf inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused (`parseInboxCard`).
  *
- * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line `workflow:` or `repo:`, or an
- * `after:`, which is refused by name — gives its keys and its body; any other text is the body whole, as `wf start` takes a brief that is not
- * a card. `workflow` and `repo`, when given, are written over the text's own. Refused too: text with nothing in it.
+ * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or an
+ * `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the body
+ * whole, as `wf start` takes a brief that is not a card. `workflow` and `repo`, when given, are written over the text's own. Refused too:
+ * text with nothing in it, a `workflow` or `repo` given on more than one line, and a `queued:` in the text: a card is queued once it is in the
+ * inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with a `---` rule of its own is
+ * given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
  *
  * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
@@ -404,9 +403,7 @@ export function ideaCard(
   let split: { block: string | null; body: string } | undefined;
   try {
     split = splitFrontmatter(from, text);
-  } catch {
-    /* a rule that never closes: the text is the body */
-  }
+  } catch {}
   const lines = (split?.block ?? '')
     .split('\n')
     .map((l) => l.trim())
@@ -414,9 +411,7 @@ export function ideaCard(
   const isCardLine = (line: string) =>
     line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
   if (split && lines.length && lines.every(isCardLine)) {
-    // Its keys, to be written over; whether what they say holds is asked of the card written, below.
     const read = inboxKeys(from, split.block!, true);
-    // A card is queued once it is in the inbox, under its own name: a time carried in from elsewhere would jump the queue.
     if (read.queued !== undefined) {
       refuse(
         `${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card wf inbox add names: wf inbox queue <name>.`,
@@ -433,7 +428,6 @@ export function ideaCard(
     ...(repo !== undefined ? [`repo: ${repo}`] : []),
     ...(keys.gate !== undefined ? [`gate: ${keys.gate}`] : []),
   ];
-  // A body that opens with a rule of its own is kept from being read as the card's frontmatter by a frontmatter before it.
   if (!frontmatter.length && body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
   const card = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${body}\n`;
   parseInboxCard(from, card, isDirectory);
@@ -442,13 +436,13 @@ export function ideaCard(
 
 /**
  * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given: what `wf inbox queue`
- * writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card. Pure; the text it gives
- * reads back as a card (`parseInboxCard`), or is refused as one would be.
+ * writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card, and a body that opens
+ * with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Pure; the text it gives reads back as a
+ * card (`parseInboxCard`), or is refused as one would be.
  */
 export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
   const keys = { workflow: workflow ?? card.workflow, repo: card.repo, queued: at ?? undefined, gate: card.gate };
   const frontmatter = INBOX_KEYS.flatMap((key) => (keys[key] !== undefined ? [`${key}: ${keys[key]}`] : []));
-  // A body that opens with a rule of its own is kept from being read as the card's frontmatter, as `ideaCard` keeps it.
   if (!frontmatter.length && card.body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
   const text = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${card.body}\n`;
   parseInboxCard(card.file, text, isDirectory);

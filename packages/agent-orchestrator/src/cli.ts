@@ -451,7 +451,7 @@ type FlagRules = {
 /**
  * A verb's flags after its one positional argument — `wf start`'s and `wf plan`'s — each value flag also as `--flag=<value>`. Anything else is
  * refused before anything is read: a flag the verb does not take, a misspelt one, a value flag with no value or given twice, and a second
- * positional. Dropped, a misspelt `--after` started a run that waited on nothing, and the tick filed it at once.
+ * positional: dropped instead, a misspelt `--after` would start a run that waits on nothing, filed on the next pass.
  */
 function readFlags(argv: string[], rules: FlagRules): { values: Record<string, string[]>; switches: string[] } {
   const values: Record<string, string[]> = {};
@@ -677,7 +677,9 @@ const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--mo
 
 /**
  * `wf retry`'s one choice of how, read off its flags: at most one way, `--model` with a name, and `--message` at most once, with what
- * to tell the step — refused, before a run is read, when it is empty or rides on `--recheck` (`messageRefusal`).
+ * to tell the step — refused, before a run is read, when it is empty or rides on `--recheck` (`messageRefusal`). The argument after
+ * `--message` is the answer whatever it starts with, since an answer about a flag names it ("--flag stays"): only one of this verb's own
+ * flags, alone, reads as the answer left out, and `--message=<answer>` carries even that.
  */
 function retryHow(argv: string[]): RetryHow {
   const given: Array<{ mode: RetryMode; model?: string }> = [];
@@ -693,8 +695,6 @@ function retryHow(argv: string[]): RetryHow {
     } else if (arg === '--message' || arg.startsWith('--message=')) {
       if (message !== undefined)
         usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
-      // The next argument is the answer, whatever it starts with: an answer about a flag names it ("--flag stays"). Only one of this verb's own
-      // flags, alone, is read as the answer left out — and `--message=<answer>` carries even that.
       const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
       if (text === undefined) return usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
       if (arg === '--message' && RETRY_FLAGS.includes(text)) {
@@ -828,14 +828,13 @@ function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
 }
 
 /**
- * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, and a cut feed said on stderr, until `stop()`.
+ * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
+ * said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
  *
  * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it —
- * finds a watch already there to see it. Printed first, a cut in that moment had the watch refuse the cursor it was given and end with a stack
- * (learned under a loaded suite, whose test truncated the feed on the banner).
+ * finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
  */
 export function watchPrinted(from: number): { stop(): void } {
-  // A feed cut under the watch is said once, and followed from the start of the feed there is now (`watchFeedFile`).
   const watch = watchFeed({
     from,
     onLine: (line) => console.log(feedLineWords(line)),
@@ -846,7 +845,39 @@ export function watchPrinted(from: number): { stop(): void } {
   return watch;
 }
 
-/** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
+/**
+ * Runs the verb `argv` names and prints what it did, or prints the help for a verb it does not know. `e` is the engine the verbs talk to:
+ * the board under `WF_ROOT`, unless a test hands it one of its own. Beside what the help and the functions each verb calls say:
+ * - `wf start` of a file that is not a plan's card (`cardToStart`) takes the whole file as the brief, frontmatter and all, and a card's own
+ *   `workflow:` is found from its plan folder. `wf inbox add` and `wf inbox queue` read a `--workflow` path from where they are typed, and
+ *   write it absolute (`workflowAt`).
+ * - `wf tick` beside a daemon that ticks the store is refused, with no way to force it. `wf tick` and `wf up` start a queued card that
+ *   names no repository on the one they are typed in, as `wf start` takes `.`.
+ * - `wf up` refuses its interval (`everyOf`) and its ceilings (`ceilings`) before it takes the store. It beats on a timer of its own,
+ *   unref'd, so a long pass is not taken for stalled and taken over mid-pass; it stops at the first pass that finds the store taken over
+ *   (`stillHeld`), and a signal that stops it lets the store go, so it reads free at once. It says each failure once while it lasts — a
+ *   queued card's start, the feed's, a move the lifecycle refused, a journal left out — going by what it has printed, not by the store.
+ * - `wf ls <run>` judges the cap on runs in flight over the whole store. A listing views each task once and asks git of each repository's
+ *   branches once (`viewedOnce`, `branchReader`), and says an ending's gate once, on its `to decide` line, and what a run has cost so
+ *   far on its line, where the engine measured it. A run a task journal of which does not read is listed with its steps and
+ *   `→ unreadable:` in the runtime's words (`unjudgedOf`), and `wf decide` of it fails with those words.
+ * - `wf cancel` prints a line in every case, a run already finished and one with nothing in flight included.
+ * - `wf rm`, and `wf prune` of named runs, judge each run on its own, a line each, a refusal included, and fail once every run has had its
+ *   say: exit 2, or 1 when one failed otherwise. `wf prune` of every run says the runs not over in one line, and a run with nothing to
+ *   prune not at all; each run is judged again before it is pruned, never trusted from the listing.
+ * - `wf decide` refuses a flag before the run, which would otherwise print the help and exit 0. Every screen names the files a person gave
+ *   the run under its line, as its steps were handed them. A run waiting on others (`--after`), held
+ *   (`wf hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a hold beside a wait says
+ *   that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for, and the tries and
+ *   rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said there and on the
+ *   deciding screen. A shipped run whose ending never ran says so, as `wf ls` still shows it at its gate. A pruned run waits on nobody
+ *   (`prunedRefusal`): how each step ended is said, and not that it waits on you. Each step's closeout, in the order the steps run
+ *   (`namesInOrder`), is read off the engine's record, never a branch, so a dropped branch keeps its review. The top-level markdown files
+ *   a branch added are printed, 120 lines at most. The git commands to ship or drop are printed only where no step merges (`merges`), never
+ *   for a run that worked on its base branch itself (`--no-worktree`), and a folder run is offered `wf rm` alone.
+ * - `wf say` takes every word after the step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
+ * - `wf agents card` prints the card alone on stdout, so `| jq` reads it, and what it is not on stderr.
+ */
 export async function main(argv: string[], e: ReturnType<typeof engine> = engine()): Promise<void> {
   const [verb, ...rest] = argv;
 
@@ -857,7 +888,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const how = startHow(rest.slice(1));
       const printStarted = (run: ReturnType<typeof start>, from?: string) => {
         const steps = stepsOf(run);
-        // Each node with what is attached to it: `review (reviewer)`. A node with no agent is its name alone.
         console.log(
           `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
         );
@@ -869,7 +899,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (run.after?.length)
           console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
         const gates = gatesOf(steps, run);
-        // An ending step in the repository's checkout is held before it is filed, not after it signs off: its approval is what runs it.
         const ends = endingSteps(steps, run)
           .filter((s) => approvedFirst(s, run))
           .map((s) => s.name);
@@ -883,10 +912,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
           );
         console.log(`run 'wf tick' (or 'wf up') to start it`);
-        // A folder written before a key was renamed runs as written, and is told the key's name now.
         for (const line of formerKeyLines(run.workflowDir)) console.log(line);
       };
-      // A card of the inbox starts out of it, and leaves it. Its brief is its body, or --brief; its workflow and repository are the flags', else its own.
       const inboxName = inboxNameAt(arg);
       if (inboxName !== null) {
         const brief =
@@ -912,7 +939,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             ? `${fromNote(started.run)} — removed from the inbox`
             : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`,
         );
-        // A card filed with a repository, started as a team that works in folders: the path is on the card and nothing reads it.
         if (started.ignoredRepo) console.log(ignoredRepoLine(started.ignoredRepo));
         return;
       }
@@ -921,16 +947,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           `wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`,
         );
       const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
-      // A card of a plan — what `wf plan` prints `wf start <card>` for — starts its body. Any other file is the brief whole, frontmatter and all.
       const card = text === undefined ? null : cardToStart(arg, text, how.after);
       const repo = path.resolve(how.repo ?? '.');
       const run = start({
         brief: card ? card.body : (text?.trim() ?? arg),
         repo,
-        // Named or not matters to a team that says `workspace: folder`, which works on no repository and refuses one named.
         repoNamed: how.repo !== undefined,
-        // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev. Without the flag, a card's
-        // `workflow:`, found from its plan folder as `wf plan` finds it.
         workflowDir:
           how.workflows === undefined && card?.workflow !== undefined
             ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
@@ -944,7 +966,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A folder of cards, started as a whole. It writes the runs and nothing else; the tick does the waiting.
     case 'plan': {
       if (rest.includes('--help')) return console.log(PLAN_HELP);
       const folder = rest[0];
@@ -960,7 +981,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // Cards before they are started. Each writes one card's file, or removes one, and nothing else: a card is started with wf start.
     case 'inbox': {
       const [sub, ...args] = rest;
       if (sub === '--help') return console.log(INBOX_HELP);
@@ -985,8 +1005,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           usage(
             `${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`,
           );
-        // A workflow given as a path is kept absolute, so it names the same folder from the inbox; a name stays a name, found in the repository at
-        // start. The flag's is read from here; a file's own `workflow:`, from the file's folder.
         const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
         const { card, file } = addToInbox({
           text: at ? fs.readFileSync(idea, 'utf8') : idea,
@@ -1007,7 +1025,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             'wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].',
           );
         const how = inboxQueueHow(more);
-        // A workflow given as a path is kept absolute, as `wf inbox add` keeps it.
         const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
         const queued = queueInInbox(name, { off: how.off, ...(workflow !== undefined ? { workflow } : {}) });
         if (queued.was === 'not queued') return console.log(`${name}  not queued — nothing to take back`);
@@ -1039,18 +1056,15 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     }
 
     case 'tick': {
-      // A second writer beside a daemon that ticks the store: refused, with no force — the daemon runs this same pass within its interval.
       const stats = rest.includes('--stats');
       const other = rest.find((a) => a !== '--stats');
       if (other !== undefined)
         usage(`wf tick takes no ${other}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`);
       const held = storeRefusal('tick');
-      // The pass's cost is on disk all the same, written by the daemon's last pass: said where to read it, with no second writer.
       if (held)
         throw Object.assign(new Error(stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held), {
           exitCode: 2,
         });
-      // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
       const { runs: results, queue, feedError, cost, refused, unreadable } = await tick(e, { repo: path.resolve('.') });
       if (feedError) console.error(feedError);
       for (const why of unreadable ?? []) console.error(`left out: ${why}`);
@@ -1067,13 +1081,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`);
         for (const note of r.notes) console.log(`   ${note}`);
       }
-      // Last, what the pass cost: the numbers `wf up --stats` reads off the store, of this pass.
       if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
       return;
     }
 
     case 'up': {
-      // What the last pass cost, read off the store: no pass, no store taken, so it is asked beside a daemon that holds it.
       if (rest.includes('--stats')) {
         const other = rest.find((a) => a !== '--stats');
         if (other !== undefined)
@@ -1093,22 +1105,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             : 'no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
         );
       }
-      // An interval the file cannot hold is refused before anything: a daemon whose file does not read holds nothing.
       const asked = everyOf(rest[0]);
       const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
-      // The ceilings first, so a WF_MAX_RUNS refused is refused before the store is taken; then the store, or a refusal naming who holds it.
       const ceiling = ceilings();
       const { held, replaced } = takeStore({ every, cwd: path.resolve('.') });
       const store = HOME;
       console.log(`up — every ${every}ms, ^C to stop`);
-      // Both ceilings, in words, before the first pass: what the daemon holds work to.
       for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
       console.log(
         `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
       );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
-      // Stopped by a signal, the store is let go on the way out, so it reads free at once. A crash leaves the file, read as gone.
       const stops = (
         [
           ['SIGINT', 130],
@@ -1123,32 +1131,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         process.once(signal, stop);
         return [signal, stop] as const;
       });
-      // The beat, on its own timer: a pass that runs long — an install in each of several worktrees — is still heard from, and is not taken
-      // for stalled and taken over mid-pass. Unref'd: the loop holds the process, not the beat.
       const beating = setInterval(() => beat(held), every);
       beating.unref();
       try {
-        // The failure this daemon last said, so that it says it once and no more. A card whose start fails without a refusal is tried on
-        // every pass, and the pass writes down what it said (`QueueTry`, `again`) — but that pass may have been another `wf up` or a
-        // `wf tick`, whose line is on a terminal that is gone, and a person restarting the daemon to see why cards stopped starting must be
-        // told. So the daemon goes by what it has said itself, not by what the store has written: `again` is not read here. Nothing is
-        // decided on it — a pass decides what it decides, and this is only what has been printed.
         let said: string | undefined;
-        // And the feed's failure, said once until it changes, the same way: a feed that cannot be written fails every pass alike.
         let feedSaid: string | undefined;
-        // And each move the runtime's lifecycle refused, said once while it lasts and again if it comes back (`refusalLines`): a stalled task
-        // is refused on every pass alike, and a line every pass is noise nobody reads.
         let refusedSaid: ReadonlySet<string> = new Set();
         let unreadableSaid: ReadonlySet<string> = new Set();
-        // What the passes since the last line cost, said once an interval (`STATS_EVERY_MS`) and started afresh: numbers, and nothing decided on them.
         let interval: Interval | undefined;
         for (;;) {
-          // Still this daemon's store, or it stops: taken over, it would be a second writer.
           const by = stillHeld(held);
           if (by) throw new Error(takenFromLine(by, store));
-          // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
           const { runs: advanced, queue, feedError, cost, refused, unreadable } = await tick(e, { repo: path.resolve('.') });
-          // The heartbeat: a pass completed, written down for `wf ls` and for the next `wf up`.
           passed(held);
           if (cost) interval = addPass(interval, cost, Date.now());
           if (summaryDue(interval, Date.now())) {
@@ -1164,7 +1158,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             if (!unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
           unreadableSaid = new Set(unreadable);
           if (queue) {
-            // A pass at a full cap reads no queue at all (`tick`), so the first pass that does is the first that can say anything.
             const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
             if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
             said = failure;
@@ -1188,7 +1181,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'feed': {
       const { lines, cursor } = readFeed(feedCursor('feed', rest));
       for (const line of lines) console.log(feedLineWords(line));
-      // Last, and always: where to read on from, as `ae feed` ends.
       return console.log(`cursor: ${cursor}`);
     }
 
@@ -1196,7 +1188,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const from = feedCursor('watch', rest);
       const refusal = feedCursorRefusal(from);
       if (refusal) usage(refusal);
-      // For ever: the watch holds the process open until ^C, as \`wf up\` does.
       return new Promise<void>(() => {
         watchPrinted(from);
       });
@@ -1204,21 +1195,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
     case 'ls': {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
-      // Last, on every path: whether a daemon ticks the store, and when its last pass was — or `waiting` could mean nothing ticks at all.
       const ticking = () => console.log(daemonLine(daemonStanding(), Date.now()));
       if (!runs.length) {
         console.log('no runs');
         return ticking();
       }
-      // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
-      // One read of each task and one question to git of each branch for the whole listing: a task a run waits on is viewed once, and git
-      // lists each repository's branches once, with their distance from every base the runs name (`viewedOnce`, `branchReader`).
       const viewed = viewedOnce(e);
       const git = branchReader();
       git.prime(runs);
       const held = await runSlots(viewed, rest[0] ? listRuns() : runs);
       for (const run of runs) {
-        // A pruned run is still a run: said beside its line, as a cancelled one is, since what is left of it is its branches.
         const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
         const listed = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
           const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
@@ -1233,31 +1219,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           continue;
         }
         const { steps, waitingOnYou, waiting, holding, cost, toDecide } = listed;
-        // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
-        // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
         const said = steps.map((s) => `${s.status}${s.cost ? `  ${s.cost}` : ''}`);
-        // As wide as this run's longest status, so its branches still line up beside it.
         const width = Math.max(20, ...said.map((w) => w.length));
         for (const [i, s] of steps.entries()) {
-          // The try a step is on, or the try due, beside its line: `try 2 asked (--nudge)`, `try 2, by retries: 1`.
           console.log(`   ${s.name.padEnd(14)} ${said[i].padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
         }
-        // What is left to decide about the result: the ending step's gate, in the folder's own words, with the approval that runs it — or,
-        // in a folder with no ending step, the branch nobody has merged. Said before who else the run waits on, since it is the run's end.
         if (toDecide) console.log(`   → to decide: ${toDecideWords(run, toDecide)}`);
-        // The step a person has to act on, and where to act. Said here and not left to the result
-        // line, because a run blocked on its first step has no result branch yet. A step at its gate is named with what is asked: approve plan.
-        // The ending step's own gate is the line above, and is not said twice.
         const onYou = onYouWords({ steps, waitingOnYou }).filter(
           (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
         );
         if (onYou.length) console.log(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
-        // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
         if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length))
           console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
-        // A held run asks nothing of anyone while its hold stands (`listing` offers nothing): what holds it, in place of what it would ask —
-        // and, for a run named that never ships, or a hold that names none, how it is let go.
         if (holding) {
           const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
           const lifting = holding.length > 0 && holding.every((w) => w.shipped);
@@ -1265,7 +1239,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             `   → ${holdWord(holding)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
           );
         }
-        // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
       }
@@ -1276,9 +1249,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!rest[0]) return console.log(HELP);
       const { run, plan } = await cancel(e, rest[0]);
 
-      // Say what happened, in every case. A `wf cancel` that prints nothing is indistinguishable
-      // from one that did nothing — and "already finished" and "nothing was in flight" are exactly
-      // the answers a person cannot tell apart from silence.
       if (plan.kind === 'finished') return console.log(`${run.id}  already ${plan.status} — nothing to stop`);
 
       console.log(plan.kind === 'already-cancelled' ? `${run.id}  already cancelled at ${plan.at}` : `${run.id}  cancelled`);
@@ -1288,8 +1258,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // Forgetting a run that is over: never cancelling one. Each run is judged on its own and gets its line, a refusal included; a run not
-    // forgotten makes the verb fail once every run has had its say, so a script sees it.
     case 'rm': {
       const { ids, how } = rmHow(rest);
       if (!ids.length) return console.log(HELP);
@@ -1317,9 +1285,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // Freeing what runs that are over hold on disk: their worktrees, and under --artifacts their files. A dry run unless a person says yes —
-    // on the flag, or at the prompt — and never on a tick. Named runs each get their line, a refusal included, and a refusal makes the verb
-    // fail once every run has had its say; with none named, every run is read, and one still running or with nothing to prune is not a line of its own.
     case 'prune': {
       const { ids, unmerged, yes, artifacts } = pruneHow(rest);
       const named = ids.length > 0;
@@ -1370,7 +1335,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         return refusedNamed();
       }
       for (const p of prunable) {
-        // Read again, not trusted from the listing: a run may have been handed a word, or a change made in a worktree, since.
         try {
           const done = await prune(e, p.id, { unmerged, artifacts, yes: true });
           for (const line of pruneLines(done)) console.log(line);
@@ -1384,7 +1348,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return refusedNamed();
     }
 
-    // A person's word that a run waits for others to ship, given after it started: its own file (`runs/<id>.hold`), which the tick lifts.
     case 'hold': {
       if (!rest[0] || rest[0].startsWith('-'))
         usage('wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.');
@@ -1399,15 +1362,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       );
     }
 
-    // The run does not end by going quiet. A review and a reply are two opinions and something
-    // has to say what ships — which is a person's job, so the run's last act is to put the
-    // material in front of one. Read-only on purpose: it shows the choice and the exact commands,
-    // and does not decide anything itself.
     case 'decide': {
       if (rest.includes('--help')) return console.log(DECIDE_HELP);
       if (!rest[0]) return console.log(HELP);
-      // Read before the run is: a mistyped flag is refused, not a screen quietly printed without it — and
-      // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--'))
         usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
@@ -1441,18 +1398,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const unjudged = await unjudgedOf(e, readRun(rest[0]), err, 'wf decide');
         throw unjudged ? new Error(unjudged.said) : err;
       });
-      // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
-      // And the inbox card it was started from, when it was.
       const from = fromNote(run);
-      // And that its worktrees were removed: what is left of it is its branches, its record and its files.
       const pruned = run.pruned ? `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` : '';
       const head = `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}${pruned ? `\n  ${pruned}` : ''}`;
       const steps = stepsOf(run);
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
-      // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
-      // A hold beside the wait is said too: lifting it is not enough to start the run, and the line says so.
       if (waiting.length) {
         const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
         const alsoHeld = run.hold
@@ -1460,30 +1412,21 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           : '';
         return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
       }
-      // Nor while a person holds it (wf hold): what is in flight finishes, and what its steps ask is asked once the hold lifts — so the hold,
-      // and what is still running, are the whole of what there is to say, and nothing is offered.
       if (run.hold) {
         console.log(`${head}\n\n  ${holdWord(holding)}`);
         if (decision.kind === 'running' && decision.waiting.length) console.log(`  still running: ${decision.waiting.join(', ')}`);
         for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
         return console.log(`  ${holdAdvice(run, holding)}`);
       }
-      // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
       if (held)
         return console.log(
           `${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
         );
-      // An ending a person's word would file, waiting for the repository's own checkout: which run's step is in it, and what frees this one.
-      // Said on either screen — a run whose ending has not run is still running, and one whose ending ended blocked is waiting on a person.
       const ending = steps.find((s) => s.workspace === 'main');
       const heldOut = checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '';
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
-        // A step whose session the harness blocked reads as running and moves for nobody: what it waits for, and where to answer it.
-        // Said here because there is no other screen for it — a run held this way never reaches the one below.
         for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
-        // A try the next tick files is why a run that had stopped is running again: said, with whose word it is — unless the checkout holds
-        // it, which the line below says instead: the next tick files nothing of it.
         for (const r of retrying.filter((r) => !(heldOut && r.step === ending?.name)))
           console.log(
             `  ${r.step}: ${dueNote(
@@ -1492,14 +1435,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
               r,
             )}`,
           );
-        // So is a loop going round again.
         for (const r of rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
         if (heldOut) console.log(heldOut);
         return console.log('  nothing to decide yet');
       }
       if (decision.kind === 'shipped') {
-        // An ending that never ran, on a run git reads as shipped: its result was merged without it, and its line on `wf ls` still sits at its
-        // gate — said here too, with the one command there still is, so the two screens do not disagree about who is waited on.
         const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
         const never = unrun
           ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${run.id}`
@@ -1508,10 +1448,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       }
 
       console.log(`${head}\n`);
-      // A pruned run waits on nobody, as `wf ls` says: whatever a person would do about a step files work into a worktree that is gone
-      // (`prunedRefusal`). How each step ended is still said; that it waits on you is not.
       const onYou = run.pruned ? '' : ', waiting on you';
-      // The run's own verdicts first: they decide how much of the rest is worth reading.
       if (decision.failedCheck.length)
         console.log(
           `  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`,
@@ -1520,7 +1457,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(
           `  CHECK DID NOT FINISH: ${decision.unfinishedCheck.join(', ')}  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran`,
         );
-      // A step the run already nudged to sign off, once this round, says so: the nudge is spent, and what is left is yours.
       if (decision.unsigned.length)
         console.log(
           `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran`,
@@ -1528,28 +1464,20 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.unverified.length)
         console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
       if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
-      // A step that stopped itself and said why is a different thing from one that broke, and the
-      // difference decides whether you read a summary or a log.
       if (decision.stuck.length) console.log(`  BLOCKED${onYou}: ${decision.stuck.join(', ')}`);
-      // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
       if (decision.exhausted.length)
         console.log(
           `  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
         );
-      // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
-      // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length)
         console.log(
           `  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
         );
-      // A call denied is a person's to weigh: whether the work stands without it, or the folder's allowedTools: grows for a new run.
       if (decision.denied.length)
         console.log(
           `  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
         );
-      // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
-      // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
       const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);
       const unrun = decision.awaitingApproval.filter((name) => !run.steps[name]?.taskId);
       if (handedOn.length)
@@ -1561,18 +1489,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           `  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
         );
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
-      // And the checkout, where a try of the ending waits for it: the ask stands, and the tick files it once that step settles.
       if (heldOut) console.log(heldOut);
-      // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 
-      // What the branch touched, before any step's account of it: which parts of the repository, and
-      // whether among them are the files an agent reads as instructions or those that decide what its
-      // check means. Then the lesson — CLAUDE.md's "When you miss", held to — and those check files in
-      // full, because a check that passed says nothing about a check that was changed to pass.
-      // Never the run's own base branch on a run that cut worktrees: a step that recorded it worked in the repository's checkout, and
-      // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
-      // A folder run has no branch, and nothing here to read: what its steps made is in their artifacts.
       const git = isGitRun(run) ? run : undefined;
       const touched = !git
         ? []
@@ -1592,34 +1511,20 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
       }
 
-      // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
-      // it — that is the point of the field — and you are the audience it was addressed to. Above it,
-      // what the run's check of the step said: the machine's word before the agent's. Below it, what the
-      // step declared for the steps after it — read off the engine's record, not a branch, so dropping
-      // the branch does not drop the review.
-      // In the order the steps run, whatever order the record is keyed in.
       for (const name of namesInOrder(run, steps)) {
         const c = closeouts[name];
         const check = checks[name];
-        // A step the run filed consumed something, closeout or not; one never filed has nothing to say.
         if (!c && !check && !run.steps[name]?.taskId) continue;
         const blocked = c && !('error' in c) && c.outcome === 'blocked';
         const step = steps.find((s) => s.name === name);
-        // The try — and the round — whose closeout and check these are, when it is not the first, and whether a person answered it.
         const tried = step ? tryNote(step, run.steps[name], steps, Boolean(answers[name])) : '';
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
-        // Its gate, under its name: approved, when and with what words — or awaiting approval, and the commands that answer it.
         if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
-        // And, under a looping step, the loop a person ended as it stands: when, and why they said the findings below can stay open.
         if (accepted[name]) console.log(`    accepted  ${accepted[name].split('\n').join('\n              ')}`);
-        // And what its session is waiting for, when its harness blocked it and said what for: the wait is the step's whole story.
         if (waitingOn[name]) console.log(`    harness  ${waitingOn[name]}`);
-        // And what its sessions were denied: a tool it was not allowed, which a job carries on without, so its work may be short of it.
         if (denied[name]) console.log(`    ${denied[name]}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
-          // For a check that refused, the last of each stream, labelled: which pipe a line came from
-          // is the difference between a runner's progress noise and its summary.
           for (const [stream, text] of [
             ['stdout', check.stdout],
             ['stderr', check.stderr],
@@ -1627,18 +1532,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             if (!check.passed && text) console.log(`      ${stream}:\n        ${text.split('\n').join('\n        ')}`);
           }
         }
-        // What its session consumed, beside the check's word on it — or that nobody measured it — and what its tries cost, against its budget.
         const [usedLine, costOfTry] = usedLines(used[name]);
         console.log(`    ${usedLine}`);
         console.log(`    ${costs[name] ?? costOfTry}`);
-        // Where its time went, try by try and check by check: when each was filed, spawned and ended, how long it queued and ran.
         for (const line of timelineLines(timeline.steps[name] ?? [])) console.log(`    ${line}`);
-        // What a person said to this try, beside what the try before it needed: the question and its answer, before what the try made of them.
         const answer = answers[name];
         if (answer?.needs) console.log(`    try ${answer.try - 1} needs: ${answer.needs.split('\n').join('\n    ')}`);
         if (answer) console.log(`    your answer: ${answer.message.split('\n').join('\n    ')}`);
-        // What a person said to its sessions while they ran, as data, before the step's own account: a scope a person widened mid-flight is
-        // the reviewer's to weigh, not the step's to claim.
         for (const line of saidLines(said[name] ?? []).flatMap((l) => l.split('\n'))) console.log(`    ${line}`);
         if (!c) continue;
         if ('error' in c) {
@@ -1646,18 +1546,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           continue;
         }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
-        // What it declared — and, for a loop's target past its first round, its replies to the findings.
         for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
-        // The question, then the command that answers it.
         if (answering[name]) console.log(`    ${answering[name]}`);
-        // What it declared that is not where it says, then what is in the directory the run made for its
-        // files: the screenshots a UI step's check took, say, which are on no branch.
         const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name), run.pruned);
         for (const line of files) console.log(`    ${line}`);
       }
       console.log();
-      // And the run's: what it cost, every step's tries together; then each round's time when its loop went round, and the whole run's.
       const totals = [...runCost, ...timelineTotalLines(timeline)];
       if (totals.length) {
         for (const line of totals) console.log(`  ${line}`);
@@ -1668,8 +1563,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const stat = diffStat(git!, branch);
         console.log(`  ${branch}${stat ? `  —${stat}` : ''}`);
 
-        // Markdown a step ADDED is a message written for whoever reads next, and today that is
-        // you. Source it added is in the diff, where source belongs.
         const notes = artifacts(git!, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
         for (const file of notes) {
           const text = readArtifact(git!, branch, file).trimEnd();
@@ -1680,22 +1573,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
       }
 
-      // Worked on the base branch itself (`--no-worktree`): `merge --no-ff main` into main is nothing, `branch -D main` is not a command
-      // to print beside it, and a standing would read `main is on main`. What there is to decide is still said, below.
-      // A folder run has no branch to stand anywhere: its work is in its steps' folders, and what they named is listed above.
       if (!git) {
         console.log(`\n  worked in folders, with no git repository: ${run.workspace}, a folder per step; nothing to merge`);
       } else if (decision.direct) {
         console.log(`\n  worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`);
         console.log(`  read it    git -C ${run.repo} diff ${run.baseRef}...${run.branch}`);
       } else if (standings.length) {
-        // The facts about the result, before anything to do about it: where each branch stands against the base branch, as git says it now.
         console.log();
         for (const s of standings) console.log(`  branch    ${branchWord(run, s)}`);
       }
 
-      // What is left to decide: the step a person's word is waited on for. For an ending that has not run, what it would do, in the
-      // folder's own words, since approving is what runs it; for a gated step that has, nothing but the word — its closeout is above.
       if (toDecide?.kind === 'approve') {
         const step = steps.find((s) => s.name === toDecide.step)!;
         console.log(
@@ -1707,10 +1594,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         return;
       }
 
-      // And where no step of the workflow merges (`merges`), the commands a person runs by hand: this folder says nothing about what
-      // happens when the work is done, whether its last step was gated or not, and its branch is still a person's to land or drop.
-      // None for a run that worked on the base branch itself: there is nothing to merge, and its own lines are above.
-      // A folder run's work is kept where it is until a person is done with it: there is nothing to land, and forgetting it is the one command.
       if (!git) return console.log(`\n  done with it   wf rm ${run.id}  — forgets the run with its folders and files`);
       const first = decision.branches[0];
       if (first && !merges(steps) && !decision.direct) {
@@ -1720,12 +1603,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A person's word that a step gets one more try. It writes the ask and nothing else: the tick, which owns
-    // the run's record, honours it once on its next pass, as it enforces a cancellation.
     case 'retry': {
       const [runId, stepName] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
-      // A step whose session its harness blocked is taken too: the tick stops that session, then files the try.
       const { ask, file, stopFirst } = await retry(e, runId, stepName, retryHow(rest.slice(2)), { stopBlocked: true });
       const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
       const then = stopFirst
@@ -1738,13 +1618,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A person's word at a gate. Like `wf retry`, it writes the approval and nothing else: the tick reads it on every pass, and files what waits.
     case 'approve': {
       const [runId, stepName, ...more] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       const { approval, file } = await approve(e, runId, stepName, approveHow(more));
-      // What the approval lets happen: an ending step is filed by the next tick, since its approval is what files it; a step something
-      // waits on hands on to what waits; a last step that has run hands its run on to be decided.
       const after = readRun(runId);
       const waited = stepsOf(after).some((s) => s.after.includes(stepName));
       const files = !after.steps[stepName]?.taskId;
@@ -1755,7 +1632,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A person's "once more" for a loop whose rounds are spent. Like `wf retry`, it writes the ask and nothing else: the tick honours it once.
     case 'round': {
       const [runId, ...more] = rest;
       if (!runId || runId.startsWith('--')) return console.log(HELP);
@@ -1768,15 +1644,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A person's "enough" for a loop whose rounds are spent. Like `wf approve`, it writes the acceptance and nothing else: the tick reads
-    // it on every pass, and the looping step hands on with its findings still open.
     case 'accept': {
       const [runId, ...more] = rest;
       if (!runId || runId.startsWith('--')) return console.log(HELP);
       const { stepName, message } = acceptHow(more);
       const { acceptance, file } = await accept(e, runId, stepName, message);
-      // What the acceptance lets happen: what waits on the looping step is filed on the next tick — or, with nothing waiting, the run is
-      // finished and there is something to decide.
       const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(acceptance.step));
       console.log(
         `${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
@@ -1785,8 +1657,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return;
     }
 
-    // A person's words to a step's running session, through the engine's `say`, which journals them: the one record, and this verb writes
-    // nothing else. The words are everything after the step, so an unquoted sentence is one message; empty ones are the engine's to refuse.
     case 'say': {
       const [runId, stepName, ...words] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
@@ -1805,7 +1675,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'show': {
       if (!rest[0]) return console.log(HELP);
       const run = readRun(rest[0]);
-      // The frozen workflow is shown by its keys; each step's prose is what `wf logs` is for.
       const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
       console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…`, workflow }, null, 2));
       return;
@@ -1819,7 +1688,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       return console.log(await e.logs(taskId));
     }
 
-    // The agents a step may name, and one of them in A2A's shape. Reads the two places and prints; writes nothing.
     case 'agents': {
       const [sub, ...args] = rest;
       if (sub === 'card') {
@@ -1829,7 +1697,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const { from, dir, agent } = findAgent(name, how.repo ?? '.', how.from);
         const found = agentSkillsFound(dir, how.repo ?? '.');
         const version = agentVersion(dir, name, found)!;
-        // The card alone on stdout, so `wf agents card <name> | jq` reads it; what it is not goes to stderr.
         console.log(JSON.stringify(agentCard(agent, version, cardSkills(agent, found)), null, 2));
         console.error(
           `${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`,
@@ -1851,7 +1718,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           continue;
         }
         console.log(`${name}  ${from}  ${agent.description ?? 'no description:'}`);
-        // What its card says it can do, generated from its skills (or its description, given none): the entries, or why there is no card.
         let card: Array<{ id: string; name: string; description: string }>;
         try {
           card = cardSkills(agent, agentSkillsFound(dir, how.repo ?? '.'));

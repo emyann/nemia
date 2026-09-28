@@ -3,8 +3,8 @@
  * (`dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files — the tries the tick wrote down of a queued card's start
  * (`queueDir`, `queueTries`). The judgement is `inbox.ts`'s; this reads and writes.
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what it exported of
- * this before. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and is `start.ts`'s, beside `start`.
+ * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
+ * exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and is `start.ts`'s, beside `start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,7 +55,7 @@ export const inboxCards = (): string[] =>
 
 /**
  * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
- * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is no longer queued as it
+ * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued as it
  * was — started, taken back, dropped or edited.
  */
 export const queueDir = (): string => path.join(HOME, 'queue');
@@ -65,7 +65,10 @@ const isQueueTry = Schema.is(
   Schema.Struct({ at: Schema.String, text: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean }),
 );
 
-/** The tries the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
+/**
+ * The tries the tick has written down, by card name. A file that does not read as one, torn or removed after the listing, is none: the card
+ * is tried, and written again.
+ */
 export function queueTries(): Map<string, QueueTry> {
   const tries = new Map<string, QueueTry>();
   let names: string[];
@@ -79,9 +82,7 @@ export function queueTries(): Map<string, QueueTry> {
       const r: unknown = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8'));
       if (isQueueTry(r))
         tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-    } catch {
-      /* torn, or removed since the listing */
-    }
+    } catch {}
   }
   return tries;
 }
@@ -123,8 +124,8 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
 
 /**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
- * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it; `dir` is the folder a path in the text's own
- * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
+ * alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is what a
+ * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
  * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
 export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): {
@@ -139,7 +140,6 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
     const name = runId(body.split('\n')[0]);
     const file = path.join(inboxDir(), `${name}.md`);
     try {
-      // `wx`: a name already taken is drawn again, never written over.
       fs.writeFileSync(file, text, { flag: 'wx' });
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
@@ -154,13 +154,17 @@ export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: 
 
 /**
  * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
- * takes the mark back. The card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the
- * file keeps the time it was last written, since the rename would give it the time of the queue, and a card has no filing time of its own but
- * its mtime: a board orders its cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea.
+ * takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The card's file
+ * is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the file keeps the time it was last
+ * written, as the rename would give it the time of the queue, and a card has no filing time of its own but its mtime: a board orders its
+ * cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea. When that time cannot be
+ * set back, the queue is written all the same.
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card — naming the cards
  * there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names, one already queued, and one with no
- * workflow and none given. `off` on a card not queued writes nothing, and says so.
+ * workflow and none given. A `workflow` given, queued or taken back, is written over the card's own, and refused onto a folder team for a
+ * card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged. `off` on a card not queued writes
+ * nothing, and says so.
  */
 export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
   const refused = inboxNameRefusal(name);
@@ -175,7 +179,6 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
       `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
     );
   }
-  // Taken back whatever its `repo:` names: a card whose repository is gone leaves the queue as any card does, and is listed with why.
   const exists = how.off ? () => true : isDirectory;
   const card = parseInboxCard(`${name}.md`, text, exists);
   if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
@@ -190,16 +193,11 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     );
     if (why) throw new WorkflowError(why);
   }
-  // `--workflow` writes that key over the card's own — queued or taken off the queue, `queuedText` below writes it either way — which
-  // makes this a writer of the pair a card's `repo:` is judged against: a card filed with a repository is not put onto a folder team,
-  // to start on a repository no step of it looks at. With no `--workflow` nothing is refused — the card is as it was, and a card on disk
-  // cannot be edited from the board.
   if (how.workflow !== undefined) {
     const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });
     if (refusedRepo) throw new WorkflowError(refusedRepo);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
-  // When the card was last written, to set back over the rename below: the card's filing time, as a board reads it.
   const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
   const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
   fs.writeFileSync(hidden, written);
@@ -207,9 +205,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
   if (filed) {
     try {
       fs.utimesSync(file, filed, filed);
-    } catch {
-      // The queue is written all the same: the card lists at the time of the queue, until it is written again.
-    }
+    } catch {}
   }
   const now = parseInboxCard(`${name}.md`, written, exists);
   if (how.off) return { card: now, file, was: 'taken back' };

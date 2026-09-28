@@ -56,31 +56,25 @@ import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from './tick.
 export type Cancelled = { run: Run; plan: CancelPlan };
 
 /**
- * Call a run off: stop what it has in flight, and write down that it is cancelled.
+ * Call a run off: stop what it has in flight, and write down that it is cancelled. Returns the run and the plan, whose `stop` is what it
+ * ASKED to stop: `e.stop` records the intent, and the engine carries it out on its next tick and confirms on the one after.
  *
- * Both halves matter and neither replaces the other. Stopping the session ends the work that is
- * burning right now; the mark on the run is what stops the NEXT step being filed, which the engine
- * could never know to do — it has tasks, not runs.
+ * Both halves matter. Stopping the session ends the work running now; the mark on the run is what stops the NEXT step being filed, which
+ * the engine cannot know to do — it has tasks, not runs. The stop is asked for BEFORE the run is marked: if the engine refuses, the run is
+ * left uncancelled and asking again does both, where the other order would leave a run that reads as cancelled while its session runs on.
  *
- * The stop is asked for BEFORE the run is marked, on purpose. If the engine refuses, the run is
- * left uncancelled and asking again does both; the other order would leave a run that reads as
- * cancelled while its session ran on.
+ * A check, a try or a round filed by a pass that died before writing the run down is in flight too: it is adopted first (`adoptRounds`,
+ * `adoptTries`, `adoptChecks`), so it is stopped at once, and is on the record only in memory. A task held open that waits for a person's
+ * word — a gate, a blocked sign-off — runs nothing, so it is closed as it signed, not stopped (`closeWaitingTasks`); a close the engine
+ * refuses is the next pass's to make again.
  *
- * Note what this does NOT do: write the run's json. A tick may be halfway through a pass over the
- * same run, and rewriting the record underneath it is how the mark got lost before. The
- * cancellation goes in a file only this verb writes, and `advance` enforces it on every pass —
- * which is also what covers a step filed in the moment after the stop list was taken.
- *
- * `e.stop` only records the operator's intent — the engine carries it out on its next tick and
- * confirms on the one after. That is the engine's contract, not a shortcut here, and it is why the
- * verb reports what it ASKED to stop.
+ * Never writes the run's json: a tick may be halfway through a pass over the same run. The cancellation goes in a file only this verb
+ * writes (`markCancelled`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was taken.
  */
 export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  // A check, a try or a round filed by a pass that died before writing the run down is in flight too. Found here so
-  // the verb stops it at once; on the record only in memory, because this verb never writes the run.
   const { asks, rounds } = readAsks(id);
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
@@ -92,8 +86,6 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
-  // A task held open that waits for a person's word — a gate, a blocked sign-off — runs nothing, so it is closed, not stopped: settled as it
-  // signed. A close the engine refuses is the next pass's to make again, as the mark is what every pass enforces.
   await closeWaitingTasks(e, run, views);
   if (plan.kind === 'already-cancelled') return { run, plan };
 
@@ -109,7 +101,9 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on
  * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there. Like a
  * cancellation, the ask is the person's own file, and the verb never writes the run's json, which the tick owns. What
- * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief.
+ * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief. An ask written by someone else
+ * between the look and the write is refused as the look would have refused it, and a file at the ask's name that no pass reads as one is
+ * named (`strayAsk`).
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
  * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a
@@ -157,7 +151,6 @@ export async function retry(
     at: new Date().toISOString(),
   };
   const file = askFile(id, stepName, ask.try);
-  // Someone asked in the moment since the look above: said as the look would have said it. Or a file is at the ask's name that no pass reads as one.
   if (!writeAsk(file, ask)) {
     refuse(
       refusal(readAsks(id).asks) ??
@@ -184,8 +177,10 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * verb never writes the run's json.
  *
  * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
- * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, and a send-back already asked for.
- * A file at the approval's name that is not one is named, with how to clear it.
+ * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, a send-back already asked for, and
+ * an ending that merges whose result is already on the base branch. Where the result stands is read off git (`standingsOf`) only for such
+ * an ending (`approvedFirst`): no other gate's approval turns on it. An approval written by someone else between the look and the write is
+ * refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
  *
  * Sending back is not this verb's: `wf retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
  */
@@ -198,8 +193,6 @@ export async function approve(e: Engine, id: string, stepName: string, message?:
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  // Where the result stands against the base branch, read off git, for an ending that merges: one whose result is already on the base has
-  // nothing to merge. Asked of git only for such a step — no other gate's approval turns on it.
   const standings = steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? standingsOf(run) : [];
   const refusal = (now: Run) =>
     approvalRefusal(
@@ -224,7 +217,6 @@ export async function approve(e: Engine, id: string, stepName: string, message?:
     ...(message !== undefined ? { message } : {}),
   };
   const file = approvalFile(id, stepName, approval.try);
-  // Someone approved in the moment since the look above: said as the look would have said it. Or a file is at the name that opens no gate.
   if (!writeAsk(file, approval)) {
     const read = approvalIn(file, stepName, approval.try);
     refuse(
@@ -244,7 +236,8 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
  * Tell a step's running session something — `wf say` — through the engine's `say`, on the step's current try's task: the one `retry` would
  * replace, as `run.steps[step].taskId` names it. The engine hands the words to the session through its harness, then journals them as a
  * `said` entry on the task, which is the record: this verb writes nothing of its own, and `wf ls` and `wf decide` read the words back off
- * the engine's view of the task.
+ * the engine's view of the task. Only the step's own task is read: the engine's `say` observes its harness again, and a run's other tasks
+ * have no part in it.
  *
  * Refused before the engine is asked, with what to do instead (`sayRefusal`): a step the run does not have, a cancelled run, a step with no
  * task filed, and one whose task has settled. Then the engine's refusals pass through as it words them, exit code 2 and all — empty words,
@@ -254,7 +247,6 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
 export async function say(e: Engine, id: string, stepName: string, text: string): Promise<Told> {
   const run = readRun(id);
   const steps = stepsOf(run);
-  // Only the step's own task is read: the engine's `say` observes its harness again, and a run's other tasks have no say in it.
   const taskId = run.steps[stepName]?.taskId;
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
   const refused = sayRefusal(steps, run, stepName, () => phase);
@@ -284,6 +276,8 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is the
  * person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one loop.
  * `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps it.
+ * An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
+ * name that does not read as one is named (`strayAsk`).
  */
 export async function round(e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> {
   const run = readRun(id);
@@ -304,7 +298,6 @@ export async function round(e: Engine, id: string, stepName?: string, budget?: n
     at: new Date().toISOString(),
   };
   const file = roundAskFile(id, ask.step, ask.round);
-  // Someone asked in the moment since the look above: said as the look would have said it.
   if (!writeAsk(file, ask)) {
     const now = answer(readAsks(id).rounds);
     refuse(
@@ -331,7 +324,8 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * Refused before anything is written, with what to do instead (`acceptAsk`): no words, a round the run files itself or that waits on a
  * budget, a round already asked for, a loop that ended `again: false`, a round still running, a try already accepted, a cancelled run. Like
  * `wf round`'s, the acceptance is the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be
- * left out when the run has one loop.
+ * left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
+ * have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
  * Going round once more is not this verb's: `wf round <run> [<step>]` — and the two are offered side by side (`roundLines`).
  */
@@ -351,7 +345,6 @@ export async function accept(e: Engine, id: string, stepName?: string, message?:
   if ('refusal' in first) return refuse(first.refusal);
   const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
   const file = acceptFile(id, acceptance.step, acceptance.try);
-  // Someone accepted in the moment since the look above: said as the look would have said it. Or a file is at the name that ends no loop.
   if (!writeAsk(file, acceptance)) {
     const now = answer(readRun(id), readAsks(id).rounds);
     const read = acceptanceIn(file, acceptance.step, acceptance.try);
@@ -374,8 +367,10 @@ export type Holding = { run: Run; hold: Hold };
  * (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in flight
  * runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
  *
- * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), a run not there, and what
- * `holdRefusal` refuses — nothing named, a run cancelled, pruned, shipped or succeeded, a run already held, a folder run; and of each run
+ * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), and one named after
+ * `--until`, whose fix keeps the run to hold; a run not there, and what `holdRefusal` refuses — nothing named, a run cancelled, pruned,
+ * shipped (as `--after` reads it) or succeeded with nothing left but a person's merge, asked of the engine only for a run nothing else
+ * refuses, a run already held, a folder run; and of each run
  * named: twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch
  * gone, already shipped — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`, exclusively: a hold
  * two people put at once is the first one's, and the second is refused as already held.
@@ -386,7 +381,6 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
   };
   const bad = idRefusal(id, 'hold');
   if (bad) refuse(bad);
-  // A run named is fixed on its own flag: the command that fixes it keeps the run to hold.
   for (const named of until) {
     const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
     if (badUntil) refuse(`--until ${badUntil}`);
@@ -395,8 +389,6 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
     refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`);
   const run = readRun(id);
   const read = new Map(await Promise.all([...new Set(until)].filter((u) => u !== id).map(async (u) => [u, await parentOf(e, u)] as const)));
-  // Finished: shipped as a run `--after` it reads it, or succeeded with nothing left but a person's merge. Asked only of a run a hold could
-  // still refuse for nothing else.
   let finished: 'shipped' | 'succeeded' | undefined;
   if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
     if ((await parentOf(e, id)).shipped) finished = 'shipped';
@@ -422,7 +414,6 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
   const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, listRuns(), finished);
   if (refused) refuse(refused);
   const put = writeHold(id, until);
-  // Someone held it in the moment since the look above: said as the look would have said it.
   if (!put)
     return refuse(holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`);
   return { run: { ...run, hold: put }, hold: put };
@@ -430,7 +421,8 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
 
 /**
  * Lift a person's hold by hand — `wf hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
- * asked again. Refused, exit 2: an id that is not a run's, a run not there, and a run nobody holds.
+ * asked again. Refused, exit 2: an id that is not a run's, a run not there, a run nobody holds, and a hold lifted and put again since it
+ * was read, which is a person's newer word and stays (`removeHold` takes only the hold read, by its `at`).
  */
 export function unhold(id: string): Holding {
   const refuse = (words: string): never => {
@@ -441,7 +433,6 @@ export function unhold(id: string): Holding {
   if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.`);
   const run = readRun(id);
   if (!run.hold) refuse(`${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`);
-  // The hold read above, and no other: one lifted and put again since is a person's newer word, and stays.
   if (!removeHold(id, run.hold!.at) && fs.existsSync(holdFile(id)))
     refuse(`${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`);
   return { run, hold: run.hold! };

@@ -3,7 +3,7 @@
  * and acceptance — and the directories a step's check stderr, artifacts and inputs are kept in, outside every workspace.
  *
  * Beneath the controllers, as `retry.ts` is beneath `run.ts`: this file imports neither the engine nor a controller, `runner.ts` re-exports
- * what it exported of this before, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this file loads, which is when
+ * what the package exports of it, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this file loads, which is when
  * the package loads.
  */
 import fs from 'node:fs';
@@ -43,7 +43,7 @@ const Strings = Schema.mutable(Schema.Array(Schema.String));
 
 const TaskRef = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String }), Rest);
 
-/** A try a step had before the one it is on (`EarlierTry`), as every version of the tick has written one. */
+/** A try a step had before the one it is on (`EarlierTry`), as any version of the tick writes one. */
 const EarlierTrySchema = Schema.StructWithRest(
   Schema.Struct({
     taskId: Schema.String,
@@ -75,8 +75,8 @@ const StepRecordSchema = Schema.StructWithRest(
 );
 
 /**
- * A step as the run froze it at `wf start`, checked only for what names it and orders it: the rest of its keys were the parser's output
- * when it was frozen, and are kept as they are (phase 2 of parsing what the packages read takes them up with that parser).
+ * A step as the run froze it at `wf start`, checked only for what names it and orders it: the rest of its keys are the parser's output as
+ * it was frozen, kept as they are and not checked.
  */
 const FrozenStepSchema = Schema.StructWithRest(
   Schema.Struct({ name: Schema.String, after: Schema.optional(Strings), body: Schema.optional(Schema.String) }),
@@ -84,14 +84,14 @@ const FrozenStepSchema = Schema.StructWithRest(
 );
 
 /**
- * The frozen steps, read as the workflow they were parsed into: the one cast left on a record, until phase 2 checks each key as the
- * parser does.
+ * The frozen steps, read as the workflow they were parsed into: the one cast left on a record. Every key but those `FrozenStepSchema`
+ * checks is taken on trust.
  */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the frozen step's keys are the parser's output; phase 2 checks them
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the frozen step's keys are the parser's output, and no schema checks them
 const frozenSteps = (steps: readonly (typeof FrozenStepSchema.Type)[]): Workflow[] => steps as Workflow[];
 
 /**
- * A run's record as the tick writes it, and as every version of it has: `Run`, with the person's files it composes on read
+ * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
  * (`approvals`, `acceptances`, `pruned`, `hold`) left to their own readers. Every key it does not name is kept, so a key a newer or an
  * older `wf` wrote — a frozen step's former name (`withFormerNames`) among them — survives `rewriteRun`.
  */
@@ -215,14 +215,13 @@ export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
 export const inboxDir = (): string => path.join(HOME, 'inbox');
 
 /**
- * A cancellation gets its OWN file, and this is the whole reason it does.
+ * A cancellation, in a file of its own.
  *
  * The run's json has one writer that rewrites it constantly — a tick reads the record, spends
  * seconds observing sessions and cutting worktrees, then writes back what it filed. `wf cancel` is
- * a second writer, and it exists to be used while that daemon is running: that is the point of the
- * verb. Two writers doing read-modify-write on one file is a lost update, and it was: a cancel
- * landing mid-pass was overwritten by the tick's stale copy, the mark vanished, and the run went
- * on filing steps. Re-reading before writing only narrows that window; it does not close it.
+ * used while that daemon runs, and a second read-modify-write of the one file would lose an update:
+ * a cancel landing mid-pass overwritten by the tick's stale copy, and the run filing steps on.
+ * Re-reading before writing only narrows that window; it does not close it.
  *
  * So the two writers are given two files and never touch each other's. The tick owns the run's
  * steps, a person owns the cancellation, and `readRun` composes them. No lock, and nothing to get
@@ -238,7 +237,10 @@ export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`
  */
 export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 
-/** The prune marker, read: undefined for a run never pruned, and for a marker that no longer reads as one, whose run is taken as pruned all the same. */
+/**
+ * The prune marker, read: undefined for a run never pruned. A marker that does not read as one still says the run is pruned, and each
+ * field that does not read is empty. Its files (`wf prune --artifacts`) are pruned when the marker names them, at the time it says or none.
+ */
 function readPruned(id: string): Pruned | undefined {
   let text: string;
   try {
@@ -252,7 +254,6 @@ function readPruned(id: string): Pruned | undefined {
   return {
     at: isText(at) ? at : '',
     worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [],
-    // Its files too (`wf prune --artifacts`), when the marker says so: a field that no longer reads says they went, at a time it does not say.
     ...(artifacts === undefined
       ? {}
       : { artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } }),
@@ -267,7 +268,7 @@ function readPruned(id: string): Pruned | undefined {
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
 
 /**
- * The hold, read: undefined for a run nobody holds. A file that no longer reads as a hold still holds the run, on no run named: the tick
+ * The hold, read: undefined for a run nobody holds. A file that does not read as a hold still holds the run, on no run named: the tick
  * never lifts a hold that names nothing, so only `wf hold --off` lifts it, and the run files nothing while the file is there (`advance`).
  */
 function readHold(id: string): Hold | undefined {
@@ -315,17 +316,18 @@ export const removeHold = (id: string, at: string): boolean => {
 };
 
 /**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold (`holdFile`), each
- * approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is ever written into
- * the record (`rewriteRun`).
+ * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold
+ * (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is
+ * ever written into the record (`rewriteRun`), and whatever the record carries under their keys is dropped. Counted as one record read
+ * (`countRecord`) under `records` while a pass is metered.
+ *
+ * The frozen steps are read under the names their keys have now (`asNamed`), and written back under both (`recordText`), in their place
+ * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
+ * `wf ls`, for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
-/** A run record read, counted as one (`countRecord`) under `records` while a pass is metered. */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
 
 const readRecord = (id: string): Run => {
-  // A mistyped run id is the commonest way to reach this, and `ENOENT: no such file or directory,
-  // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
-  // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
   countRecord();
   let raw: unknown;
@@ -336,11 +338,8 @@ const readRecord = (id: string): Run => {
     throw new UnreadableRecord(id, `is not JSON (${err.message})`);
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(id, recordRefusal(raw));
-  // What people own beside the record is theirs, composed below, whatever an older record carried under the same keys.
   const read = { ...raw };
   for (const key of ['approvals', 'acceptances', 'pruned', 'hold']) delete read[key];
-  // A run frozen before a step key was renamed is read under the names the keys have now (`asNamed`), and written back under both (`recordText`).
-  // In its place among the keys, so a record read and written back moves no line.
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: frozenSteps(workflow).map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
@@ -361,11 +360,11 @@ const readRecord = (id: string): Run => {
 /**
  * The run's steps: the workflow it froze at `wf start`, in the order they run (`orderSteps`).
  *
- * The folder is read only for a record from before the run froze its workflow — and a run started
- * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
- * Ordered on the way out too, so a record frozen before steps were ordered — in the folder's order,
- * alphabetical — reads in the order its steps run, as one written since does. And each step as it ran then (`asRan`): a step bridged to
- * claude.ai before steps were jobs is the background session it was.
+ * The folder is read only for a record that froze no workflow, never for a run `wf start` froze, so
+ * nothing written into the folder after `wf start` reaches it. Ordered on the way out, so a record
+ * frozen in the folder's order, alphabetical, reads in the order its steps run. And each step as it
+ * ran when it was frozen (`asRan`): a frozen `remote: true` step with no `background` is the background
+ * session it was.
  */
 export const stepsOf = (run: Run): Workflow[] => orderSteps((run.workflow ?? loadWorkflows(run.workflowDir)).map(asRan));
 
@@ -551,7 +550,11 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
   return { step, try: n, at, message };
 }
 
-/** The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one. */
+/**
+ * The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one, and
+ * for each approval and acceptance that cannot be read (`readApprovals`, `readAcceptances`), said on the pass as an ask's is. A file named
+ * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them.
+ */
 export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
   return within('asks', () => readAsksNow(id));
 }
@@ -570,11 +573,8 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
   } catch {
     return { asks, rounds, notes };
   }
-  // An approval opens a gate, read with the run (`readRun`); one that cannot be read is said on the pass, as an ask is. An acceptance
-  // ends a loop the same way, and is said the same way.
   notes.push(...readApprovals(id).notes, ...readAcceptances(id).notes);
   for (const name of names) {
-    // Anything else is not an ask: the file the verb writes before linking it into place starts with a dot.
     const tried = /^retry-(.+)-(\d+)$/.exec(name);
     const again = /^round-(.+)-(\d+)$/.exec(name);
     const file = path.join(asksDir(id), name);
@@ -603,8 +603,9 @@ export function roundAskIn(file: string, step: string, round: number): RoundAsk 
 
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
- * A file from before asks carried a message has none, and reads as it did. What `wf retry` refuses to write is refused here too, so a
- * file written by hand is held to the verb's word: a message that is not text or is empty, and a message on a recheck.
+ * A file with no message reads as an ask without one. What `wf retry` refuses to write is refused here too, so a file written by hand is
+ * held to the verb's word: a message that is not text or is empty, and a message on a recheck. A file that holds no object, or whose mode
+ * is not one of the three, asks for no mode `wf retry` knows.
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   const held = heldIn(file);
@@ -614,7 +615,6 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     if (read.refused === 'model') return 'its model is not a name';
     if (read.refused === 'message') return messageWords(held.read);
     if (read.refused === 'budget') return BUDGET_WORDS;
-    // Anything else read as an ask with no mode: a file that holds no object, or one whose mode is not one of the three.
     return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held.read, 'mode'))})`;
   }
   const { mode, model, message, budget, at } = read.read;
@@ -684,7 +684,9 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
 
 /**
  * Move each ask the run's record already answers into `done/` — and each approval a later try of its step spent (`spentApprovals`), and
- * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit.
+ * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
+ * run's asks directory, never the directory itself, which `wf rm` may remove mid-pass; an ask already moved by a pass beside this one, or
+ * removed with its run, is passed over.
  */
 export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
   within('act', () => consumeNow(run, asks, rounds));
@@ -699,17 +701,12 @@ function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundA
   ];
   for (const file of spent) {
     const done = path.join(asksDir(run.id), 'done', path.basename(file));
-    // Not `recursive`: `done/` is made inside the run's asks directory, never the directory itself, which `wf rm` may have removed mid-pass.
     try {
       fs.mkdirSync(path.dirname(done));
-    } catch {
-      /* there already — or gone, with its run */
-    }
+    } catch {}
     try {
       fs.renameSync(file, done);
-    } catch {
-      /* already moved, by a pass beside this one — or removed, with its run */
-    }
+    } catch {}
   }
 }
 
@@ -741,7 +738,7 @@ export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
  * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the record,
- * `.cancelled`, `.pruned`, `.hold`, and whatever a later marker is called, since a name nobody listed here is still stamped — and of every
+ * `.cancelled`, `.pruned`, `.hold`, and any other marker, as every name of that form is stamped — and of every
  * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
  * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and made again moves
  * its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
@@ -783,7 +780,7 @@ export const restStamps = (): Map<string, string> =>
 
 /**
  * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
- * so a daemon older than the rename that ticks the run still files each step's rule lists.
+ * so a daemon that reads only the former names still files each step's rule lists.
  */
 const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold'>): string =>
   JSON.stringify(run.workflow ? { ...run, workflow: run.workflow.map(withFormerNames) } : run, null, 2);
@@ -847,7 +844,7 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
  *
  * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
  * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is `places.ts`'s
- * (`inputsRoot`), since that is where the copy is read from.
+ * (`inputsRoot`), as that is where the copy is read from.
  */
 export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 

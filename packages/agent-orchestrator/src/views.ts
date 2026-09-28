@@ -36,19 +36,19 @@ import { continuesFrom } from './retry.ts';
  * state as one that is filed and waiting for a slot — `settled: null`, zero attempts — and the one
  * thing that tells them apart is that a filed task has the brief it was filed with.
  *
- * Worth the line, because `pending` counts as in flight. A run whose engine board has since been
- * cleared read as running for ever: `wf cancel` claimed to stop steps nobody can find, and
- * `wf decide` said "still running". `unknown` was in the type for this and was simply unreachable.
- * Found by the `wf rm` run (34774e0), whose verb was not kept; this was.
+ * Worth the line, because `pending` counts as in flight: a run whose engine board has been cleared
+ * would read as running for ever, `wf cancel` claiming to stop steps nobody can find.
+ *
+ * A task held open whose turn signed (`signedAndHeld`) is `succeeded`: waiting on a person with no
+ * process running, its session is over, and the run reads its closeout, check and gate as a settled
+ * task's; closed after it signed, it is read as the `succeeded` the engine settles it at on its next
+ * pass, never `running` for the pass between.
  *
  * Exported, log-free, so a consumer narrows a view as the tick does. No view at all is `unknown` too.
  */
 export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
-  // A task held open whose turn signed waits on a person with no process running (`input-required`): the step's session is over, as a
-  // settled one's is, and the run reads it so — its closeout, its check, its gate. And one closed after it signed, which the engine settles
-  // `succeeded` on its next pass: read as that already, or it would read `running` for the pass between.
   if (signedAndHeld(v)) return 'succeeded';
   if (v.state.attempts.length) return 'running';
   return v.state.brief ? 'pending' : 'unknown';
@@ -113,7 +113,8 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
  * The engine a command reads — `wf ls`, `wf decide` — whose `view` of a task is read once for the whole command: `wf ls` views a run's
  * tasks, and again each run another waits on, and `wf decide` its current tries and then every try. A view is the engine's word at the
  * moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of it,
- * as `reportedEngine` does, and a pass drops all of it, so a command that acts reads the engine's word after its act.
+ * as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
+ * its act. A view that failed is not kept: the next read asks the engine again.
  */
 export function viewedOnce(e: Engine): Engine {
   const read = new Map<unknown, Promise<TaskView>>();
@@ -123,7 +124,6 @@ export function viewedOnce(e: Engine): Engine {
       if (key === 'view') {
         return (taskId: string) => {
           let v = read.get(taskId);
-          // A view that failed is not kept: the next read asks the engine again, as it would have.
           if (!v)
             read.set(
               taskId,
@@ -135,7 +135,6 @@ export function viewedOnce(e: Engine): Engine {
           return v;
         };
       }
-      // A pass moves every task, so a `tick` or a `start` is read as a verb this does not know: it drops every view.
       if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key) && key !== 'tick' && key !== 'start'))
         return value;
       return (...args: unknown[]) => {
@@ -172,8 +171,9 @@ const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unkno
  * which the cap in force on it is held to (`stepSpend`, `overBudget`, `budgetUsdFor`) — and every reader of that is gated on there being a
  * cap (`budgetOf`), so with none in force they are read and never asked. A screen reads them all the same (`decide` prints what a run cost
  * and its timeline over every try), and so does anything that must answer for a try that is over. The tick does not: `advance` asks for
- * them only while a cap is in force, because a step answered without limit — the supervisor, which is answered for as long as a person
- * keeps answering — would otherwise add one journal read per answer to every pass of every four seconds, for ever, buying nothing.
+ * them only while a cap is in force, because each is a read off the task's journal — no harness asked, but a read per try per pass — and
+ * a step answered without limit — the supervisor, which is answered for as long as a person keeps answering — would otherwise add one
+ * journal read per answer to every pass, for ever, buying nothing.
  */
 export async function taskPhases(
   e: Engine,
@@ -187,7 +187,6 @@ export async function taskPhases(
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
     if (check) views.set(check.taskId, await e.view(check.taskId));
-    // A settled task is read off its journal, and asks no harness — but it is still a read, once per try per pass.
     if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
   }
   return {
@@ -197,10 +196,10 @@ export async function taskPhases(
 }
 
 /**
- * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement since stage 4a, off
- * what the runtime reports: its harness let the session go `done` with `stated: false`. And, on a journal written before stage 4a,
- * the runtime's own old verdict, `reason: 'unsigned'` (an attempt it ended `failed`). An end with no `stated` key is not read as a
- * missing statement: a `done` with no closeout from before 2026-09-19 would otherwise read unsigned, and be nudged, long after.
+ * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
+ * reports: its harness let the session go `done` with `stated: false`; or the runtime's own verdict `reason: 'unsigned'`, which a journal
+ * may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `done` with no closeout on a
+ * journal that says nothing of `stated` is not unsigned, and is never nudged.
  */
 const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][number] | undefined): boolean =>
   state.closeoutSchema !== undefined &&
@@ -223,11 +222,11 @@ export const closeoutAsked =
   };
 
 /**
- * How an attempt ended, in the words a person has read for it since 2026-09-19: an attempt its harness cut at its spend cap is `failed`,
- * `budget` — off the runtime's `limit: 'budget'`, since stage 4b a fact it carries and no longer an end it judges — one that ended without
- * the statement its task asked for is `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) —
- * and any other is as the runtime recorded it. The one writer of those words for a surface that shows an attempt's end, so the board says
- * what it said when the runtime judged it: never read an attempt's raw `reason` for `unsigned` or `budget`.
+ * How an attempt ended, in the words a person reads for it: an attempt its harness cut at its spend cap is `failed`, `budget` — off the
+ * runtime's `limit: 'budget'`, a fact it carries and not an end it judges — one that ended without the statement its task asked for is
+ * `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) — and any other is as the runtime
+ * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
+ * attempt's raw `reason` for `unsigned` or `budget`.
  */
 export const endWords = (
   state: TaskView['state'],
@@ -298,7 +297,8 @@ export const spendReader =
  * `unfinished` when it gave none — killed by a signal, stopped, or never started — and `undefined` for a step
  * with no check filed. What the tick tells a refusal from a check that did not finish by (`refusedCheck`),
  * without reading a log: a run waiting on a person costs no more each pass. The check prints the code it exits
- * with, so this and the log's `[wf check] exit N`, which `wf ls` reads, agree.
+ * with, so this and the log's `[wf check] exit N`, which `wf ls` reads, agree. A check the operator or its deadline cut short is
+ * `unfinished`, whatever code its process died with.
  *
  * Exported for a consumer that words a check as `wf ls` does, without a `logs` call per refused check.
  */
@@ -307,7 +307,6 @@ export const exitVerdicts =
   (step: string): Verdict | undefined => {
     const taskId = run.steps[step]?.check?.taskId;
     if (!taskId) return undefined;
-    // A check the operator or its deadline cut short did not finish, whatever code its process died with.
     const last = views.get(taskId)?.state.attempts.at(-1);
     return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
   };
@@ -362,7 +361,7 @@ export const saidCount =
     return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
   };
 
-/** What was said to a task's sessions while they ran (`wf say`), off its view: none for a task with no view, or one from before `said`. */
+/** What was said to a task's sessions while they ran (`wf say`), off its view: none for a task with no view, or a view with no `said`. */
 export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
 
 /**
@@ -415,22 +414,15 @@ function tailOf(file: string, bytes = 64_000): string {
 }
 
 /**
- * Where the run's work ended up, for a person who now has to go and look at it.
- *
- * A branch, not a directory: the worktree is scaffolding and gets removed, the branch is the
- * result and stays in the repository. Reported as soon as a terminal step has a branch, so it is
- * useful while the run is still going, not only afterwards.
- */
-/**
  * How a step signed off: its closing statement, as the engine recorded it on the attempt.
  *
  * The engine carries the payload and never reads it; this reads it. No git and no path — the step
  * made the statement to its harness, and it lives on the engine's record of the attempt that made
- * it, which is also what keeps a resumed step from being credited with its parent's.
+ * it, which is also what keeps a resumed step from being credited with its parent's. It is the current turn's (`currentTurn`): a task
+ * held open and answered has none until its next turn signs.
  */
 export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
   const taskId = run.steps[stepName]?.taskId;
-  // The current turn's: a task held open and answered keeps the closeout of the turn it answered until the next turn signs.
   const state = taskId ? views.get(taskId)?.state : undefined;
   const said = state ? currentTurn(state).at(-1)?.closeout : undefined;
   return said === undefined ? undefined : parseCloseout(said);
@@ -495,7 +487,7 @@ export async function parentOf(e: Engine, id: string, git: BranchReader = oneByO
 }
 
 /**
- * The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate no longer applies to (`gated`).
+ * The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate does not apply to (`gated`).
  * And the runs a person holds it until (`Run.hold`), for as long as the hold stands.
  */
 export async function parentsOf(e: Engine, run: Run, git: BranchReader = oneByOne): Promise<(id: string) => ParentRun> {
@@ -510,8 +502,8 @@ export async function parentsOf(e: Engine, run: Run, git: BranchReader = oneByOn
  * and check `wf decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
  * flight on the view; an attempt that never started consumed nothing, and is left out.
  *
- * Off views already read, not a view of its own: each `e.view` is a harness observe (~300 ms, plan §4b),
- * so `decide` reads each task once and hands its views here.
+ * Off views already read, not a view of its own: each `e.view` is a harness observe, so `decide` reads
+ * each task once and hands its views here.
  */
 export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Record<string, Consumed | undefined> {
   const used: Record<string, Consumed | undefined> = {};

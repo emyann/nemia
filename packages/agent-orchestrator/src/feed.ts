@@ -3,10 +3,10 @@
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
- * approval — was a pass's judgement and nothing more: gone once the pass was, and learned by a watcher only by asking again. This is
- * where it is written down, as it changes.
+ * approval — is a pass's judgement, gone with the pass. This is where it is written down, as it changes, so a watcher reads it here
+ * rather than asking again.
  *
- * **A report, never an input.** The tick is its one writer and nothing reads it to decide: every pass still judges from the world
+ * **A report, never an input.** The tick is its one writer and nothing reads it to decide: every pass judges from the world
  * (`assess`), and a feed deleted by hand costs the history, not a decision.
  *
  * **What a pass compares against is the feed itself**, folded (`foldFeed`): not a copy of the last words kept in memory, which a

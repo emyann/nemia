@@ -191,7 +191,7 @@ export type Engine = {
    * brought as `'claude'`; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep.
    * A harness brought as a `PromiseRunner` is asked nothing of its own.
    */
-  file(spec: TaskSpec): Promise<string>;
+  file: (spec: TaskSpec) => Promise<string>;
   /**
    * One pass: start what may start — every task not queued, and each queued one `admit`ted — notice what ended, settle what
    * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument, since the
@@ -202,7 +202,7 @@ export type Engine = {
    * it since, or this engine has never folded it — so an engine's first pass reads every journal and the whole feed, and
    * the passes after it read only what changed. A store (`PromiseJournal`) must therefore put every append on its feed.
    */
-  tick(): Promise<TickReport>;
+  tick: () => Promise<TickReport>;
   /**
    * Let tasks filed `queued` start (stage 4c): journals an `admitted` entry for each whose current turn waits for one, and
    * returns their ids; the next tick starts them. Reads the tasks' records and asks no
@@ -210,7 +210,7 @@ export type Engine = {
    * returned. Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled for any of them — when one
    * is a task this engine has no record of, or has settled.
    */
-  admit(taskIds: readonly string[]): Promise<string[]>;
+  admit: (taskIds: readonly string[]) => Promise<string[]>;
   /**
    * One task. A settled task is read off its record, on every harness, and no registry is asked: its phase is its
    * outcome, and its session's id is the harness's own where it can `find` one, found by name when the record lacks it,
@@ -220,17 +220,17 @@ export type Engine = {
    * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other.
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
-  view(taskId: string): Promise<TaskView>;
+  view: (taskId: string) => Promise<TaskView>;
   /**
    * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
    * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
    * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
    * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
    */
-  list(taskIds?: readonly string[]): Promise<TaskView[]>;
+  list: (taskIds?: readonly string[]) => Promise<TaskView[]>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
-  stop(taskId: string): Promise<void>;
-  logs(taskId: string): Promise<string>;
+  stop: (taskId: string) => Promise<void>;
+  logs: (taskId: string) => Promise<string>;
   /**
    * The conversation of the task's session — the one `logs` reads, asked of the task's own harness — as
    * events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor the last
@@ -247,7 +247,7 @@ export type Engine = {
    * without `transcript`); and, for the engine's own readers (`claude`, `claude-bg` and a `HarnessSpec`), an
    * `after` that none of them gave. A `PromiseRunner`'s cursor is its own, and passed through.
    */
-  transcript(taskId: string, after?: TranscriptCursor): Promise<Transcript>;
+  transcript: (taskId: string, after?: TranscriptCursor) => Promise<Transcript>;
   /**
    * Tell the task's session something while it runs — `kubectl attach` with its audit line. `text` is handed, as
    * given, to the session of the attempt in flight through the task's own harness, and then journalled as a
@@ -274,7 +274,7 @@ export type Engine = {
    * `working` until it exits, and its record settles on the next tick. Words said in the half second before its
    * result are taken and may never be read (open issue 29).
    */
-  say(taskId: string, text: string): Promise<Said>;
+  say: (taskId: string, text: string) => Promise<Said>;
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
@@ -290,15 +290,15 @@ export type Engine = {
    * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
    * Two answers journalled before the next turn begins are told to it both, in order.
    */
-  answer(taskId: string, text: string, options?: { config?: HarnessArgs }): Promise<Input>;
+  answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Promise<Input>;
   /**
    * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
    * `closed`, by the next tick. Refused — an `Error` whose `exitCode` is 2, nothing journalled — as `answer` is, for a task
    * that is not waiting for one. To end one that is running, `stop` it.
    */
-  close(taskId: string): Promise<void>;
+  close: (taskId: string) => Promise<void>;
   /** Everything that has happened since `after`, and where to resume. */
-  feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+  feed: (after?: Cursor) => Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
   /**
    * Watch everything that happens, as it happens — the engine's event-driven surface.
    *
@@ -308,16 +308,16 @@ export type Engine = {
    * correctness. Delivery is in order and at-least-once; the cursor never expires, so starting at
    * 0 replays the whole history first.
    */
-  watch(options: {
+  watch: (options: {
     onEntry: (entry: FeedEntry) => void | Promise<void>;
     from?: Cursor;
     intervalMs?: number;
     onError?: (e: unknown) => void;
-  }): { stop(): void };
+  }) => { stop: () => void };
   /** What this engine's reads, spawns and observes have cost so far (`EngineIo`): running totals, read by nothing in the engine. */
-  io(): EngineIo;
+  io: () => EngineIo;
   /** Tick on a timer until stopped. Ticks never overlap. */
-  start(options?: { intervalMs?: number; onTick?: (r: TickReport) => void; onError?: (e: unknown) => void }): { stop(): void };
+  start: (options?: { intervalMs?: number; onTick?: (r: TickReport) => void; onError?: (e: unknown) => void }) => { stop: () => void };
 };
 
 // ─── the adapters ───────────────────────────────────────────────────────────

@@ -109,7 +109,7 @@ export type BranchReader = {
    * Each branch of the repository and its commit, off the listing the answers were read from — what a memo of those answers keys them by,
    * so a branch that moves between the answer and the key is read as moved. Empty where git would not list them.
    */
-  heads(repo: string): ReadonlyMap<string, string>;
+  heads: (repo: string) => ReadonlyMap<string, string>;
 };
 
 const countOf = (said: string | undefined) => {

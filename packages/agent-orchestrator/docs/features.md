@@ -294,7 +294,8 @@ What it leaves:
   with a try due.
 - **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
   no exit code, so the missing exit code, not the phase, is what says it did not finish.
-- **`bin/wf.ts` exits 1 on every error**, including the verbs' refusals, which set `exitCode` 2.
+- **`bin/wf.ts` exited 1 on every error**, including the verbs' refusals, which set `exitCode` 2. Since 2026-09-28 it exits with a
+  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli.ts`, `test/exit-code.test.ts` runs `wf` as a process).
 - **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
 ## Shipped: going round again — `loop:`, `rounds:` and `wf round`
@@ -1665,8 +1666,8 @@ What it leaves:
 - **A card filed by hand under a name a record carries** lists as `started as` and is refused a start. `wf inbox add` names carry a
   random suffix, so this takes a hand-named file.
 - **`wf ls` does not say a run came from the inbox.** Only `wf decide` does.
-- **`bin/wf.ts` exits 1 on every refusal**, whatever `exitCode` it carries. This was here before the inbox, and was not changed. The tests
-  read `exitCode` off what `main` throws.
+- **`bin/wf.ts` exited 1 on every refusal**, whatever `exitCode` it carried. This was here before the inbox, and was not changed then; it
+  exits with the refusal's code since 2026-09-28 (`test/exit-code.test.ts`).
 - **The board had no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gave the api its routes and the board its page: *The board
   half*, below.
 

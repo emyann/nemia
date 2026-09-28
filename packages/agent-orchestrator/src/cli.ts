@@ -312,6 +312,12 @@ const usage = (message: string): never => {
   throw Object.assign(new Error(message), { exitCode: 2 });
 };
 
+/** What `wf` exits with on what `main` threw: its `exitCode` when that is a whole number from 1 to 255, and 1 otherwise. */
+export const exitCodeOf = (thrown: unknown): number => {
+  const code = (thrown as { exitCode?: unknown } | null | undefined)?.exitCode;
+  return typeof code === 'number' && Number.isInteger(code) && code > 0 && code <= 255 ? code : 1;
+};
+
 const PLAN_HELP = `wf plan <folder> [--repo .]
 
 Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.

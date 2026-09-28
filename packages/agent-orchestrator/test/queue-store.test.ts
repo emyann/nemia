@@ -948,3 +948,33 @@ test("REFUSED at shipped defaults, on the repository it was tried on: a queued c
   const [run] = fromCard(card.name);
   assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run!.id, removed: true }, dev]);
 });
+
+test('a record that does not read as a run stops no other run: the pass files the rest, and says once, on stderr, which record it left out and why', async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const run = started('a run beside a broken one', at(1));
+  const broken = path.join(RUNS, 'r-broken.json');
+  fs.writeFileSync(broken, JSON.stringify({ id: 'r-broken', brief: 'written by hand' }));
+  const errs: string[] = [];
+  const err = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+    errs.push(String(chunk));
+    return true;
+  });
+  try {
+    const ticked = await printedBy(t, b.e, 'tick');
+    assert.deepEqual(b.filings, [`${run.id}-implement`]);
+    assert.ok(!ticked.some((l) => l.includes('r-broken')), ticked.join('\n'));
+    const listed = await printedBy(t, b.e, 'ls');
+    assert.ok(
+      listed.some((l) => l.startsWith(run.id)),
+      listed.join('\n'),
+    );
+    await tick(b.e);
+  } finally {
+    err.mock.restore();
+    fs.rmSync(broken);
+  }
+  const leftOut = errs.filter((l) => l.startsWith('left out: run r-broken: its record, '));
+  assert.equal(leftOut.length, 1, `said once a process, pass after pass: ${errs.join('')}`);
+  assert.ok(leftOut[0]!.includes('does not read as a run: its `workspace` is missing'), leftOut[0]);
+});

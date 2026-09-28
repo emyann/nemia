@@ -1,0 +1,275 @@
+/**
+ * What the store reads back, read against what the tick and the verbs write: a run record, a person's asks and markers. A record that does
+ * not read as a run is refused by `readRun` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and says
+ * why in the verb's words; a marker that does not read still holds its run. Every shape a former `wf` wrote reads as it did.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Run } from '../src/run.ts';
+import { scratch } from './scratch.ts';
+
+const ROOT = scratch('wf-record-read-');
+// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
+process.env.WF_ROOT = ROOT;
+const store = await import('../src/store.ts');
+const {
+  UnreadableRecord,
+  acceptanceIn,
+  approvalIn,
+  askIn,
+  listRuns,
+  readRun,
+  rewriteRun,
+  roundAskIn,
+  runFile,
+  runsDir,
+  pruneFile,
+  holdFile,
+} = store;
+
+fs.mkdirSync(runsDir(), { recursive: true });
+
+/** A git run's record as the tick writes one today, frozen steps and all. */
+const aRecord = (id: string): Record<string, unknown> => ({
+  id,
+  repo: '/repo',
+  workspace: '/repo',
+  baseRef: 'abc123',
+  branch: 'main',
+  isolate: true,
+  brief: 'add a flag',
+  workflowDir: '/repo/workflows/dev',
+  workflow: [
+    { name: 'implement', after: [], body: 'do it', harness: 'claude' },
+    { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
+  ],
+  steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
+  createdAt: '2026-09-01T00:00:00.000Z',
+});
+
+const put = (id: string, record: unknown): void =>
+  fs.writeFileSync(runFile(id), typeof record === 'string' ? record : JSON.stringify(record, null, 2));
+
+/** What `readRun` is refused with, as its message — exit code 2, and an `UnreadableRecord`. */
+const refusalOf = (id: string): string => {
+  try {
+    readRun(id);
+  } catch (err) {
+    assert.ok(err instanceof UnreadableRecord, `refused as unreadable, not ${String(err)}`);
+    assert.equal(err.exitCode, 2);
+    return err.message;
+  }
+  assert.fail(`run ${id} read`);
+};
+
+const FIX = 'Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it';
+
+test('a record with no `id` is refused by name, with where it is and what to do — never a parse error', () => {
+  const { id: _, ...record } = aRecord('r-noid');
+  put('r-noid', record);
+  const said = refusalOf('r-noid');
+  assert.ok(said.startsWith(`run r-noid: its record, ${runFile('r-noid')}, does not read as a run: its \`id\` is missing.`), said);
+  assert.ok(said.includes(FIX), said);
+  assert.ok(!said.includes('Expected'), `in wf's words: ${said}`);
+});
+
+test("a frozen step's `after` that is no list is refused at its path, saying what is there and what wf writes", () => {
+  const record = aRecord('r-after');
+  (record.workflow as Array<Record<string, unknown>>)[1]!.after = 'implement';
+  put('r-after', record);
+  const said = refusalOf('r-after');
+  assert.ok(said.includes('its `workflow.1.after` is "implement", where wf writes'), said);
+});
+
+test('a frozen step with no name, a step record with no task, and a folder run with no place kind are each refused at their field', () => {
+  const noName = aRecord('r-noname');
+  delete (noName.workflow as Array<Record<string, unknown>>)[0]!.name;
+  put('r-noname', noName);
+  assert.ok(refusalOf('r-noname').includes('its `workflow.0.name` is missing'));
+
+  const noTask = aRecord('r-notask');
+  (noTask.steps as Record<string, unknown>).review = {};
+  put('r-notask', noTask);
+  assert.ok(refusalOf('r-notask').includes('its `steps.review.taskId` is missing'));
+
+  const { repo: _r, baseRef: _b, branch: _br, isolate: _i, ...folder } = aRecord('r-place');
+  put('r-place', { ...folder, place: { kind: 'shelf' } });
+  // Read against the folder run it says it is, not the git run it is not.
+  assert.ok(refusalOf('r-place').includes('its `place.kind` is "shelf", where wf writes "folder"'));
+});
+
+test('a record that is not JSON, or holds no object, is refused saying so', () => {
+  put('r-half', '{"id": "r-half", "repo"');
+  assert.ok(refusalOf('r-half').includes('is not JSON ('));
+  put('r-list', '[]');
+  assert.ok(refusalOf('r-list').includes('is no run record: it holds no object'));
+});
+
+test('a run id with no record is still told to try `wf ls`, not called unreadable', () => {
+  assert.throws(
+    () => readRun('r-nobody'),
+    (err: Error) => !(err instanceof UnreadableRecord) && err.message === "no such run: r-nobody  (try 'wf ls')",
+  );
+});
+
+test('`listRuns` leaves out a record that does not read, says so with its fix, and lists every other run', () => {
+  const said: string[] = [];
+  put('r-good', aRecord('r-good'));
+  const listed = listRuns((line) => said.push(line)).map((r) => r.id);
+  assert.ok(listed.includes('r-good'));
+  for (const bad of ['r-noid', 'r-after', 'r-noname', 'r-notask', 'r-place', 'r-half', 'r-list']) {
+    assert.ok(!listed.includes(bad), `${bad} left out`);
+    assert.ok(
+      said.some((l) => l.startsWith(`left out: run ${bad}: its record, `)),
+      `${bad} said: ${said.join('\n')}`,
+    );
+  }
+  for (const bad of ['r-noid', 'r-after', 'r-noname', 'r-notask', 'r-place', 'r-half', 'r-list']) fs.rmSync(runFile(bad));
+});
+
+test('a key the tick does not name survives a read and a rewrite, and so does a frozen step key it does not name', () => {
+  const record: Record<string, unknown> = { ...aRecord('r-newer'), fromANewerWf: { kept: true } };
+  (record.workflow as Array<Record<string, unknown>>)[0]!.aNewStepKey = 3;
+  put('r-newer', record);
+  const run = readRun('r-newer');
+  assert.ok(rewriteRun(run));
+  const written = JSON.parse(fs.readFileSync(runFile('r-newer'), 'utf8')) as Record<string, unknown>;
+  assert.deepEqual(written.fromANewerWf, { kept: true });
+  assert.equal((written.workflow as Array<Record<string, unknown>>)[0]!.aNewStepKey, 3);
+});
+
+test("the oldest shapes on the owner's store read: no frozen workflow, `disallow:` on a frozen step, an earlier try, a landing and a slot", () => {
+  // Before the run froze its workflow; with a step on a try it was retried from, a check, a hand-off, and the ship's landing.
+  const { workflow: _, ...unfrozen } = aRecord('r-old');
+  put('r-old', {
+    ...unfrozen,
+    after: ['r-parent'],
+    slotHeldAt: '2026-09-01T00:00:00.000Z',
+    tips: { implement: 'def456' },
+    steps: {
+      implement: {
+        taskId: 'r-old-implement-try2',
+        workspace: '/w/implement',
+        branch: 'wf/r-old/implement',
+        check: { taskId: 'r-old-implement-try2-check' },
+        tries: [{ taskId: 'r-old-implement', check: { taskId: 'r-old-implement-check' }, then: 'retries' }],
+        handedOff: 'r-old-implement-try2',
+      },
+      ship: { taskId: 'r-old-ship', landed: { commit: 'fed789' } },
+    },
+  });
+  const old = readRun('r-old');
+  assert.equal(old.workflow, undefined);
+  assert.equal(old.steps.implement!.tries![0]!.then, 'retries');
+
+  // A step frozen before `disallow:` was renamed reads under the name it has now, and is written back under both.
+  const renamed = aRecord('r-renamed');
+  (renamed.workflow as Array<Record<string, unknown>>)[0]!.disallow = ['SendMessage'];
+  put('r-renamed', renamed);
+  const run: Run = readRun('r-renamed');
+  assert.deepEqual(run.workflow![0]!.disallowedTools, ['SendMessage']);
+  rewriteRun(run);
+  const written = JSON.parse(fs.readFileSync(runFile('r-renamed'), 'utf8')) as { workflow: Array<Record<string, unknown>> };
+  assert.deepEqual(written.workflow[0]!.disallowedTools, ['SendMessage']);
+  assert.deepEqual(written.workflow[0]!.disallow, ['SendMessage']);
+});
+
+test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {
+  put('r-marked', aRecord('r-marked'));
+  fs.writeFileSync(
+    pruneFile('r-marked'),
+    JSON.stringify({
+      at: 7,
+      worktrees: [
+        { path: '/w', bytes: 'lots' },
+        { path: '/v', bytes: 2 },
+      ],
+      artifacts: {},
+    }),
+  );
+  fs.writeFileSync(holdFile('r-marked'), 'not json');
+  const run = readRun('r-marked');
+  assert.deepEqual(run.pruned, { at: '', worktrees: [{ path: '/v', bytes: 2 }], artifacts: { at: '', bytes: 0 } });
+  assert.deepEqual(run.hold, { at: '', until: [] });
+});
+
+/** An ask file with `body`, as a person might have written it by hand. */
+const ask = (name: string, body: unknown): string => {
+  const dir = path.join(ROOT, 'asks');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, typeof body === 'string' ? body : JSON.stringify(body));
+  return file;
+};
+
+const AT = '2026-09-01T00:00:00.000Z';
+
+test('an approval `wf approve` would not write is refused in its words; one it writes, with or without words, reads', () => {
+  assert.equal(approvalIn(ask('a1', { message: 'go' }), 'plan', 1), 'it says no time it was given');
+  assert.equal(approvalIn(ask('a2', { at: 'tuesday' }), 'plan', 1), 'it says no time it was given');
+  assert.equal(approvalIn(ask('a3', { at: AT, message: 7 }), 'plan', 1), 'its message is not text');
+  assert.equal(approvalIn(ask('a4', { at: AT, message: '  ' }), 'plan', 1), 'its message is empty');
+  assert.equal(approvalIn(ask('a5', [AT]), 'plan', 1), 'it is not an approval wf approve wrote');
+  assert.ok(String(approvalIn(ask('a6', '{'), 'plan', 1)).startsWith('unreadable ('));
+  assert.deepEqual(approvalIn(ask('a7', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
+  assert.deepEqual(approvalIn(ask('a8', { at: AT, message: 'go', by: 'a newer wf' }), 'plan', 2), {
+    step: 'plan',
+    try: 2,
+    at: AT,
+    message: 'go',
+  });
+});
+
+test('an acceptance with no words, blank words or no time is refused in `wf accept`’s words', () => {
+  assert.equal(acceptanceIn(ask('c1', { message: 'fine' }), 'implement', 3), 'it says no time it was given');
+  assert.equal(
+    acceptanceIn(ask('c2', { at: AT }), 'implement', 3),
+    'it says nothing of why the work is good enough with its findings open',
+  );
+  assert.equal(
+    acceptanceIn(ask('c3', { at: AT, message: ' ' }), 'implement', 3),
+    'its message is empty, and an acceptance is nothing but its reason',
+  );
+  assert.equal(acceptanceIn(ask('c5', 'null'), 'implement', 3), 'it is not an acceptance wf accept wrote');
+  assert.deepEqual(acceptanceIn(ask('c4', { at: AT, message: 'fine' }), 'implement', 3), {
+    step: 'implement',
+    try: 3,
+    at: AT,
+    message: 'fine',
+  });
+});
+
+test('a round ask whose budget is not dollars above zero is refused; one with no time or a time that is no text reads as before', () => {
+  assert.equal(roundAskIn(ask('r1', { at: AT, budget: 0 }), 'implement', 4), 'its budget is not an amount of dollars above zero');
+  assert.equal(roundAskIn(ask('r2', { at: AT, budget: '5' }), 'implement', 4), 'its budget is not an amount of dollars above zero');
+  assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask wf round wrote');
+  assert.deepEqual(roundAskIn(ask('r4', {}), 'implement', 4), { step: 'implement', round: 4, at: '' });
+  assert.deepEqual(roundAskIn(ask('r5', { at: 12, budget: 2.5 }), 'implement', 4), { step: 'implement', round: 4, budget: 2.5, at: '' });
+});
+
+test('a retry ask is held to `wf retry`’s word, reason by reason; one from before asks carried a message reads as it did', () => {
+  const said = (body: unknown): unknown => askIn(ask('t', body), 'implement', 2);
+  assert.equal(said({ mode: 'again' }), 'it asks for no mode wf retry knows ("again")');
+  assert.equal(said({}), 'it asks for no mode wf retry knows (undefined)');
+  assert.equal(said({ mode: 'fresh', model: '' }), 'its model is not a name');
+  assert.equal(said({ mode: 'nudge', message: ['go'] }), 'its message is not text');
+  assert.equal(said({ mode: 'nudge', message: '\n' }), 'its message is empty');
+  assert.equal(said({ mode: 'nudge', budget: -1 }), 'its budget is not an amount of dollars above zero');
+  assert.equal(
+    said({ mode: 'recheck', message: 'look' }),
+    'it carries a message and asks for a recheck, which files no session to read it',
+  );
+  assert.equal(said({ mode: 'recheck', budget: 3 }), 'it carries a budget and asks for a recheck, which files no session to spend it');
+  assert.deepEqual(said({ mode: 'fresh', at: AT }), { step: 'implement', try: 2, mode: 'fresh', at: AT });
+  assert.deepEqual(said({ mode: 'nudge', model: 'haiku', message: 'go on', budget: 4, at: AT }), {
+    step: 'implement',
+    try: 2,
+    mode: 'nudge',
+    model: 'haiku',
+    message: 'go on',
+    budget: 4,
+    at: AT,
+  });
+});

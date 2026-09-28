@@ -1,0 +1,239 @@
+/**
+ * Claude Code as the engine runs it by default: a step is a job, and a session a person means to reach is a background one.
+ *
+ * A job is `claude -p`, detached by the engine's worker (`harness/detached/detached.ts`): it runs its brief to completion and exits,
+ * so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it keeps. Under `-p` no mode
+ * waits on a prompt; a call it may not make is denied and the session carries on, and the result says what was denied.
+ * It reads its brief on its stdin, and words a person says while it works after it, until its result. A background session
+ * (`config.background: true`) is `claude --bg` (`claudeOps`): a person can attach to it, say words to it, and bridge it to
+ * claude.ai. One harness, two modes, chosen per task.
+ *
+ * Every verb given a session id finds its mode by the id's shape, with nothing remembered: a job is known by the name the
+ * engine gave it (`ae/<task>/<n>`), and a background session by Claude Code's own id. So a stop or a read asked after a
+ * restart, before any observe, reaches the right one. A job resumed from a background session's id is a job: the mode
+ * is the new attempt's, and `claude -p --resume` continues a `--bg` session.
+ *
+ * A job's argv is built here too (`claudePrintArgs`), and so is `claude-detached` (`claudeDetached`): Claude Code run as
+ * `claude -p`, detached by the engine's worker rather than by the harness, whose output is one JSON object at its exit.
+ */
+import { Effect } from 'effect';
+import os from 'node:os';
+import path from 'node:path';
+import { nameParts, type Sighting } from '../../core/index.ts';
+import { claudeOps, type ClaudeOptions } from './bg.ts';
+import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
+import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../detached/detached.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudeFlagsOf, claudePrintRefuses, worktreeName } from './vocabulary.ts';
+import { claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
+import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
+
+/**
+ * The arguments `claude -p` is given, whichever of the engine's specs runs it, given how its output is to be printed: the
+ * format goes first, where the brief's `-p` has already taken its value and the variadic lists after it cannot take one.
+ */
+export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, output: string[]): string[] => [
+  '-p',
+  r.brief,
+  ...output,
+  ...claudePrintFlags(r, io),
+];
+
+/**
+ * What `claude -p` is given beside its brief and its formats: the same whether the brief is `-p`'s value or the first line
+ * on its stdin (`claudeJob`). In order:
+ *
+ * 1. `--tools`, `--disallowedTools` and `--allowedTools`, each joined by commas: variadic, and ended by the flag after
+ *    each, as for `claude --bg`. The allow list is not the fence's opposite: a rule there says a tool the session has may
+ *    be used without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, even
+ *    in the session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved
+ *    against its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it.
+ * 2. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
+ * 3. `--permission-mode`, `auto` unless the task names one.
+ * 4. The MCP configurations, strict on every spawn as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
+ * 5. `--setting-sources project,local`, one value: a job reads `.claude/settings.json` and `settings.local.json` of its
+ *    cwd, and nothing of `~/.claude/` — the user's mode, allow rules, plugins, skills, hooks, model and effort — so it does
+ *    the same on any machine, and an agent's own skills do not share the listing's budget with a person's. `--settings`,
+ *    `--plugin-dir` and `--mcp-config` still reach it.
+ * 6. `--model` and `--effort`, where the task names them.
+ * 7. `--autocompact`, the context window, as for `claude --bg`: `claude -p` compacts past it and still gives its
+ *    `structured_output`.
+ * 8. `--json-schema`, the closing statement's shape, as for `claude --bg`: the answer comes back as the result's
+ *    `structured_output`.
+ * 9. `--resume` and `--worktree`, where the task continues a session or asks for a worktree.
+ * 10. `--max-budget-usd`, the spend cap: `claude -p` ends the session once a response takes it past, and says so in its
+ *     result.
+ */
+export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): string[] => [
+  ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
+  ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
+  ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+  ...claudeFlagsOf(r.config?.claude),
+  '--permission-mode',
+  r.config?.permissionMode ?? 'auto',
+  ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
+  '--setting-sources',
+  'project,local',
+  ...(r.config?.model ? ['--model', r.config?.model] : []),
+  ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
+  ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
+  ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
+  ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
+  ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
+  ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
+];
+
+/** The regex that finds Claude Code's own session id in what `claude -p` prints. */
+export const CLAUDE_SESSION_ID_PATTERN = '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"';
+
+/** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
+export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
+  const found = checkoutMcpConfig(r.cwd);
+  return found ? { checkoutMcpConfig: found } : {};
+};
+
+/**
+ * Claude Code run as `claude -p`, detached by the engine's worker rather than by the harness, its output one JSON object.
+ *
+ * - `command` asks for `--output-format json`: one object when it exits, which `readOutput` reads the final answer from —
+ *   text output prints only the answer's prose — and which carries the session id `nativeIdPattern` looks for.
+ * - `transcript` is the one `claude --bg` writes, read the same way, but only once the session has exited: its id is in
+ *   the one object `--output-format json` prints, and that is printed last.
+ */
+export const claudeDetached: HarnessSpec = {
+  name: 'claude-detached',
+  command: (r, io) => ({ cmd: 'claude', args: claudePrintArgs(r, io, ['--output-format', 'json']) }),
+  readOutput: claudeResultOutput,
+  nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
+  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  noChannel:
+    "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
+  prepare: claudePrepare,
+  refuses: claudePrintRefuses,
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
+  claudeFlags: true,
+};
+
+/**
+ * A step run as a job: `claude -p`, its output a stream. The stream's first line names the session, so its id is known
+ * while it runs and its transcript can be read then; each call it was denied is a line as it happens, so a job killed
+ * before its result still says what it was denied (`claudeStreamOutput`). `--verbose` is what `-p` needs to print a
+ * stream at all. `--permission-prompts none` says what `-p` does in every mode: a call that would ask is denied, never
+ * waited on — said on the command line, so no default of Claude Code's can make a job wait on a person who is not there.
+ *
+ * Its input is a stream too (`--input-format stream-json`): the brief is the first user message on its stdin, and each
+ * word said to it while it works is another, which it takes into the turn it is working. It reads its stdin until
+ * it ends, so the worker ends it at the job's first result, and the job exits. Its closeout, its spend cap and what it is
+ * denied are as they are under a prompt.
+ *
+ * - `input.line`: a user message; the session is the job's own, so it names none.
+ * - `input.closesOn`: its result, the line after which a `-p` session reads nothing more; Claude Code prints its `type` far
+ *   down the line, so it is parsed, never matched at the line's start.
+ * - `resumeCostCarried`: `claude -p --resume` prints its parent's cost and API time on in its own.
+ */
+export const claudeJob: HarnessSpec = {
+  name: 'claude',
+  command: (r, io) => ({
+    cmd: 'claude',
+    args: [
+      '-p',
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-prompts',
+      'none',
+      ...claudePrintFlags(r, io),
+    ],
+  }),
+  input: {
+    line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
+    closesOn: { key: 'type', value: 'result' },
+  },
+  readOutput: claudeStreamOutput,
+  nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
+  transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  prepare: claudePrepare,
+  refuses: claudePrintRefuses,
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
+  claudeFlags: true,
+  resumeCostCarried: true,
+};
+
+/** Whether a session id is a job's: the name the engine gave it, where a background session's is Claude Code's own. */
+export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undefined;
+
+/**
+ * Claude Code's runner: a job (`claudeJob`) or a background session (`claudeOps`) per task, each verb given a session id
+ * sent to the mode its id's shape names (`isClaudeJob`).
+ *
+ * - `observe` lists both modes; one mode's registry unreadable does not blind the engine to the other's sessions, as for
+ *   the composite's harnesses: a read that failed lists nothing.
+ * - `find` reads the job's own run file first — one file, never the jobs' output, which a transcript in flight would
+ *   re-read on every poll — and then Claude Code's registration.
+ * - `release` lets a background session go; a job's run file is its record, as `logs` reads it, so a job has nothing to
+ *   let go of.
+ * - `transcript` reads a job by its name while it runs, and by Claude Code's id — an ended job's, or a background
+ *   session's — the same transcript file either way, which the background reader finds by that id.
+ * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
+ *   Code's inbox.
+ */
+export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
+  const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+  const job = detachedOps(claudeJob, root);
+  const findJob = detachedFind(claudeJob, root);
+  const bg = claudeOps({ ...options, root });
+  const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
+
+  const read = (ops: RunnerOps) =>
+    ops.observe.pipe(
+      Effect.map((m): Map<string, Sighting> | undefined => m),
+      Effect.catchCause(() => Effect.succeed(undefined)),
+    );
+  const seen = (ops: RunnerOps) => read(ops).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
+
+  return {
+    spawn: (r) => (r.config?.background ? bg : job).spawn(r),
+    refuses: claudeCodeRefuses,
+
+    observe: Effect.all([seen(job), seen(bg)], { concurrency: 'unbounded' }).pipe(
+      Effect.map(([jobs, sessions]) => new Map([...jobs, ...sessions])),
+    ),
+
+    /**
+     * The jobs, off their run files, and Claude Code's registry only when a session expected is not among them: it asks
+     * `claude agents` only for a session it expects that is no job, so a pass with only jobs in flight spawns none. Read
+     * off the world, never off a task's config: a task filed on this harness may run `--bg` without its config saying so,
+     * and a job whose run file is not there is looked for in the registry too — once its grace is past, the pass reads it
+     * lost either way. A job listing that cannot be read this time asks the registry, as `observe` would.
+     *
+     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job listing, or
+     * the registry once asked. A job's name the registry was asked for and does not list, with the jobs read, is absent.
+     */
+    observeFor: (expected) =>
+      read(job).pipe(
+        Effect.flatMap((jobs) =>
+          !jobs || expected.some((e) => !jobs.has(e.name))
+            ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+            : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() }),
+        ),
+        Effect.map(({ jobs, sessions }): Observation => {
+          const seen = new Map([...(jobs ?? []), ...(sessions ?? [])]);
+          const failed = !jobs || !sessions;
+          return { seen, unread: new Set(failed ? expected.map((e) => e.name).filter((name) => !seen.has(name)) : []) };
+        }),
+      ),
+
+    find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),
+
+    stop: (sessionId) => of(sessionId).stop(sessionId),
+    logs: (sessionId) => of(sessionId).logs(sessionId),
+
+    release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
+
+    transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
+
+    say: (session, text) => of(session.sessionId).say!(session, text),
+  };
+};

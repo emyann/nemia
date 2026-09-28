@@ -20,9 +20,9 @@ the orchestrator imports the runtime. A test of the api may import the runtime's
 ## Pure core, effectful shell
 
 Each package keeps its judgement in a pure function and applies it in a shell that does the I/O. In the runtime, the
-core is `decide` (`packages/agent-runtime/src/domain.ts`) and the shell is `src/engine.ts`. Since thin runtime stage 5,
+core is `decide` (`packages/agent-runtime/src/core/domain.ts`) and the shell is `src/core/engine/engine.ts`. Since thin runtime stage 5,
 `decide` reads a state off the journal and an event off the pass's observation, and asks a statechart
-(`src/lifecycle.ts`, XState used as a pure transition function, never run) for the edge: an event with no edge is
+(`src/core/lifecycle.ts`, XState used as a pure transition function, never run) for the edge: an event with no edge is
 refused and reported on the pass, never guessed at. In the orchestrator, the
 core is `assess` (`packages/agent-orchestrator/src/run.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
 data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
@@ -43,7 +43,7 @@ a relative path, `import.meta.resolve`, or a path built with path.join. `decide`
 reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and
 `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk is exported
 from `agent-orchestrator`. XState is a dependency
-of the runtime alone: `src/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
+of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and
@@ -71,6 +71,15 @@ A file in src or bin that no kind names fails the suite.
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`) and
 passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI imports it, and it
 imports no controller.
+
+**Inside the runtime, folders by feature**, held by path in `packages/agent-runtime/test/layout.test.ts`. The two entries,
+`src/facade.ts` and `src/index.ts`, are the only files flat in `src/`; each re-exports by name. `core/` is the judgement
+(`domain.ts`, `session.ts`, `lifecycle.ts`) and `core/engine/` its shell (the engine, filing, the journal, the memo, the tally);
+`harness/` is the seam (`seam.ts`, `args.ts`) and each harness's driver beneath it (`claude/`, `codex/`, `detached/`); `a2a/` is
+the one place the A2A SDK is imported; `facade/` is the Promise door behind `src/facade.ts`, and `cli/` the `ae` command. The
+core imports of the harnesses only `seam.ts`, `args.ts` and the harness face; neither the core nor a harness imports `a2a/`,
+`facade/` or `cli/`; `cli/` reaches the runtime through `src/facade.ts` alone; and no two files import each other's values,
+directly or around a loop. A folder another folder reads has a face, `index.ts`.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package, so a change elsewhere alone is not in their package's turbo cache

@@ -4,7 +4,8 @@
  * A2A's names; `session-state.test.ts` hands in the same sightings in the runtime's former words, translated, and holds each
  * case to the answer of `decide` that `fixtures/decide-corpus.json` records.
  */
-import { fold, nameFor, type Ended, type Event, type Sighting } from '../src/domain.ts';
+import { fold, nameFor, type Event, type Sighting } from '../src/core/domain.ts';
+import type { Ended } from '../src/core/session.ts';
 
 export const T0 = new Date('2026-01-01T00:00:00Z');
 export const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();

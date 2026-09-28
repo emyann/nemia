@@ -16,24 +16,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import {
-  decide,
-  endOf,
-  fold,
-  formerStateOf,
-  isSessionState,
-  nameFor,
-  observe,
-  phaseWordOf,
-  SESSION_STATES,
-  type Action,
-  type SessionState,
-  type Sighting,
-} from '../src/domain.ts';
-import { viewOfState } from '../src/engine.ts';
-import { AUTH_WAIT, claudeStateOf } from '../src/runner.ts';
-import { detachedStateOf } from '../src/runner-detached.ts';
-import { promiseOps } from '../src/runner-promise.ts';
+import { decide, fold, nameFor, observe, type Action, type Sighting } from '../src/core/domain.ts';
+import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type SessionState } from '../src/core/session.ts';
+import { viewOfState } from '../src/core/engine/engine.ts';
+import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/bg.ts';
+import { detachedStateOf } from '../src/harness/detached/detached.ts';
+import { promiseOps } from '../src/facade/promise.ts';
 import { createEngine, type PromiseRunner } from '../src/facade.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from './scratch.ts';

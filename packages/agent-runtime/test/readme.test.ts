@@ -11,17 +11,20 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRIEF_KEYS } from '../src/cli.ts';
+import { BRIEF_KEYS } from '../src/cli/main.ts';
 
 const pkg = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => fs.readFileSync(path.join(pkg, p), 'utf8');
+/** Every file under `dirs`, in folders too, by its path from the package. */
 const filesIn = (...dirs: string[]) =>
   dirs.flatMap((d) =>
     fs
-      .readdirSync(path.join(pkg, d), { withFileTypes: true })
-      .filter((f) => f.isFile())
-      .map((f) => `${d}/${f.name}`),
+      .readdirSync(path.join(pkg, d), { recursive: true, encoding: 'utf8' })
+      .filter((f) => fs.statSync(path.join(pkg, d, f)).isFile())
+      .map((f) => `${d}/${f.split(path.sep).join('/')}`),
   );
+/** The source files under `dirs`: a test beside the code is left out, as the README names none. */
+const sourceIn = (...dirs: string[]) => filesIn(...dirs).filter((f) => !f.endsWith('.test.ts'));
 const unique = (xs: string[]) => [...new Set(xs)];
 
 /** `AE_…` variables the README names that no code reads. */
@@ -30,7 +33,9 @@ const unreadEnv = (readme: string, code: string) =>
 
 /** Package paths the README names, in backticks as it names its own files, that do not exist. */
 const missingFiles = (readme: string, exists: (p: string) => boolean) =>
-  unique([...readme.matchAll(/`((?:src|bin|test|docs)\/[\w.-]+\.(?:ts|md))(?::[\d-]+)?`/g)].map((m) => m[1])).filter((p) => !exists(p));
+  unique([...readme.matchAll(/`((?:src|bin|test|docs)(?:\/[\w.-]+)+\.(?:ts|md))(?::[\d-]+)?`/g)].map((m) => m[1])).filter(
+    (p) => !exists(p),
+  );
 
 /** `ae <verb>` uses — at a line's start, after a backtick or a prompt — with no case in the CLI. */
 const unknownVerbs = (readme: string, cli: string) =>
@@ -70,9 +75,16 @@ test('each check refuses a README that says what the code does not', () => {
     ['src/gone.ts'],
     'a line reference names its file too',
   );
+  assert.deepEqual(
+    missingFiles('`src/core/gone.ts` and `src/core/engine/memo.ts:4`', (p) => p === 'src/core/engine/memo.ts'),
+    ['src/core/gone.ts'],
+    'a path into a folder is read whole',
+  );
   assert.deepEqual(unknownVerbs(planted, cli), ['frobnicate']);
   assert.deepEqual(counts(planted), ['25 tests', '180 lines']);
   assert.deepEqual(undocumented(planted, ['src/domain.ts', 'src/engine.ts']), ['src/engine.ts']);
+  assert.ok(filesIn('test').includes('test/fixtures/decide-corpus.json'), 'the walk goes into folders');
+  assert.ok(!sourceIn('test').includes('test/readme.test.ts'), 'and the source leaves tests out');
   assert.deepEqual(unnamedKeys(planted, ['cwd', 'model', 'tools']), ['tools']);
 });
 
@@ -90,12 +102,12 @@ test('the README names no file that does not exist, and every source file is in 
     missingFiles(readme, (p) => fs.existsSync(path.join(pkg, p))),
     [],
   );
-  assert.deepEqual(undocumented(readme, filesIn('src', 'bin')), []);
+  assert.deepEqual(undocumented(readme, sourceIn('src', 'bin')), []);
 });
 
 test('the README uses no `ae` verb the CLI does not have, and names every key a brief has', () => {
   const readme = read('README.md');
-  assert.deepEqual(unknownVerbs(readme, read('src/cli.ts')), []);
+  assert.deepEqual(unknownVerbs(readme, read('src/cli/main.ts')), []);
   assert.deepEqual(unnamedKeys(readme, BRIEF_KEYS), []);
 });
 
@@ -104,5 +116,5 @@ test('the README keeps no count of tests or lines by hand', () => {
 });
 
 test("the README's claim that the CLI imports no Effect is true", () => {
-  assert.doesNotMatch(read('src/cli.ts'), /from 'effect'/);
+  assert.doesNotMatch(read('src/cli/main.ts'), /from 'effect'/);
 });

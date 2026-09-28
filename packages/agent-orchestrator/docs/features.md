@@ -2114,11 +2114,37 @@ Where it departs from the plan:
 
 Left for later:
 
-- **`--artifacts`**: a run's files under `runs/<id>/` (screenshots, the e2e's PNGs) are the other large thing a finished run keeps. A card
-  of its own; today they go only with `wf rm`.
+- ~~**`--artifacts`**~~: shipped, below (*a finished run's files — `wf prune --artifacts`*).
 - **The board has no prune button**, and the Runs list and the Factory say nothing of a pruned run; only its page does.
 - **A cancelled run whose branch is not merged prunes without `--unmerged`**: nothing of it could be tried again anyway, but its branch is
   still the one place its work is.
+
+## Shipped: a finished run's files — `wf prune --artifacts`
+
+Measured on the owner's store on 2026-09-28, read-only (`du -sk`): `runs/` holds 3.57 GB, and 3.56 GB of it is the runs' files
+directories, `runs/<id>/artifacts/` — 189 runs, 2.7 MB at the median, 130 MB at most, 18,022 PNGs, most of them the e2e's screenshots.
+Everything else under `runs/` is small: the rendered prompts under `agents/` 1.1 MB in all, the check logs 1.5 MB, the asks 1.2 MB, the
+inputs nothing. So `--artifacts` removes the files directory and nothing else.
+
+What was built:
+
+- **`wf prune --artifacts`** removes `runs/<id>/artifacts/` beside the worktrees, a link among the files as a link, and says what each
+  held and what the whole freed. It keeps prune's rules: a run not over, one held, a folder run, and a finished run not merged without
+  `--unmerged` are refused (an in-place run, which never reads shipped, in words of its own); the mark is written first, and a prune that
+  removed nothing puts back the mark the run had. A run whose worktrees are gone, or that cut none, may still have its files pruned.
+- **What stays, and why.** The record, the asks and the engine's journals are what `wf decide` and the board read. The inputs are a
+  person's own files. The rendered prompts say what each step was told, and cost a megabyte. The check logs say why a check refused. A
+  folder run's `work/` is its work, and a folder run is refused.
+- **The mark** carries `artifacts: {at, bytes}` beside the worktrees; the worktrees' time moves only when a worktree goes. `prunedWords`,
+  `prunedRefusal` and `wf decide` say the files went; a file a closeout named in the directory reads `!! not kept: … — its files were
+  removed at …`, not missing.
+- **The api** answers the artifacts route 410 for a pruned run's file, saying when and by what, where it answered 404 as if the file had
+  never been made; a closeout's file there is `{path, pruned}`, and the detail's `pruned.artifacts` is `{at, bytes}` or null. **The board**
+  draws such a file greyed with the words, and the run's `pruned` row names what the files freed.
+
+Left for later:
+
+- **The whole directory or none**: nothing keeps one screenshot and prunes the rest. And the board still has no prune button.
 
 ## Shipped: holding a run that has started — `wf hold`, the orchestrator's half
 

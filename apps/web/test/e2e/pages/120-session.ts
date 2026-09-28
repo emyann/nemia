@@ -4,6 +4,12 @@ import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
+  /**
+   * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box, which
+   * ends the window — the prompt, the calls with nothing said between them folded into one line, thoughts folded, the session's words from
+   * their markdown, a system line and the closeout. The session has ended, so the prompt box is closed, with why and where to go instead.
+   * The conversation is photographed from its start, scrolled up as a reader scrolls to it.
+   */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
   expect: async (page) => {
@@ -16,7 +22,6 @@ export default {
 
     const talk = page.getByRole('region', { name: "The step's conversation" });
     await expectVisible(talk, 'the conversation');
-    // The conversation takes the page's height down to the prompt box, and the box ends the window.
     const prompt = page.locator(`section[aria-label="Say something to ${SESSION.step}"]`);
     await expectVisible(prompt, 'a prompt box below the conversation');
     const [box, below, window] = [await talk.boundingBox(), await prompt.boundingBox(), page.viewportSize()];
@@ -66,7 +71,6 @@ export default {
       0,
       'no link to Claude Code web: nothing the engine reads carries a URL for a session',
     );
-    // Its session has ended: the box is closed, with the reason and where to go instead, and nobody said anything to it.
     const field = prompt.getByRole('textbox', { name: `What to say to ${SESSION.step}'s session` });
     await expectVisible(field, 'the prompt box, closed');
     if (await field.isEnabled())
@@ -81,15 +85,15 @@ export default {
     await expectCount(talk.locator('[data-turn="told"]'), 0, 'nobody said anything to it: no turn of yours');
     await expectCount(page.locator('main input, main textarea:not([disabled])'), 0, 'nothing else to type into');
 
-    // Photographed from its start, as a reader scrolls up to it: the prompt, the thought opened, and the fold's line opened
-    // over its calls. The scroller opens at the end, so a photograph taken where the checks left it shows only the closeout.
     await talk.hover();
     await page.mouse.wheel(0, -100_000);
     const scrolled = () => talk.evaluate((element) => element.scrollTop);
     for (const until = Date.now() + WAIT_MS; (await scrolled()) > 0 && Date.now() < until;)
       await new Promise((resolve) => setTimeout(resolve, 100));
     if ((await scrolled()) > 0)
-      throw new Refused(`the conversation scrolls up to its start for the photograph — it stopped ${await scrolled()} px down`);
+      throw new Refused(
+        `the conversation scrolls up to its start for the photograph, from its end, where the scroller opens and only the closeout shows — it stopped ${await scrolled()} px down`,
+      );
     await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
     await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
   },

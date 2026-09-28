@@ -9,10 +9,12 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // A hold lifted on the board, as `wf hold <run> --off` lifts it (`DELETE /api/runs/:id/hold`): GATED held until HELD, as the `hold` page
-  // holds it, lifted once from its card on the Factory and once from its page, each asked twice. The lift removes the hold's file — the page
-  // does not — and the board reads the run again of itself: no hold said, no hold edge, and plan's gate offered again. What the api refuses
-  // is proven in its own tests (`apps/api/test/hold.test.ts`), since the e2e's watch counts every 4xx.
+  /**
+   * A hold lifted on the board, as `wf hold <run> --off` lifts it (`DELETE /api/runs/:id/hold`): GATED held until HELD, as the `hold` page
+   * holds it, lifted once from its card on the Factory and once from its page, each asked twice. The lift removes the hold's file — the page
+   * does not — and the board reads the run again of itself: no hold said, no hold edge, and plan's gate offered again. What the api refuses
+   * is proven in its own tests (`apps/api/test/hold.test.ts`), since the e2e's watch counts every 4xx.
+   */
   name: 'lift',
   route: '/',
   expect: async (page) => {
@@ -26,8 +28,7 @@ export default {
       fed(id, 'held');
     };
     const lifted = (where: string) => {
-      // The file is gone once the api answers; the board says so once it has read the run again.
-      if (fs.existsSync(hold)) throw new Refused(`the lift from ${where} removed ${hold} — it is still there`);
+      if (fs.existsSync(hold)) throw new Refused(`the lift from ${where} removed ${hold} once the api answered — it is still there`);
     };
     const theme = await themeOf(page);
     await page.getByRole('button', { name: 'Reset layout' }).click();
@@ -38,7 +39,6 @@ export default {
     await expectCount(page.locator('[data-lift]'), 0, 'and no card offers a lift: nothing on the floor is held');
 
     try {
-      // From the card: Lift… beside its held chip, then Lift in the popover.
       holdIt();
       await expectVisible(card.locator('[data-holding]', { hasText: new RegExp(`^${word}$`) }), `the card says ${word}`);
       const button = card.locator(`[data-lift="${id}"]`);
@@ -61,7 +61,6 @@ export default {
       await expectCount(page.locator('[data-lift]'), 0, 'and offers no lift');
       await expectVisible(card.locator('[data-answer="Approve"]'), `and offers ${gated}'s gate again`);
 
-      // From the run's page: Lift… in the Held section, then Lift.
       holdIt();
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);

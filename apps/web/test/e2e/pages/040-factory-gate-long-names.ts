@@ -28,7 +28,7 @@ const LONG_NAMES = {
 } as const;
 
 /**
- * Write LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to take
+ * Writes LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to take
  * back.
  */
 function seedLongNames(root: string, createdAt: string, now = Date.now()): string[] {
@@ -98,16 +98,19 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()): strin
 }
 
 export default {
-  // The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
-  // steps, one asking. Its gate line holds one row, the rest on hover, and the card stays clear of the card beneath it after a Reset
-  // layout. The run is written for this page and taken back before it ends, the floor laid out again as seeded.
+  /**
+   * The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
+   * steps, one asking. The run is dated before every run in the store, so the grid, oldest first, puts it at the top of its column with
+   * the default floor's cards beneath it, whatever runs join or leave that floor. Its gate line holds one row, the rest on hover; its rail
+   * has a pill a step, each cut to its pill and whole on hover; opened, it has a tile a step, each named whole; and the card stays clear of
+   * the card beneath it after a Reset layout. The run is written for this page and taken back before it ends, the floor laid out again as
+   * seeded.
+   */
   name: 'factory-gate-long-names',
   route: '/',
   expect: async (page) => {
     const { id, ending, back, onto } = LONG_NAMES;
     const notes = LONG_NAMES.steps[1];
-    // Dated before every run in the store, so the grid, oldest first, puts it in the first cell — the top of its column, with the default
-    // floor's cards beneath it. Dated among the others, it moves whenever a run joins or leaves the default floor, and lands in its last row.
     const runs = path.join(store!, 'runs');
     const oldest = Math.min(
       ...fs
@@ -128,22 +131,21 @@ export default {
         card.locator(`[data-need="asks"][data-step="${LONG_NAMES.steps[1]}"]`),
         'and the step that asks says so on the card',
       );
-      // Measured against a card beneath it, or the measure proves nothing: the grid puts one there on this floor.
       const cards = await cardsDrawn(page);
       const mine = cards.find((c) => c.id === id)!;
       if (!cards.some((c) => Math.abs(c.x - mine.x) < 1 && c.y > mine.y))
-        throw new Refused(`a card lies beneath ${id} in its column, to measure it against`);
+        throw new Refused(`a card lies beneath ${id} in its column, to measure it against, or the measure proves nothing`);
       await expectClearOfEachOther(page);
       const line = card.locator(`[data-gate-line="${ending}"]`);
       const whole = `approve to run ${ending} on ${onto}, or send ${back} back`;
       await expectVisible(line, `the card has ${ending}'s gate line`);
       const title = await line.getAttribute('title');
       if (!title?.includes(whole)) throw new Refused(`the gate line is whole on hover — its title is ${JSON.stringify(title)}`);
-      // In the card's own pixels (`offsetHeight`), not the screen's: the floor is drawn zoomed out, and under half its size a row read off
-      // the screen rounds to none.
       const rows = await line.evaluate((el) => Math.round((el as HTMLElement).offsetHeight / parseFloat(getComputedStyle(el).lineHeight)));
-      if (rows !== 1) throw new Refused(`the gate line holds one row whatever the names — it is ${rows} rows`);
-      // Its rail: a pill a step, each name cut to its pill and whole on hover; the two steps after implement side by side in two lanes.
+      if (rows !== 1)
+        throw new Refused(
+          `the gate line holds one row whatever the names, read in the card's own pixels as the floor is drawn zoomed out — it is ${rows} rows`,
+        );
       const pills = card.locator('ul[aria-label="Steps"] [data-step]');
       await expectCount(pills, LONG_NAMES.steps.length, 'a pill per step on the rail');
       for (const name of LONG_NAMES.steps) {
@@ -162,14 +164,13 @@ export default {
         );
       }
       await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
-      // Opened: a tile a step, each named whole for a screen reader and on hover, the ending's saying what approving does; and no card over another.
       await card.locator('time').click();
       await expectCount(card.locator('[data-tile]'), LONG_NAMES.steps.length, 'the card opens into a tile per step');
       for (const name of LONG_NAMES.steps) {
         await expectCount(
           card.locator(`[data-tile="${name}"][aria-label="Inspect step ${name}"]`).getByTitle(name, { exact: true }),
           1,
-          `${name}'s tile is named whole, and on hover`,
+          `${name}'s tile is named whole for a screen reader, and on hover`,
         );
       }
       await expectVisible(

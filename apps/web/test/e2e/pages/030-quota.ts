@@ -8,10 +8,15 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // The subscription's quota over the Factory's floor, as the api asked the e2e's `claude` for it (get_usage): each window's percentage
-  // and its reset in the browser's own time, the week marked past 80%, and the answer's age. Then three ways the harness cannot answer —
-  // no plan, a request it refuses, and a `claude` that ends before it answers — each asked again on the reload and said in a sentence, with
-  // no number. The answer is put back as seeded.
+  /**
+   * The subscription's quota over the Factory's floor, as the api asked the e2e's `claude` for it (get_usage): each window's percentage
+   * and its reset in the browser's own time, the week marked past 80%, and the answer's age. Each reset is read here as the browser says a
+   * time where it is, to the minute, with the weekday when it falls on another day than today (`clockWord`), never assumed: the week
+   * resets three days out and always reads with one, and the five-hour window's reset crosses midnight for the two hours before it. Then
+   * three ways the harness cannot answer — no plan, a request it refuses, and a `claude` that ends before it answers — each asked again on
+   * the reload and said in a sentence, with no number. The answer is put back as seeded, and the header, taller with the quota, leaves
+   * every card clear of the one beneath it.
+   */
   name: 'quota',
   route: '/',
   expect: async (page) => {
@@ -34,9 +39,6 @@ export default {
       const { rate_limits: limits } = (
         JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }
       ).response.response;
-      // The resets as the browser says a time where it is, to the minute, with the weekday when the reset falls on another day than
-      // today (`clockWord`) — which is read here rather than assumed: the week resets three days out and always reads with one, and the
-      // five-hour window's reset crosses midnight for the two hours before it, when a run in the evening read `resets 00:02` as wrong.
       const clock = (iso: string) =>
         page.evaluate((at) => {
           const d = new Date(at);
@@ -56,10 +58,9 @@ export default {
         [`week ${QUOTA.week.used}% · resets ${weekResets}`],
         'the week, with the weekday it resets on',
       );
-      // Whatever the browser's locale writes a short weekday as — `Mon`, `dim.`, `Mo.`, `月` — it is not a number, and a bare time begins with one.
       if (/^\p{N}/u.test(weekResets))
         throw new Refused(
-          `three days out, the week's reset says the weekday it is on — this read ${JSON.stringify(weekResets)}, a time alone`,
+          `three days out, the week's reset says the weekday it is on, which no locale writes with a number, where a bare time begins with one — this read ${JSON.stringify(weekResets)}, a time alone`,
         );
       await expectCount(line.locator('[data-quota-window="seven_day"][data-marked]'), 1, `the week, ${QUOTA.week.used}% used, is marked`);
       await expectCount(
@@ -97,7 +98,6 @@ export default {
     await idle(page);
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again');
 
-    // The header, taller with the quota, leaves every card clear of the one beneath it.
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     await expectClearOfEachOther(page);

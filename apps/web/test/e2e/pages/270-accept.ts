@@ -7,10 +7,12 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // `wf accept` as a button: the loop out of rounds, review on round 3 of 3 and asking again, accepted from its run's page with a reason. The
-  // api calls the package's `accept()`, which writes the acceptance as `wf accept` does and nothing else, and the page reads the run move: the
-  // loop is over on the person's word, and nobody is waited on. Taken back, so every page after this one, and this one in the other theme,
-  // reads the store as seeded.
+  /**
+   * `wf accept` as a button: the loop out of rounds, review on round 3 of 3 and asking again, accepted from its run's page with a reason. The
+   * api calls the package's `accept()`, which writes the acceptance as `wf accept` does and nothing else, and the page reads the run move: the
+   * loop is over on the person's word, and nobody is waited on. Taken back, so every page after this one, and this one in the other theme,
+   * reads the store as seeded.
+   */
   name: 'accept',
   route: `/runs/${LOOPING.id}`,
   expect: async (page) => {
@@ -31,19 +33,19 @@ export default {
     const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: step, exact: true }) });
     const waiting = page.getByText(`Waiting on you: ${step}`);
 
-    // The command to copy, as `wf decide` prints it, and beside it the box and the button: the button waits for a reason, as the CLI waits for
-    // `--message`.
     await expectVisible(
       row.locator('code', { hasText: `wf accept ${id} ${step} --message "<why>"` }),
-      `the Decide section offers wf accept ${id} ${step} to copy`,
+      `the Decide section offers wf accept ${id} ${step} to copy, as wf decide prints it`,
     );
     await expectVisible(reason, `a box for why ${step}'s work is good enough as it stands`);
-    if (await press.isEnabled()) throw new Refused('Accept as it stands is disabled while there is no reason — it was enabled with none');
+    if (await press.isEnabled())
+      throw new Refused(
+        'Accept as it stands is disabled while there is no reason, as the CLI waits for --message — it was enabled with none',
+      );
     await reason.fill('   ');
     if (await press.isEnabled()) throw new Refused('Accept as it stands is disabled while the reason is only whitespace — it was enabled');
     await expectVisible(chip, `${step} reads rounds exhausted before it is accepted`);
 
-    // Accepted, with a reason: the api takes it through the board's proxy and the package writes the acceptance, and nothing else.
     const message = 'Good enough to ship: the two findings left are for a later run.';
     await reason.fill(message);
     const accepted = (r: { request: () => { method: () => string }; url: () => string }) =>
@@ -70,7 +72,6 @@ export default {
       if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)
         throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
 
-      // The run moves once it is read again: the loop is over on the person's word, and nobody is waited on for it.
       await expectVisible(
         section.locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }),
         `${step}'s note says it was accepted as it stands, as wf ls says it`,
@@ -85,7 +86,6 @@ export default {
       fed(id, step, 'rounds exhausted');
     }
 
-    // Taken back: the loop is out of rounds again once the run is read again, and the page ends as it began.
     await expectVisible(chip, `with the acceptance taken back, ${step} reads rounds exhausted again`);
     await expectVisible(waiting, `and ${step} is waiting on you again`);
     await expectVisible(row.locator('code', { hasText: `wf accept ${id} ${step}` }), 'and the Decide section offers wf accept again');

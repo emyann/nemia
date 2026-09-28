@@ -1,6 +1,6 @@
 # hkb-v2 — contributor guide
 
-Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/domain.ts` is
+Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/core/domain.ts` is
 the whole judgement). `packages/agent-orchestrator` sequences runtime tasks into runs of steps — a folder of markdown is a workflow (the
 `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, talks to it. Dependencies point down that list, never up.
 Read `README.md` and each package's README for the model before changing behaviour. The `wf` and `ae` commands and the stores
@@ -56,7 +56,7 @@ holds what every change needs.
 ## Rules the code keeps
 
 - **The runtime is finished.** It runs one workload on one harness; anything that knows about a second workload is the upper layer.
-  `decide` (`agent-runtime/src/domain.ts`) is pure and stays a screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect`
+  `decide` (`agent-runtime/src/core/domain.ts`) is pure and stays a screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect`
   (`src/index.ts`) are the export lists, and neither exports `decide`. A knob on the workload is a field carried on the task and read by a
   runner, never a callback into `decide`, and no `if` in `engine.ts` belongs in `decide`.
 - **Three rules hold the layers, each a test** (`docs/architecture.md`):

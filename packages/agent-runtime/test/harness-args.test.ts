@@ -46,7 +46,7 @@ test("HARNESS_ARGS is the twelve arguments a harness takes — the spend cap and
 
 test("remoteControl, one of Claude Code's own flags, is refused under config and beside it at any value, naming config.claude — and taken there", () => {
   const says =
-    "`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: { claude: { remoteControl: true } }`, or leave it out.";
+    "`remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: { claude: { remoteControl: true } }`, or leave it out.";
   for (const value of [true, false, undefined]) {
     assert.equal(argsRefusalOf({ ...task, config: { remoteControl: value } } as never), says, `config.remoteControl: ${value}`);
     assert.equal(argsRefusalOf({ ...task, remoteControl: value } as never), says, `remoteControl: ${value} beside config`);

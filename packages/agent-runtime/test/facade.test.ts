@@ -840,7 +840,7 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
     await refused(
       engine,
       { brief: 'b', cwd: '/r', config: config as never },
-      /^file: `remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`/,
+      /^file: `remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`/,
     );
   }
   await refused(engine, { brief: 'b', cwd: '/r', remoteControl: true } as never, /^file: `remoteControl` is Claude Code's own flag/);

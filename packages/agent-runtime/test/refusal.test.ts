@@ -99,7 +99,7 @@ const REFUSALS: Array<
   [{ priority: 'high' }, /^`priority` is retired:/],
   [
     { config: { remoteControl: true } },
-    /^`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`, or leave it out\.$/,
+    /^`remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`, or leave it out\.$/,
   ],
   [{ config: { remoteControl: 'true' } }, /^`remoteControl` is Claude Code's own flag/],
   [{ remoteControl: true }, /^`remoteControl` is Claude Code's own flag/],

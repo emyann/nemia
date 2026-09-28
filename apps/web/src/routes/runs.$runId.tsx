@@ -190,13 +190,28 @@ function Run({ run }: { run: RunDetail }) {
   );
 }
 
-/** When `wf prune` removed a run's worktrees, how many and what they held, and what it kept — in `wf prune`'s words. */
-function Pruned({ pruned: { at, worktrees } }: { pruned: NonNullable<RunDetail['pruned']> }) {
+/**
+ * When `wf prune` removed a run's worktrees, how many and what they held, and what it kept — in `wf prune`'s words. And when `--artifacts`
+ * removed its files, what that freed: the files then go from what is kept.
+ */
+function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
   const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
+  const title = [...worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`), ...(artifacts ? [`its files  ${bytesWord(artifacts.bytes)}`] : [])].join('\n');
+  if (!artifacts) {
+    return (
+      <span data-pruned title={title}>
+        {when(at)} — removed {count}, {bytesWord(bytes)} freed; its branches, record and files are kept
+      </span>
+    );
+  }
+  const files = `its files, ${bytesWord(artifacts.bytes)} freed; its branches and record are kept`;
+  // One prune took both, or its files alone; or the files went later than the worktrees, each at its own time.
   return (
-    <span data-pruned title={worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`).join('\n')}>
-      {when(at)} — removed {count}, {bytesWord(bytes)} freed; its branches, record and files are kept
+    <span data-pruned data-files-pruned title={title}>
+      {!worktrees.length ? <>{when(artifacts.at)} — removed {files}</>
+        : artifacts.at === at ? <>{when(at)} — removed {count}, {bytesWord(bytes)} freed, and {files}</>
+        : <>{when(at)} — removed {count}, {bytesWord(bytes)} freed; {when(artifacts.at)} — removed {files}</>}
     </span>
   );
 }

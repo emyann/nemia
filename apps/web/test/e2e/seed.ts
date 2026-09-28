@@ -367,6 +367,10 @@ export const SHIPPED = {
   merged: 'Merged it onto main with --no-ff, and the check passed.',
   /** What `wf prune` freed once it shipped: the one worktree its implement and review worked in, as a `node_modules` makes one. */
   prunedBytes: 1.5 * 1024 ** 3,
+  /** And what `--artifacts` freed with it: its files directory, whose screenshot review named. */
+  prunedFilesBytes: 48 * 1024 ** 2,
+  /** The file review's closeout named in its files directory, gone with it. */
+  shot: 'review-light.png',
 } as const;
 
 /**
@@ -1127,11 +1131,17 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   // SHIPPED: the same, with ship approved — the approval as `wf approve` writes one, with no words — filed in the checkout, and merged.
   const shippedLane = path.join(root, 'worktrees', SHIPPED.id, 'implement');
   signedOff(`${SHIPPED.id}-implement`, shippedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
-  signedOff(`${SHIPPED.id}-review`, shippedLane, 'Review the change.', 0.59, 0.4, done('One reading of it, and nothing to change.'));
+  signedOff(`${SHIPPED.id}-review`, shippedLane, 'Review the change.', 0.59, 0.4, done(
+    'One reading of it, and nothing to change.',
+    [path.join(root, 'runs', SHIPPED.id, 'artifacts', 'review', SHIPPED.shot)],
+  ));
   signedOff(`${SHIPPED.id}-ship`, repo, shipBody, 0.3, 0.2, done(SHIPPED.merged));
   write(path.join(root, 'runs', `${SHIPPED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
-  // And pruned after it shipped, as `wf prune` marks a run: its record and branch kept, the worktree gone.
-  write(path.join(root, 'runs', `${SHIPPED.id}.pruned`), JSON.stringify({ at: ago(0.1), worktrees: [{ path: shippedLane, bytes: SHIPPED.prunedBytes }] }, null, 2));
+  // And pruned after it shipped, as `wf prune --artifacts` marks a run: its record and branch kept, the worktree and its files gone.
+  const prunedAt = ago(0.1);
+  write(path.join(root, 'runs', `${SHIPPED.id}.pruned`), JSON.stringify({
+    at: prunedAt, worktrees: [{ path: shippedLane, bytes: SHIPPED.prunedBytes }], artifacts: { at: prunedAt, bytes: SHIPPED.prunedFilesBytes },
+  }, null, 2));
   shipRun(SHIPPED.id, SHIPPED.title, 'its ending step was approved, ran in the checkout and merged the branch: nothing left to decide.', SHIPPED.branch, 0.8, {
     implement: { taskId: `${SHIPPED.id}-implement`, workspace: shippedLane, branch: SHIPPED.branch },
     review: { taskId: `${SHIPPED.id}-review`, workspace: shippedLane, branch: SHIPPED.branch },

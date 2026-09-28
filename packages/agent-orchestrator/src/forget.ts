@@ -9,7 +9,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
-import { approvedFirst, branchFates, checkLogsOf, decision, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruning, type Run } from './run.ts';
+import { approvedFirst, branchFates, checkLogsOf, decision, filesPrunedWords, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneAgain, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruned, type Pruning, type Run } from './run.ts';
 import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
 import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
@@ -145,6 +145,13 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
  * directory, its check logs and inputs, and the engine's record of its sessions are kept, so `wf decide`, `wf ls` and the board still read
  * it, and a run waiting on it still reads whether it shipped.
  *
+ * With `artifacts` — `wf prune --artifacts` — its files directory too (`runs/<id>/artifacts/`: the screenshots and logs its steps and
+ * checks left, which are on no branch), by far the most of what a run keeps once its worktrees are gone. It is judged exactly as the
+ * worktrees are, since a run that is not over, or waits on a person, is read off those files; a run whose worktrees are already gone, or
+ * never cut, may still give them back. Everything else stays: the record, the asks, the inputs a person gave, the prompts its steps were
+ * rendered (`agents/`), the check logs and the engine's journals, each small and each read by `wf decide` or the board — which say the
+ * files were removed where they would list them, as the api's file route does (410).
+ *
  * Read as `wf rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run, a
  * run not over, anything that holds `wf rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on
  * no branch, or holds a change no commit has. A run with no worktree left answers `nothing`, and says why.
@@ -152,10 +159,11 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
  * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
  * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it, the run is marked pruned first (`pruneFile`),
  * so that a pass reading it while its worktrees go files nothing (`advance`); then git removes each worktree — never `--force`, so a file
- * that turned up since it was read is git's refusal and not a loss — and the marker is written again with what was removed. A run left with
- * nothing removed and never pruned before is not marked. The tick never calls this.
+ * that turned up since it was read is git's refusal and not a loss — then its files, under `artifacts` — and the marker is written again with
+ * what was removed. A prune that removed nothing takes the marker back: gone on a run never pruned before, as it was on one that was. The
+ * tick never calls this.
  */
-export async function prune(e: Engine, id: string, { unmerged = false, yes = false }: { unmerged?: boolean; yes?: boolean } = {}): Promise<Pruning> {
+export async function prune(e: Engine, id: string, { unmerged = false, yes = false, artifacts = false }: { unmerged?: boolean; yes?: boolean; artifacts?: boolean } = {}): Promise<Pruning> {
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw Object.assign(new Error(refusedId), { exitCode: 2 });
   const run = readRun(id);
@@ -170,10 +178,14 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   const recorded = { ...run, steps: Object.fromEntries(Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st])) };
   const listed = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? '')).worktrees
     .filter((w) => !(w.prunable && w.locked === undefined));
-  if (!listed.length) {
-    const nothing = run.pruned ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (wf prune)`
+  // Its files directory, under `--artifacts`: a link there is removed as a link, and read as nothing to give back.
+  const filesDir = path.join(runsDir(), id, 'artifacts');
+  const files = artifacts && lstatOf(filesDir)?.isDirectory() ? filesDir : undefined;
+  if (!listed.length && !files) {
+    const worktrees = run.pruned?.worktrees.length || (run.pruned && !run.pruned.artifacts) ? `its worktrees were removed at ${run.pruned.at || 'a time its marker no longer says'} (wf prune)`
       : !run.isolate ? `it cut no worktree — it worked in ${run.repo} itself`
       : 'no worktree of it is left';
+    const nothing = !artifacts ? worktrees : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
     if (yes && run.pruned) gitSays(run.repo, 'worktree', 'prune');
     return { id, kind: 'nothing', nothing, ...none };
   }
@@ -199,7 +211,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     // No other run is asked: one waiting on this run reads its record, which stays.
-    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps));
+    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps), pruneAgain(id, { unmerged, artifacts }));
     owed = handOffOwed(steps, run, phaseOf);
   }
   // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.
@@ -212,16 +224,25 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
     return { path: w.path, ...(hold ?? {}), ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
   });
-  // A run once pruned was agreed to be pruned unmerged, or was merged: its merge is not asked again.
-  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || Boolean(run.pruned) });
+  // A run once pruned is not asked its merge again for its worktrees; for its files it is (`pruneRefusal`).
+  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts, files: Boolean(files) }, { unmerged, artifacts });
   if (refusal) return { id, kind: 'refused', refusal, ...none };
 
   const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
-  if (!yes) return { id, kind: 'prunable', worktrees, left: [] };
+  const kept = files ? { path: files, bytes: diskBytes(files) } : undefined;
+  if (!yes) return { id, kind: 'prunable', worktrees, ...(kept ? { artifacts: kept } : {}), left: [] };
 
-  const at = new Date().toISOString();
+  const now = new Date().toISOString();
+  // The worktrees' time moves only when a worktree goes: a prune of the files alone leaves when they went as it was.
+  const at = worktrees.length || !run.pruned ? now : run.pruned.at;
   const before = run.pruned?.worktrees ?? [];
-  fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: before }, null, 2));
+  const filesBefore = run.pruned?.artifacts;
+  const marker = (removed: Pruned['worktrees'], freed: number | undefined): Pruned => ({
+    at, worktrees: [...before, ...removed],
+    ...(freed !== undefined ? { artifacts: { at: now, bytes: (filesBefore?.bytes ?? 0) + freed } } : filesBefore ? { artifacts: filesBefore } : {}),
+  });
+  // Marked first — its files as gone too, when they are to go — so a pass, or the api, that reads the run while things go reads it pruned.
+  fs.writeFileSync(pruneFile(id), JSON.stringify(marker([], kept?.bytes), null, 2));
   const removed: Array<{ path: string; bytes: number }> = [];
   const left: Pruning['left'] = [];
   for (const w of worktrees) {
@@ -234,22 +255,39 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   }
   gitSays(run.repo, 'worktree', 'prune');
   try { fs.rmdirSync(within); } catch { /* not empty: what git would not remove is still there */ }
-  if (!removed.length && !run.pruned) fs.rmSync(pruneFile(id), { force: true });
-  else fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: [...before, ...removed] }, null, 2));
-  return { id, kind: 'pruned', worktrees: removed, left, at };
+  // Then its files: removed, not followed, a link among them included. What would not go is said, and counted out of what was freed.
+  let freed: number | undefined;
+  if (kept) {
+    try {
+      fs.rmSync(kept.path, { recursive: true, force: true });
+      freed = kept.bytes;
+    } catch (err) {
+      freed = Math.max(0, kept.bytes - diskBytes(kept.path));
+      left.push({ path: kept.path, files: (err as Error).message.split('\n')[0]! });
+    }
+  }
+  const filesWent = freed !== undefined && (freed > 0 || !lstatOf(kept!.path));
+  // A prune that removed nothing takes its marker back — to what it was, on a run pruned before.
+  if (!removed.length && !filesWent) {
+    if (run.pruned) fs.writeFileSync(pruneFile(id), JSON.stringify(run.pruned, null, 2));
+    else fs.rmSync(pruneFile(id), { force: true });
+  } else {
+    fs.writeFileSync(pruneFile(id), JSON.stringify(marker(removed, filesWent ? freed : undefined), null, 2));
+  }
+  return { id, kind: 'pruned', worktrees: removed, ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}), left, at, ...(unmerged ? { unmerged: true as const } : {}) };
 }
 
 /**
  * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all while
  * `beside` still holds it. `du` counts an inode once per invocation, at the first path it meets it under, so `beside` is named first and the
- * directory's own line is read. Zero when `du` cannot say.
+ * directory's own line is read. Zero when `du` cannot say. A run's files directory has no `beside`: what a run collects is copied, not linked.
  */
-function diskBytes(dir: string, beside: string): number {
+function diskBytes(dir: string, beside?: string): number {
   const own = (out: string) => {
     const line = out.trimEnd().split('\n').at(-1) ?? '';
     return line.endsWith(`\t${dir}`) ? (Number.parseInt(line, 10) || 0) * 1024 : 0;
   };
-  const args = fs.existsSync(beside) ? ['-sk', beside, dir] : ['-sk', dir];
+  const args = beside && fs.existsSync(beside) ? ['-sk', beside, dir] : ['-sk', dir];
   try {
     return own(execFileSync('du', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
   } catch (err) {

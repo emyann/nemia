@@ -1,5 +1,5 @@
 import { sidebar } from '../board.ts';
-import { expectCount, expectVisible, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
 import { SHIPPED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -30,10 +30,18 @@ export default {
     await expectCount(page.getByText('every step after the gate'), 0, 'nothing on the page says a step follows the gate: none does');
     await expectCount(section.locator(`section[aria-label="The gate of ${ending}"]`), 0, 'and there is no gate to act at: it is approved');
 
-    // And pruned since: the run's facts say when, what it freed and what it kept, and its steps are still read as they ended.
-    const said = /— removed 1 worktree, 1\.50 GB freed; its branches, record and files are kept$/;
+    // And pruned since, its files with it: the run's facts say when, what it freed and what it kept, and its steps are still read as they ended.
+    const said = /— removed 1 worktree, 1\.50 GB freed, and its files, 48\.0 MB freed; its branches and record are kept$/;
     await expectVisible(page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }), 'the run says it was pruned: when, what it removed and freed, and what it kept');
     await expectVisible(section.getByText(SHIPPED.merged), 'and a pruned run still reads its steps as they ended');
+    // A file a step named in its files directory is said gone, by the prune — not drawn as a path, as if it had never been made.
+    const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: SHIPPED.shot });
+    await expectVisible(shot, `review's ${SHIPPED.shot} reads as removed by wf prune --artifacts`);
+    await expectVisible(shot.getByText(/ — its files were removed at .+ \(wf prune --artifacts\)$/), 'with when, and by what');
+    // One moment, one form: the file says when it went as the run's pruned row says it, never as the api spells it.
+    const moment = (await page.locator('article [data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();
+    await expectTexts(shot.locator('time'), [moment], `and says that moment as the run's pruned row does (${moment})`);
+    await expectCount(shot.getByText(/\d{4}-\d\d-\d\dT/), 0, 'not as an ISO time');
     await settled(page);
   },
 } satisfies PageSpec;

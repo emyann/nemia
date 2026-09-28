@@ -2,9 +2,13 @@
 
 /**
  * Mirrors `StepArtifact` in apps/api/src/artifacts.ts: a file a closeout named. One the api serves from the step's files
- * directory has its name, the `url` to read it by, its kind and size; anything else is the path alone.
+ * directory has its name, the `url` to read it by, its kind and size; one that directory held until `wf prune --artifacts`
+ * removed it has the words that say so, `pruned`, and that moment, `prunedAt`; anything else is the path alone.
  */
-export type StepArtifact = { path: string } | { path: string; name: string; url: string; kind: 'image' | 'text' | 'other'; size: number };
+export type StepArtifact =
+  | { path: string }
+  | { path: string; name: string; url: string; kind: 'image' | 'text' | 'other'; size: number }
+  | { path: string; pruned: string; prunedAt: string };
 
 /** Mirrors `StepReply` in apps/api/src/tries.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };

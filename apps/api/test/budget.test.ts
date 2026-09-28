@@ -276,7 +276,7 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
     assert.match(await retryRefuses('tokens', { mode: 'nudge', budget: 10 }), /^r-cost was pruned at 2026-09-15T07:00:00\.000Z: /);
 
     const run = await detail();
-    assert.deepEqual(run.pruned, pruned);
+    assert.deepEqual(run.pruned, { ...pruned, artifacts: null });
     assert.deepEqual([run.waitingOnYou, run.steps.map((s: Step) => s.raise)], [[], [null, null, null]]);
     assert.doesNotMatch(JSON.stringify(run.steps.map((s: Step) => s.note)), /wf (retry|round|accept|approve) /);
   } finally {

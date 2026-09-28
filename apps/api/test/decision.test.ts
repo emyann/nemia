@@ -363,7 +363,7 @@ test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no tr
   assert.equal(status, 200);
   assert.deepEqual(body.commands, []);
   const page = await (await app.request('/api/runs/r-d10')).json();
-  assert.deepEqual(page.pruned, pruned);
+  assert.deepEqual(page.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
   assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
   // A try asked by hand, beside the verb that refuses it, is no try coming: the board says nothing is on its way.
   const asks = path.join(root, 'runs', 'r-d10.asks');

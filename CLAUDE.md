@@ -570,6 +570,9 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   it`, and the board drew the run as moving: `listing` and the api read what is due off `assess`, not off the tick. A new marker beside
   `.cancelled` goes into `assess` (and `listing`'s `waitingOnYou`), and its test asserts `wf ls` and the api say nothing is coming (learned
   by the run that added `wf prune`).
+- **`wf decide` of a shipped run prints no step's closeout.** It returns on `shipped — … is already on main`, so a test that wants a step's
+  artifact lines (`!! not kept`, `!! missing`) reads a run still awaiting a decision; one on a merged run finds none and fails, or passes an
+  absence for nothing (learned by the run that added `wf prune --artifacts`).
 - **A line that offers a verb says that verb's refusal itself; its callers do not.** `decide` and the api's `decisionOf` each wrapped
   `retryLines` in `run.pruned ? [] : …`, and neither wrapped `overBudgetLine`: a pruned run over its budget was told `OVER BUDGET, waiting
   on you` with a `wf retry --budget` that `prunedRefusal` refused, while `wf ls` said nothing waited on you. And `wf ls`'s step notes

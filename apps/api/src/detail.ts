@@ -109,8 +109,8 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
  * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
- * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone does not
- * say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
+ * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone
+ * does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
@@ -154,7 +154,8 @@ export type StepSpec = {
   /**
    * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
    * ends the run, whose gate holds before it is filed and whose approval is what files it. Null for every other step, which works in a
-   * worktree. What tells such a gate from any other on the board, where the two read the same off the record: unfiled and awaiting approval.
+   * worktree. What tells such a gate from any other on the board, where the two read the same off the record: unfiled and awaiting
+   * approval.
    */
   workspace: string | null;
   resume: string | null;

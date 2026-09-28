@@ -1,9 +1,9 @@
 /**
  * Usage: measured, or absent — never a zero standing in for "nobody counted".
  *
- * The transcript arithmetic is pure, so it is tested here without a harness: the traps are the
- * ones measured on real transcripts — a response written as several lines, and a resumed session
- * carrying its parent's whole conversation under its own id.
+ * The transcript arithmetic is pure, so it is tested here without a harness: the traps are two things
+ * Claude Code writes — a response written as several lines, and a resumed session carrying its parent's
+ * whole conversation, under the parent's times, in its own transcript.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,24 +44,26 @@ test('a response written as several lines is one turn, with its tokens counted o
 });
 
 test("a resumed session's inherited conversation is not counted as its own", () => {
-  // The parent's entries keep the parent's timestamps (measured on two resumed sessions); the
-  // registry's start for the child is what tells them apart.
   const jsonl = [
     response('2026-09-13T03:55:08Z', 'msg_parent', [{ type: 'tool_use', id: 'tu_p', name: 'Write' }]),
     response('2026-09-13T04:06:20Z', 'msg_child', [{ type: 'text', text: 'carrying on' }]),
   ].join('\n');
-  assert.deepEqual(transcriptUsage(jsonl, Date.parse('2026-09-13T04:06:15Z')), {
-    turns: 1,
-    toolCalls: 0,
-    inputTokens: 1110,
-    uncachedTokens: 10,
-    cacheWriteTokens: 100,
-    cacheReadTokens: 1000,
-    outputTokens: 5,
-    peakContextTokens: 1110,
-    firstContextTokens: 1110,
-    firstCacheWriteTokens: 100,
-  });
+  assert.deepEqual(
+    transcriptUsage(jsonl, Date.parse('2026-09-13T04:06:15Z')),
+    {
+      turns: 1,
+      toolCalls: 0,
+      inputTokens: 1110,
+      uncachedTokens: 10,
+      cacheWriteTokens: 100,
+      cacheReadTokens: 1000,
+      outputTokens: 5,
+      peakContextTokens: 1110,
+      firstContextTokens: 1110,
+      firstCacheWriteTokens: 100,
+    },
+    "the parent's entries keep the parent's timestamps: the registry's start for the child tells them apart",
+  );
 });
 
 test('tokens are absent, not 0, when a counted response did not carry them — and a transcript has no cost', () => {
@@ -73,11 +75,11 @@ test('tokens are absent, not 0, when a counted response did not carry them — a
   assert.equal('costUsd' in u, false);
 });
 
-// ─── cost: Claude Code's cost-state lines ───────────────────────────────────
-
 /**
- * A `cost-state` line as Claude Code writes it (2.1.272, `modelUsage` trimmed): no time of its own, the session's
- * totals, and when its count began. Written twice as the session's process exits, and never per turn.
+ * A `cost-state` line as Claude Code writes it, its `modelUsage` left out: no time of its own, the session's totals,
+ * and when its count began. Claude Code writes it twice as the session's process exits, and never per turn. A session
+ * continued by another process carries its count on: each process writes its pair at its exit, then the next process's
+ * name, all under the first process's `startTime`.
  */
 const costState = (
   totalCostUSD: number,
@@ -140,8 +142,6 @@ test('no cost-state written since the attempt began is no cost — not 0, and no
 });
 
 test("a resumed session's cost is its own: the total it exited with, less the total its session had when it began", () => {
-  // As one real session continued twice was written (2.1.272): each process's pair at its exit, then the next process's
-  // name, all under the first process's startTime — the count carried on.
   const first = Date.parse('2026-09-15T00:04:43.817Z');
   const second = Date.parse('2026-09-15T01:12:01Z');
   const jsonl = [
@@ -209,9 +209,7 @@ test('a count carried on from a total the transcript does not show is no cost', 
   );
 });
 
-// ─── a compacted conversation: the summary's call writes no response ─────────
-
-/** A `cost-state` with its `modelUsage`, as 2.1.278 writes one: per model, uncached input, cache reads and writes, output. */
+/** A `cost-state` with its `modelUsage`, as Claude Code writes one: per model, uncached input, cache reads and writes, output. */
 const costStateWith = (totalCostUSD: number, startTime: number, models: Record<string, [number, number, number, number]>) =>
   line({
     type: 'cost-state',
@@ -229,7 +227,7 @@ const costStateWith = (totalCostUSD: number, startTime: number, models: Record<s
       ]),
     ),
   });
-/** The boundary Claude Code writes where it compacted a conversation (2.1.278), trimmed. */
+/** The boundary Claude Code writes where it compacted a conversation, trimmed. The summary's call writes no response. */
 const boundary = (at: string) =>
   line({
     type: 'system',
@@ -240,7 +238,6 @@ const boundary = (at: string) =>
   });
 
 test("a compacted attempt's tokens are its cost-state's, which counts the summary's call its responses do not — and none until one is written", () => {
-  // Measured (open issue 26): three compactions, 408,348 input tokens in the responses and 601,367 in the cost-state.
   const since = Date.parse('2026-09-19T03:55:58Z');
   const lines = [
     prompt('2026-09-19T03:55:59Z'),
@@ -417,7 +414,6 @@ test("an attempt's input is counted in its three classes, which sum to inputToke
 });
 
 test("a resumed attempt's classes and peak are its own lines', and its peak starts where its parent's conversation ended", () => {
-  // One transcript, as `--resume` leaves it: the parent's conversation under the parent's times, then the child's.
   const parentStart = Date.parse('2026-09-18T08:00:00Z');
   const since = Date.parse('2026-09-18T09:00:00Z');
   const usage = (uncached: number, write: number, read: number) => ({
@@ -431,7 +427,6 @@ test("a resumed attempt's classes and peak are its own lines', and its peak star
     response('2026-09-18T08:00:02Z', 'msg_p1', [], usage(4, 30_000, 0)),
     response('2026-09-18T08:10:00Z', 'msg_p2', [], usage(2, 2_000, 180_000)),
     prompt('2026-09-18T09:00:01Z'),
-    // The child's first response reads the whole of the parent's conversation, and here rewrites it to the cache.
     response('2026-09-18T09:00:05Z', 'msg_c1', [], usage(6, 183_000, 0)),
     response('2026-09-18T09:00:09Z', 'msg_c2', [], usage(1, 1_500, 183_000)),
   ].join('\n');
@@ -467,7 +462,6 @@ test("a resumed attempt's classes and peak are its own lines', and its peak star
 });
 
 test('a journal written before the classes were measured folds as it did: inputTokens alone, and no class standing in as 0', () => {
-  // Two lines as the engine wrote them on 2026-09-18, verbatim in shape.
   const journal = [
     '{"kind":"filed","at":"2026-09-18T09:00:00Z","brief":"b","cwd":"/r"}',
     '{"kind":"starting","at":"2026-09-18T09:00:01Z","attempt":1}',
@@ -475,15 +469,19 @@ test('a journal written before the classes were measured folds as it did: inputT
     '{"kind":"measured","at":"2026-09-18T09:05:02Z","attempt":1,"usage":{"costUsd":14.72,"apiMs":679931,"toolMs":29305}}',
   ].map((l) => JSON.parse(l) as Event);
   const [a] = fold('t', journal).attempts;
-  assert.deepEqual(a.usage, {
-    turns: 85,
-    toolCalls: 40,
-    inputTokens: 21861234,
-    outputTokens: 40100,
-    costUsd: 14.72,
-    apiMs: 679931,
-    toolMs: 29305,
-  });
+  assert.deepEqual(
+    a.usage,
+    {
+      turns: 85,
+      toolCalls: 40,
+      inputTokens: 21861234,
+      outputTokens: 40100,
+      costUsd: 14.72,
+      apiMs: 679931,
+      toolMs: 29305,
+    },
+    'an end and a measure in the shape a runtime that counted no classes wrote them',
+  );
   for (const key of ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens', 'peakContextTokens'])
     assert.equal(key in a.usage, false, key);
   assert.equal(
@@ -713,10 +711,10 @@ test('ae show and ae feed say an end gave no statement where its task asked for 
       ['attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured', `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done`],
       JSON.stringify(extra),
     );
-  // An old journal's end, judged by the engine: its reason, as ever.
   assert.equal(
     entryLine('t-1', end({ observed: 'failed', reason: 'unsigned' })),
     `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  failed (unsigned)`,
+    "an older journal's end the engine judged: its reason, as written",
   );
 });
 
@@ -729,7 +727,7 @@ test('ae show prints the budget and the context window a task was filed with, an
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 
-test('ae ls prints no priority, even of an old journal that carries one: the runtime keeps no order since stage 4c part 2', () => {
+test('ae ls prints no priority, even of an old journal that carries one: the runtime keeps no order', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra });
   const shown = (extra: object) => taskLine({ id: 't-1', state: fold('t-1', [filed(extra)]), phase: 'pending', sessionId: null });
   for (const extra of [{ priority: 3 }, { priority: -1 }, {}])
@@ -748,9 +746,7 @@ test('a count its runner could not see is named as not measured — a Codex atte
   );
 });
 
-// ─── Codex: its exec --json stream ──────────────────────────────────────────
-
-/** A stream as `codex exec --json` writes it (0.154.0, shapes from a real run's log, text shortened). */
+/** A stream as `codex exec --json` writes it, its text shortened. */
 const codexStream = (...events: object[]) => ['Reading additional input from stdin...', ...events.map((e) => JSON.stringify(e))].join('\n');
 const THREAD = { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' };
 const TURN = { type: 'turn.started' };
@@ -779,15 +775,18 @@ test("a Codex run's usage is read from its stream: tokens from turn.completed, t
       completed(),
     ),
   );
-  // Cached tokens are part of input_tokens and reasoning part of output_tokens: neither is added.
-  assert.deepEqual(read.usage, {
-    toolCalls: 2,
-    inputTokens: 373710,
-    uncachedTokens: 59854,
-    cacheWriteTokens: 0,
-    cacheReadTokens: 313856,
-    outputTokens: 1082,
-  });
+  assert.deepEqual(
+    read.usage,
+    {
+      toolCalls: 2,
+      inputTokens: 373710,
+      uncachedTokens: 59854,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 313856,
+      outputTokens: 1082,
+    },
+    'cached tokens are part of input_tokens and reasoning part of output_tokens: neither is added',
+  );
   assert.equal('turns' in read.usage, false, "Codex's turns are prompts, not model responses");
   assert.equal('costUsd' in read.usage, false);
 });
@@ -827,8 +826,6 @@ test('a Codex stream with no turn in it measured nothing, and reports no usage a
   assert.deepEqual(codexOutput(codexStream(THREAD)), {});
 });
 
-// ─── when it ran, for a person ──────────────────────────────────────────────
-
 /** Attempt 1 as fold reads it: started at `startedAt`, and ended `done` at `endedAt` when there is one. */
 const ranAt = (startedAt: string, endedAt?: string) => {
   const ended: Event[] = endedAt ? [{ kind: 'ended', at: endedAt, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' }] : [];
@@ -846,8 +843,11 @@ test('ae show says when each attempt ran: its start, its end, and how long that 
     shown('2026-09-12T09:00:01.250Z', '2026-09-12T10:02:30.000Z'),
     'attempt 1  done  09:00:01 → 10:02:30 (1h 02m)  usage not measured',
   );
-  // The length is taken from the timestamps, not from the clock text: past midnight it is still 45 seconds.
-  assert.equal(shown('2026-09-12T23:59:30Z', '2026-09-13T00:00:15Z'), 'attempt 1  done  23:59:30 → 00:00:15 (45s)  usage not measured');
+  assert.equal(
+    shown('2026-09-12T23:59:30Z', '2026-09-13T00:00:15Z'),
+    'attempt 1  done  23:59:30 → 00:00:15 (45s)  usage not measured',
+    'the length is taken from the timestamps, not from the clock text: past midnight it is still 45 seconds',
+  );
 });
 
 test('an attempt still running has no end to print, so ae show says since when', () => {

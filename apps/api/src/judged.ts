@@ -95,10 +95,11 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[
 
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
- * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is known
- * only once it ends, a job's (`claude -p`) with its result and a background session's with its attempt, and one killed first, or on a
- * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`): `$4.20`, and `≥$4.20` where an ended
- * attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was measured: a cost nobody measured is not $0.
+ * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is
+ * known only once it ends, a job's (`claude -p`) with its result and a background session's with its attempt, and one killed first, or on a
+ * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`):
+ * `$4.20`, and `≥$4.20` where an ended attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was
+ * measured: a cost nobody measured is not $0.
  */
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
 
@@ -260,12 +261,13 @@ type Judged = {
   toDecide: RunToDecide | null;
   status: RunStatus;
   /**
-   * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file —
-   * a check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
+   * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
+   * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
    * once those ship (`runReady`), which never happens on its own for one that never ships: the gate is the tick's, and `assess` does not
    * know it. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands. A held run's due is what it
    * files once its hold lifts, for a hold that lifts on its own; a hold that lifts only by a person's hand leaves nothing due. A record the
-   * tick cannot read — no frozen workflow, its folder gone — has nothing filed for it, whatever its bare steps would make ready: the tick fails on it.
+   * tick cannot read — no frozen workflow, its folder gone — has nothing filed for it, whatever its bare steps would make ready: the tick
+   * fails on it.
    */
   moving: boolean;
   /** The runs its roots wait on (`waitingOf`). */

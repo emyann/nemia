@@ -426,7 +426,8 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
  * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
  * 403 for the repository's); the package's refusals have `refusalOf`'s statuses.
  *
- * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is now.
+ * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is
+ *   now.
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
  * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`). Not a valid card and it says so:
  *   A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and nothing here serves an agent over A2A — so
@@ -438,10 +439,10 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
  * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
  *   agent's version has moved (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
  *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
- *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief
- *   (422); an agent that does not read, or whose name, harness or `remote:` the loader would refuse on the try's own step (422, before
- *   anything is written); an agent that gives a skill only the repository's .claude/skills has, which a start that looks at no repository
- *   does not find (422); and, while a try of it still moves, another (409): one at a time, so a second press does not spend a second budget.
+ *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
+ *   an agent that does not read, or whose name, harness or `remote:` the loader would refuse on the try's own step (422, before anything is
+ *   written); an agent that gives a skill only the repository's .claude/skills has, which a start that looks at no repository does not find
+ *   (422); and, while a try of it still moves, another (409): one at a time, so a second press does not spend a second budget.
  * - `DELETE /api/agents/:from/:name` — an agent of yours removed, against the `version` it was read at — refused while a step still names
  *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
  */

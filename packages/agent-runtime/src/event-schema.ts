@@ -9,7 +9,8 @@
  * takes, so `tsc` refuses the assignment in `journal.ts`.
  *
  * The harness's arguments are checked for their types only. What a filing may carry is `argsRefusalOf`'s at the door;
- * a journal holds what a door once let through, a former argument included (`FORMER_ARGS`), which `upgrade` moves.
+ * a journal holds what a door let through when it was written, a former argument included (`FORMER_ARGS`), which `upgrade`
+ * moves.
  */
 import { Schema, SchemaIssue } from 'effect';
 
@@ -58,7 +59,7 @@ const harnessArgs = {
   claude: Schema.optional(ClaudeFlagsSchema),
 };
 
-/** `FORMER_ARGS`: a harness argument once, a flag of Claude Code's now, which `upgrade` moves into `config.claude`. */
+/** `FORMER_ARGS`: a former harness argument that Claude Code's flag of the same key replaces, which `upgrade` moves into `config.claude`. */
 const formerArgs = { remoteControl: Schema.optional(Schema.Boolean) };
 
 export const HarnessArgsSchema = Schema.StructWithRest(Schema.Struct({ ...harnessArgs, ...formerArgs }), Rest);
@@ -87,7 +88,7 @@ const UsageSchema = Schema.StructWithRest(
 const event = <const K extends string, const F extends Schema.Struct.Fields>(kind: K, fields: F) =>
   Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal(kind), at: Schema.String, ...fields }), Rest);
 
-/** A filing: until 2026-09-23 its harness's arguments were written beside its own fields, which `upgrade` lifts into `config`. */
+/** A filing: one an older runtime wrote may carry its harness's arguments beside its own fields, which `upgrade` lifts into `config`. */
 const Filed = event('filed', {
   ...harnessArgs,
   ...formerArgs,
@@ -103,8 +104,8 @@ const Filed = event('filed', {
 });
 
 /**
- * An end as any runtime wrote one: `budget` is the reason a journal written before stage 4b (2026-09-25) gave a session its
- * harness ended at a spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
+ * An end as any runtime wrote one: `budget` is the reason an older runtime's journal gives a session its harness ended at a
+ * spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
  */
 const Ended = event('ended', {
   attempt: Schema.Finite,
@@ -121,7 +122,7 @@ const Ended = event('ended', {
   error: Schema.optional(Schema.String),
 });
 
-/** A person's answer: `budgetUsd` beside `config` is how one was written before stage 4b, moved under it by `upgrade`. */
+/** A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. */
 const Input = event('input', {
   text: Schema.String,
   config: Schema.optional(HarnessArgsSchema),

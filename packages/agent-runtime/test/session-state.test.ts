@@ -1,12 +1,15 @@
 /**
- * Sightings speak A2A's TaskState (2026-09-25). Before, a sighting's state was one of five words of the runtime's own —
- * `working`, `blocked`, `done`, `failed`, `stopped` — and each driver handed its harness's words through nearly as they
- * came. Now each driver translates once, at its edge, into A2A's eight names, and the journal keeps its three end words.
+ * Sightings speak A2A's TaskState: each driver translates its harness's words once, at its edge, into A2A's eight names, and the
+ * journal keeps its three end words. A harness or a `PromiseRunner` may speak the runtime's five former words instead — `working`,
+ * `blocked`, `done`, `failed`, `stopped` — which `formerStateOf` reads as their names.
  *
- * What holds the change: the lifecycle corpus as it stood before the words changed, translated, decides every case as it
- * did then (`fixtures/decide-corpus.json`, recorded by the commit before the change); the three names that joined —
- * `submitted`, `auth-required`, `rejected` — decide every case as the one they join; each driver's table, word for word,
- * with the words it has no reading of; and a journal written before folds and settles as it did.
+ * What holds it:
+ *
+ * 1. the lifecycle corpus in the former words, translated, decides every case as `fixtures/decide-corpus.json` recorded;
+ * 2. the three names with no former word — `submitted`, `auth-required`, `rejected` — decide every case as the one they join;
+ * 3. each driver's table, word for word, with the words it has no reading of;
+ * 4. what a view prints for each name;
+ * 5. a journal a runtime wrote in the former words folds and settles as it did.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,7 +48,7 @@ const read = (c: Case): Recorded => ({
   action: decide(fold(TASK, c.events), c.observed, c.now),
 });
 
-/** The corpus's sightings as they were written before the words changed, word for word (`lifecycle.test.ts` at f1c7c4f). */
+/** The corpus's sightings in the five former words, word for word: the sightings `fixtures/decide-corpus.json` was recorded from. */
 type FormerSighting = Omit<Sighting, 'sessionId' | 'state'> & { state: string };
 const FORMER_SIGHTINGS: Record<string, FormerSighting | undefined> = {
   unseen: undefined,
@@ -69,24 +72,20 @@ const translated = (by: (s: FormerSighting) => SessionState | undefined) =>
     }),
   ) as Record<string, Omit<Sighting, 'sessionId'> | undefined>;
 
-// ─── the corpus decides as it did ──────────────────────────────────────────
-
-test('the corpus as it stood before the words changed, translated, decides every case as it did then', () => {
+test("the corpus as it stood before the words changed, translated, decides every case as it did then, by `formerStateOf` and by Claude Code's registry table, which says these very words", () => {
   const ways: Array<[string, (s: FormerSighting) => SessionState | undefined]> = [
     ['formerStateOf', (s) => formerStateOf(s.state)],
-    // Claude Code's registry said these very words: its runner's table must read them the same.
     ['claudeStateOf', (s) => claudeStateOf(s.state, s.waitingFor)],
   ];
   for (const [way, by] of ways) {
     const cases = corpusOf(translated(by));
     assert.deepEqual(cases.map((c) => c.name).sort(), Object.keys(RECORDED).sort(), `${way}: every recorded case, and no other`);
-    assert.equal(cases.length, 1152);
+    assert.equal(cases.length, 1152, `${way}: every journal shape, deadline, sighting and time`);
     for (const c of cases) assert.deepEqual(asJson(read(c)), asJson(RECORDED[c.name]), `${way}: ${c.name}`);
   }
 });
 
-test('REFUSED: the recorded corpus is not matched by a translation that reads a word wrong', () => {
-  // The proof above is only as good as the fixture's grip: `done` read as `canceled`, or `blocked` as `working`, must fail it.
+test("REFUSED: the recorded corpus is not matched by a translation that reads a word wrong, so the proof above has the fixture's grip", () => {
   for (const [word, wrong] of [
     ['done', 'canceled'],
     ['blocked', 'working'],
@@ -115,35 +114,31 @@ const BESIDE: Record<string, Omit<Sighting, 'sessionId' | 'state'>> = {
 const corpusIn = (state: SessionState) =>
   corpusOf({ unseen: undefined, ...Object.fromEntries(Object.entries(BESIDE).map(([k, b]) => [k, { ...b, state }])) });
 
-test('the three names that joined decide every case as the one they join: no new event, no new edge', () => {
-  // submitted runs as working (SESSION_LIVE, or SESSION_QUIET), auth-required waits as input-required (SESSION_BLOCKED),
-  // and rejected ends as failed (SESSION_ENDED, recorded `failed`).
+test('the three names that joined decide every case as the one they join: no new event, no new edge (submitted runs as working, auth-required waits as input-required, rejected ends as failed)', () => {
   for (const [joined, as] of [
     ['submitted', 'working'],
     ['auth-required', 'input-required'],
     ['rejected', 'failed'],
   ] as const) {
     const [mine, theirs] = [corpusIn(joined), corpusIn(as)];
-    assert.equal(mine.length, theirs.length);
+    assert.equal(mine.length, theirs.length, `${joined} and ${as}: the same cases`);
     mine.forEach((c, i) => assert.deepEqual(read(c), read(theirs[i]), `${joined} as ${as}: ${c.name}`));
   }
 });
 
-test("every end recorded off any sighting is one of the journal's three words, and no edge records a wait on a person as an end", () => {
+test("every end recorded off any sighting is one of the journal's three words, and no edge records a wait on a person as an end (decide throws on an end with no word)", () => {
   let ends = 0;
   for (const state of SESSION_STATES) {
     for (const c of corpusIn(state)) {
-      const a = decide(fold(TASK, c.events), c.observed, c.now); // harnessEnd throws on an end with no word: none here
+      const a = decide(fold(TASK, c.events), c.observed, c.now);
       if (a.do !== 'record-end') continue;
       ends++;
       assert.ok(['done', 'failed', 'stopped'].includes(a.observed), `${state}: ${c.name} recorded ${a.observed}`);
       if (a.reason === 'harness') assert.equal(a.observed, endOf(state), `${state}: ${c.name}`);
     }
   }
-  assert.ok(ends > 0);
+  assert.ok(ends > 0, 'some sighting ends an attempt');
 });
-
-// ─── the tables ─────────────────────────────────────────────────────────────
 
 test("endOf and phaseWordOf: each name's journal word and view word, exactly", () => {
   const expected: Record<SessionState, [ReturnType<typeof endOf>, ReturnType<typeof phaseWordOf>]> = {
@@ -222,8 +217,7 @@ test('AUTH_WAIT: a wait that names signing in is auth-required, and one that onl
   ]) {
     assert.equal(claudeStateOf('blocked', wait), 'input-required', wait);
   }
-  // Only a blocked session's wait: a working one that names login is at work.
-  assert.equal(claudeStateOf('working', 'login'), 'working');
+  assert.equal(claudeStateOf('working', 'login'), 'working', "only a blocked session's wait: a working one that names login is at work");
 });
 
 test("the detached worker's words on its run file: each is one name, a lease gone is failed, and a word no worker writes is failed", () => {
@@ -245,8 +239,6 @@ test("the detached worker's words on its run file: each is one name, a lease gon
   for (const [state, heartbeatAt, name] of rows)
     assert.equal(detachedStateOf({ state, heartbeatAt }, now), name, `${state} at ${heartbeatAt}`);
 });
-
-// ─── a PromiseRunner ────────────────────────────────────────────────────────
 
 const reporting = (states: Record<string, string>): PromiseRunner => ({
   async spawn() {},
@@ -318,8 +310,6 @@ test('an engine over a PromiseRunner that speaks the former words settles its ta
   assert.equal((await engine.view(blocked)).phase, 'needs-human');
 });
 
-// ─── what a view prints ─────────────────────────────────────────────────────
-
 test("a view prints each name in the words views have always printed: A2A's names stop at the runtime", () => {
   const inFlight = fold(TASK, [filed(), starting(1), spawned(1)]);
   const expected: Record<SessionState, string> = {
@@ -346,9 +336,7 @@ test("a view prints each name in the words views have always printed: A2A's name
   }
 });
 
-// ─── a journal written before ───────────────────────────────────────────────
-
-test("a journal written before the words changed folds and settles as it did: its end words are the journal's still", async () => {
+test("a journal written before the words changed folds and settles as it did: its end words are the journal's still (each filing as this engine writes it, then what a runtime in the former words wrote, word for word, read by a new process)", async () => {
   const root = scratch('ae-state-old-');
   const cwd = scratch('ae-state-old-cwd-');
   const fake: PromiseRunner = {
@@ -367,7 +355,6 @@ test("a journal written before the words changed folds and settles as it did: it
     await first.file({ brief: 'b', cwd, harness: 'fake' }),
     await first.file({ brief: 'c', cwd, harness: 'fake' }),
   ];
-  // Each journal's filing as this engine wrote it, then what a runtime before 2026-09-25 went on to write, word for word.
   const file = (id: string) => path.join(root, 'tasks', `${id}.jsonl`);
   const then = (id: string, ...lines: object[]) => fs.appendFileSync(file(id), lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
   const at = (s: number) => new Date(Date.parse('2026-09-20T10:00:00Z') + s * 1_000).toISOString();
@@ -402,13 +389,13 @@ test("a journal written before the words changed folds and settles as it did: it
   );
   const before = ids.map((id) => fs.readFileSync(file(id), 'utf8'));
 
-  // A new process reads what the old one wrote.
   const engine = createEngine({ root, harnesses: { fake } });
   await engine.tick();
   const views = await Promise.all(ids.map((id) => engine.view(id)));
   assert.deepEqual(
     views.map((v) => v.state.settled),
     ['succeeded', 'stopped', 'failed'],
+    'a new process settles what the old one wrote',
   );
   assert.deepEqual(
     views.map((v) => v.state.attempts[0].ended),

@@ -139,7 +139,9 @@ session(
   'claude',
   200,
   done('Answered the review.', {
-    /** A loop's target owes its answers to the findings of the review before it: without them it reads unsigned, and a try would take it on. */
+    /**
+     * A loop's target owes its answers to the findings of the review before it: without them it reads unsigned, and a try would take it on.
+     */
     replies: [{ finding: 'src/cache.ts — never expires', answer: 'fixed', why: 'It expires now.' }],
   }),
   USAGE.implement2,

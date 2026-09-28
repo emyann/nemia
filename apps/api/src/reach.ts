@@ -1,19 +1,19 @@
 /**
- * What each step of each workflow gets: the fence its file declares, beside what of the repository's capabilities reaches it. Pure over what
- * the api read of the checkout (`capabilitiesOf`) and the workflows the package's loader read, as the Workflows page reads them
+ * What each step of each workflow gets: the fence its file declares, beside what of the repository's capabilities reaches it. Pure over
+ * what the api read of the checkout (`capabilitiesOf`) and the workflows the package's loader read, as the Workflows page reads them
  * (`listWorkflows`); nothing here starts, asks or writes anything.
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
- * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
- * enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's read-only commands, which
- * ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what the settings allow of what asks.
- * What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that says `background: true`), which asks
- * nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
- * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions): deny, then ask, then allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask
- * rule every allow it matches, which asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included,
- * and `:*` at the end is a trailing ` *`, which also matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny,
- * removes the tool. A Codex step reads no `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the
- * page claims nothing else for it.
+ * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the
+ * settings enable, whatever its tools; the settings' deny rules and its own `disallowedTools:`; the settings' ask rules; Claude Code's
+ * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
+ * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
+ * says `background: true`), which asks nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
+ * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions): deny, then ask, then
+ * allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask rule every allow it matches, which
+ * asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included, and `:*` at the end is a trailing ` *`, which also
+ * matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny, removes the tool. A Codex step reads no
+ * `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the page claims nothing else for it.
  */
 import { HARNESSES } from 'agent-orchestrator';
 import {
@@ -32,7 +32,8 @@ const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
 
 /**
  * The modes a job was measured in on Claude Code 2.1.280, each denying what would ask and carrying on (agent-runtime's docs/open-issues.md,
- * "Claude Code as a job") — none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job in it.
+ * "Claude Code as a job") — none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job
+ * in it.
  */
 const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
 
@@ -236,8 +237,8 @@ export function reachOf(
 }
 
 /**
- * What one step gets (`StepReach`). A step on a harness that is not Claude Code reads no settings, and nothing of them is claimed for it. On
- * Claude Code:
+ * What one step gets (`StepReach`). A step on a harness that is not Claude Code reads no settings, and nothing of them is claimed for it.
+ * On Claude Code:
  *
  * - A deny naming a tool whole — `Bash`, or `Bash(*)` — removes it from the session. One naming one tool of a family the set names as
  *   one — `CronCreate` of `Cron*` — leaves the family, and names the tool as taken.

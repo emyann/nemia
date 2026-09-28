@@ -44,8 +44,6 @@ export const feedCursorRefusal = (after: number): string | undefined => cursorRe
 /** Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched when the cursor cannot be read from. */
 export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
 
-// ─── the file, by path ──────────────────────────────────────────────────────
-
 const statOf = (file: string): fs.Stats | undefined => fs.statSync(file, { throwIfNoEntry: false });
 
 /** The byte at `at` in the file, read alone. */
@@ -63,7 +61,7 @@ function byteAt(file: string, at: number): number {
 /**
  * Why a cursor cannot be read from, in words that say what to do — or undefined when it can: 0, or the byte just after a line, at most the
  * feed's size. A cursor inside a line would have the reader take the rest of that line for one; one past the end was handed out by a feed
- * since truncated or replaced, and nothing after it means what the reader thinks.
+ * that has been truncated or replaced, and nothing after it means what the reader thinks.
  */
 function cursorRefusalAt(file: string, after: number): string | undefined {
   if (!Number.isSafeInteger(after) || after < 0)
@@ -140,8 +138,8 @@ function readEnds(file: string, after: number): { lines: FeedLine[]; ends: numbe
  * The pass's words written where they changed (`feedChanges`), in one append, and the lines written.
  *
  * `memo` is the fold this process has read so far. It is read on to the end of the feed first — the lines this process wrote last pass,
- * and any another wrote — and read again from the start when it does not fit the file: another file, or a cursor the file no longer has a
- * line boundary at. It is not moved past what this call writes: the next call reads those lines back, so what it compares against is
+ * and any another wrote — and read again from the start when it does not fit the file: another file, or a cursor the file has no line
+ * boundary at. It is not moved past what this call writes: the next call reads those lines back, so what it compares against is
  * always what the feed says.
  *
  * A line with no newline at the end of the feed is one a writer died in: the append starts with a newline, so that line ends as the one
@@ -208,6 +206,9 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
  * written between the cut and the watch noticing it. The cost is a line the watcher had before may be said again, which at least once
  * already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's stream
  * does, and a reader opens it again from the feed it has now.
+ *
+ * A directory `fs.watch` cannot watch leaves the timer alone. The timer is not unref'd: a watch keeps its process alive, as `wf watch`
+ * needs.
  */
 function watchFeedFile(
   file: string,
@@ -231,7 +232,6 @@ function watchFeedFile(
   const refusal = cursorRefusalAt(file, from);
   if (refusal) throw refused(refusal);
   let cursor = from;
-  // The file the cursor was read in, by inode: one put in its place is another feed, whatever its size.
   let ino = statOf(file)?.ino;
   let stopped = false;
   let draining = false;
@@ -285,10 +285,7 @@ function watchFeedFile(
     watcher = fs.watch(dir, (_event, changed) => {
       if (!changed || changed === name) void drain();
     });
-  } catch {
-    /* the timer alone, then */
-  }
-  // Not unref'd: a watch is what keeps `wf watch` alive, as the engine's timer keeps `ae watch`.
+  } catch {}
   const timer = setInterval(() => void drain(), intervalMs);
   void drain();
   return {

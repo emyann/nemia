@@ -29,7 +29,7 @@ export type HarnessCost = { calls: number; ms: number; listed: number; spawned: 
  * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass. `records`
  * is the run records it read, `bytes` and `spawned` its totals, and `overheadMs` what measuring took — the counting inside the pass, and
  * composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass answered from
- * its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them — absent from a pass written before there was one.
+ * its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them — none when absent.
  */
 export type PassCost = {
   at: string;

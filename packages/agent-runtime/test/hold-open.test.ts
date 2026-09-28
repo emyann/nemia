@@ -1,7 +1,10 @@
 /**
- * A task held open (R1, thin runtime stage 2 part 4): an attempt that signs leaves the task `input-required` with nothing
+ * A task held open: an attempt that signs leaves the task `input-required` with nothing
  * running; an answer is a new attempt that continues the session; a close settles it. Walked through both doors — the
  * facade and the Effect door — and each refusal of `answer` and `close` made to refuse, with nothing journalled.
+ *
+ * The Effect door's harness lets a session go as `claude-bg`'s does: a session released is not listed. A process there is the
+ * file store under a root and that harness, and a restart is a new one on the same two, reading only the store.
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
  */
@@ -45,7 +48,6 @@ test('the Effect door: signed, it waits with its session released; answered afte
     const sessions = new Map<string, Sighting>();
     const spawned: SpawnRequest[] = [];
     const released: string[] = [];
-    // A harness that lets a session go as `claude-bg`'s does: no longer listed once released.
     const ops = testOps({ sessions, spawned });
     const harness = Runner.layer({
       ...ops,
@@ -55,7 +57,6 @@ test('the Effect door: signed, it waits with its session released; answered afte
           for (const [name, t] of sessions) if (t.sessionId === s.sessionId) sessions.delete(name);
         }),
     });
-    // A process: the file store under `root`, and the harness. A restart is a new one on the same two.
     const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
       Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(Journal.files(root), harness))));
     const phase = async (id: string) =>
@@ -74,7 +75,6 @@ test('the Effect door: signed, it waits with its session released; answered afte
     const input = await run(answer(id, 'shorter, please', { budgetUsd: 0.5 }));
     assert.equal(input.text, 'shorter, please');
     assert.deepEqual(input.config, { budgetUsd: 0.5 });
-    // A new process, reading only the store: the answer is on the record, so the turn is too.
     await run(tick());
     assert.equal(spawned.length, 2);
     assert.equal(spawned[1].name, `ae/${id}/2`);
@@ -112,7 +112,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
   }
 });
 
-test('the Effect door refuses as the facade does: InputRefused, and nothing journalled', async () => {
+test("the Effect door refuses as the facade does: InputRefused, and nothing journalled — a budget its harness would not keep refused by the harness, and a turn's configuration other than its spend cap", async () => {
   const journal = Journal.test();
   const layer = Layer.mergeAll(
     journal,
@@ -146,10 +146,8 @@ test('the Effect door refuses as the facade does: InputRefused, and nothing jour
   );
   await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
   assert.equal(await count(unrecorded), 4, 'nothing journalled');
-  // Waiting, the words are taken; a budget its harness would not keep is refused by the harness, at this door too.
   await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(held, e))));
   await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
-  // A turn gives its own spend cap and nothing else: the session it continues was started with the rest.
   await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
   await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);
   assert.equal(await count(held), 4);
@@ -173,7 +171,10 @@ const signedJournal = (): Event[] => [
   },
 ];
 
-/** The facade over a store in memory a test may write to by hand, and a harness the test moves. */
+/**
+ * The facade over a store in memory a test may write to by hand, and a harness the test moves. Its `write` writes a task's
+ * journal by hand: the filing, held open unless said, then `events`.
+ */
 const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
   const tasks = new Map<string, Event[]>();
   const journal: PromiseJournal = {
@@ -208,7 +209,6 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
     },
   };
   const engine = createEngine({ journal, harnesses: harnesses ?? { fake } });
-  /** Write a task's journal by hand: the filing, held open unless said, then `events`. */
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
     tasks.set(id, [
       { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', holdOpen: true, harness: 'fake', ...filed },
@@ -263,7 +263,6 @@ test("answer refuses what is no answer: empty words, a budget that is not dollar
       /^answer: `budgetUsd: .*` is not an amount of dollars\. Give dollars above 0/,
     );
   }
-  // The cap was an option of its own until stage 4b: a caller built before it is told where it goes, not ignored.
   await refuses(
     b,
     't-w',
@@ -362,7 +361,6 @@ test('answer and close refuse a task that is not waiting for one, each saying wh
     await refuses(b, id, () => b.engine.answer(id, 'go'), new RegExp(`^answer: \`${id}\`.*${answering.source}`));
     await refuses(b, id, () => b.engine.close(id), new RegExp(`^close: \`${id}\`.*${closing.source}`));
   }
-  // Signed with no session recorded — a harness that reports none — there is nothing for an answer to continue; a close is taken.
   const unrecorded = signedJournal().map((e) => (e.kind === 'ended' ? (({ nativeId: _, ...rest }) => rest)(e) : e)) as Event[];
   b.write('t-unrecorded', unrecorded);
   await refuses(
@@ -376,10 +374,9 @@ test('answer and close refuse a task that is not waiting for one, each saying wh
   assert.equal(b.tasks.get('t-unrecorded')!.at(-1)!.kind, 'closed');
   await refuses(b, 't-nope', () => b.engine.answer('t-nope', 'go'), /^answer: `t-nope` is not a task on this board/);
   await refuses(b, 't-nope', () => b.engine.close('t-nope'), /^close: `t-nope` is not a task on this board/);
-  // And the control: the same board takes both from a task that waits.
   b.write('t-waits', signedJournal());
   await b.engine.close('t-waits');
-  assert.equal(b.tasks.get('t-waits')!.at(-1)!.kind, 'closed');
+  assert.equal(b.tasks.get('t-waits')!.at(-1)!.kind, 'closed', 'the control: the same board closes a task that waits');
 });
 
 test('file refuses a holdOpen that is not true', async () => {
@@ -396,8 +393,6 @@ test('file refuses a holdOpen that is not true', async () => {
   }
   assert.equal(b.tasks.size, 0);
 });
-
-// ─── ae ──────────────────────────────────────────────────────────────────────
 
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 

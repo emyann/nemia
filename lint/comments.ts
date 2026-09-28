@@ -1,8 +1,8 @@
 /**
  * The oxlint plugin `comments`: the rules that keep a comment to a JSDoc contract (CLAUDE.md, "Code reads by itself").
  *
- * `.oxlintrc.json` loads it and switches its rules on package by package, in the override blocks that name them;
- * `packages/agent-orchestrator/test/comments.test.ts` runs oxlint on fixtures that each rule refuses.
+ * `.oxlintrc.json` loads it and switches its rules on package by package, in the override blocks that name them; the runtime's
+ * block also covers this folder. `packages/agent-orchestrator/test/comments.test.ts` runs oxlint on fixtures that each rule refuses.
  */
 import type { RuleTester } from 'oxlint/plugins-dev';
 

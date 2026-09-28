@@ -146,23 +146,22 @@ const argsOf = (config: Record<string, unknown>): HarnessArgs =>
   Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
 /**
- * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
- * line is what was said when it was said, so a change to an event's shape is made where it is read.
+ * An event in the shape the runtime reads, whatever shape it was written in. Nothing on disk is rewritten: the journal is
+ * append-only, and a line is what was said when it was said, so a change to an event's shape is made where it is read.
  *
- * Three changes so far. Until 2026-09-23 a `filed` event carried the harness's arguments beside the task's own fields;
- * they are the adapter's configuration now, under `config` (`harness-args.ts`). A `filed` event with any of them at
- * its top level has them moved under `config`, where a value already there is kept: `config` is the newer word. So
- * `fold` reads one shape, and a store holding tasks filed on both sides of the change lists them alike.
+ * The former shapes a journal an older runtime wrote may carry, and what each is read as:
  *
- * And until 2026-09-25 (stage 4b) the spend cap was the runtime's own field, `budgetUsd`, which it judged: on a `filed`
- * event (lifted above, as it is one of the harness's arguments now), on an `input` (moved under that turn's `config`),
- * and as an end's reason — `reason: 'budget'` — which is read as the harness ending the session at a limit its
- * configuration set: `reason: 'harness'`, `limit: 'budget'`.
- *
- * And until 2026-09-25 a bridge to claude.ai was a harness argument of its own, `remoteControl`, and is Claude Code's flag now,
- * in `config.claude` (`FORMER_ARGS`). A `filed` event with it — under `config`, or at its top level from before either change —
- * has it moved there: `true` as the flag, where a flag already in `claude` is kept, and `false`, which asked for nothing, dropped.
- * So a task filed bridged before the move is bridged again on its next attempt.
+ * - A `filed` event with any of the harness's arguments (`HARNESS_ARGS`) at its top level, beside the task's own fields:
+ *   they are moved under `config` (`harness-args.ts`), where a value already there is kept, since `config` is the newer
+ *   word. So `fold` reads one shape, and a store holding tasks filed in both shapes lists them alike.
+ * - The spend cap as the runtime's own field, `budgetUsd`: on a `filed` event it is lifted as above, being one of the
+ *   harness's arguments; on an `input` it is moved under that turn's `config`.
+ * - An end's reason `budget`: read as the harness ending the session at a limit its configuration set, `reason:
+ *   'harness'` with `limit: 'budget'`.
+ * - A former harness argument that a flag of Claude Code's replaces (`FORMER_ARGS`: `remoteControl`, a bridge to
+ *   claude.ai), under `config` or at a `filed` event's top level: moved into `config.claude` — `true` as the flag, where a
+ *   flag already in `claude` is kept, and `false`, which asked for nothing, dropped. So a task filed bridged is bridged
+ *   again on its next attempt.
  */
 export const upgrade = (event: StoredEvent): Event => {
   if (event.kind === 'input') {
@@ -202,7 +201,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
    * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
    * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
-   * where a journal written before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
+   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is.
    */
   static layer = (ops: StoreOps) =>
     Layer.succeed(Journal)(
@@ -226,14 +225,16 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
   /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));
 
-  /** The same implementation as a plain value, for a caller that needs its optional `subscribe`. */
+  /**
+   * The same implementation as a plain value, for a caller that needs its optional `subscribe`. A line is read as its JSON,
+   * or as its text where it is none — a write cut short — for the decoder to refuse by place.
+   */
   static filesOps = (root = path.join(os.homedir(), '.agent-engine')): StoreOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
     const fail = (taskId: string) => (cause: unknown) =>
       new JournalError({ taskId, message: cause instanceof Error ? cause.message : String(cause) });
-    /** A line as the store holds it: its JSON, or its text where it is none — a write cut short — for the decoder to refuse by place. */
     const parsed = (line: string): unknown => {
       try {
         return JSON.parse(line);
@@ -244,13 +245,15 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
 
     return {
       located: { journal: file, feed: feedFile },
+      /**
+       * The task's journal, then the feed, in the one call every writer makes, so no writer can forget the feed. The task
+       * file is the source of truth; the feed is its index.
+       */
       append: (taskId, event) =>
         Effect.try({
           try: () => {
             fs.mkdirSync(dir, { recursive: true });
             fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
-            // The feed is written on the same path as the journal, so it cannot be forgotten by
-            // a future writer. The task file stays the source of truth; this is its index.
             fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
           },
           catch: fail(taskId),
@@ -275,6 +278,10 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         catch: fail('*'),
       }),
 
+      /**
+       * The feed from byte `after` to its last complete line: a reader never consumes half an entry, and the cursor never
+       * advances past what was read.
+       */
       feed: (after) =>
         Effect.try({
           try: () => {
@@ -288,8 +295,6 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             fs.closeSync(fd);
             countRead(buf.length);
 
-            // Stop at the last COMPLETE line: a reader must never consume half an entry, and the
-            // cursor must never advance past what was actually read.
             const text = buf.toString('utf8');
             const end = text.lastIndexOf('\n');
             if (end < 0) return { entries: [], cursor: after };
@@ -299,8 +304,10 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
           catch: fail('*'),
         }),
 
-      // `fs.watch` on the directory holding the feed: a write to the file is a change the OS will
-      // tell us about. Not the mechanism — `feed()` is — just the thing that skips the wait.
+      /**
+       * `fs.watch` on the directory holding the feed, which the OS signals on a write to the file: not the mechanism — `feed`
+       * is — only what skips the wait. A directory that cannot be watched gives no signal.
+       */
       subscribe: (onChange) => {
         try {
           fs.mkdirSync(root, { recursive: true });
@@ -327,7 +334,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         }),
       read: (taskId) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
       list: Effect.sync(() => [...store.keys()].sort()),
-      // In memory the cursor is an index rather than a byte offset — same contract either way.
+      /** The cursor is an index into the feed rather than a byte offset: the same contract. */
       feed: (after) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
     });
   };

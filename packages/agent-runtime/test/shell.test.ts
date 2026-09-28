@@ -2,13 +2,14 @@
  * A session held by something that is not the work, at shipped defaults — a fake `claude` that keeps a registry, and
  * a transcript file where Claude Code keeps one.
  *
- * Issue 24, measured on 2026-09-17: an implement step signed off with `StructuredOutput` at 02:53Z, every commit in,
- * and left a `run_in_background` loop running. Its registration read `status: shell`, the registry listed the session
- * busy, and its journal shows nothing written for the next seventy minutes — no end, no check, no review — while its
- * transcript stayed exactly as its closing turn left it. `busy` was the gate: it stops the runner reading a statement,
- * and stops `closedOut` acting on one. Now the last word in the conversation answers the question `busy` cannot: a
- * session whose own closeout is the last thing in it, and which has written nothing since for the quiescence floor,
- * has finished, whatever its process is still doing.
+ * A session that signs off with `StructuredOutput` and leaves a `run_in_background` loop running is listed busy by the
+ * registry, and its transcript stays exactly as its closing turn left it. `busy` stops the runner reading a statement, and
+ * stops `closedOut` acting on one, so the last word in the conversation answers the question `busy` cannot: a session
+ * whose own closeout is the last thing in it, and which has written nothing since for the quiescence floor, has finished,
+ * whatever its process is still doing.
+ *
+ * Claude Code's registration has a word of its own, `shell`, for a session held by a background shell, beside `busy`,
+ * `idle` and `waiting`. It is not a turn, so the quiescence floor ends such a session, closeout or not.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-shell-${label}-`);
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
+/** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { createEngine } = await import('../src/facade.ts');
@@ -120,7 +121,6 @@ test('a session held busy by a background shell, its closeout the last word in i
     const [row] = claude.rows();
     assert.equal(row?.status, 'busy', 'its process is doing something: the shell it left running');
 
-    // It ran for ten minutes, signed off ten minutes ago, and has written nothing since; the shell loops on.
     wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
@@ -145,14 +145,13 @@ test('a session held busy whose transcript is still advancing is left alone — 
     await engine.tick();
     const [row] = claude.rows();
 
-    // A statement it may yet revise: it gave one a second ago and is still going.
     wrote(row.sessionId, 1_000, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
     const v = await engine.view(id);
     assert.equal(v.state.settled, null, 'still running');
-    assert.equal(v.state.attempts[0]?.ended, null);
+    assert.equal(v.state.attempts[0]?.ended, null, 'a statement given a second ago, which it may yet revise, ends nothing');
     assert.equal(claude.rows().length, 1, 'and its session untouched');
   });
 });
@@ -165,25 +164,23 @@ test('a session held busy that gave no closeout is left where it was: the existi
     await engine.tick();
     const [row] = claude.rows();
 
-    // It ended its turn with words and nothing else, ten minutes ago, and its process is still busy.
     wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     assert.equal((await engine.view(id)).state.attempts[0]?.ended, null, 'a busy session with nothing said is not quiet');
 
-    // Idle, the quiescence floor reads it as it always has: quiet, with no statement — `stated: false`, which the layer
-    // above reads as unsigned (the engine judged it `unsigned` itself until stage 4a).
     claude.set(row.name, { status: 'idle' });
     await engine.tick();
     const v = await engine.view(id);
-    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.stated], ['done', false]);
+    assert.deepEqual(
+      [v.state.attempts[0]?.ended, v.state.attempts[0]?.stated],
+      ['done', false],
+      'idle, the quiescence floor reads it quiet with no statement: `stated: false`, which the layer above reads as unsigned',
+    );
   });
 });
 
 test('a session the registry lists `shell` is not busy at all: the quiescence floor reads it quiet, closeout or not', async () => {
-  // `shell` is the registration's own word for a session held by a background shell, beside `busy`, `idle` and
-  // `waiting` (2.1.274's vocabulary). It is not a turn, so the floor already ends such a session — the reading the
-  // measured one did not get, because the registry listed it busy.
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });

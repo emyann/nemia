@@ -1,9 +1,15 @@
 /**
- * What "done" means for Claude Code, tested without Claude Code.
+ * What "done" means for Claude Code, tested without Claude Code: `claudeOps` translates what `claude agents` lists into A2A's
+ * states, with an injected clock and an injected transcript, and leaves the judgement to the engine. `observe` shells out to
+ * `claude`, so each test puts a fake one on PATH that prints the registry it is given.
  *
- * The whole point of putting this in the runner is that it becomes a translation with an injected
- * clock and an injected transcript, rather than a judgement buried in `decide` that needs a live
- * harness to exercise.
+ * Facts about Claude Code these tests hold the runner to:
+ * - a tool call that runs for minutes leaves the transcript untouched for as long, while the registry lists the session busy;
+ * - a closeout read is a full read of a transcript that runs to tens of megabytes, where its mtime is cheap: the runner reads
+ *   it once per write of the transcript, never once per pass;
+ * - `--tools`, `--disallowedTools` and `--allowedTools` are variadic, and `--remote-control` and `--worktree` take an optional
+ *   value: each would take the prompt after it, so a flag always follows them and the prompt comes last;
+ * - a list of rules joined by commas is one rule per item: `--allowedTools "Write(**),Edit(**)"` allows both.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,10 +20,6 @@ import { createEngine } from '../src/facade.ts';
 import { Journal } from '../src/journal.ts';
 import type { Event } from '../src/domain.ts';
 
-/**
- * `observe` shells out, so these tests drive the predicate through a stub of that call. A tiny
- * fake `claude` on PATH is the honest way to exercise the real code path.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
@@ -107,7 +109,6 @@ test("working + idle is reported quiet only after the window, not before — and
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     let t = 0;
-    // The window is measured from the transcript's last write, so that is where the clock starts.
     const ops = claudeOps({ now: () => t, transcriptTime: async () => 0 });
 
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'it just spoke');
@@ -127,8 +128,6 @@ test("working + idle is reported quiet only after the window, not before — and
 });
 
 test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, not finished', async () => {
-  // This is the case the window exists for: `working` also means "between steps of work it drives
-  // on its own". Calling that done would settle a task whose session is still going.
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     let t = 0;
@@ -136,10 +135,14 @@ test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, 
     const ops = claudeOps({ now: () => t, transcriptTime: async () => written });
 
     t = QUIESCENT_AFTER_MS - 1_000;
-    written = t; // the session wrote something: it is alive
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
+    written = t;
+    assert.equal(
+      (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs,
+      undefined,
+      '`working` also means between steps of work it drives on its own: it wrote, so it is alive',
+    );
 
-    t += QUIESCENT_AFTER_MS - 1_000; // past the ORIGINAL deadline, not the new one
+    t += QUIESCENT_AFTER_MS - 1_000;
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'deadline moved with it');
 
     t += 1_000;
@@ -150,29 +153,28 @@ test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, 
 });
 
 test('a cold transcript is NOT silence while the session is busy', async () => {
-  // The risk the `busy` gate carries alone, now that the clock is the transcript's: a tool call
-  // that runs for minutes writes nothing at all. Measured on a live session — the transcript went
-  // 35 seconds untouched mid-step — so this is the guard, not a hypothetical.
   const restore = withFakeClaude(row('working', 'busy'));
   try {
     const ops = claudeOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => 0 });
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
+    assert.equal(
+      (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs,
+      undefined,
+      'a tool call that runs for minutes writes nothing at all: only `busy` tells it from silence',
+    );
   } finally {
     restore();
   }
 });
 
-// ─── busy, and held by something that is not the work ───────────────────────
-// A step signed off with StructuredOutput and left a `run_in_background` loop running. Its registration read
-// `status: shell`, the registry listed it busy, and seventy-seven minutes later nothing had read its closeout:
-// `busy` alone kept every other rule from firing (issue 24). Its own closeout as the last word in the
-// conversation, and the floor, are what tell that session from one in a long turn.
-
 const STARTED = 1_789_000_000_000;
 const busyRow = JSON.stringify([
   { name: 'ae/t-1/1', sessionId: 's-1', state: 'working', status: 'busy', kind: 'background', startedAt: STARTED },
 ]);
-/** A busy session observed `after` its start, whose transcript was last written `written` and holds `said`. */
+/**
+ * A busy session observed `after` its start, whose transcript was last written `written` and holds `said`. A session that signed
+ * off with StructuredOutput and left a background shell running is listed busy for as long as the shell runs; its own closeout as
+ * the last word in the conversation, and a transcript cold for the window, tell it from a session in a long turn.
+ */
 const heldSession = async (after: number, written: number, said: { payload: unknown; at: number; lastWord?: boolean } | undefined) => {
   const restore = withFakeClaude(busyRow);
   let asked = 0;
@@ -227,21 +229,20 @@ test('a busy session with no statement at all is left to the deadline, as it alw
 });
 
 test('a busy session carrying only the closeout of the session it continues is not quiet: it has said nothing of its own', async () => {
-  // `--resume` keeps the parent's whole conversation, its closing turn last, and a continuation's first turn
-  // can run past the floor without writing. Reading that as quiet would end an attempt that has just begun.
   const { seen } = await heldSession(10 * QUIESCENT_AFTER_MS, STARTED - 3_600_000, {
     payload: { outcome: 'done' },
     at: STARTED - 3_600_000,
     lastWord: true,
   });
-  assert.equal(seen?.quietMs, undefined);
+  assert.equal(
+    seen?.quietMs,
+    undefined,
+    "`--resume` keeps the parent's whole conversation, its closing turn last: a continuation's first turn that runs past the floor has just begun",
+  );
   assert.equal(seen?.closeout, undefined);
 });
 
 test('a busy session over a cold transcript is read ONCE, and again only once the transcript grows — not on every pass of a long tool call', async () => {
-  // The read this branch makes is a full read of a transcript that runs to tens of megabytes (measured: 174–282 ms
-  // on a 39.5 MB one, against 17–60 ms for the mtime that gates it), and a tool call that runs for minutes reaches
-  // it on every pass. It is safe to keep precisely because the branch is reached only while nothing has written.
   const restore = withFakeClaude(busyRow);
   try {
     let asked = 0;
@@ -260,7 +261,6 @@ test('a busy session over a cold transcript is read ONCE, and again only once th
     await Effect.runPromise(ops.observe);
     assert.equal(asked, 1, 'three passes over a transcript nothing has written: one read');
 
-    // It wrote again — a tool result — and went quiet for another window. What it says now may differ.
     written = t;
     t += QUIESCENT_AFTER_MS;
     await Effect.runPromise(ops.observe);
@@ -285,15 +285,16 @@ test('a busy session the registry gives no start is left alone: its conversation
 });
 
 test('the verdict does not depend on WHO is asking, or for how long', async () => {
-  // Two independent runners are what two `wf tick` processes are. An earlier version kept the
-  // clock in a closure, so a driver that ticked once per process could never reach a verdict:
-  // one long-lived process said `done` where three consecutive one-shot ones said `working`.
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     const at = (t: number) => claudeOps({ now: () => t, transcriptTime: async () => 0 });
     const first = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);
-    const second = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe); // a fresh runner, no history
-    assert.equal(first.get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS);
+    const second = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);
+    assert.equal(
+      first.get('ae/t-1/1')?.quietMs,
+      QUIESCENT_AFTER_MS,
+      'two runners are what two processes that each tick once are: neither keeps the clock between passes',
+    );
     assert.equal(second.get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS, 'a runner that has never seen this session agrees');
   } finally {
     restore();
@@ -326,8 +327,6 @@ test('blocked is never quiescent — a session waiting on a person is not finish
 });
 
 test('quiet is counted from the later of its last write and its own start: a session resumed over a cold transcript has just begun', async () => {
-  // `--resume` continues a transcript that may have been cold for an hour. Measured from the transcript alone, the
-  // continuation would be quiet the moment the registry listed it idle, and its attempt would end before it began.
   const started = 10 * QUIESCENT_AFTER_MS;
   const restore = withFakeClaude(
     JSON.stringify([{ name: 'ae/t-1/2', sessionId: 's-1', state: 'working', status: 'idle', kind: 'background', startedAt: started }]),
@@ -356,8 +355,6 @@ test('quiet is counted from the later of its last write and its own start: a ses
   }
 });
 
-// ─── the closing statement ──────────────────────────────────────────────────
-
 const entry = (o: object) => JSON.stringify(o);
 const structured = (timestamp: string, input: object) =>
   entry({
@@ -367,24 +364,33 @@ const structured = (timestamp: string, input: object) =>
   });
 
 test('the LAST StructuredOutput call is the statement, stamped with when it was made', () => {
-  // A resumed transcript holds the parent's calls too, so the time matters as much as the payload.
   const jsonl = [
-    entry({ type: 'system', tools: [{ name: 'StructuredOutput' }] }), // the definition names it too
+    entry({ type: 'system', tools: [{ name: 'StructuredOutput' }] }),
     structured('2026-09-12T08:00:00.000Z', { outcome: 'done', by: 'parent' }),
     entry({ type: 'user', timestamp: '2026-09-12T09:00:00.000Z', message: { content: 'carry on' } }),
     structured('2026-09-12T09:30:00.000Z', { outcome: 'blocked' }),
     '{half a line mentioning StructuredOutput',
   ].join('\n');
-  assert.deepEqual(lastStructuredOutput(jsonl), {
-    payload: { outcome: 'blocked' },
-    at: Date.parse('2026-09-12T09:30:00.000Z'),
-    lastWord: false,
-  });
-  assert.equal(lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })), undefined);
+  assert.deepEqual(
+    lastStructuredOutput(jsonl),
+    {
+      payload: { outcome: 'blocked' },
+      at: Date.parse('2026-09-12T09:30:00.000Z'),
+      lastWord: false,
+    },
+    "the last call, with its time: a resumed transcript holds the parent's calls too, and the tool's definition names it",
+  );
+  assert.equal(
+    lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })),
+    undefined,
+    'a name said is not a call',
+  );
 });
 
-// A closing turn as Claude Code writes it, measured on the transcript issue 24 was written from: the call, an
-// `attachment` line carrying the same payload, the call's result, and a `system` line with the turn's duration.
+/**
+ * A closing turn as Claude Code writes it: the StructuredOutput call, an `attachment` line carrying the same payload, the call's
+ * result, and a `system` line with the turn's duration.
+ */
 const closingTurn = (timestamp: string, id: string, input: object) => [
   entry({ type: 'assistant', timestamp, message: { content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }] } }),
   entry({ parentUuid: 'u1', attachment: { type: 'structured_output', data: input } }),
@@ -450,15 +456,17 @@ test('an idle session reports what it said; a busy one is not even asked', async
 });
 
 test('a blocked, idle session reports what it said too — and stays blocked, for the engine to judge', async () => {
-  // A session that gave its closeout and ended its turn has been seen `blocked`/idle. The engine
-  // ends that attempt only if the runner still hands it the statement.
   const said = { payload: { outcome: 'done' }, at: 5 };
   const restore = withFakeClaude(row('blocked', 'idle'));
   try {
     const seen = await Effect.runPromise(
       claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe,
     );
-    assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
+    assert.deepEqual(
+      seen.get('ae/t-1/1')?.closeout,
+      said,
+      'Claude Code lists a session that gave its closeout and ended its turn as blocked and idle: the engine ends that attempt only if it is handed the statement',
+    );
     assert.equal(seen.get('ae/t-1/1')?.state, 'input-required');
   } finally {
     restore();
@@ -487,13 +495,11 @@ test('a finished session is read once while its transcript is unchanged — agai
     restore();
   }
 
-  // `--resume` keeps the id: the same session under a new attempt's name is not the attempt that was read,
-  // however old its transcript.
   written = 0;
   restore = withFakeClaude(JSON.stringify([{ name: 'ae/t-2/1', sessionId: 's-1', state: 'done', status: 'idle', kind: 'background' }]));
   try {
     await Effect.runPromise(ops.observe);
-    assert.equal(asked, 3);
+    assert.equal(asked, 3, "`--resume` keeps the session's id: under a new attempt's name it is read again, however old its transcript");
   } finally {
     restore();
   }
@@ -517,8 +523,6 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
     process.env.PATH = prev;
   }
 });
-
-// ─── the fence and the effort ───────────────────────────────────────────────
 
 import type { SpawnRequest } from '../src/runner.ts';
 
@@ -549,8 +553,6 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
 });
 
 test('a context window reaches Claude Code as --autocompact and its digits, where no variadic flag can take it and it takes nothing', async () => {
-  // Beside every flag that could swallow or be swallowed: `--tools` and `--disallowedTools` are variadic, `--remote-control`
-  // and `--worktree` take an optional value, and the prompt is last.
   const args = await argvOf({
     config: {
       contextTokens: 200000,
@@ -567,17 +569,23 @@ test('a context window reaches Claude Code as --autocompact and its digits, wher
   assert.ok(i > args.indexOf('--permission-mode'), 'after the flag that ends the variadic lists');
   assert.ok(i < args.indexOf('--worktree'), 'before the optional value that must never meet the prompt');
   assert.equal(args.at(-1), 'the prompt');
-  assert.equal(args.filter((a) => a === '--autocompact').length, 1);
+  assert.equal(
+    args.filter((a) => a === '--autocompact').length,
+    1,
+    'once, beside the variadic lists and the flags that take an optional value',
+  );
 });
 
 test('claude.remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {
-  // `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap: directly before the prompt it would take the
-  // prompt as the session's name, and the session would run with nothing to do. `--permission-mode` always follows it.
   const args = await argvOf({ config: { claude: { remoteControl: true }, tools: ['Read'], disallowedTools: ['SendMessage'] } });
   const i = args.indexOf('--remote-control');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], '--permission-mode', 'a flag, not a value, comes next');
-  assert.equal(args.filter((a) => a === '--remote-control').length, 1);
+  assert.equal(
+    args.filter((a) => a === '--remote-control').length,
+    1,
+    "`--remote-control [name]` takes an optional value: before the prompt it would take the prompt as the session's name",
+  );
   assert.equal(args[args.indexOf('--tools') + 1], 'Read', 'the variadic lists before it keep their values');
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage');
   assert.equal(args.at(-1), 'the prompt');
@@ -589,7 +597,6 @@ test('at shipped defaults, a background task filed with claude.remoteControl is 
   const registry = path.join(dir, 'registry.json');
   const runs = path.join(dir, 'runs.jsonl');
   fs.writeFileSync(registry, '[]');
-  // A registry, as `claude agents` keeps one: `--bg` adds a session, busy, so nothing reads a transcript.
   fs.writeFileSync(
     path.join(dir, 'claude'),
     `#!${process.execPath}
@@ -612,7 +619,6 @@ if (args[0] === '--bg') {
     const engine = createEngine({ root });
     await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } });
     await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
-    // Filed before 2026-09-25, when the bridge was a harness argument of its own: journalled as it was then, past today's door.
     const at = new Date().toISOString();
     await Effect.runPromise(
       Journal.filesOps(root).append('t-before-the-move', {
@@ -625,7 +631,6 @@ if (args[0] === '--bg') {
       } as unknown as Event),
     );
     await engine.tick();
-    // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
 
     const argvs = fs
       .readFileSync(runs, 'utf8')
@@ -645,20 +650,21 @@ if (args[0] === '--bg') {
 });
 
 test('a budget reaches Claude Code as --max-budget-usd, and the prompt still comes last', async () => {
-  // `file()` refuses a budget on this harness, which keeps none under `--bg`; a task that reaches the runner with one gets it.
   const args = await argvOf({ config: { tools: ['Read'], budgetUsd: 0.5 } });
-  assert.equal(args[args.indexOf('--max-budget-usd') + 1], '0.5');
+  assert.equal(
+    args[args.indexOf('--max-budget-usd') + 1],
+    '0.5',
+    '`file()` refuses a budget on this harness, which keeps none under `--bg`; a task that reaches the runner with one gets it',
+  );
   assert.equal(args.at(-1), 'the prompt');
 });
 
 test('tools reach Claude Code as --tools, and a flag ends the list before the prompt', async () => {
-  // `--tools <tools...>` is variadic. Directly before the prompt it would take the prompt as a tool
-  // name — the `--worktree` trap again — so it goes before `--permission-mode`, which always follows.
   const args = await argvOf({ config: { tools: ['Read', 'Grep', 'Glob'] } });
   const i = args.indexOf('--tools');
   assert.notEqual(i, -1);
   assert.equal(args[i + 1], 'Read,Grep,Glob');
-  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args[i + 2], '--permission-mode', '`--tools <tools...>` is variadic: before the prompt it would take the prompt as a tool');
   assert.equal(args.at(-1), 'the prompt');
 });
 
@@ -668,14 +674,13 @@ test('an empty tool list reaches Claude Code as no tools at all, not as every to
 });
 
 test('disallowedTools reach Claude Code as --disallowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
-  // Variadic, as `--tools` is: directly before the prompt it would take the prompt as a rule to deny.
   const args = await argvOf({
     config: { tools: ['Read', 'Bash'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'] },
   });
   const i = args.indexOf('--disallowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Bash(npm run build),Bash(npm run e2e),SendMessage', 'a space inside a rule stays inside it');
-  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args[i + 2], '--permission-mode', 'variadic: before the prompt it would take the prompt as a rule to deny');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Bash', 'beside the tool list, not in its place');
   assert.equal(args.at(-1), 'the prompt');
   assert.equal(
@@ -686,15 +691,13 @@ test('disallowedTools reach Claude Code as --disallowedTools, the rules in one a
 });
 
 test('allowedTools reach Claude Code as --allowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
-  // Variadic, as the two lists beside it are, and joined the same way — measured on Claude Code 2.1.278, where
-  // `--allowedTools "Write(**),Edit(**)"` allowed both.
   const args = await argvOf({
     config: { tools: ['Read', 'Write'], disallowedTools: ['SendMessage'], allowedTools: ['Write(**)', 'Bash(npm test)'] },
   });
   const i = args.indexOf('--allowedTools');
   assert.notEqual(i, -1, args.join(' '));
   assert.equal(args[i + 1], 'Write(**),Bash(npm test)', 'a space inside a rule stays inside it');
-  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args[i + 2], '--permission-mode', 'variadic: before the prompt it would take the prompt as a rule to allow');
   assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage', 'beside the deny list, not in its place');
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write');
   assert.equal(args.at(-1), 'the prompt');
@@ -710,8 +713,6 @@ test('effort reaches Claude Code as --effort', async () => {
   assert.equal(args[args.indexOf('--effort') + 1], 'high');
   assert.equal(args.at(-1), 'the prompt');
 });
-
-// ─── what a session consumed ────────────────────────────────────────────────
 
 const rowStarted = (state: string, status: string, startedAt?: number) =>
   JSON.stringify([
@@ -781,8 +782,6 @@ test('a busy session is not read for usage — nothing it has consumed is final'
     restore();
   }
 });
-
-// ─── a spawn that fails: did anything start? ────────────────────────────────
 
 test('claude that could not even be launched says nothing started; one that ran and failed does not', async () => {
   const caught = (cwd: string) =>

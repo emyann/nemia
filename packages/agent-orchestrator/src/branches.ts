@@ -5,7 +5,7 @@
  * what decides a check.
  *
  * Beneath the controllers, beside `store.ts` and `worktree.ts`, whose `git` helpers it reads through: it imports neither the engine nor
- * a controller, and `runner.ts` re-exports what it exported of this before. What asks the engine as well — `parentOf`, `decide` — is
+ * a controller, and `runner.ts` re-exports most of what it exports. What asks the engine as well — `parentOf`, `decide` — is
  * the controllers' (`views.ts`, `decide.ts`).
  */
 import { execCounted } from './tally.ts';
@@ -28,7 +28,8 @@ import { git, gitSays } from './worktree.ts';
  * A branch git no longer has — deleted after the merge — is asked by the tip the run's tick recorded
  * once the run had finished (`tipsSeen`): still git's answer, about the commit the branch named. Git
  * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
- * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
+ * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell. The tip is asked only when
+ * git cannot read the branch: git's no about a branch it has is final, whatever an older tip of it says.
  */
 export const isShipped = (run: GitRun, branch: string): Shipped => shippedBy(askGit, run, branch);
 
@@ -49,26 +50,14 @@ const askGit: Within = (repo, commit, base) => {
 };
 
 function shippedBy(within: Within, run: GitRun, branch: string): Shipped {
-  // On the base branch already: with commits past the run's base, or none. Git's no is the commit is not within the run's base; a name it
-  // cannot read is `unchanged`, decided by a person.
   const landed = (commit: string): Shipped => (within(run.repo, commit, run.baseRef) === 'no' ? true : 'unchanged');
   const onBase = within(run.repo, branch, run.branch);
   if (onBase === 'yes') return landed(branch);
-  // Git's no is final. A name git cannot read is asked by its tip instead — only then, since a branch that is still there and not on the base
-  // has not landed, whatever an older tip of it says.
   const tip = run.tips?.[branch];
   if (onBase === 'no' || !tip) return false;
   return within(run.repo, tip, run.branch) === 'yes' ? landed(tip) : false;
 }
 
-/**
- * Where each of a run's result branches stands against the base branch it was cut from, as git says it now (`BranchStanding`): on it
- * (`isShipped`, either yes), gone — git no longer has it, and no recorded tip puts it on the base — or ahead of it, by the commits the
- * base branch does not have.
- *
- * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
- * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
- */
 /** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
 export const standingsOf = (run: Run, git: BranchReader = oneByOne): BranchStanding[] =>
   isGitRun(run) ? branchStandings(run, resultBranches(run), git) : [];
@@ -79,6 +68,14 @@ export const shippedOf =
   (branch: string): Shipped =>
     isGitRun(run) ? git.shipped(run, branch) : false;
 
+/**
+ * Where each of a run's result branches stands against the base branch it was cut from, as git says it now (`BranchStanding`): on it
+ * (`isShipped`, either yes), gone — git no longer has it, and no recorded tip puts it on the base — or ahead of it, by the commits the
+ * base branch does not have.
+ *
+ * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
+ * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
+ */
 export function branchStandings(run: GitRun, branches: readonly string[], git: BranchReader = oneByOne): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
     if (git.shipped(run, branch) !== false) return { branch, where: 'on' };
@@ -89,13 +86,13 @@ export function branchStandings(run: GitRun, branches: readonly string[], git: B
 
 /**
  * What git says of result branches — `isShipped`, whether git has a branch, how far one is ahead of its base — for one command or one
- * request. `oneByOne` asks git a process for each question, as `isShipped` always has. `branchReader()` answers them from one
+ * request. `oneByOne` asks git a process for each question, as `isShipped` does. `branchReader()` answers them from one
  * `for-each-ref` of a repository's branches with each branch's distance from a base (`%(ahead-behind:<base>)`, git 2.41), made once for
- * each repository and base and kept for the reader's life, which is the command's: `wf ls` over 200 finished runs asked 406
- * `merge-base --is-ancestor` (measured 2026-09-25). `prime(runs)` lists every base those runs will ask about in one process per repository.
+ * each repository and base and kept for the reader's life, which is the command's, so a command over many runs asks git once per
+ * repository rather than once per branch. `prime(runs)` lists every base those runs will ask about in one process per repository.
  *
  * The same answers: a question the listing cannot answer — a branch it does not list, a commit that is no branch, a listing git refused
- * because a base is unreadable, or an older git — is asked one by one, as before. A reader is a cache of git's word for as long as the
+ * because a base is unreadable, or an older git — is asked one by one. A reader is a cache of git's word for as long as the
  * command runs, never kept past it: a person merging by hand changes the answer.
  */
 export type BranchReader = {
@@ -133,11 +130,14 @@ export const oneByOne: BranchReader = {
 /** A commit's full name, which a base is when it is a run's `baseRef`: never a branch, so a listing for it is made by `prime` alone. */
 const isCommitName = (name: string) => /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(name);
 
+/**
+ * The `BranchReader` that answers from one listing per repository and base, each question once. Git refuses the whole listing for one base it
+ * cannot read, so where it does, the commits a run was cut at that it can read are found in one more process (`rev-list --no-walk
+ * --ignore-missing`) and listed again without the rest — with every commit readable, the base it cannot read is a branch; a base branch
+ * the repository does not have is found by a listing of the branches alone, and the rest listed again; a base still not listed is asked
+ * one by one. A commit is within itself, so a branch still at the commit the run was cut at is within it without asking git.
+ */
 export function branchReader(): BranchReader {
-  /**
-   * For each repository: each branch's commit (`null` where git would not list them), each branch's distance ahead of each base listed
-   * (`null` for a base git would not list), and every question answered, by the commit and the base asked about.
-   */
   const repos = new Map<
     string,
     { heads?: Map<string, string> | null; ahead: Map<string, Map<string, number> | null>; asked: Map<string, ReturnType<Within>> }
@@ -167,12 +167,6 @@ export function branchReader(): BranchReader {
     return { heads, each };
   };
 
-  /**
-   * One `for-each-ref` of every branch, with its distance from each base not yet listed. Git refuses the whole listing for one base it cannot
-   * read — a commit a run was cut at that is gone from the repository — so where it does, the commits it can read are asked for in one more
-   * process (`rev-list --no-walk --ignore-missing`) and listed again without the rest; a base branch the repository does not have is found by
-   * a listing of the branches alone, and the rest listed again; a base still not listed is asked one by one.
-   */
   const list = (repo: string, bases: readonly string[]) => {
     const r = of(repo);
     let fresh = [...new Set(bases)].filter((b) => !r.ahead.has(b));
@@ -183,11 +177,9 @@ export function branchReader(): BranchReader {
       const readable = new Set((gitSays(repo, 'rev-list', '--no-walk', '--ignore-missing', ...commits) ?? '').split('\n'));
       for (const c of commits) if (!readable.has(c)) r.ahead.set(c, null);
       const without = fresh.filter((b) => !isCommitName(b) || readable.has(b));
-      // Every commit readable, the listing would be refused again: the base it cannot read is a branch.
       if (without.length < fresh.length) listed = listing(repo, (fresh = without));
     }
     if (!listed && fresh.length) {
-      // A base branch the repository does not have: the branches alone, and again with the bases among them.
       const bare = listing(repo, []);
       if (bare) {
         r.heads ??= bare.heads;
@@ -206,7 +198,6 @@ export function branchReader(): BranchReader {
     fresh.forEach((b, k) => r.ahead.set(b, listed.each[k]));
   };
 
-  /** The bases `prime` was handed for each repository, listed on the first question about it. */
   const primed = new Map<string, Set<string>>();
   const asking = (repo: string) => {
     const bases = primed.get(repo);
@@ -229,8 +220,7 @@ export function branchReader(): BranchReader {
         ? listed === 0
           ? 'yes'
           : 'no'
-        : // A commit is within itself: a branch still at the commit the run was cut at.
-          commit === base || r.heads?.get(commit) === base
+        : commit === base || r.heads?.get(commit) === base
           ? 'yes'
           : askGit(repo, commit, base);
     r.asked.set(key, said);
@@ -269,7 +259,8 @@ export function branchReader(): BranchReader {
 /**
  * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
  * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
- * edge by (`afterRefusal`), and where `parentOf` starts.
+ * edge by (`afterRefusal`), and where `parentOf` starts. A record whose steps cannot be read — no frozen workflow, and its folder gone —
+ * names no result branch.
  */
 export function parentRecord(id: string, git: BranchReader = oneByOne): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
@@ -283,7 +274,7 @@ export function parentRecord(id: string, git: BranchReader = oneByOne): Pick<Par
     branches = resultBranches(record);
   } catch {
     branches = [];
-  } // a pre-freeze record whose folder is gone names no steps
+  }
   const cut = isGitRun(record) ? record : undefined;
   const gone = cut ? branches.filter((b) => !git.has(cut.repo, b) && !git.shipped(cut, b)) : [];
   return { record, ...(gone.length ? { gone } : {}) };
@@ -393,6 +384,12 @@ export function sensitiveDiff(run: GitRun, t: Touched, globs: readonly string[])
   );
 }
 
+/**
+ * Where the run's work ended up, for a person who now has to go and look at it: the branches of its result steps that have one.
+ *
+ * A branch, not a directory: the worktree is scaffolding and gets removed, the branch is the result and stays in the repository. A
+ * terminal step's branch is named as soon as it has one, so it is useful while the run is still going, not only afterwards.
+ */
 export function resultBranches(run: Run): string[] {
   const steps = stepsOf(run);
   return resultSteps(steps)

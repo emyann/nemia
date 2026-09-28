@@ -4,22 +4,19 @@
  * A worktree holds tracked files only. Two things fill the rest in, both decided here from names and
  * applied by `worktree.ts`, which reads the disk this file never touches:
  *
- * - **`node_modules`, per worktree.** It used to be one link to the main checkout's whole tree, and
- *   npm workspaces are links whose real path is the main checkout — so a worktree's apps imported
- *   main's packages: a branch's api change was tested against main's agent-orchestrator, and once main
- *   moved under the branch its check failed on tests it never touched. `depsPlan` gives the worktree
- *   a `node_modules` of its own: a workspace package is a link to the worktree's own copy, and every
- *   other package is main's, hardlinked file by file into a directory of the worktree's. When the
- *   branch's lockfile asks for a tree main has not installed, main's would lie, and the runner runs
- *   `npm ci` instead (`lockfileParting`).
+ * - **`node_modules`, per worktree.** npm workspaces are links whose real path is the main checkout, so
+ *   one link to main's whole tree would have a worktree's apps import main's packages, and a branch's
+ *   change be tested against main's. `depsPlan` gives the worktree a `node_modules` of its own: a
+ *   workspace package is a link to the worktree's own copy, and every other package is main's,
+ *   hardlinked file by file into a directory of the worktree's. When the branch's lockfile asks for a
+ *   tree main has not installed, main's would lie, and the runner runs `npm ci` instead
+ *   (`lockfileParting`).
  *
  *   Hardlinked, not linked, because a link out of the worktree is a path out of the step's working
  *   directory: Claude Code allows a read through a symlink only when the link and its target both
- *   match, so a `dontAsk` job was denied `Read`, `Grep` and `ls` under `node_modules` with no prompt
- *   (recorded on the live runs of 2026-09-23). A hardlink is no path anywhere else: every file's path is
- *   inside the worktree. It copies no data either — measured 2026-09-23 on this repository's tree (WSL2,
- *   ext4, 729 MB, 3,134 directories, 37,154 files, 46 links): 0.5 to 0.8 s and 13 MB of directories per
- *   worktree, where `npm ci` takes a minute and 729 MB.
+ *   match, so a `dontAsk` job is denied `Read`, `Grep` and `ls` under a linked `node_modules` with no
+ *   prompt. A hardlink is no path anywhere else: every file's path is inside the worktree, and no data
+ *   is copied.
  * - **`.worktreeinclude`**, the gitignored paths a repository says a new worktree needs, the file
  *   Claude Code's `--worktree` reads. `worktreeInclude` parses it.
  */
@@ -47,23 +44,23 @@ export type DepsAction =
   | { kind: 'link'; path: string; target: string }
   | { kind: 'tree'; path: string; from: string };
 
-/** What a worktree's `node_modules` turned out to be. `worktree.ts`'s `provisionDeps` returns it. */
+/**
+ * What a worktree's `node_modules` turned out to be. `worktree.ts`'s `provisionDeps` returns it.
+ *
+ * - `hardlinked`: made from `depsPlan`, main's packages hardlinked; `made` is how many entries this call added, so 0 on a second call.
+ * - `linked`: made from `depsPlan` with main's packages linked, not hardlinked, where a hardlink to main's files cannot be made (another
+ *   filesystem); `why` is what the hardlink met. A fenced step's reads through those links leave its working directory, and are denied.
+ * - `own`: a tree npm installed here, because the lockfile asks for one main has not installed; `installed`: this call ran `npm ci`.
+ * - `failed`: it could not be made: `npm ci` exited non-zero or timed out, or a link could not be written.
+ * - `absent`: the main checkout has no `node_modules`, and the lockfiles agree: nothing to provision.
+ * - `shared`: `node_modules` is one link to a whole tree: left as it is.
+ */
 export type Provisioned =
-  /** Made from `depsPlan`, main's packages hardlinked: `made` is how many entries this call added, so 0 on a second call. */
   | { tree: 'hardlinked'; made: number }
-  /**
-   * Made from `depsPlan` with main's packages linked, not hardlinked — every worktree before 2026-09-23, and one whose store is where
-   * a hardlink to main's files cannot be made (another filesystem): `why` is what the hardlink met. A fenced step's reads through those
-   * links leave its working directory, and are denied.
-   */
   | { tree: 'linked'; made: number; why?: string }
-  /** A tree npm installed here, because the lockfile asks for one main has not installed. `installed`: this call ran `npm ci`. */
   | { tree: 'own'; installed: boolean }
-  /** It could not be made: `npm ci` exited non-zero or timed out, or a link could not be written. */
   | { tree: 'failed'; error: string }
-  /** The main checkout has no `node_modules`, and the lockfiles agree: nothing to provision. */
   | { tree: 'absent' }
-  /** `node_modules` is one link to a whole tree, as worktrees were cut before this: left as it is. */
   | { tree: 'shared' };
 
 /** `p` relative to `root` when it lies strictly inside it, else null. */
@@ -160,13 +157,12 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * the runner — not main's `package-lock.json`, and not npm's record of the tree either. The links point at
  * what is on disk, a lockfile can be ahead of it (merged in, with no install since), and
  * `npm install --package-lock-only` rewrites `node_modules/.package-lock.json` to name packages it did
- * not install (npm 11.19, measured).
+ * not install.
  *
  * A package parts when main does not have it, when one side is a link and the other is not, when a link
  * leads elsewhere, or when the versions differ. So does one nested in a workspace's own `node_modules`,
  * which links to main's root tree cannot give. An optional package main does not have is not a
- * difference: it is a platform build this machine did not take, as all 84 of this repository's were at
- * 2026-09-13. A package main has and the lockfile does not name is not looked for. A lockfile that did
+ * difference: it is a platform build this machine did not take. A package main has and the lockfile does not name is not looked for. A lockfile that did
  * not parse parts at `package-lock.json`.
  *
  * `inPlace` is for a tree read where the lockfile is — the repository's checkout, against the merge staged in it

@@ -7,9 +7,9 @@ import type { Denial, Usage } from './domain.ts';
 import type { HarnessOutput } from './runner-detached.ts';
 
 /**
- * The item types a Codex `exec --json` stream was seen to carry (0.154.0, seventeen runs): two that
- * are tool calls and one that is said. Any other type cannot be counted either way, so a stream that
- * has one reports no count of tool calls rather than a guessed one.
+ * The item types a Codex `exec --json` stream carries: two that are tool calls and one that is said.
+ * Any other type cannot be counted either way, so a stream that has one reports no count of tool calls
+ * rather than a guessed one.
  */
 const CODEX_CALL_ITEMS: readonly string[] = ['command_execution', 'file_change'];
 const CODEX_SAID_ITEMS: readonly string[] = ['agent_message'];
@@ -19,11 +19,11 @@ const CODEX_SAID_ITEMS: readonly string[] = ['agent_message'];
  *
  * Tokens come from `turn.completed`, one per prompt run to completion, and only when every turn that
  * started completed with them: a session killed mid-turn has not reported its last one. Nothing is
- * added to `input_tokens` or `output_tokens`: in every run seen, `cached_input_tokens` was below the
- * first and `reasoning_output_tokens` below the second, so each is a part of its total, not beside it.
- * `cache_write_input_tokens` was 0 in every one, so whether `input_tokens` counts it is unknown, and a
- * stream where it is not 0 gives no input count. Tool calls are the call items, counted once by id.
- * No `turns` — it counts model responses, which the stream does not report — and no cost.
+ * added to `input_tokens` or `output_tokens`: `cached_input_tokens` is read as a part of the first and
+ * `reasoning_output_tokens` as a part of the second, not beside them. Whether `input_tokens` counts
+ * `cache_write_input_tokens` is not known, so a stream where it is not 0 gives no input count. A line
+ * that is not JSON is passed over. Tool calls are the call items, counted once by id. No `turns` — it
+ * counts model responses, which the stream does not report — and no cost.
  *
  * The input's classes follow from the same counts: `cached_input_tokens` read from the cache, the rest of `input_tokens`
  * uncached, and `cache_write_input_tokens` — 0, as the stream says — written. No peak: a `turn.completed` totals every
@@ -88,31 +88,32 @@ export const codexOutput = (output: string): HarnessOutput => {
  * The final answer is its `structured_output`, which Claude Code fills when it was given `--json-schema` and the session
  * answered in that shape. No result, a result without the field, or one whose field is `null`, is no answer.
  *
- * What the session cost is its `total_cost_usd`, and the time it waited on the API its `duration_api_ms` (2.1.272). The
- * cost of a `--resume` is not the process's own since 2.1.278: it carries its parent's total on (measured again on
- * 2.1.280: a parent's $0.0209649, and its resume's $0.0257381, the parent's and its own $0.0047732 to the digit — open
- * issue 4). Read here as printed; a spec that knows the parent takes it off (`resumeCostCarried`). The result counts no
- * tool time, and its turns are not read here: `num_turns` counts prompts' turns, not responses.
+ * What the session cost is its `total_cost_usd`, and the time it waited on the API its `duration_api_ms`. The cost of
+ * a `--resume` is not the process's own: it carries its parent's total on, to the digit. Read here as printed; a spec
+ * that knows the parent takes it off (`resumeCostCarried`). The result counts no tool time, and its turns are not read
+ * here: `num_turns` counts prompts' turns, not responses.
  *
  * Its tokens are its `usage`'s, in their classes — `input_tokens` uncached, `cache_creation_input_tokens` written,
- * `cache_read_input_tokens` read — and the process's own: on 2.1.278 a `--resume` printed a `usage` of 21,402 input
- * where its `modelUsage` carried its parent's 43,015 on (open issue 4). A `usage` whose input sums to 0 is not a count
- * — every response reads its prompt — and gives none: 2.1.272 printed one beside a `modelUsage` that counted thousands.
- * No peak: `usage.iterations` holds the last response alone, not the largest.
+ * `cache_read_input_tokens` read — and the process's own: a `--resume`'s `usage` counts its own input, where its
+ * `modelUsage` carries its parent's on. A `usage` whose input sums to 0 is not a count — every response reads its prompt
+ * — and gives none: Claude Code can print one beside a `modelUsage` that counts thousands. No peak: `usage.iterations`
+ * holds the last response alone, not the largest.
  *
- * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd` — measured on 2.1.272
- * at a $0.01 cap: exit 1, `is_error`, `terminal_reason: budget_exhausted`, "Reached maximum budget ($0.01)", and a
- * `total_cost_usd` of $0.018, since the cap is checked after the response that crosses it.
+ * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd`, and exits 1 with
+ * `is_error`, `terminal_reason: budget_exhausted` and "Reached maximum budget ($0.01)" for a $0.01 cap. Its
+ * `total_cost_usd` can pass the cap: the cap is checked after the response that crosses it.
  *
  * What it was denied is its `permission_denials`, one `{tool_name, tool_use_id, tool_input}` for each tool call Claude
- * Code refused without asking (2.1.280, in every permission mode: under `-p` nothing waits on a prompt, and the session
- * carries on past the refusal). Read as `denialOf` words it, one per call, in the order given.
+ * Code refused without asking — in every permission mode: under `-p` nothing waits on a prompt, and the session carries
+ * on past the refusal. A `--resume`'s result names only what the resume was denied, though its cost is its session's.
+ * Read as `denialOf` words it, one per call, in the order given.
  */
 export const claudeResultOutput = (output: string): HarnessOutput => readClaude(output, [], new Map());
 
 /**
  * `claudeResultOutput`, with the denials a stream named before its result (`claudeStreamOutput`) joined ahead of the
- * result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
+ * result's own. Everything else is the result's alone, and a stream with no result says only what it denied. A line that
+ * is not JSON is passed over, and the last `result` line is the one read.
  */
 const readClaude = (output: string, denied: readonly unknown[], inputs: ReadonlyMap<string, unknown>): HarnessOutput => {
   let result:
@@ -131,9 +132,7 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
     try {
       const parsed = JSON.parse(line) as typeof result;
       if (parsed?.type === 'result') result = parsed;
-    } catch {
-      /* not the result line */
-    }
+    } catch {}
   }
   if (!result) {
     const denials = deniedCalls(denied, inputs);
@@ -162,7 +161,6 @@ const readClaude = (output: string, denied: readonly unknown[], inputs: Readonly
         }
       : {};
   const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
-  // A resume's result names only what the resume was denied, though its cost is its session's (2.1.280, open issue 28, M7).
   const denials = deniedCalls([...denied, ...(Array.isArray(result.permission_denials) ? result.permission_denials : [])], inputs);
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
@@ -199,8 +197,8 @@ export const denialOf = (tool: string, input: unknown): Denial => {
 /**
  * Denied calls, each once by its `tool_use_id`, in the order first given: `{tool_name, tool_use_id, tool_input?}` as a
  * result's `permission_denials` and a `permission_denied` event write them. An entry with no input takes the one its
- * call was made with (`inputs`, by id), or else the one a later entry for the same call gives. One that names no tool is
- * not a denial anyone can read, and is skipped.
+ * call was made with (`inputs`, by id), or else the one a later entry for the same call gives: a call named again keeps
+ * the place of its first naming. One that names no tool is not a denial anyone can read, and is skipped.
  */
 const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, unknown>): Denial[] => {
   const seen = new Map<string, { denial: Denial; input: unknown }>();
@@ -210,7 +208,6 @@ const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, un
     if (typeof tool !== 'string' || !tool) continue;
     const key = typeof id === 'string' && id ? id : `(no id ${++unnamed})`;
     const input = given ?? inputs.get(key);
-    // Named again, its place stays the first; an input the first naming lacked is taken from the later one.
     const first = seen.get(key);
     if (!first || (first.input === undefined && input !== undefined))
       seen.set(key, { denial: denialOf(first?.denial.tool ?? tool, input), input });
@@ -223,9 +220,9 @@ const deniedCalls = (entries: readonly unknown[], inputs: ReadonlyMap<string, un
  * last of them its `result` — read by `claudeResultOutput`, as the one line of `--output-format json` is.
  *
  * What it was denied is read off the stream as well as the result, so a session killed before its result still says
- * it: each `{"type":"system","subtype":"permission_denied","tool_name","tool_use_id",…}` event (2.1.280), which names
- * no input — the input is the one the assistant's `tool_use` block of the same id was called with. Joined with the
- * result's `permission_denials`, one per call, in the order the stream first named each.
+ * it: each `{"type":"system","subtype":"permission_denied","tool_name","tool_use_id",…}` event, which names no input —
+ * the input is the one the assistant's `tool_use` block of the same id was called with. Joined with the result's
+ * `permission_denials`, one per call, in the order the stream first named each. A line that is not JSON is passed over.
  */
 export const claudeStreamOutput = (output: string): HarnessOutput => {
   const events: unknown[] = [];
@@ -234,9 +231,7 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
     try {
       const e = JSON.parse(line) as { type?: unknown; subtype?: unknown };
       if (e?.type === 'system' && e.subtype === 'permission_denied') events.push(e);
-    } catch {
-      /* not an event */
-    }
+    } catch {}
   }
   const wanted = new Set(
     events.map((e) => (e as { tool_use_id?: unknown }).tool_use_id).filter((id): id is string => typeof id === 'string'),
@@ -251,9 +246,7 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
         for (const block of e.message.content as Array<Record<string, unknown>>) {
           if (block?.type === 'tool_use' && typeof block.id === 'string' && wanted.has(block.id)) inputs.set(block.id, block.input);
         }
-      } catch {
-        /* not an event */
-      }
+      } catch {}
     }
   }
   return readClaude(output, events, inputs);

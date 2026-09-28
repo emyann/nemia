@@ -76,7 +76,10 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`, or the former key `permissionMode:` a codex file may still carry): null on Claude Code, and where a codex step names none. */
+  /**
+   * Codex's sandbox (`sandbox:`, or the former key `permissionMode:` a codex file may still carry): null on Claude Code, and where a codex
+   * step names none.
+   */
   sandbox: string | null;
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallowedTools:`): empty where the step denies nothing. */

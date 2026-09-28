@@ -81,7 +81,10 @@ const working = (taskId: string) => journal(taskId, [filed(), { kind: 'starting'
 /** One step, frozen on the record as `wf start` freezes it: its branch is the run's result. */
 const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
-/** Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `wf cancel` does, in a file of its own beside the record. */
+/**
+ * Writes run `id`'s record, one `implement` step frozen on it; `cancelledAt` marks it cancelled as `wf cancel` does, in a file of its own
+ * beside the record.
+ */
 function writeRun(id: string, fields: { after?: string[]; steps?: object; cancelledAt?: string } = {}): void {
   const { cancelledAt, ...rest } = fields;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });

@@ -1,5 +1,5 @@
 /**
- * Queued and admitted (stage 4c): a task filed `queued` starts only once the layer above says so, and the pass that
+ * Queued and admitted: a task filed `queued` starts only once the layer above says so, and the pass that
  * starts it is the one after the word. The runtime keeps the wait and the word; which task gets the word, and when, is
  * the orchestrator's (`agent-orchestrator/src/admission.ts`).
  *
@@ -25,8 +25,6 @@ const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event =>
 });
 const admitted = (ms = 1): Event => ({ kind: 'admitted', at: at(ms) });
 
-// ─── the pure layer ─────────────────────────────────────────────────────────
-
 test('a task filed queued waits for the word, and starts once it is given', () => {
   const queued = fold(TASK, [filed({ queued: true })]);
   assert.deepEqual(decide(queued, new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
@@ -36,9 +34,8 @@ test('a task filed queued waits for the word, and starts once it is given', () =
   assert.deepEqual(decide(let_, new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
   assert.equal(awaitsAdmission(let_), false);
   assert.equal(admissionOf(let_), 'admitted', 'a slot handed out, until the pass starts it');
-  // Started, it says nothing more of admission: its phase does.
   const started = fold(TASK, [filed({ queued: true }), admitted(), { kind: 'starting', at: at(2), attempt: 1 }]);
-  assert.equal(admissionOf(started), undefined);
+  assert.equal(admissionOf(started), undefined, 'started, it says nothing more of admission: its phase does');
 });
 
 test('a task filed with `queued: false` starts with no word, and says nothing of admission', () => {
@@ -47,7 +44,7 @@ test('a task filed with `queued: false` starts with no word, and says nothing of
   assert.equal(admissionOf(s), undefined);
 });
 
-test('a filing with no `queued` key — a journal from before stage 4c — reads as queued, so a restarted daemon starts nothing it has not admitted', () => {
+test('a filing with no `queued` key — a journal an older runtime wrote — reads as queued, so a restarted daemon starts nothing it has not admitted', () => {
   const s = fold(TASK, [filed()]);
   assert.equal(s.queued, undefined, 'folded as written');
   assert.deepEqual(decide(s, new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
@@ -86,15 +83,12 @@ test('a task held open waits for a word before each turn: the one given for its 
   const answered = fold(TASK, [...signed, { kind: 'input', at: at(5), text: 'again' }]);
   assert.deepEqual(decide(answered, new Map(), now(6)), { do: 'nothing', why: 'queued — waits to be admitted' });
   assert.equal(admissionOf(answered), 'queued');
-  // A word written before the answer is the first turn's, and stays so.
   const early = fold(TASK, [...signed.slice(0, 1), ...signed.slice(2), admitted(4), { kind: 'input', at: at(5), text: 'again' }]);
-  assert.equal(early.admitted, 0);
+  assert.equal(early.admitted, 0, "a word written before the answer is the first turn's, and stays so");
   assert.equal(decide(early, new Map(), now(6)).do, 'nothing');
   const let_ = fold(TASK, [...signed, { kind: 'input', at: at(5), text: 'again' }, admitted(6)]);
   assert.deepEqual(decide(let_, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'again' });
 });
-
-// ─── through the facade ─────────────────────────────────────────────────────
 
 const memoryJournal = (reads: { n: number } = { n: 0 }): PromiseJournal & { tasks: Map<string, Event[]> } => {
   const tasks = new Map<string, Event[]>();
@@ -184,8 +178,7 @@ test('a tick reports the view of every task it left unsettled, and none it settl
     r.views.map((v) => v.id),
     [waits],
   );
-  // The same view `view` gives of it, off the same record.
-  assert.deepEqual(r.views[0], await b.engine.view(waits));
+  assert.deepEqual(r.views[0], await b.engine.view(waits), 'the same view `view` gives of it, off the same record');
 });
 
 test('admit is idempotent, and writes nothing for a task that waits for no word', async () => {
@@ -259,8 +252,7 @@ test('a tick observes each harness once, whatever it reports, and admit observes
   assert.equal(b.sessions.size, 2);
 });
 
-/** A state is a plain fold: `admissionOf` reads nothing else. */
-test('admissionOf reads the record alone', () => {
+test('admissionOf reads the record alone: a state is a plain fold, and it reads nothing else', () => {
   const s: State = fold(TASK, [filed({ queued: true })]);
   assert.equal(admissionOf(structuredClone(s)), 'queued');
 });

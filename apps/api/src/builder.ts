@@ -7,12 +7,12 @@
  * the board shows it by them. The body's shape is the api's own to refuse (400), and what was written is answered read back from disk
  * (`listed`), never echoed from the request.
  *
- * A schema pasted for an `output:` is the one file `writeWorkflow` never writes, so it travels in the same PUT (`schemas`) and is judged with
- * the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder leaves
- * no schema behind under "nothing written".
+ * A schema pasted for an `output:` is the one file `writeWorkflow` never writes, so it travels in the same PUT (`schemas`) and is judged
+ * with the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder
+ * leaves no schema behind under "nothing written".
  *
- * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a step edited,
- * added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
+ * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a step
+ * edited, added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
  *
  * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes nothing
  * into a checkout. Every write passes the guard (guard.ts) before its body is read.

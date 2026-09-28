@@ -153,8 +153,9 @@ export type Dated = { harness: string; version: string; measuredAt: string; sour
 
 /**
  * `measurement`, refused unless it says what it was taken on and when: a harness named, a version numbered as Claude Code numbers its own
- * (`2.1.272`), a day that is on the calendar, written `YYYY-MM-DD` — not the 30th of February — and where it is recorded. A list without them reads as a claim about today, which
- * nothing here can check: the page says which day and which version, and those are all that hold it to what was measured.
+ * (`2.1.272`), a day that is on the calendar, written `YYYY-MM-DD` — not the 30th of February — and where it is recorded. A list without
+ * them reads as a claim about today, which nothing here can check: the page says which day and which version, and those are all that hold
+ * it to what was measured.
  */
 export function dated<T extends Dated>(name: string, measurement: T): T {
   const { harness, version, measuredAt, source } = measurement as Partial<Dated>;

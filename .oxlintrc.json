@@ -95,11 +95,10 @@
     },
     // The comment guards (lint/comments.ts, CLAUDE.md "Code reads by itself"), one block per package, the same rules in each. A block
     // whose `excludeFiles` names its own package is off: the card that cleans a package switches it on by deleting that one line, and
-    // edits nothing shared. packages/agent-orchestrator/test/comments.test.ts reads these blocks.
+    // edits nothing shared. The runtime's block also covers lint/**, the guards' own plugin. packages/agent-orchestrator/test/comments.test.ts
+    // reads these blocks.
     {
       "files": ["apps/api/**"],
-      // The test helper and its test are held byte for byte to the runtime's copy, which the runtime's cleanup card cleans in every package.
-      "excludeFiles": ["apps/api/test/scratch.ts", "apps/api/test/scratch.test.ts"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
@@ -140,8 +139,7 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/**"],
-      "excludeFiles": ["packages/agent-runtime/**"],
+      "files": ["packages/agent-runtime/**", "lint/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

@@ -22,10 +22,19 @@
  * The reason this is a file rather than a rule is that a rule gets re-broken every session and
  * an export list does not. If something on top needs `decide`, the answer is not to export it —
  * it is that the thing on top is trying to make a scheduling decision that belongs in here, or a
- * workflow decision that belongs out there.
+ * workflow decision that belongs out there. `decide` is the engine's judgement, and a consumer that
+ * wants to influence it is asking for a knob on the workload, which is a field on the task, not a
+ * callback.
+ *
+ * The list, in groups:
+ *
+ * - filing work, asking about it and stopping it (`engine.ts`);
+ * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
+ * - the harnesses: bring your own (`Runner`, and each runner the package ships);
+ * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
+ *   that checks a task before filing it holds its own copy to.
  */
 
-// ─── file work, ask about it, stop it ───────────────────────────────────────
 export {
   file,
   FileRefused,
@@ -46,11 +55,9 @@ export {
 } from './engine.ts';
 export type { Filing, RefusedMove, TaskView } from './engine.ts';
 
-// ─── the feed: how an upper layer reacts without polling a task ─────────────
 export { Journal, JournalError } from './journal.ts';
 export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './journal.ts';
 
-// ─── harnesses: bring your own ──────────────────────────────────────────────
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
 export type {
   ExpectedSession,
@@ -75,13 +82,7 @@ export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
-// ─── the vocabulary ─────────────────────────────────────────────────────────
 export type { Event, State, Attempt, SessionState, Ended, Outcome, Sighting, EndReason, Usage, Said, Denial, Input } from './domain.ts';
 export { denialText, fold, nameFor } from './domain.ts';
-// The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
-
-// NOT exported, on purpose: `decide`. It is the engine's judgement, and a consumer that wants to
-// influence it is asking for a knob on the workload (attempts, ceiling, harness) — which is a
-// field, not a callback.

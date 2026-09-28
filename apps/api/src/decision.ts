@@ -34,8 +34,8 @@ export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
 /**
  * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
  * — with the fact in the package's words (`branchWord`) and how much it changed, as `wf decide` prints beside the branch (`diffStat`, git's
- * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it does
- * not have, or one with nothing on it past the run's base.
+ * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it
+ * does not have, or one with nothing on it past the run's base.
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
@@ -199,10 +199,10 @@ const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --fres
 type AtGate = { step: string; back: string[] };
 
 /**
- * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each
- * step waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch —
- * which has nothing to merge, nor a branch to delete. A folder run has none of those: its work stays where it is until a person is done with
- * it, and forgetting it is the one command `wf decide` prints (cli.ts, `!git`), and nothing about git.
+ * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each step
+ * waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch — which
+ * has nothing to merge, nor a branch to delete. A folder run has none of those: its work stays where it is until a person is done with it,
+ * and forgetting it is the one command `wf decide` prints (cli.ts, `!git`), and nothing about git.
  *
  * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
  * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run

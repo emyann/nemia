@@ -73,10 +73,9 @@ test('a consumer can run the whole lifecycle in plain async/await', async () => 
   assert.equal((await engine.view(id)).phase, 'running (working)');
   assert.equal(sessions.size, 1);
 
-  // The harness finishes the work; the engine finds out by asking.
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
   await engine.tick();
-  assert.equal((await engine.view(id)).phase, 'succeeded');
+  assert.equal((await engine.view(id)).phase, 'succeeded', 'the harness finished the work, and the engine found out by asking');
 });
 
 test('the feed is enough to build a workflow on, with no Effect anywhere', async () => {
@@ -88,7 +87,6 @@ test('the feed is enough to build a workflow on, with no Effect anywhere', async
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
   await engine.tick();
 
-  // "When something succeeds, file the review." The whole upper-layer pattern, in six lines.
   let cursor = 0;
   const filed: string[] = [];
   const { entries, cursor: next } = await engine.feed(cursor);
@@ -127,14 +125,21 @@ test('the file-backed default needs no configuration at all', async () => {
   assert.ok(fs.existsSync(path.join(root, 'tasks', `${id}.jsonl`)), 'it wrote a journal');
   assert.ok(fs.existsSync(path.join(root, 'feed.jsonl')), 'and a feed');
 
-  // A second engine over the same root sees the same board — the state is on disk, not in memory.
   const reopened = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
-  assert.equal((await reopened.view(id)).state.brief, 'b');
+  assert.equal(
+    (await reopened.view(id)).state.brief,
+    'b',
+    'a second engine over the same root sees the same board: the state is on disk, not in memory',
+  );
 });
 
 /**
  * A harness whose every observation takes `ms`: one pass of `tick()` observes once, so this is a tick slower than
  * the timer. It counts the passes begun and the most ever in flight at once.
+ *
+ * With a pass three intervals long, the timer comes due before the pass's own wait does, and timers fire in the
+ * order they come due, however late: the timer fires during every pass, and only the guard in `start()` keeps a
+ * second pass out. Without that guard `most` reads 2.
  */
 const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
   const fast = fakeHarness(sessions);
@@ -156,7 +161,10 @@ const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
   return { harness, seen };
 };
 
-/** Resolves when `onTick` has been called `n` times, or rejects after `boundMs` of wall clock. */
+/**
+ * Resolves when `onTick` has been called `n` times, or rejects after `boundMs` of wall clock. A test waits for the
+ * tick it counts, as long as a starved machine needs, never for a length of time before counting.
+ */
 const ticksUntil = (n: number, boundMs: number) => {
   let ticks = 0;
   let reached!: () => void;
@@ -187,12 +195,6 @@ const ticksUntil = (n: number, boundMs: number) => {
 };
 
 test('start() ticks on a timer and never overlaps', async () => {
-  // Nothing here waits for a length of time and then counts: under load a fixed wait saw one tick where it expected
-  // two (2026-09-20). It waits for the third tick instead, as long as a starved machine needs.
-  //
-  // Each pass takes three intervals, and the timer comes due before the pass's own wait does — timers fire in the
-  // order they come due, however late — so the timer fires during every pass, and only the guard in `start()` keeps a
-  // second pass out. Delete the guard and `most` reads 2.
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
   const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' });
@@ -213,22 +215,18 @@ test('start() ticks on a timer and never overlaps', async () => {
     loop.stop();
   }
 
-  // `stop()` ran in the same turn as the third tick's report, before any timer could fire: no pass is under way.
   assert.equal(ticks.count(), 3, 'three ticks, and nobody called tick()');
   assert.equal(seen.most, 1, 'two ticks ran at once');
   assert.equal(seen.passes, 3, 'every pass that began, reported');
-  assert.equal(seen.inFlight, 0);
+  assert.equal(seen.inFlight, 0, "no pass under way: stop() ran in the same turn as the third tick's report, before any timer could fire");
 
-  // Any wait longer than the interval proves it: the interval, had it survived, comes due first and fires first.
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(seen.passes, 3, 'stop() means stopped: no pass began after it');
   assert.equal(ticks.count(), 3, 'and none was reported');
   assert.deepEqual(errors, []);
 });
 
-test('a tick under way when stop() is called finishes, and reports, and is the last', async () => {
-  // What the fixed-wait version of the test above could meet, and never pinned: `stop()` cannot take back a pass
-  // that has begun — its sessions are spawned, its events journalled — so the pass ends and says what it did.
+test('a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last', async () => {
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
   const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' });
@@ -243,12 +241,11 @@ test('a tick under way when stop() is called finishes, and reports, and is the l
       errors.push(e);
     },
   });
-  // The first pass begins on the first firing; stop while its observation is still waiting.
   const bound = Date.now() + 30_000;
   while (seen.inFlight === 0 && Date.now() < bound) await new Promise((r) => setTimeout(r, 1));
   loop.stop();
   assert.equal(seen.inFlight, 1, 'a pass was under way at stop()');
-  assert.equal(ticks.count(), 0);
+  assert.equal(ticks.count(), 0, 'and it has not reported yet');
 
   await ticks.wait(errors);
   await new Promise((r) => setTimeout(r, 100));
@@ -258,8 +255,6 @@ test('a tick under way when stop() is called finishes, and reports, and is the l
 });
 
 test('running is keyed by the harness the task resolved to: a task that names it and one that does not count together', async () => {
-  // An unresolved harness once counted as its own pool. The facade resolves the harness at filing,
-  // so three that name `fake` and three that name nothing are six under `fake`, none under "default".
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
   for (let i = 0; i < 3; i++) await engine.file({ brief: `e${i}`, cwd: '/r', id: `a-${i}`, harness: 'fake' });
@@ -267,10 +262,12 @@ test('running is keyed by the harness the task resolved to: a task that names it
 
   const report = await engine.tick();
   assert.equal(sessions.size, 6);
-  assert.deepEqual(report.running, { fake: 6 });
+  assert.deepEqual(
+    report.running,
+    { fake: 6 },
+    'the facade resolves the harness at filing: three that name `fake` and three that name nothing are six under `fake`, none under "default"',
+  );
 });
-
-// ─── watching ───────────────────────────────────────────────────────────────
 
 test('watch delivers every event, in order, once', async () => {
   const sessions = new Map<string, Sighting>();
@@ -294,8 +291,6 @@ test('watch delivers every event, in order, once', async () => {
   assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
   void id;
 });
-
-// ─── what no runtime wrote: one task's, or one line's, never the pass's ───
 
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
 const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
@@ -402,7 +397,6 @@ test('the file store pushes: a watcher hears about a write it did not poll for',
   const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
 
   const seen: string[] = [];
-  // A deliberately useless timer: anything that arrives quickly came from the push, not the poll.
   const w = engine.watch({
     onEntry: (e) => {
       seen.push(e.event.kind);
@@ -418,16 +412,13 @@ test('the file store pushes: a watcher hears about a write it did not poll for',
   assert.deepEqual(seen, ['filed'], 'delivered without waiting for the interval');
 });
 
-/**
- * The one property a test running INSIDE the test runner cannot check.
- *
- * `start()` and `watch()` both used to `unref()` their interval, so neither held the event loop
- * open. Every in-process test passed — the runner was keeping the process alive — while `ae up`
- * printed its banner and exited, doing nothing at all. The only way to see it is from outside,
- * so this spawns a real child and asks whether it is still there.
- */
 import { spawn } from 'node:child_process';
 
+/**
+ * Whether a child process that runs `body` against an engine is still there after 1.2 seconds. `start()` and `watch()`
+ * must hold the event loop open, and a test inside the test runner cannot see whether they do: the runner keeps its
+ * own process alive. So this spawns a real child and asks from outside.
+ */
 const survives = (body: string) =>
   new Promise<boolean>((resolve) => {
     const root = scratch('ae-alive-');
@@ -460,8 +451,6 @@ test('start() keeps its host process alive — a loop that lets you exit is not 
 });
 
 test('watch() keeps its host process alive, even with a store that cannot push', async () => {
-  // The file store's fs.watch holds the loop open by accident, which is how this hid. A store
-  // with no `subscribe` — the kind a consumer brings — has only the interval.
   assert.equal(
     await survives(`
     const store = {
@@ -471,10 +460,9 @@ test('watch() keeps its host process alive, even with a store that cannot push',
     createEngine({ journal: store }).watch({ onEntry: () => {} });
   `),
     true,
+    "a store with no `subscribe`, the kind a consumer brings, has only the interval to hold the loop open: the file store's fs.watch holds it by itself",
   );
 });
-
-// ─── the door refuses what the loop cannot run ──────────────────────────────
 
 import { claudeDetached, codex, type Engine, type HarnessSpec, type HarnessArgs, type TaskSpec } from '../src/facade.ts';
 
@@ -492,7 +480,7 @@ const refused = (engine: Engine, spec: TaskSpec, says: RegExp) =>
     return true;
   });
 
-test('file() refuses a harness the engine does not have — it used to run on the fallback', async () => {
+test('file() refuses a harness the engine does not have, rather than run the task on the fallback', async () => {
   const { journal, engine } = shipped();
   await refused(
     engine,
@@ -502,7 +490,7 @@ test('file() refuses a harness the engine does not have — it used to run on th
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 });
 
-test('file() refuses seconds the loop cannot use — NaN was journalled as null', async () => {
+test('file() refuses seconds the loop cannot use — NaN among them, which JSON writes as null', async () => {
   const { journal, engine } = shipped();
   for (const deadlineSeconds of [Number.NaN, 0, -5, Infinity]) {
     await refused(engine, { brief: 'b', cwd: '/r', deadlineSeconds }, /is not a number of seconds/);
@@ -510,9 +498,8 @@ test('file() refuses seconds the loop cannot use — NaN was journalled as null'
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 });
 
-test('file() refuses the retired maxAttempts and resume, at what were their defaults, and says what to do instead', async () => {
+test('file() refuses the retired maxAttempts and resume, at what were their defaults, from an untyped caller — the type names neither key — and says what to do instead', async () => {
   const { journal, engine } = shipped();
-  // An untyped caller, or one written before stage 4a part 2: the type no longer names either key.
   await refused(
     engine,
     { brief: 'b', cwd: '/r', maxAttempts: 1 } as TaskSpec,
@@ -545,10 +532,9 @@ test("file() refuses a permission mode outside its harness's own words", async (
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  // The words each harness does have are filed.
   await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { permissionMode: 'read-only' } });
   await engine.file({ brief: 'b', cwd: '/r', config: { permissionMode: 'default' } });
-  assert.equal((await journal.list()).length, 2);
+  assert.equal((await journal.list()).length, 2, 'the words each harness does have are filed');
 });
 
 test('file() refuses an empty brief, cwd, model or resumeFrom', async () => {
@@ -559,9 +545,7 @@ test('file() refuses an empty brief, cwd, model or resumeFrom', async () => {
   await refused(engine, { brief: 'b', cwd: '/r', resumeFrom: '' }, /`resumeFrom` is empty/);
 });
 
-test('file() refuses a cwd that is not absolute, naming it resolved — on every harness, so no detached worker is launched into repo/repo', async () => {
-  // The process that ticks resolves a relative cwd, and it need not be the one that filed it. A
-  // detached worker resolved it twice, from inside itself: `cwd: 'repo'` failed with `spawn sh ENOENT`.
+test('file() refuses a cwd that is not absolute, naming it resolved — the process that ticks would resolve it, and need not be the one that filed it — on every harness, so no detached worker is launched into repo/repo', async () => {
   const { journal, engine } = shipped();
   for (const harness of ['claude', 'codex', 'claude-detached']) {
     await refused(
@@ -596,7 +580,7 @@ test('file() refuses an effort its harness does not have — Claude Code would h
 
   await engine.file({ brief: 'b', cwd: '/r', config: { effort: 'xhigh' } });
   await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { effort: 'minimal' } });
-  assert.equal((await journal.list()).length, 2);
+  assert.equal((await journal.list()).length, 2, 'the efforts each harness does have are filed');
 });
 
 test('file() refuses a tool list that is not a list of names, and journals one that is', async () => {
@@ -700,7 +684,6 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
     [{ web: { command: 'x', env: { PORT: 3000 } } }, /`mcp.web.env` is not a map of strings/],
     [{ web: { command: 'x', cwd: '/r' } }, /`mcp.web` has `cwd`, which a server with a `command` does not take/],
     [{ web: { command: 'x', type: 'http' } }, /`mcp.web` has a `command` and `type: "http"`/],
-    // Claude Code would load nothing from this, and say nothing.
     [{ web: { url: 'https://h/mcp' } }, /`mcp.web` has a `url` and no `type`.*Claude Code loads no server/],
     [{ web: { type: 'ws', url: 'https://h/mcp' } }, /`mcp.web` has a `url` and `type: "ws"`/],
     [{ web: { type: 'http', url: 7 } }, /`mcp.web.url` is not an address/],
@@ -708,7 +691,6 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
     [{ web: { type: 'http', url: 'https://h/mcp', headers: { Authorization: 1 } } }, /`mcp.web.headers` is not a map of strings/],
   ];
   for (const [mcp, says] of bad) await refused(engine, { brief: 'b', cwd: '/r', config: { mcp: mcp as HarnessArgs['mcp'] } }, says);
-  // Codex's own words: it connects to no SSE server. Claude Code does.
   const sse = { docs: { type: 'sse' as const, url: 'https://h/sse' } };
   await refused(
     engine,
@@ -736,7 +718,6 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
       /is not an amount of dollars\. Give dollars above 0/,
     );
   }
-  // Measured: a `claude --bg` session given a $0.01 cap spent $0.19. The default harness runs one when asked for a background session.
   await refused(
     engine,
     { brief: 'b', cwd: '/r', config: { budgetUsd: 5, background: true } },
@@ -749,17 +730,20 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  // A job keeps its cap: `claude -p` ends the session at it, on the default harness as on `claude-detached`.
   for (const harness of ['claude-detached', 'claude']) {
     const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { budgetUsd: 0.25 } });
     const [filed] = await journal.read(id);
     assert.deepEqual((filed as { config?: object }).config, { budgetUsd: 0.25 }, 'on the record, for the runner');
     assert.equal('budgetUsd' in filed, false, 'and nowhere else');
-    assert.equal((await engine.view(id)).state.config?.budgetUsd, 0.25);
+    assert.equal(
+      (await engine.view(id)).state.config?.budgetUsd,
+      0.25,
+      `a job keeps its cap on ${harness}: \`claude -p\` ends the session at it`,
+    );
   }
 });
 
-test('file() refuses `priority` at any value, on every harness, and journals nothing: the runtime chooses no order since stage 4c part 2', async () => {
+test('file() refuses `priority` at any value, on every harness, and journals nothing: the runtime chooses no order', async () => {
   const { journal, engine } = shipped();
   for (const harness of ['claude', 'codex', 'claude-detached', 'check']) {
     for (const priority of [2, -1, 0.5, 0, Number.NaN, 'high', null, undefined]) {
@@ -812,9 +796,9 @@ test('createEngine refuses a harness that names a `pool`, a spec or a Promise ru
       },
     );
   }
-  // Every shipped harness is taken as it is.
-  assert.doesNotThrow(() =>
-    createEngine({ journal: memoryJournal(), harnesses: { codex, bg: claudeDetached, fake: fakeHarness(sessions) } }),
+  assert.doesNotThrow(
+    () => createEngine({ journal: memoryJournal(), harnesses: { codex, bg: claudeDetached, fake: fakeHarness(sessions) } }),
+    'every shipped harness is taken as it is',
   );
 });
 
@@ -843,7 +827,6 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
   const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
   const journal = memoryJournal();
   const engine = createEngine({ journal, harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check } });
-  // claude-detached takes Claude Code's flags, and codex and a check none: each is told of the bridge, never of the bag.
   for (const harness of ['codex', 'claude-detached', 'check']) {
     await refused(
       engine,
@@ -853,7 +836,6 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
       ),
     );
   }
-  // A harness argument until 2026-09-25: at its old place, at any value and on any harness, told where it went.
   for (const config of [{ remoteControl: true }, { remoteControl: false }, { remoteControl: 'true' }]) {
     await refused(
       engine,
@@ -869,7 +851,6 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
   assert.deepEqual((filed as { config?: object }).config, { claude: { remoteControl: true } }, 'on the record, for the runner');
   assert.equal((await engine.view(id)).state.config?.claude?.remoteControl, true);
 
-  // Named by what the engine has: no harness brought as 'claude-bg', none to file on.
   const bare = createEngine({ journal: memoryJournal(), harnesses: { codex } });
   await refused(
     bare,
@@ -878,7 +859,7 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
   );
 });
 
-test('file() refuses background on every harness with no such mode, and remoteControl on a job — claude journals a background session, bridged or not', async () => {
+test('file() refuses background on every harness with no such mode, and remoteControl on a job, which a task at shipped defaults is unless it asks for a background session — claude journals a background session, bridged or not', async () => {
   const { journal, engine } = shipped();
   for (const harness of ['codex', 'claude-detached']) {
     await refused(
@@ -895,7 +876,6 @@ test('file() refuses background on every harness with no such mode, and remoteCo
     { brief: 'b', cwd: '/r', config: { background: true } },
     /the `claude` harness has no such mode: every session of it is one already\. Leave `background` off/,
   );
-  // A job runs `claude -p`, which opens no bridge: at shipped defaults, a task is one unless it asks for a background session.
   await refused(
     engine,
     { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } },
@@ -928,15 +908,15 @@ test('say() to a job at shipped defaults is refused only as any task is — here
       return true;
     });
   }
-  // A background session's are refused in that mode before anything is read.
   const bg = await engine.file({ brief: 'b', cwd: '/r', config: { background: true, permissionMode: 'bypassPermissions' } });
   await assert.rejects(
     engine.say(bg, 'hello'),
     (e: Error & { exitCode?: number }) => e.exitCode === 2 && /permissionMode: bypassPermissions`/.test(e.message),
+    "a background session's words are refused in that mode before anything is read",
   );
 });
 
-test('file() refuses a contextTokens that is not a whole number of tokens, one outside what Claude Code takes, and any on codex — and journals one both Claude harnesses take', async () => {
+test('file() refuses a contextTokens that is not a whole number of tokens, one outside what Claude Code takes — which it refuses as it parses its arguments, so a spawn would fail on every pass — and any on codex, and journals one both Claude harnesses take, both ends of the range included', async () => {
   const { journal, engine } = shipped();
   for (const contextTokens of [0, -200000, 150000.5, Number.NaN, Infinity, '200000' as unknown as number, '200k' as unknown as number]) {
     await refused(
@@ -945,7 +925,6 @@ test('file() refuses a contextTokens that is not a whole number of tokens, one o
       /`contextTokens: .*` is not a number of tokens\. Give a whole number of tokens, like 200000/,
     );
   }
-  // The CLI refuses these while it parses (2.1.278), so a spawn would fail on every pass: both ends are in, and nothing past them.
   for (const harness of ['claude', 'claude-detached']) {
     for (const contextTokens of [99_999, 1_000_001, 1_000]) {
       await refused(
@@ -1018,9 +997,7 @@ test('a harness brought as a runner is asked nothing of claude.remoteControl, an
   assert.deepEqual(asked, [true], 'its to honour');
 });
 
-test('a usage whose key has no value is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
-  // Found in review: `{ costUsd: undefined }` type-checks, the files journal drops the key as it writes, and the key was
-  // then missing from the record on every pass — a `measured` entry each tick, for as long as the session was listed.
+test('a usage whose key has no value, as `{ costUsd: undefined }` that the files journal writes without the key, is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
   const root = scratch('ae-measured-');
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });

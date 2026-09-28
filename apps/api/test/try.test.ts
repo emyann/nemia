@@ -1,13 +1,14 @@
 /**
- * An agent of yours tried on a short brief: the try's folder written in the store's `tries/`, and a run of it started with no repository — a
- * folder run, its one step naming the agent and fenced to its folder with a dollar to spend. The run is listed as a try, one at a time, and
- * the board removes it. Every refusal is made to refuse, and leaves no run behind: a repository agent, an empty brief, a try while one
+ * An agent of yours tried on a short brief: the try's folder written in the store's `tries/`, and a run of it started with no repository —
+ * a folder run, its one step naming the agent and fenced to its folder with a dollar to spend. The run is listed as a try, one at a time,
+ * and the board removes it. Every refusal is made to refuse, and leaves no run behind: a repository agent, an empty brief, a try while one
  * moves, a name a try's folder cannot take, a skill only the repository has, and the guard's.
  *
  * `WF_ROOT` points at a scratch directory before the api loads: agent-orchestrator locates its store when the module loads. Your agents are
  * `scribe`, with a result schema beside it; `borrower`, which gives a skill only the repository's .claude/skills has; `agents` and
- * `skills`, whose names a try's folder cannot take; and those a try's fence does not reach: `coder` on codex, `faraway`, a remote A2A agent,
- * and `bridged`, bridged to claude.ai. The repository's own agents are `critic` and `grader`, the second with a result schema beside it.
+ * `skills`, whose names a try's folder cannot take; and those a try's fence does not reach: `coder` on codex, `faraway`, a remote A2A
+ * agent, and `bridged`, bridged to claude.ai. The repository's own agents are `critic` and `grader`, the second with a result schema beside
+ * it.
  */
 import './harness.ts';
 import { test } from 'node:test';

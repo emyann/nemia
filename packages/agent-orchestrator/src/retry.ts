@@ -22,8 +22,7 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * The session a try continues, off the attempts of the task before it: the harness's own id for the last attempt's session — what
  * `--resume` takes. An attempt its harness never named — one whose spawn it refused (`unstartable`), one it lost, one that died before it
  * said its id — continues nothing of its own, but the session it was started to continue is still there, and where the work last stood:
- * the try continues that one rather than starting cold (agent-runtime's open issue 5, which the runtime answered on its next attempt until
- * stage 4a part 2 made it one attempt a start). For a later turn of a task held open, that is the session that signed the turn before,
+ * the try continues that one rather than starting cold. For a later turn of a task held open, that is the session that signed the turn before,
  * which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and left
  * no id. Pure; typed by what it reads, so this file imports no runtime.
  */
@@ -57,8 +56,7 @@ export type EarlierTry = {
 /**
  * A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
  * with it (`--message`): the answer to the `needs` of a step that signed off blocked, or anything else they have to say to the
- * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one, and on every ask file
- * written before there were messages.
+ * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one.
  */
 export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; at: string };
 
@@ -74,8 +72,8 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string; budg
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
  * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
- * step, and files it. `runsOn` beside it when the harness no longer says the session is blocked: asked for while it was, the session has
- * worked again since.
+ * step, and files it. `runsOn` beside it when the session, blocked when the try was asked for, is not blocked now: it has worked again
+ * since.
  */
 export type Retry = {
   step: string;

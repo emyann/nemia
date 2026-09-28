@@ -77,7 +77,8 @@ const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNo
 
 /**
  * The inbox as the package lists it, each entry with its body and when its file was written (`InboxEntry`). An entry dropped, or edited
- * into a card that does not read, since the listing read it is listed as the listing has it, with no body or time, and read again next time.
+ * into a card that does not read, since the listing read it is listed as the listing has it, with no body or time, and read again next
+ * time.
  */
 export function listInbox(): InboxEntry[] {
   return readInbox().map((entry) => {

@@ -8,9 +8,8 @@ import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { machineTempDir, scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('hkb-api-quota-');
 
@@ -48,7 +47,8 @@ const plan = (five = 38.4, week = 86) =>
 const heard = (response: unknown, at = NOW): Held => ({ asked: { kind: 'answer', response }, at });
 /**
  * A recorded answer's control_response, as `askUsage` hands it on: `plan`; `no-plan`, signed in with no subscription; `unsupported`, as
- * 2.1.278 refuses a subtype it does not have, a Claude Code without get_usage; `unanswered`, when Anthropic's usage service gave it nothing.
+ * 2.1.278 refuses a subtype it does not have, a Claude Code without get_usage; `unanswered`, when Anthropic's usage service gave it
+ * nothing.
  */
 const fixture = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered') => (JSON.parse(recorded(name)) as { response: unknown }).response;
 
@@ -393,8 +393,7 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
   assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
   assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
-  // oxlint-disable-next-line no-inline-comments, comments/no-code-comments -- scratch.test.ts lets a tmpdir line through only with this marker
-  assert.equal(ran.cwd, fs.realpathSync(os.tmpdir())); // not a root: where askUsage runs its claude
+  assert.equal(ran.cwd, fs.realpathSync(machineTempDir()), 'askUsage runs its claude in the temp directory');
   const started = fs
     .readFileSync(calls, 'utf8')
     .split('\n')

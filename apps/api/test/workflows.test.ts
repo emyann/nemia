@@ -646,7 +646,10 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
       [
         {
           name: 'implement',
-          /** Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role that builds. */
+          /**
+           * Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role
+           * that builds.
+           */
           spec: spec({
             agent: 'implementer',
             harness: 'claude',

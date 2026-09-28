@@ -1,14 +1,18 @@
 /**
- * A spend cap on the task, at shipped defaults — fake `claude`s on PATH that answer as Claude Code 2.1.272 does.
+ * A spend cap on the task, at shipped defaults — fake `claude`s on PATH that answer as Claude Code does.
  *
- * Measured first, by hand and by `test/live.test.ts` (`AE_LIVE=1`): `claude -p --max-budget-usd 0.01` ended a session
- * that crossed its cap with exit 1 and a result whose `subtype` is `error_max_budget_usd`; a `claude --bg` session given
- * the same flag read a file 42 times, spent $0.19 and ended `done`. So `claude-detached` hands a task's cap
- * (`config.budgetUsd`, one of the harness's arguments since stage 4b) to the harness on every attempt and records the end
- * it prints — `failed`, and the limit the harness says it stopped at, as a fact: the runtime judges no budget, and the
- * orchestrator says `budget exhausted` of it. `createEngine().file()` refuses a cap on a `claude --bg` session, which
- * would keep none. The `claude --bg` runner is still given the flag when a task reaches it with one — through the Effect
- * door, which refuses no harness's words (open issue 6).
+ * `claude -p --max-budget-usd` ends a session that crosses its cap with exit 1 and a result whose `subtype` is
+ * `error_max_budget_usd` (`test/live.test.ts` runs it with `AE_LIVE=1`); a `claude --bg` session given the same flag keeps
+ * no cap, runs on past it, and ends `done`. So `claude-detached` hands a task's cap (`config.budgetUsd`, one of the
+ * harness's arguments) to the harness on every attempt and records the end it prints — `failed`, and the limit the harness
+ * says it stopped at, as a fact: the runtime judges no budget, and the orchestrator says `budget exhausted` of it.
+ * `createEngine().file()` refuses a cap on a `claude --bg` session, which would keep none. The `claude --bg` runner is
+ * still given the flag when a task reaches it with one — through the Effect door, which refuses no harness's words — and a
+ * later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
+ *
+ * The `claude -p` fake prints the result `claude -p --output-format json` prints for a session that crosses its cap, keys
+ * trimmed. The `claude --bg` fake keeps a registry as `claude agents` does: `--bg` adds a session, busy, so nothing reads a
+ * transcript, and `rm` removes it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,7 +50,6 @@ const valueOf = (args: string[], flag: string) => (args.includes(flag) ? args[ar
 test('claude-detached at shipped defaults: a session that stops at its cap ends its attempt failed, at the limit `budget` its harness named, with what it cost — and its task settles failed, with no attempt 2 and no word of a budget of its own', async () => {
   const bin = tmp('bin');
   const runs = path.join(bin, 'runs.jsonl');
-  // What `claude -p --output-format json` printed when a session crossed its `--max-budget-usd` (2.1.272, keys trimmed).
   const result = {
     type: 'result',
     subtype: 'error_max_budget_usd',
@@ -106,7 +109,6 @@ test('claude --bg is given --max-budget-usd on the attempt of a task that reache
   const registry = path.join(bin, 'registry.json');
   const runs = path.join(bin, 'runs.jsonl');
   fs.writeFileSync(registry, '[]');
-  // A registry, as `claude agents` keeps one: `--bg` adds a session, busy, so nothing reads a transcript; `rm` removes it.
   fs.writeFileSync(
     path.join(bin, 'claude'),
     `#!${process.execPath}
@@ -138,7 +140,6 @@ if (args[0] === '--bg') {
     await run(file({ brief: 'the prompt', cwd: tmp('cwd'), config: { budgetUsd: 0.5 } }));
     await run(tick());
 
-    // One attempt per start: a later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
     const argvs = runsIn(runs);
     assert.equal(argvs.length, 1, 'the attempt');
     for (const args of argvs) {

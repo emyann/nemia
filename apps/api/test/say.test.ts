@@ -4,8 +4,9 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH,
  * listing the sessions this file says are running, each with a pid, so the registry of the sessions on this machine is never asked; and a
- * real Unix socket standing in for a session's inbox, registered where Claude Code registers one (`<CLAUDE_CONFIG_DIR>/sessions/<pid>.json`).
- * So words the api takes are on that socket, as given, and on the task's journal; words it refuses are on neither.
+ * real Unix socket standing in for a session's inbox, registered where Claude Code registers one
+ * (`<CLAUDE_CONFIG_DIR>/sessions/<pid>.json`). So words the api takes are on that socket, as given, and on the task's journal; words it
+ * refuses are on neither.
  *
  * The tasks it seeds: `t-implement`, at work, its inbox listening; `t-deaf`, at work, its registration naming an inbox that is not there;
  * `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work with its inbox listening: only the run's mark

@@ -5,7 +5,7 @@
  * plain values and Promises, so a consumer needs to know three functions and no library: `file`
  * what you want done, `tick` to move it along, `feed` to react to what happened.
  *
- * The Effect API is still there for anyone who wants `Layer` composition and typed error channels
+ * The Effect API is there for anyone who wants `Layer` composition and typed error channels
  * — `import { ... } from 'agent-runtime/effect'`. Keeping it behind a subpath is deliberate: two
  * copies of Effect in one dependency tree break service resolution, and a consumer who never
  * imports Effect can never have two.
@@ -61,19 +61,16 @@ import {
   type TaskView,
 } from './engine.ts';
 
-// ─── what a consumer implements, if anything ────────────────────────────────
-
 /**
  * A store, in Promises. Implement this to keep the engine's records in your own database. Every `append` goes on the `feed`
- * too: a running engine reads a settled task's record again only once the feed names it (`Engine.tick`).
+ * too: a running engine reads a settled task's record again only once the feed names it (`Engine.tick`). A store answers `feed`
+ * and has no `watch`: `Engine.watch` is built on `feed`.
  */
 export type PromiseJournal = {
   append(taskId: string, event: Event): Promise<void>;
   read(taskId: string): Promise<Event[]>;
   list(): Promise<string[]>;
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
-  // No `watch` here: a store only has to answer `feed`. `Engine.watch` is built on it, and a
-  // required `watch` on the store was a method nothing ever called.
 };
 
 /**
@@ -87,10 +84,15 @@ export type PromiseJournal = {
  *   a `PromiseRunner` anything else at all
  *
  * None is counted under a ceiling: the runtime starts what it is given, and a layer above that pools its harnesses under
- * one rate limit files them `queued` and `admit`s them (stage 4c). A spec or a runner that still names a `pool` is refused.
+ * one rate limit files them `queued` and `admit`s them. A harness brought as an object that names a `pool` is refused
+ * (`createEngine`).
  */
 export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | RemoteAgent | PromiseRunner;
 
+/**
+ * What `createEngine` builds an engine from. It takes no `maxConcurrent`: given, at any value, it is refused, since the runtime keeps
+ * no ceiling and starts every task it is given; how many run at once is the layer above's, which files `queued` and `admit`s.
+ */
 export type EngineOptions = {
   /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
   root?: string;
@@ -111,12 +113,12 @@ export type EngineOptions = {
    * set, say. Absent, the refusal says to give `createEngine` a `credentials` that answers for the scheme.
    */
   missingCredential?: MissingCredential;
-  /*
-   * `maxConcurrent`, the sessions that could be at work at once in each pool, is retired (stage 4c part 2, 2026-09-25):
-   * given, `createEngine` refuses it. How many run at once is the layer above's, which files `queued` and `admit`s.
-   */
 };
 
+/**
+ * A task to file (`Engine.file`). It takes no `priority`: a task that carries one, at any value, is refused, since the runtime keeps
+ * no slots to give first; which task starts first is the layer above's, when it `admit`s.
+ */
 export type TaskSpec = {
   brief: string;
   cwd: string;
@@ -141,22 +143,18 @@ export type TaskSpec = {
    * engine: its shape is yours.
    */
   closeoutSchema?: object;
-  /*
-   * `priority`, which waiting task a free slot went to first, is retired with the runtime's ceiling (stage 4c part 2): a
-   * task that carries it, at any value, is refused. Which task starts first is the layer above's, when it `admit`s.
-   */
   /**
-   * Hold the task open when an attempt signs, rather than settle it (R1): the task waits, phase `input-required` — A2A's
+   * Hold the task open when an attempt signs, rather than settle it: the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
    * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
    * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
    */
   holdOpen?: true;
   /**
-   * Wait for the word to start (stage 4c): the task is filed and a pass starts nothing of it until `admit` names it — then
+   * Wait for the word to start: the task is filed and a pass starts nothing of it until `admit` names it — then
    * the next pass starts it. A task held open waits for the word again before each later
    * turn. For a layer above that decides itself what runs when; `view` says `admission: 'queued'` while it waits, and its
-   * phase stays `pending`. Absent, or `false`, starts it on the next pass as ever. Refused unless true or false.
+   * phase stays `pending`. Absent, or `false`, starts it on the next pass. Refused unless true or false.
    */
   queued?: boolean;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
@@ -167,10 +165,10 @@ export type TaskSpec = {
  * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its
  * last attempt open, and `working` or not yet listed; a `blocked` one is not — and the
  * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
- * layer above that decides what to `admit` reads the board without asking any harness again (stage 4c) — and what the pass
+ * layer above that decides what to `admit` reads the board without asking any harness again — and what the pass
  * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
  *
- * `refused` is every move the task's lifecycle had no edge for in this pass (stage 5), off the same steps: the task, the state
+ * `refused` is every move the task's lifecycle had no edge for in this pass, off the same steps: the task, the state
  * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
  * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy board, and a settled
  * task is never on it.
@@ -209,28 +207,30 @@ export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
 
 export type Engine = {
   /**
-   * File work. Returns the task id. Nothing runs until a tick.
+   * File work. Returns the task id. Nothing runs until a tick. A task that names no harness is filed on the default one
+   * (`defaultHarness`, else the first configured), named on its record and its view, so a layer above that pools by harness
+   * counts it with an identical task that named it.
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
    * a `cwd` that is not absolute; a `priority`, whatever its value, which is retired: the runtime chooses no order. And in its `config`: a key that is no harness
-   * argument, or one filed beside `config` instead — `budgetUsd` among them, the spend cap the runtime kept as its own
-   * until stage 4b; a `budgetUsd` that is not dollars above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
+   * argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
    * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
    * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
    * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
    * on a harness with no context window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's
-   * flag in `config.claude` since 2026-09-25, and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
+   * flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
    * a task whose `background` is not true); a `background` that is not true or false, or `true` on any harness not
-   * brought as `'claude'`; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep.
-   * A harness brought as a `PromiseRunner` is asked nothing of its own.
+   * brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; and, on `'claude'`, a
+   * `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a `PromiseRunner` is asked
+   * nothing of its own.
    */
   file: (spec: TaskSpec) => Promise<string>;
   /**
    * One pass: start what may start — every task not queued, and each queued one `admit`ted — notice what ended, settle what
-   * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument, since the
-   * ceiling and the pools it once took are retired.
+   * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument — a ceiling
+   * or pools among them, which the runtime does not keep.
    *
    * An engine keeps, for as long as it lives, the settled tasks its passes have folded (`tick-memo.ts`): a pass reads the
    * feed on from where the last stopped, and reads the journal of a task only when it is not settled, the feed has named
@@ -239,7 +239,7 @@ export type Engine = {
    */
   tick: () => Promise<TickReport>;
   /**
-   * Let tasks filed `queued` start (stage 4c): journals an `admitted` entry for each whose current turn waits for one, and
+   * Let tasks filed `queued` start: journals an `admitted` entry for each whose current turn waits for one, and
    * returns their ids; the next tick starts them. Reads the tasks' records and asks no
    * harness. Idempotent: a task already admitted, not filed queued, or whose turn has started is left as it is, and not
    * returned. Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled for any of them — when one
@@ -247,13 +247,20 @@ export type Engine = {
    */
   admit: (taskIds: readonly string[]) => Promise<string[]>;
   /**
-   * One task. A settled task is read off its record, on every harness, and no registry is asked: its phase is its
-   * outcome, and its session's id is the harness's own where it can `find` one, found by name when the record lacks it,
-   * and otherwise the id its harness reported when the attempt ended. An attempt in flight is observed, as a pass
-   * observes: its phase is its session's state, and only a registry has that. A task not settled with no attempt in
-   * flight is read off its record on a harness that can `find`, and observed on one that cannot.
-   * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other.
-   * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
+   * One task, off one read of its journal. A settled task is read off its record, on every harness, and no registry is asked:
+   * its phase is its outcome, and a sighting would give it nothing else but its session's id — `waitingFor` is only a
+   * `needs-human` phase's, and `usage` only an attempt in flight's. Its session's id is the harness's own (`nativeId`) where it
+   * can `find` one, found by name when the record lacks it, and otherwise the handle its harness reported when the attempt
+   * ended: what the harness lists the session by and what its `logs` take (a detached runner's is the attempt's name, never
+   * `nativeId`: a check's `logs` are its verdict). An attempt in flight is observed, as a pass observes: its phase is its
+   * session's state, and only a registry has that. A task not settled with no attempt in flight is read off its record on a
+   * harness that can `find`, and observed on one that cannot.
+   *
+   * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other, since no
+   * other registry can name its session; a harness that can be told which sessions (`observeFor`) is told this task's own, so a
+   * view of a Claude Code job lists the jobs and asks no `claude agents`. A registry that cannot be read this time is nothing
+   * observed, as a pass reads it. A task on a harness this engine does not have is read off its record, and no harness is
+   * asked. `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view: (taskId: string) => Promise<TaskView>;
   /**
@@ -269,12 +276,18 @@ export type Engine = {
   list: (taskIds?: readonly string[]) => Promise<TaskList>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
   stop: (taskId: string) => Promise<void>;
+  /**
+   * What the task's session printed, asked of the task's own harness rather than of whichever listed the session this pass: a
+   * session its harness has released is in no observation, and its transcript is still there to read. `(no session yet)`
+   * before its harness names one.
+   */
   logs: (taskId: string) => Promise<string>;
   /**
-   * The conversation of the task's session — the one `logs` reads, asked of the task's own harness — as
-   * events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor the last
-   * read returned; nothing is pushed. No session yet is no events, and the cursor asked with — or one
-   * from the start.
+   * The conversation of the task's session — the one `logs` reads, asked of the task's own harness alone, since no other
+   * registry can name it — as events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor
+   * the last read returned; nothing is pushed. No session yet is no events, and the cursor asked with — or one from the
+   * start — so a moment the registry could not be read costs a caller a poll, not a read from the start. The cursor of the
+   * start is handed to no runner: the session is read from its start.
    *
    * An attempt that has ended is read by the session id the journal recorded, and no registry is asked.
    * One in flight is found by name when its harness can `find` it, and by observing its harness when it
@@ -296,22 +309,28 @@ export type Engine = {
    * journalled nothing. What the session makes of them is its own affair, and `decide` never reads them. Words
    * taken are not words read: a harness may still set them aside (Claude Code: its `crossSessionInbound`
    * setting, a rate limit, an identical repeat), and says nothing back when it does. A session its harness lists
-   * `blocked` is told too, and reads the words only if it moves again: one waiting on a permission prompt nobody
-   * answers keeps them queued, and a stopped or continued one has lost them (open issue 16).
+   * `blocked` is told too, as a working one is, and reads the words only if it moves again: one waiting on a permission
+   * prompt nobody answers keeps them queued, and a stopped or continued one has lost them. `claude agents` does not say
+   * which wait a session is in, so neither is refused. A quiet session is `working` too: its runner reports how long it
+   * has been quiet, not an end, and an idle session's inbox starts a turn.
    *
-   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing sent or journalled — for an empty
-   * `text`; a task this engine has no record of; a harness with no channel into a running session (a
-   * `HarnessSpec`, in its own words, or a `PromiseRunner` without `say`); what the harness cannot carry (Claude
-   * Code's background session: a task in `bypassPermissions`, or words longer than its inbox reads); a task that
-   * has settled, or has been asked to stop; one with no attempt in flight; and one whose attempt its harness does
-   * not list running. A registry that cannot be read this time, or words the harness did not take, reject with the
-   * harness's error and no `exitCode`: ask again.
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing sent or journalled — in this order, what the
+   * record says before what the harness says, so a settled task's harness is not asked: an empty `text`; a task this
+   * engine has no record of; a harness with no channel into a running session (a `HarnessSpec`, in its own words, or a
+   * `PromiseRunner` without `say`); what the harness cannot carry (Claude Code's background session: a task in
+   * `bypassPermissions`, or words longer than its inbox reads), asked of a task whose config makes it one; a task that
+   * has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an attempt its harness
+   * does not list; what a background session cannot carry, asked again of a session on `claude` that is no job (one an older
+   * runtime started `--bg` without `background` in its config); a session its harness lists ended; and a task on a remote A2A agent whose
+   * Task is at work, since A2A lets its caller speak only once the Task asks for input. A registry that cannot be read
+   * this time — on `claude`, a session Claude Code has registered that its listing does not show — or words the
+   * harness did not take, reject with the harness's error and no `exitCode`: ask again.
    *
    * A Claude Code job (`claude -p`) is told on its stdin: the words go to an inbox its worker writes on as the
    * next user message, which the job takes into the turn it is working. Once it has given its result its input
    * is closed, and words said then are not taken — a rejection with no `exitCode`, since the job is still
    * `working` until it exits, and its record settles on the next tick. Words said in the half second before its
-   * result are taken and may never be read (open issue 29).
+   * result are taken and may never be read.
    */
   say: (taskId: string, text: string) => Promise<Said>;
   /**
@@ -349,6 +368,10 @@ export type Engine = {
    * that a store which cannot signal — or an OS that drops the event — costs latency rather than
    * correctness. Delivery is in order and at-least-once; the cursor never expires, so starting at
    * 0 replays the whole history first. An entry no runtime wrote is skipped, and said to `onError` as an `Error` naming it.
+   *
+   * One read of the feed runs at a time, so a push and a tick of the timer that arrive together never deliver an entry twice
+   * or out of order. The timer holds the process open until `stop()`, whatever the store: only the file store pushes
+   * (`subscribe`), and a store a consumer brings, which cannot, is watched all the same.
    */
   watch: (options: {
     onEntry: (entry: FeedEntry) => void | Promise<void>;
@@ -358,12 +381,15 @@ export type Engine = {
   }) => { stop: () => void };
   /** What this engine's reads, spawns and observes have cost so far (`EngineIo`): running totals, read by nothing in the engine. */
   io: () => EngineIo;
-  /** Tick on a timer until stopped. Ticks never overlap. */
+  /**
+   * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
+   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
+   * loop must: `stop()` gives the process back.
+   */
   start: (options?: { intervalMs?: number; onTick?: (r: TickReport) => void; onError?: (e: unknown) => void }) => { stop: () => void };
 };
 
-// ─── the adapters ───────────────────────────────────────────────────────────
-
+/** A store in Promises as the engine's `Journal`: each rejection a `JournalError`, on the task it was asked of, or `*`. */
 const journalOf = (j: PromiseJournal) =>
   Journal.layer({
     append: (taskId, event) =>
@@ -426,8 +452,9 @@ const runnersOf = (
 
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
- * options as handed in, untyped: a caller built against the options before stage 4c part 2 still sends the ceiling, and a
- * harness brought as an object may still name its pool. Each would be taken and dropped, a ceiling nobody keeps.
+ * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` at any value, and a harness brought as an object
+ * that names a `pool` — each, taken and dropped, a ceiling nobody keeps; a remote agent's entry `remoteConfigRefusal` refuses;
+ * and a `credentials` or `missingCredential` that is not a function.
  */
 const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   if (Object.hasOwn(options, 'maxConcurrent')) {
@@ -449,26 +476,35 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   return undefined;
 };
 
-// ─── what the door refuses ──────────────────────────────────────────────────
-
 /**
  * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, the
  * half every door refuses (`engine.ts`), whose type checks the ranges here rest on.
  *
- * Checked at the API, so the CLI is not the only door that checks: a permission mode the harness rejects failed the
- * spawn, which failed the whole tick. Which words a harness takes is asked of the harness; the engine never learns
- * them, and the Effect door, which has no harnesses to ask, refuses none of them (open issue 6).
+ * Checked at the API, not only at the CLI: a word the harness rejects would fail its spawn, and with it the whole tick. Which
+ * words a harness takes is asked of the harness; the engine never learns them, and the Effect door, which has no harnesses to
+ * ask, refuses none of them. Refuses, in this order:
+ *
+ * 1. a harness this engine does not have;
+ * 2. `background: true` on any harness but one brought as `'claude'`, the one mode of the engine's own Claude Code: dropped
+ *    without a word, a task that asked for a session a person can reach would run as whatever the harness runs;
+ * 3. a `contextTokens` on Claude Code or a `HarnessSpec` that has no window to set, or one outside the harness's range: a
+ *    window the harness has no knob for would be dropped without a word, and Claude Code refuses one outside its range while
+ *    it parses its arguments, at every spawn;
+ * 4. a `claude.remoteControl` on a `HarnessSpec`: only Claude Code's background sessions are bridged, and a spec's harness
+ *    runs a prompt and exits — `claude -p` among them, whose help offers Remote Control only to an interactive session;
+ * 5. a `claude` on a `HarnessSpec` without `claudeFlags`: its session would start without them, and a body meant for the
+ *    system prompt would be read by nobody;
+ * 6. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
+ *
+ * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl` and a `claude`, and asked
+ * nothing of its own.
  */
 const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
   }
   const h = harnesses[spec.harness];
-  // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
-  // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
   const { contextTokens, background } = spec.config ?? {};
-  // A mode of the engine's own Claude Code, and of no other harness: dropped without a word, a task that asked for a
-  // session a person can reach would run as whatever the harness runs.
   if (background && h !== 'claude') {
     const modal = Object.keys(harnesses)
       .filter((name) => harnesses[name] === 'claude')
@@ -490,16 +526,12 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
       return `\`contextTokens: ${contextTokens}\` is outside the windows the \`${spec.harness}\` harness takes, and it would refuse the session at every spawn. Give a whole number of tokens from ${range.least} to ${range.most}, or leave it out for the harness's own window.`;
     }
   }
-  // Only Claude Code's background sessions are bridged. A spec's harness runs a prompt and exits — `claude -p` among them,
-  // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
   if (bridgeAsked(spec) && isSpec(h)) {
     const bridged = Object.keys(harnesses)
       .filter((name) => isClaude(harnesses[name]))
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`claude.remoteControl\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`claude.remoteControl\` off.` : "Leave `claude.remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
-  // Claude Code's own flags, on a harness that is not Claude Code: its session would start without them, and a body meant for
-  // the system prompt would be read by nobody. A `PromiseRunner` is the consumer's own, and is handed them.
   if (spec.config?.claude !== undefined && isSpec(h) && !h.claudeFlags) {
     const takers = Object.keys(harnesses)
       .filter((name) => {
@@ -522,8 +554,23 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   )?.(spec);
 };
 
-// ─── the engine ─────────────────────────────────────────────────────────────
-
+/**
+ * An engine over `options`: the file-backed store under `root` (`~/.agent-engine` by default) or the `journal` given, and the
+ * `harnesses` given — by default `claude`, `codex` and `claude-detached`. The default harness, `defaultHarness` or else the
+ * first, takes a task that names none, and answers `logs`, `transcript` and `say` for a task whose harness this engine does not
+ * have, whose `view` asks no harness. Refused — throws an `Error` whose `exitCode` is 2 — for what `optionsRefusalOf` refuses.
+ *
+ * Built once, and shared by every call as services are shared inside one Effect program, each method an Effect provided and run:
+ *
+ * - the store, and for the file store its `subscribe`, which pushes to `watch`;
+ * - each harness behind its A2A agent, reached through the SDK's client in this process (`a2a-client.ts`): the agent holds
+ *   nothing, and answers a task it never started off the harness and this journal, so a restart loses no session. A remote
+ *   agent is A2A already, spoken to by the SDK's client over HTTP, and wrapped in no seam of ours;
+ * - every observe of a harness — a pass's, a view's, and an `observeFor`, an observe told what to look for — made through its
+ *   runner and counted on the way (`ObserveCount`, `io`), where `spawned` says whether it asked a registry;
+ * - one memo of the settled tasks its passes may skip (`tick-memo.ts`), which lives as long as this engine, so a new engine
+ *   folds every task on its first pass.
+ */
 export function createEngine(options: EngineOptions = {}): Engine {
   const refused = optionsRefusalOf(options);
   if (refused) throw Object.assign(new Error(`createEngine: ${refused}`), { exitCode: 2 });
@@ -535,15 +582,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
   };
   const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
 
-  // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
   const journalOps = options.journal ? undefined : Journal.filesOps(root);
   const journal = options.journal ? journalOf(options.journal) : Journal.layer(journalOps!);
-  // Each harness behind its A2A agent, reached through the SDK's client in this process (`a2a-client.ts`). Its agent
-  // holds nothing: it answers a task it never started off the harness and this journal, so a restart loses no session.
   const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
-  // Every observe of a harness, a pass's and a view's alike, goes through its runner here, and is counted on the way (`ObserveCount`).
   const observed: Record<string, ObserveCount> = {};
-  // `observeFor` is an observe too, told what to look for, and counted as one: `spawned` is what says whether it asked a registry.
   const counted = <R extends RunnerOps>(name: string, ops: R): R => {
     const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
       Effect.suspend(() => {
@@ -574,53 +616,26 @@ export function createEngine(options: EngineOptions = {}): Engine {
     };
   };
   const observedNow = (): Record<string, ObserveCount> => Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
-  // A remote agent is A2A already, spoken to by the SDK's client over HTTP: counted, and wrapped in no seam of ours.
   const runners = Object.fromEntries(
     Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential)).map(([name, ops]): [string, SeamOps] => [
       name,
       counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
     ]),
   );
-  // The engine's one memo of the settled tasks its passes may skip (`tick-memo.ts`): made here, once, so it lives as long as
-  // this engine and a new one folds every task on its first pass.
   const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer());
-  // Every method is the same shape: an Effect, provided and run. The layer is built once, so
-  // services are shared across calls exactly as they would be inside one Effect program.
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> => Effect.runPromise(e.pipe(Effect.provide(layer)));
 
-  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has, whose view asks none (`viewOf`). */
   const harnessOf = (state: State) => {
     const asked = state.harness ?? fallback;
     return Object.hasOwn(runners, asked) ? asked : fallback;
   };
 
-  /**
-   * One task's view, asking a registry only what the record cannot answer (`Engine.view`).
-   *
-   * A settled task is read off its record alone, on every harness: its phase is its outcome, and a sighting gives such
-   * a view nothing else but its session's id — `waitingFor` is only a `needs-human` phase's, and `usage` only an
-   * attempt in flight's (an ended one's is on its `ended` entry, read off the sighting it ended on). That id is on the
-   * record too: the harness's own (`nativeId`) where the harness can `find`, as a registry would confirm it; and where
-   * it cannot, the handle the harness reported the session under when its attempt ended, which is what it lists it by
-   * and what its `logs` take (a detached runner's is the attempt's name, never `nativeId`: a check's `logs` are its verdict).
-   * Before 2026-09-25 a harness that cannot `find` was observed for every view, even of a task settled days ago: a
-   * `check` harness listing every run file it ever ran, once for each check of each run the tick viewed, every pass.
-   *
-   * A task not settled is observed while an attempt is in flight, whose phase is its session's state, and on a harness
-   * that cannot `find`, for its session's id. Otherwise the record holds the phase and, once an attempt has ended, its
-   * session's id. A session whose id the record lacks is found by name, or observed.
-   *
-   * Observed on the task's own harness alone, as `transcript` and `logs` reach it: no other registry can name its
-   * session, and asking every one made a view of a `check` or a Codex task a `claude agents` call. A registry that
-   * cannot be read this time is nothing observed, as `composite` reads it for a pass.
-   */
   const viewOf = (taskId: string) =>
     Effect.gen(function* () {
       const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
       const state = fold(taskId, events);
       const last = state.attempts.at(-1);
       const { find, observe, observeFor } = runners[harnessOf(state)];
-      // Told this task's own sessions, where the harness can be: a view of a Claude Code job lists the jobs and asks no `claude agents`.
       const look = observeFor
         ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))).pipe(Effect.map((o) => o.seen))
         : observe;
@@ -628,10 +643,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
         Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
         Effect.map((o) => viewOfState(state, o)),
       );
-      // The fold already made, never a second read of the journal: `view` reads it again, which made every view two reads (measured
-      // 2026-09-25: `wf ls` read 418 journals for 209 tasks).
       const recorded = Effect.sync(() => viewOfState(state, new Map()));
-      // A harness this engine does not have is asked nothing: the record is all there is, as the pass reads it (`composite`).
       if (!Object.hasOwn(runners, state.harness ?? fallback)) return yield* recorded;
       if (!state.settled && (!find || last?.ended === null)) return yield* observed;
       if (!last || (find && last.nativeId)) return yield* recorded;
@@ -643,9 +655,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
     });
 
   const engine: Engine = {
-    // The harness is RESOLVED here, never left implicit: a task filed without one would otherwise read
-    // `default` on its record and its view, and a layer above that pools by harness would count it apart
-    // from an identical task that named its harness.
     file: async (spec) => {
       const task = { ...spec, harness: spec.harness ?? fallback };
       const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
@@ -703,8 +712,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
         Effect.gen(function* () {
           const v = yield* viewOf(taskId);
           if (!v.sessionId) return '(no session yet)';
-          // Asked of the task's own harness, not of whichever reported the session this pass: a session its
-          // harness has released is in no observation, and its transcript is still there to read.
           return yield* runners[harnessOf(v.state)].logs(v.sessionId);
         }),
       ),
@@ -713,30 +720,21 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
       if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
-      // The task's own harness, as for `logs`, and observed by that harness alone: a board asks this every
-      // second while a session runs, and no other harness's registry can name the session.
       const harness = harnessOf(state);
       const runner = runners[harness];
       const read = runner.transcriptOf;
       if (!read)
         throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
-      // A cursor is its reader's. The engine's own readers give one shape, and one they did not give is
-      // refused at the door; a PromiseRunner's is passed through as it gave it.
       const h = harnesses[harness];
       if (after !== undefined && (isClaude(h) || isSpec(h)) && !isTranscriptCursor(after)) {
         throw refuse(
           `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
         );
       }
-      // The start, as a read of no session gives it, is handed to no runner: it is asked from the start.
       const start = noTranscript().cursor;
-      // No session to read — none started yet, or none its harness can name this time: nothing new, and the cursor
-      // asked with, so a moment the registry could not be read costs a caller a poll rather than a read from the start.
       const nothing = { events: [], cursor: after ?? start };
       const last = state.attempts.at(-1);
       if (!last) return nothing;
-      // The session is asked for by name, and its harness's agent finds its id: the one on the record for an attempt
-      // that has ended, else found or observed on the harness (`sessionTranscript` in `a2a-handler.ts`).
       return (await go(read(nameFor(taskId, last.n), after === start ? undefined : after))) ?? nothing;
     },
     say: async (taskId, text) => {
@@ -746,7 +744,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
       if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
-      // The task's own harness, as for `transcript`: only its registry can name the session, and only it has a way in.
       const harness = harnessOf(state);
       const runner = runners[harness];
       const h = harnesses[harness];
@@ -757,13 +754,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
           (isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`,
         );
       }
-      // What Claude Code's inbox cannot carry is a background session's: a job's words go on its stdin. Asked here of a
-      // session that is one by its config, and below, once it is found, of one on `claude` that runs `--bg` without saying
-      // so — a task filed on it before jobs were its default.
       const bgRefuses = () => claudeSayRefuses(state.config ?? {}, text);
       const cannot = h === 'claude-bg' || (h === 'claude' && state.config?.background) ? bgRefuses() : undefined;
       if (cannot) throw refuse(cannot);
-      // What the record says first, then what the harness says: a settled task is not asked about.
       if (state.settled)
         throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
       if (state.stopRequested) throw refuse(`\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}`);
@@ -783,8 +776,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
         );
       }
       const sighting = observed.get(name);
-      // Registered and not listed: on `claude`, whose listing reads past a registry that failed so its jobs stay seen, that
-      // is the registry failing (or a session between states), not a session that is not running. Rejected, as above.
       if (!sighting && isClaude(h) && runner.find) {
         const registered = await go(runner.find(name)).catch(() => undefined);
         if (registered)
@@ -798,19 +789,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
         );
       const cannotBg = h === 'claude' && !isClaudeJob(sighting.sessionId) ? bgRefuses() : undefined;
       if (cannotBg) throw refuse(cannotBg);
-      // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
-      // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
-      // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue
-      // 16). `claude agents` does not say which wait a session is in, so neither is refused. A quiet session is
-      // `working` too: its runner reports how long it has been quiet, not an end, and an idle session's inbox
-      // starts a turn (open issue 14).
       if (!isLive(sighting.state)) {
         throw refuse(
           `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: the next pass writes its end. ${resume}`,
         );
       }
-      // A remote agent's Task takes a message only where A2A lets its caller speak: once it asks for input. At work, a
-      // message would be a second turn the agent never asked for.
       if (isRemote(h) && !waitsOnPerson(sighting.state)) {
         throw refuse(
           `\`${taskId}\` runs on the \`${harness}\` remote A2A agent, whose Task takes words only once it asks for input, and it is at work. Say them when \`ae ls\` shows it waiting, or ${resume.charAt(0).toLowerCase()}${resume.slice(1)}`,
@@ -836,7 +819,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
     },
     answer: async (taskId, text, options = {}) => {
       const refuse = (why: string) => Object.assign(new Error(`answer: ${why}`), { exitCode: 2 });
-      // Asked of the options as handed in, untyped: a caller built before stage 4b still sends the cap as its own option.
       if (Object.hasOwn(options, 'budgetUsd')) {
         throw refuse(
           "`budgetUsd` is the harness's configuration: give it under `config`, as `answer(id, text, { config: { budgetUsd: … } })`.",
@@ -845,7 +827,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const { config } = options;
       const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
       const state = events.length ? fold(taskId, events) : undefined;
-      // The turn's configuration is asked of the task's harness as a filing's is: `claude --bg` keeps no cap, and `codex` has none.
       const refused =
         answerRefusalOf(taskId, state, text, config) ??
         (state && config ? harnessRefusalOf({ ...filingOf(state, config), harness: harnessOf(state) }, harnesses) : undefined);
@@ -863,8 +844,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       let stopped = false;
       let draining = false;
 
-      // One drain at a time: a push and a tick can arrive together, and delivering an entry twice
-      // because two reads overlapped would make "at-least-once in order" a lie.
       const drain = async () => {
         if (stopped || draining) return;
         draining = true;
@@ -887,9 +866,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       };
 
       const unsubscribe = journalOps?.subscribe?.(() => void drain());
-      // Also not unref'd, for the same reason. The file store's `fs.watch` happens to hold the
-      // loop open, which is exactly why this hid here: a store WITHOUT `subscribe` would have
-      // exited on the spot, and the store is the part a consumer is invited to replace.
       const timer = setInterval(() => void drain(), intervalMs);
       void drain();
 
@@ -906,8 +882,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const every = o.intervalMs ?? 3_000;
       let running = false;
       let stopped = false;
-      // Re-entrancy guard rather than a fixed schedule: a tick that outruns the interval must not
-      // be joined by a second one, or two passes would admit against the same count.
       const timer = setInterval(async () => {
         if (running || stopped) return;
         running = true;
@@ -919,9 +893,6 @@ export function createEngine(options: EngineOptions = {}): Engine {
           running = false;
         }
       }, every);
-      // NOT unref'd. A control loop that lets its host exit is a control loop that does nothing:
-      // `ae up` printed its banner and returned, because an unref'd interval does not hold the
-      // event loop open. `stop()` is how a consumer gets their process back.
       return {
         stop: () => {
           stopped = true;
@@ -934,11 +905,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
   return engine;
 }
 
-// ─── the vocabulary, all plain data ─────────────────────────────────────────
 export type { PromiseRunner, PromiseSighting } from './runner-promise.ts';
 export { codex } from './runner-codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
-// The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to.
+/** The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to. */
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
 export type { HarnessSpec } from './runner-detached.ts';

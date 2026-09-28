@@ -3,6 +3,7 @@
   "options": {
     "typeAware": true
   },
+  "jsPlugins": [{ "name": "comments", "specifier": "./lint/comments.ts" }],
   "plugins": [
     "typescript",
     "unicorn",
@@ -90,6 +91,65 @@
       "rules": {
         "typescript/no-base-to-string": "off",
         "typescript/restrict-template-expressions": "off"
+      }
+    },
+    // The comment guards (lint/comments.ts, CLAUDE.md "Code reads by itself"), one block per package, the same rules in each. A block
+    // whose `excludeFiles` names its own package is off: the card that cleans a package switches it on by deleting that one line, and
+    // edits nothing shared. packages/agent-orchestrator/test/comments.test.ts reads these blocks.
+    {
+      "files": ["apps/api/**"],
+      "excludeFiles": ["apps/api/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
+      "files": ["apps/web/**"],
+      "excludeFiles": ["apps/web/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/**"],
+      "excludeFiles": ["packages/agent-orchestrator/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
+      }
+    },
+    {
+      "files": ["packages/agent-runtime/**"],
+      "excludeFiles": ["packages/agent-runtime/**"],
+      "rules": {
+        "comments/no-code-comments": "error",
+        "comments/no-history-in-comments": "error",
+        "comments/no-deferral-in-comments": "error",
+        "no-warning-comments": [
+          "error",
+          { "terms": ["todo", "fixme", "xxx", "hack", "workaround", "work around", "stopgap", "learned by"], "location": "anywhere" }
+        ],
+        "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
       }
     }
   ],

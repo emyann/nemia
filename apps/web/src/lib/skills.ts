@@ -113,7 +113,7 @@ export function skillEdited(form: SkillForm, was: SkillForm): boolean {
 
 /**
  * What the page says of the switch beside what a turn carries now (`costWords`): what the other position would carry — on, the body too,
- * about four characters a token, loaded every turn and cached as the system prompt is (F14); off, only its name and what it does.
+ * about four characters a token, loaded every turn and cached as the system prompt is; off, only its name and what it does.
  */
 export function preloadWords(cost: SkillCost): string {
   if (cost.preload) return 'Off, a session is told only its name and what it does, and loads it when it needs it.';

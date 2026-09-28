@@ -30,7 +30,11 @@ export const ROW_HEIGHT = 150;
 /** How wide a step's node is drawn (`w-56`): the rest of its column is the arrow to the next. */
 export const NODE_WIDTH = 224;
 
-/** The columns, left first, each top to bottom. Throws, naming the steps it could not place, on a cycle. */
+/**
+ * The columns, left first, each top to bottom. An `after` naming anything but one of the run's own steps draws nothing. Each step is
+ * taken once, when the last step it waits on has been (Kahn's algorithm), so every edge is visited once and the layering ends whatever
+ * `after` says. Throws, naming the steps it could not place, on a cycle: a step never taken is in or behind one.
+ */
 export function layers(steps: readonly StepEdges[]): string[][] {
   const order = new Map<string, number>();
   const afterOf = new Map<string, readonly string[]>();
@@ -41,13 +45,10 @@ export function layers(steps: readonly StepEdges[]): string[][] {
   }
   const names = [...order.keys()];
 
-  // Edges between the run's own steps only: an `after` naming anything else draws nothing.
   const parents = new Map(names.map((name) => [name, [...new Set(afterOf.get(name))].filter((p) => order.has(p))]));
   const children = new Map(names.map((name) => [name, [] as string[]]));
   for (const [name, ps] of parents) for (const p of ps) children.get(p)!.push(name);
 
-  // Kahn's algorithm. A step is taken once, when the last step it waits on has been, so the loop
-  // visits each edge once and ends whatever `after` says; what is never taken is in or behind a cycle.
   const depthOf = new Map<string, number>();
   const waiting = new Map(names.map((name) => [name, parents.get(name)!.length]));
   const taken = names.filter((name) => waiting.get(name) === 0);
@@ -73,7 +74,6 @@ export function layers(steps: readonly StepEdges[]): string[][] {
   const place = new Map<string, number>();
   columns.forEach((column, c) => {
     if (c > 0) {
-      // Every step right of the first column has a parent, and every parent is in a column already placed.
       const pull = (name: string) => mean(parents.get(name)!.map((p) => place.get(p)!));
       column.sort((a, b) => pull(a) - pull(b) || order.get(a)! - order.get(b)!);
     }

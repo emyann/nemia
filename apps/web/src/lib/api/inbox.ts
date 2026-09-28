@@ -34,7 +34,7 @@ export type InboxEntry = {
 
 /**
  * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and on
- * a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards yet.
+ * a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards.
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],

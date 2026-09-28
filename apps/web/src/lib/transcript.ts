@@ -73,11 +73,13 @@ export function mergeEvents(known: readonly TranscriptEvent[], incoming: readonl
   return merged;
 }
 
-/** The events as turns. See the file's comment for the rules. */
+/**
+ * The events as turns, by the rules the file's head gives. A result whose call is not in what was read — a transcript cut short at its
+ * start — is still shown, as a call of an unknown tool; a `text` event that says nothing is no pause between calls.
+ */
 export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
   const turns: Turn[] = [];
   const calls = new Map<string, ToolCall>();
-  // Everything since the last thing said: calls, and the thoughts and system lines around them. Drawn once it ends.
   let stretch: FoldedTurn[] = [];
   const end = () => {
     turns.push(...drawn(stretch));
@@ -107,7 +109,6 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
         const result = { text: event.result?.text ?? '', isError: event.result?.isError ?? false };
         const call = calls.get(event.id);
         if (call) call.result = result;
-        // A result whose call is not in what was read — a transcript cut short at its start — is still shown.
         else
           stretch.push({
             kind: 'tool',
@@ -123,7 +124,6 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
         stretch.push({ kind: 'system', key: `system:${event.id}`, at: event.at, text: event.text ?? '' });
         break;
       case 'text':
-        // Nothing said is not a pause between calls.
         if (!event.text?.trim()) break;
         end();
         if (event.role === 'system') turns.push({ kind: 'system', key: `system:${event.id}`, at: event.at, text: event.text });
@@ -185,8 +185,7 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
  * What was said to a session, each with the first of the session's events that shows its words reaching it (`arrived`), and the events without
  * those. The session's line for words it was handed is the same words, so a person reads them once, as what they said (`withSaid`), where they
  * reached the session. Matched in the order said, each thing said to one event at most: words said twice are two arrivals. Words the transcript
- * does not show — queued behind a prompt nobody answers (agent-runtime's open issue 16), or set aside (issue 12) — have none, and every other
- * line stays the session's. Nothing said leaves the events as they were.
+ * does not show — queued behind a prompt nobody answers, or set aside — have none, and every other line stays the session's. Nothing said leaves the events as they were.
  */
 export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {
   const taken = new Set<number>();
@@ -260,6 +259,10 @@ const onePath = (input: Record<string, unknown>) => {
   return typeof file === 'string' ? [file] : [];
 };
 
+/**
+ * How each tool's calls are counted and said, by the tool's name: Claude Code's, and Codex's two items, `CommandExecution` and `FileChange`.
+ * The same act under another name is said the same: `Glob` as `Grep`, `Write`, `MultiEdit` and `NotebookEdit` as `Edit`, `Agent` as `Task`.
+ */
 const VERBS: Record<string, Verb> = {
   Bash: { group: 'command', one: 'ran a command', many: (n) => `ran ${n} commands` },
   Read: { group: 'read', one: 'read a file', many: (n) => `read ${n} files`, subject: onePath },
@@ -270,7 +273,6 @@ const VERBS: Record<string, Verb> = {
   Task: { group: 'agent', one: 'ran an agent', many: (n) => `ran ${n} agents` },
   TodoWrite: { group: 'todo', one: 'updated its plan', many: (n) => `updated its plan ${n} times` },
 };
-// The same act under another name: Claude Code's other search and edit tools, and Codex's two items.
 VERBS.Glob = VERBS.Grep!;
 VERBS.Write = VERBS.Edit!;
 VERBS.MultiEdit = VERBS.Edit!;
@@ -313,10 +315,12 @@ export function summaryOf(calls: readonly ToolCall[]): string {
 const inputOf = (call: ToolCall): Record<string, unknown> =>
   call.input && typeof call.input === 'object' && !Array.isArray(call.input) ? (call.input as Record<string, unknown>) : {};
 
-/** The one thing a call was about, for its line — a command, a file, a pattern, an address — on one line. Null when its input names none. */
+/**
+ * The one thing a call was about, for its line — a command, a file, a pattern, an address — on one line. Null when its input names none. A
+ * command Codex gives as its argv, `['/bin/bash', '-lc', 'npm test']`, is its last word.
+ */
 export function detailOf(call: ToolCall): string | null {
   const input = inputOf(call);
-  // Codex gives a command as its argv: `['/bin/bash', '-lc', 'npm test']`.
   const command = Array.isArray(input.command) ? input.command.at(-1) : input.command;
   const said = [command, input.file_path, input.notebook_path, input.pattern, input.url, input.query, input.description, input.path].find(
     (value): value is string => typeof value === 'string' && value.trim() !== '',

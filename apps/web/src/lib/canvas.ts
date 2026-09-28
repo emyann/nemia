@@ -10,9 +10,8 @@ import { satisfiesAfter, type StepState } from './status.ts';
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'needs-human';
 
-/** A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`. */
+/** A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is `0s`. */
 export function duration(ms: number): string {
-  // Below zero only when this clock is behind the engine's; nothing has elapsed yet.
   const s = Math.max(0, Math.floor(ms / 1000));
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
@@ -28,8 +27,8 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
  *
  * While the attempt runs, the time counts. Once it is over, the time is how long it took, from its
- * start to its end. A record from before the engine kept the end has no clock to stop, so it says how
- * long ago the attempt started instead.
+ * start to its end. An attempt over whose record has no end (`endedAt`) says how long ago it started
+ * instead.
  */
 export function attemptLine(attempts: StepAttempts, live: boolean, now: number): string | null {
   const { count, latest } = attempts;
@@ -162,12 +161,11 @@ export const LOOP_DEPTH = 44;
 
 /**
  * A `loop` edge's path, from under its looping step to under its target: straight down from one, beneath the row, and up
- * into the other, where its arrow points. A cubic whose control points sit below both ends; its middle, where the label
- * goes, is `depth` below the lower end.
+ * into the other, where its arrow points. A cubic whose control points sit below both ends, at the height that puts its middle
+ * (at t = ½, ⅛ of each end and ⅜ of each control point), where the label goes, `depth` below the lower end.
  */
 export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH): { path: string; labelX: number; labelY: number } {
   const bottom = Math.max(source.y, target.y) + depth;
-  // A cubic's point at t = ½ is ⅛ of each end and ⅜ of each control point: the control height that puts it at `bottom`.
   const control = (bottom - (source.y + target.y) / 8) / 0.75;
   return {
     path: `M ${source.x},${source.y} C ${source.x},${control} ${target.x},${control} ${target.x},${target.y}`,
@@ -207,16 +205,15 @@ export function parseLayout(raw: string | null): Map<string, Point> | null {
 /**
  * Per run, in this browser only: a layout is a person's arrangement, not a fact about the run.
  *
- * `v2` since the graph reads left to right. An arrangement dragged on the top-to-bottom canvas is
- * left unread under the old key, rather than laid over the new layering with its steps stacked.
+ * `v2`, the key of an arrangement on the left-to-right layering: one under the key without it, made for a top-to-bottom one, is never read.
  */
 const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
 
 /**
  * The Factory's arrangement, one per browser: where each run's card was left, by run id.
  *
- * `v2` since a cell is wider, to hold a card's rail. The arrangement saved under the old key puts its cards a narrower cell apart: it is
- * read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2` one is.
+ * `v2`, the key of an arrangement whose cells are wide enough to hold a card's rail. One under the key without it puts its cards a narrower
+ * cell apart: it is read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2` one is.
  */
 const FACTORY_KEY = 'hkb:factory-layout:v2';
 const NARROW_FACTORY_KEY = 'hkb:factory-layout';
@@ -225,8 +222,8 @@ const NARROW_FACTORY_KEY = 'hkb:factory-layout';
 const FACTORY_OPEN_KEY = 'hkb:factory-open';
 
 /**
- * Where a person dragged the steps of the graph that unfolded beside a Factory card, before the steps went onto the card: read by nothing
- * now, and forgotten when the floor opens, so it does not sit in a browser for ever.
+ * Where a browser may keep an arrangement of the steps of a graph unfolded beside a Factory card, which nothing reads: forgotten when the
+ * floor opens, so it does not sit in a browser for ever.
  */
 const FACTORY_STEPS_KEY = 'hkb:factory-steps';
 
@@ -272,18 +269,16 @@ function readAt<T>(key: string, parse: (raw: string | null) => T, none: T): T {
   }
 }
 
+/** Saves `value` under `key`: where storage is refused or full, nothing is kept, and the arrangement lasts as long as the page does. */
 function saveAt(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Refused or full: the arrangement lasts as long as the page does.
-  }
+  } catch {}
 }
 
+/** Forgets what is kept under `key`: where storage is refused, nothing was kept to forget. */
 function forgetAt(key: string): void {
   try {
     localStorage.removeItem(key);
-  } catch {
-    // Nothing could have been kept, so there is nothing to forget.
-  }
+  } catch {}
 }

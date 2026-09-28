@@ -126,6 +126,8 @@ test('runs are read from the workflow store and summarized, with what each step 
     // Started, and none of its filings on the feed (there is none here): when it was created.
     startedAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
+    // Nobody pruned it: no mark beside its status.
+    pruned: null,
     // Started without `--after`: it waits on no run.
     after: [],
     waiting: null,

@@ -30,6 +30,7 @@ import { HOME, inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, write
 import { makeWorkspace, readInclude } from './worktree.ts';
 import { parentRecord } from './branches.ts';
 import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox/inbox.store.ts';
+import { Invalid } from './refusal/refusal.ts';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
@@ -79,58 +80,46 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
 function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
   const steps = loadWorkflows(workflowDir, places);
   if (!isolate && isFolderTeam(steps)) {
-    throw Object.assign(
-      new Error(
+    throw new Invalid({
+      message:
         `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
-          `Start it without --no-worktree.`,
-      ),
-      { exitCode: 2 },
-    );
+        `Start it without --no-worktree.`,
+    });
   }
   if (!isolate && fansOut(steps)) {
-    throw Object.assign(
-      new Error(
+    throw new Invalid({
+      message:
         'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
-          'Either drop --no-worktree, or make the steps a chain.',
-      ),
-      { exitCode: 2 },
-    );
+        'Either drop --no-worktree, or make the steps a chain.',
+    });
   }
   const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
   if (ending) {
-    throw Object.assign(
-      new Error(
+    throw new Invalid({
+      message:
         `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
-          `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
-      ),
-      { exitCode: 2 },
-    );
+        `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
+    });
   }
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash) {
-    throw Object.assign(
-      new Error(
-        `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
-      ),
-      { exitCode: 2 },
-    );
+    throw new Invalid({
+      message: `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
+    });
   }
   const tryClash = steps
     .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
     .find(({ of }) => of && steps.some((other) => other.name === of));
   if (tryClash) {
     const { s, of } = tryClash;
-    throw Object.assign(
-      new Error(
-        `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
-      ),
-      { exitCode: 2 },
-    );
+    throw new Invalid({
+      message: `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
+    });
   }
   const unbridged = remoteRefusal(steps);
-  if (unbridged) throw Object.assign(new Error(unbridged), { exitCode: 2 });
+  if (unbridged) throw new Invalid({ message: unbridged });
   const undeclared = undeclaredRefusal(steps);
-  if (undeclared) throw Object.assign(new Error(undeclared), { exitCode: 2 });
+  if (undeclared) throw new Invalid({ message: undeclared });
   return steps;
 }
 
@@ -163,12 +152,9 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
 function refuseInclude(repo: string, isolate: boolean): void {
   const refused = isolate ? (readInclude(repo)?.refused ?? []) : [];
   if (refused.length) {
-    throw Object.assign(
-      new Error(
-        `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
-      ),
-      { exitCode: 2 },
-    );
+    throw new Invalid({
+      message: `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
+    });
   }
 }
 
@@ -210,17 +196,15 @@ export function start(opts: {
   const steps = stepsToStart(opts.workflowDir, isolate, places);
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) {
-    throw Object.assign(
-      new Error(
+    throw new Invalid({
+      message:
         `--repo ${opts.repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
-          `Start it without --repo, or start a workflow whose steps work on a repository.`,
-      ),
-      { exitCode: 2 },
-    );
+        `Start it without --repo, or start a workflow whose steps work on a repository.`,
+    });
   }
   const gates = opts.gates ?? [];
   const refusedGates = gateRefusal(gates, steps);
-  if (refusedGates) throw Object.assign(new Error(refusedGates), { exitCode: 2 });
+  if (refusedGates) throw new Invalid({ message: refusedGates });
   if (!folder) refuseInclude(opts.repo, isolate);
   const inputs = (opts.inputs ?? []).map((given): InputFile => {
     const resolved = path.resolve(given);
@@ -228,7 +212,7 @@ export function start(opts: {
     return { given, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
   });
   const refusedInputs = inputRefusal(inputs);
-  if (refusedInputs) throw Object.assign(new Error(refusedInputs), { exitCode: 2 });
+  if (refusedInputs) throw new Invalid({ message: refusedInputs });
   const id = runId(opts.brief);
   const after = opts.after ?? [];
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
@@ -244,7 +228,7 @@ export function start(opts: {
   let run: Run;
   if (folder) {
     const refusedAfter = afterRefusal(after, { place: { kind: 'folder' } }, parentRecord);
-    if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
+    if (refusedAfter) throw new Invalid({ message: refusedAfter });
     run = {
       id,
       place: { kind: 'folder' },
@@ -256,7 +240,7 @@ export function start(opts: {
   } else {
     const { workspace, baseRef, branch } = makeWorkspace(opts.repo);
     const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
-    if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
+    if (refusedAfter) throw new Invalid({ message: refusedAfter });
     run = {
       id,
       repo: opts.repo,
@@ -349,7 +333,7 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
       stepsToStart(folder, true, placesOf(opts.repo));
       folders.set(card.name, folder);
     } catch (err) {
-      throw Object.assign(new Error(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`), { exitCode: 2 });
+      throw new Invalid({ message: `${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}` });
     }
   }
   const folderOf = (card: Card): string => folders.get(card.name)!;

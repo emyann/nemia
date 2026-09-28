@@ -55,6 +55,7 @@ import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, handOffOwed, resultTips, unrecordedSteps } from './tick.ts';
+import { Invalid } from './refusal/refusal.ts';
 
 /** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
 const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>
@@ -94,7 +95,7 @@ const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['
  */
 export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> {
   const refusedId = idRefusal(id);
-  if (refusedId) throw Object.assign(new Error(refusedId), { exitCode: 2 });
+  if (refusedId) throw new Invalid({ message: refusedId });
   const nothing = { removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
   const dir = path.join(HOME, 'worktrees', id);
   if (!fs.existsSync(runFile(id))) {
@@ -263,7 +264,7 @@ export async function prune(
   { unmerged = false, yes = false, artifacts = false }: { unmerged?: boolean; yes?: boolean; artifacts?: boolean } = {},
 ): Promise<Pruning> {
   const refusedId = idRefusal(id, 'prune');
-  if (refusedId) throw Object.assign(new Error(refusedId), { exitCode: 2 });
+  if (refusedId) throw new Invalid({ message: refusedId });
   const run = readRun(id);
   const none = { worktrees: [], left: [] };
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });

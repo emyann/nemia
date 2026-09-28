@@ -165,7 +165,15 @@ function impurities(sources: Sources): string[] {
   const of = kinds(sources);
   return of.PURE.flatMap((file) =>
     (sources[file] ?? [])
-      .filter((m) => isRuntime(m) || (isEffect(m) && m !== PURE_EFFECT) || IMPURE.includes(m) || of.STORE.includes(m) || of.CONTROLLER.includes(m) || m === CLIENT)
+      .filter(
+        (m) =>
+          isRuntime(m) ||
+          (isEffect(m) && m !== PURE_EFFECT) ||
+          IMPURE.includes(m) ||
+          of.STORE.includes(m) ||
+          of.CONTROLLER.includes(m) ||
+          m === CLIENT,
+      )
       .map((m) => `${file} is pure and imports ${m}`),
   );
 }

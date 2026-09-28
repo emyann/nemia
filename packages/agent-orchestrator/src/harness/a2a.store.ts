@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { REMOTE_NAME, REMOTE_PREFIX } from '../workflow.ts';
+import { Invalid } from '../refusal/refusal.ts';
 
 /** The file, in the store's root (`$WF_ROOT`). */
 export const A2A_AGENTS_FILE = 'a2a-agents.json';
@@ -39,7 +40,7 @@ export const envNameOf = (name: string, scheme: string): string => `WF_A2A_${env
 
 /** A refusal of the file, with the fix: exit code 2, as every refusal a person acts on. */
 function refuse(file: string, why: string): never {
-  throw Object.assign(new Error(`${file}: ${why}`), { exitCode: 2 });
+  throw new Invalid({ message: `${file}: ${why}` });
 }
 
 /**

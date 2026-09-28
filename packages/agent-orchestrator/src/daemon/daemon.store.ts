@@ -22,6 +22,7 @@ import {
   type DaemonStanding,
   type Identity,
 } from './daemon.ts';
+import { Conflict } from '../refusal/refusal.ts';
 
 /** The text as JSON, or undefined where it is not: a file half written, or another program's. */
 const jsonOr = (text: string): unknown => {
@@ -259,7 +260,7 @@ export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);
-    if (holder) throw Object.assign(new Error(holdRefusal(holder, 'up', HOME, now)), { exitCode: 2 });
+    if (holder) throw new Conflict({ message: holdRefusal(holder, 'up', HOME, now) });
     if (replaced.kind !== 'none') {
       writeDaemon(held);
       return { held, replaced };

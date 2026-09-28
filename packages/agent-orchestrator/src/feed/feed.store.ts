@@ -11,6 +11,7 @@ import { HOME } from '../store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
 import { feedChanges, foldFeed, freshMemo, type FeedLine, type FeedMemo } from './feed.ts';
 import type { FeedWords } from '../run.ts';
+import { Invalid } from '../refusal/refusal.ts';
 
 /** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the tick alone. */
 export const feedFile = (): string => path.join(HOME, 'feed.jsonl');
@@ -116,7 +117,7 @@ function linesFrom(file: string, after: number, size: number): { lines: FeedLine
   return { lines, ends, cursor: after + start };
 }
 
-const refused = (message: string): Error => Object.assign(new Error(message), { exitCode: 2 });
+const refused = (message: string): Invalid => new Invalid({ message });
 
 /**
  * The lines written since `after`, and the cursor to read on from: the byte after the last complete line. A feed not written yet reads as

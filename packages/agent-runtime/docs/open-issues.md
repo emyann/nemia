@@ -403,7 +403,7 @@ under the engine.
 ### 27. The A2A seam carries every call to a session, the transcript as an extension method
 
 Since thin runtime stage 1 part 2 (2026-09-23), `createEngine` puts every harness behind an A2A agent of its own
-(`src/a2a-handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a-client.ts`):
+(`src/a2a/handler.ts`) and reaches it through the SDK's `Client` over an in-process transport (`src/a2a/client.ts`):
 `spawn` is a message, `observe` a listing, `stop` a cancel. Since part 3 (the same day), `say` is a follow-up message on
 the session's Task, and `find`, `logs` and `release` are the runtime extension's methods (`findSession`, `sessionLogs`,
 `releaseSession`), offered as the harness's card lists them. Since part 4 (the same day), a transcript is read by the
@@ -685,7 +685,7 @@ What is left:
 
 ### 34. A remote Task answered in the moment before the registry holds it is owned by nobody (2026-09-25; the slow agent fixed in part 2 the same day)
 
-A remote A2A agent's spawn (`src/a2a-remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
+A remote A2A agent's spawn (`src/a2a/remote.ts`, stage 6 part 1) writes its intent to `<root>/remote/<name>.json`, sends
 one SendMessage, and writes the Task's id beside the intent when the answer comes back. An answer that never reaches that
 write leaves an intent with no Task: the next spawn under the name refuses to send again, in words that are no refusal,
 and the grace window reads the attempt `lost`. Nothing is sent twice, which is the rule the registry keeps. But the Task

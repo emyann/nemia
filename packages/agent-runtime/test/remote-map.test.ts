@@ -1,12 +1,12 @@
 /**
  * A remote agent's Task in the runtime's words, and a spawn in A2A's (`sightingOfTask`, `remoteMessageOf` in
- * `a2a-map.ts`): pure, so each A2A state and each place a closing statement can be is one case here, with no agent behind
+ * `a2a/map.ts`): pure, so each A2A state and each place a closing statement can be is one case here, with no agent behind
  * it. The agent itself is `remote-agent.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Role, TaskState, type Artifact, type Part, type Task } from '@a2a-js/sdk';
-import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_EXTENSION, sightingOfTask } from '../src/a2a-map.ts';
+import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_EXTENSION, sightingOfTask } from '../src/a2a/map.ts';
 import type { SessionState } from '../src/core/session.ts';
 
 const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });

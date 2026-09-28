@@ -16,8 +16,8 @@ import { Effect } from 'effect';
 import { ClientFactory, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
 import { AgentCard, Role } from '@a2a-js/sdk';
 import { createEngine, type Engine, type EngineOptions, type TaskSpec, type TaskView } from '../src/facade.ts';
-import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a-remote.ts';
-import { RUNTIME_EXTENSION } from '../src/a2a-map.ts';
+import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
+import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
 

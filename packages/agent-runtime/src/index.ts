@@ -60,13 +60,13 @@ export type { HarnessArgs } from './harness/args.ts';
 export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
-export { remoteOps } from './a2a-remote.ts';
-export type { Credentials, RemoteAgent } from './a2a-remote.ts';
+export { remoteOps } from './a2a/remote.ts';
+export type { Credentials, RemoteAgent } from './a2a/remote.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/code.ts';
 export { composite } from './harness/seam.ts';
 export { sdkRunner } from './harness/sdk.ts';
-export { a2aRunner } from './a2a-client.ts';
+export { a2aRunner } from './a2a/client.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/domain.ts';
 export type { SessionState, Ended, Outcome } from './core/session.ts';

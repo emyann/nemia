@@ -57,7 +57,7 @@ import { tick, view } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/harness/seam.ts';
 import { TaskState } from '@a2a-js/sdk';
-import { clientOf } from '../src/a2a-client.ts';
+import { clientOf } from '../src/a2a/client.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';

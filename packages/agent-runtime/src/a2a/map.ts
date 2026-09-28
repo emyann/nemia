@@ -15,12 +15,12 @@
  * words said to a session that runs, a follow-up on its Task.
  *
  * Nothing here is stored. A Task is built from a sighting or from the journal each time it is asked for
- * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
+ * (`a2a/handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameParts, type Attempt, type Sighting } from './core/domain.ts';
-import type { SessionState } from './core/session.ts';
-import type { SpawnRequest } from './harness/seam.ts';
+import { nameParts, type Attempt, type Sighting } from '../core/domain.ts';
+import type { SessionState } from '../core/session.ts';
+import type { SpawnRequest } from '../harness/seam.ts';
 
 /**
  * The runtime's A2A extension. On a message, it marks a spawn: a session started under the name the message gives. On a

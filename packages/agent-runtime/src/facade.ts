@@ -27,8 +27,8 @@ import { detachedOps, type HarnessSpec } from './harness/detached/detached.ts';
 import { codex } from './harness/codex/codex.ts';
 import { claudeDetached } from './harness/claude/code.ts';
 import { composite } from './harness/seam.ts';
-import { a2aOps, type SeamOps } from './a2a-client.ts';
-import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from './a2a-remote.ts';
+import { a2aOps, type SeamOps } from './a2a/client.ts';
+import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from './a2a/remote.ts';
 import { ioCounts, type IoCounts } from './core/engine/tally.ts';
 import { tickMemoLayer } from './core/engine/memo.ts';
 import { promiseOps, wrap, type PromiseRunner } from './runner-promise.ts';
@@ -62,7 +62,7 @@ export type PromiseJournal = {
  *                   background session (`claude --bg`, its registry Claude Code's) when its `config.background` is true
  *   `'claude-bg'`   Claude Code's own background sessions, every task — it keeps the registry
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
- *   a `RemoteAgent` an A2A agent another party runs, by its URL or its card (`a2a-remote.ts`) — we keep the registry of
+ *   a `RemoteAgent` an A2A agent another party runs, by its URL or its card (`a2a/remote.ts`) — we keep the registry of
  *                   what we sent it; its secrets come from `credentials`
  *   a `PromiseRunner` anything else at all
  *
@@ -546,7 +546,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
  * Built once, and shared by every call as services are shared inside one Effect program, each method an Effect provided and run:
  *
  * - the store, and for the file store its `subscribe`, which pushes to `watch`;
- * - each harness behind its A2A agent, reached through the SDK's client in this process (`a2a-client.ts`): the agent holds
+ * - each harness behind its A2A agent, reached through the SDK's client in this process (`a2a/client.ts`): the agent holds
  *   nothing, and answers a task it never started off the harness and this journal, so a restart loses no session. A remote
  *   agent is A2A already, spoken to by the SDK's client over HTTP, and wrapped in no seam of ours;
  * - every observe of a harness — a pass's, a view's, and an `observeFor`, an observe told what to look for — made through its
@@ -895,9 +895,9 @@ export { claudeDetached } from './harness/claude/code.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
-export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.ts';
+export type { Credentials, MissingCredential, RemoteAgent } from './a2a/remote.ts';
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
-export { remoteConfigRefusal } from './a2a-remote.ts';
+export { remoteConfigRefusal } from './a2a/remote.ts';
 export { denialText, nameFor } from './core/domain.ts';
 export { refusedText } from './core/engine/engine.ts';
 export { retiredKeyRefusal } from './core/engine/filing.ts';

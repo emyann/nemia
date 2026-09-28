@@ -1,6 +1,6 @@
 /**
  * A remote A2A agent as a harness: the runtime's session verbs as A2A calls to an agent another party runs, over HTTP,
- * by the SDK's client. The in-process seam (`a2a-client.ts`) speaks to a handler the
+ * by the SDK's client. The in-process seam (`a2a/client.ts`) speaks to a handler the
  * runtime built over its own driver; here nothing of the runtime stands on the other side, so the only words exchanged are
  * A2A's own — SendMessage, GetTask, CancelTask — and the runtime extension's methods are never asked.
  *
@@ -63,10 +63,10 @@ import {
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { formerStateOf, isSessionState, type SessionState } from './core/session.ts';
-import type { Sighting } from './core/domain.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest } from './harness/seam.ts';
-import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './a2a-map.ts';
+import { formerStateOf, isSessionState, type SessionState } from '../core/session.ts';
+import type { Sighting } from '../core/domain.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/seam.ts';
+import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 
 /**
  * A remote A2A agent, as a harness is configured: the agent's base URL, whose card is read from

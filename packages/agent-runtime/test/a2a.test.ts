@@ -9,11 +9,11 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { A2A_PROTOCOL_VERSION, Role, TaskState } from '@a2a-js/sdk';
 import { ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, UnsupportedOperationError } from '@a2a-js/sdk/errors';
-import { a2aOps, a2aRunner, InProcessTransport } from '../src/a2a-client.ts';
+import { a2aOps, a2aRunner, InProcessTransport } from '../src/a2a/client.ts';
 import { file, requestStop } from '../src/core/engine/filing.ts';
 import { tick } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { HarnessHandler } from '../src/a2a-handler.ts';
+import { HarnessHandler } from '../src/a2a/handler.ts';
 import {
   closeoutArtifact,
   closeoutOf,
@@ -33,7 +33,7 @@ import {
   taskOfAttempt,
   taskOfSighting,
   wordsOf,
-} from '../src/a2a-map.ts';
+} from '../src/a2a/map.ts';
 import { nameParts } from '../src/core/domain.ts';
 import { SESSION_STATES, type Ended, type SessionState } from '../src/core/session.ts';
 import type { Attempt, Sighting } from '../src/core/domain.ts';

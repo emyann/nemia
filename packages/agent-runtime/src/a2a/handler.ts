@@ -47,9 +47,9 @@ import {
   UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import { fold, waitsForInput, type Event, type Sighting, type Usage } from './core/domain.ts';
-import { isLive, phaseWordOf } from './core/session.ts';
-import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './harness/seam.ts';
+import { fold, waitsForInput, type Event, type Sighting, type Usage } from '../core/domain.ts';
+import { isLive, phaseWordOf } from '../core/session.ts';
+import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from '../harness/seam.ts';
 import {
   canceledTask,
   contextRefusal,
@@ -63,8 +63,8 @@ import {
   taskOfAttempt,
   taskOfSighting,
   type SessionMethod,
-} from './a2a-map.ts';
-import { nameParts } from './core/domain.ts';
+} from './map.ts';
+import { nameParts } from '../core/domain.ts';
 
 /**
  * What a harness said when a verb failed, carried out of the handler with its words unchanged. Anything else the handler

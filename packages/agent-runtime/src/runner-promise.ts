@@ -1,7 +1,7 @@
 /**
  * A harness a consumer wrote in Promises (`PromiseRunner`), as the engine's `RunnerOps`: each verb an Effect with the
  * engine's error on it, and each optional verb present only when the consumer gave it. An adapter like the others,
- * handed to the A2A seam (`a2a-client.ts`) and reached only through it.
+ * handed to the A2A seam (`a2a/client.ts`) and reached only through it.
  */
 import { Effect } from 'effect';
 import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type SessionState } from './core/session.ts';

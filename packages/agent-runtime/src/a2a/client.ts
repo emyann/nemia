@@ -32,8 +32,8 @@ import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
 import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { Event, Sighting, Usage } from './core/domain.ts';
-import { Journal } from './core/engine/journal.ts';
+import type { Event, Sighting, Usage } from '../core/domain.ts';
+import { Journal } from '../core/engine/journal.ts';
 import {
   Runner,
   RunnerError,
@@ -43,7 +43,7 @@ import {
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
-} from './harness/seam.ts';
+} from '../harness/seam.ts';
 import {
   cardOf,
   HarnessFailed,
@@ -52,8 +52,8 @@ import {
   type RuntimeExtensionParams,
   type SessionMethods,
   type TranscriptRequest,
-} from './a2a-handler.ts';
-import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './a2a-map.ts';
+} from './handler.ts';
+import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './map.ts';
 
 /**
  * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that

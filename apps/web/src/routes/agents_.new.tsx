@@ -5,7 +5,7 @@ import { AgentRefused, RouteLink } from '../components/AgentParts';
 import { AgentRefusal, createAgent, keyFormQuery, type AgentDraft } from '../lib/api';
 import { invalidateAgents } from '../lib/agentWrites';
 
-// `agents_`: at /agents/new, and not drawn inside the Agents page, which has no outlet for it.
+/** The New agent page, at /agents/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
 export const Route = createFileRoute('/agents_/new')({
   loader: ({ context }) => context.queryClient.prefetchQuery(keyFormQuery),
   component: NewAgentPage,

@@ -49,7 +49,8 @@ const SECONDARY =
 /**
  * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
  * refused with, by card, since the inbox is read again after each answer: a card gone behind the page's back leaves the list, and its refusal
- * stays where it was listed until dismissed.
+ * stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray file
+ * beside it answer to one name, and a refusal is of one of them.
  */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
@@ -57,7 +58,6 @@ function InboxPage() {
   const cards = newestCardsFirst(entries);
   const queue = queueOf(entries).length;
   const lines = cardLines(entries, refusals);
-  // Kept by the entry's file, as `cardLines` matches them: a card and a stray file beside it answer to one name, and a refusal is of one of them.
   const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
     setRefusals((kept) => [...kept.filter((r) => r.entry.file !== entry.file), ...(refusal ? [{ ...refusal, entry }] : [])]);
 
@@ -117,7 +117,8 @@ function WorkflowOptions({ workflows }: { workflows: readonly WorkflowListing[] 
 /**
  * The box that files a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is known; and the
  * repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's refusal in full, with the
- * idea kept to send again.
+ * idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository, and the api refuses a card
+ * for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed before.
  */
 function FileCard() {
   const queryClient = useQueryClient();
@@ -125,12 +126,9 @@ function FileCard() {
   const repository = useQuery(repositoryQuery);
   const [idea, setIdea] = useState('');
   const [workflow, setWorkflow] = useState('');
-  // Null until a person types in it: the api's repository, once it has said which.
   const [repo, setRepo] = useState<string | null>(null);
   const about = repo ?? repository.data?.repo ?? '';
   const picked = workflows.data?.find((w) => workflowKey(w) === workflow) ?? null;
-  // A team whose every step works in a folder looks at no repository, and the api refuses a card for one that names one: no box, and
-  // nothing sent, whatever a person typed before picking it.
   const inFolders = picked?.folderTeam ?? false;
   const file = useMutation({
     mutationFn: () =>
@@ -221,16 +219,20 @@ function FileCard() {
 /**
  * A card: its first line, linked to its page, its workflow and repository when it names them, and when it was filed; Start, which opens its
  * start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it was queued, and
- * Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps it.
- * A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card
- * shows why, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
+ * Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps it. A card a
+ * run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card shows
+ * why, with its file for a title, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
+ *
+ * Its page shows the body rendered and its keys explained, and for a file that does not read, the file as written. A folder, a name the api
+ * refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and its title is its name alone.
  *
  * A start from this page whose card could not be removed is kept (`kept`): the start form goes, since the card may not start again, and the
- * card says it was started as that run, with why its removal failed, in the api's words — which only the start's answer carries, so a later
- * visit says it was started, and not why.
+ * card says it was started as that run, before the inbox is read again and names it, with why its removal failed, in the api's words —
+ * which only the start's answer carries, so a later visit says it was started, and not why.
  *
- * What its start or its drop was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot: the inbox is read
- * again after any answer, and a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
+ * What its start, drop, queue or unqueue was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot.
+ * Remove, Queue and Unqueue read the inbox again whatever the answer, so a card dropped, queued or started behind the page's back reads as it is; a
+ * card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
 function CardItem({
   entry,
@@ -251,17 +253,14 @@ function CardItem({
     mutationFn: () => dropCard(entry.name),
     onMutate: () => onRefused(null),
     onError: (error) => onRefused({ action: 'remove', message: error.message }),
-    // Whatever the answer: a card dropped behind the page's back — a 404 — leaves the list too.
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
-  // Queued, or taken off the queue: read again whatever the answer, so a card queued or started behind the page's back — a 409 — reads as it is.
   const queue = useMutation({
     mutationFn: (off: boolean) => queueCard(entry.name, { off }),
     onMutate: () => onRefused(null),
     onError: (error, off) => onRefused({ action: off ? 'unqueue' : 'queue', message: error.message }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
-  // The run a start just wrote, before the inbox is read again and names it.
   const startedAs = kept && !entry.startedAs.includes(kept.id) ? [...entry.startedAs, kept.id] : entry.startedAs;
   const started = startedAs.length > 0;
   const startable = !started && entry.error === null;
@@ -274,8 +273,6 @@ function CardItem({
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
-          {/* Its title opens its page: the body rendered and its keys explained — for a file that does not read too, with the file as written. A
-              folder, a name the api refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and is its name alone. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
               <PageLink entry={entry} entries={entries}>
@@ -484,9 +481,10 @@ function Refused({ refusal }: { refusal: CardRefusal }) {
 }
 
 /**
- * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. A start the api
- * took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays. A refusal is
- * `onRefused`'s to show, since the form may not outlive it.
+ * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. The workflows
+ * listed are those of the api's repository: a card about another repository names a workflow of that one, and presets none of these. A
+ * start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays. A
+ * refusal is `onRefused`'s to show, since the form may not outlive it.
  */
 function StartCard({
   entry,
@@ -499,7 +497,6 @@ function StartCard({
 }) {
   const navigate = useNavigate();
   const workflows = useQuery(workflowsQuery);
-  // The api's repository, whose workflows are listed: a name on a card about another is that one's, and presets none of these.
   const repository = useQuery(repositoryQuery);
   const here = repository.data?.repo;
   const [picked, setPicked] = useState<string | null>(null);

@@ -40,13 +40,14 @@ function recordsKind(keys: ReadonlySet<string>, flat: boolean): OutputKind {
 /**
  * How a closeout's field is drawn, from the value's shape and the schema it was declared by — never from the field's or the step's
  * name, which this is not given. `images` are the paths of the try's artifacts that are images: only they can say a string names one.
+ * A value its schema does not describe is `json`, drawn as it came, since a drawing chosen by the schema would say what it is not. An
+ * empty array has no shape to read, so its schema says it: records by the keys its items declare, anything else an empty `list`.
  *
  * This is the one seam between a closeout and its drawing: a generic renderer, or a judgment choosing a component, would replace it,
  * taking the same three things and answering the same closed set, `json` when nothing fits.
  */
 export function outputKind(schema: unknown, value: unknown, images: ReadonlySet<string>): OutputKind {
   const s = isRecord(schema) ? (schema as Schema) : undefined;
-  // A value its schema does not describe is drawn as it came: a drawing chosen by the schema would say what it is not.
   if (!agrees(s, value)) return 'json';
   if (typeof value === 'boolean') return 'yesno';
   if (typeof value === 'number') return 'text';
@@ -57,7 +58,6 @@ export function outputKind(schema: unknown, value: unknown, images: ReadonlySet<
   if (!Array.isArray(value)) return 'json';
   const items = isRecord(s?.items) ? (s.items as Schema) : undefined;
   if (value.length === 0) {
-    // Nothing to read the shape off, so the schema says it: records by the keys it declares, anything else a list that is empty.
     const declared = isRecord(items?.properties) ? Object.keys(items.properties) : null;
     return declared ? recordsKind(new Set(declared), true) : 'list';
   }
@@ -109,7 +109,11 @@ const CUT_WORDS: Readonly<Record<string, string>> = {
   budget: 'then its harness cut it off at its spend cap',
 };
 
-/** How a try ended and who said so. `none` is what the inspector says of a try with no statement and no reason on the record. */
+/**
+ * How a try ended and who said so. `none` is what the inspector says of a try with no statement and no reason on the record, and of any
+ * reason `MACHINE_WORDS` does not name but a harness's `failed` or `stopped`: the engine reports a harness's `done` with no statement as
+ * `unsigned`.
+ */
 export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>, none: string): Outcome {
   const latest = t.attempts.latest;
   if (t.closeout) return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null };
@@ -128,7 +132,6 @@ export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts
       words: `Its harness ended the session ${latest.ended}, and it said nothing of how it went.`,
     };
   }
-  // A harness's `done` with no statement is `unsigned` since 2026-09-19.
   return { by: 'nobody', words: none };
 }
 

@@ -1,7 +1,7 @@
 /**
  * What an engine's pass reads of a store of settled tasks, on the files store and through the meter (`Engine.io()`): once
  * a pass has folded a settled task, the passes after it read only the feed's new bytes and the journals the feed names,
- * until the engine is made again (`tick-memo.ts`).
+ * until the engine is made again (`core/engine/memo.ts`).
  *
  * The harness is a `PromiseRunner` that lists nothing and refuses every spawn, so each task settles on its first pass and
  * the only bytes a pass reads are the journal's: a detached harness would read its run files through the same meter.

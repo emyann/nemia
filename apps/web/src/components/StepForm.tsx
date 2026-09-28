@@ -108,7 +108,15 @@ export function StepForm({
   );
 }
 
-/** One key's field: its name, the control its kind is set with, and what it means. */
+/**
+ * One key's field: its name, the control its kind is set with, and what it means. A key the step's agent gives it is shown as the agent's,
+ * in place of none: the field is empty until the step sets it itself. A fence the step's harness does not have — `sandbox` on Claude Code,
+ * `permissionMode` on codex — is not drawn unless the step says it, to be taken off; nor is a key a remote agent does not take (`tools`,
+ * `model`, a fence), whose unset list is empty rather than null.
+ *
+ * No tools typed is no `tools:` line, the harness's own set; no rule typed denies nothing; a list of commas is the package's to refuse. A
+ * count of tokens is written as a person writes it, `200k`, and put in the draft as the number; a word it cannot read is left unset.
+ */
 function KeyInput({
   field,
   step,
@@ -126,14 +134,11 @@ function KeyInput({
 }) {
   const id = useId();
   const { key, kind, meaning } = field;
-  // A key the step's agent gives it is shown as the agent's, in place of none: the field is empty until the step sets it itself.
   const inherited = step.own !== null && form.roleKeys.includes(key) && !step.own.keys.includes(key);
   const value = inherited ? (Array.isArray(step.spec[key]) ? [] : null) : step.spec[key];
   const given = inherited ? givenText(key, step.spec[key], step.spec.agent) : null;
   const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v, form));
   const harness = step.spec.harness ?? form.defaultHarness;
-  // A fence the step's harness does not have — `sandbox` on Claude Code, `permissionMode` on codex — is not drawn, unless the step says it,
-  // to be taken off; nor is a key a remote agent does not take (`tools`, `model`, a fence), whose unset list is empty rather than null.
   const unset = value === null || (Array.isArray(value) && value.length === 0);
   if (!takes(form, field, harness) && unset && given === null) return null;
 
@@ -221,7 +226,6 @@ function KeyInput({
           value={listed ? listed.join(', ') : ''}
           placeholder={given ?? (key === 'tools' ? "the harness's own set" : 'nothing denied')}
           canon={(typed) => listOf(typed).join(', ')}
-          // No tools typed is no `tools:` line, the harness's own set; no rule typed denies nothing. A list of commas the package refuses.
           commit={(typed) => set(key, (key === 'tools' && !typed.trim() ? null : listOf(typed)) as never)}
         />
       );
@@ -242,7 +246,6 @@ function KeyInput({
       );
       break;
     case 'tokens': {
-      // Written as a person writes it, `200k`, and put in the draft as the number; a word it cannot read is left unset.
       const tokens = value as number | null;
       control = (
         <Typed
@@ -323,7 +326,6 @@ function Choose({
   onChange,
   options,
   unset,
-  // Declared once: the compiler cannot reorder an arrow function written as a default.
   stray = asIs,
 }: {
   id: string;

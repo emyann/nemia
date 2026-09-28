@@ -269,9 +269,12 @@ function RuleRow({ rule, source, refuses = [] }: { rule: string; source: string;
 const OWN = "the harness's own";
 
 /**
- * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has (what was only
- * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny and ask rules that hold for it, and what it runs
- * without asking: Claude Code's read-only commands, and what the settings allow it. A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
+ * What one step of a workflow gets: the fence its file declares, its mode under its harness's own name (Codex's sandbox, Claude Code's
+ * permission mode), then — on Claude Code, whose set was measured — the tools it has (what was only inferred, dashed), the skills it can
+ * load, the tools of each server the checkout enables, the deny and ask rules that hold for it, and what it runs without asking: Claude
+ * Code's read-only commands, and what the settings allow it. A server's tool is refused where a rule denies it, where the step runs in
+ * `dontAsk` and no rule allows it, and where an ask rule makes it ask while something denies an ask without a prompt (`askDenier`:
+ * `dontAsk`, or a job). A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
  */
 function StepRow({ step, measured, readOnly }: { step: StepReach; measured: MeasuredTools; readOnly: ReadOnlyCommands }) {
   const { fence, tools, skills, mcp, denied, asked, allowed } = step;
@@ -295,7 +298,6 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
             ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
             ['disallowed tools', fence.disallowedTools.join(', ') || 'nothing'],
             ['allowed tools', fence.allowedTools.join(', ') || 'nothing'],
-            // Each harness has one fence under its own name: Codex's sandbox, Claude Code's permission mode.
             step.harness === 'codex' ? ['sandbox', fence.sandbox ?? OWN] : ['permission mode', fence.permissionMode ?? OWN],
             ['effort', fence.effort ?? OWN],
             ['mcp', 'none named: a step has no mcp: key'],
@@ -380,7 +382,6 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                     {server.tools ? (
                       <span className="flex flex-wrap gap-1">
                         {server.tools.map((tool) => {
-                          // In dontAsk what no rule allows is denied; in dontAsk or on a job, what an ask rule makes ask is.
                           const refused =
                             tool.denied !== null ||
                             (allowed.dontAsk && !tool.allowed) ||

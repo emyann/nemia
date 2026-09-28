@@ -4,8 +4,11 @@ import { FactoryCanvas } from '@/components/FactoryCanvas';
 import { daemonQuery, inboxQuery, quotaQuery, runsQuery } from '@/lib/api';
 
 export const Route = createFileRoute('/')({
-  // The inbox too, for the queue's ghosts beside the floor, and the quota and whether a daemon ticks over it: drawn with the first cards, the
-  // floor is fitted beside them. Prefetches, which never throw: what cannot be read says so over the floor, and the runs are drawn all the same.
+  /**
+   * Waits for the runs, and prefetches the inbox for the queue's ghosts beside the floor, the quota, and whether a daemon ticks over it,
+   * so the floor is fitted beside them with the first cards. A prefetch never throws: what cannot be read says so over the floor, and the
+   * runs are drawn all the same.
+   */
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(runsQuery),

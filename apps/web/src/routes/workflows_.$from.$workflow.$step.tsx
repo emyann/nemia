@@ -5,7 +5,10 @@ import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
 import { stepQuery } from '../lib/api';
 
-// `workflows_`: at /workflows/$from/$workflow/$step, and not drawn inside the Workflows page, which has no outlet for it.
+/**
+ * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` draws it on its own, not inside the Workflows page,
+ * which has no outlet for it.
+ */
 export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(stepQuery(params.from, params.workflow, params.step)),
   component: StepPage,
@@ -18,14 +21,14 @@ export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
 });
 
 /**
- * One step of a workflow, to read: what it is told, rendered, the agent attached to it, if one is, linked, with what that agent says it can
- * do, then every key a step may set with its value and what it means — or, with Source, its file as written. It starts nothing: the
- * Workflows page does.
+ * One step of a workflow, to read: what it is told, rendered; the agent attached to it, if one is, read from the `agents/` beside its
+ * workflow and linked to its page in the step's own place, with what that agent says it can do (`skills:`), a description of the work that
+ * fences nothing; then every key a step may set with its value and what it means — or, with Source, its file as written. It starts nothing:
+ * the Workflows page does.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
   const { data: page } = useSuspenseQuery(stepQuery(from, workflow, step));
-  // The agent attached to this node, if one is: read from the agents/ beside its workflow, so its page is in the step's own place.
   const agent = page.keys.find((row) => row.key === 'agent')?.value ?? null;
 
   return (
@@ -55,7 +58,6 @@ function StepPage() {
               Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions
               it is told first.
             </p>
-            {/* What that agent says it can do (`skills:`), read beside this workflow: a description of the work, which fences nothing. */}
             <Skills skills={page.agentSkills} className="pl-3" />
           </div>
         )}

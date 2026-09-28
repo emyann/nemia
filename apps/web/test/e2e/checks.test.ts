@@ -32,8 +32,8 @@ import {
 
 let browser: Browser;
 /**
- * A server on this machine, for what a route cannot fake: a stream held open — the feed's, and a run's — and a request answered late. Its
- * pages are `served`'s.
+ * A server on this machine, for what a route cannot fake: a stream held open — the feed's, and a run's: its headers and a comment, never an
+ * end — and a request answered late, on a timer that does not hold the tests open. Its pages are `served`'s.
  */
 let server: http.Server;
 let origin: string;
@@ -43,12 +43,10 @@ before(async () => {
   server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://here');
     if (url.pathname === FEED_STREAM || url.pathname === '/api/runs/r-1/stream') {
-      // Headers and a comment, and never an end: an EventSource open for as long as the page is.
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
       res.write(': open\n\n');
       return;
     }
-    // Unref'd: an answer nobody waits for any more does not hold the tests open.
     if (url.pathname === '/api/slow')
       return void setTimeout(
         () => res.writeHead(200, { 'content-type': 'application/json' }).end('[]'),
@@ -223,10 +221,10 @@ test('a page that stays light in the dark is refused, and so is one nobody paint
     (err: Error) => err instanceof Refused && /^the page is dark — its background is rgb\(255, 255, 255\), which is not$/.test(err.message),
   );
   await assert.rejects(expectTheme((await pageWith('<p>unpainted</p>', { theme: 'dark' })).page, 'dark'), Refused);
-  // And the emulation itself: a light browser asked to be judged dark.
   await assert.rejects(
     expectTheme((await pageWith(themed)).page, 'dark'),
     (err: Error) => err instanceof Refused && err.message === 'the browser prefers dark — it prefers light',
+    'a light browser asked to be judged dark is refused',
   );
 });
 
@@ -324,18 +322,18 @@ test('an edge back that runs beside its steps, or over them, is refused, naming 
     <div class="over" data-id="over" style="position:absolute;left:50px;top:40px;width:300px;height:200px"></div>
   </div>`);
   await expectBeneath(page.locator('.edge'), page.locator('.step'), 'the edge back runs beneath the row');
-  // Level with the row: it reaches no lower than review, the taller of the two.
   await assert.rejects(
     expectBeneath(page.locator('.beside'), page.locator('.step'), 'the edge back runs beneath the row'),
     (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — beside reaches no lower than review',
+    'an edge level with the row reaches no lower than review, the taller of the two, and is refused',
   );
-  // Lower than both, and over them too: it rises above the middle of each.
   await assert.rejects(
     expectBeneath(page.locator('.over'), page.locator('.step'), 'the edge back runs beneath the row'),
     (err: Error) =>
       err instanceof Refused &&
       err.message ===
         'the edge back runs beneath the row — over rises above the middle of implement, over rises above the middle of review',
+    'an edge lower than both steps and over them too rises above the middle of each, and is refused',
   );
   await assert.rejects(
     expectBeneath(page.locator('.gone'), page.locator('.step'), 'the edge back runs beneath the row'),
@@ -348,10 +346,10 @@ test('a card that does not end left of one that waits on it is refused, naming b
     <div class="child" data-id="b" style="position:absolute;left:150px;top:0;width:100px;height:50px"></div>
     <div class="under" data-id="c" style="position:absolute;left:80px;top:60px;width:100px;height:50px"></div>`);
   await expectLeftOf(page.locator('.parent'), page.locator('.child'), 'a is left of b');
-  // Begun before a ends, a row down: not left of it, though not over it either.
   await assert.rejects(
     expectLeftOf(page.locator('.parent'), page.locator('.under'), 'a is left of c', 300),
     (err: Error) => err instanceof Refused && err.message === 'a is left of c — a does not end left of c',
+    'c, begun before a ends a row down, is not left of it though not over it either, and is refused',
   );
   await assert.rejects(
     expectLeftOf(page.locator('.child'), page.locator('.parent'), 'b is left of a', 300),
@@ -442,12 +440,14 @@ test("the feed's stream left by the page's own reload is not counted — and one
   const { page, problems } = await servedPage(opens);
   const isStream = (r: { url: () => string }) => new URL(r.url()).pathname === FEED_STREAM;
   await page.waitForFunction(() => (window as unknown as { es: EventSource }).es.readyState === EventSource.OPEN);
-  // Playwright 1.62 reports nothing of a request its page left, so this much holds with the watch's rule or without it: the page below,
-  // whose events are emitted by hand, is where the rule is made to allow and to refuse.
   const [reopened] = await Promise.all([page.waitForResponse(isStream, { timeout: 5_000 }), page.reload({ waitUntil: 'load' })]);
   assert.ok(reopened.ok());
   await idle(page, 3_000);
-  assert.deepEqual(problems(), []);
+  assert.deepEqual(
+    problems(),
+    [],
+    "the stream the reload left is not counted — which Playwright 1.62, reporting nothing of a request its page left, passes with or without the watch's rule; the next test is where the rule allows and refuses",
+  );
 
   await page.evaluate(() => (window as unknown as { es: EventSource }).es.close());
   const want = `request failed: GET ${origin}${FEED_STREAM} — net::ERR_ABORTED`;
@@ -456,7 +456,6 @@ test("the feed's stream left by the page's own reload is not counted — and one
 });
 
 test("the watch lets the feed's stream be aborted by a navigation of the page committed after it opened, and counts every other failure", () => {
-  // A page as far as `watch` listens to one, its events emitted in the order a browser would report them.
   const main = {};
   const emitter = new EventEmitter();
   const page = Object.assign(emitter, { mainFrame: () => main }) as unknown as Page;
@@ -468,7 +467,6 @@ test("the watch lets the feed's stream be aborted by a navigation of the page co
     failure: () => ({ errorText: error }),
   });
   const failed = (pathname: string, error = 'net::ERR_ABORTED') => `request failed: GET http://e2e.test${pathname} — ${error}`;
-  // The page's own navigation: asked for, then committed.
   const navigate = (frame: object = main) => {
     emitter.emit('request', { ...request('/', { navigation: true }), frame: () => frame });
     emitter.emit('framenavigated', frame);
@@ -476,28 +474,32 @@ test("the watch lets the feed's stream be aborted by a navigation of the page co
   const { problems } = watch(page);
   const seen = () => problems().length;
 
-  // Opened, then the page reloads: its abort passes.
   const left = request(FEED_STREAM);
   emitter.emit('request', left);
   navigate();
   emitter.emit('requestfailed', left);
-  assert.deepEqual(problems(), []);
+  assert.deepEqual(problems(), [], 'a stream opened, then left by the page reloading, is let abort');
 
-  // Opened by the page it leaves while the navigation is on its way, before the commit: its abort passes too.
   const late = request(FEED_STREAM);
   emitter.emit('request', request('/', { navigation: true }));
   emitter.emit('request', late);
   emitter.emit('framenavigated', main);
   emitter.emit('requestfailed', late);
-  assert.deepEqual(problems(), []);
+  assert.deepEqual(
+    problems(),
+    [],
+    'a stream opened by the page it leaves while the navigation is on its way, before the commit, is let abort',
+  );
 
-  // Opened after that navigation, and aborted with no other: the board closed it.
   const closed = request(FEED_STREAM);
   emitter.emit('request', closed);
   emitter.emit('requestfailed', closed);
-  assert.deepEqual(problems(), [failed(FEED_STREAM)]);
+  assert.deepEqual(
+    problems(),
+    [failed(FEED_STREAM)],
+    'a stream opened after that navigation and aborted with no other, closed by the board, is counted',
+  );
 
-  // Opened, then a navigation, and failed some other way than an abort; and another stream, aborted the same way.
   const broken = request(FEED_STREAM, { error: 'net::ERR_INCOMPLETE_CHUNKED_ENCODING' });
   const other = request('/api/runs/r-1/stream');
   emitter.emit('request', broken);
@@ -505,39 +507,39 @@ test("the watch lets the feed's stream be aborted by a navigation of the page co
   navigate();
   emitter.emit('requestfailed', broken);
   emitter.emit('requestfailed', other);
-  assert.equal(seen(), 3);
+  assert.equal(seen(), 3, 'a stream failed some other way than an abort after a navigation, and another stream aborted, are both counted');
   assert.deepEqual(problems().slice(1), [failed(FEED_STREAM, 'net::ERR_INCOMPLETE_CHUNKED_ENCODING'), failed('/api/runs/r-1/stream')]);
 
-  // A navigation of a frame inside the page is not the page's own.
   const framed = request(FEED_STREAM);
   emitter.emit('request', framed);
   navigate({});
   emitter.emit('requestfailed', framed);
-  assert.equal(seen(), 4);
-  // Nor is a frame's commit while the page's own navigation is on its way: only the page's commit leaves the page.
+  assert.equal(seen(), 4, "a navigation of a frame inside the page is not the page's own: the stream's abort is counted");
   const pending = request(FEED_STREAM);
   emitter.emit('request', pending);
   emitter.emit('request', request('/', { navigation: true }));
   emitter.emit('framenavigated', {});
   emitter.emit('requestfailed', pending);
   emitter.emit('framenavigated', main);
-  assert.equal(seen(), 5);
+  assert.equal(
+    seen(),
+    5,
+    "a frame's commit while the page's own navigation is on its way does not leave the page: the stream's abort is counted",
+  );
 
-  // Nor is a same-document navigation (`history.pushState`), which asks for nothing.
   const pushed = request(FEED_STREAM);
   emitter.emit('request', pushed);
   emitter.emit('framenavigated', main);
   emitter.emit('requestfailed', pushed);
-  assert.equal(seen(), 6);
+  assert.equal(seen(), 6, "a same-document navigation (pushState) asks for nothing and leaves nothing: the stream's abort is counted");
 });
 
-test('idle lets go of the requests a page left behind when it reloaded, of which Playwright says nothing more — and of none on a pushState', async () => {
+test('idle lets go of the requests a page left behind when it reloaded or navigated, those its old document asked for on the way included, of which Playwright says nothing more — and of none on a pushState', async () => {
   const { page } = await servedPage('<p>ok</p>');
   await page.evaluate(() => void fetch('/api/slow?ms=60000'));
   await page.reload({ waitUntil: 'load' });
   await idle(page, 3_000);
 
-  // And of those the old document asks for while the navigation is on its way: a poll every 50 ms, and a page that answers after 800.
   const asked: string[] = [];
   let navigating = false;
   page.on('request', (r) => {

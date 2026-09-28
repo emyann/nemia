@@ -75,8 +75,8 @@ export const needText = (need: Need): string => {
 /**
  * A need as a step's node says it, which has one line about thirty characters wide and truncates: for a session the harness blocked with
  * a wait on it, the wait alone (`waiting for a permission prompt`). It is the one fact this page has nowhere else at a glance — the chip
- * above the line already says `needs-human`, and `blocked by the harness: ` is twenty-four characters, which left the wait cut off after
- * `waiting f…` and readable only on hover, where it already was. The whole of it, with what the session said last, is the line's `title`
+ * above the line already says `needs-human`, and `blocked by the harness: ` is twenty-four characters, which would leave room for a few of
+ * the wait's. The whole of it, with what the session said last, is the line's `title`
  * and the banner's. Every other need, and a harness that said nothing about what for, reads as it does anywhere else.
  */
 export const needNodeText = (need: Need): string => (need.kind === 'harness' && need.waitingFor ? need.waitingFor.words : needText(need));
@@ -144,7 +144,7 @@ export type Answer = Exclude<Offer, { kind: 'continue' }>;
  * such check — and a try of either that files a session is refused without the raise. None where the package takes none: the target of a
  * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off, and nothing on a run a
  * person holds (`wf hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that fails.
- * `holding` is read tolerantly, for an api older than the hold.
+ * A run without `holding` is taken for one nobody holds.
  */
 export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Offer[] {
   if (run.cancelledAt !== null || run.holding != null) return [];

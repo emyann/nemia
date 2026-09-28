@@ -11,7 +11,6 @@ export const invalidateAgents = (queryClient: QueryClient): Promise<unknown> =>
     queryClient.invalidateQueries({ queryKey: agentsQuery.queryKey }),
     queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true }),
     queryClient.invalidateQueries({ queryKey: keyFormQuery.queryKey, exact: true }),
-    // Not exact: a skill's page lists the agents that give it.
     queryClient.invalidateQueries({ queryKey: skillsQuery.queryKey }),
   ]);
 

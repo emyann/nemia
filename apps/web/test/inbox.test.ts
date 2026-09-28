@@ -63,29 +63,38 @@ test("a refused start or drop stays on the page after the inbox is read again: o
   ];
   const line = (l: ReturnType<typeof cardLines>[number]) => [l.entry.name, l.gone ? 'gone' : 'listed', l.refusal?.action ?? null];
 
-  // Read again after the answers: dropped-k2q9 and oldest-a1b2 are gone, started-e5f6 is still listed, as started.
   const lines = cardLines([newest, kept], refusals);
-  assert.deepEqual(lines.map(line), [
-    ['newest-c3d4', 'listed', null],
-    ['dropped-k2q9', 'gone', 'start'],
-    ['oldest-a1b2', 'gone', 'remove'],
-    ['started-e5f6', 'listed', 'start'],
-  ]);
+  assert.deepEqual(
+    lines.map(line),
+    [
+      ['newest-c3d4', 'listed', null],
+      ['dropped-k2q9', 'gone', 'start'],
+      ['oldest-a1b2', 'gone', 'remove'],
+      ['started-e5f6', 'listed', 'start'],
+    ],
+    'read again after the answers: dropped-k2q9 and oldest-a1b2 are gone, started-e5f6 is still listed, as started',
+  );
   assert.equal(lines[3].entry, kept, 'a card still listed is drawn as the inbox now lists it, not as it was refused');
   assert.equal(lines[1].refusal!.message, 'no card dropped-k2q9 in the inbox.', "with the api's words");
 
-  // Before the inbox is read again, each refused card is still listed: its refusal on it, and no line of its own.
-  assert.deepEqual(cardLines([newest, middle, oldest, kept], refusals).map(line), [
-    ['newest-c3d4', 'listed', null],
-    ['dropped-k2q9', 'listed', 'start'],
-    ['oldest-a1b2', 'listed', 'remove'],
-    ['started-e5f6', 'listed', 'start'],
-  ]);
-  // With no refusal, only what the inbox lists.
-  assert.deepEqual(cardLines([newest, kept], []).map(line), [
-    ['newest-c3d4', 'listed', null],
-    ['started-e5f6', 'listed', null],
-  ]);
+  assert.deepEqual(
+    cardLines([newest, middle, oldest, kept], refusals).map(line),
+    [
+      ['newest-c3d4', 'listed', null],
+      ['dropped-k2q9', 'listed', 'start'],
+      ['oldest-a1b2', 'listed', 'remove'],
+      ['started-e5f6', 'listed', 'start'],
+    ],
+    'before the inbox is read again, each refused card is still listed: its refusal on it, and no line of its own',
+  );
+  assert.deepEqual(
+    cardLines([newest, kept], []).map(line),
+    [
+      ['newest-c3d4', 'listed', null],
+      ['started-e5f6', 'listed', null],
+    ],
+    'with no refusal, only what the inbox lists',
+  );
 });
 
 test('REFUSED: a refusal is on the entry it is of, not on another of the same name — a card and a stray file beside it, notes.md and notes', () => {
@@ -101,7 +110,6 @@ test('REFUSED: a refusal is on the entry it is of, not on another of the same na
     ],
   );
 
-  // And the card gone since — dropped behind the page's back — leaves its refusal in its place, with the stray still listed and clear of it.
   const after = cardLines([stray], [refused]);
   assert.deepEqual(
     after.map((l) => [l.entry.file, l.gone, l.refusal?.action ?? null]),
@@ -109,6 +117,7 @@ test('REFUSED: a refusal is on the entry it is of, not on another of the same na
       ['notes.md', true, 'remove'],
       ['notes', false, null],
     ],
+    "the card dropped behind the page's back leaves its refusal in its place, with the stray still listed and clear of it",
   );
 });
 
@@ -159,10 +168,16 @@ test("REFUSED: no page for a stray file a card of the same name answers for — 
   const stray = entryOf('notes', false);
   assert.equal(hasPage(stray, [card, stray]), false, 'notes, beside notes.md');
   assert.equal(hasPage(card, [card, stray]), true, 'and the card keeps the page, which is the one the api reads');
-  // The stray alone is its own page: the api finds no card of that name, and answers with the file.
-  assert.equal(hasPage(stray, [stray]), true, 'notes, with no card beside it');
-  // Two strays of one name cannot both be listed — one file, one name — and a card's name is its file's: nothing else takes a card's page away.
-  assert.equal(hasPage(card, [card, entryOf('notes.txt', false)]), true);
+  assert.equal(
+    hasPage(stray, [stray]),
+    true,
+    'notes, with no card beside it, is its own page: the api finds no card of that name, and answers with the file',
+  );
+  assert.equal(
+    hasPage(card, [card, entryOf('notes.txt', false)]),
+    true,
+    "a card's name is its file's, and one name is one file: nothing else takes a card's page away",
+  );
 });
 
 test("a card's start is preset to the workflow it names, found as a start finds it: a name is the repository's, a path that folder", () => {
@@ -171,15 +186,18 @@ test("a card's start is preset to the workflow it names, found as a start finds 
     WORKFLOWS[0],
     "a name is the repository's workflow, though yours has one of that name too",
   );
-  // A card about the api's repository names one of its workflows, however the path is written.
-  for (const repo of [HERE, `${HERE}/`]) assert.equal(presetOf('dev', repo, HERE, WORKFLOWS), WORKFLOWS[0], repo);
+  for (const repo of [HERE, `${HERE}/`])
+    assert.equal(
+      presetOf('dev', repo, HERE, WORKFLOWS),
+      WORKFLOWS[0],
+      `a card about the api's repository, ${repo}, names one of its workflows`,
+    );
   assert.equal(
     presetOf('/home/me/.agent-workflows/workflows/dev', null, HERE, WORKFLOWS),
     WORKFLOWS[2],
     'an absolute path is that folder, yours included',
   );
   assert.equal(presetOf('/home/me/.agent-workflows/workflows/mine/', null, HERE, WORKFLOWS), WORKFLOWS[3], 'with a trailing slash too');
-  // A path names one folder, whatever repository the card is about.
   assert.equal(
     presetOf('/code/app/workflows/dev', '/code/other', HERE, WORKFLOWS),
     WORKFLOWS[0],
@@ -225,9 +243,11 @@ test("REFUSED: no preset for a name on a card about another repository, though t
 test("a card's repository on a team that works in folders: the start form says it is not looked at, before the start, and names it", () => {
   const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
   const said = ignoredRepoNote(inFolders, '/code/app');
-  assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
-  // The board says it before the start because a start the api takes opens the run's page: the api answers the same fact on the start
-  // (`ignoredRepo`), which a person would never read here.
+  assert.equal(
+    said,
+    "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.",
+    "said before the start: a start the api takes opens the run's page, so the api's `ignoredRepo` on the start is never read here",
+  );
   assert.match(said, /\/code\/app/, 'and it names the repository the card named, not a repository in general');
 });
 
@@ -245,10 +265,12 @@ test('a start sends the runs it waits on, as they were picked', () => {
 });
 
 test('REFUSED: a start of a team that works in folders sends none, whatever the picker was left holding', () => {
-  // The picker is hidden for a folder team, not emptied, and it is the same form on a card: pick runs under a git workflow, then pick
-  // the folder team, and what is no longer on the page would have been sent — for `wf start`'s refusal of `--after` on such a run.
   const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
-  assert.deepEqual(afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']), []);
+  assert.deepEqual(
+    afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']),
+    [],
+    'the picker is hidden for a folder team, not emptied: runs picked under a git workflow are not sent, which `wf start` refuses as `--after` on such a run',
+  );
 });
 
 /** The api answering each request with `answer()`, for the length of the test: the requests the board sent. */
@@ -351,8 +373,6 @@ test('a card is started through POST /api/runs with `card` beside the workflow a
   answer = answered(404, { error: refusal });
   await assert.rejects(startRun(asked), (err: Error) => err.message === refusal);
 });
-
-// ─── the queue ──────────────────────────────────────────────────────────────
 
 test('a place is said as a person says it: 1st, 2nd, 3rd, then th — 11th to 13th too — and 21st, 102nd', () => {
   assert.deepEqual([1, 2, 3, 4, 10, 11, 12, 13, 14, 21, 22, 23, 101, 102, 111, 112, 113].map(ordinal), [

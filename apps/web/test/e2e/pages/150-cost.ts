@@ -8,9 +8,12 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // What a run cost, and steps held on their budget: the run's cost in its header, a cost column on the timeline, a step's cost of its cap on
-  // its node and in the inspector, red past it — and the raises the Decide section offers, one refused in a page of its own, where it is not
-  // above what was spent, in the package's words and with nothing written. Nothing is taken: every page after this one reads the store as seeded.
+  /**
+   * What a run cost, and steps held on their budget: the run's cost and what its sessions read in its header, a cost column on the
+   * timeline, a step's cost of its cap on its node and in the inspector, red past it, and the raises the Decide section offers. In a page
+   * of its own, a raise not above what was spent is refused in the package's words, and nothing is written. The page ends with tokens'
+   * Details open for the photograph, and each page after it reads the store as seeded.
+   */
   name: 'cost',
   route: `/runs/${COSTLY.id}`,
   expect: async (page) => {
@@ -25,18 +28,16 @@ export default {
       page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }),
       `the run's header says what it cost (${COSTLY.cost})`,
     );
-    // Beside it, what the same sessions read: the classes every one of them measured, and the resumed session that rebuilt its cache.
     const runRead = page.locator('article header [data-run-read]');
     await expectVisible(
       runRead.locator('.font-mono', { hasText: COSTLY.read.run }),
-      `and what its sessions read, by price (${COSTLY.read.run})`,
+      `and what its sessions read, by price, in the classes every one of them measured (${COSTLY.read.run})`,
     );
     await expectVisible(
       runRead.locator('[data-rebuilt="1"]', { hasText: COSTLY.read.rebuilt }),
       'and that a resumed session rebuilt its cache, in words that say so',
     );
     await expectCount(runRead.locator('[data-peak]'), 0, "no peak on the run's: review's Codex sessions measured none");
-    // palette's section: its peak past 200k with no cap, marked.
     const palette = page.locator(`section#step-${COSTLY.asks.step}`);
     await expectVisible(
       palette.locator('dd [data-read]', { hasText: COSTLY.read.palette.counts }),
@@ -46,11 +47,10 @@ export default {
       palette.locator('[data-peak="large"]', { hasText: COSTLY.read.palette.peak }),
       `and marks its peak, past 200k with no cap`,
     );
-    // Whole: implement and review did their work, and are held on implement's budget alone — the reason has to be among those the banner gives.
     const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
     await expectVisible(
       page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }),
-      `the banner says every step past its budget waits on you, and why: ${reasons}`,
+      `the banner says every step past its budget waits on you, implement and review held on implement's budget alone, and why: ${reasons}`,
     );
     await expectVisible(
       page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${askingStep.step}"]`, {
@@ -59,7 +59,6 @@ export default {
       `the banner says what ${askingStep.step}, signed off blocked past its budget, asks`,
     );
 
-    // On the graph: each step's word with its amounts, amber and a human gate, and what its tries cost of its cap — red past it.
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
     await expectCount(
@@ -97,7 +96,6 @@ export default {
       `${held.step}, with no cap and no session priced, has no cost row: not $0`,
     );
 
-    // The timeline's cost column: each session's, `not measured` for the Codex sessions nobody priced, nothing for a check, and the totals.
     const timeline = page.locator('section[aria-label="Timeline"]');
     const cellsSay = async (cells: Locator, want: readonly string[], assertion: string) => {
       await expectCount(cells, want.length, assertion);
@@ -108,7 +106,7 @@ export default {
       await cellsSay(
         timeline.locator(`tr[data-step="${name}"][data-task="session"] [data-cell="cost"]`),
         costs,
-        `the timeline says what each of ${name}'s sessions cost (${costs.join(', ')})`,
+        `the timeline says what each of ${name}'s sessions cost, not measured for a Codex session nobody priced (${costs.join(', ')})`,
       );
     }
     await cellsSay(
@@ -127,7 +125,6 @@ export default {
       `the run's total says what it cost (${COSTLY.cost})`,
     );
 
-    // What `wf decide` says of steps held on their budget, and the raises: tokens' with its try, review's with its round, and none of implement's own.
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(
       decide.locator('[data-over-budget]', {
@@ -163,16 +160,14 @@ export default {
       raiseRow(decide, over.step).getByRole('radio', { name: /^a new session/ }),
       `a new session as an option to continuing ${over.step}'s`,
     );
-    // Its check refused: its check again is a way on too, which needs no raise; and anything to tell a new session, if you like.
     await expectVisible(
       raiseRow(decide, over.step).getByRole('radio', { name: /^its check again/ }),
-      `its check again as an option for ${over.step}, whose check refused`,
+      `its check again as an option for ${over.step}, whose check refused, which needs no raise`,
     );
     await expectVisible(
       raiseRow(decide, over.step).getByRole('textbox', { name: `What to tell ${over.step}, if anything` }),
       `a box for anything to tell ${over.step}`,
     );
-    // Signed off blocked past its budget: its question on its row, and the answer beside the raise — the button waits for it, and is not pressed.
     const answering = raiseRow(decide, askingStep.step);
     await expectVisible(
       answering.locator('[data-asks]', { hasText: `asks: ${askingStep.needs}` }),
@@ -202,8 +197,6 @@ export default {
       'once more: the round with its cap raised, as a line',
     );
 
-    // A raise not above what tokens' tries cost, in a page of its own whose one refusal is the point: the package's sentence beside the box,
-    // word for word, the amount still in it, and nothing written.
     const asks = path.join(store!, 'runs', `${COSTLY.id}.asks`);
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${COSTLY.id}/steps/${over.step}/retry`;
@@ -246,20 +239,20 @@ export default {
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), fullPage: true });
       await idle(refused);
-      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
         (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal, its answer and the line Chromium writes to the console for one, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     } finally {
       await refused.close();
       fs.rmSync(asks, { recursive: true, force: true });
     }
 
-    // tokens' Details: what its tries cost of its cap, red past it. Left open for the photograph.
     await node(over.step).click();
     const inspector = page.locator(`aside[aria-label="Step ${over.step}"]`);
     await inspector.getByRole('tab', { name: 'Details' }).click();
@@ -268,10 +261,9 @@ export default {
       `the inspector's Details say what ${over.step}'s tries cost of its cap (${over.of}), red past it`,
     );
     await expectVisible(inspector.locator('[data-state="over-budget"]', { hasText: over.status }), `and its word, ${over.status}`);
-    // And what its try read: its peak at its `context: 200k` cap, and its resumed session's rebuilt cache, each marked.
     await expectVisible(
       inspector.locator('[data-peak="cap"]', { hasText: COSTLY.read.tokens.peak }),
-      `the inspector marks ${over.step}'s peak at its cap (${COSTLY.read.tokens.peak})`,
+      `the inspector marks ${over.step}'s peak at its context: 200k cap (${COSTLY.read.tokens.peak})`,
     );
     await expectVisible(
       inspector.locator('[data-rebuilt="1"]', { hasText: COSTLY.read.rebuilt }),

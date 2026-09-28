@@ -74,7 +74,7 @@ export type StepTry = {
 
 /**
  * Mirrors `StepAttempts` in apps/api/src/detail/tries.ts. `endedAt` is when the latest attempt ended — the
- * engine's `Attempt.endedAt` — and null while it runs or on a record from before the engine kept it.
+ * engine's `Attempt.endedAt` — and null while it runs, or where the engine's record has none.
  */
 export type StepAttempts = {
   count: number;

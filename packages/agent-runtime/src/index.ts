@@ -28,37 +28,23 @@
  *
  * The list, in groups:
  *
- * - filing work, asking about it and stopping it (`engine.ts`);
+ * - filing work, asking about it and stopping it (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
  *   that checks a task before filing it holds its own copy to.
  */
 
-export {
-  file,
-  FileRefused,
-  requestStop,
-  answer,
-  close,
-  InputRefused,
-  admit,
-  AdmitRefused,
-  view,
-  viewOfState,
-  tick,
-  TickRefused,
-  step,
-  settleTask,
-  StepRefused,
-  GRACE_MS,
-} from './engine.ts';
-export type { Filing, RefusedMove, TaskView } from './engine.ts';
+export { file, FileRefused, requestStop, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
+export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';
+export type { Filing } from './core/engine/index.ts';
+export type { RefusedMove, TaskView } from './core/engine/index.ts';
 
-export { Journal, JournalError } from './journal.ts';
-export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './journal.ts';
+export { Journal, JournalError } from './core/engine/index.ts';
+export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/index.ts';
 
-export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';
+export { Runner, RunnerError, testOps } from './harness/index.ts';
+export { claudeOps } from './harness/claude/index.ts';
 export type {
   ExpectedSession,
   McpServer,
@@ -68,21 +54,22 @@ export type {
   Transcript,
   TranscriptCursor,
   TranscriptEvent,
-} from './runner.ts';
-export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness-args.ts';
-export type { HarnessArgs } from './harness-args.ts';
-export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
-export { detachedOps, STALE_MS } from './runner-detached.ts';
-export type { HarnessSpec } from './runner-detached.ts';
-export { remoteOps } from './a2a-remote.ts';
-export type { Credentials, RemoteAgent } from './a2a-remote.ts';
-export { codex } from './runner-codex.ts';
-export { claudeDetached } from './runner-claude-detached.ts';
-export { composite } from './runner-composite.ts';
-export { sdkRunner } from './runner-sdk.ts';
-export { a2aRunner } from './a2a-client.ts';
+} from './harness/index.ts';
+export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
+export type { HarnessArgs } from './harness/index.ts';
+export type { ClaudeFlags } from './harness/claude/index.ts';
+export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
+export type { HarnessSpec } from './harness/detached/detached.ts';
+export { remoteOps } from './a2a/index.ts';
+export type { Credentials, RemoteAgent } from './a2a/index.ts';
+export { codex } from './harness/codex/codex.ts';
+export { claudeDetached } from './harness/claude/index.ts';
+export { composite } from './harness/index.ts';
+export { sdkRunner } from './harness/index.ts';
+export { a2aRunner } from './a2a/index.ts';
 
-export type { Event, State, Attempt, SessionState, Ended, Outcome, Sighting, EndReason, Usage, Said, Denial, Input } from './domain.ts';
-export { denialText, fold, nameFor } from './domain.ts';
-export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
+export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';
+export type { SessionState, Ended, Outcome } from './core/index.ts';
+export { denialText, fold, nameFor } from './core/index.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';

@@ -81,7 +81,7 @@ const COMPONENTS: Components = {
   p: ({ node: _node, className, ...props }) => <p className={cn('my-2 leading-relaxed', className)} {...props} />,
   ul: ({ node: _node, className, ...props }) => <ul className={cn('my-2 list-disc space-y-1 pl-5', className)} {...props} />,
   ol: ({ node: _node, className, ...props }) => <ol className={cn('my-2 list-decimal space-y-1 pl-5', className)} {...props} />,
-  // A task's checkbox stands where a bullet would.
+  /** A task's checkbox stands where a bullet would. */
   li: ({ node: _node, className, ...props }) => (
     <li
       className={cn(
@@ -126,10 +126,10 @@ type MarkdownProps = {
  *
  * Raw HTML in the text is shown as the text it is, never as HTML: react-markdown turns it into text as it ships, and nothing here adds
  * a plugin that would parse it. A link's address passes react-markdown's own check, which empties a protocol that could run script.
- * Headings are two levels down (`SHIFTED`), and a text's footnotes are named apart from another text's on the same page.
+ * Headings are two levels down (`SHIFTED`), and a text's footnote ids have a prefix of its own, so two closeouts with a `[^1]` on one page
+ * each link to their own.
  */
 function MarkdownText({ children, className }: MarkdownProps): ReactNode {
-  // Footnote ids are the page's, so each text gets its own prefix: two closeouts with a `[^1]` on one page link each to its own.
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
   return (
     <div data-markdown className={cn('min-w-0 break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}>

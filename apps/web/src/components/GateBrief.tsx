@@ -28,14 +28,16 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
   return null;
 }
 
-/** A gate, told: the words off the record, the facts under them, then Approve and Send back. */
+/**
+ * A gate, told: the words off the record, the facts under them, then Approve and Send back. The facts read the run's decision once for this
+ * state of the run, as the run page's Decide section does — what it touched, and whether each branch still merges onto the base — on the
+ * detail the inspector has, never on the list the Factory polls.
+ */
 function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
   const gate = gateOfStep(run, step)!;
   const next = run.graph.edges.filter((e) => e.kind === 'after' && e.from === step.name).map((e) => e.to);
   const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : firstLine(step.body);
   const brief = gateBrief(gate, gate.ends ? says : null, next);
-  // The run's decision, read once for this state of the run, as the run page's Decide section reads it: what it touched, and whether each
-  // branch still merges onto the base. On the detail the inspector has, never on the list the Factory polls.
   const { data } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const facts = gateFacts(run, isDecidable(data) ? data : null);
 

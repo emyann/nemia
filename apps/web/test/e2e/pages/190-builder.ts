@@ -11,7 +11,7 @@ import { OUT, store } from '../world.ts';
 /** The workflow the `builder` page makes, and what its two steps' agents are told. */
 const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
 
-/** The workflow of yours the `builder` page opens a step with an agent on: `build`, whose agent is `agent`, and `other`, the agent it is moved to. */
+/** The workflow of yours the `builder` page opens a step with an agent on: its step `build` names the agent `agent`, and is moved to `other`. */
 const CREWED = { name: 'crew', agent: 'coder', other: 'critic' };
 
 /** The schema the `builder` page pastes for an `output:`: strict, as the parser takes one. */
@@ -46,11 +46,13 @@ async function addStep(builder: Locator, name: string, body: string): Promise<vo
 }
 
 export default {
-  // The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
-  // other, two keys set in the step's form, a schema pasted, saved — and the folder read back through the api and on disk — then taken back, so
-  // every page after this one, in either theme, reads the store as seeded. A cycle drawn and saved, with a schema pasted beside it, is refused in a page of its own, whose one
-  // refusal is the point, and nothing is written; a save of the folder changed by hand since is refused in another. The repository's workflow
-  // has no builder, and says why.
+  /**
+   * The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
+   * other, two keys set in the step's form, a schema pasted, saved, and the folder read back through the api and on disk, then taken back,
+   * so every page after this one, in either theme, reads the store as seeded. Each in a page of its own: a cycle drawn and saved, with a
+   * schema pasted beside it, refused, and nothing written; a save of the folder changed by hand since, refused; and a step with an agent,
+   * whose form shows what each agent picked gives it. The repository's workflow has no builder, and says why.
+   */
   name: 'builder',
   route: '/workflows',
   expect: async (page) => {
@@ -69,7 +71,6 @@ export default {
     await expectCount(card(page, good.name).getByRole('button', { name: 'Build', exact: true }), 0, `and offers no Build`);
     await expectVisible(card(page, yours.name).getByRole('button', { name: 'Build', exact: true }), `${yours.name}, yours, offers Build`);
 
-    // A cycle drawn and saved: refused in the package's words, shown above the canvas and on both steps it names, and nothing written.
     const mineDir = path.join(store!, 'workflows', yours.name);
     const before = filesIn(mineDir);
     const refused = await page.context().newPage();
@@ -82,7 +83,6 @@ export default {
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
       await expectVisible(builder, `Build opens ${yours.name}'s builder`);
       await addStep(builder, 'build', 'Build what PLAN.md says.');
-      // A good schema pasted for build's output, beside the cycle: the save is judged whole, so the refusal writes no schema either.
       await pasteSchema(builder, 'build', PASTED);
       await drawEdge(refused, builder, 'plan', 'build');
       await drawEdge(refused, builder, 'build', 'plan');
@@ -120,15 +120,13 @@ export default {
       await expectVisible(builder.locator('[data-unsaved]', { hasText: 'Unsaved changes' }), 'the draft is still unsaved');
       if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before))
         throw new Refused(
-          `nothing is written on a refusal, the pasted schema included — ${mineDir} holds ${filesIn(mineDir)
+          `nothing is written on a refusal, the pasted schema included: the save is judged whole — ${mineDir} holds ${filesIn(mineDir)
             .map(([f]) => f)
             .join(', ')}`,
         );
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `builder-refused-${await themeOf(refused)}.png`), fullPage: true });
 
-      // Nothing saved, so the draft is still there to change: an edge taken away by its button, and a loop drawn from the violet dot and
-      // taken away, each taking its key with it. None of it is saved.
       await builder.getByRole('button', { name: 'Remove the edge build → plan' }).click();
       await expectCount(builder.locator('.react-flow__edge'), 1, "the edge's button takes it away, and plan no longer waits on build");
       await expectCount(
@@ -139,7 +137,7 @@ export default {
       const buildKeys = builder.locator('[data-step-form="build"]');
       await drawEdge(refused, builder, 'build', 'plan', true);
       if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== 'plan')
-        throw new Refused("the loop drawn sets build's loop: plan in its form");
+        throw new Refused("the loop drawn from build's violet dot sets build's loop: plan in its form");
       if ((await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '3') throw new Refused('and its rounds, the default 3');
       await builder.getByRole('button', { name: "Remove build's loop back to plan" }).click();
       await expectCount(builder.locator('.react-flow__edge'), 1, "the loop's button takes it away");
@@ -150,21 +148,20 @@ export default {
         throw new Refused("and build's loop and rounds with it");
       }
       await idle(refused);
-      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 422: PUT ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
         (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal, its answer and the line Chromium writes to the console for one, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     } finally {
       await refused.close();
     }
     if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`${mineDir} is as seeded after the refused page`);
 
-    // The folder changed by hand while the builder has it open: the save is refused (409) rather than written over the change, which is kept,
-    // and Read the folder again starts the draft from what the folder holds now. In a page of its own, whose one refusal is the point.
     const planFile = path.join(mineDir, 'plan.md');
     const seeded = fs.readFileSync(planFile, 'utf8');
     const byHand = seeded.replace('harness: codex\n', 'harness: codex\ncheck: test -f PLAN.md\n');
@@ -179,9 +176,11 @@ export default {
       const builder = mine.locator(`section[data-builder="${yours.name}"]`);
       const keys = builder.locator('[data-step-form="plan"]');
       await expectVisible(keys, "plan's form, open as the builder opens");
-      // plan runs on codex: its fence is Codex's sandbox, and the form has no permission mode, which codex has not.
-      await expectVisible(keys.locator('[data-field="sandbox"] select'), "plan's form offers its sandbox");
-      await expectCount(keys.locator('[data-field="permissionMode"]'), 0, 'and no permission mode');
+      await expectVisible(
+        keys.locator('[data-field="sandbox"] select'),
+        "plan's form offers its sandbox: plan runs on codex, whose fence is Codex's sandbox",
+      );
+      await expectCount(keys.locator('[data-field="permissionMode"]'), 0, 'and no permission mode, which codex has not');
       await keys.getByRole('textbox', { name: 'What it is told' }).fill('Write PLAN.md, briefly.');
       fs.writeFileSync(planFile, byHand);
       const [answered] = await Promise.all([
@@ -234,10 +233,6 @@ export default {
       fs.writeFileSync(planFile, seeded);
     }
 
-    // A step with an agent: in a page of its own, over a folder and two agents of yours written for it and taken away after, nothing saved.
-    // Its form says the body is its own note, told after its agent's instructions; each key the agent gives it shows as the agent's; the
-    // picker offers no agent and each agent of yours; moved to another agent, the form shows what that one gives and nothing the last gave;
-    // and with no agent, the body is all it is told again.
     const { name: crew, agent, other } = CREWED;
     const crewDir = path.join(store!, 'workflows', crew);
     const agentsDir = path.join(store!, 'workflows', 'agents');
@@ -316,7 +311,6 @@ export default {
       if (hadAgents) fs.rmSync(path.join(agentsDir, `${other}.md`), { force: true });
     }
 
-    // A workflow made, built and saved.
     const { name, plan, implement } = BUILT;
     const made = path.join(store!, 'workflows', name);
     try {
@@ -378,7 +372,6 @@ export default {
       if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json')
         throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
 
-      // Read back through the api, as a start would read it, and on disk.
       const answered = await page.request.get(new URL('/api/workflows', page.url()).href);
       const listing = (
         (await answered.json()) as Array<{
@@ -403,7 +396,9 @@ export default {
         edges: [{ from: 'plan', to: 'implement', kind: 'after' }],
       };
       if (JSON.stringify(read) !== JSON.stringify(want))
-        throw new Refused(`GET /api/workflows reads the folder as it was built — it read ${JSON.stringify(read)}`);
+        throw new Refused(
+          `GET /api/workflows reads the folder as it was built, as a start would read it — it read ${JSON.stringify(read)}`,
+        );
       const files = [
         ['implement.md', `---\nafter: plan\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`],
         ['implement.schema.json', `${PASTED}\n`],

@@ -48,8 +48,6 @@ import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './worl
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
 
-// ─── the servers, and stopping them ─────────────────────────────────────────
-
 const servers: Array<{ name: string; child: ChildProcess; output: () => string }> = [];
 
 /**
@@ -67,9 +65,7 @@ function listen(socket: string, onLine: (line: unknown) => void = () => {}): Pro
         let read: unknown = line;
         try {
           read = JSON.parse(line);
-        } catch {
-          // Kept as it came.
-        }
+        } catch {}
         heard.push(read);
         onLine(read);
       }
@@ -105,7 +101,10 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
 // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
 const ANSI = /\x1b\[[0-9;]*m/g;
 
-/** Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. */
+/**
+ * Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. Rejects when the server exits or
+ * cannot start before that, or says nothing within `START_MS`; a server that dies after is seen as failed requests.
+ */
 function startServer(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, listening: RegExp): Promise<string> {
   const child = spawn(process.execPath, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let raw = '';
@@ -127,7 +126,6 @@ function startServer(name: string, args: string[], cwd: string, env: NodeJS.Proc
     };
     child.stdout.on('data', read);
     child.stderr.on('data', read);
-    // After it resolved, a rejection is a no-op; a server that dies mid-run shows as failed requests.
     child.on('exit', (code, signal) => fail(`exited (${signal ?? `code ${code}`}) before it was listening`));
     child.on('error', (err) => fail(`could not start: ${err.message}`));
   });
@@ -142,10 +140,21 @@ function fromNodeModules(file: string): string {
   }
 }
 
-// ─── the run ────────────────────────────────────────────────────────────────
-
+/**
+ * The run: loads the pages first, so a stray in pages/ is refused before the build, not after it; builds the app; seeds the store; starts
+ * the api and `vite preview`; and visits every page. The seed writes the diamond after the checkout's files, which its base commits; then
+ * the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, where the api reads
+ * when each task was filed.
+ *
+ * First on the api's PATH is a `claude` that lists the store's sessions (REGISTRY), HELD's blocked: the engine observes claude agents on
+ * every list, and the pages are about the store, not about the sessions on this machine. It answers the api's get_usage request too
+ * (quota.ts), with the store's answer (QUOTA.file) under the request's id, and waits on its stdin as Claude Code does; with no answer in
+ * the store, it ends as a claude that cannot answer would. Claude Code's transcripts are in the store (CLAUDE_CONFIG_DIR), where the engine
+ * reads a session's conversation, never from this machine's. draft's inbox (SAYING), the socket its registration names, listens before the
+ * api can be asked to say anything into it, and writes each arrival into draft's transcript, as a working session does when it reads the
+ * words between calls.
+ */
 async function main(): Promise<void> {
-  // First: a stray in pages/ is refused before the build, not after it.
   const pages = await loadPages();
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
 
@@ -157,7 +166,6 @@ async function main(): Promise<void> {
     throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''), { cause: err });
   }
 
-  // A string from here on, and the same store the pages read off world.ts.
   const store = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-'));
   setStore(store);
   seed(store);
@@ -167,19 +175,11 @@ async function main(): Promise<void> {
   seedInbox(store, checkout);
   seedQueue(store, checkout);
   seedQuota(store);
-  // After the checkout's files, which its base commits.
   seedDiamond(checkout, store);
-  // A run with no repository anywhere in it, newest of them all.
   seedFolder(store);
-  // Over every journal the seed wrote: where the api reads when each task was filed.
   seedFeed(store);
-  // A `claude` that lists the store's sessions (REGISTRY) — HELD's, blocked — first on the api's PATH. The engine observes `claude
-  // agents` on every list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
-  // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.
   const bin = path.join(store, 'bin');
   fs.mkdirSync(bin);
-  // It answers the api's get_usage request too (quota.ts), with the store's answer (QUOTA.file) under the request's id, and waits on its stdin
-  // as Claude Code does; with no answer in the store, it ends as a claude that cannot answer would.
   const answer = path.join(store, QUOTA.file);
   fs.writeFileSync(
     path.join(bin, 'claude'),
@@ -197,8 +197,6 @@ async function main(): Promise<void> {
     { mode: 0o755 },
   );
 
-  // draft's inbox (SAYING): the socket its registration names, listening before the api can be asked to say anything into it.
-  // And, as a working session does when it reads the words between calls, the stand-in writes their arrival into draft's transcript.
   const draftTranscript = path.join(store, DRAFT_TRANSCRIPT);
   await listen(path.join(store, INBOX), (line) => {
     const { session_id: sessionId, message } = (line ?? {}) as { session_id?: unknown; message?: { content?: unknown } };
@@ -211,9 +209,9 @@ async function main(): Promise<void> {
     WF_ROOT: store,
     HKB_REPO: checkout,
     CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
-    // The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written.
+    /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */
     HKB_QUOTA_KEEP_MS: '0',
-    // And after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back.
+    /** Asked again at once after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back. */
     HKB_QUOTA_BACKOFF_MS: '0',
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });

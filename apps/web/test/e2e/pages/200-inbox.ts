@@ -18,9 +18,13 @@ const STARTED = 'Cache the views between passes\n\nRead each journal once a pass
 const STARTED_AS = 'show-what-a-step-cost-on-the-e2e0';
 
 export default {
-  // The inbox: the seeded cards, newest first; a card filed from the box, then removed with its Remove; a card's start form, preset from the
-  // card; and, each in a page of its own, a card started — which opens its run's page — a card started already, an empty inbox, and a start
-  // refused because the card is gone. Every write is taken back, so every page after this one, in either theme, reads the store as seeded.
+  /**
+   * The inbox: the seeded cards, newest first, and the queue; a card filed from the box, queued, unqueued, then removed with its Remove; a
+   * card's start form, preset from the card. Each in a page of its own: a card started, which opens its run's page; a start whose card
+   * cannot be removed; a card started already; a card about another repository; stray files and a folder; an empty inbox; and a start, a
+   * remove and a queue each refused behind the page's back. Every write is taken back, so every page after this one, in either theme,
+   * reads the store as seeded.
+   */
   name: 'inbox',
   route: '/inbox',
   expect: async (page) => {
@@ -36,12 +40,11 @@ export default {
     const listed = (p: Page) => p.locator('section[aria-label="Cards"] li[data-card]');
     const order = (p: Page) => listed(p).evaluateAll((items) => items.map((item) => item.getAttribute('data-card')));
 
-    // The queued cards were filed before the rest, the first queued first: newest first, they are listed last, the last filed first.
     const queuedByFiling = [QUEUE.third, QUEUE.refused, QUEUE.first].map((c) => c.name);
     await expectCount(listed(page), 3 + QUEUED.length, `a card per file in the inbox: the ${3 + QUEUED.length} the store has`);
     if (JSON.stringify(await order(page)) !== JSON.stringify([bare.name, rich.name, planned.name, ...queuedByFiling])) {
       throw new Refused(
-        `the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${rich.name}, then ${planned.name}, then ${queuedByFiling.join(', ')} — and they were listed ${(await order(page)).join(', ')}`,
+        `the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${rich.name}, then ${planned.name}, then the queued cards, filed before the rest, the last filed first, ${queuedByFiling.join(', ')} — and they were listed ${(await order(page)).join(', ')}`,
       );
     }
     for (const card of [planned, bare, rich]) {
@@ -68,8 +71,6 @@ export default {
     );
     await expectCount(cardIn(page, bare.name).locator('[data-workflow]'), 0, `${bare.name} names no workflow, and shows none`);
 
-    // The queue: each queued card says its place and when it was queued, and offers Unqueue, not Queue; the card whose start the tick
-    // refused says why, and that it stays queued. A card that names a workflow and is not queued offers Queue; one that names none does not.
     await expectTexts(
       page.locator('section[aria-label="Cards"] h2 [data-queue-count]'),
       [`· ${QUEUED.length} queued`],
@@ -105,7 +106,6 @@ export default {
       `${bare.name}, which names no workflow, offers no Queue`,
     );
 
-    // Filed from the box, with a workflow and the repository it is prefilled with — the api's own — then removed with its Remove.
     const box = page.locator('form[aria-label="File a card"]');
     const idea = box.getByRole('textbox', { name: 'An idea' });
     const fileIt = box.getByRole('button', { name: 'File' });
@@ -139,8 +139,6 @@ export default {
       await expectVisible(cardIn(page, name).locator('[data-title]', { hasText: FILED.split('\n')[0] }), 'by its first line');
       if ((await idea.inputValue()) !== '') throw new Refused('the box is emptied once the card is filed');
 
-      // Queued from its button, behind the three queued already, then taken off the queue with Unqueue, both through the proxy: the card
-      // written as wf inbox queue writes it, and back as it was.
       const fresh = cardIn(page, name);
       const [queued] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${name}/queue`, {
@@ -191,8 +189,6 @@ export default {
       fs.rmSync(written, { force: true });
     }
 
-    // Queued and taken off the queue from its buttons, a card that is not the newest: it keeps its place in the list and the time it was
-    // filed, and its file its mtime — a queue is no edit of the idea — and it is written back as it was. Put back all the same.
     {
       const file = path.join(inbox, `${planned.name}.md`);
       const [text, mtime] = [fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs];
@@ -215,7 +211,7 @@ export default {
         }
         if (fs.statSync(file).mtimeMs !== mtime)
           throw new Refused(
-            `${when}, ${file} keeps its mtime — it was ${new Date(mtime).toISOString()}, and is ${fs.statSync(file).mtime.toISOString()}`,
+            `${when}, ${file} keeps its mtime, a queue being no edit of the idea — it was ${new Date(mtime).toISOString()}, and is ${fs.statSync(file).mtime.toISOString()}`,
           );
       };
       try {
@@ -256,7 +252,6 @@ export default {
       }
     }
 
-    // A card's start form: the workflow preset from the card, the brief prefilled from its body, and the runs to wait on.
     const plannedItem = cardIn(page, planned.name);
     await plannedItem.getByRole('button', { name: 'Start' }).click();
     const workflowPick = plannedItem.getByRole('combobox', { name: 'Workflow' });
@@ -279,8 +274,6 @@ export default {
     await plannedItem.getByRole('button', { name: 'Close' }).click();
     await expectCount(startForm, 0, 'Close folds the start form away');
 
-    // Started, in a page of its own: the brief as edited, posted with the card; the run's page opens; the record carries where it came from,
-    // and the card has left the inbox. Taken back: the record removed, and the card written again as it was.
     const cardFile = path.join(inbox, `${planned.name}.md`);
     const cardText = fs.readFileSync(cardFile, 'utf8');
     const cardTime = fs.statSync(cardFile).mtime;
@@ -340,9 +333,6 @@ export default {
       }
     }
 
-    // Started, and its card could not be removed — the inbox read-only — in a page of its own: the run is written and the page stays, the
-    // card says it was started as that run with the api's why, word for word, once the inbox is read again too, and offers Start no more.
-    // Taken back: the inbox writable again, the record removed. Not as root, which removes a file from a read-only folder all the same.
     if (process.getuid?.() === 0) {
       console.log('e2e: inbox — a start whose card cannot be removed is not looked at as root, which removes it all the same');
     } else {
@@ -356,7 +346,6 @@ export default {
         await item.getByRole('button', { name: 'Start' }).click();
         const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
         await expectVisible(form.getByRole('button', { name: 'Start' }), `Start opens ${planned.name}'s start form`);
-        // Waited on from before the start, so the read its answer asks for is not missed: nothing else on the page reads the inbox again.
         const reread = kept.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', {
           timeout: WAIT_MS,
         });
@@ -368,10 +357,9 @@ export default {
         const answer = (await started.json()) as { id?: string; removed?: boolean; why?: string };
         if (started.status() !== 201 || answer.removed !== false || !answer.why?.startsWith(`${cardFile} could not be removed — `)) {
           throw new Refused(
-            `the api starts a card it cannot remove, and says so — it answered ${started.status()}: ${JSON.stringify(answer)}`,
+            `the api starts a card it cannot remove, the inbox read-only, and says so — it answered ${started.status()}: ${JSON.stringify(answer)}`,
           );
         }
-        // Once the inbox has been read again, which names the run: the form gone, the why still there.
         const listing = (await (await reread).json()) as Array<{ name: string; startedAs: string[] }>;
         if (JSON.stringify(listing.find((e) => e.name === planned.name)?.startedAs) !== JSON.stringify([answer.id])) {
           throw new Refused(`the inbox read again names the run the card was started as — it listed ${JSON.stringify(listing)}`);
@@ -406,7 +394,6 @@ export default {
       }
     }
 
-    // A card a run's record already names — started, its removal failed — in a page of its own: linked to its run, Remove only. Taken back.
     const startedRecord = path.join(runsDir, `${STARTED_AS}.json`);
     const already = await page.context().newPage();
     try {
@@ -454,9 +441,6 @@ export default {
       fs.rmSync(startedRecord, { force: true });
     }
 
-    // A card about another repository that names `dev`, which the api's repository has too, in a page of its own: a start of it from the
-    // command line looks for `dev` in the card's repository, so the form presets none of the api's workflows, says whose `dev` the card
-    // means, and offers no Start until one is picked. The card written by hand, and taken back.
     const elsewhere = path.join(store!, 'hkb-v2');
     const elsewhereName = 'a-card-about-another-repo-e2e0';
     const elsewhereFile = path.join(inbox, `${elsewhereName}.md`);
@@ -472,7 +456,7 @@ export default {
       await expectVisible(pick, `Start opens ${elsewhereName}'s start form`);
       if ((await pick.inputValue()) !== '') {
         throw new Refused(
-          `a card about ${elsewhere} that names ${WORKFLOWS.good.name} presets none of the api's workflows — it preset ${JSON.stringify(await pick.inputValue())}`,
+          `a card about ${elsewhere} that names ${WORKFLOWS.good.name} presets none of the api's workflows, as a start from the command line looks for ${WORKFLOWS.good.name} in the card's repository — it preset ${JSON.stringify(await pick.inputValue())}`,
         );
       }
       await expectVisible(
@@ -495,10 +479,6 @@ export default {
       fs.rmSync(elsewhereFile, { force: true });
     }
 
-    // What is in the inbox besides cards, in a page of its own: a stray file and a folder, each listed with why it is not a card. The file's
-    // name opens its page — its refusal and the file as written — and the folder, whose name `sub/` the api refuses, has no page to open.
-    // Beside them a card and a stray file of one name, `notes.md` and `notes`: /inbox/notes is the card's, so the stray opens nothing.
-    // All taken back.
     const strayFile = path.join(inbox, 'notes.txt');
     const strayText = 'Not a card: notes kept beside the cards.\n';
     const folder = path.join(inbox, 'sub');
@@ -520,7 +500,6 @@ export default {
         0,
         'and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed',
       );
-      // A stray file and a card of one name: both listed as `notes`, and the page the name opens is the card's, so only the card is linked.
       const named = cardIn(strays, 'notes');
       await expectCount(named, 2, 'a card and a stray file of one name are both listed, under that name');
       const namedStray = named.filter({ hasText: 'notes: not a card' });
@@ -560,7 +539,6 @@ export default {
       fs.rmSync(namedCard, { force: true });
     }
 
-    // An empty inbox, in a page of its own: every card set aside, and put back.
     const aside = path.join(store!, 'inbox-aside');
     const empty = await page.context().newPage();
     try {
@@ -589,21 +567,18 @@ export default {
       }
     }
 
-    /** Waited on from before the answer, so the read of the inbox the answer asks for is not missed. */
     const rereadOf = (p: Page) =>
       p.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS });
-    /** That a page saw the one refusal it made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else. */
     const onlyRefusal = (p: Page, seen: string[], answered: Response) => {
       const expected = `request answered ${answered.status()}: ${answered.request().method()} ${answered.url()}`;
       const chromium = new RegExp(`^console error: Failed to load resource: the server responded with a status of ${answered.status()}\\b`);
       const others = seen.filter((problem) => problem !== expected && !chromium.test(problem));
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal, its answer and the line Chromium writes to the console for one, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     };
 
-    // Refused, in a page of its own whose one refusal is the point: the card dropped behind the page's back — `wf inbox rm` in a terminal —
-    // after its start form opened. The inbox is read again after the answer, so the card leaves the list, and the package's sentence stays,
-    // word for word, in the card's place; no run written; the card put back.
     const bareFile = path.join(inbox, `${bare.name}.md`);
     const bareAside = path.join(store!, `${bare.name}.md.aside`);
     const refused = await page.context().newPage();
@@ -670,8 +645,6 @@ export default {
       if (fs.existsSync(bareAside)) fs.renameSync(bareAside, bareFile);
     }
 
-    // Remove refused, in a page of its own: the card dropped behind the page's back before its Remove was clicked — a 404. As a start's: the
-    // card leaves the list once the inbox is read again, the package's sentence stays in its place, and Dismiss takes that away. Put back.
     const plannedAside = path.join(store!, `${planned.name}.md.aside`);
     const unremoved = await page.context().newPage();
     try {
@@ -719,8 +692,6 @@ export default {
       if (fs.existsSync(plannedAside)) fs.renameSync(plannedAside, cardFile);
     }
 
-    // Start refused with a 409, in a page of its own: a run started the card behind the page's back — its removal failed — after its form
-    // opened. The inbox read again lists the card as started, so its form goes, and the package's sentence stays on the card. Taken back.
     const conflicted = await page.context().newPage();
     try {
       const { problems } = watch(conflicted);
@@ -793,10 +764,6 @@ export default {
       fs.rmSync(startedRecord, { force: true });
     }
 
-    // Queue refused with a 409, in a page of its own whose one refusal is the point: the card queued behind the page's back — from another tab
-    // of the board, through the api, which this page's watch does not see — after the page listed it. The inbox read again says it is queued,
-    // offers Unqueue, and lists it where it was; the package's sentence stays on the card, word for word. Taken back: the card written, and
-    // dated, as it was.
     const plannedText = fs.readFileSync(cardFile, 'utf8');
     const plannedTime = fs.statSync(cardFile).mtime;
     const requeued = await page.context().newPage();

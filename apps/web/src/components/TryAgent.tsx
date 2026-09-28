@@ -13,17 +13,20 @@ const code = (text: string) => <code className="font-mono text-xs break-all">{te
 /**
  * An agent of yours tried on a short brief: the fence said in one line, the brief and the button, and the latest try of it — its state, what
  * it spent of its dollar, the files it wrote and a link to its run. The api starts one try of an agent at a time, as an ordinary folder run of
- * the store's hidden `tries/<agent>` team (agents card 3c), and the button is held while one moves, with the reason beside it.
+ * the store's hidden `tries/<agent>` team, and the button is held while one moves, with the reason beside it.
  */
 export function TryAgent({ agent }: { agent: AgentListing }) {
   if (agent.untried) return <Untried untried={agent.untried} />;
   return <TryForm agent={agent} />;
 }
 
+/**
+ * The brief, the button and the try shown: the one this page started, before the list read again has it, else the agent's latest. A start
+ * reads the list of runs again alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state.
+ */
 function TryForm({ agent }: { agent: AgentListing }) {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState('');
-  // The try this page started: shown before the list, read again, has it.
   const [started, setStarted] = useState<string | null>(null);
   const { data: runs } = useQuery(runsQuery);
   const latest = latestTryOf(runs ?? [], agent.name);
@@ -34,7 +37,6 @@ function TryForm({ agent }: { agent: AgentListing }) {
     onSuccess: (tried) => {
       setBrief('');
       setStarted(tried.id);
-      // The list alone: a prefix would reach every run's decision, which is keyed by the run's state.
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
     },
   });

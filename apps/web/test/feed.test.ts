@@ -103,11 +103,10 @@ test('each event names the queries it can change, and no other: a step its run a
   assert.deepEqual(keysOf('step', 'r-1'), [['runs'], ['runs', 'r-1'], ['daemon']]);
   assert.deepEqual(keysOf('run', 'r-1'), [['runs'], ['runs', 'r-1'], ['ceilings'], ['inbox'], ['daemon']]);
   assert.deepEqual(keysOf('removed', 'r-1'), [['runs'], ['runs', 'r-1'], ['ceilings'], ['daemon']]);
-  // Never a decision: it is keyed by the run's state, and read again under a key of its own when the record moves.
   for (const event of ['step', 'run', 'removed'] as const) {
     assert.ok(
       keysOf(event, 'r-1').every((key) => key.length <= 2),
-      `${event} names no decision`,
+      `${event} names no decision: a decision is keyed by the run's state, read again under a key of its own when the record moves`,
     );
   }
 });
@@ -119,10 +118,10 @@ test('a run removed has its record read again, exactly: the read that finds none
   f.frame();
   const keys = f.invalidated[0].map((k) => JSON.stringify(k));
   assert.ok(keys.includes(JSON.stringify(['runs', 'r-1'])), `the run's record is read again: ${keys.join(' ')}`);
-  // Its record, and never its decision or another run's: invalidated exactly, a key of two.
   assert.deepEqual(
     keysOf('removed', 'r-1').filter((key) => key[0] === 'runs' && key.length > 1),
     [['runs', 'r-1']],
+    "its record, and never its decision or another run's: invalidated exactly, a key of two",
   );
   f.stop();
 });
@@ -172,7 +171,6 @@ test('the events that arrive together are read again once a frame, each key once
   f.stream().send('step', line('r-1', 'implement'), '20');
   f.stream().send('run', line('r-1'), '30');
   f.stream().send('step', line('r-2', 'plan'), '40');
-  // Typed as the list is: `assert.deepEqual` narrows what it compares to the type of what it is compared with, and `[]` is `never[]`.
   assert.deepEqual(f.invalidated, [] as QueryKey[][], 'nothing before the frame');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
@@ -261,19 +259,19 @@ test('a stream the api refused is opened again after a while from the last event
     'from the last event read',
   );
 
-  // Refused again before it opened: the cursor may be what is refused (a 400 reads as a proxy's 5xx does), so the next goes from the start.
   f.stream().refused();
   f.pass(REOPEN_MS);
   assert.deepEqual(
     f.streams.map((s) => s.after),
     [undefined, '42', undefined],
+    "refused again before it opened, the cursor may be what is refused (a 400 reads as a proxy's 5xx does): the next goes from the start",
   );
-  // And one from the start refused too — the api is not there yet — is tried again from the start.
   f.stream().refused();
   f.pass(REOPEN_MS);
   assert.deepEqual(
     f.streams.map((s) => s.after),
     [undefined, '42', undefined, undefined],
+    'one from the start refused too, while the api is not there yet, is tried again from the start',
   );
   f.stream().opens();
   assert.equal(f.statuses.at(-1), 'open');

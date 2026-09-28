@@ -27,8 +27,9 @@ import { StepNode, type StepFlowNode } from './StepNode';
 
 type Props = { run: RunDetail; selected: string | null; onSelect: (step: string | null) => void };
 
-// Declared once: a new object per render makes React Flow warn and mount every node afresh.
+/** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { step: StepNode };
+/** The canvas's edge types for React Flow, one object for the module's life. */
 const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
@@ -41,10 +42,10 @@ const button =
  * `graph` has them, never worked out here from a step's spec.
  *
  * Laid out from the `after` edges the first time the run is seen in this browser; after that, wherever a
- * person dragged the nodes, kept per run until "Reset layout" lays it out again.
+ * person dragged the nodes, kept per run until "Reset layout" lays it out again. The layering reads the steps' names and the graph's
+ * edges only, so a refetch that moves a status does not redo it; a graph that cannot be laid out is said in place of the canvas.
  */
 export function RunCanvas(props: Props) {
-  // The layering reads names and the graph's edges only, kept by their content, so a refetch that moves a status does not redo it.
   const names = useContent(props.run.steps.map((s) => s.name));
   const edges = useContent(props.run.graph.edges);
   const computed = useMemo(() => {
@@ -71,11 +72,11 @@ export function RunCanvas(props: Props) {
 
 /** A node as the canvas keeps it: where it is and how big React Flow measured it. What it shows is read from the run on every render. */
 type PlacedStep = Node<Record<string, never>, 'step'>;
+/** The node of the step `name` at `position`: its edges leave it on its right and arrive on its left, so the graph reads left to right. */
 const nodeAt = (name: string, position: Point): PlacedStep => ({
   id: name,
   type: 'step',
   position,
-  // The graph reads left to right: an edge leaves a step on its right and arrives on the left.
   sourcePosition: Position.Right,
   targetPosition: Position.Left,
   data: {},
@@ -85,24 +86,31 @@ const nodeAt = (name: string, position: Point): PlacedStep => ({
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
 
+/**
+ * The canvas of `RunCanvas`, given the layering it computed.
+ *
+ * - A node's place and size change only through a drag, a move by the arrow keys or React Flow measuring it, a step the workflow folder
+ *   gains or loses while the page is open (placed where it belongs, `place`), and Reset layout. What a node shows is read from the run
+ *   on every render, so a refetch moves the chips and leaves the nodes where a person put them. A node moved is saved in this browser.
+ * - A click or a key that selects a step hands it up (`onSelect`), and a click on the pane hands up none: the page owns the panel, so it
+ *   owns which step is selected.
+ * - Reset layout lays the nodes out again from `after`, forgets the saved arrangement, and fits the view once, after the commit that
+ *   moved them. The view is fitted again when the canvas changes width, as when the step panel opens beside it.
+ * - The legend wraps short of the minimap, drawn smaller than React Flow's own so it covers no node; arrowheads take their edges' colour
+ *   in both themes.
+ */
 function Canvas({ run, selected, onSelect, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
   const { fitView } = useReactFlow<StepFlowNode>();
   const runCancelled = run.cancelledAt !== null;
   const names = useContent(run.steps.map((s) => s.name));
 
-  // Where each node is and how big React Flow measured it, changed only through `onNodesChange`.
-  // What a node shows is not kept here: it is read from the run on every render below, so a
-  // refetch moves the chips and leaves the nodes where a person put them.
   const [placed, setPlaced] = useState<PlacedStep[]>(() => {
     const at = place(names, computed, readLayout(run.id));
     return names.map((name) => nodeAt(name, at.get(name)!));
   });
 
-  // Steps the workflow folder gained or lost while the page was open: add them where they belong.
   useEffect(() => {
-    // React Flow's nodes are state a drag and its measurements write too: the steps are merged into them after the commit, beside the
-    // arrangement saved in this browser.
-    // oxlint-disable-next-line react/set-state-in-effect
+    // oxlint-disable-next-line react/set-state-in-effect -- React Flow's nodes are state a drag and its measurements write too: the folder's steps are merged into them after the commit
     setPlaced((current) => {
       const have = new Map(current.map((n) => [n.id, n]));
       const at = place(names, computed, readLayout(run.id));
@@ -127,12 +135,9 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
 
   const edges = useMemo(() => stepEdges(run), [run]);
 
-  // Set when a person has moved a node — a drag, or the arrow keys — and cleared once it is saved.
   const moved = useRef(false);
   const onNodesChange = useCallback(
     (changes: NodeChange<StepFlowNode>[]) => {
-      // A click or a key picks the step to inspect. The page owns the panel, so it owns which step
-      // is selected: selection is handed up, not applied here.
       const picked = changes.find((c) => c.type === 'select' && c.selected);
       if (picked?.type === 'select') onSelect(picked.id);
       if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
@@ -150,15 +155,12 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   const running = run.steps.filter((s) => states.get(s.name) === 'working').map((s) => s.name);
   const focusRunning = () => void fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
 
-  // Laid out again from `after`, and the saved arrangement forgotten, so the next visit agrees.
   const [resets, setResets] = useState(0);
   const resetLayout = () => {
     forgetLayout(run.id);
     setPlaced((current) => current.map((n) => ({ ...n, position: computed.get(n.id) ?? n.position })));
     setResets((n) => n + 1);
   };
-  // Fitted after the commit that moved the nodes, once React Flow has them where they now are; and
-  // once per reset, not on every render after one.
   const fitted = useRef(0);
   useEffect(() => {
     if (resets === fitted.current) return;
@@ -166,8 +168,6 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
     void fitView({ ...FIT, duration: 300 });
   }, [resets, fitView]);
 
-  // Fitted again when the canvas changes width — the step panel opening beside it, mostly — or the
-  // nodes fitted to the wider canvas are left hanging off its edge.
   const frame = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = frame.current;
@@ -198,7 +198,6 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         selectionKeyCode={null}
         multiSelectionKeyCode={null}
         colorMode="system"
-        // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
         defaultMarkerColor={null}
         fitView
         fitViewOptions={FIT}
@@ -222,9 +221,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         </Panel>
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />
-        {/* Wrapped short of the minimap, which would cover its last words. */}
         <CanvasLegend className="mr-40 ml-14" />
-        {/* Smaller than React Flow's 200 × 150, which covers a node on a canvas this size. */}
         <MiniMap<StepFlowNode>
           pannable
           zoomable

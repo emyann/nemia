@@ -7,12 +7,14 @@ const none = new Set<string>();
 const shot = '/wf/runs/r-1/artifacts/implement/runs-light.png';
 const images = new Set([shot]);
 
-// Each field of the schemas the shipped agents declare (workflows/agents/*.schema.json), as they declare it.
+/** A list of findings, as the schemas of the shipped agents (workflows/agents/*.schema.json) declare it. */
 const findingsSchema = {
   type: 'array',
   items: { type: 'object', properties: { file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } } },
 };
+/** A list of files and how each changed, as the schemas of the shipped agents declare it. */
 const filesSchema = { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, change: { type: 'string' } } } };
+/** A list of strings, as the schemas of the shipped agents declare it. */
 const strings = { type: 'array', items: { type: 'string' } };
 
 test('an array of objects with a file and a line is findings — whatever else each says, and a null line among them', () => {
@@ -22,8 +24,11 @@ test('an array of objects with a file and a line is findings — whatever else e
   ];
   assert.equal(outputKind(findingsSchema, findings, none), 'findings');
   assert.equal(outputKind(undefined, [{ file: 'a', line: 1, finding: 'x' }], none), 'findings', 'with no schema, off the value alone');
-  // A finding whose text is not flat is still one: the place is what makes it a finding.
-  assert.equal(outputKind(undefined, [{ file: 'a', line: 1, what: { why: 'nested' } }], none), 'findings');
+  assert.equal(
+    outputKind(undefined, [{ file: 'a', line: 1, what: { why: 'nested' } }], none),
+    'findings',
+    'a finding whose text is not flat is still one: the place is what makes it a finding',
+  );
 });
 
 test("an array of objects with a finding and an answer is replies — the loop target's", () => {
@@ -68,7 +73,6 @@ test("a string that is the path of one of the try's image artifacts is the image
   assert.equal(outputKind({ type: 'string' }, shot, images), 'image');
   assert.equal(outputKind({ type: 'string' }, shot, none), 'text');
   assert.equal(outputKind({ type: 'string' }, 'other.png', images), 'text');
-  // `imagePaths` is what tells it: an image the api serves, not a text file nor a bare path.
   assert.deepEqual(
     [
       ...imagePaths([
@@ -78,6 +82,7 @@ test("a string that is the path of one of the try's image artifacts is the image
       ]),
     ],
     [shot],
+    '`imagePaths` tells it: an image the api serves, not a text file nor a bare path',
   );
 });
 
@@ -116,8 +121,7 @@ test('a value its schema does not describe is json, though its shape alone would
 });
 
 test("the kind is the value's and its schema's, never its field's name: it is not given one", () => {
-  // `outputKind` takes no name at all; what a field named `findings` holds decides, and the same value under any name draws alike.
-  assert.equal(outputKind.length, 3);
+  assert.equal(outputKind.length, 3, '`outputKind` takes no name at all: what a field holds decides, under any name');
   assert.equal(outputKind(strings, ['src/a.ts:12 — it breaks'], none), 'list', 'a `findings` that is strings is a list');
   assert.equal(outputKind(undefined, { findings: [] }, none), 'json');
 });

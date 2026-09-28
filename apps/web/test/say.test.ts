@@ -121,9 +121,12 @@ test("words the session's transcript shows reaching it are drawn once, as what w
   const drawnWith = (turns: ReturnType<typeof withSaid>) =>
     turns.filter((t) => (t.kind === 'system' || t.kind === 'told') && t.text.includes(words)).length;
 
-  // Working: the words alone, between the session's words and its calls. Folded and laid in as they were, they are drawn twice.
   const working = [...EVENTS.slice(0, 2), arrival('att-1', 15, words), ...EVENTS.slice(2)];
-  assert.equal(drawnWith(withSaid(foldTranscript(working), [told])), 2, 'the duplicate, without heardIn');
+  assert.equal(
+    drawnWith(withSaid(foldTranscript(working), [told])),
+    2,
+    "a working session's words, between its words and its calls, folded and laid in as they were: the duplicate, without heardIn",
+  );
   const heard = heardIn(working, [told]);
   assert.deepEqual(heard.said, [{ ...told, arrived: at(15) }]);
   assert.deepEqual(heard.events, EVENTS, "the session's line for the words is taken out, and nothing else");
@@ -135,18 +138,24 @@ test("words the session's transcript shows reaching it are drawn once, as what w
     'where the words reached it',
   );
 
-  // Idle: the words after Claude Code's line for a peer's message, starting a turn after the session's last words.
   const late = said(at(44), words);
   const idle = [...EVENTS, arrival('idle-1', 45, `Another Claude session sent a message:\n${words}`)];
-  assert.equal(drawnWith(withSaid(foldTranscript(idle), [late])), 2, 'the duplicate, without heardIn');
+  assert.equal(
+    drawnWith(withSaid(foldTranscript(idle), [late])),
+    2,
+    "an idle session's words after Claude Code's line for a peer's message, starting a turn: the duplicate, without heardIn",
+  );
   const heardIdle = heardIn(idle, [late]);
   assert.deepEqual([heardIdle.said, heardIdle.events], [[{ ...late, arrived: at(45) }], EVENTS]);
   const turns = withSaid(foldTranscript(heardIdle.events), heardIdle.said);
   assert.equal(drawnWith(turns), 1);
   assert.deepEqual(turns.at(-1), { kind: 'told', key: `told:1:${at(44)}`, at: at(44), attempt: 1, text: words, arrived: at(45) });
 
-  // Handed over a moment before the engine journalled them, as it hands them over first: still their arrival.
-  assert.equal(heardIn([arrival('att-2', 11, words)], [told]).said[0].arrived, at(11));
+  assert.equal(
+    heardIn([arrival('att-2', 11, words)], [told]).said[0].arrived,
+    at(11),
+    'handed over a moment before the engine journalled them, as it hands them over first: still their arrival',
+  );
 });
 
 test("REFUSED as an arrival: a line with other words, one that only mentions them, one written well before they were said, the session's own words, and a second line for words said once — each stays the session's, and words it has not shown have none", () => {

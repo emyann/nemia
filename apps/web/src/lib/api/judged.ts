@@ -12,13 +12,12 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
  * step that has signed off, whose closeout is what to read); or `git`, result branches ahead of the base that nothing in the workflow
  * merges.
  *
+ * On `approve`, `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on
+ * before it is filed; and `onto` the base branch the run's result is on its way to: what the Factory's card answers the gate with, off the list.
+ *
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
  */
 export type RunToDecide =
-  /**
-   * `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on before it
-   * is filed. `onto` is the base branch the run's result is on its way to. What the Factory's card answers the gate with, off the list.
-   */
   | { kind: 'approve'; step: string; says: string | null; back: string[]; onto: string | null; said: string; command: string }
   | { kind: 'git'; branches: string[]; said: string; command: string };
 

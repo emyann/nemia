@@ -7,9 +7,13 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
-  // The board continues a session the harness blocked, as `wf retry` does: refused first, in a page of its own, in the package's words
-  // beside the button; then taken — the ask written, and what the tick does with it said in the banner and in the Decide section. The ask
-  // is taken back, so every page after this one, in either theme, reads the store as seeded.
+  /**
+   * The board continues a session the harness blocked, as `wf retry` does. Its node spends its one narrow line on the wait, read whole.
+   * Continue is refused first, in a page of its own, where a file `wf retry` did not write sits at try 2's ask name (`strayAsk`): the
+   * package's sentence is beside the button, word for word, and nothing is written or stopped. Then it is taken: the ask written as a nudge
+   * with nothing said, the session left to the tick, and what the tick does with it said in the banner and in the Decide section. The page
+   * takes the ask back, so every page after it, in either theme, reads the store as seeded.
+   */
   name: 'held',
   route: `/runs/${HELD.id}`,
   expect: async (page) => {
@@ -33,9 +37,11 @@ export default {
       node.locator('[data-state="needs-human"]', { hasText: 'needs-human' }),
       "the step's chip is the engine's word, needs-human",
     );
-    // The node has one narrow line, so it spends it on the wait — and the wait must be read off it whole, not cut to `waiting f…`.
     const nodeNeed = node.locator('[data-need="harness"]');
-    await expectVisible(nodeNeed.filter({ hasText: new RegExp(`^${HELD.wait}$`) }), 'its node says what the harness waits for');
+    await expectVisible(
+      nodeNeed.filter({ hasText: new RegExp(`^${HELD.wait}$`) }),
+      'its node spends its one narrow line on what the harness waits for',
+    );
     await expectUncut(nodeNeed, "and says it whole: the line is the node's width, and the wait has to fit it");
     if ((await nodeNeed.getAttribute('title')) !== said)
       throw new Refused(`the whole of it is on hover — the node's title is ${JSON.stringify(await nodeNeed.getAttribute('title'))}`);
@@ -46,13 +52,9 @@ export default {
       r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${HELD.id}/steps/${HELD.blocked}/retry`;
     const asks = path.join(store!, 'runs', `${HELD.id}.asks`);
     const file = path.join(asks, `retry-${HELD.blocked}-2`);
-    // The tick stops the session, never the api: the engine's journal of the step's task stays as seeded, refused or taken.
     const journal = path.join(store!, 'engine', 'tasks', `${HELD.id}-${HELD.blocked}.jsonl`);
     const seeded = fs.readFileSync(journal, 'utf8');
 
-    // Refused first, in a page of its own whose one refusal is the point, as the `answer` page makes one: a file at try 2's ask name that
-    // `wf retry` did not write, which the package will not write over (`strayAsk`). Its sentence must be beside the button, word for word,
-    // and nothing written.
     fs.mkdirSync(asks, { recursive: true });
     fs.writeFileSync(file, '{}\n');
     const refused = await page.context().newPage();
@@ -88,21 +90,20 @@ export default {
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `held-refused-${await themeOf(refused)}.png`), fullPage: true });
       await idle(refused);
-      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
         (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal as the browser reports it (its answer, and the line Chromium writes to the console for one) and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     } finally {
       await refused.close();
       fs.rmSync(file, { force: true });
     }
 
-    // Continue, where the commands to copy were: a nudge, and a box for anything to tell it that may stay empty. No Decide section yet:
-    // nothing to decide while the run runs, and no try asked.
     const button = need.getByRole('button', { name: 'Continue' });
     await expectVisible(button, 'the banner offers Continue for a session the harness blocked');
     await expectVisible(
@@ -124,10 +125,9 @@ export default {
     if (took.try !== 2 || took.file !== file || took.stopFirst !== true) {
       throw new Refused(`the api answers with the try, its ask file and the package's stopFirst — it answered ${JSON.stringify(took)}`);
     }
-    // The ask is the package's file, as `wf retry` writes a nudge with nothing said; the api stopped nothing.
     const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
     if (written?.step !== HELD.blocked || written?.try !== 2 || written?.mode !== 'nudge' || 'message' in written) {
-      throw new Refused(`the ask is written as wf retry writes a nudge — ${file} holds ${JSON.stringify(written)}`);
+      throw new Refused(`the ask is written as wf retry writes a nudge with nothing said — ${file} holds ${JSON.stringify(written)}`);
     }
     if (fs.readFileSync(journal, 'utf8') !== seeded) throw new Refused(`the api stops no session, the tick does — ${journal} changed`);
 

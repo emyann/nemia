@@ -79,9 +79,11 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
   );
 }
 
-/** One agent: its name, linked to its page, what it is for, what it says it can do, the keys it sets, and the nodes that name it. */
+/**
+ * One agent: its name, linked to its page, what it is for, what it says it can do, the keys it sets on its nodes, what its sessions are told
+ * beyond its instructions (the skills it gives and its system prompt), and the nodes that name it.
+ */
 function AgentCard({ agent }: { agent: AgentListing }) {
-  // The keys it sets on its nodes, then what its sessions are told beyond its instructions: the skills it gives and its system prompt.
   const rows: [string, string][] = [
     ...ROLE_KEYS.filter((key) => agent.keys[key] !== undefined).map((key): [string, string] => [
       KEY_LABELS[key].toLowerCase(),

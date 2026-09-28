@@ -142,9 +142,12 @@ test("a gate on a step that ran is §6's: approving files what waits on it, and 
   const brief = gateBrief(gate, null, ['implement']);
   assert.equal(brief.approving, "Approving files implement, handed plan's closeout and your words, if any.");
   assert.equal(brief.sendingBack, 'Sending back asks plan for a new try, told your words; it waits at its gate again once it signs off.');
-  // An ending that has a task already — sent back and filed — holds after it ran, so a send-back asks it, not what it waits on.
   const ran = step('ship', { approve: 'approve ship', spec: { workspace: 'main' } as Step['spec'] });
-  assert.deepEqual(gateOfStep(detail([ran]), ran), { step: 'ship', ends: false, back: ['ship'], onto: 'main' });
+  assert.deepEqual(
+    gateOfStep(detail([ran]), ran),
+    { step: 'ship', ends: false, back: ['ship'], onto: 'main' },
+    'an ending that has a task already, sent back and filed, holds after it ran: a send-back asks it, not what it waits on',
+  );
 });
 
 const tried = (round: number, n = 1) => ({ try: n, round }) as Step['tries'][number];
@@ -183,15 +186,17 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
     { label: 'round', said: 'round 1 · cost not measured' },
     { label: 'last review', said: 'review left 2 findings and asks another round', state: undefined, step: 'review' },
   ]);
-  // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the fact says whose word ended the loop, with
-  // their words — not "asks another round", which would send whoever approves the ending looking for a round nobody will file.
   const accepted = [{ ...findings[0], accepted: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } }];
-  assert.deepEqual(gateFacts(detail(accepted, { cost: null }), null)[1], {
-    label: 'last review',
-    said: 'review left 2 findings; a person accepted the work as it stands, with them open: fan-in teams are follow-up work',
-    state: undefined,
-    step: 'review',
-  });
+  assert.deepEqual(
+    gateFacts(detail(accepted, { cost: null }), null)[1],
+    {
+      label: 'last review',
+      said: 'review left 2 findings; a person accepted the work as it stands, with them open: fan-in teams are follow-up work',
+      state: undefined,
+      step: 'review',
+    },
+    'a loop a person ended out of rounds (`wf accept`) still has `again: true` in its closeout: the fact says whose word ended it, with their words, not "asks another round"',
+  );
   const one = [
     { ...accepted[0], closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] },
   ];

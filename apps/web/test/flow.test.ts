@@ -24,7 +24,6 @@ const read = (flow: Flow): string[][] => {
 const arrows = (flow: Flow): Record<string, string> => Object.fromEntries(flow.arrows.map((a) => [a.id, a.state]));
 
 test('a chain is a row of pills, one arrow between each, done, running and to come', () => {
-  // The run's order is not the chain's: the layering puts each after the step it waits on.
   const names = ['review', 'implement', 'ship'];
   const flow = railOf(
     names,
@@ -32,7 +31,11 @@ test('a chain is a row of pills, one arrow between each, done, running and to co
     stepsOf({ review: 'working', implement: 'verified', ship: 'waiting' }),
     false,
   );
-  assert.deepEqual(read(flow), [['implement'], ['review'], ['ship']]);
+  assert.deepEqual(
+    read(flow),
+    [['implement'], ['review'], ['ship']],
+    "the run's order is not the chain's: the layering puts each after the step it waits on",
+  );
   assert.deepEqual(arrows(flow), { 'step:implement->step:review': 'running', 'step:review->step:ship': 'to-come' });
   assert.deepEqual(
     flow.pills.map((p) => [p.label, p.live]),
@@ -43,13 +46,11 @@ test('a chain is a row of pills, one arrow between each, done, running and to co
     ],
   );
   assert.equal(flow.error, null);
-  // A single row, with no arc over it or loop under it: no room kept for either.
-  assert.equal(flow.height, 20);
+  assert.equal(flow.height, 20, 'a single row, with no arc over it or loop under it: no room kept for either');
   assert.ok(flow.width <= RAIL_WIDTH, `${flow.width}`);
 });
 
-test('a fan-out is two lanes, and an edge that skips a column arcs over the row', () => {
-  // The Factory e2e's fake run: implement → review → respond, implement → respond, tokens → theme.
+test("a fan-out is two lanes, and an edge that skips a column arcs over the row: the Factory e2e's fake run", () => {
   const names = ['implement', 'review', 'respond', 'tokens', 'theme'];
   const graph = graphOf(after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme'));
   const flow = railOf(
@@ -61,16 +62,15 @@ test('a fan-out is two lanes, and an edge that skips a column arcs over the row'
   assert.deepEqual(read(flow), [['implement', 'tokens'], ['review', 'theme'], ['respond']]);
   const skip = flow.arrows.find((a) => a.id === 'step:implement->step:respond')!;
   const side = flow.arrows.find((a) => a.id === 'step:implement->step:review')!;
-  // Over: its control points above every pill; beside: level with its ends.
   const controls = (path: string) => [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => Number(m[2]));
   const top = Math.min(...flow.pills.map((p) => p.y));
   assert.ok(
     controls(skip.path)
       .slice(1, 3)
       .every((y) => y < top),
-    skip.path,
+    `over: its control points above every pill: ${skip.path}`,
   );
-  assert.ok(!controls(side.path).some((y) => y < top), side.path);
+  assert.ok(!controls(side.path).some((y) => y < top), `beside: level with its ends: ${side.path}`);
   assert.ok(top >= 12, 'room over the row for the arc');
 });
 
@@ -111,10 +111,12 @@ test('a loop past its first round says the round it is on, under the middle of i
   const [a, b] = tiles.pills;
   assert.equal(back.round.x, (a.x + a.width / 2 + b.x + b.width / 2) / 2);
   assert.ok(back.round.y > Math.max(...tiles.pills.map((p) => p.y + p.height)), 'under the tiles, where the curve is');
-  // On its first round, a loop says nothing of it; and an `after` arrow never does.
   const first = tilesOf(names, graph, stepsOf({ implement: 'working', review: 'waiting' }, { implement: 'round 1 of 3' }), false);
-  assert.equal(first.arrows.find((a) => a.loop)!.round, null);
-  assert.ok(tiles.arrows.filter((a) => !a.loop).every((a) => a.round === null));
+  assert.equal(first.arrows.find((a) => a.loop)!.round, null, 'on its first round, a loop says nothing of it');
+  assert.ok(
+    tiles.arrows.filter((a) => !a.loop).every((a) => a.round === null),
+    'an `after` arrow never says a round',
+  );
 });
 
 test('a run listed without its graph, by an api older than the board: its steps in its order, no arrows, and what to do', () => {
@@ -136,19 +138,17 @@ test('the window: four slots around the live column, the rest folded into a pill
   assert.deepEqual(windowOf(6, 3), { start: 2, end: 3 });
   assert.deepEqual(windowOf(6, 5), { start: 3, end: 5 });
   assert.deepEqual(windowOf(6, 0), { start: 0, end: 2 });
-  // Never a fold of a single column: the column takes its slot.
   for (let n = 5; n < 9; n++) {
     for (let live = 0; live < n; live++) {
       const { start, end } = windowOf(n, live);
-      assert.ok(start !== 1 && end !== n - 2, `${n} columns, live ${live}: ${start}..${end}`);
+      assert.ok(start !== 1 && end !== n - 2, `never a fold of a single column: ${n} columns, live ${live}: ${start}..${end}`);
       assert.ok(start <= live && live <= end, `${n} columns, live ${live}: ${start}..${end}`);
       assert.ok((start > 0 ? 1 : 0) + (end - start + 1) + (end < n - 1 ? 1 : 0) <= 4);
     }
   }
 });
 
-test('six columns fold around the one the run is at, and the arrows into a fold are one', () => {
-  // The run's order backwards, so a window taken off the order and not the layering fails.
+test('six columns fold around the one the run is at, and the arrows into a fold are one — the run listing them backwards, so a window taken off the order and not the layering fails', () => {
   const chain = ['a', 'b', 'c', 'd', 'e', 'f'];
   const names = [...chain].reverse();
   const graph = graphOf(...chain.slice(1).map((name, i) => after(chain[i], name)));
@@ -160,10 +160,12 @@ test('six columns fold around the one the run is at, and the arrows into a fold 
   assert.deepEqual(middle.pills.find((p) => p.kind === 'fold' && p.done)!.names, ['a', 'b']);
   assert.deepEqual(read(railOf(names, graph, states(5), false)), [['3 done'], ['d'], ['e'], ['f']]);
   assert.deepEqual(read(railOf(names, graph, states(0), false)), [['a'], ['b'], ['c'], ['3 steps']]);
-  // Nothing live and all done: the last column.
-  assert.deepEqual(read(railOf(names, graph, states(6), false)), [['3 done'], ['d'], ['e'], ['f']]);
-  // Four slots across the card, arrows between them.
-  assert.ok(middle.width <= RAIL_WIDTH, `${middle.width}`);
+  assert.deepEqual(
+    read(railOf(names, graph, states(6), false)),
+    [['3 done'], ['d'], ['e'], ['f']],
+    'nothing live and all done: the last column',
+  );
+  assert.ok(middle.width <= RAIL_WIDTH, `four slots across the card, arrows between them: ${middle.width}`);
 });
 
 test('a column of five steps shows two and a pill counting the rest, the live step never among them', () => {
@@ -182,17 +184,19 @@ test('a column of five steps shows two and a pill counting the rest, the live st
   const flow = railOf(names, graph, stepsOf(states), false);
   assert.deepEqual(read(flow), [['plan'], ['l1', 'l4', '+3'], ['merge']]);
   assert.deepEqual(flow.pills.find((p) => p.kind === 'more')!.names, ['l2', 'l3', 'l5']);
-  // Every edge through a lane counted is one arrow into the pill, and one out: to come while one of them, l5, is.
-  assert.deepEqual(arrows(flow), {
-    'step:plan->step:l1': 'done',
-    'step:plan->more:l2': 'to-come',
-    'step:plan->step:l4': 'running',
-    'step:l1->step:merge': 'to-come',
-    'more:l2->step:merge': 'to-come',
-    'step:l4->step:merge': 'to-come',
-  });
-  // Three lanes, however many steps.
-  assert.equal(flow.height, 3 * 20 + 2 * 6);
+  assert.deepEqual(
+    arrows(flow),
+    {
+      'step:plan->step:l1': 'done',
+      'step:plan->more:l2': 'to-come',
+      'step:plan->step:l4': 'running',
+      'step:l1->step:merge': 'to-come',
+      'more:l2->step:merge': 'to-come',
+      'step:l4->step:merge': 'to-come',
+    },
+    'every edge through a lane counted is one arrow into the pill, and one out: to come while one of them, l5, is',
+  );
+  assert.equal(flow.height, 3 * 20 + 2 * 6, 'three lanes, however many steps');
 });
 
 test("a cycle in the steps' after is the run's order, no arrows, and says why", () => {

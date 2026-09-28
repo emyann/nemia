@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Effect } from 'effect';
-import { detachedOps, type HarnessSpec } from '../../src/runner-detached.ts';
+import { detachedOps, type HarnessSpec } from '../../src/harness/detached/detached.ts';
 
 test('a worker started in a root made by hand, and never stopped', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-detached-'));

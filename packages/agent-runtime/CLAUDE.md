@@ -1,7 +1,14 @@
 # packages/agent-runtime — `ae`
 
-One session run to completion, durably, on one harness. `decide` (`src/domain.ts`) is the whole judgement, pure; `src/facade.ts` and
+One session run to completion, durably, on one harness. `decide` (`src/core/domain.ts`) is the whole judgement, pure; `src/facade.ts` and
 `src/index.ts` are the only doors.
+
+## Layout
+
+- **A folder another folder reads is read through its face** (`index.ts`), inside a feature by a file's own path. The core imports
+  `harness/seam.ts` and `harness/args.ts`, and a harness `core/engine/tally.ts`, by their own path: through a face the value graph
+  closes a loop, and `test/layout.test.ts` refuses a cycle of value imports. A file moved deeper that builds a path from its own
+  place gains a `..` (`WORKER`).
 
 ## The pass
 

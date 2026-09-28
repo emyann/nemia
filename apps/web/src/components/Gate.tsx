@@ -35,7 +35,12 @@ import { when } from './Facts';
  *
  * `closeout` is what is being approved, where the gate is drawn beside it: the step's summary and each field it declared (`HandedOn`,
  * the Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the
- * one thing a person must read before either. The inspector's gate has none: its Output tab is where the closeout is.
+ * one thing a person must read before either: left of the answer where the page is wide, above it where it is not. The inspector's gate
+ * has none: its Output tab is where the closeout is.
+ *
+ * An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>. The words
+ * of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a send-back with
+ * none is the package's to refuse. Where the ending waits on more than one step, one of them is enough to hold its gate again.
  */
 export function Gate({
   runId,
@@ -57,16 +62,13 @@ export function Gate({
   const [objection, setObjection] = useState('');
   const [mode, setMode] = useState<RetryMode>('nudge');
   const [to, setTo] = useState(back[0] ?? step);
-  // An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>.
   const [confirming, setConfirming] = useState(false);
   const field = useId();
   const approval = useApprove(runId, step, () => setWords(''));
   const sendBack = useAsk(runId, step, () => setObjection(''));
   const busy = approval.isPending || sendBack.isPending;
-  // What the send-back's words name: the one step it goes to, or the work where there are several and a person picks one.
   const backName = back.length === 1 ? back[0] : 'the work';
 
-  // What the gate says the moment either word is taken (`takenOf`), until the run is read again and the step says it itself.
   const taken = approval.isSuccess
     ? takenOf({ approved: approval.data.try }, step, acts)
     : sendBack.isSuccess
@@ -105,7 +107,6 @@ export function Gate({
         </p>
       )}
 
-      {/* What it handed on, left of the answer where the page is wide and above it where it is not: read first, then decided. */}
       <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
         {closeout && (
           <section
@@ -125,7 +126,6 @@ export function Gate({
             onSubmit={(event) => {
               event.preventDefault();
               if (acts && !confirming) return setConfirming(true);
-              // Words go as they were typed, as `--message` takes them; none when nothing was written.
               approval.mutate(words.trim() ? { message: words } : {});
             }}
           >
@@ -165,16 +165,12 @@ export function Gate({
             {approval.isError && <Refusal error={approval.error} not="Not approved" />}
           </form>
 
-          {/* No send-back where there is no work to send back: an ending that waits on nothing has nothing of its own to object to, and a try
-              of the unfiled step is refused by the package. `wf ls`'s gate note prints the approval alone for it (`gateNote`). */}
           {back.length > 0 && (
             <form
               aria-label={`Send ${backName} back`}
               className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
               onSubmit={(event) => {
                 event.preventDefault();
-                // An objection goes as it was typed, as `--message` takes it: the package refuses a send-back with none. To the step the
-                // package sends it to, which at an ending's gate is the work and not the step at the gate.
                 sendBack.mutate({ mode, message: objection, step: to });
               }}
             >
@@ -203,7 +199,6 @@ export function Gate({
                   ))}
                 </fieldset>
               </div>
-              {/* Which step the objection goes to, where the ending waits on more than one: one of them is enough to hold its gate again. */}
               {back.length > 1 && (
                 <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                   <legend className="sr-only">Which step to send back</legend>
@@ -258,12 +253,12 @@ export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): bool
  * Where each result branch stands against the base branch and how much it changed, in the package's words (`branchWord`, `diffStat`, off
  * the run's decision, which the Decide section on this page has already read for this state of the run); then, for each step the ending
  * waits on — the steps a send-back goes to (`sendBackTo`) — the closeout it handed on, rendered, with the files it named. That is the
- * whole of what there is to read: the ending has run nothing and said nothing.
+ * whole of what there is to read: the ending has run nothing and said nothing. Git's own `--shortstat` sits under each branch, as `wf decide`
+ * prints it beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the ending's spec reads.
  */
 export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps'][number] }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const standings = isDecidable(data) ? data.standings : [];
-  // The steps it waits on, in the run's order, off the graph the api gives: what its work is, whatever its spec reads as.
   const waitsOn = new Set(run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from));
   const work = run.steps.filter((one) => waitsOn.has(one.name));
 
@@ -277,7 +272,6 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
         {standings.map((s) => (
           <p key={s.branch} data-standing={s.where} className="break-words">
             <span className="font-mono text-xs">{s.said}</span>
-            {/* Git's own `--shortstat`, as `wf decide` prints it beside the branch. */}
             {s.stat && (
               <span data-stat className="block font-mono text-xs text-neutral-500">
                 {s.stat}
@@ -375,7 +369,8 @@ export const SECONDARY =
 
 /**
  * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the
- * list the Factory's card reads, each by its own key (`exact`).
+ * list the Factory's card reads, each by its own key (`exact`), never a decision: a decision is keyed by the state it was read for, and
+ * refetching the key the page is on would fill it with the answer for the state after this write.
  */
 export function useApprove(runId: string, step: string, onApproved: () => void) {
   const queryClient = useQueryClient();
@@ -383,8 +378,6 @@ export function useApprove(runId: string, step: string, onApproved: () => void) 
     mutationFn: (how: { message?: string }) => approveStep(runId, step, how),
     onSuccess: () => {
       onApproved();
-      // The run as the api has it now: the step's approval under it, and the step waiting on nobody. Its record alone (`exact`): a decision
-      // is keyed by the state it was read for, and refetching the key the page is on would fill it with the answer for the state after this.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
     },

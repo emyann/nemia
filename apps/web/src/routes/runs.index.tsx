@@ -17,9 +17,16 @@ export const Route = createFileRoute('/runs/')({
   ),
 });
 
+/**
+ * Every run, in three groups under a heading each, in the Factory's words and counts: the runs still going, then those at their result
+ * that nobody has decided, then the rest, each newest first (`inFlightFirst`) where the api lists them by id. No row says whether its run
+ * is in flight, so without the headings the first finished row, newer than the last in flight, would read as a sort gone wrong. A run to
+ * decide is a group of its own, as `wf ls` says it before who else a run waits on, and not a row among the finished that nothing marks as
+ * waiting for a person; a run that is somehow both in flight and to decide is in flight, since what still moves is not yet a result to
+ * decide. Every row reads how long its run has been at work against one clock for the page (`useNow`), not in the render.
+ */
 function Runs() {
   const { data: runs } = useSuspenseQuery(runsQuery);
-  // Each row's title says how long its run has been at work, read against one clock for the page, not in the render.
   const now = useNow(60_000);
 
   if (!runs.length) {
@@ -34,13 +41,6 @@ function Runs() {
     );
   }
 
-  // The runs still going on top, then those nobody has decided, then the rest, each newest first (`inFlightFirst`): the api lists them by
-  // id. Under a heading each, in the Factory's words and counts, since no row says whether its run is in flight: without one, the first
-  // finished row, newer than the last in flight, reads as a sort gone wrong.
-  //
-  // To decide between the two, as `wf ls` says it before who else a run waits on: a run at its result that nobody has decided is finished,
-  // and would otherwise be a row among the finished with nothing to say it is the one row that is waiting for a person. In flight first all
-  // the same, for a run that is somehow both: what still moves is not yet a result to decide.
   const ordered = inFlightFirst(runs);
   const flying = ordered.filter((run) => inFlight(run));
   const deciding = ordered.filter((run) => !inFlight(run) && toDecideOf(run) !== null);
@@ -87,12 +87,22 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
   );
 }
 
+/**
+ * One run's row. Its link carries the run's title and id; where it works, its repository or, for a folder run, which has none, `folders`;
+ * whether it is cancelled; whether `wf prune` gave back its worktrees, and its files when asked, with what it removed and kept on hover;
+ * what waits on you, as `wf ls` prints it: the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships,
+ * what is yours to resolve; a person's hold (`wf hold`) in `wf ls`'s word, with how to lift it on hover, amber once only a person lifts it;
+ * what there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that approves it,
+ * or a branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does
+ * not read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML: when it was created,
+ * which orders the list, with when it started and how long it waited before on hover, in the card's words; what it has cost, as `wf ls`
+ * puts it on the run's line, once a cost was measured; and the workflow it was started from.
+ */
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
   const title = titleOf(run);
   const decide = toDecideOf(run);
 
   return (
-    // The run's link, and beside it when it was created and the workflow's link: side by side, since a link inside a link is not HTML.
     <li
       data-in-flight={inFlight(run)}
       className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900"
@@ -101,22 +111,18 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
           <span className="font-mono">{run.id}</span>
-          {/* A folder run has no repository to name: where a git run's row says one, it says what it works in. */}
           <span title={run.repo ?? 'Its steps work in folders the run made'}>{run.repo ?? 'folders'}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
-          {/* That `wf prune` gave back its worktrees, and its files when asked: what it removed and kept, on hover. */}
           {run.pruned && (
             <span data-pruned title={run.pruned.said}>
               pruned
             </span>
           )}
-          {/* As `wf ls` prints `→ waiting on you:` — the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve. */}
           {waitsOnYou(run) && (onYouOf(run).length > 0 || run.waiting?.advice) && (
             <span data-waiting-on-you className="font-medium text-amber-600">
               waiting on you: {onYouOf(run).length ? onYouOf(run).join(', ') : run.waiting?.advice}
             </span>
           )}
-          {/* A person's hold on it (`wf hold`), in `wf ls`'s word, and how to lift it on hover: amber once only a person lifts it. */}
           {run.holding && (
             <span
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
@@ -127,14 +133,11 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
             </span>
           )}
         </p>
-        {/* What there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that
-            approves it, or a branch nobody has merged. The step's own `approve <step>` is on this line, and not above it too. */}
         {decide && (
           <p data-to-decide={decide.kind} className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
             to decide: {decide.said}
           </p>
         )}
-        {/* Why the run is not judged: a task it reads does not, in the api's words (`RunSummary.unreadable`). */}
         {run.unreadable && (
           <p data-unreadable className="mt-1 text-xs font-medium break-words text-red-700 dark:text-red-400">
             {run.unreadable}
@@ -150,11 +153,9 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
         </ul>
       </Link>
       <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
-        {/* When it was created, which orders the list; when it started, and how long it waited before, on hover, in the card's words. */}
         <time className="text-xs text-neutral-500" dateTime={run.createdAt} title={runClock(run, now, !inFlight(run)).title}>
           {new Date(run.createdAt).toLocaleString()}
         </time>
-        {/* What it has cost, as `wf ls` puts it on the run's line, once a cost was measured. */}
         {run.cost && (
           <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
             {run.cost.said}

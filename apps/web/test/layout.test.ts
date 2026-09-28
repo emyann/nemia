@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { COLUMN_WIDTH, extentOf, layers, layout, ROW_HEIGHT, stepsOf } from '../src/lib/layout.ts';
 
-// A layering that loops would hang the suite rather than fail it; these fail it.
+/** The bound that fails a test whose layering loops, where the loop would otherwise hang the suite. */
 const bounded = { timeout: 2_000 };
 
 test('a chain is one row, a column per step, in the order it runs', bounded, () => {
@@ -28,9 +28,8 @@ test('a fan-in is placed to the right of both of its parents, between them verti
   const [api, web, merge] = [at.get('api')!, at.get('web')!, at.get('merge')!];
   assert.ok(merge.x > api.x && merge.x > web.x, JSON.stringify({ api, web, merge }));
   assert.ok(api.y < merge.y && merge.y < web.y, JSON.stringify({ api, web, merge }));
-  // The parents stand in one column, a row apart.
-  assert.equal(api.x, web.x);
-  assert.equal(web.y - api.y, ROW_HEIGHT);
+  assert.equal(api.x, web.x, 'the parents stand in one column');
+  assert.equal(web.y - api.y, ROW_HEIGHT, 'the parents stand a row apart');
 });
 
 test('every edge points right, however the steps fan out and in', bounded, () => {
@@ -85,7 +84,6 @@ test('a cycle is refused, naming the steps in it, and the layering does not loop
       ]),
     /cycle among a, b\b/,
   );
-  // Behind a step that is fine, and dragging a step that waits on it: everything it cannot place.
   assert.throws(
     () =>
       layout([
@@ -95,6 +93,7 @@ test('a cycle is refused, naming the steps in it, and the layering does not loop
         { name: 'after-b', after: ['b'] },
       ]),
     /cycle among a, b, after-b\b/,
+    'a cycle behind a step that is fine, dragging a step that waits on it, names everything the layering cannot place',
   );
   assert.throws(() => layers([{ name: 'self', after: ['self'] }]), /cycle among self\b/);
 });
@@ -148,11 +147,15 @@ test("the layering reads a graph's `after` edges and leaves its `loop` edges out
       ),
     ),
   );
-  // What leaving it out is for: read as an `after`, the edge back is a cycle, which the layering refuses.
   const asAfter = names.map((name) => ({ name, after: edges.filter((e) => e.to === name).map((e) => e.from) }));
-  assert.throws(() => layers(asAfter), /cycle among implement, test, review\b/);
-  // A loop edge and nothing else orders nothing: both steps in the first column.
-  assert.deepEqual(layers(stepsOf(['implement', 'review'], [{ from: 'review', to: 'implement', kind: 'loop' }])), [
-    ['implement', 'review'],
-  ]);
+  assert.throws(
+    () => layers(asAfter),
+    /cycle among implement, test, review\b/,
+    'read as an `after`, the edge back is a cycle, which the layering refuses',
+  );
+  assert.deepEqual(
+    layers(stepsOf(['implement', 'review'], [{ from: 'review', to: 'implement', kind: 'loop' }])),
+    [['implement', 'review']],
+    'a loop edge and nothing else orders nothing: both steps in the first column',
+  );
 });

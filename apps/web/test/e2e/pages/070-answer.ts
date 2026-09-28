@@ -10,8 +10,14 @@ import { OUT, store } from '../world.ts';
 const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
 
 export default {
-  // The board's second write: an answer refused, shown in the package's words, and then one taken, asked for through the api, with the
-  // step's row saying what `wf ls` says. Each file is taken back, so every page after this one, in either theme, reads the store as seeded.
+  /**
+   * The board's second write: an answer refused, shown in the package's words, and then one taken, asked for through the api, with the
+   * step's row saying what `wf ls` says. The refusal comes first, in a page of its own whose one refusal is the point: a file `wf retry` did
+   * not write sits at the name try 2's ask goes under, which no tick honours, so the step still waits on you and its box is there, and the
+   * package refuses to write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence is beside the box, word for
+   * word, the answer still in the box, and nothing written. Each file is taken back, so every page after this one, in either theme, reads
+   * the store as seeded.
+   */
   name: 'answer',
   route: `/runs/${FAKE.id}`,
   expect: async (page) => {
@@ -21,10 +27,6 @@ export default {
     const asks = path.join(store!, 'runs', `${FAKE.id}.asks`);
     const file = path.join(asks, `retry-${FAKE.blocked}-2`);
 
-    // Refused first, in a page of its own whose one refusal is the point. A file already at the name try 2's ask goes under, which
-    // `wf retry` did not write: no tick honours it, so the step still waits on you and its box is there — and the package refuses to
-    // write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence must be beside the box, word for word,
-    // the answer still in the box, and nothing written.
     fs.mkdirSync(asks, { recursive: true });
     fs.writeFileSync(file, '{}\n');
     const refused = await page.context().newPage();
@@ -63,14 +65,15 @@ export default {
       await settled(refused);
       await refused.screenshot({ path: path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), fullPage: true });
       await idle(refused);
-      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
         (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
       );
       if (!seen.includes(expected) || others.length)
-        throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        throw new Refused(
+          `the refused page saw its one refusal, as its answer and the line Chromium writes to the console for one, and nothing else — it saw:\n    ${seen.join('\n    ')}`,
+        );
     } finally {
       await refused.close();
       fs.rmSync(file, { force: true });
@@ -99,7 +102,6 @@ export default {
       0,
       'and the banner no longer names it: nobody waits on you for it',
     );
-    // The ask is the package's file, as `wf retry` writes it: the api wrote nothing else.
     const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
     if (written?.mode !== 'nudge' || written?.message !== ANSWER) {
       throw new Refused(`the ask is written as wf retry writes it, with the answer — ${file} holds ${JSON.stringify(written)}`);

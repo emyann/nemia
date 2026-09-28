@@ -1,3 +1,8 @@
+/**
+ * A block of code in a transcript: its words as plain text until shiki highlights them, in a light and a dark theme, and for `text` or code
+ * past `HIGHLIGHT_LIMIT` never highlighted, so a server render and a reader in a hurry both get the words. Shiki's fine-grained build
+ * carries the few languages a session's calls are in, loaded on first use. No line numbers. A copy button sits in its corner when given.
+ */
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -6,14 +11,6 @@ import { CheckIcon, CopyIcon } from 'lucide-react';
 import { type ComponentProps, createContext, type HTMLAttributes, useContext, useEffect, useState } from 'react';
 import type { HighlighterCore } from 'shiki/core';
 
-// From AI Elements (registry.ai-sdk.dev/code-block.json), with three changes for a transcript:
-// - shiki's fine-grained build with the few languages a session's calls are in, loaded on first use, rather than
-//   every grammar shiki bundles;
-// - the code as plain text until it is highlighted, and for `text` or code too long to be worth it, rather than
-//   nothing — a server render and a reader in a hurry both get the words;
-// - no line numbers, which nothing here asks for.
-// And its copy button is pressed with `onPress`: AI Elements has no React Aria variant, and the aria base's `Button` is
-// React Aria's.
 export type CodeLanguage = 'json' | 'bash' | 'diff' | 'typescript' | 'tsx' | 'markdown' | 'text';
 
 /** Past this many characters a block is shown as it is: a long tool result is read, not admired. */
@@ -61,8 +58,11 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 const PRE =
   'overflow-auto [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm';
 
+/**
+ * A block of `code` in `language`, highlighted once shiki has it: the highlight is kept with the code and language it was made for, and
+ * shown only while they are still what is drawn. A highlight that fails leaves the code as plain text. `children` sit in its top right corner.
+ */
 export const CodeBlock = ({ code, language, className, children, ...props }: CodeBlockProps) => {
-  // The highlight kept with the code and language it was made for: shown only while they are still what is drawn.
   const [highlight, setHighlight] = useState<{ code: string; language: CodeLanguage; html: readonly [light: string, dark: string] } | null>(
     null,
   );
@@ -75,7 +75,6 @@ export const CodeBlock = ({ code, language, className, children, ...props }: Cod
       (highlighted) => {
         if (!cancelled) setHighlight({ code, language, html: highlighted });
       },
-      // Unhighlighted is still the code.
       () => {},
     );
     return () => {
@@ -93,16 +92,8 @@ export const CodeBlock = ({ code, language, className, children, ...props }: Cod
         <div className="relative">
           {html ? (
             <>
-              <div
-                className={cn(PRE, 'dark:hidden')}
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
-                dangerouslySetInnerHTML={{ __html: html[0] }}
-              />
-              <div
-                className={cn(PRE, 'hidden dark:block')}
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
-                dangerouslySetInnerHTML={{ __html: html[1] }}
-              />
+              <div className={cn(PRE, 'dark:hidden')} dangerouslySetInnerHTML={{ __html: html[0] }} />
+              <div className={cn(PRE, 'hidden dark:block')} dangerouslySetInnerHTML={{ __html: html[1] }} />
             </>
           ) : (
             <div className={PRE}>
@@ -124,11 +115,15 @@ export type CodeBlockCopyButtonProps = ComponentProps<typeof Button> & {
   timeout?: number;
 };
 
+/**
+ * The block's copy button, pressed with `onPress` (React Aria's `Button`): it writes the block's code to the clipboard, shows a check for
+ * `timeout` milliseconds and calls `onCopy`; a page with no clipboard, or a write refused, calls `onError`, the refusal taken on the write's
+ * promise.
+ */
 export const CodeBlockCopyButton = ({ onCopy, onError, timeout = 2000, children, className, ...props }: CodeBlockCopyButtonProps) => {
   const [isCopied, setIsCopied] = useState(false);
   const { code } = useContext(CodeBlockContext);
 
-  // Handled on the promise rather than in a try: the compiler compiles no optional call inside a try.
   const copyToClipboard = () => {
     if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
       onError?.(new Error('Clipboard API not available'));

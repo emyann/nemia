@@ -23,8 +23,8 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * Mirrors `StepRaise` in apps/api/src/detail/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its
  * loop's round (`round`) — and what the budget has to be more than, as the package refuses less. For a try, the ways the package takes it
  * (`modes`, `recheck` among them where a check did not pass, needing no raise) and how the step ended on its own work, its budget aside
- * (`own`, the package's word: `blocked`, `unsigned`, `failed (check)` …), which its word — `over budget` — no longer says. For a round,
- * none, and null.
+ * (`own`, the package's word: `blocked`, `unsigned`, `failed (check)` …), which its word, `over budget`, does not say. For a round, none,
+ * and null.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
 
@@ -65,7 +65,7 @@ export type StepSpec = {
   resume: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`; on a run frozen before 2026-09-23, its `permissionMode`, read so): null on Claude Code. */
+  /** Codex's sandbox (`sandbox:`, or `permissionMode:` where a run froze a codex step's sandbox under that key): null on Claude Code. */
   sandbox: string | null;
   /** Null for the harness's own set, empty for none. */
   tools: string[] | null;
@@ -95,7 +95,7 @@ export type StepFiled = {
   deadlineSeconds: number | null;
   /**
    * The remote A2A agent a step on `harness: a2a:<name>` was sent to: its name, and its address as the store's `a2a-agents.json` gives it
-   * now — origin and path, never a query string, which can carry a key — or null where the file no longer declares it. Null on a harness of ours.
+   * now — origin and path, never a query string, which can carry a key — or null where the file does not declare it. Null on a harness of ours.
    */
   remote: { name: string; address: string | null } | null;
 };
@@ -283,13 +283,12 @@ export const runQuery = (id: string) =>
   });
 
 /**
- * A run's detail, refused unless it carries its `graph`, which is all the canvases draw.
+ * A run's detail, as the api answered it, refused unless it carries what the run's pages draw: its `graph`, the only graph the canvases
+ * draw (none is worked out from `after`); each step's `tries`, `said`, `timeline`, `approve` and `gate`; the run's `timeline` totals and
+ * its `onYou`. A detail without a step's `approve` would offer Approve on a route the api that sent it does not have.
  *
- * An api process started before `RunDetail` carried it answers without one — the version skew that had the board take
- * every step for a root on 2026-09-13. Refused here, naming the fix, so the run's page and the Factory's card say so,
- * rather than a render throwing on `undefined` and taking the whole floor down with it. Nothing is worked out from
- * `after` instead: a graph the api did not give is the guess this replaces. So is a step without its `tries`, which the
- * inspector reads for every step: an api from before it carried them.
+ * An api process older than this board answers without some of them: the refusal names the field missing and says to restart the api
+ * and reload the page, so the run's page and the Factory's card show it rather than a render throwing on `undefined`.
  */
 export function withGraph(id: string, detail: RunDetail): RunDetail {
   const restart = 'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.';
@@ -311,7 +310,6 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
       `The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`,
     );
   }
-  // And a run's page draws where its time went, off each step's timeline and the run's totals.
   const untimed = detail.steps.find((step) => !Array.isArray((step as { timeline?: unknown }).timeline));
   const totals = (detail as { timeline?: Partial<RunDetail['timeline']> | null }).timeline;
   if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
@@ -320,8 +318,6 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
       `The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`,
     );
   }
-  // And a gate: who the run waits on in `wf ls`'s words, and each step's need and gate. Without them the banner cannot say `approve plan`, and a
-  // step's `approve` read as anything but null would offer Approve on a route that api does not have.
   const ungated = detail.steps.find((step) => !Object.hasOwn(step, 'approve') || !Object.hasOwn(step, 'gate'));
   if (ungated || !Array.isArray((detail as { onYou?: unknown }).onYou)) {
     const what = ungated ? `the gate of its step '${ungated.name}'` : "who it waits on in wf ls's words";

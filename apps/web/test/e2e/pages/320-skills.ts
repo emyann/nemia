@@ -19,15 +19,17 @@ function tree(dir: string): Array<[string, string]> {
 }
 
 export default {
-  // An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, is given a skill
-  // HKB ships — the first on disk your library and the repository do not have — copied into your library from the sheet's third group, the
-  // copy a write of its own, on disk byte for byte before any save; its tools, which leave out Skill, put right from the note that says so;
-  // and `Doesn't write code` picked, with Only my instructions behind For experts. The sheet lists your library, this repository's and HKB's in
-  // that order, the repository's `scratch` refused with its reason and nothing to press. Saved, the file gives the skill and says
-  // `systemPrompt: no-coding`. The agent and the copy are both taken back, so the next visit, in either theme, reads the store as seeded.
-  // Before the sheet opens, `scribe`'s file is made to name that skill already — as one copied from a repository would — so its row reads
-  // not found, and its description is edited and left unsaved: the copy moves the agent's version (it digests the skills its file names),
-  // and the form keeps the edit and the sheet stays open, and the save sends the version the copy moved to and is not refused as stale.
+  /**
+   * An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, is given a
+   * skill HKB ships, the first on disk your library and the repository do not have. Its file first names that skill, as one copied from a
+   * repository would, so its row reads not found, and its description is edited and left unsaved. The sheet lists your library, this
+   * repository's and HKB's in that order, the repository's `scratch` refused with its reason and nothing to press. The skill is copied into
+   * your library from the sheet's third group, a write of its own, on disk byte for byte before any save. The copy moves the agent's
+   * version, since the version digests the skills its file names; the form keeps the edit, the sheet stays open, and the save sends the
+   * version the copy moved to and is not refused as stale. Its tools, which leave out Skill, are put right from the note that says so, and
+   * Doesn't write code is picked, with Only my instructions behind For experts. Saved, the file gives the skill and says
+   * systemPrompt: no-coding. The page takes the agent and the copy back, so each visit, in either theme, reads the store as seeded.
+   */
   name: 'skills',
   route: `/agents/yours/${AGENTS.seeded.name}`,
   expect: async (page) => {
@@ -53,19 +55,17 @@ export default {
     const form = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(form, `${seeded.name}'s form`);
     try {
-      // Its file names the shipped skill already, found nowhere an agent of yours looks: its row says so.
       if (naming === was) throw new Refused(`agents/${seeded.name}.md opens with its frontmatter — it holds ${JSON.stringify(was)}`);
       fs.writeFileSync(agentFile, naming);
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectVisible(
         form.locator(`[data-given-skill="${shipped}"] [data-given-error]`, { hasText: 'No skills folder has' }),
-        `${shipped}, named and found nowhere, is said not found`,
+        `${shipped}, named and found nowhere an agent of yours looks, is said not found`,
       );
       const description = form.getByRole('textbox', { name: 'Description', exact: true });
       await description.fill(drafted);
 
-      // The system prompt, unset: drawn as the default, with the choice that drops the safety rules folded away.
       const prompt = form.getByRole('radiogroup', { name: 'System prompt' });
       await expectVisible(
         prompt.getByRole('radio', { name: /^Works on code or files/, checked: true }),
@@ -83,13 +83,12 @@ export default {
         'and it says what it drops',
       );
 
-      // The sheet: three groups, in the order an agent of yours finds a name, the shipped last.
       await form.getByRole('button', { name: 'Add a skill' }).click();
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await expectTexts(
         sheet.locator('section[data-skill-place] h3'),
         ['Your library', 'This repository', 'Shipped with HKB'],
-        'the sheet lists your library, this repository and what HKB ships, in that order',
+        'the sheet lists your library, this repository and what HKB ships, in the order an agent of yours finds a name',
       );
       const scratch = sheet.locator('section[aria-label="This repository"] [data-offered-skill="scratch"]');
       await expectVisible(
@@ -106,7 +105,6 @@ export default {
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `skills-sheet-${await themeOf(page)}.png`) });
 
-      // Copied and added: the folder is in your library at once, byte for byte, before any save.
       const [answered] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/skills/yours', {
           timeout: WAIT_MS,
@@ -116,7 +114,7 @@ export default {
       if (answered.status() !== 201)
         throw new Refused(`the api copies the skill — it answered ${answered.status()}: ${await answered.text()}`);
       if (JSON.stringify(tree(copied)) !== JSON.stringify(tree(path.join(shippedDir, shipped))))
-        throw new Refused(`skills/${shipped} is copied into your library byte for byte`);
+        throw new Refused(`skills/${shipped} is copied into your library at once, byte for byte, before any save`);
       await expectVisible(
         offered.locator('[data-skill-from="yours"]'),
         `the shipped ${shipped} now says it is in your library, and offers no second copy`,
@@ -142,18 +140,19 @@ export default {
       await expectVisible(given.locator('[data-skill-from="yours"]'), `${shipped} is given, from your library`);
       await expectVisible(given.locator('[data-skill-cost]', { hasText: /tokens/ }), 'with what it costs a turn');
 
-      // Its tools leave out Skill: said before the save is refused, and put right with one press.
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill('Read');
       const note = form.locator('[data-skill-tool-note]');
-      await expectVisible(note, 'tools that leave out Skill are said');
+      await expectVisible(note, 'tools that leave out Skill are said before a save is refused for them');
       await note.getByRole('button', { name: 'Add Skill to its tools' }).click();
       if ((await form.getByRole('textbox', { name: 'Tools', exact: true }).inputValue()) !== 'Read, Skill')
         throw new Refused('one press adds Skill to its tools');
       await expectCount(note, 0, 'and the note goes');
 
-      // Doesn't write code, pressed by its label, as a React Aria radio is.
       await prompt.locator('[data-system-prompt="no-coding"]').click();
-      await expectVisible(prompt.getByRole('radio', { name: /^Doesn't write code/, checked: true }), "Doesn't write code is chosen");
+      await expectVisible(
+        prompt.getByRole('radio', { name: /^Doesn't write code/, checked: true }),
+        "Doesn't write code is chosen, pressed by its label",
+      );
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `skills-composed-${await themeOf(page)}.png`), fullPage: true });
 

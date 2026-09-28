@@ -37,8 +37,8 @@ export type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: b
  * where the person asked. A refusal of a card still listed is on that card, and on no line of its own.
  *
  * By the file, not the name: two entries may answer to one name — a card and a stray file beside it, `notes.md` and `notes` (`hasPage`) — and
- * a refusal is of the one the page asked about. Matched by name, a refused Remove of the card drew its sentence under the stray file too,
- * which has no Remove to be refused.
+ * a refusal is of the one the page asked about. Matched by name, a refused Remove of the card would draw its sentence under the stray file
+ * too, which has no Remove to be refused.
  */
 export function cardLines(entries: readonly InboxEntry[], refusals: readonly CardRefusal[]): CardLine[] {
   const listed = new Set(entries.map((entry) => entry.file));
@@ -152,7 +152,7 @@ export function triedLine(entry: Pick<InboxEntry, 'repo' | 'error'> & { tried: N
 /**
  * The Factory's line on the cap: `2 of 4 run slots taken · 3 queued`, or `no cap · 3 queued` — the queue left out when it is empty. The count is the
  * cap's (`Ceilings.inFlight`), not the floor's, and said in the package's word for what the cap holds, a run slot (`slotWord`): beside the floor's
- * `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` read as a full floor with a slot free.
+ * `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` would read as a full floor with a slot free.
  */
 export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: number): string {
   const cap = ceilings.cap > 0 && ceilings.inFlight ? `${ceilings.inFlight.length} of ${ceilings.cap} run slots taken` : 'no cap';

@@ -20,7 +20,9 @@ type Props = {
  * button in its corner. Enter sends; Shift+Enter breaks the line. Sending posts the words to the api (`sayToStep`), which calls `wf say`'s own
  * `say()`: the words go to the session through its harness, and onto the step's record. A refusal shows under the box as the api said it —
  * the package's words or the engine's — and the words stay in the box, to send again. Closed, with the reason and where to go instead, when
- * the step has no session in flight.
+ * the step has no session in flight. Once said, the box is emptied only if it still holds what was sent, keeping what a person wrote
+ * meanwhile, and the run's record alone is read again (`exact`): nothing said to a session changes what there is to decide, and a decision
+ * is keyed by the state it was read for.
  */
 export function PromptBox({ runId, step, sayable, onSaid }: Props) {
   const [text, setText] = useState('');
@@ -30,11 +32,8 @@ export function PromptBox({ runId, step, sayable, onSaid }: Props) {
   const send = useMutation({
     mutationFn: (words: string) => sayToStep(runId, step, words),
     onSuccess: (said, words) => {
-      // Emptied only if it still holds what was sent: what a person wrote while the words were being said is kept.
       setText((now) => textAfterSaid(now, words));
       onSaid(said);
-      // The run as the api has it now: what was said to the step, and its note. Its record alone (`exact`): nothing said to a session
-      // changes what there is to decide, and a decision is keyed by the state it was read for.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });

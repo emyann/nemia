@@ -18,7 +18,7 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`, read from `permissionMode:` in a file written before 2026-09-23): null on Claude Code, and where a codex step names none. */
+  /** Codex's sandbox (`sandbox:`, or `permissionMode:` where a codex step's file names its sandbox under that key): null on Claude Code, and where a codex step names none. */
   sandbox: string | null;
   tools: string[] | null;
   /** What the session may not have (`disallowedTools:`): empty where the step denies nothing. */
@@ -135,7 +135,7 @@ export type Started = { id: string; removed?: boolean; why?: string };
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
  * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
- * on), or the api's own about the request. `after` names the runs it waits on, as `--after` does; left out when there are none.
+ * on), or the api's own about the request; and an answer that succeeded without an id, saying the run may have started. `after` names the runs it waits on, as `--after` does; left out when there are none.
  *
  * `card` starts an inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the card
  * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started already.
@@ -159,7 +159,6 @@ export async function startRun(start: {
     };
   }
   if (res.ok) {
-    // Written, it may well be: look before starting it again.
     throw new Error(
       `POST /api/runs answered ${res.status} ${res.statusText} without the new run's id, so the api and this board disagree about what a start answers. ` +
         'The run may have started: look on the Runs page before starting it again, and restart the api (`npm run dev`).',

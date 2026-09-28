@@ -1,8 +1,7 @@
 /**
  * Two runs that change the board side by side merge without a hand, in a throwaway repository: two that each add a page to the e2e (its
- * file and its line in `pages/NAMES`), and two that each add a lesson to CLAUDE.md. Each beside what the old shape did — one array of
- * pages, NAMES and CLAUDE.md merged as code — which conflicts, so the test shows the structure is what stops it. No browser: `npm test` runs
- * it. Git with no config of this machine's: no hooks, no signing, no one's defaults.
+ * file and its line in `pages/NAMES`), and two that each add a lesson to CLAUDE.md. Each beside the shape that conflicts — one array of
+ * pages, NAMES and CLAUDE.md merged as code — so the test shows the structure is what stops it. No browser: `npm test` runs it. Git with no config of this machine's: no hooks, no signing, no one's defaults.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -88,7 +87,7 @@ const shippedPages = (): Record<string, string> => ({
   '.gitattributes': fs.readFileSync(path.join(REPO, '.gitattributes'), 'utf8'),
 });
 
-/** The last page there is, and the number after it, as two runs would each take it: a page added since does not move the tests. */
+/** The last page there is, and the number after it, as two runs would each take it, so adding a page does not move the tests. */
 const lastAndNext = (): [string, string] => {
   const last = pageFiles(PAGES_DIR).at(-1)!;
   return [last, String(Number(last.slice(0, 3)) + 10).padStart(3, '0')];

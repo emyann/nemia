@@ -1,8 +1,8 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, forget, listRuns, runStartedAt, unhold } from 'agent-orchestrator';
-import { isGitRun, type PlaceKind, placeOf, type Run } from 'agent-orchestrator/run';
+import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold } from 'agent-orchestrator';
+import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
 import { type Asked, holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
@@ -97,6 +97,7 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
     try: tryOf(run),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
+    pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
     waiting: judged.waiting,
     heldUntil: judged.holding ? run.hold!.until : [],
@@ -152,6 +153,34 @@ const liftGuard = (route: string): Guarded => ({
   instead: "Lift it on the board's run page, or with `wf hold <run> --off`",
   shape: '`{}`',
 });
+
+/** What a prune takes, as its refusal of another content type says it: `wf prune`'s two flags, each a switch. */
+const PRUNE_SHAPE = '`{ "artifacts"?: boolean, "unmerged"?: boolean }`';
+
+/** A finished run pruned, as the guard's refusals word it (guard.ts). */
+const pruneGuard = (route: string): Guarded => ({
+  route,
+  does: 'prunes a run',
+  forAnother: 'prune one',
+  why: "a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved",
+  reach: "prune it on the board's run page",
+  instead: "Prune it on the board's run page, or with `wf prune <run>`",
+  shape: PRUNE_SHAPE,
+});
+
+/** A prune's body, as `wf prune` reads its flags: `artifacts` is `--artifacts` and `unmerged` is `--unmerged`, each absent or a boolean. */
+function pruneHowOf(body: unknown): { artifacts: boolean; unmerged: boolean } | { error: string } {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return { error: `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.` };
+  const said = body as Record<string, unknown>;
+  const unknown = Object.keys(said).filter((key) => key !== 'artifacts' && key !== 'unmerged');
+  if (unknown.length) return { error: `POST …/prune does not take ${unknown.map((key) => `\`${key}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.` };
+  for (const [key, flag] of [['artifacts', '--artifacts'], ['unmerged', '--unmerged']] as const) {
+    if (said[key] !== undefined && typeof said[key] !== 'boolean') {
+      return { error: `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${flag} — and this request sent ${JSON.stringify(said[key])}.` };
+    }
+  }
+  return { artifacts: said.artifacts === true, unmerged: said.unmerged === true };
+}
 
 /**
  * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
@@ -267,6 +296,40 @@ export const runs = new Hono()
       const message = err instanceof Error ? err.message : String(err);
       if ((err as { exitCode?: number }).exitCode === 2) return c.json({ error: message }, 409);
       return c.json({ error: `${route}: the hold was not lifted — ${message}. Lift it with \`wf hold ${id} --off\`.` }, 502);
+    }
+  })
+  /**
+   * A finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts` and `unmerged` its `--unmerged`:
+   * its worktrees removed, and its files with `artifacts`; its record and every branch kept. The page asks twice before it sends this, so
+   * there is no dry run here. The package decides everything and words it, and the api maps its answer to a status: refused (a folder run,
+   * a run not over, a finished run nobody merged without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one
+   * pruned already) are each a 409 in `wf prune`'s words; a thrown refusal of the package's (`exitCode` 2) is a 422. No feed line: the marker the prune writes moves
+   * the run's `restStamps`, and the board reads the run again itself.
+   */
+  .post('/api/runs/:id/prune', async (c) => {
+    const id = c.req.param('id');
+    const route = `POST /api/runs/${id}/prune`;
+    const refused = refusedBeforeReading(pruneGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.` }, 400);
+    }
+    const how = pruneHowOf(body);
+    if ('error' in how) return c.json({ error: how.error }, 400);
+    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+    try {
+      const p = await prune(e, id, { ...how, yes: true });
+      // The package's words alone, as `DELETE …` sends `forget`'s: the page says `Not pruned` above them itself (`Refusal`).
+      if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
+      if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
+      return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if ((err as { exitCode?: number }).exitCode === 2) return c.json({ error: message }, 422);
+      return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
     }
   })
   // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.

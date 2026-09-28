@@ -220,6 +220,16 @@ export default {
     await showFinished(page);
     await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
     await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
+    // Pruned with its files (`wf prune --artifacts`): the card says so in its footer, and what went and what stayed on hover.
+    await expectVisible(
+      cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }),
+      'and it says it was pruned',
+    );
+    const prunedSaid = await cardOf(page, SHIPPED.id).locator('[data-pruned]').getAttribute('title');
+    if (!/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(prunedSaid ?? '')) {
+      throw new Refused(`the pruned mark says what went and what was kept on hover, as wf ls says it — its title is ${JSON.stringify(prunedSaid)}`);
+    }
+    await expectCount(page.locator('[data-pruned]'), 1, 'and no other card says pruned: SHIPPED is the one run pruned');
     // A run with no repository says `folders` where a git run's card says its repository's name, and where its steps worked on hover. Not a
     // row of its own: a card drawn taller than its cell reaches over the card beneath it on every layout (`expectClearOfEachOther`), and the
     // path is on the run's page, copyable, for a person who wants to open it.

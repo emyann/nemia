@@ -127,8 +127,8 @@ test('REFUSED at shipped defaults: a card with no skills, or for an agent with n
     return true;
   });
   const bare = parseAgent('scribe', '---\neffort: low\n---\nWrite the notes.\n', () => undefined);
-  assert.throws(() => agentCard(bare, 'abc123', cardSkills(agent, found)), (e: Error) => /^agents\/scribe\.md has no `description:`/.test(e.message));
-  assert.throws(() => cardSkills(bare, found), (e: Error) => /^agents\/scribe\.md has no `description:`/.test(e.message), 'nor is an entry made of nothing');
+  assert.throws(() => agentCard(bare, 'abc123', cardSkills(agent, found)), (e: Error) => e.message.startsWith('agents/scribe.md has no `description:`'));
+  assert.throws(() => cardSkills(bare, found), (e: Error) => e.message.startsWith('agents/scribe.md has no `description:`'), 'nor is an entry made of nothing');
 });
 
 test("REFUSED: a card from a skill no folder has, or whose SKILL.md says nothing it can be listed by", () => {

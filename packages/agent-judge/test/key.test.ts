@@ -34,7 +34,7 @@ test("the question's id is not in the key, nor the order a question object was b
 
 test('REFUSED: a model that is an alias, not one version', () => {
   for (const alias of ['jev-latest', 'jev-preview', 'jev', 'jev-1', '', undefined, 'JEV-1.13.0']) {
-    assert.throws(() => pinnedModel(alias), (e: any) => e.exitCode === 2 && /^judge: the model must be pinned to one version/.test(e.message), String(alias));
+    assert.throws(() => pinnedModel(alias), (e: any) => e.exitCode === 2 && e.message.startsWith('judge: the model must be pinned to one version'), String(alias));
   }
   assert.equal(pinnedModel('jev-1.13.0'), 'jev-1.13.0');
 });
@@ -42,9 +42,9 @@ test('REFUSED: a model that is an alias, not one version', () => {
 test('REFUSED: a state that is not JSON, or none', () => {
   const cycle: any = {};
   cycle.self = cycle;
-  assert.throws(() => stateHash(cycle), (e: any) => e.exitCode === 2 && /^judge: the state is not JSON/.test(e.message));
-  assert.throws(() => stateHash(undefined as any), (e: any) => /^judge: the state is empty/.test(e.message));
-  assert.throws(() => stateHash(null as any), (e: any) => /^judge: the state is empty/.test(e.message));
+  assert.throws(() => stateHash(cycle), (e: any) => e.exitCode === 2 && e.message.startsWith('judge: the state is not JSON'));
+  assert.throws(() => stateHash(undefined as any), (e: any) => e.message.startsWith('judge: the state is empty'));
+  assert.throws(() => stateHash(null as any), (e: any) => e.message.startsWith('judge: the state is empty'));
   assert.match(stateHash('text'), /^sha256:[0-9a-f]{64}$/);
 });
 

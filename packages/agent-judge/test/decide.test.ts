@@ -28,10 +28,10 @@ test('every failure kind is unsure, and why says which', () => {
 
 test('REFUSED: thresholds that are not yes above no, or not probabilities for a noul, or a choice', () => {
   for (const bad of [{ yes: 0.2, no: 0.8 }, { yes: 0.5, no: 0.5 }, { yes: NaN, no: 0 }, {} as any, undefined as any]) {
-    assert.throws(() => decide(noulOf(0.5), bad), (e: any) => e.exitCode === 2 && /^judge: decide takes \{ yes, no \} with yes above no/.test(e.message), JSON.stringify(bad));
+    assert.throws(() => decide(noulOf(0.5), bad), (e: any) => e.exitCode === 2 && e.message.startsWith('judge: decide takes { yes, no } with yes above no'), JSON.stringify(bad));
   }
-  assert.throws(() => decide(noulOf(0.5), { yes: 2.5, no: 1.5 }), (e: any) => /^judge: a noul's thresholds are probabilities/.test(e.message));
+  assert.throws(() => decide(noulOf(0.5), { yes: 2.5, no: 1.5 }), (e: any) => e.message.startsWith('judge: a noul\'s thresholds are probabilities'));
   const chosen: Judgment = { status: 'answered', answer: { type: 'choice', choice: 'a', confidence: 0.9, probabilities: {} } as any, key: 'k', at: 't', model: 'm' };
-  assert.throws(() => decide(chosen, t), (e: any) => /^judge: decide reads a noul or a score; a choice has no threshold/.test(e.message));
+  assert.throws(() => decide(chosen, t), (e: any) => e.message.startsWith('judge: decide reads a noul or a score; a choice has no threshold'));
   assert.equal(why(chosen), 'chose a, confidence 0.90');
 });

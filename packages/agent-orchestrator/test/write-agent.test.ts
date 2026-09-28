@@ -75,12 +75,12 @@ test('a render writes the description first, the keys in their order, and an uns
 
 test('a render refuses a key no agent has, agent:, wiring, description among the keys and a line break, by name', () => {
   const r = (keys: Record<string, string>, description?: string) => () => renderAgent({ name: 'a', description, keys: keys as AgentDraft['keys'], body: 'x' });
-  assert.throws(r({ agent: 'b' }), (e: Error) => /^agents\/a\.md: `agent` is a step's key/.test(e.message));
-  assert.throws(r({ check: 'npm test' }), (e: Error) => /^agents\/a\.md: `check` is wiring, and belongs on the step/.test(e.message));
-  assert.throws(r({ modle: 'opus' }), (e: Error) => /^agents\/a\.md: `modle` is not a key an agent has/.test(e.message));
-  assert.throws(r({ description: 'x' }), (e: Error) => /^agents\/a\.md: `description` is the agent's own line/.test(e.message));
-  assert.throws(r({ model: 'opus\ncheck: rm -rf /' }), (e: Error) => /^agents\/a\.md: `model` holds a line break/.test(e.message));
-  assert.throws(r({}, 'one\ntwo'), (e: Error) => /^agents\/a\.md: `description` holds a line break/.test(e.message));
+  assert.throws(r({ agent: 'b' }), (e: Error) => e.message.startsWith('agents/a.md: `agent` is a step\'s key'));
+  assert.throws(r({ check: 'npm test' }), (e: Error) => e.message.startsWith('agents/a.md: `check` is wiring, and belongs on the step'));
+  assert.throws(r({ modle: 'opus' }), (e: Error) => e.message.startsWith('agents/a.md: `modle` is not a key an agent has'));
+  assert.throws(r({ description: 'x' }), (e: Error) => e.message.startsWith('agents/a.md: `description` is the agent\'s own line'));
+  assert.throws(r({ model: 'opus\ncheck: rm -rf /' }), (e: Error) => e.message.startsWith('agents/a.md: `model` holds a line break'));
+  assert.throws(r({}, 'one\ntwo'), (e: Error) => e.message.startsWith('agents/a.md: `description` holds a line break'));
 });
 
 test('a name is refused unless it is one file of the agents folder that a step can name', () => {

@@ -539,7 +539,7 @@ test("a run that worked on the base branch itself says so, and still says what i
   const said = indexOf(direct, '  to decide  review has signed off and waits for your word:');
   assert.ok(worked < said, 'the branch facts, then what to decide');
   indexOf(direct, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
-  assert.ok(!direct.some((l) => /^  branch    /.test(l)), 'no standing: it would read `main is on main`');
+  assert.ok(!direct.some((l) => l.startsWith('  branch    ')), 'no standing: it would read `main is on main`');
   assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
 });
 
@@ -565,8 +565,8 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   assert.ok(!('error' in moved) && moved.changes.length === 2, JSON.stringify(moved));
 
   const lines = await screen(t, e, run.id);
-  assert.ok(!lines.some((l) => /^  touched /.test(l)), `no branch to read:\n${lines.join('\n')}`);
-  assert.ok(!lines.some((l) => /^  lesson /.test(l)), 'nor a lesson credited to it for what another run merged');
+  assert.ok(!lines.some((l) => l.startsWith('  touched ')), `no branch to read:\n${lines.join('\n')}`);
+  assert.ok(!lines.some((l) => l.startsWith('  lesson ')), 'nor a lesson credited to it for what another run merged');
   assert.ok(!lines.some((l) => /in full: the check-affecting files/.test(l)), 'nor every check-affecting file merged since, above the question');
   // What the person came for is what they get.
   const said = indexOf(lines, '    add-sub is ready to merge.');

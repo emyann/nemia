@@ -353,5 +353,5 @@ test('a report that cannot be written is refused by name, after the tables have 
 test('the usage names the verb, and an unknown verb still does not', async () => {
   const bare = await run([]);
   assert.match(bare.text, /^judge runs \[--store <dir>\] \[--record <dir>\] \[--since <date>\] \[--json <file>\] \[--yes\] \[--reask\]$/m);
-  await assert.rejects(run(['walk']), (e: Error) => /^judge: no command walk/.test(e.message));
+  await assert.rejects(run(['walk']), (e: Error) => e.message.startsWith('judge: no command walk'));
 });

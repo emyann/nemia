@@ -84,8 +84,8 @@ test('a branch that changed nothing says so, rather than printing an empty radiu
 });
 
 test('a numstat line the parser cannot read is refused, not skipped', () => {
-  assert.throws(() => parseNumstat('12\t3\tsrc/a.ts\n 6 files changed, 2 insertions(+)\n'), (e: Error) => /^not a line of git diff --numstat: " 6 files changed/.test(e.message));
-  assert.throws(() => parseNumstat('x\t3\tsrc/a.ts'), (e: Error) => /^not a line of git diff --numstat/.test(e.message));
+  assert.throws(() => parseNumstat('12\t3\tsrc/a.ts\n 6 files changed, 2 insertions(+)\n'), (e: Error) => e.message.startsWith('not a line of git diff --numstat: " 6 files changed'));
+  assert.throws(() => parseNumstat('x\t3\tsrc/a.ts'), (e: Error) => e.message.startsWith('not a line of git diff --numstat'));
 });
 
 test('a path git quoted is read as the name it is', () => {

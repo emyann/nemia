@@ -103,7 +103,7 @@ test('an image whose request failed is refused as not drawn, though its box is v
   await expectVisible(page.locator('#broken'), 'the broken image has a box');
   await assert.rejects(
     expectDrawn(page.locator('#broken'), 'the broken image is drawn', 500),
-    (err) => err instanceof Refused && /^the broken image is drawn — the image did not load/.test(err.message),
+    (err) => err instanceof Refused && err.message.startsWith('the broken image is drawn — the image did not load'),
   );
   await expectDrawn(page.locator('#drawn'), 'the loaded image is drawn');
 });

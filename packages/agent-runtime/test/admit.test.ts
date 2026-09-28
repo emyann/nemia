@@ -163,7 +163,7 @@ test('admit refuses a task it has no record of, and a settled one — exit 2, an
   const b = board();
   const queued = await b.engine.file({ brief: 'q', cwd: '/r', queued: true });
   await assert.rejects(b.engine.admit([queued, 'nobody']), (e: Error & { exitCode?: number }) =>
-    e.exitCode === 2 && /^admit: `nobody` is not a task on this board/.test(e.message));
+    e.exitCode === 2 && e.message.startsWith('admit: `nobody` is not a task on this board'));
   assert.equal(b.journal.tasks.get(queued)!.some((e) => e.kind === 'admitted'), false, 'the known one was not admitted either');
 
   const settled = await b.engine.file({ brief: 's', cwd: '/r', queued: true });

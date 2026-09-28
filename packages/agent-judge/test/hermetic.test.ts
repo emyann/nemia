@@ -26,6 +26,6 @@ test('REFUSED: a test file whose first import is not the harness, or none, or an
 test('the harness took the key out of the environment, and the global fetch refuses', async () => {
   assert.equal(Object.keys(process.env).filter((k) => k.startsWith('TYPESAFE_')).length, 0);
   const before = reached.length;
-  await assert.rejects(fetch('https://api.typesafe.ai/v1/systemone'), (e: Error) => /^hermetic: a test reached for the network/.test(e.message));
+  await assert.rejects(fetch('https://api.typesafe.ai/v1/systemone'), (e: Error) => e.message.startsWith('hermetic: a test reached for the network'));
   assert.equal(reached.length, before + 1);
 });

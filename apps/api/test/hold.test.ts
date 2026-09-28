@@ -311,7 +311,7 @@ test('REFUSED at shipped defaults: every verb the board sends for a held run —
     assert.equal(res.status, 409, route);
     const { error } = await res.json();
     assert.equal(error, await refusal(verb), route);
-    const what = /approve$/.test(route) ? 'an approval' : /retry$/.test(route) ? 'a retry' : /round$/.test(route) ? 'a round' : 'an acceptance';
+    const what = route.endsWith('approve') ? 'an approval' : route.endsWith('retry') ? 'a retry' : route.endsWith('round') ? 'a round' : 'an acceptance';
     assert.equal(error, heldRefusal(readRun(id), what), route);
     assert.deepEqual(asked(id), [], `nothing written: ${route}`);
   }

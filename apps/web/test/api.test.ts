@@ -21,7 +21,7 @@ const TOTALS = { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight:
 const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, onYou: [], ...extra }) as unknown as RunDetail;
 
 const refusesStale = (err: Error) =>
-  /^The api answered run 'r-1' without its graph, so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
+  err.message.startsWith('The api answered run \'r-1\' without its graph, so it is older than this board') && /Restart the api/.test(err.message);
 
 test("a run's detail without its graph is refused, naming the fix — an api started before the board drew the graph", async (t) => {
   answering(t, detail());
@@ -45,7 +45,7 @@ test("a run's detail with its graph is read as the api gave it", async (t) => {
 test("a run's detail whose steps come without their tries is refused, naming the step and the fix — an api started before the board showed rounds", async (t) => {
   const stale = detail({ graph, steps: [{ name: 'implement', tries: [] }, { name: 'review' }] });
   const refusesTries = (err: Error) =>
-    /^The api answered run 'r-1' without the tries of its step 'review', so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
+    err.message.startsWith('The api answered run \'r-1\' without the tries of its step \'review\', so it is older than this board') && /Restart the api/.test(err.message);
   assert.throws(() => withGraph('r-1', stale), refusesTries);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
@@ -55,7 +55,7 @@ test("a run's detail whose steps come without their tries is refused, naming the
 test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
   const stale = detail({ graph, steps: [{ name: 'implement', tries: [], said: [] }, { name: 'review', tries: [] }] });
   const refusesSaid = (err: Error) =>
-    /^The api answered run 'r-1' without what was said to its step 'review', so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
+    err.message.startsWith('The api answered run \'r-1\' without what was said to its step \'review\', so it is older than this board') && /Restart the api/.test(err.message);
   assert.throws(() => withGraph('r-1', stale), refusesSaid);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesSaid);

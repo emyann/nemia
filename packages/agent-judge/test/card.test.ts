@@ -128,7 +128,7 @@ test('only the leading frontmatter is taken off, with a BOM or CRLF, and a rule 
   assert.equal(cardText('\uFEFF---\r\nworkflow: dev\r\n---\r\nBody.'), 'Body.');
   assert.equal(cardText('Intro.\n---\nkey: value\n---\nMore.'), 'Intro.\n---\nkey: value\n---\nMore.');
   assert.equal(cardText('---\na: b\n---\nx\n---\ny'), 'x\n---\ny');
-  assert.throws(() => cardText('---\na: b\n---'), (e: Error) => /^judge card: the card says nothing/.test(e.message));
+  assert.throws(() => cardText('---\na: b\n---'), (e: Error) => e.message.startsWith('judge card: the card says nothing'));
 });
 
 test('dispatch reads a failure on every property as unsure about each', () => {

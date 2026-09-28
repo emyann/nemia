@@ -118,7 +118,7 @@ test('pages/ refuses a folder, and a link, however they are named', () => {
 
 test('a page is refused when its file exports none', async () => {
   const dir = dirOf({ '010-a.ts': 'export const spec = { name: "a", route: "/", expect: async () => {} };\n' });
-  await assert.rejects(loadPages(dir), (e: Error) => /^010-a\.ts default-exports its page/.test(e.message));
+  await assert.rejects(loadPages(dir), (e: Error) => e.message.startsWith('010-a.ts default-exports its page'));
 });
 
 test('a page is refused when its name is not its file\'s, which names its screenshots', async () => {
@@ -128,7 +128,7 @@ test('a page is refused when its name is not its file\'s, which names its screen
 
 test('a page is refused the second time it is there, under another number', async () => {
   const dir = dirOf({ '010-a.ts': page('a'), '020-b.ts': page('b'), '030-a.ts': page('a') });
-  await assert.rejects(loadPages(dir), (e: Error) => /^010-a\.ts and 030-a\.ts are both the a page, which would be visited twice/.test(e.message));
+  await assert.rejects(loadPages(dir), (e: Error) => e.message.startsWith('010-a.ts and 030-a.ts are both the a page, which would be visited twice'));
 });
 
 test('an empty pages/ is refused: an e2e that visits nothing passes', async () => {

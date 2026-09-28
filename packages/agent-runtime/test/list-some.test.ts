@@ -75,6 +75,6 @@ test('REFUSED: `list` handed anything but a list of task ids, or more than one a
   const untyped = engine.list as (...args: unknown[]) => Promise<unknown>;
   for (const args of [[settled[0]], [[1]], [{ ids: settled }], [settled, 'more'], [null]]) {
     assert.throws(() => untyped(...args), (err: Error & { exitCode?: number }) =>
-      /^list: takes the task ids to view, a list of strings, or nothing for every task/.test(err.message) && err.exitCode === 2, JSON.stringify(args));
+      err.message.startsWith('list: takes the task ids to view, a list of strings, or nothing for every task') && err.exitCode === 2, JSON.stringify(args));
   }
 });

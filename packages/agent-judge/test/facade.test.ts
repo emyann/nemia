@@ -26,7 +26,7 @@ test('with a key it is ready, and asks nothing to say so', async () => {
   assert.equal(await main(['status'], { env: ENV, out: (l) => lines.push(l) }), 0);
   assert.deepEqual(lines, ['ready']);
   assert.equal(reached.length, 0);
-  await assert.rejects(main(['status', 'now'], { env: ENV, out: () => {} }), (e: Error) => /^judge status takes nothing/.test(e.message));
+  await assert.rejects(main(['status', 'now'], { env: ENV, out: () => {} }), (e: Error) => e.message.startsWith('judge status takes nothing'));
 });
 
 test('the facade refuses a key passed in, an unknown option, no record, an alias and a bad mode', () => {

@@ -899,7 +899,7 @@ test('a sent-back ending merges nothing: the work is filed again, the checkout i
   assert.equal(git(repo, 'status', '--porcelain'), '');
   // While the work runs there is nothing to decide, and the approval of a step that has not been filed is refused.
   assert.equal((await list(e, readRun(id))).toDecide, undefined);
-  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^ship is not at its gate yet/.test(err.message));
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith('ship is not at its gate yet'));
 
   settle(`${id}-implement-try2`, 'succeeded', SIGNED);
   const held = await advance(e, readRun(id));
@@ -1106,7 +1106,7 @@ test("an ending that stopped on the base branch sends the work back through the 
   assert.match(brief, /## What ship said\n\nIts summary:\n\n```text\nmain moved since the branch was cut/);
   assert.match(brief, /What it needs:\n\n```text\nthe branch has to take main: add.ts conflicts with main's sub\n```/);
   assert.match(brief, /sign off with `again: true` and say what — what ship needs among it: the work's next round is on the run's branch, where merging main into it is the work's to do\./);
-  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^ship is not at its gate yet/.test(err.message),
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith('ship is not at its gate yet'),
     'the approval of try 1 does not carry over, and none is taken while the work is out');
 
   // The reviewer asks for a round: implement goes on, on its branch, and review reviews again.
@@ -1187,7 +1187,7 @@ test("the incident's other ending: at rounds exhausted a person accepts the work
   const stuck = await list(e, readRun(id));
   assert.deepEqual(['review', 'ship'].map((n) => stuck.steps.find((s) => s.name === n)!.status), ['rounds exhausted', 'waiting'],
     'the ending never reaches its gate, which is how the work came to be merged by hand');
-  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^ship is not at its gate yet/.test(err.message));
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith('ship is not at its gate yet'));
 
   // The person read the findings, judged them follow-up work, and said so. The loop ends; the run does not.
   const { acceptance } = await accept(e, id, 'review', ENOUGH);
@@ -1222,7 +1222,7 @@ test("a send-back at the ending's gate spends the acceptance: the loop is open a
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'done', 'accept-review-1')), 'and moved whole');
   assert.doesNotMatch(tasks.get(`${id}-review-try2`)!.spec.brief as string, /## Accepted/, 'the reviewer is not told its own loop was ended');
   // Out of rounds again on the new try, and the acceptance that ended the old one opens nothing.
-  await assert.rejects(accept(e, id, 'review', ENOUGH), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^round 1 of review's loop is still running/.test(err.message));
+  await assert.rejects(accept(e, id, 'review', ENOUGH), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith('round 1 of review\'s loop is still running'));
 });
 
 test("REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is", async () => {

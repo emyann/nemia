@@ -322,10 +322,10 @@ test('what the default Claude Code refuses depends on the mode: a job refuses a 
   // In Claude Code's flags since 2026-09-25, and a name for the bridge (`--remote-control <name>`) asks for one as `true` does.
   for (const remoteControl of [true, 'phone'] as const) {
     const bridge = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { claude: { remoteControl } } });
-    assert.ok(bridge && /^`claude\.remoteControl` bridges a session to claude\.ai/.test(bridge) && bridge.includes('`config.background: true`'), bridge);
+    assert.ok(bridge && bridge.startsWith('`claude.remoteControl` bridges a session to claude.ai') && bridge.includes('`config.background: true`'), bridge);
   }
   const cap = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 0.5, background: true } });
-  assert.ok(cap && /^`budgetUsd: 0\.5` is a spend cap/.test(cap) && cap.includes('Leave `config.background` off'), cap);
+  assert.ok(cap && cap.startsWith('`budgetUsd: 0.5` is a spend cap') && cap.includes('Leave `config.background` off'), cap);
   for (const background of [undefined, true]) {
     assert.match(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background, effort: 'huge' } }) ?? '', /^`effort: huge` is not an effort Claude Code has/);
     assert.match(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background, permissionMode: 'yolo' } }) ?? '', /^`permissionMode: yolo` is not a mode/);

@@ -365,7 +365,7 @@ test('where a hardlink cannot be made — another filesystem — main\'s package
   const linking = t.mock.method(fs, 'linkSync', exdev);
   const got = await provisionDeps(main, wt);
   assert.equal(got.tree, 'linked');
-  assert.ok(got.tree === 'linked' && /^EXDEV: cross-device link not permitted/.test(got.why ?? ''), JSON.stringify(got));
+  assert.ok(got.tree === 'linked' && (got.why ?? '').startsWith('EXDEV: cross-device link not permitted'), JSON.stringify(got));
   assert.equal(got.tree === 'linked' && got.made, 10, 'every entry is still made');
   const nm = path.join(wt, 'node_modules');
   assert.equal(fs.readlinkSync(path.join(nm, 'third')), path.join(main, 'node_modules/third'), 'as worktrees were before');

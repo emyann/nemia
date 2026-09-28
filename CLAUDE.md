@@ -95,7 +95,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `240-capabilities.ts` as the last page and `250` as the number two runs would both take, so the page after it failed before a browser
   opened. It reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
-  pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
+  pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => e.message.startsWith('…'))`,
+  since `npm run lint` refuses an anchored literal regex where `startsWith` says it: `unicorn/prefer-string-starts-ends-with`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
 - **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
   every check it executes in a step's worktree of a git run. A ship's `check:` is its implement's line, and the run executes it on the

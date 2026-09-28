@@ -799,7 +799,7 @@ test("permissionMode: yolo is refused with the modes of the step's own harness",
     () => fm('implement', 'permissionMode: yolo'),
     /implement: `permissionMode: yolo` is not a mode claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: acceptEdits, auto, bypassPermissions, default, dontAsk, manual, plan\./,
   );
-  assert.throws(() => fm('review', 'harness: codex\nsandbox: yolo'), (e: Error) => /^review: `sandbox: yolo` is not a sandbox codex has\. On codex it is one of: read-only, workspace-write, danger-full-access\./.test(e.message));
+  assert.throws(() => fm('review', 'harness: codex\nsandbox: yolo'), (e: Error) => e.message.startsWith('review: `sandbox: yolo` is not a sandbox codex has. On codex it is one of: read-only, workspace-write, danger-full-access.'));
   // A sandbox written as a permission mode on Claude Code is told where it belongs, under the key it is written with there.
   assert.throws(() => fm('implement', 'permissionMode: read-only'), (e: Error) => /not a mode claude has .*`read-only` is a sandbox codex has, written `sandbox: read-only` on a step that runs on codex/.test(e.message));
 
@@ -1134,7 +1134,7 @@ test("`workspace: folder` runs a step in a folder the run makes, with a check an
 
   // And at load, from a folder of files, as a person writes them.
   assert.throws(() => parseFolder([['write', '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite.\n'], ['review', '---\nafter: write\n---\nReview.\n']]),
-    (e: WorkflowError) => e.exitCode === 2 && /^write says `workspace: folder`, and review does not/.test(e.message));
+    (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('write says `workspace: folder`, and review does not'));
 });
 
 test('REFUSED at load: a background step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine\'s `auto`; a job, on claude or claude-detached, and a codex step pass in every mode their harness takes', () => {
@@ -1180,7 +1180,7 @@ test('REFUSED at load: a background step of a folder team in a permission mode t
 
   // At load, from files: the same refusal reaches a person writing a folder of markdown.
   assert.throws(() => parseFolder([['write', '---\nworkspace: folder\nbackground: true\npermissionMode: acceptEdits\n---\nWrite.\n']]),
-    (e: WorkflowError) => e.exitCode === 2 && /^write: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can/.test(e.message));
+    (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('write: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can'));
 });
 
 test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice, any harness but claude, and a `budget:` beside it — in the engine\'s words', () => {

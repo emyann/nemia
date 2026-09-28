@@ -645,7 +645,7 @@ test('`wf start` refuses an `output:` file that is not there, and an `input:` on
   const missing = reviewed();
   fs.rmSync(path.join(missing, 'review.schema.json'));
   assert.throws(() => started(missing), (err: Error & { exitCode?: number }) =>
-    err.exitCode === 2 && /^review: `output: review\.schema\.json` is not there\./.test(err.message));
+    err.exitCode === 2 && err.message.startsWith('review: `output: review.schema.json` is not there.'));
 
   const early = reviewed('input: review\n');
   fs.writeFileSync(path.join(early, 'respond.md'), '---\nafter: implement\ninput: review\n---\nanswer it\n');
@@ -1086,7 +1086,7 @@ test("a step named for another step's try is refused at `wf start`, before anyth
   fs.writeFileSync(path.join(dir, 'implement-try2.md'), '---\nafter: implement\n---\na step of its own\n');
   const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
   assert.throws(() => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }), (err: Error & { exitCode?: number }) =>
-    err.exitCode === 2 && /^implement-try2: a step may not be named for another step's try/.test(err.message) && /Rename implement-try2\.md/.test(err.message));
+    err.exitCode === 2 && err.message.startsWith('implement-try2: a step may not be named for another step\'s try') && /Rename implement-try2\.md/.test(err.message));
   assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
 });
 
@@ -3699,7 +3699,7 @@ test("`wf rm` forgets a run that is over, at shipped defaults: its worktree remo
   assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
   assert.deepEqual([b.filings, b.stopped, b.tasks.has(`${run.id}-implement`)], [filings, [], true], "the engine's board is the engine's");
-  assert.throws(() => readRun(run.id), (err: Error) => /^no such run: /.test(err.message));
+  assert.throws(() => readRun(run.id), (err: Error) => err.message.startsWith('no such run: '));
 
   const again = await rmTyped(t, b.e, run.id);
   assert.deepEqual([again.printed, again.error], [[`${run.id}  no such run — nothing to forget`], undefined]);
@@ -3897,7 +3897,7 @@ test("a run whose tasks the engine no longer knows is forgotten; so is a record 
   writeRun(legacy);
   assert.equal(stepsOf(readRun(legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
   fs.rmSync(legacyDir, { recursive: true });
-  assert.throws(() => stepsOf(readRun(legacy.id)), (err: Error) => /^no workflow folder at /.test(err.message));
+  assert.throws(() => stepsOf(readRun(legacy.id)), (err: Error) => err.message.startsWith('no workflow folder at '));
 
   const { printed, error } = await rmTyped(t, e, legacy.id);
   assert.equal(error, undefined);

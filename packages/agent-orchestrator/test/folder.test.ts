@@ -226,7 +226,7 @@ test('REFUSED: a card filed for a folder team with a repository — the card nam
     assert.throws(() => addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO }),
       (err: Error & { exitCode?: number }) => err.exitCode === 2
         && err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``)
-        && /File the card without a repository, or name a workflow whose steps work on one\.$/.test(err.message));
+        && err.message.endsWith('File the card without a repository, or name a workflow whose steps work on one.'));
     const inbox = path.join(ROOT, 'inbox');
     assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], 'refused before the card is written');
     assert.ok(addToInbox({ text: 'a note on tides', workflow: TEAM }).card.name, 'a folder team with no repository is filed');

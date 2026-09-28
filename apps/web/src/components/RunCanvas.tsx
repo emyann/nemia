@@ -10,11 +10,15 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type Node,
   type NodeChange,
+  type NodeDimensionChange,
+  type NodePositionChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
+import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
 import { CanvasLegend } from './CanvasLegend';
 import { StateEdge } from './StateEdge';
@@ -40,17 +44,16 @@ const button =
  * person dragged the nodes, kept per run until "Reset layout" lays it out again.
  */
 export function RunCanvas(props: Props) {
-  const { steps, graph } = props.run;
-  // The layering reads names and the graph's edges only, so a refetch that moves a status does not redo it.
-  const names = steps.map((s) => s.name);
-  const shape = JSON.stringify([names, graph.edges]);
+  // The layering reads names and the graph's edges only, kept by their content, so a refetch that moves a status does not redo it.
+  const names = useContent(props.run.steps.map((s) => s.name));
+  const edges = useContent(props.run.graph.edges);
   const computed = useMemo(() => {
     try {
-      return layout(stepsOf(names, graph.edges));
+      return layout(stepsOf(names, edges));
     } catch (err) {
       return err instanceof Error ? err : new Error(String(err));
     }
-  }, [shape]);
+  }, [names, edges]);
 
   if (computed instanceof Error) {
     return (
@@ -66,39 +69,47 @@ export function RunCanvas(props: Props) {
   );
 }
 
-const nodeAt = (run: RunDetail, index: number, position: Point): StepFlowNode => ({
-  id: run.steps[index]!.name,
+/** A node as the canvas keeps it: where it is and how big React Flow measured it. What it shows is read from the run on every render. */
+type PlacedStep = Node<Record<string, never>, 'step'>;
+const nodeAt = (name: string, position: Point): PlacedStep => ({
+  id: name,
   type: 'step',
   position,
   // The graph reads left to right: an edge leaves a step on its right and arrives on the left.
   sourcePosition: Position.Right,
   targetPosition: Position.Left,
-  data: stepData(run, index),
+  data: {},
 });
+
+/** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; a selection is handed up to the page. */
+const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
+  change.type === 'position' || change.type === 'dimensions';
 
 function Canvas({ run, selected, onSelect, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
   const { fitView } = useReactFlow<StepFlowNode>();
   const runCancelled = run.cancelledAt !== null;
-  const names = run.steps.map((s) => s.name);
+  const names = useContent(run.steps.map((s) => s.name));
 
   // Where each node is and how big React Flow measured it, changed only through `onNodesChange`.
   // What a node shows is not kept here: it is read from the run on every render below, so a
   // refetch moves the chips and leaves the nodes where a person put them.
-  const [placed, setPlaced] = useState<StepFlowNode[]>(() => {
+  const [placed, setPlaced] = useState<PlacedStep[]>(() => {
     const at = place(names, computed, readLayout(run.id));
-    return names.map((name, i) => nodeAt(run, i, at.get(name)!));
+    return names.map((name) => nodeAt(name, at.get(name)!));
   });
 
   // Steps the workflow folder gained or lost while the page was open: add them where they belong.
-  const namesKey = JSON.stringify(names);
   useEffect(() => {
+    // React Flow's nodes are state a drag and its measurements write too: the steps are merged into them after the commit, beside the
+    // arrangement saved in this browser.
+    // oxlint-disable-next-line react/set-state-in-effect
     setPlaced((current) => {
       const have = new Map(current.map((n) => [n.id, n]));
       const at = place(names, computed, readLayout(run.id));
-      const next = names.map((name, i) => have.get(name) ?? nodeAt(run, i, at.get(name)!));
+      const next = names.map((name) => have.get(name) ?? nodeAt(name, at.get(name)!));
       return next.length === current.length && next.every((n, i) => n === current[i]) ? current : next;
     });
-  }, [namesKey]);
+  }, [names, computed, run.id]);
 
   const runHeld = run.holding != null;
   const states = useMemo(
@@ -108,7 +119,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
 
   const nodes = useMemo(() => {
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
-    return placed.flatMap((node) => {
+    return placed.flatMap((node): StepFlowNode[] => {
       const index = indexOf.get(node.id);
       return index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }];
     });
@@ -125,12 +136,8 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
       const picked = changes.find((c) => c.type === 'select' && c.selected);
       if (picked?.type === 'select') onSelect(picked.id);
       if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
-      setPlaced((current) =>
-        applyNodeChanges(
-          changes.filter((c) => c.type !== 'select' && c.type !== 'remove'),
-          current,
-        ),
-      );
+      const kept = changes.filter(placing);
+      setPlaced((current) => applyNodeChanges(kept, current));
     },
     [onSelect],
   );

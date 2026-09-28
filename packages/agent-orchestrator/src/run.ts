@@ -2080,6 +2080,26 @@ export type StepRecord = {
   landed?: Landed;
 };
 
+/** Every task a step has filed: its current try's and its check's, and each earlier try's and its check's, in that order. */
+export const stepTasks = ({ taskId, check, tries }: StepRecord): string[] => [
+  ...(taskId ? [taskId] : []),
+  ...(check ? [check.taskId] : []),
+  ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
+];
+
+/** Every task a run has filed (`stepTasks`), step by step: what a read of the whole run reads, and what a journal that does not read can cost it. */
+export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run.steps).flatMap(stepTasks);
+
+/**
+ * Why a run is not judged, whole, when a task it reads has a journal that does not read: `own`, the task of its own that does not
+ * (`runTasks`), or undefined for a task of a run it waits on; `why`, the runtime's words; `by`, what does not judge it — `the board`,
+ * `wf ls`, `wf decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that costs.
+ */
+export function unjudgedWords(runId: string, own: string | undefined, why: string, by: string): string {
+  const what = own ? `the journal of its task ${own} does not: ${why}` : `the journal of a task of a run it waits on does not: ${why}`;
+  return `${runId}'s record reads, but ${/[.!?]$/.test(what) ? what : `${what}.`} So ${by} does not judge the run, and the tick does not advance it, until that journal reads again.`;
+}
+
 /**
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
  * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that

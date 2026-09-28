@@ -93,6 +93,7 @@ import {
   inputsNote,
   lessonLine,
   list,
+  unjudgedOf,
   listRuns,
   messageRefusal,
   missingArtifacts,
@@ -1219,7 +1220,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (const run of runs) {
         // A pruned run is still a run: said beside its line, as a cancelled one is, since what is left of it is its branches.
         const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
-        const { steps, waitingOnYou, waiting, holding, cost, toDecide } = await list(viewed, run, held.get(run.id), git);
+        const listed = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
+          const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
+          if (!unjudged) throw err;
+          return unjudged;
+        });
+        if ('said' in listed) {
+          console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}`);
+          const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
+          for (const s of listed.steps) console.log(`   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`);
+          console.log(`   → unreadable: ${listed.said}`);
+          continue;
+        }
+        const { steps, waitingOnYou, waiting, holding, cost, toDecide } = listed;
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
@@ -1424,7 +1437,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         checkout,
         standings,
         toDecide,
-      } = await decide(e, rest[0]);
+      } = await decide(e, rest[0]).catch(async (err: unknown) => {
+        const unjudged = await unjudgedOf(e, readRun(rest[0]), err, 'wf decide');
+        throw unjudged ? new Error(unjudged.said) : err;
+      });
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.

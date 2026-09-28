@@ -2,7 +2,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, wordOfView } from 'agent-orchestrator';
+import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, unjudgedWord } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { readBody, type BodyIssue } from './body.ts';
 import { decisionOf } from './decision.ts';
@@ -166,14 +166,14 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
 
 /**
  * A run a task of which does not read, answered off its record: what it asked, where, its steps and their graph, and each step's word off
- * the views that did read — the unreadable task's `unreadable` — with `said` as `unreadable`. Nothing judged: the tick does not advance
+ * the views that did read — `unreadable` for a step any task of which does not, its check's or an earlier try's among them (`unjudgedWord`)
+ * — with `said` as `unreadable`. Nothing judged: the tick does not advance
  * it either, and counts it in flight, so it is `running` and moving until the journal reads again.
  */
 function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string): Omit<RunSummary, 'startedAt'> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
-  const wordOf = (taskId: string | null | undefined) =>
-    !taskId ? 'pending' : unreadable.has(taskId) ? 'unreadable' : wordOfView(views.get(taskId));
+  const wordOf = unjudgedWord(views, unreadable);
   return {
     id: run.id,
     repo: run.repo ?? null,
@@ -196,7 +196,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string):
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
-      status: wordOf(run.steps[name]?.taskId),
+      status: wordOf(run.steps[name]),
       note: null,
       needs: null,
       blockedByHarness: false,
@@ -473,10 +473,16 @@ export const runs = new Hono()
       return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
     }
   })
-  // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.
+  /**
+   * What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404
+   * with no such run, and a 502 when a task it reads does not, in the words the list says it with (`RunSummary.unreadable`).
+   */
   .get('/api/runs/:id/decision', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
-    return c.json(await decisionOf(run));
+    const { unreadable } = await viewsFor([run]);
+    const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run));
+    if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
+    return c.json(read.judged);
   });

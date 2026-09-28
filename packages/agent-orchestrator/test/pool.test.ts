@@ -1,14 +1,16 @@
 /**
- * Pools by subscription, at shipped defaults, through the orchestrator's admission (thin runtime stage 4c): the client's `engine()`, which
- * files every task `queued`, and `tick()`, which admits off the runtime's report. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2.
+ * Pools by subscription, at shipped defaults, through the orchestrator's admission: the client's `engine()`, which files every task
+ * `queued`, and `tick()`, which admits off the runtime's report. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass.
+ * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers
+ * from its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
  *
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
  * views none of them: every `claude agents` call a pass makes is the runtime's observe, or admission's — and the observe asks it only for
  * a session expected that is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
  *
- * These are the runtime's own `pool.test.ts` cases, moved with the rule. An admitted task starts on the runtime's next pass, so a freed
- * slot is taken one pass later than when the runtime admitted: each case ticks once to admit and once to start.
+ * An admitted task starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each case ticks
+ * once to admit and once to start.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,9 +20,7 @@ import { checkBrief } from '../src/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-pool-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it; the ceiling on every pass.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 const { engine, tick } = await import('../src/runner.ts');
@@ -90,7 +90,10 @@ const fake = fakes();
 const e = engine();
 const cwd = scratch('wf-pool-cwd-');
 
-/** A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. */
+/**
+ * A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. A check's brief has no stderr file,
+ * workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+ */
 const file = (id: string, harness: string) =>
   e.file({
     id,
@@ -98,8 +101,7 @@ const file = (id: string, harness: string) =>
     harness,
     brief:
       harness === 'check'
-        ? // No stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
-          checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, {
+        ? checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, {
             WF_RUN: 'r',
             WF_STEP: id,
             WF_WORKSPACE: '',
@@ -159,12 +161,15 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
     assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
     assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
 
-    // The claude-detached session ends. The slot it frees is the pool's, and goes to the next task in it: b1, filed first.
     fake.open('a1');
     await until(['a1'], 'running (done)');
     await tick(e);
     assert.equal((await e.view('a1')).state.settled, 'succeeded');
-    assert.equal((await e.view('b1')).admission, 'admitted', 'b1 is admitted into the slot a claude-detached session freed');
+    assert.equal(
+      (await e.view('b1')).admission,
+      'admitted',
+      "the claude-detached session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
+    );
     assert.equal(await attempts('b1'), 0, 'and starts a pass later');
     await tick(e);
     assert.equal(await attempts('b1'), 1, 'b1 took the slot');
@@ -203,10 +208,13 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
 test("one pass — the runtime's tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting", async () => {
   try {
     for (const id of ['s1', 's2', 's3', 's4']) await file(id, 'claude');
-    // The pass that admits s1 and s2: its `admit` is a word to the journals, and asks no harness.
     const admitting = fake.agentsCalls();
     const first = (await tick(e)).cost;
-    assert.equal(fake.agentsCalls() - admitting, 0, 'no `claude agents` for the pass that admits: nothing has started');
+    assert.equal(
+      fake.agentsCalls() - admitting,
+      0,
+      'no `claude agents` for the pass that admits s1 and s2: its `admit` is a word to the journals, and nothing has started',
+    );
     assert.deepEqual([(await e.view('s1')).admission, (await e.view('s3')).admission], ['admitted', 'queued']);
     assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
     assert.equal(first?.harnesses.claude?.spawned, 0);
@@ -214,17 +222,21 @@ test("one pass — the runtime's tick, admission and admit — asks `claude agen
     await until(['s1', 's2'], 'running (working)');
     assert.equal((await e.view('s3')).admission, 'queued');
 
-    // Admission here reads the views the runtime's pass built; a read of `e.list()` or `e.view` for it would ask the harness again.
-    // And the runtime's observe is told the jobs it expects, which are listed off their run files: Claude Code's registry is not asked.
     const before = fake.agentsCalls();
     const { cost } = await tick(e);
-    assert.equal(fake.agentsCalls() - before, 0, 'no `claude agents` for the whole pass: every claude task in flight is a job');
+    assert.equal(
+      fake.agentsCalls() - before,
+      0,
+      "no `claude agents` for the whole pass: admission reads the views the runtime's pass built, not a list or a view that asks the harness again, and the observe is told the jobs it expects, listed off their run files",
+    );
     assert.ok(cost, 'the pass says what it cost');
     assert.equal(cost.harnesses.claude?.calls, 1, 'one observe of claude, as the meter counts the pass');
-    // Each harness is observed once a pass, and a process one starts is counted against every harness observing in that moment
-    // (`ObserveCount`), so the pass's own count says how many were started in all: none.
     for (const [name, o] of Object.entries(cost.harnesses)) assert.equal(o.calls, 1, `${name} observed once`);
-    assert.equal(cost.spawned, 0, 'no process started in the whole pass');
+    assert.equal(
+      cost.spawned,
+      0,
+      "no process started in the whole pass: a process one observe starts is counted against every harness observing in that moment (`ObserveCount`), so the count is the pass's own",
+    );
     assert.equal(await attempts('s3'), 0, 'and s3 still waits');
   } finally {
     await drain();

@@ -2,7 +2,9 @@
  * What a pass costs, counted on a store (`tally.ts`, composed by `tick`): the phases add up to the pass, the run records read are counted,
  * the harnesses' observes are moved out of the runtime's pass, and the cost is written for `wf up --stats` and read back.
  *
- * A file of its own, since `tick` reads every run under `WF_ROOT`: the runs of the other store tests would be counted in it.
+ * A file of its own, since `tick` reads every run under `WF_ROOT`: the runs of the other store tests would be counted in it. `WF_ROOT` is
+ * read as the module loads, so it is set before the import. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of
+ * runs at rest, and a difference throws (`verifyRest` in tick.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,9 +20,7 @@ const ROOT = scratch('wf-meter-');
 const RUNS = path.join(ROOT, 'runs');
 const STATS = path.join(ROOT, 'tick-stats.json');
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-// Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { lastPassCost, listRuns, readRun, start, tick } = await import('../src/runner.ts');
@@ -29,9 +29,7 @@ const { metered, within } = await import('../src/tally.ts');
 /** A spin, so a fake's time is spent on the thread the meter measures, not handed to a timer that may fire late. */
 const busy = (ms: number) => {
   const until = performance.now() + ms;
-  while (performance.now() < until) {
-    /* spin */
-  }
+  while (performance.now() < until) {}
 };
 
 /**
@@ -156,7 +154,6 @@ test("a pass's phases add up to its time, less what measuring took, and the time
 test('what measuring took is in no phase: a runtime whose report is slow to read adds to the overhead, and the phases stay the rest', async () => {
   emptyStore();
   started(3);
-  // Metered from outside, so the meter's own counts are read: the pass's `overheadMs` also has what came after its time (composing, writing).
   const { ms, tallies } = await metered(() => tick(fake({ passMs: 5, ioMs: 3 })));
   assert.ok(tallies);
   const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
@@ -167,7 +164,7 @@ test('what measuring took is in no phase: a runtime whose report is slow to read
   );
   assert.ok(
     Math.abs(ms - sum - tallies.overheadMs) <= 0.5,
-    `the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`,
+    `metered from outside, so the meter's own counts are read, not the pass's overhead, which also has what came after its time: the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`,
   );
 });
 
@@ -184,13 +181,12 @@ test('a pass on a fixture store counts the run records it read: twice as many ru
   assert.equal(perRun, Math.round(perRun), `a whole number of reads a run (${two.records} for two)`);
 
   started(2);
-  // Measured before the pass, which may write a record back longer than it read it.
   const recordBytes = listRuns().reduce((n, r) => n + fs.statSync(path.join(RUNS, `${r.id}.json`)).size, 0);
   const four = (await tick(e)).cost!;
   assert.equal(four.records, perRun * 4, `four runs are read ${perRun} times each, as two were`);
   assert.ok(
     four.phases.records.bytes >= recordBytes,
-    `the records phase read every record's ${recordBytes} bytes (counted ${four.phases.records.bytes})`,
+    `the records phase read every record's ${recordBytes} bytes, measured before the pass, which may write a record back longer (counted ${four.phases.records.bytes})`,
   );
   assert.ok(four.phases.records.calls >= four.records, 'each record read is a call of the records phase');
 });
@@ -201,7 +197,6 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
   const { cost } = await tick(fake({ passMs: 30, observeMs: 20 }));
   assert.ok(cost);
   assert.deepEqual(cost.harnesses, { claude: { calls: 1, ms: 20, listed: 4, spawned: 1 } });
-  // What could not be read is counted per pass, and said only when there was some.
   const e = fake({ observeMs: 20, unread: 1 });
   assert.equal((await tick(e)).cost!.harnesses.claude.unread, 1, 'an observe that could not read its harness');
   assert.equal((await tick(e)).cost!.harnesses.claude.unread, 1, 'counted for the pass, not the running total');
@@ -210,12 +205,13 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
   assert.equal(cost.phases.observe.calls, 1);
   assert.equal(cost.phases.observe.spawned, 1, "the process the observe started is observe's");
   assert.equal(cost.phases.runtime.spawned, 0);
-  // Its 30 ms is a floor, never a ceiling: a process parked after the spin takes longer, and `< 30` failed at 30.8 under load. Moved
-  // and not copied is what the phases adding up to no more than the pass says, whatever the scheduler did.
-  assert.ok(cost.phases.runtime.ms >= 9, `the runtime's pass keeps the rest of its 30 ms (${cost.phases.runtime.ms})`);
+  assert.ok(
+    cost.phases.runtime.ms >= 9,
+    `the runtime's pass keeps the rest of its 30 ms, a floor and never a ceiling, since a process parked after the spin takes longer (${cost.phases.runtime.ms})`,
+  );
   assert.ok(
     phaseSum(cost) <= cost.ms + 0.01,
-    `the observe's 20 ms is counted once: the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`,
+    `the observe's 20 ms is moved, not copied, whatever the scheduler did: the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`,
   );
   assert.equal(cost.phases.runtime.bytes, 1000, 'what the runtime read is counted where it was called');
   assert.equal(
@@ -261,7 +257,7 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   const [run] = started(1);
   const outside = await metered(async () => 'none');
   assert.equal(outside.tallies!.records, 0);
-  readRun(run.id); // not metered: nothing is open to count it in
+  readRun(run.id);
   const outer = await metered(async () => {
     readRun(run.id);
     within('act', () => busy(2));

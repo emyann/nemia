@@ -5,7 +5,9 @@
  *
  * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
  * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in
- * full as well (`verifyRest`), and throws where the two differ.
+ * full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import; no
+ * cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is built
+ * in a few passes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,8 +22,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-rest-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it. No cap on runs in flight, and sessions enough
-// that every task filed is admitted on the pass after: a store of two hundred runs is built in a few passes.
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
@@ -79,9 +79,12 @@ const memoryJournal = (): PromiseJournal => {
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag?' };
 
-/** The runtime, with a harness whose sessions work until `signAll` ends them. */
+/**
+ * The runtime, with a harness whose sessions work until `signAll` ends them. The harness reports its own words (`done`, `stopped`), as a
+ * runner written in Promises may still report them: the runtime reads them as A2A's. `signAll` signs every session at work but those of
+ * the runs `keep` names, which stay in flight, with `closeout`, or `SIGNED` where it names none.
+ */
 const engine = () => {
-  // A harness's own words (`done`, `stopped`), as a runner written in Promises may still report them: the runtime reads them as A2A's.
   const sessions = new Map<string, PromiseSighting>();
   let n = 0;
   const runner: PromiseRunner = {
@@ -106,7 +109,6 @@ const engine = () => {
     harnesses: { claude: runner, codex: runner, check: runner },
     defaultHarness: 'claude',
   });
-  /** Sign every session at work but those of the runs `keep` names, which stay in flight, with `closeout`, or `SIGNED` where it names none. */
   const signAll = (keep: readonly Run[] = [], closeout: (name: string) => object | undefined = () => undefined) => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || keep.some((r) => name.startsWith(`ae/${r.id}-`))) continue;
@@ -157,8 +159,6 @@ const journals = (c: PassCost) => c.phases.journals.calls;
 const observes = (c: PassCost) => c.phases.observe.calls;
 const gits = (c: PassCost) => c.phases.git.spawned;
 
-// ─── what a pass costs ──────────────────────────────────────────────────────
-
 /** The store at each size, and the pass each was measured at: built once, read by the tests that follow. */
 const sizes: Array<{ finished: number; cost: PassCost; fresh?: PassCost }> = [];
 const ISOLATED_REPOS = [aRepo(), aRepo()];
@@ -167,7 +167,6 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
   inFlight.push(...started(3));
   sizes.push({ finished: 0, cost: await steady() });
 
-  // Three runs on each of two repositories whose result branches the pass reads the tips of, and the rest on one worked in place.
   started(3, TWO, ISOLATED_REPOS[0], true);
   started(3, TWO, ISOLATED_REPOS[1], true);
   started(94);
@@ -176,10 +175,9 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
   sizes.push({ finished: 200, cost: await steady() });
 
   const [none, hundred, twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
-  // Read off the views the runtime's pass reported (`reportedEngine`): before, each run in flight cost a view of its step, and this said `>= 3`.
   assert.ok(
     journals(none) < 3,
-    `the three runs in flight are read off the runtime's pass, with no view of their own (${journals(none)} reads)`,
+    `the three runs in flight are read off the views the runtime's pass reported (\`reportedEngine\`), with no view of their own (${journals(none)} reads)`,
   );
   assert.ok(observes(none) >= 1, `and their harness observed (${observes(none)} observes)`);
   for (const [at, c] of [
@@ -192,7 +190,7 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
     assert.equal(
       gits(c),
       gits(none) + ISOLATED_REPOS.length,
-      `${at} finished runs: one for-each-ref a repository whose runs' tips are read, and no more`,
+      `${at} finished runs: one for-each-ref a repository whose runs' tips are read (three runs on each of two), and no more`,
     );
     assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
   }
@@ -211,21 +209,24 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
     gits(fresh) >= gits(none) + 6,
     `each of the six runs whose tips are read asks git on its own (${gits(fresh)} processes, against ${gits(twoHundred)})`,
   );
-  // And the pass that follows, on the engine's own memo, is as it was: an empty memo is a cost, never an answer.
-  assert.equal(journals(await measured()), journals(twoHundred));
+  assert.equal(
+    journals(await measured()),
+    journals(twoHundred),
+    "the pass that follows, on the engine's own memo, is as it was: an empty memo is a cost, never an answer",
+  );
 });
 
 test('a pass that answers the finished runs from memory carries no refused move: their tasks are settled, and the runtime moves none', async () => {
-  // The refusals are the runtime's pass's (`TickReport.refused`), taken before the memo is read, and a settled task is asked nothing
-  // (`settledQuiet` in the runtime's domain.ts): three passes over two hundred runs at rest say nothing stalled.
   for (let k = 0; k < 3; k++) {
     const pass = await verified();
     assert.ok((pass.cost!.rested ?? 0) >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
-    assert.equal(pass.refused, undefined, `pass ${k + 1}: no refused move`);
+    assert.equal(
+      pass.refused,
+      undefined,
+      `pass ${k + 1}: no refused move; the refusals are the runtime's pass's (\`TickReport.refused\`), taken before the memo is read, and a settled task is asked nothing (\`settledQuiet\` in the runtime's domain.ts)`,
+    );
   }
 });
-
-// ─── what takes a run out of the memo ───────────────────────────────────────
 
 /** How many runs the next pass answers from memory, every one of them judged again in full. */
 const rested = async (): Promise<number> => (await verified()).cost!.rested ?? 0;
@@ -318,11 +319,13 @@ test('an ask takes a run out, and the try it asks for is filed: a retry, and an 
 });
 
 test('an acceptance, and an ask moved into done/, each take a run out', async () => {
-  // Of a step that loops nowhere: read, it ends nothing and stays where it is, so the run rests again with it there.
   const accepted = await evicts('an acceptance', (run) => {
     writeAsk(acceptFile(run.id, 'work', 1), { step: 'work', try: 1, at: new Date().toISOString(), message: 'good enough as it is' });
   });
-  assert.ok(fs.existsSync(acceptFile(accepted.id, 'work', 1)));
+  assert.ok(
+    fs.existsSync(acceptFile(accepted.id, 'work', 1)),
+    'an acceptance of a step that loops nowhere ends nothing and stays where it is, so the run rests again with it there',
+  );
   await evicts('done/', (run) => {
     fs.mkdirSync(path.join(asksDir(run.id), 'done'), { recursive: true });
     fs.writeFileSync(path.join(asksDir(run.id), 'done', 'retry-work-9'), '{}\n');
@@ -370,8 +373,6 @@ test('a run forgotten leaves the memo, and passes over runs at rest write nothin
   assert.equal(MEMO.runs.has(run.id), false, 'gone from the memo with its record');
 });
 
-// ─── refusals: the two watches the memo cannot do without ───────────────────
-
 test('REFUSED: a file in the asks directory that no reader reads still takes its run out — the stamp reads the asks, not only the record', async () => {
   await evicts('an unread file in the asks', (run) => {
     fs.mkdirSync(asksDir(run.id), { recursive: true });
@@ -400,7 +401,6 @@ test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchan
 });
 
 test('REFUSED: a memo that holds a run a full pass finds not at rest throws under verifyRest, naming the clauses that hold it out', async () => {
-  // A run in flight, put in the memo as though a pass had found it at rest: its stamp and record as the next pass reads them.
   const { run: _, ...advanced } = await answered(inFlight[0].id);
   const run = readRun(inFlight[0].id);
   MEMO.runs.set(run.id, { stamp: restStamps().get(run.id)!, record: JSON.stringify(run), tipped: [], advanced });
@@ -427,12 +427,9 @@ test("a run's stamp moves with any file named for it, a marker nobody has named 
   assert.equal(restStamps().has(`${run.id}-other`), false, 'a run with no files has no stamp');
 });
 
-// ─── runs that stopped otherwise: called off before they started, their worktrees gone ─────────────────────────────────────────────────────
-
 /**
- * A finished run of worktrees, its worktrees then removed from under it and its hand-offs never written down, as 70 of the owner's 195 runs
- * were on 2026-09-25 (older runs, from before a step's hand-off was marked, whose worktrees went by hand): a pass owes a step a hand-off
- * (`handOffDue`) that it can only try in a directory that is not there.
+ * A finished run of worktrees, its worktrees then removed from under it by hand and its hand-offs never written down: a pass owes a step a
+ * hand-off (`handOffDue`) that it can only try in a directory that is not there.
  */
 const worktreesGone = (run: Run) => {
   const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as {
@@ -459,9 +456,8 @@ test('a run called off before anything of it was filed rests like a finished one
   assert.ok(MEMO.runs.has(run.id), 'at rest after the pass that judged it');
   assert.equal(await rested(), before + 1, 'answered from memory on the next, and judged the same in full (verifyRest)');
   assert.equal((await answered(run.id)).status, 'cancelled');
-  // And a word of a person's takes it out as it takes any run out: its record's stamp moved.
   await evicts(
-    '.pruned',
+    ".pruned, a word of a person's, which takes it out as it takes any run out",
     (r) => {
       fs.writeFileSync(pruneFile(r.id), `${JSON.stringify({ at: new Date().toISOString(), worktrees: [] })}\n`);
     },
@@ -502,7 +498,6 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
 });
 
 test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone — no pass could make one there', async () => {
-  // Two roots, each in a worktree of its own: one of them removed, the other still there for `wf prune` to remove.
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const name of ['left', 'right']) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n---\n${name} it\n`);
   const run = start({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true });
@@ -511,7 +506,11 @@ test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone
   const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as {
     steps: Record<string, { workspace: string; handedOff?: string }>;
   };
-  assert.notEqual(record.steps.left.workspace, record.steps.right.workspace, 'a worktree each');
+  assert.notEqual(
+    record.steps.left.workspace,
+    record.steps.right.workspace,
+    'two roots, a worktree each: one of them removed, the other still there for `wf prune` to remove',
+  );
   delete record.steps.right.handedOff;
   fs.rmSync(record.steps.right.workspace, { recursive: true, force: true });
   fs.writeFileSync(runFile(run.id), JSON.stringify(record, null, 2));

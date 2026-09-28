@@ -421,6 +421,30 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   assert.deepEqual(filedTasks(), []);
 });
 
+test("REFUSED at shipped defaults: a start's `workflow` that is not a name, and a `from` that is neither place, are 400s in the api's words, word for word — and nothing is written", async () => {
+  const before = runFiles();
+  const shape =
+    '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
+  for (const workflow of ['', 7, null]) {
+    const res = await post({ workflow, brief: 'Do it.' });
+    assert.equal(res.status, 400, JSON.stringify(workflow));
+    assert.equal(
+      ((await res.json()) as { error: string }).error,
+      `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${shape}.`,
+    );
+  }
+  for (const from of ['elsewhere', 7, null]) {
+    const res = await post({ workflow: 'good', brief: 'Do it.', from });
+    assert.equal(res.status, 400, JSON.stringify(from));
+    assert.equal(
+      ((await res.json()) as { error: string }).error,
+      '`from` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named \'good\'.',
+    );
+  }
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
+});
+
 /** A start of the repository's `good`, sent with exactly `headers`. */
 const sentWith = (headers: Record<string, string>) =>
   app.request('/api/runs', {

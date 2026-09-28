@@ -76,7 +76,7 @@ fs.writeFileSync(
     createdAt: at,
     workflowDir: path.join(root, 'no-such-workflow'),
     workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }],
-    steps: { write: { taskId: 't-write', workspace: path.join(work, 'write'), branch: null } },
+    steps: { write: { taskId: 't-write', workspace: path.join(work, 'write') } },
   }),
 );
 
@@ -235,8 +235,8 @@ test('a folder the api cannot read says why, where one not there is an empty lis
         { name: 'review', after: ['write'], body: 'Read it.', harness: 'claude', workspace: 'folder' },
       ],
       steps: {
-        write: { taskId: 't-gone-write', workspace: notAFolder, branch: null },
-        review: { taskId: 't-gone-review', workspace: path.join(root, 'runs', 'f-gone', 'review'), branch: null },
+        write: { taskId: 't-gone-write', workspace: notAFolder },
+        review: { taskId: 't-gone-review', workspace: path.join(root, 'runs', 'f-gone', 'review') },
       },
     }),
   );
@@ -346,7 +346,7 @@ test("a file a step wrote called `given` is its own work, and is listed — only
       createdAt: at,
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }],
-      steps: { write: { taskId: 't-given-write', workspace: folder, branch: null } },
+      steps: { write: { taskId: 't-given-write', workspace: folder } },
     }),
   );
 

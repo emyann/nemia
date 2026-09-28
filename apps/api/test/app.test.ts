@@ -2333,7 +2333,10 @@ test("the detail carries where each step's time went — per try and per check, 
     ]);
   const feed = path.join(root, 'engine', 'feed.jsonl');
   const fileOnFeed = (taskId: string, at: string) =>
-    fs.appendFileSync(feed, `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`);
+    fs.appendFileSync(
+      feed,
+      `${JSON.stringify({ taskId, event: { kind: 'filed', at, brief: filedBrief(taskId), cwd: '/code/app', harness: 'codex' } })}\n`,
+    );
 
   // implement's check refused try 1, and try 2's check is still running. The feed has each filing; a task's view has none.
   ran('r-60-implement', 'codex', T(0), T(0, 12), {

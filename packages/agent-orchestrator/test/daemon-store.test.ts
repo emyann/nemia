@@ -22,7 +22,9 @@ process.env.WF_ROOT = ROOT;
 // Every run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`verifyRest` in tick.ts).
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { beat, daemonFile, daemonStanding, procStartOf } = await import('../src/runner.ts');
+const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../src/runner.ts');
+const { parsePassCost } = await import('../src/daemon-store.ts');
+const { PHASES, passCost } = await import('../src/meter.ts');
 const { main } = await import('../src/cli.ts');
 
 const FILE = path.join(ROOT, 'daemon.json');
@@ -76,6 +78,7 @@ const pass = (said: Partial<TickReport> = {}): TickReport => ({
   ms: 0,
   observed: {},
   refused: [],
+  unreadable: [],
   ...said,
 });
 
@@ -552,4 +555,90 @@ test('`wf tick` says every move its one pass refused', async (t) => {
     printed.filter((l) => l.includes('stalled')),
     ['t-stuck  stalled: its lifecycle has no edge from submitted on READY, so nothing is done; it is asked again each pass'],
   );
+});
+
+test('`wf up` says a task the runtime left out once while it lasts, and again once it clears and comes back; `wf tick` says each its pass left out', async (t) => {
+  clear();
+  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.turns` is not a number";
+  const feed = 'the feed (/store/feed.jsonl), entry 3 read from cursor 148 is no event this runtime writes';
+  const byPass = [[bad], [bad, feed], [bad], [], [bad]];
+  const e = engineOf();
+  e.tick = async () => {
+    e.passes++;
+    if (e.passes > byPass.length) throw STOP;
+    return pass({ tasks: 2, unreadable: byPass[e.passes - 1]! });
+  };
+  const errors: string[] = [];
+  t.mock.method(console, 'error', (...args: unknown[]) => {
+    errors.push(args.map(String).join(' '));
+  });
+  const { threw } = await typed(t, ['up', '1'], e);
+  assert.equal(threw, STOP);
+  const said = errors.filter((l) => l.includes('left out: '));
+  assert.deepEqual(
+    said.map((l) => l.slice(10)),
+    [`left out: ${bad}`, `left out: ${feed}`, `left out: ${bad}`],
+    errors.join('\n'),
+  );
+  assert.ok(
+    said.every((l) => /^\d\d:\d\d:\d\d  left out: /.test(l)),
+    'stamped as the daemon stamps every line',
+  );
+  errors.length = 0;
+  e.tick = async () => pass({ tasks: 2, unreadable: [bad, feed] });
+  assert.equal((await typed(t, ['tick'], e)).threw, undefined);
+  assert.deepEqual(errors, [`left out: ${bad}`, `left out: ${feed}`]);
+});
+
+/** A pass's cost as the meter writes one: every phase, and two harnesses observed. */
+const COST = passCost({
+  at: '2026-09-25T10:00:00.000Z',
+  ms: 212,
+  phases: Object.fromEntries(PHASES.map((p) => [p, { ms: 10, calls: 1, bytes: 100, reads: 1, spawned: 0 }])) as Parameters<
+    typeof passCost
+  >[0]['phases'],
+  harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0, unread: 1 } },
+  records: 12,
+  overheadMs: 0.4,
+});
+
+test('a cost reads back as written, and REFUSED: half a file, another shape, a phase missing, a count that is not one', () => {
+  assert.deepEqual(parsePassCost(JSON.stringify(COST)), COST);
+  const text = JSON.stringify(COST);
+  assert.equal(parsePassCost(text.slice(0, text.length / 2)), undefined, 'half of one');
+  assert.equal(parsePassCost('[]'), undefined);
+  assert.equal(parsePassCost(JSON.stringify({ sessions: 2, runs: 0 })), undefined, 'tick.json is not one');
+  const { git: _, ...noGit } = COST.phases;
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, phases: noGit })), undefined, 'a phase missing');
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, ms: -1 })), undefined);
+  assert.equal(
+    parsePassCost(JSON.stringify({ ...COST, phases: { ...COST.phases, act: { ...COST.phases.act, bytes: 'many' } } })),
+    undefined,
+  );
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, harnesses: [] })), undefined);
+  assert.equal(
+    parsePassCost(JSON.stringify({ ...COST, harnesses: { claude: { calls: 1, ms: 1, listed: 'all', spawned: 0 } } })),
+    undefined,
+  );
+  // A key a newer meter writes is kept, as the file is read whole.
+  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, later: 1 })), { ...COST, later: 1 });
+  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, rested: 3 })), { ...COST, rested: 3 }, 'the runs answered from memory');
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and REFUSED, a count of them that is not one');
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: -1 })), undefined);
+});
+
+test('the ceilings of the last pass read back as written, and REFUSED — read as none — when a count is not one', () => {
+  const file = path.join(ROOT, 'tick.json');
+  try {
+    fs.writeFileSync(file, JSON.stringify({ sessions: 4, runs: 2 }));
+    assert.deepEqual(lastCeilings(), { sessions: 4, runs: 2 });
+    for (const bad of [{ sessions: 4, runs: -1 }, { sessions: 4, runs: 1.5 }, { sessions: '4', runs: 2 }, { sessions: 4 }, [4, 2]]) {
+      fs.writeFileSync(file, JSON.stringify(bad));
+      assert.equal(lastCeilings(), undefined, JSON.stringify(bad));
+    }
+    fs.writeFileSync(file, '{"sessions": 4');
+    assert.equal(lastCeilings(), undefined, 'half a file');
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
 });

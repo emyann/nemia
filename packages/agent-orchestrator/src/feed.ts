@@ -64,9 +64,15 @@ const same = (a: FeedSaid | undefined, b: FeedSaid): boolean => a !== undefined 
  * The lines a pass owes the feed: one for each run and each step whose word or note is not what the feed said of it last — a run the feed
  * has never named says each of its words once — and one `removed` for each run the feed still names that the store no longer has. Pure.
  *
- * `now` is every run in the store, as the pass read it: a run not in it is a run that is gone. A removed run's steps get no line of their own.
+ * `now` is every run in the store, as the pass read it: a run not in it is a run that is gone — but for one of `unjudged`, which the pass
+ * read and could not judge, and of which it says nothing. A removed run's steps get no line of their own.
  */
-export function feedChanges(fold: FeedFold, now: ReadonlyMap<string, FeedWords>, at: string): FeedLine[] {
+export function feedChanges(
+  fold: FeedFold,
+  now: ReadonlyMap<string, FeedWords>,
+  at: string,
+  unjudged: ReadonlySet<string> = new Set(),
+): FeedLine[] {
   const line = (run: string, step: string | undefined, said: FeedSaid): FeedLine => ({
     at,
     run,
@@ -80,7 +86,7 @@ export function feedChanges(fold: FeedFold, now: ReadonlyMap<string, FeedWords>,
     if (!same(before?.run, words.run)) out.push(line(id, undefined, words.run));
     for (const s of words.steps) if (!same(before?.steps.get(s.name), s)) out.push(line(id, s.name, s));
   }
-  for (const id of fold.keys()) if (!now.has(id)) out.push({ at, run: id, word: REMOVED });
+  for (const id of fold.keys()) if (!now.has(id) && !unjudged.has(id)) out.push({ at, run: id, word: REMOVED });
   return out;
 }
 

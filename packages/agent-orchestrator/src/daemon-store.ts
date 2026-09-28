@@ -7,20 +7,34 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Result, Schema } from 'effect';
 import { HOME } from './store.ts';
 import { runCapOf } from './run.ts';
-import { parsePassCost, type PassCost } from './meter.ts';
+import { PHASES, type PassCost, type Phase } from './meter.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
   daemonText,
   holderAgainst,
   holdRefusal,
-  parseDaemonFile,
   type DaemonFile,
+  type DaemonRead,
   type DaemonStanding,
   type Identity,
 } from './daemon.ts';
+
+/** The text as JSON, or undefined where it is not: a file half written, or another program's. */
+const jsonOr = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+/** A count as the meter writes one: a number, never below zero. */
+const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
  * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the tick's admission's
@@ -39,15 +53,19 @@ export const ceilings = (): { sessions: number; runs: number } => ({
  */
 const tickFile = (): string => path.join(HOME, 'tick.json');
 
+/** `tick.json` as the tick writes it: the sessions a pool admits, and the runs in flight at once, a whole number (0 for no cap). */
+const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }));
+
 /** The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them. */
 export function lastCeilings(): { sessions: number; runs: number } | undefined {
+  let text: string;
   try {
-    const c = JSON.parse(fs.readFileSync(tickFile(), 'utf8')) as { sessions?: unknown; runs?: unknown };
-    const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
-    return typeof c.sessions === 'number' && count(c.runs) ? { sessions: c.sessions, runs: c.runs } : undefined;
+    text = fs.readFileSync(tickFile(), 'utf8');
   } catch {
     return undefined;
   }
+  const c = jsonOr(text);
+  return isCeilings(c) ? { sessions: c.sessions, runs: c.runs } : undefined;
 }
 
 /**
@@ -73,6 +91,39 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
  * read by `wf up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  */
 export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
+
+const PhaseCostSchema = Schema.StructWithRest(Schema.Struct({ ms: Count, calls: Count, bytes: Count, reads: Count, spawned: Count }), Rest);
+const HarnessCostSchema = Schema.StructWithRest(
+  Schema.Struct({ calls: Count, ms: Count, listed: Count, spawned: Count, unread: Schema.optionalKey(Count) }),
+  Rest,
+);
+
+/**
+ * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase there; `rested` is absent from a pass written before there was one.
+ * A key it does not name is kept, as a newer `wf` may write one.
+ */
+const isPassCost = Schema.is(
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      ms: Count,
+      phases: Schema.Struct(Object.fromEntries(PHASES.map((p) => [p, PhaseCostSchema])) as Record<Phase, typeof PhaseCostSchema>),
+      harnesses: Schema.Record(Schema.String, HarnessCostSchema),
+      records: Count,
+      bytes: Count,
+      spawned: Count,
+      overheadMs: Count,
+      rested: Schema.optionalKey(Count),
+    }),
+    Rest,
+  ),
+);
+
+/** A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one. */
+export const parsePassCost = (text: string): PassCost | undefined => {
+  const c = jsonOr(text);
+  return isPassCost(c) ? c : undefined;
+};
 
 /** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
 export function lastPassCost(): PassCost | undefined {
@@ -107,14 +158,46 @@ export function recordPassCost(cost: PassCost): number {
 /** `$WF_ROOT/daemon.json`: the store taken by one `wf up`, written by it alone (`daemon.ts`). */
 export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
 
+const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
+
+/**
+ * `daemon.json` as `wf up` writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and `kill(-n)`
+ * signal process groups, not a process. `passedAt` is absent from a file written before its first pass by an older `wf up`, and read as
+ * `null`. A key it does not name is dropped: the file is the daemon's alone, and written whole by it.
+ */
+const DaemonFileSchema = Schema.Struct({
+  pid: Schema.Int.check(Schema.isGreaterThan(0)),
+  startedAt: When,
+  cwd: Schema.String,
+  every: Schema.Finite.check(Schema.isGreaterThan(0)),
+  passedAt: Schema.optional(Schema.NullOr(When)),
+  beatAt: Schema.optionalKey(When),
+  procStart: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  stoppedAt: Schema.optionalKey(When),
+});
+
+/** The file as `wf up` writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
+export function parseDaemonFile(text: string): DaemonFile | undefined {
+  const decoded = Schema.decodeUnknownResult(DaemonFileSchema)(jsonOr(text));
+  if (Result.isFailure(decoded)) return undefined;
+  const file = decoded.success;
+  return { ...file, passedAt: file.passedAt ?? null };
+}
+
 /** The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged free. */
-function readDaemon(): string | undefined {
+function readDaemonText(): string | undefined {
   try {
     return fs.readFileSync(daemonFile(), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw err;
   }
+}
+
+/** The file read: its text and what it holds, or undefined when there is none. */
+function readDaemon(): DaemonRead | undefined {
+  const text = readDaemonText();
+  return text === undefined ? undefined : { text, file: parseDaemonFile(text) };
 }
 
 /** Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there. */
@@ -205,8 +288,7 @@ export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd
  * file or none that reads, which the next write puts right — or the file of whoever took it over.
  */
 export function stillHeld(held: DaemonFile): DaemonFile | undefined {
-  const text = readDaemon();
-  const file = text === undefined ? undefined : parseDaemonFile(text);
+  const file = readDaemon()?.file;
   return file && file.pid !== held.pid ? file : undefined;
 }
 
@@ -227,8 +309,7 @@ export function passed(held: DaemonFile, at = new Date().toISOString()): DaemonF
  */
 export function beat(held: DaemonFile, at = new Date().toISOString()): void {
   try {
-    const text = readDaemon();
-    const file = text === undefined ? undefined : parseDaemonFile(text);
+    const file = readDaemon()?.file;
     if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
   } catch {
     /* the next pass writes the file, or fails saying why */
@@ -242,8 +323,7 @@ export function beat(held: DaemonFile, at = new Date().toISOString()): void {
  */
 export function releaseStore(held: DaemonFile, at = new Date().toISOString()): void {
   try {
-    const text = readDaemon();
-    const file = text === undefined ? undefined : parseDaemonFile(text);
+    const file = readDaemon()?.file;
     if (file?.pid === held.pid && !file.stoppedAt) writeDaemon({ ...file, stoppedAt: at });
   } catch {
     /* read as gone once the process is */

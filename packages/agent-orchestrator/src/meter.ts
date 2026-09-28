@@ -152,27 +152,3 @@ export const breakdownLines = (c: PassCost): string[] => {
     `measuring it: ${msWord(c.overheadMs)} ms`,
   ];
 };
-
-/** A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one. */
-export const parsePassCost = (text: string): PassCost | undefined => {
-  let c: unknown;
-  try {
-    c = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  if (!c || typeof c !== 'object') return undefined;
-  const r = c as Record<string, unknown>;
-  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-  const phases = r.phases as Record<string, Record<string, unknown>> | undefined;
-  if (typeof r.at !== 'string' || !num(r.ms) || !num(r.records) || !num(r.bytes) || !num(r.spawned) || !num(r.overheadMs)) return undefined;
-  if (r.rested !== undefined && !num(r.rested)) return undefined;
-  if (
-    !phases ||
-    typeof phases !== 'object' ||
-    !PHASES.every((p) => phases[p] && ['ms', 'calls', 'bytes', 'reads', 'spawned'].every((k) => num(phases[p]![k])))
-  )
-    return undefined;
-  if (!r.harnesses || typeof r.harnesses !== 'object' || Array.isArray(r.harnesses)) return undefined;
-  return c as PassCost;
-};

@@ -20,13 +20,17 @@ const feedMemo: FeedMemo = freshMemo();
 
 /**
  * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`), and the lines
- * written. `now` is every run the pass read: one the feed still names that is not in it is gone, and gets its `removed`. `memo` is for a
- * test, which starts one afresh to be a restarted daemon.
+ * written. `now` is every run the pass judged: one the feed still names that is not in it is gone, and gets its `removed` — but for one of
+ * `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test, which starts one afresh to be a restarted daemon.
  */
 export const recordFeed = (
   now: ReadonlyMap<string, FeedWords>,
-  { at = new Date().toISOString(), memo = feedMemo }: { at?: string; memo?: FeedMemo } = {},
-): FeedLine[] => within('act', () => recordFeedFile(feedFile(), now, at, memo));
+  {
+    at = new Date().toISOString(),
+    memo = feedMemo,
+    unjudged = new Set<string>(),
+  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string> } = {},
+): FeedLine[] => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -143,7 +147,13 @@ function readEnds(file: string, after: number): { lines: FeedLine[]; ends: numbe
  * A line with no newline at the end of the feed is one a writer died in: the append starts with a newline, so that line ends as the one
  * nobody can read (`parseLine`) and the lines after it are whole.
  */
-function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>, at: string, memo: FeedMemo): FeedLine[] {
+function recordFeedFile(
+  file: string,
+  now: ReadonlyMap<string, FeedWords>,
+  at: string,
+  memo: FeedMemo,
+  unjudged: ReadonlySet<string>,
+): FeedLine[] {
   const stat = statOf(file);
   const size = stat?.size ?? 0;
   if ((memo.ino !== undefined && stat?.ino !== memo.ino) || cursorRefusalAt(file, memo.cursor) !== undefined)
@@ -152,7 +162,7 @@ function recordFeedFile(file: string, now: ReadonlyMap<string, FeedWords>, at: s
   foldFeed(memo.fold, read.lines);
   memo.cursor = read.cursor;
   memo.ino = stat?.ino;
-  const lines = feedChanges(memo.fold, now, at);
+  const lines = feedChanges(memo.fold, now, at, unjudged);
   if (!lines.length) return [];
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.appendFileSync(file, `${read.cursor < size ? '\n' : ''}${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);

@@ -152,7 +152,7 @@ write(
     createdAt: at(0),
     workflowDir: path.join(root, 'no-such-workflow'),
     workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'codex', workspace: 'folder' }],
-    steps: { write: { taskId: 'p-folder-write', workspace: path.join(work, 'write'), branch: null } },
+    steps: { write: { taskId: 'p-folder-write', workspace: path.join(work, 'write') } },
   }),
 );
 

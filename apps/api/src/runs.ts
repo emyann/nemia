@@ -1,8 +1,10 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
+import { Schema } from 'effect';
 import { Hono } from 'hono';
 import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
+import { readBody, type BodyIssue } from './body.ts';
 import { decisionOf } from './decision.ts';
 import { detail } from './detail.ts';
 import {
@@ -188,27 +190,23 @@ const pruneGuard = (route: string): Guarded => ({
   shape: PRUNE_SHAPE,
 });
 
-/** A prune's body, as `wf prune` reads its flags: `artifacts` is `--artifacts` and `unmerged` is `--unmerged`, each absent or a boolean. */
-function pruneHowOf(body: unknown): { artifacts: boolean; unmerged: boolean } | { error: string } {
-  if (typeof body !== 'object' || body === null || Array.isArray(body))
-    return { error: `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.` };
-  const said = body as Record<string, unknown>;
-  const unknown = Object.keys(said).filter((key) => key !== 'artifacts' && key !== 'unmerged');
-  if (unknown.length)
-    return {
-      error: `POST …/prune does not take ${unknown.map((key) => `\`${key}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.`,
-    };
-  for (const [key, flag] of [
-    ['artifacts', '--artifacts'],
-    ['unmerged', '--unmerged'],
-  ] as const) {
-    if (said[key] !== undefined && typeof said[key] !== 'boolean') {
-      return {
-        error: `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${flag} — and this request sent ${JSON.stringify(said[key])}.`,
-      };
-    }
+/**
+ * A prune's body, as `wf prune` reads its flags: `artifacts` is `--artifacts` and `unmerged` is `--unmerged`, each absent or a boolean, and
+ * nothing else — decoded with `onExcessProperty: 'error'` (`PRUNE_OPTIONS`), which reads a key it does not have before those it does.
+ */
+const PRUNE_BODY = Schema.Struct({ artifacts: Schema.optionalKey(Schema.Boolean), unmerged: Schema.optionalKey(Schema.Boolean) });
+const PRUNE_OPTIONS = { onExcessProperty: 'error' } as const;
+const PRUNE_FLAGS = { artifacts: '--artifacts', unmerged: '--unmerged' } as const;
+
+/** Why a prune's body is not one (400), by the first thing its schema refused: every key it does not take, named at once. */
+function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): string {
+  if (kind === 'excess' && typeof body === 'object' && body !== null) {
+    const unknown = Object.keys(body).filter((k) => !Object.hasOwn(PRUNE_FLAGS, k));
+    return `POST …/prune does not take ${unknown.map((k) => `\`${k}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.`;
   }
-  return { artifacts: said.artifacts === true, unmerged: said.unmerged === true };
+  if (key === 'artifacts' || key === 'unmerged')
+    return `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${PRUNE_FLAGS[key]} — and this request sent ${JSON.stringify(input)}.`;
+  return `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.`;
 }
 
 /**
@@ -362,17 +360,12 @@ export const runs = new Hono()
       c.req.header('content-type'),
     );
     if (refused) return c.json({ error: refused.error }, refused.status);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.` }, 400);
-    }
-    const how = pruneHowOf(body);
-    if ('error' in how) return c.json({ error: how.error }, 400);
+    const read = await readBody(c.req, PRUNE_BODY, `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.`, pruneWords, PRUNE_OPTIONS);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
     if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
     try {
-      const p = await prune(e, id, { ...how, yes: true });
+      const { artifacts = false, unmerged = false } = read.body;
+      const p = await prune(e, id, { artifacts, unmerged, yes: true });
       // The package's words alone, as `DELETE …` sends `forget`'s: the page says `Not pruned` above them itself (`Refusal`).
       if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
       if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);

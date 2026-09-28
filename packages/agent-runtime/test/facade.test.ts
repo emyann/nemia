@@ -295,6 +295,84 @@ test('watch delivers every event, in order, once', async () => {
   void id;
 });
 
+// ─── what no runtime wrote: one task's, or one line's, never the pass's ───
+
+/** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
+const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
+
+test('a task whose journal holds an entry no runtime wrote is left out of each pass and said, naming the file, the entry and the field; every other task moves', async () => {
+  const root = scratch('ae-facade-');
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  const bad = await engine.file({ brief: 'miswritten', cwd: '/repo' });
+  const good = await engine.file({ brief: 'fine', cwd: '/repo' });
+  const journal = path.join(root, 'tasks', `${bad}.jsonl`);
+  fs.appendFileSync(journal, MISWRITTEN);
+
+  const first = await engine.tick();
+  assert.equal((await engine.view(good)).phase, 'running (working)');
+  assert.deepEqual([...sessions.keys()], [nameFor(good, 1)]);
+  assert.equal(first.unreadable.length, 1);
+  assert.ok(
+    first.unreadable[0]!.startsWith(
+      `${bad}'s journal (${journal}), entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
+    ),
+    first.unreadable[0],
+  );
+
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
+  const second = await engine.tick();
+  assert.equal((await engine.view(good)).phase, 'succeeded');
+  assert.deepEqual(second.unreadable, first.unreadable, 'said on every pass it lasts');
+  await assert.rejects(engine.view(bad), (e: Error) => e.message.includes(`${bad}'s journal (${journal}), entry 2`));
+});
+
+test('a feed entry no runtime wrote is skipped: the pass that meets it says it once and moves on, and a watcher is told and delivers the rest', async () => {
+  const root = scratch('ae-facade-');
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  const id = await engine.file({ brief: 'b', cwd: '/repo' });
+  await engine.tick();
+  const feedFile = path.join(root, 'feed.jsonl');
+  fs.appendFileSync(feedFile, JSON.stringify({ taskId: id, event: { kind: 'nudged', at: 'x' } }) + '\n');
+  fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
+
+  const meets = await engine.tick();
+  assert.equal((await engine.view(id)).phase, 'succeeded');
+  assert.equal(meets.unreadable.length, 2);
+  assert.ok(
+    meets.unreadable[0]!.startsWith(`the feed (${feedFile}), entry `) &&
+      meets.unreadable[0]!.includes('is no event this runtime writes (its kind is "nudged"'),
+    meets.unreadable[0],
+  );
+  assert.deepEqual((await engine.tick()).unreadable, [], 'said once: the cursor is past it');
+
+  const { entries, cursor, refused } = await engine.feed(0);
+  assert.equal(cursor, fs.statSync(feedFile).size);
+  assert.deepEqual(
+    entries.map((e) => e.event.kind),
+    ['filed', 'starting', 'spawned', 'ended', 'settled'],
+  );
+  assert.equal(refused?.length, 2);
+
+  const seen: string[] = [];
+  const told: string[] = [];
+  const w = engine.watch({
+    onEntry: (e) => void seen.push(e.event.kind),
+    onError: (e) => void told.push((e as Error).message),
+    intervalMs: 20,
+  });
+  const bound = Date.now() + 10_000;
+  while (seen.length < 5 && Date.now() < bound) await new Promise((r) => setTimeout(r, 10));
+  w.stop();
+  assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled']);
+  assert.deepEqual(
+    told,
+    refused?.map((r) => r.why),
+  );
+});
+
 test('a watcher starting at 0 replays history, and stop() stops', async () => {
   const sessions = new Map<string, Sighting>();
   const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });

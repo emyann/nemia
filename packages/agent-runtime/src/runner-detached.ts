@@ -16,7 +16,7 @@
  * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The two shipped are
  * `codex` (`runner-codex.ts`) and `claudeDetached` (`runner-claude-detached.ts`).
  */
-import { Effect } from 'effect';
+import { Effect, Result, Schema, SchemaIssue } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -193,38 +193,76 @@ type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
 const WORKER_STATES: Record<WorkerState, SessionState> = { working: 'working', done: 'completed', failed: 'failed', stopped: 'canceled' };
 
 /** A `working` run whose heartbeat has stopped is not working: `failed`. In the worker's words. */
-const leased = (run: { state: WorkerState; heartbeatAt: string }, now: number): WorkerState =>
+const leased = (run: { state: string; heartbeatAt: string }, now: number): string =>
   run.state === 'working' && now - new Date(run.heartbeatAt).getTime() > STALE_MS ? 'failed' : run.state;
 
 /** A run file's state as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
 export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now: number): SessionState => {
-  const word = leased(run as { state: WorkerState; heartbeatAt: string }, now);
-  return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word] : 'failed';
+  const word = leased(run, now);
+  return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
 };
 
-type RunFile = {
-  /** The worker's own words (`bin/ae-worker.ts`), kept on disk as they are: `detachedStateOf` translates them. */
-  name?: string;
-  state: WorkerState;
-  pid: number;
-  heartbeatAt: string;
-  startedAt?: string;
-  nativeId?: string;
-  logFile: string;
-  exitCode?: number;
-  /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
-  resumeFrom?: string;
-  /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
-  input?: RunInput;
-  /**
-   * How far into the inbox the worker has written on, in bytes: every line before it was handed to the harness, or was
-   * about to be — the worker writes this before it writes the line, so a worker started again on this run file never
-   * writes one twice. Absent, nothing has been, and the worker starts at `input.from`.
-   */
-  inputAt?: number;
-  /** The harness printed the line that closes its input, and the worker ended its stdin: words said now reach nobody. */
-  inputClosed?: true;
+/**
+ * A run file as the worker (`bin/ae-worker.ts`) and the spawn write it. Its `state` is the worker's own word, kept on disk as it
+ * is: `detachedStateOf` translates it, and reads a word no worker writes as `failed`, so the schema takes any text there.
+ */
+const RunFileSchema = Schema.StructWithRest(
+  Schema.Struct({
+    name: Schema.optional(Schema.String),
+    state: Schema.String,
+    pid: Schema.Finite,
+    heartbeatAt: Schema.String,
+    startedAt: Schema.optional(Schema.String),
+    nativeId: Schema.optional(Schema.String),
+    logFile: Schema.String,
+    exitCode: Schema.optional(Schema.Finite),
+    /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
+    resumeFrom: Schema.optional(Schema.String),
+    /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
+    input: Schema.optional(
+      Schema.Struct({
+        first: Schema.String,
+        inbox: Schema.String,
+        from: Schema.Finite,
+        closesOn: Schema.Struct({ key: Schema.String, value: Schema.String }),
+      }),
+    ),
+    /**
+     * How far into the inbox the worker has written on, in bytes: every line before it was handed to the harness, or was
+     * about to be — the worker writes this before it writes the line, so a worker started again on this run file never
+     * writes one twice. Absent, nothing has been, and the worker starts at `input.from`.
+     */
+    inputAt: Schema.optional(Schema.Finite),
+    /** The harness printed the line that closes its input, and the worker ended its stdin: words said now reach nobody. */
+    inputClosed: Schema.optional(Schema.Literal(true)),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
+type RunFile = typeof RunFileSchema.Type;
+
+const isRunFile = Schema.is(RunFileSchema);
+
+/**
+ * The run file in `text`, or why it is none: the first field a worker would have written otherwise. JSON that does not parse
+ * is none too — a worker rewriting it is caught mid-write, and the next read finds it whole.
+ */
+const runFileIn = (text: string): RunFile | string => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    return `it is not JSON yet (${e instanceof Error ? e.message : String(e)})`;
+  }
+  if (isRunFile(parsed)) return parsed;
+  const decoded = Schema.decodeUnknownResult(RunFileSchema)(parsed);
+  if (Result.isSuccess(decoded)) return decoded.success;
+  const [first] = formatter(decoded.failure.issue).issues;
+  const key = first?.path?.map((p) => (typeof p === 'object' && p !== null && 'key' in p ? String(p.key) : String(p))).join('.');
+  return key ? `its \`${key}\` is not what a worker writes (${first?.message ?? 'refused'})` : 'it is no run file a worker writes';
 };
+
+const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
 /**
  * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
@@ -245,8 +283,8 @@ export const detachedFind =
   (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
     Effect.sync(() => {
       try {
-        const run = JSON.parse(readText(runFileOf(spec, root, name))) as RunFile;
-        return run.name === name ? { sessionId: name } : undefined;
+        const run = runFileIn(readText(runFileOf(spec, root, name)));
+        return typeof run !== 'string' && run.name === name ? { sessionId: name } : undefined;
       } catch {
         return undefined;
       }
@@ -272,10 +310,11 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       // happened to carry a `name` would otherwise be read as a session.
       if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
       try {
-        const run = JSON.parse(readText(path.join(dir, f))) as RunFile;
-        if (run.name) out.push({ name: run.name, run });
+        // A half-written file, or one in no shape a worker writes, is skipped: the next pass reads it whole.
+        const run = runFileIn(readText(path.join(dir, f)));
+        if (typeof run !== 'string' && run.name) out.push({ name: run.name, run });
       } catch {
-        /* a half-written file: the next pass will read it */
+        /* gone between the listing and the read */
       }
     }
     return out;
@@ -390,12 +429,16 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       Effect.try({
         try: () => {
           const { name } = session;
-          let run: RunFile | undefined;
+          let run: RunFile | string | undefined;
           try {
-            run = JSON.parse(fs.readFileSync(runFile(name), 'utf8')) as RunFile;
+            run = runFileIn(fs.readFileSync(runFile(name), 'utf8'));
           } catch {
-            /* none, or mid-write: refused below */
+            /* none: refused below */
           }
+          if (typeof run === 'string')
+            throw new Error(
+              `\`${name}\` cannot be told anything: its run file, ${runFile(name)}, is unreadable — ${run}. Its worker writes that file; if it is being written, say it again in a moment. Nothing was said.`,
+            );
           if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
           if (!run.input)
             throw new Error(

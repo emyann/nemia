@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { Result, Schema, SchemaIssue } from 'effect';
 import {
   spentAcceptances,
   spentApprovals,
@@ -35,6 +36,172 @@ import {
 } from './rendering.ts';
 import { inputsRoot } from './places.ts';
 import { countRecord, readText, within } from './tally.ts';
+
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+const Strings = Schema.mutable(Schema.Array(Schema.String));
+
+const TaskRef = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String }), Rest);
+
+/** A try a step had before the one it is on (`EarlierTry`), as every version of the tick has written one. */
+const EarlierTrySchema = Schema.StructWithRest(
+  Schema.Struct({
+    taskId: Schema.String,
+    check: Schema.optional(TaskRef),
+    then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'back']),
+    model: Schema.optional(Schema.String),
+    budget: Schema.optional(Schema.Finite),
+  }),
+  Rest,
+);
+
+const LandedSchema = Schema.Union([
+  Schema.StructWithRest(Schema.Struct({ commit: Schema.String }), Rest),
+  Schema.StructWithRest(Schema.Struct({ aborted: Schema.String }), Rest),
+  Schema.StructWithRest(Schema.Struct({ untouched: Schema.String }), Rest),
+]);
+
+const StepRecordSchema = Schema.StructWithRest(
+  Schema.Struct({
+    taskId: Schema.NullOr(Schema.String),
+    workspace: Schema.optional(Schema.String),
+    branch: Schema.optional(Schema.String),
+    check: Schema.optional(TaskRef),
+    tries: Schema.optional(Schema.mutable(Schema.Array(EarlierTrySchema))),
+    handedOff: Schema.optional(Schema.String),
+    landed: Schema.optional(LandedSchema),
+  }),
+  Rest,
+);
+
+/**
+ * A step as the run froze it at `wf start`, checked only for what names it and orders it: the rest of its keys were the parser's output
+ * when it was frozen, and are kept as they are (phase 2 of parsing what the packages read takes them up with that parser).
+ */
+const FrozenStepSchema = Schema.StructWithRest(
+  Schema.Struct({ name: Schema.String, after: Schema.optional(Strings), body: Schema.optional(Schema.String) }),
+  Rest,
+);
+
+/**
+ * The frozen steps, read as the workflow they were parsed into: the one cast left on a record, until phase 2 checks each key as the
+ * parser does.
+ */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the frozen step's keys are the parser's output; phase 2 checks them
+const frozenSteps = (steps: readonly (typeof FrozenStepSchema.Type)[]): Workflow[] => steps as Workflow[];
+
+/**
+ * A run's record as the tick writes it, and as every version of it has: `Run`, with the person's files it composes on read
+ * (`approvals`, `acceptances`, `pruned`, `hold`) left to their own readers. Every key it does not name is kept, so a key a newer or an
+ * older `wf` wrote — a frozen step's former name (`withFormerNames`) among them — survives `rewriteRun`.
+ */
+const runBase = {
+  id: Schema.String,
+  workspace: Schema.String,
+  brief: Schema.String,
+  workflowDir: Schema.String,
+  workflow: Schema.optional(Schema.mutable(Schema.Array(FrozenStepSchema))),
+  after: Schema.optional(Strings),
+  inputs: Schema.optional(Strings),
+  from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
+  gates: Schema.optional(Strings),
+  slotHeldAt: Schema.optional(Schema.String),
+  tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  cancelledAt: Schema.optional(Schema.String),
+  steps: Schema.Record(Schema.String, StepRecordSchema),
+  createdAt: Schema.String,
+};
+
+const GitRecordSchema = Schema.StructWithRest(
+  Schema.Struct({
+    ...runBase,
+    place: Schema.optional(Schema.Undefined),
+    repo: Schema.String,
+    baseRef: Schema.String,
+    branch: Schema.String,
+    isolate: Schema.Boolean,
+  }),
+  Rest,
+);
+
+const FolderRecordSchema = Schema.StructWithRest(
+  Schema.Struct({
+    ...runBase,
+    place: Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal('folder') }), Rest),
+    repo: Schema.optional(Schema.Undefined),
+    baseRef: Schema.optional(Schema.Undefined),
+    branch: Schema.optional(Schema.Undefined),
+    isolate: Schema.optional(Schema.Undefined),
+  }),
+  Rest,
+);
+
+const RunRecordSchema = Schema.Union([GitRecordSchema, FolderRecordSchema]);
+
+const isRunRecord = Schema.is(RunRecordSchema);
+
+const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
+
+const fieldOf = (value: unknown, key: PropertyKey): unknown =>
+  typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
+
+/** The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes. */
+function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
+  const [first] = formatter(error.issue).issues;
+  const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
+  const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
+  const message = first?.message ?? 'is not what wf writes';
+  const words =
+    message === 'Missing key'
+      ? 'is missing'
+      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, 'wf writes ').replace(/ \| undefined$/, '')}`;
+  return { path, words };
+}
+
+/** Why a record does not read as a run: its first field that is not what the tick writes, read against the kind of run it says it is. */
+function recordRefusal(raw: unknown): string {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return 'is no run record: it holds no object';
+  const kind = fieldOf(raw, 'place') === undefined ? GitRecordSchema : FolderRecordSchema;
+  const decoded = Schema.decodeUnknownResult(kind)(raw);
+  if (Result.isSuccess(decoded)) return 'is no run record';
+  const { path, words } = firstRefusal(raw, decoded.failure);
+  return `does not read as a run: its ${path.length ? `\`${path.map(String).join('.')}\`` : 'shape'} ${words}`;
+}
+
+/**
+ * A run record that is there and does not read as one: a person's or a program's edit, or a newer `wf`'s. Said by `readRun` with the fix,
+ * and left out of `listRuns`, so one record nobody can read stops no other run.
+ */
+export class UnreadableRecord extends Error {
+  readonly exitCode = 2;
+  constructor(id: string, why: string) {
+    super(
+      `run ${id}: its record, ${runFile(id)}, ${why}. Only the tick writes a record: if a person or another program edited it, put it back as the tick wrote it; if a newer wf wrote it, read this store with that wf.`,
+    );
+  }
+}
+
+/** Each unreadable record said once a process: a daemon lists the runs every pass. */
+const saidAlready = new Set<string>();
+const sayOnce = (line: string): void => {
+  if (saidAlready.has(line)) return;
+  saidAlready.add(line);
+  process.stderr.write(`${line}\n`);
+};
+
+const isText = Schema.is(Schema.String);
+const isAmount = Schema.is(Schema.Finite);
+const isList = Schema.is(Schema.Array(Schema.Unknown));
+const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
+
+/** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
+const jsonOr = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -79,24 +246,17 @@ function readPruned(id: string): Pruned | undefined {
   } catch {
     return undefined;
   }
-  try {
-    const { at, worktrees, artifacts } = JSON.parse(text) as Partial<Pruned>;
-    return {
-      at: typeof at === 'string' ? at : '',
-      worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [],
-      // Its files too (`wf prune --artifacts`), when the marker says so: a field that no longer reads says they went, at a time it does not say.
-      ...(artifacts === undefined
-        ? {}
-        : {
-            artifacts: {
-              at: typeof artifacts?.at === 'string' ? artifacts.at : '',
-              bytes: typeof artifacts?.bytes === 'number' ? artifacts.bytes : 0,
-            },
-          }),
-    };
-  } catch {
-    return { at: '', worktrees: [] };
-  }
+  const read = jsonOr(text);
+  const [at, worktrees, artifacts] = [fieldOf(read, 'at'), fieldOf(read, 'worktrees'), fieldOf(read, 'artifacts')];
+  const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
+  return {
+    at: isText(at) ? at : '',
+    worktrees: isList(worktrees) ? worktrees.filter(isPrunedWorktree) : [],
+    // Its files too (`wf prune --artifacts`), when the marker says so: a field that no longer reads says they went, at a time it does not say.
+    ...(artifacts === undefined
+      ? {}
+      : { artifacts: { at: isText(artifactsAt) ? artifactsAt : '', bytes: isAmount(artifactsBytes) ? artifactsBytes : 0 } }),
+  };
 }
 
 /**
@@ -117,15 +277,9 @@ function readHold(id: string): Hold | undefined {
   } catch {
     return undefined;
   }
-  try {
-    const { at, until } = JSON.parse(text) as Partial<Hold>;
-    return {
-      at: typeof at === 'string' ? at : '',
-      until: Array.isArray(until) ? until.filter((u): u is string => typeof u === 'string') : [],
-    };
-  } catch {
-    return { at: '', until: [] };
-  }
+  const read = jsonOr(text);
+  const [at, until] = [fieldOf(read, 'at'), fieldOf(read, 'until')];
+  return { at: isText(at) ? at : '', until: isList(until) ? until.filter(isText) : [] };
 }
 
 /**
@@ -174,9 +328,21 @@ const readRecord = (id: string): Run => {
   // id comes through here, so saying it once covers all of them.
   if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
   countRecord();
-  const { approvals: _, acceptances: __, pruned: ___, hold: ____, ...read } = JSON.parse(readText(runFile(id))) as Run;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readText(runFile(id)));
+  } catch (err) {
+    if (!(err instanceof SyntaxError)) throw err;
+    throw new UnreadableRecord(id, `is not JSON (${err.message})`);
+  }
+  if (!isRunRecord(raw)) throw new UnreadableRecord(id, recordRefusal(raw));
+  // What people own beside the record is theirs, composed below, whatever an older record carried under the same keys.
+  const read = { ...raw };
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold']) delete read[key];
   // A run frozen before a step key was renamed is read under the names the keys have now (`asNamed`), and written back under both (`recordText`).
-  const run = read.workflow ? { ...read, workflow: read.workflow.map(asNamed) } : read;
+  // In its place among the keys, so a record read and written back moves no line.
+  const { workflow, ...unfrozen } = read;
+  const run = workflow ? { ...read, workflow: frozenSteps(workflow).map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);
@@ -274,20 +440,66 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
   return { approvals, notes };
 }
 
+/**
+ * The ask files a person's verbs write (`wf approve`, `wf accept`, `wf round`, `wf retry`), each checked for what the verb refuses to
+ * write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read leniently where the tick never
+ * reads it as a time (a round, a retry). A key none of them names is kept, as a newer `wf` may write one.
+ */
+const Said = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
+const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
+/** An amount an ask file may carry as its budget: dollars above zero, as `wf retry --budget` and `wf round --budget` write one. */
+const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
+const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
+
+const ApprovalFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Schema.optionalKey(Said) }), Rest);
+const AcceptanceFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Said }), Rest);
+const RoundAskFileSchema = Schema.StructWithRest(
+  Schema.Struct({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) }),
+  Rest,
+);
+const RetryAskFileSchema = Schema.StructWithRest(
+  Schema.Struct({
+    mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
+    model: Schema.optionalKey(Schema.NonEmptyString),
+    message: Schema.optionalKey(Said),
+    budget: Schema.optionalKey(Dollars),
+    at: Schema.optionalKey(Schema.Unknown),
+  }),
+  Rest,
+);
+
+/** An ask file's JSON, or why it cannot be read. */
+function heldIn(file: string): { read: unknown } | { unreadable: string } {
+  try {
+    return { read: JSON.parse(readText(file)) };
+  } catch (err) {
+    return { unreadable: `unreadable (${err instanceof Error ? err.message : String(err)})` };
+  }
+}
+
+/** `value` read with `schema`, or the first key it refuses (`''` for the value itself, which holds no object). */
+function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
+  const decoded = Schema.decodeUnknownResult(schema)(value);
+  if (Result.isSuccess(decoded)) return { read: decoded.success };
+  const [key] = firstRefusal(value, decoded.failure).path;
+  return { refused: key === undefined ? '' : String(key) };
+}
+
+/** Why a message is refused: one that is not text, or one with nothing in it. */
+const messageWords = (held: unknown): string => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
+
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
 export function approvalIn(file: string, step: string, n: number): Approval | string {
-  let held: unknown;
-  try {
-    held = JSON.parse(readText(file));
-  } catch (err) {
-    return `unreadable (${(err as Error).message})`;
+  const held = heldIn(file);
+  if ('unreadable' in held) return held.unreadable;
+  const read = readAs(ApprovalFileSchema, held.read);
+  if ('refused' in read) {
+    if (read.refused === 'at') return 'it says no time it was given';
+    if (read.refused === 'message') return messageWords(held.read);
+    return 'it is not an approval wf approve wrote';
   }
-  if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an approval wf approve wrote';
-  const { at, message } = held as Record<string, unknown>;
-  if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
-  if (message !== undefined && typeof message !== 'string') return 'its message is not text';
-  if (typeof message === 'string' && !message.trim()) return 'its message is empty';
-  return { step, try: n, at, ...(typeof message === 'string' ? { message } : {}) };
+  const { at, message } = read.read;
+  return { step, try: n, at, ...(message === undefined ? {} : { message }) };
 }
 
 /** The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named as one that cannot be read as one. */
@@ -325,17 +537,17 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
  * words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
-  let held: unknown;
-  try {
-    held = JSON.parse(readText(file));
-  } catch (err) {
-    return `unreadable (${(err as Error).message})`;
+  const held = heldIn(file);
+  if ('unreadable' in held) return held.unreadable;
+  const read = readAs(AcceptanceFileSchema, held.read);
+  if ('refused' in read) {
+    if (read.refused === 'at') return 'it says no time it was given';
+    if (read.refused !== 'message') return 'it is not an acceptance wf accept wrote';
+    return isText(fieldOf(held.read, 'message'))
+      ? 'its message is empty, and an acceptance is nothing but its reason'
+      : 'it says nothing of why the work is good enough with its findings open';
   }
-  if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an acceptance wf accept wrote';
-  const { at, message } = held as Record<string, unknown>;
-  if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
-  if (typeof message !== 'string') return 'it says nothing of why the work is good enough with its findings open';
-  if (!message.trim()) return 'its message is empty, and an acceptance is nothing but its reason';
+  const { at, message } = read.read;
   return { step, try: n, at, message };
 }
 
@@ -381,20 +593,13 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
 
 /** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
 export function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
-  let held: unknown;
-  try {
-    held = JSON.parse(readText(file));
-  } catch (err) {
-    return `unreadable (${(err as Error).message})`;
-  }
-  if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an ask wf round wrote';
-  const { at, budget } = held as Record<string, unknown>;
-  if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
-  return { step, round, ...(isDollars(budget) ? { budget } : {}), at: typeof at === 'string' ? at : '' };
+  const held = heldIn(file);
+  if ('unreadable' in held) return held.unreadable;
+  const read = readAs(RoundAskFileSchema, held.read);
+  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask wf round wrote';
+  const { at, budget } = read.read;
+  return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '' };
 }
-
-/** An amount an ask file may carry as its budget: dollars above zero, as `wf retry --budget` and `wf round --budget` write one. */
-const isDollars = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
@@ -402,28 +607,27 @@ const isDollars = (v: unknown): v is number => typeof v === 'number' && Number.i
  * file written by hand is held to the verb's word: a message that is not text or is empty, and a message on a recheck.
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
-  let held: unknown;
-  try {
-    held = JSON.parse(readText(file));
-  } catch (err) {
-    return `unreadable (${(err as Error).message})`;
+  const held = heldIn(file);
+  if ('unreadable' in held) return held.unreadable;
+  const read = readAs(RetryAskFileSchema, held.read);
+  if ('refused' in read) {
+    if (read.refused === 'model') return 'its model is not a name';
+    if (read.refused === 'message') return messageWords(held.read);
+    if (read.refused === 'budget') return BUDGET_WORDS;
+    // Anything else read as an ask with no mode: a file that holds no object, or one whose mode is not one of the three.
+    return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held.read, 'mode'))})`;
   }
-  const { mode, model, message, budget, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
-  if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
-  if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
-  if (message !== undefined && typeof message !== 'string') return 'its message is not text';
-  if (typeof message === 'string' && !message.trim()) return 'its message is empty';
+  const { mode, model, message, budget, at } = read.read;
   if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
-  if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
   if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
   return {
     step,
     try: n,
     mode,
-    ...(model ? { model: model as string } : {}),
-    ...(typeof message === 'string' ? { message } : {}),
-    ...(isDollars(budget) ? { budget } : {}),
-    at: typeof at === 'string' ? at : '',
+    ...(model === undefined ? {} : { model }),
+    ...(message === undefined ? {} : { message }),
+    ...(budget === undefined ? {} : { budget }),
+    at: isText(at) ? at : '',
   };
 }
 
@@ -509,8 +713,12 @@ function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundA
   }
 }
 
-/** Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass. */
-export const listRuns = (): Run[] =>
+/**
+ * Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass;
+ * nor is a record that does not read as a run (`UnreadableRecord`), which is left out and said, once a process, on `said` — stderr unless
+ * given — with its fix. `wf <verb> <that id>` refuses in the same words.
+ */
+export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
   within('records', () =>
     fs.existsSync(runsDir())
       ? fs
@@ -521,7 +729,8 @@ export const listRuns = (): Run[] =>
             try {
               return [readRun(id)];
             } catch (err) {
-              if (fs.existsSync(runFile(id))) throw err;
+              if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
+              else if (fs.existsSync(runFile(id))) throw err;
               return [];
             }
           })

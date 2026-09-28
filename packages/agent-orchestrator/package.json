@@ -14,7 +14,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "agent-runtime": "*"
+    "agent-runtime": "*",
+    "effect": "4.0.0-rc.116"
   },
   "devDependencies": {
     "@a2a-js/sdk": "1.2.0",

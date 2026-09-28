@@ -898,6 +898,50 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   assert.deepEqual(snapshot(STORE), listing);
 });
 
+test("REFUSED at shipped defaults: a new folder's body not in its shape is a 400 in the builder's words, word for word — not JSON, not an object, a step that is not one, a readme that is not text — and nothing is made", async () => {
+  const route = 'POST /api/workflows/yours';
+  const shape =
+    '`{ "name": "<workflow>", "step": <step>, "readme"?: "<README.md>" }`, the step `{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>", "own"?: { "keys": ["<key>", …], "body": "<its own note>" } }`, as GET /api/workflows lists a step, a key unset as null or left out';
+  const step = { name: 'plan', spec: spec(), body: 'Plan it.' };
+  for (const [body, said] of [
+    ['not json', `${route} takes a JSON body: ${shape}.`],
+    [[], `${route} takes a JSON object: ${shape}.`],
+    [null, `${route} takes a JSON object: ${shape}.`],
+    [{ name: 'unmade', step: 'plan' }, `${route}: \`step\` is "plan", and a step is an object. Send ${shape}.`],
+    [
+      { name: 'unmade', step: { ...step, name: 7 } },
+      `${route}: \`step\` has no \`name\`: a step is named by its file, without .md. Send ${shape}.`,
+    ],
+    [
+      { name: 'unmade', step: { name: 'plan', spec: spec() } },
+      `${route}: \`step\` (plan) has no \`body\`, what its agent is told, as a string. Send ${shape}.`,
+    ],
+    [
+      { name: 'unmade', step: { ...step, spec: null } },
+      `${route}: \`step\` (plan)'s \`spec\` is null, and it is an object of the step's keys. Send ${shape}.`,
+    ],
+    [
+      { name: 'unmade', step, readme: ['#'] },
+      `${route}: \`readme\` is the README's text, a string, or left out to leave it as it is — this request's was ["#"]. Send ${shape}.`,
+    ],
+  ] as const) {
+    const res = await post(body);
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.equal(((await res.json()) as { error: string }).error, said);
+  }
+  assert.equal(fs.existsSync(path.join(STORE, 'unmade')), false, 'nothing made');
+});
+
+test("REFUSED at shipped defaults: a schema that is not `{ file, text }` is refused as one before its file's name is read — and nothing is written", async () => {
+  const dir = planned('schema-order');
+  const before = snapshot(dir);
+  const [plan] = (await listedSteps('schema-order')) as [ListedStep];
+  const res = await put('schema-order', { steps: [plan], schemas: [{ file: 'review.txt', text: 3 }] });
+  assert.equal(res.status, 400);
+  assert.match(((await res.json()) as { error: string }).error, /: schema 1 is \{"file":"review\.txt","text":3\}, and a schema is/);
+  assert.deepEqual(snapshot(dir), before);
+});
+
 const risks = JSON.stringify(
   { type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false },
   null,

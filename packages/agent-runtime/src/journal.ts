@@ -7,11 +7,19 @@
  *
  * It is a service (not an import) so tests run against memory and spend no filesystem.
  */
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Context, Effect, Layer, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
+import {
+  entryWords,
+  HarnessArgsSchema,
+  StoredEventSchema,
+  StoredEventsSchema,
+  StoredFeedEntrySchema,
+  type StoredEvent,
+} from './event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 import { countRead, readText } from './io-tally.ts';
 
@@ -32,6 +40,12 @@ export type FeedEntry = { taskId: string; event: Event };
  * back a cursor it was given.
  */
 export type Cursor = number;
+
+/**
+ * A feed entry no runtime wrote, skipped by the read that met it: the task it names, when it names one, and why it is no entry, naming
+ * where it is. The cursor the read returns is past it, so it is said once, by the read that met it, and never stops a reader.
+ */
+export type FeedRefusal = { taskId?: string; why: string };
 
 export class JournalError extends Schema.TaggedError<JournalError>()('JournalError', {
   taskId: Schema.String,
@@ -60,7 +74,7 @@ export type JournalOps = {
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
    * replays rather than being told to start over. Pass 0 to read the whole history.
    */
-  readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor }, JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
   /**
    * Optional: call `onChange` when something has been appended, so a watcher can read instead of
    * poll. A store that cannot signal simply omits this and watchers fall back to a timer — the
@@ -69,6 +83,67 @@ export type JournalOps = {
    */
   readonly subscribe?: (onChange: () => void) => () => void;
 };
+
+/**
+ * A store as the runtime reads it: what `read` and `feed` give back is whatever the store holds, parsed, and is an event
+ * only once `Journal.layer` has decoded it. A `JournalOps` is one; the files store is one that never says its lines are events.
+ */
+export type StoreOps = Omit<JournalOps, 'read' | 'feed'> & {
+  readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
+  /** Optional: where the store keeps a task's journal and the feed, named in the words of an entry no runtime wrote. */
+  readonly located?: { readonly journal: (taskId: string) => string; readonly feed: string };
+};
+
+const isEvent = Schema.is(StoredEventSchema);
+const isFeedEntry = Schema.is(StoredFeedEntrySchema);
+const refusalOf = (schema: typeof StoredEventSchema | typeof StoredFeedEntrySchema, entry: unknown) => {
+  const decoded = Schema.decodeUnknownResult(schema)(entry);
+  return Result.isFailure(decoded) ? decoded.failure : undefined;
+};
+
+/**
+ * A store's entries as events, the very objects it gave: a decoded struct comes back with its keys in the schema's order, and
+ * the order of `config.claude` is the order of the flags on Claude Code's command line, so the schema is asked whether they
+ * are events (`Schema.is`) and decodes only to say why not. One entry no runtime wrote fails the read, naming it: the task cannot
+ * be folded without it.
+ */
+const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps['located']) => {
+  if (Schema.is(StoredEventsSchema)(raw)) return Effect.succeed(raw);
+  const index = raw.findIndex((entry) => !isEvent(entry));
+  const where = `${taskId}'s journal${located ? ` (${located.journal(taskId)})` : ''}, entry ${index + 1}`;
+  const error = refusalOf(StoredEventSchema, raw[index]);
+  const message = error ? entryWords(where, raw[index], error, false) : `${where} is not what the runtime writes.`;
+  return Effect.fail(new JournalError({ taskId, message }));
+};
+
+/**
+ * A store's feed entries, those no runtime wrote left out: each is skipped with why (`FeedRefusal`), and the cursor is past it all the
+ * same, so one entry nobody can read stops no reader and no pass. The task it names, when it names one, is still named: its journal is
+ * read again, and says for itself whether it reads.
+ */
+const decodeFeed = (raw: readonly unknown[], after: Cursor, located: StoreOps['located']) => {
+  const entries: FeedEntry[] = [];
+  const refused: FeedRefusal[] = [];
+  raw.forEach((entry, index) => {
+    if (isFeedEntry(entry)) {
+      entries.push({ taskId: entry.taskId, event: upgrade(entry.event) });
+      return;
+    }
+    const where = `the feed${located ? ` (${located.feed})` : ''}, entry ${index + 1} read from cursor ${after}`;
+    const error = refusalOf(StoredFeedEntrySchema, entry);
+    const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
+    refused.push({
+      ...(typeof taskId === 'string' ? { taskId } : {}),
+      why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
+    });
+  });
+  return { entries, refused };
+};
+
+/** Harness arguments `upgrade` put together from ones already read as such: the same object, typed. */
+const argsOf = (config: Record<string, unknown>): HarnessArgs =>
+  Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
 /**
  * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
@@ -89,27 +164,28 @@ export type JournalOps = {
  * has it moved there: `true` as the flag, where a flag already in `claude` is kept, and `false`, which asked for nothing, dropped.
  * So a task filed bridged before the move is bridged again on its next attempt.
  */
-export const upgrade = (event: Event): Event => {
+export const upgrade = (event: StoredEvent): Event => {
   if (event.kind === 'input') {
-    const { budgetUsd, ...rest } = event as Event & { kind: 'input'; budgetUsd?: unknown };
-    if (budgetUsd === undefined) return event;
-    return { ...rest, config: { budgetUsd, ...rest.config } as HarnessArgs };
+    const { budgetUsd, ...rest } = event;
+    if (budgetUsd === undefined) return rest;
+    return { ...rest, config: { budgetUsd, ...rest.config } };
   }
   if (event.kind === 'ended') {
-    if ((event.reason as string) !== 'budget') return event;
+    if (event.reason !== 'budget') return { ...event, reason: event.reason };
     return { ...event, reason: 'harness', limit: 'budget' };
   }
   if (event.kind !== 'filed') return event;
-  const legacy = event as Event & Record<string, unknown>;
+  const legacy: Record<string, unknown> = event;
   const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS)].filter((key) => Object.hasOwn(legacy, key));
-  const given = legacy.config as Record<string, unknown> | undefined;
-  const former = Object.keys(FORMER_ARGS).filter((key) => given !== undefined && Object.hasOwn(given, key));
+  const given: Record<string, unknown> = event.config ?? {};
+  const former = Object.keys(FORMER_ARGS).filter((key) => Object.hasOwn(given, key));
   if (!moved.length && !former.length) return event;
   const lifted: Record<string, unknown> = {};
-  const { config: _, ...rest }: Record<string, unknown> = legacy;
+  const { config: _, ...rest } = event;
+  const left: Record<string, unknown> = rest;
   for (const key of moved) {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
-    delete rest[key];
+    delete left[key];
   }
   const config: Record<string, unknown> = { ...lifted, ...given };
   const flags: Record<string, unknown> = {};
@@ -117,24 +193,33 @@ export const upgrade = (event: Event): Event => {
     if (config[key] === true) flags[FORMER_ARGS[key]!] = true;
     delete config[key];
   }
-  if (Object.keys(flags).length) config.claude = { ...flags, ...(config.claude as HarnessArgs['claude']) };
-  return { ...(rest as Event & { kind: 'filed' }), ...(Object.keys(config).length ? { config: config as HarnessArgs } : {}) };
+  if (Object.keys(flags).length) config.claude = { ...flags, ...event.config?.claude };
+  return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
 };
 
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
   /**
-   * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where a journal written
-   * before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
+   * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
+   * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
+   * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
+   * where a journal written before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
    */
-  static layer = (ops: JournalOps) =>
+  static layer = (ops: StoreOps) =>
     Layer.succeed(Journal)(
       Journal.of({
         ...ops,
-        read: (taskId) => ops.read(taskId).pipe(Effect.map((events) => events.map(upgrade))),
+        read: (taskId) =>
+          ops.read(taskId).pipe(
+            Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),
+            Effect.map((events) => events.map(upgrade)),
+          ),
         feed: (after) =>
-          ops
-            .feed(after)
-            .pipe(Effect.map(({ entries, cursor }) => ({ entries: entries.map((e) => ({ ...e, event: upgrade(e.event) })), cursor }))),
+          ops.feed(after).pipe(
+            Effect.map(({ entries, cursor }) => {
+              const { entries: read, refused } = decodeFeed(entries, after, ops.located);
+              return { entries: read, cursor, ...(refused.length ? { refused } : {}) };
+            }),
+          ),
       }),
     );
 
@@ -142,14 +227,23 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));
 
   /** The same implementation as a plain value, for a caller that needs its optional `subscribe`. */
-  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): JournalOps => {
+  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): StoreOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
     const fail = (taskId: string) => (cause: unknown) =>
       new JournalError({ taskId, message: cause instanceof Error ? cause.message : String(cause) });
+    /** A line as the store holds it: its JSON, or its text where it is none — a write cut short — for the decoder to refuse by place. */
+    const parsed = (line: string): unknown => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return line;
+      }
+    };
 
     return {
+      located: { journal: file, feed: feedFile },
       append: (taskId, event) =>
         Effect.try({
           try: () => {
@@ -165,10 +259,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         Effect.try({
           try: () => {
             if (!fs.existsSync(file(taskId))) return [];
-            return readText(file(taskId))
-              .split('\n')
-              .filter(Boolean)
-              .map((l) => JSON.parse(l) as Event);
+            return readText(file(taskId)).split('\n').filter(Boolean).map(parsed);
           },
           catch: fail(taskId),
         }),
@@ -202,11 +293,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             const text = buf.toString('utf8');
             const end = text.lastIndexOf('\n');
             if (end < 0) return { entries: [], cursor: after };
-            const entries = text
-              .slice(0, end)
-              .split('\n')
-              .filter(Boolean)
-              .map((l) => JSON.parse(l) as FeedEntry);
+            const entries = text.slice(0, end).split('\n').filter(Boolean).map(parsed);
             return { entries, cursor: after + Buffer.byteLength(text.slice(0, end + 1)) };
           },
           catch: fail('*'),

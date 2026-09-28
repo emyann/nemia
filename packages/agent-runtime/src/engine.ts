@@ -667,14 +667,18 @@ const expectedOf = (
   return expected;
 };
 
-/** Read the feed on from the memo's cursor, and forget every task it names: each is folded again on this pass. */
+/**
+ * Read the feed on from the memo's cursor, and forget every task it names: each is folded again on this pass. An entry no runtime
+ * wrote is past the cursor all the same, and the task it names, when it names one, is forgotten too; returns why each was skipped.
+ */
 const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
-  const { entries, cursor } = yield* (yield* Journal).feed(memo.cursor ?? 0);
-  for (const e of entries) {
-    memo.settled.delete(e.taskId);
-    memo.listed.delete(e.taskId);
+  const { entries, cursor, refused = [] } = yield* (yield* Journal).feed(memo.cursor ?? 0);
+  for (const taskId of [...entries.map((e) => e.taskId), ...refused.flatMap((r) => r.taskId ?? [])]) {
+    memo.settled.delete(taskId);
+    memo.listed.delete(taskId);
   }
   memo.cursor = cursor;
+  return refused.map((r) => r.why);
 });
 
 /**
@@ -703,6 +707,9 @@ const verifyKept = Effect.fn('verifyKept')(function* (
  * `running` is a count, per harness, of the sessions at work as the pass left them (`atWork`), off the same observation
  * and the fold the pass already made: what `ae tick` prints, and no rule reads.
  *
+ * `unreadable` says why each task whose journal did not read was left out of this pass — it is said on every pass it lasts, as a
+ * refused move is — and each feed entry the pass skipped, said once, on the pass whose read met it.
+ *
  * `refused` is every move the lifecycle had no edge for this pass (stage 5): the task, the state it was read in and the
  * event it was handed. Such a task does nothing and is asked again on the next pass, where the same refusal comes back
  * for as long as its journal and its session say the same — so it is reported on every pass it persists, off the steps
@@ -724,11 +731,19 @@ export const tick = Effect.fn('tick')(function* () {
   // The feed first, before anything else of the board is read: whatever is appended while this pass reads is past the
   // cursor, and named on the next. A task it names is folded again; each is forgotten before any is folded, so a pass
   // that fails part way leaves nothing kept that the feed has since named.
-  if (memo) yield* forgetNamed(memo);
+  const unreadable = memo ? yield* forgetNamed(memo) : [];
   const ids = yield* journal.list;
   // Every task the memo does not keep, folded before the harnesses are looked at, so the look can be told what to look for.
   const folded = new Map<string, State>();
-  for (const id of ids) if (!memo?.settled.has(id)) folded.set(id, fold(id, yield* journal.read(id)));
+  for (const id of ids) {
+    if (memo?.settled.has(id)) continue;
+    const read = yield* journal.read(id).pipe(
+      Effect.map((events) => ({ events })),
+      Effect.catchTag('JournalError', (e) => Effect.succeed({ why: e.message })),
+    );
+    if ('why' in read) unreadable.push(read.why);
+    else folded.set(id, fold(id, read.events));
+  }
   const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
   // What a harness could not read is said (`unread`), and neither decided on nor let go of as gone. A runner that cannot be
   // told what to look for lists everything, and fails the pass when it cannot.
@@ -749,7 +764,8 @@ export const tick = Effect.fn('tick')(function* () {
       else memo!.listed.delete(id);
       continue;
     }
-    const before = folded.get(id)!;
+    const before = folded.get(id);
+    if (!before) continue;
     const actions = yield* settleOn(id, observed, unread, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
@@ -783,6 +799,7 @@ export const tick = Effect.fn('tick')(function* () {
     running,
     views,
     refused: stalled,
+    unreadable,
   };
 });
 

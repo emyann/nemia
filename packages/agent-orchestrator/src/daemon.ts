@@ -59,8 +59,6 @@ export const STALE_FLOOR_MS = 15 * 60_000;
 /** How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes. */
 export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
-const isTime = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
-
 /** The longest interval a timer keeps: Node fires a longer one after 1 ms, so `wf up 1e10` would pass without pause and never go stale. */
 export const MAX_EVERY_MS = 2 ** 31 - 1;
 
@@ -84,37 +82,10 @@ export function everyOf(arg: string | undefined): { every: number } | { refusal:
 }
 
 /**
- * The file as `wf up` writes it, or undefined when the text does not read as one. A pid that is not a positive whole number is not read as
- * one: `kill(0)` and `kill(-n)` signal process groups, not a process.
+ * `daemon.json` as it was read: its text, and the file it holds — undefined when the text does not read as one (`parseDaemonFile` in
+ * `daemon-store.ts`, which checks it against what `wf up` writes).
  */
-export function parseDaemonFile(text: string): DaemonFile | undefined {
-  let v: Record<string, unknown>;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
-    v = parsed as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
-  const { pid, startedAt, cwd, every, passedAt, beatAt, procStart, stoppedAt } = v;
-  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return undefined;
-  if (!isTime(startedAt) || typeof cwd !== 'string') return undefined;
-  if (typeof every !== 'number' || !Number.isFinite(every) || every <= 0) return undefined;
-  if (passedAt !== null && passedAt !== undefined && !isTime(passedAt)) return undefined;
-  if (beatAt !== undefined && !isTime(beatAt)) return undefined;
-  if (procStart !== undefined && (typeof procStart !== 'number' || !Number.isInteger(procStart) || procStart < 0)) return undefined;
-  if (stoppedAt !== undefined && !isTime(stoppedAt)) return undefined;
-  return {
-    pid,
-    startedAt,
-    cwd,
-    every,
-    passedAt: passedAt ?? null,
-    ...(beatAt !== undefined ? { beatAt } : {}),
-    ...(procStart !== undefined ? { procStart } : {}),
-    ...(stoppedAt !== undefined ? { stoppedAt } : {}),
-  };
-}
+export type DaemonRead = { text: string; file: DaemonFile | undefined };
 
 /**
  * Where the store stands: nobody has held it (`none`); a file that does not read as a holder (`unreadable`); a holder that stopped and said so
@@ -132,16 +103,16 @@ export type Standing = {
 export type DaemonStanding = { kind: 'none' } | { kind: 'unreadable'; text: string } | Standing;
 
 /**
- * Judge the file's text, `undefined` when there is no file, at `now`, with `identify` answering what the process table says of the file's
+ * Judge the file as read, `undefined` when there is no file, at `now`, with `identify` answering what the process table says of the file's
  * pid. A stop said is read before the process, so a reused pid does not hold a store its daemon gave up; a process gone or another before
  * staleness, so a crash frees the store at once.
  */
 export function daemonStanding(
-  text: string | undefined,
+  read: DaemonRead | undefined,
   { now, identify }: { now: number; identify: (file: DaemonFile) => Identity },
 ): DaemonStanding {
-  if (text === undefined) return { kind: 'none' };
-  const file = parseDaemonFile(text);
+  if (read === undefined) return { kind: 'none' };
+  const { text, file } = read;
   if (!file) return { kind: 'unreadable', text };
   const last = Math.max(...[file.startedAt, file.passedAt, file.beatAt].filter((t): t is string => !!t).map(Date.parse));
   const quiet = now - last;

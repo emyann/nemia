@@ -8,7 +8,6 @@ import {
   addPass,
   breakdownLines,
   heaviest,
-  parsePassCost,
   passCost,
   PHASES,
   STATS_EVERY_MS,
@@ -108,23 +107,4 @@ test('the breakdown names every phase, each harness observed, and what measuring
     'the last pass, at 2026-09-25T10:00:00.000Z: 212 ms, 12 run records read, 812.0 kB read, 1 process started, 200 runs at rest answered from memory',
   );
   assert.equal(breakdownLines({ ...COST, rested: 0 })[0], lines[0], 'none answered, nothing said of it');
-});
-
-test('a cost reads back as written, and REFUSED: half a file, another shape, a phase missing, a count that is not one', () => {
-  assert.deepEqual(parsePassCost(JSON.stringify(COST)), COST);
-  const text = JSON.stringify(COST);
-  assert.equal(parsePassCost(text.slice(0, text.length / 2)), undefined, 'half of one');
-  assert.equal(parsePassCost('[]'), undefined);
-  assert.equal(parsePassCost(JSON.stringify({ sessions: 2, runs: 0 })), undefined, 'tick.json is not one');
-  const { git: _, ...noGit } = COST.phases;
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, phases: noGit })), undefined, 'a phase missing');
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, ms: -1 })), undefined);
-  assert.equal(
-    parsePassCost(JSON.stringify({ ...COST, phases: { ...COST.phases, act: { ...COST.phases.act, bytes: 'many' } } })),
-    undefined,
-  );
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, harnesses: [] })), undefined);
-  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, rested: 3 })), { ...COST, rested: 3 }, 'the runs answered from memory');
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and REFUSED, a count of them that is not one');
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: -1 })), undefined);
 });

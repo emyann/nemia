@@ -78,7 +78,7 @@ function ranTo(id: string): void {
       .map((line) => `${JSON.stringify(line)}\n`)
       .join(''),
   );
-  run.steps = { try: { taskId: task, workspace: cwd, branch: null } };
+  run.steps = { try: { taskId: task, workspace: cwd } };
   fs.writeFileSync(record, JSON.stringify(run, null, 2));
 }
 

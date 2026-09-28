@@ -136,7 +136,7 @@ function ended(id: string): void {
   const cwd = path.join(run.workspace, 'try');
   fs.mkdirSync(cwd, { recursive: true });
   signedOff(`t-${id}`, cwd);
-  run.steps = { try: { taskId: `t-${id}`, workspace: cwd, branch: null } };
+  run.steps = { try: { taskId: `t-${id}`, workspace: cwd } };
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
@@ -314,6 +314,16 @@ test('an empty brief is refused, and a brief that is no string', async () => {
   await refused(tryIt('scribe', { brief: '' }), 422, /the brief is empty/);
   await refused(tryIt('scribe', {}), 400, /`brief` is what the agent is asked to do/);
   await refused(tryIt('scribe', 'not json'), 400, /takes a JSON body/);
+  await refused(
+    tryIt('scribe', { brief: ['Do it.'] }),
+    400,
+    /^POST \/api\/agents\/yours\/scribe\/try: `brief` is what the agent is asked to do, a string: `\{ "brief": "<what the agent is asked to do>" \}`\. This request's was \["Do it\."\]\.$/,
+  );
+  await refused(
+    tryIt('scribe', ['Do it.']),
+    400,
+    /^POST \/api\/agents\/yours\/scribe\/try: `brief` is what the agent is asked to do[^]*This request's was undefined\.$/,
+  );
 });
 
 test('an agent not there, one named as a try folder cannot be, and one giving a skill only the repository has, are refused', async () => {

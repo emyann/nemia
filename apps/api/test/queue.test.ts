@@ -67,6 +67,19 @@ const refusalOf = (name: string, off = false): string => {
   return assert.fail(`queueInInbox took ${name}${off ? ' --off' : ''}, which the api refused`);
 };
 
+/** A record of a run started from `card`, as `wf start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
+const startedFrom = (id: string, card: string): string =>
+  JSON.stringify({
+    id,
+    place: { kind: 'folder' },
+    workspace: path.join(root, 'runs', id),
+    brief: 'Started from its card',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    steps: {},
+    createdAt: '2026-09-16T09:00:00.000Z',
+    from: { inbox: card },
+  });
+
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
 // ─── the inbox's queue ──────────────────────────────────────────────────────
@@ -212,10 +225,7 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   queueInInbox(queued.name);
   const started = addToInbox({ text: 'Started, its removal failed', workflow: 'dev' }).card;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'runs', 'started-run-k2q9.json'),
-    JSON.stringify({ id: 'started-run-k2q9', from: { inbox: started.name } }),
-  );
+  fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
   fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
   const before = inboxAsIs();
 
@@ -274,6 +284,24 @@ test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 4
   assert.equal(offRoute.status, 400);
   assert.ok(
     ((await offRoute.json()) as { error: string }).error.startsWith(`DELETE /api/inbox/${card.name}/queue takes no body, or \`{}\``),
+  );
+  assert.deepEqual(inboxAsIs(), before);
+});
+
+test("REFUSED at shipped defaults: a queue's body that is JSON and not `{}` — null, a workflow named null — is a 400 saying what was sent, word for word, and nothing is written", async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Queue me not', workflow: 'dev' });
+  const before = inboxAsIs();
+  const route = `POST /api/inbox/${card.name}/queue`;
+  const takes = `${route} takes no body, or \`{}\`: the card is named in the path, and queued on the workflow it names`;
+  const res = await queue(card.name, JSON_TYPE, 'null');
+  assert.equal(res.status, 400);
+  assert.equal(((await res.json()) as { error: string }).error, `${takes}, and this request sent null.`);
+  const named = await queue(card.name, JSON_TYPE, '{"workflow":null}');
+  assert.equal(named.status, 400);
+  assert.equal(
+    ((await named.json()) as { error: string }).error,
+    `${takes}, and this request sent {"workflow":null}. A card is queued on the workflow it names: file it with one, or queue it with \`wf inbox queue <name> --workflow <w>\`, which writes both.`,
   );
   assert.deepEqual(inboxAsIs(), before);
 });

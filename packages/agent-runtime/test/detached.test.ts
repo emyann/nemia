@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedFind, detachedOps, STALE_MS, type HarnessIO, type HarnessOutput, type HarnessSpec } from '../src/runner-detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/runner-detached-output.ts';
 import { trustedProjects } from '../src/runner-codex.ts';
 import { createEngine } from '../src/facade.ts';
@@ -645,6 +645,42 @@ test('say is refused, with nothing appended, where no worker would write the wor
   assert.match(e.message, /a line break in it/);
   await Effect.runPromise(raw.say!({ name: 'ae/i6/1', sessionId: 'ae/i6/1' }, 'one line'));
   assert.equal(fs.readFileSync(inboxOf(dir, 'ae/i6/1'), 'utf8'), 'one line\n', 'only the words that make one line were appended');
+});
+
+test('a run file in no shape a worker writes is no session: not seen, not found, and told nothing, with the field that is wrong', async () => {
+  const dir = root();
+  const ops = detachedOps(listener(dir), dir);
+  const runs = path.join(dir, 'runs', 'in');
+  fs.mkdirSync(runs, { recursive: true });
+  const whole = {
+    name: 'ae/i7/1',
+    state: 'working',
+    pid: 999999,
+    logFile: '/dev/null',
+    heartbeatAt: new Date().toISOString(),
+    input: { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } },
+  };
+  fs.writeFileSync(path.join(runs, 'ae_i7_1.json'), JSON.stringify(whole));
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/i7/1')?.state, 'working', 'the whole file is a session');
+  assert.deepEqual(await Effect.runPromise(detachedFind(listener(dir), dir)('ae/i7/1')), { sessionId: 'ae/i7/1' }, 'and found');
+  for (const [broken, field] of [
+    [{ ...whole, pid: 'x' }, 'pid'],
+    [{ ...whole, heartbeatAt: undefined }, 'heartbeatAt'],
+    [{ ...whole, input: { ...whole.input, from: '0' } }, 'input.from'],
+  ] as const) {
+    fs.writeFileSync(path.join(runs, 'ae_i7_1.json'), JSON.stringify(broken));
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/i7/1'), undefined, `a run file whose ${field} is wrong is not seen`);
+    assert.equal(await Effect.runPromise(detachedFind(listener(dir), dir)('ae/i7/1')), undefined, 'nor found');
+    await sayRefused(
+      ops,
+      'ae/i7/1',
+      'hello',
+      new RegExp(`is unreadable — its \`${field.replace('.', '\\.')}\` is not what a worker writes`),
+    );
+  }
+  fs.writeFileSync(path.join(runs, 'ae_i7_1.json'), '{"name": "ae/i7/1", "sta');
+  await sayRefused(ops, 'ae/i7/1', 'hello', /is unreadable — it is not JSON yet .*say it again in a moment\. Nothing was said\./);
+  assert.equal(fs.existsSync(inboxOf(dir, 'ae/i7/1')), false, 'and nothing was appended');
 });
 
 // ─── the composite ──────────────────────────────────────────────────────────

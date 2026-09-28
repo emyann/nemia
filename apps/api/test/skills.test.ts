@@ -439,6 +439,49 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', color: 'red' } }), 400, /`color` is no key of a skill's/);
 });
 
+test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is a 400 in the api's words, word for word, a key no skill has only once the rest are read — and a body sending both or neither is refused as such before either is read", async () => {
+  const route = 'POST /api/skills/yours';
+  const shape =
+    '`{ "copy": "<the name of a skill HKB ships>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
+  const fresh = { ...NOTES, name: 'fresh' };
+  for (const [skill, said] of [
+    [null, "`skill` is the skill, an object, and this request's was null"],
+    ['notes', '`skill` is the skill, an object, and this request\'s was "notes"'],
+    [{ ...fresh, name: 3 }, "`name` is the skill's name, its folder, a string, and this request's was 3"],
+    [{ ...fresh, name: 3, color: 'red' }, "`name` is the skill's name, its folder, a string, and this request's was 3"],
+    [{ ...fresh, title: 3 }, '`title` is a line of text, or null'],
+    [{ ...fresh, description: ['one'] }, '`description` is a line of text, or null'],
+    [{ ...fresh, tags: [1] }, '`tags` is a list of lines of text, or null'],
+    [{ ...fresh, examples: 'ask' }, '`examples` is a list of lines of text, or null'],
+    [{ ...fresh, preload: 'yes' }, '`preload` is true or false'],
+    [{ ...fresh, preload: null }, '`preload` is true or false'],
+    [{ ...fresh, body: 7 }, "`body` is the skill's instructions, a string, and this request's was 7"],
+    [{ ...fresh, color: 'red', size: 2 }, "`color` and `size` are no key of a skill's"],
+  ] as const) {
+    const res = await send('/api/skills/yours', { skill });
+    const { error } = (await res.json()) as { error: string };
+    assert.equal(res.status, 400, JSON.stringify(skill));
+    assert.equal(error, `${route}: ${said}. Send ${shape}.`);
+  }
+  await refused(send('/api/skills/yours', null), 400, /^POST \/api\/skills\/yours takes a JSON object: /);
+  await refused(send('/api/skills/yours', { copy: 3, skill: fresh }), 400, /this request sent both/);
+  await refused(send('/api/skills/yours', { skill: 'notes', copy: 3 }), 400, /this request sent both/);
+  const { version } = await detail('yours', 'always');
+  await refused(
+    put('/api/skills/yours/always', { version: 7, preload: true, skill: fresh }),
+    400,
+    /takes the `version` the skill was read at/,
+  );
+  await refused(put('/api/skills/yours/always', { version, preload: 'yes', skill: 3 }), 400, /this request sent both/);
+  await refused(
+    put('/api/skills/yours/always', { version, skill: { ...NOTES, name: 'always', tags: [1] } }),
+    400,
+    /`tags` is a list of lines/,
+  );
+  await refused(put('/api/skills/yours/always', { version: ' ', preload: true }), 409, /^skills\/always changed since it was read/);
+  assert.equal(fs.existsSync(path.join(LIBRARY, 'fresh')), false);
+});
+
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet", async () => {
   const { copyCommand } = await import('../src/skills.ts');
   // A checkout with a `.claude/` and no `skills/` in it yet, under a folder whose name has a space and a quote.

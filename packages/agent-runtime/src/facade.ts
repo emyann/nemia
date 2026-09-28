@@ -26,7 +26,7 @@ import {
   type State,
 } from './domain.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
-import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
+import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './journal.ts';
 import { claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
 import { claudeSayRefuses } from './runner-claude-inbox.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
@@ -173,6 +173,10 @@ export type TaskSpec = {
  * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
  * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy board, and a settled
  * task is never on it.
+ *
+ * `unreadable` says why each task whose journal did not read was left out of the pass, naming its file, the entry and the field —
+ * on every report while it lasts, as a refusal is — and each feed entry no runtime wrote that the pass skipped, on the report of
+ * the pass that met it. Every other task is moved all the same. Empty on a healthy board.
  */
 export type TickReport = {
   tasks: number;
@@ -182,6 +186,7 @@ export type TickReport = {
   ms: number;
   observed: Record<string, ObserveCount>;
   refused: RefusedMove[];
+  unreadable: string[];
 };
 
 /**
@@ -326,8 +331,11 @@ export type Engine = {
    * that is not waiting for one. To end one that is running, `stop` it.
    */
   close: (taskId: string) => Promise<void>;
-  /** Everything that has happened since `after`, and where to resume. */
-  feed: (after?: Cursor) => Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+  /**
+   * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
+   * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader.
+   */
+  feed: (after?: Cursor) => Promise<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }>;
   /**
    * Watch everything that happens, as it happens — the engine's event-driven surface.
    *
@@ -335,7 +343,7 @@ export type Engine = {
    * by the store when it can signal (the file store watches the feed), and backed by a timer so
    * that a store which cannot signal — or an OS that drops the event — costs latency rather than
    * correctness. Delivery is in order and at-least-once; the cursor never expires, so starting at
-   * 0 replays the whole history first.
+   * 0 replays the whole history first. An entry no runtime wrote is skipped, and said to `onError` as an `Error` naming it.
    */
   watch: (options: {
     onEntry: (entry: FeedEntry) => void | Promise<void>;
@@ -867,8 +875,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
         try {
           for (;;) {
             const got = await engine.feed(cursor);
-            if (!got.entries.length) break;
+            if (!got.entries.length && !got.refused?.length) break;
             cursor = got.cursor;
+            for (const r of got.refused ?? []) onError?.(new Error(r.why));
             for (const entry of got.entries) {
               if (stopped) return;
               await onEntry(entry);
@@ -946,6 +955,6 @@ export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, A
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
-export type { FeedEntry, Cursor } from './journal.ts';
+export type { FeedEntry, FeedRefusal, Cursor } from './journal.ts';
 export type { IoCounts } from './io-tally.ts';
 export type { RefusedMove, TaskView } from './engine.ts';

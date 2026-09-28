@@ -30,6 +30,12 @@ import { detachedOps } from '../src/runner-detached.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
+/** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */
+const readJournal = (taskId: string) =>
+  Effect.gen(function* () {
+    return yield* (yield* Journal).read(taskId);
+  });
+
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
 const SCHEMA = {
   type: 'object',
@@ -281,8 +287,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   const root = tmp('store');
   const cwd = workdir();
   const engine = createEngine({ root, harnesses: { codex } });
-  const journal = Journal.filesOps(root);
-  const client = agent(root, (taskId) => Effect.runPromise(journal.read(taskId)));
+  const client = agent(root, (taskId) => Effect.runPromise(readJournal(taskId).pipe(Effect.provide(Journal.files(root)))));
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
   const phase = async (want: string) => {
     await engine.tick();

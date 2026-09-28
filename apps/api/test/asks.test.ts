@@ -458,6 +458,15 @@ test('REFUSED: a body that is not an ask (400), and a run or a step that does no
     [{ mode: 'nudge', model: 'opus' }, /^`model` names the model a new session runs on[\s\S]*goes with "mode": "fresh"/],
     [{ mode: 'fresh', model: '' }, /^`model` names the model a new session runs on[\s\S]*was ""/],
     [{ mode: 'nudge', message: 42 }, /^`message` is what to tell the step[\s\S]*was 42/],
+    [
+      { mode: 'fresh', model: 3 },
+      /^`model` names the model a new session runs on, as `wf retry --model <m>` does: a name, or left out for the step's own\. This request's was 3\.$/,
+    ],
+    [{ mode: 'fresh', model: '  ' }, /^`model` names the model a new session runs on[\s\S]*This request's was "  "\.$/],
+    [
+      { mode: 'nudge', budget: 'five' },
+      /^`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it[\s\S]*This request's was "five": `/,
+    ],
   ];
   for (const [body, words] of bodies) {
     const res = await ask('implement', body);

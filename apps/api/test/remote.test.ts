@@ -44,11 +44,8 @@ const completed = (taskId: string, harness: string) =>
 const oneStep = (id: string, harness: string, taskId: string): Run => {
   const run = {
     id,
-    repo: root,
+    place: { kind: 'folder' },
     workspace: root,
-    baseRef: null,
-    branch: null,
-    isolate: false,
     brief: 'a note on tides',
     workflowDir: path.join(root, 'no-such-workflow'),
     createdAt: at(0),

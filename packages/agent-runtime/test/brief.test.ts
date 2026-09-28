@@ -30,11 +30,10 @@ const refuses = (text: string, says: RegExp) =>
     },
   );
 
-test('every key a brief has reaches the spec — none is accepted and then dropped', () => {
+test("every key a brief has reaches the spec — none is accepted and then dropped, and a harness's argument is filed under `config`", () => {
   const dir = tmp();
   const schema = path.join(dir, 'closeout.json');
   fs.writeFileSync(schema, '{"type":"object"}');
-  // Keyed by BriefKey: a key added to BRIEF_KEYS without a sample here fails this test.
   const samples: Record<BriefKey, [string, unknown]> = {
     cwd: [dir, dir],
     harness: ['codex', 'codex'],
@@ -55,7 +54,6 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
     const spec = parse(brief(`${key}: ${written}`));
-    // A harness's argument is written as a key like any other, and filed under `config`, where the task carries it.
     const where = (HARNESS_ARGS as readonly string[]).includes(key) ? (spec.config ?? {}) : spec;
     assert.deepEqual((where as Record<string, unknown>)[key], read, key);
     assert.equal(Object.hasOwn(spec, key) && where !== spec, false, `${key} is not left beside \`config\``);
@@ -92,14 +90,13 @@ test('`queued:` is true or false, as written — the one way to hold a task back
   }
 });
 
-test('`deadlineSeconds: 5m` is refused — it became NaN, and stopped the task on its first pass', () => {
+test('`deadlineSeconds: 5m` is refused — it would be NaN, and stop the task on its first pass', () => {
   for (const bad of ['5m', '0', '-30', 'Infinity', 'soon', '1e400']) {
     refuses(brief(`deadlineSeconds: ${bad}`), /is not a number of seconds.*deadlineSeconds: 900/);
   }
 });
 
-test('a budgetUsd that is not dollars above 0, in digits, is refused', () => {
-  // `$5` would be NaN to `Number`, and `1e2` a hundred dollars nobody meant; the last converts to Infinity.
+test('a budgetUsd that is not dollars above 0, in digits, is refused — `$5`, NaN to `Number`, `1e2`, a hundred dollars nobody meant, and one that converts to Infinity', () => {
   for (const bad of ['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)]) {
     refuses(brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/);
   }
@@ -126,8 +123,11 @@ test('maxAttempts and resume are retired: refused at what were their defaults, p
   refuses(brief('maxAttempts: 3'), /^brief: `maxAttempts` is retired/);
   refuses(brief('resume: interrupted'), /^brief: `resume` is retired: .*`retries:`.*`wf retry <run> <step>`/);
   refuses(brief('resume: sometimes'), /^brief: `resume` is retired/);
-  // resumeFrom, the session a task continues, is not the policy that went.
-  assert.equal(parse(brief('resumeFrom: abc-123')).resumeFrom, 'abc-123');
+  assert.equal(
+    parse(brief('resumeFrom: abc-123')).resumeFrom,
+    'abc-123',
+    '`resumeFrom`, the session a task continues, is not the retired policy',
+  );
 });
 
 test('a key given twice, a line that is not key: value, and an empty value are refused', () => {
@@ -201,8 +201,7 @@ test('`ae start` refuses what file() refuses, too — a harness this engine does
   assert.equal(r.filed, false);
 });
 
-test('`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too: exit 2, the sentence, nothing filed', () => {
-  // The runtime's ceiling until stage 4c part 2 (2026-09-25). Read and ignored, a person's `AE_MAX_CONCURRENT=1` would start every task at once.
+test("`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too: exit 2, the sentence, nothing filed — read and ignored, a person's `AE_MAX_CONCURRENT=1` would start every task at once", () => {
   for (const value of ['3', '1', '']) {
     for (const args of [['ls'], ['tick']]) {
       const dir = tmp();
@@ -218,8 +217,11 @@ test('`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too:
       assert.deepEqual(fs.readdirSync(dir), [], 'nothing written');
     }
   }
-  // Unset, the same command runs.
   const dir = tmp();
   const { AE_MAX_CONCURRENT: _unset, ...env } = process.env;
-  assert.equal(spawnSync(process.execPath, [ae, 'ls'], { env: { ...env, AE_ROOT: dir }, encoding: 'utf8' }).status, 0);
+  assert.equal(
+    spawnSync(process.execPath, [ae, 'ls'], { env: { ...env, AE_ROOT: dir }, encoding: 'utf8' }).status,
+    0,
+    'unset, the same command runs',
+  );
 });

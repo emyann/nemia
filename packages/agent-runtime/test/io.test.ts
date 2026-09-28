@@ -72,9 +72,8 @@ test('a tick counts the observes that could not read their harness (`unread`), a
   assert.equal((await engine.view(id)).state.attempts[0].ended, null, 'the attempt still runs');
 });
 
-test("a tick counts only the observes made during it; io() counts every observe, a view's too", async () => {
+test("a tick counts only the observes made during it; io() counts every observe, a view's too — a view of a task not settled, on a harness that cannot find, observes", async () => {
   const { engine } = await settledEngine();
-  // A settled task is viewed off its record (`settled-view.test.ts`); one not settled, on a harness that cannot find, is observed.
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   const first = await engine.tick();
   const before = engine.io().observed.quick;
@@ -116,9 +115,7 @@ test('io() counts the bytes of a journal a view reads, and the worker a pass sta
   }
 });
 
-test('a view reads its journal once, settled or observed', async () => {
-  // `viewOf` folds the journal to choose what to ask, and views that fold; it once read the journal again to view it, so each view was
-  // two reads and `wf ls` read 418 journals for 209 tasks (2026-09-25). A harness held in memory, so every read counted is the journal's.
+test("a view reads its journal once, settled or observed: it views the fold it chose what to ask by, and a harness held in memory makes every read counted the journal's", async () => {
   const sessions = new Map<string, { sessionId: string; state: 'working' | 'done'; busy: boolean }>();
   const inMemory = {
     spawn: async (r: { name: string }) => {

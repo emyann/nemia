@@ -2,11 +2,12 @@
  * What a blocked session is waiting for, at shipped defaults — a fake `claude` that keeps a registry, read through
  * the real `observe` and the real `view`.
  *
- * Seen by the owner on 2026-09-19, the shipped `note` team's first real session: the board said "blocked by the
- * harness" and nothing else a person could use, while `claude agents --json` had read that same session as
- * `"status": "waiting", "waitingFor": "permission prompt", "state": "blocked"`. Nothing read `waitingFor`. Now the
- * sighting carries it, the task's view carries it where the phase is `needs-human`, and the engine judges none of
- * it: the word is the harness's, and a harness that says nothing leaves it unset.
+ * `claude agents --json` lists a session held by a prompt as `"status": "waiting", "waitingFor": "permission prompt",
+ * "state": "blocked"`. The sighting carries `waitingFor`, the task's view carries it where the phase is `needs-human`, and
+ * the engine judges none of it: the word is the harness's, and a harness that says nothing leaves it unset.
+ *
+ * Where Claude Code keeps transcripts, `CLAUDE_CONFIG_DIR`, is read when the runner is loaded, so it is set before the
+ * runner's import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,6 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-waiting-${label}-`);
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
 process.env.CLAUDE_CONFIG_DIR = tmp('config');
 const { createEngine } = await import('../src/facade.ts');
 
@@ -92,7 +92,6 @@ test('a blocked session whose harness says nothing carries nothing: the field is
     assert.equal(v.phase, 'needs-human');
     assert.equal(Object.hasOwn(v, 'waitingFor'), false, 'nothing said is nothing carried');
 
-    // Nor does a harness that says it in a shape we have no reading of, or says it blank.
     claude.set(row.name, { waitingFor: '   ' });
     assert.equal(Object.hasOwn(await engine.view(id), 'waitingFor'), false, 'a blank word is no word');
     claude.set(row.name, { waitingFor: { reason: 'permission prompt' } });
@@ -114,7 +113,6 @@ test('level-triggered: the word is read afresh each pass — the second pass sho
     assert.equal(second.waitingFor, 'workspace trust dialog', 'the second pass shows the new word');
     assert.equal(second.waitingFor?.includes('permission'), false, 'and none of the old: nothing is carried between passes');
 
-    // It moved again. Nobody is waiting on anybody, so there is no question for the word to answer.
     claude.set(row.name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
     const third = await engine.view(id);
     assert.equal(third.phase.startsWith('needs-human'), false, 'it is working again');

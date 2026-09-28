@@ -2,17 +2,12 @@
  * A session that goes quiet without the closing statement its task asked for, at shipped defaults — a fake `claude`
  * that keeps a registry and records what it was asked to run, and a transcript file where Claude Code keeps one.
  *
- * Bug 1 of the evaluation. The Claude runner reported a `working` session, not busy, whose transcript had been quiet
- * for ninety seconds as `done`, whether or not its task had asked for a closeout, and the engine settled such a task
- * `succeeded` with nothing said: measured this way before the fix, `ended: done`, `reason: harness`, `settled:
- * succeeded`, no closeout. Now the runner reports how long a session has been quiet, and `decide` — which alone knows
- * whether a statement was asked for — ends that attempt saying whether one came: `stated`, on the `ended` event.
- *
- * Until stage 4a (2026-09-23) `decide` judged such an end itself — `unsigned`, recorded `failed`, its session continued
- * with a nudge while attempts remained. It reports now, and the orchestrator judges: `closeoutAsked` reads `stated: false`
- * as unsigned and files the one sign-off nudge per round (`agent-orchestrator/test/store.test.ts`, *UNSIGNED is the
- * orchestrator's word since stage 4a*). So what is pinned here is the fact, and that the runtime continues nothing on it.
- * A task that asked for nothing ends on quiet as it always did, with no `stated` key at all.
+ * The Claude runner reports how long a session has been quiet, and `decide` — which alone knows whether a statement was
+ * asked for — ends that attempt saying whether one came: `stated`, on the `ended` event. The runtime judges nothing on it:
+ * the orchestrator's `closeoutAsked` reads `stated: false` as unsigned and files the one sign-off nudge per round
+ * (`agent-orchestrator/test/store.test.ts`). So what is pinned here is the fact, and that the runtime continues nothing on
+ * it. A task that asked for nothing ends on quiet with no `stated` key at all. The registry's own `done` is a second door
+ * to the same fact: a session it lists `done` with no statement has stated nothing either.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +17,7 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-unsigned-${label}-`);
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
+/** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { createEngine } = await import('../src/facade.ts');
@@ -122,7 +117,6 @@ test("a task that asked for a closeout, whose session goes quiet without one, en
     await engine.tick();
     const [row] = claude.rows();
 
-    // It ended its turn with words and no StructuredOutput, and has written nothing for ten minutes.
     wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
@@ -180,7 +174,6 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
     assert.equal(v.state.attempts[0]?.stated, true);
 
-    // A continuation whose transcript holds only its parent's conversation, statement included, from an hour before it began.
     const inherited = await engine.file({ config: { background: true }, brief: 'go on', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
@@ -195,13 +188,15 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     await engine.tick();
     const w = await engine.view(inherited);
     assert.equal(w.state.attempts[0]?.stated, false, "a parent's statement is not this attempt's");
-    assert.equal(w.state.attempts[0]?.closeout, undefined);
+    assert.equal(
+      w.state.attempts[0]?.closeout,
+      undefined,
+      "and no closeout: its transcript holds only its parent's conversation, statement included, from an hour before it began",
+    );
   });
 });
 
 test("THE HARNESS'S `done` without a statement is said to have stated nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing", async () => {
-  // Measured on 2026-09-19 over this machine's journals: 5 of 344 tasks filed with a schema were journalled `observed: done`,
-  // `reason: harness`, with no closeout, and settled `succeeded`. The registry said `done`, not quiet, and only quiet was read.
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });

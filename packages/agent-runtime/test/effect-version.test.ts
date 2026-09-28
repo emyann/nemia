@@ -137,8 +137,8 @@ const has = (barrel: Record<string, unknown>, name: string): boolean => {
 };
 
 /**
- * What the skill's table of Effect 3 names gets wrong about the version it is read against, one sentence each: a version it
- * was not measured on, a name on the left the version has, a name on the right it lacks, or a table with no row read.
+ * What the skill's table of Effect 3 names gets wrong about the version it is read against, one sentence each: a version other
+ * than the one the table names, a name on the left the version has, a name on the right it lacks, or a table with no row read.
  */
 function renameProblems(skill: string, barrel: Record<string, unknown>, pin: string): string[] {
   const section = /## Effect 3 names this version does not have\s*\n([\s\S]*?)\n## Services and layers/.exec(skill)?.[1];

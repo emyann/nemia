@@ -1,8 +1,8 @@
 /**
  * Claude Code as the engine runs it by default: a job (`claude -p`) unless the task asks for a background session
  * (`claude --bg`), and every verb given a session id reaching the mode that id belongs to — by its shape, with nothing
- * remembered. Against the real worker and a fake `claude` on PATH that records what it was given and prints what
- * 2.1.280 printed.
+ * remembered. Against the real worker and a fake `claude` on PATH that records what it was given and prints what Claude
+ * Code prints.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
+/** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/runner-claude-code.ts');
@@ -23,9 +23,9 @@ const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
 
 /**
- * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as
- * 2.1.280 does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin
- * ends. The result names its `type` last, as 2.1.280's does. `--bg` records its arguments; `agents` lists what
+ * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as Claude
+ * Code does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin ends.
+ * The result names its `type` last, as Claude Code's does. `--bg` records its arguments; `agents` lists what
  * `agents.json` holds, a line in `agents-calls` each time; `stop` and `rm` are recorded in order.
  */
 const fake = () => {
@@ -78,11 +78,11 @@ const fake = () => {
   };
 };
 
+/** The Claude Code runner over a store at `root`, a background session's clock and statement answered without a transcript. */
 const opsIn = (root: string) =>
   claudeCodeOps({
     root,
     sessionsDir: tmp('sessions'),
-    // A background session's clock and statement, answered without a transcript.
     transcriptTime: async () => Date.now(),
     closeoutFrom: async () => undefined,
     usageFrom: async () => undefined,
@@ -205,14 +205,17 @@ test('observeFor asks `claude agents` only when a session expected is not a job:
     assert.deepEqual(jobs.unread, new Set());
     assert.equal(calls(), 0, 'a pass with only jobs in flight spawns no `claude agents`');
 
-    // A background session is known by nothing on the task: its name is simply not a job's.
     const both = await Effect.runPromise(
       ops.observeFor!([
         { name: 'ae/j/1', harness: 'claude' },
         { name: 'ae/b/1', harness: 'claude' },
       ]),
     );
-    assert.equal(both.seen.get('ae/b/1')?.sessionId, BG_ID);
+    assert.equal(
+      both.seen.get('ae/b/1')?.sessionId,
+      BG_ID,
+      "a background session is known by nothing on the task: its name is simply not a job's",
+    );
     assert.equal(both.seen.get('ae/j/1')?.sessionId, 'ae/j/1');
     assert.equal(calls(), 1, 'one expected session that is no job: one `claude agents`');
 
@@ -239,7 +242,6 @@ test("observeFor says which names it could not read: a background session's, and
     assert.deepEqual([...o.seen.keys()], ['ae/j/1'], 'the registry failing does not hide a job');
     assert.deepEqual(o.unread, new Set(['ae/b/1', 'ae/j/2']), 'a name the failed read could have listed is unread, not gone');
 
-    // Read, and not listed: gone. The registry answered and lists neither.
     fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([]));
     const read = await Effect.runPromise(
       ops.observeFor!([
@@ -247,7 +249,7 @@ test("observeFor says which names it could not read: a background session's, and
         { name: 'ae/j/2', harness: 'claude' },
       ]),
     );
-    assert.deepEqual(read.unread, new Set());
+    assert.deepEqual(read.unread, new Set(), 'read, and not listed: gone, as the registry answered and lists neither');
   } finally {
     f.restore();
   }
@@ -261,7 +263,6 @@ test('a stop, a release and words reach the mode the id belongs to, by its shape
     await Effect.runPromise(first.spawn({ name: 'ae/j/2', brief: 'wait', cwd: f.dir }));
     await until(async () => f.read('job-args'), 'the job started');
 
-    // A fresh runner, as a restarted process has: nothing observed, nothing remembered.
     const ops = opsIn(root);
     await Effect.runPromise(ops.stop('ae/j/2'));
     await Effect.runPromise(ops.stop(BG_ID));
@@ -272,11 +273,10 @@ test('a stop, a release and words reach the mode the id belongs to, by its shape
     }, 'the job stopped by its worker');
     assert.equal(stopped.sessionId, 'ae/j/2');
 
-    // A job's run file is its record: nothing to let go of. A background session is removed from Claude Code's list.
     await Effect.runPromise(ops.release!(stopped, {}));
     assert.deepEqual(f.read('verbs'), ['stop 5e551011'], 'releasing a job asks Claude Code for nothing');
     await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'completed' }, {}));
-    assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011']);
+    assert.deepEqual(f.read('verbs'), ['stop 5e551011', 'rm 5e551011'], "a background session is removed from Claude Code's list");
 
     const toJob = await Effect.runPromise(Effect.flip(ops.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
     assert.match(
@@ -341,13 +341,12 @@ test('a job is found by its run file, and a name no job has is asked of Claude C
   }
 });
 
-test("finding a job reads its run file and nothing else — no other job's, and no job's output", async () => {
+test("finding a job reads its run file and nothing else — no other job's, and no job's output, though every log changed since both ended", async () => {
   const f = fake();
   try {
     const root = tmp('root');
     const ops = opsIn(root);
     for (const name of ['ae/j/1', 'ae/k/1']) await Effect.runPromise(ops.spawn({ name, brief: 'go', cwd: f.dir }));
-    // Both ended, and each has printed its stream: a find that listed the jobs would read every log that changed since.
     await until(async () => {
       const seen = await Effect.runPromise(ops.observe);
       return ['ae/j/1', 'ae/k/1'].every((n) => seen.get(n)?.state === 'completed') || undefined;
@@ -379,8 +378,11 @@ test('a run file another name folds onto is not the job asked for', async () => 
     const root = tmp('root');
     const ops = opsIn(root);
     await Effect.runPromise(ops.spawn({ name: 'ae/j/2', brief: 'go', cwd: f.dir }));
-    // `ae-j/2` is written at the same path as `ae/j/2`; the file says whose it is.
-    assert.equal(await Effect.runPromise(ops.find!('ae-j/2')), undefined);
+    assert.equal(
+      await Effect.runPromise(ops.find!('ae-j/2')),
+      undefined,
+      '`ae-j/2` is written at the same path as `ae/j/2`, and the file says whose it is',
+    );
     assert.deepEqual(await Effect.runPromise(ops.find!('ae/j/2')), { sessionId: 'ae/j/2' });
   } finally {
     f.restore();
@@ -433,11 +435,10 @@ test('a job resumed from a background session is a job — and, its parent not o
   }
 });
 
-test('what the default Claude Code refuses depends on the mode: a job refuses a bridge, a background session a spend cap — each naming the other', () => {
+test('what the default Claude Code refuses depends on the mode: a job refuses a bridge, named or not, a background session a spend cap — each naming the other', () => {
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { budgetUsd: 1 } }), undefined, 'a job keeps a cap');
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { background: true, claude: { remoteControl: true } } }), undefined);
   assert.equal(claudeCodeRefuses({ brief: 'b', cwd: '/r' }), undefined);
-  // In Claude Code's flags since 2026-09-25, and a name for the bridge (`--remote-control <name>`) asks for one as `true` does.
   for (const remoteControl of [true, 'phone'] as const) {
     const bridge = claudeCodeRefuses({ brief: 'b', cwd: '/r', config: { claude: { remoteControl } } });
     assert.ok(
@@ -518,10 +519,10 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
     assert.equal(args[at + want.length], '--permission-mode', `${what}: directly before the mode`);
     assert.ok(args.indexOf('--tools') < at, `${what}: after the variadic list, which the first of them ends`);
   }
-  // None given, none handed over: the argv is what it was.
   assert.deepEqual(
     claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } }).args,
     claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args,
+    'none given, none handed over: the argv is what it is without them',
   );
 });
 
@@ -652,15 +653,14 @@ test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not 
     /^`claude: \{"appendSystemPromptFile":"\/a\/prompt\.md"\}` gives Claude Code flags of its own, and `codex exec` is not Claude Code/,
   );
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined);
-  // A key that is no harness argument — `codex`, say — was refused before this card and still is: there is no bag for Codex.
   await assert.rejects(
     e.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { codex: { x: 1 } } as never }),
     /`config\.codex` is not a harness argument/,
+    'a key that is no harness argument, `codex` among them, is refused: there is no bag for Codex',
   );
 });
 
-test("a flag Claude Code does not have fails the attempt as the CLI fails it, and the CLI's own words reach the attempt's logs", async () => {
-  // What 2.1.282 does given `--frobnicate` (F22): nothing on stdout, its words on stderr, exit 1.
+test("a flag Claude Code does not have fails the attempt as the CLI fails it — nothing on stdout, its words on stderr, exit 1 — and the CLI's own words reach the attempt's logs", async () => {
   const dir = tmp('bin');
   fs.writeFileSync(
     path.join(dir, 'claude'),

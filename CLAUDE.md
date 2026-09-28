@@ -48,7 +48,7 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   written. A function it cannot compile it leaves alone and says so at build, `React Compiler skipped <file>:<line>: <why>` (the logger in
   `apps/web/vite.config.ts`): read the build's output for that line. What it skipped once, and how each was written instead: a memo whose
   dependencies were not what it reads (list what the body reads; an array rebuilt on every refetch goes through `useContent`, which keeps
-  its identity while its content stands), `??=`, an arrow function given as a destructured default (name it once, outside), and an
+  its identity while its content stands), an arrow function given as a destructured default (name it once, outside), and an
   optional call inside `try` (a promise's `.then(ok, err)`). `react/purity`, `react/set-state-in-effect` and
   `react/preserve-manual-memoization` refuse the same at lint (learned by the run that adopted the compiler).
 - Run all three before you commit. Green is the floor, not the bar: a change that makes the suite

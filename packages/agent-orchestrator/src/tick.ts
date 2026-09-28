@@ -145,19 +145,18 @@ import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.t
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
  * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
- * they cost is a number nothing in the pass looks at.
+ * they cost is a number nothing in the pass looks at, and a step answered without limit would grow that read for ever.
  */
 const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run.steps[s.name]) !== undefined);
 
 /**
- * Checks a pass filed and never wrote down, put back on the record. In memory: `advance` is the one
- * writer of the run's json, and writes it; `cancel` only needs them in view.
+ * Checks a pass filed and never wrote down, put back on the record in memory — `advance` is the one writer of the run's json, and writes
+ * it; `cancel` only needs them in view — and the steps they were adopted for.
  *
- * A pass that dies between `e.file` and `writeRun` leaves a check on the engine's board that the
- * record does not name. It is looked for under the id the run derives, for every step whose check is
- * due and unrecorded, and BEFORE anything asks what is in flight. Waiting for filing time to adopt it
- * was not enough: a run cancelled in that window files no more checks, so it was never adopted, never
- * stopped, and its suite ran on to the deadline.
+ * A pass that dies between `e.file` and `rewriteRun` leaves a check on the engine's board that the record does not name. It is looked for
+ * under the id the run derives, for every step whose check is due and unrecorded, and before anything asks what is in flight: a run
+ * cancelled in that window files no more checks, so one adopted only at filing time would never be stopped, and its suite would run on to
+ * the deadline. A task the engine holds no brief for was not filed, and is left for the pass to file.
  */
 export async function adoptChecks(
   e: Engine,
@@ -174,7 +173,7 @@ export async function adoptChecks(
     if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue; // not filed: due, and this pass's to file
+    if (!view.state.brief) continue;
     views.set(taskId, view);
     run.steps[step.name] = { ...run.steps[step.name], check: { taskId } };
     adopted.push(step.name);
@@ -183,12 +182,16 @@ export async function adoptChecks(
 }
 
 /**
- * Tries a pass filed and never wrote down, put back on the record — in memory, as `adoptChecks` does, and
- * before anything asks what is in flight, for the same reason: a run cancelled in that window files no more
- * tries, so a try filed in it would otherwise never be adopted, nor stopped.
+ * Tries a pass filed and never wrote down, put back on the record — in memory, as `adoptChecks` does, and before anything asks what is in
+ * flight, for the same reason: a run cancelled in that window files no more tries, so a try filed in it would otherwise never be adopted,
+ * nor stopped. A task the engine holds no brief for is left for the pass to file.
  *
- * Looked for only where a try is due (`retriesDue`, cancelled or not): an ask for the step's next try, or a
- * refused check `retries:` covers. A run waiting on a person with nothing asked costs no look.
+ * Looked for only where a try is due (`retriesDue`, cancelled or not): an ask for the step's next try, or a refused check `retries:`
+ * covers. A run waiting on a person with nothing asked costs no look.
+ *
+ * A person's nudge a pass gave as an answer to the step's task held open, and died before writing down, shows as a task with more answers
+ * than the record has turns (`answersIn`, `turnsOf`): the answered task reads running, so the ask reads as one to stop it first. It is
+ * adopted as the turn it is, and nothing is stopped and nothing filed.
  */
 export async function adoptTries(
   e: Engine,
@@ -204,9 +207,6 @@ export async function adoptTries(
 ): Promise<string[]> {
   const adopted: string[] = [];
   for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
-    // A person's nudge a pass gave as an answer to the step's task, held open, and died before writing down: the task has more answers than
-    // the record has turns (`answersIn`, `turnsOf`). The answered task reads running, so the ask reads as one to stop it first — adopted
-    // here, it is the turn it is, and nothing is stopped and nothing filed.
     const current = run.steps[r.step]?.taskId;
     if (r.by === 'ask' && r.mode === 'nudge' && current && answersIn(views.get(current)) > turnsOf(run.steps[r.step])) {
       run.steps[r.step] = nextTry(run.steps[r.step], r, current);
@@ -215,7 +215,7 @@ export async function adoptTries(
     }
     const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue; // not filed: due, and this pass's to file
+    if (!view.state.brief) continue;
     views.set(taskId, view);
     const record = run.steps[r.step];
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
@@ -229,9 +229,9 @@ export async function adoptTries(
  * Rounds a pass filed and never wrote down, put back on the record — in memory, and before anything asks what is in flight, as `adoptTries`
  * does and for its reason.
  *
- * Looked for only where a round is due (`roundsDue`, cancelled or not), under the target's next try's id. A pass that filed the round and died
- * left the looping step's `again: true` on the record, so the round reads due again; finding its task filed, this moves the loop on as the
- * pass would have (`roundFiled`), and nothing is filed twice.
+ * Looked for only where a round is due (`roundsDue`, cancelled or not), under the target's next try's id. A pass that filed the round and
+ * died left the looping step's `again: true` on the record, so the round reads due again; finding its task filed, this moves the loop on as
+ * the pass would have (`roundFiled`), and nothing is filed twice. A task the engine holds no brief for is left for the pass to file.
  */
 export async function adoptRounds(
   e: Engine,
@@ -248,7 +248,7 @@ export async function adoptRounds(
   for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks, spendOf)) {
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue; // not filed: due, and this pass's to file
+    if (!view.state.brief) continue;
     views.set(taskId, view);
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
     adopted.push(r.step);
@@ -281,7 +281,7 @@ export async function unrecordedSteps(
   for (const name of ready) {
     const taskId = stepTaskId(run, name, tryOf(run, name));
     const view = views.get(taskId) ?? (await e.view(taskId));
-    if (!view.state.brief) continue; // not filed
+    if (!view.state.brief) continue;
     views.set(taskId, view);
     found.push({ name, taskId });
   }
@@ -289,14 +289,14 @@ export async function unrecordedSteps(
 }
 
 /**
- * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the
- * run stands — and `notes`, each line starting with its step: what cutting a worktree had to say (a path
- * `.worktreeinclude` lists that the main checkout does not have, a line it refused, an `npm ci` that ran or
- * failed), each try and each round filed and on whose word, a blocked session the engine was asked to stop for a try, and an ask file that
- * cannot be read. `looped` names the
- * looping steps whose loop this pass took round again. `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`).
- * `inFlight` says the run counts against the cap on runs in flight once this pass is done: in flight when the pass read it (`slotNeed`), or
- * filed something. `held` is the slot the cap held its roots at, on a pass that held them.
+ * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the run stands — and `notes`,
+ * each line starting with its step: what cutting a worktree had to say (a path `.worktreeinclude` lists that the main checkout does not
+ * have, a line it refused, an `npm ci` that ran or failed), each try and each round filed and on whose word, a blocked session the engine
+ * was asked to stop for a try, and an ask file that cannot be read. `looped` names the looping steps whose loop this pass took round again.
+ * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
+ * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
+ * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
+ * them.
  */
 export type Advanced = {
   run: Run;
@@ -318,20 +318,18 @@ export type Advanced = {
  * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
  * when nothing does and this run's may be filed.
  *
- * Asked of the store on the pass that asks, never stored: only of a run whose ending step is approved and not filed, since nothing else of
- * a run works in that checkout, and then of every run of the same repository. A run is in the checkout while the engine holds its
- * `workspace: main` task in flight, as `inFlight` counts one, so a step filed earlier in this very pass is read as being in it. One waiting
- * to be filed counts only if the pass would in fact file it: a send-back of the work un-holds its gate, and an ending that will not be filed
- * must not hold another run's for ever.
+ * Asked of the store on the pass that asks, never stored, and then of every run of the same repository — but first, and cheaply, of the
+ * run's own asks: undefined, with no other run's claim read, for a run called off, for one with no person's word that would file its own
+ * ending (`endingAsked`: the approval of one that has not run, or the ask for a try of one that has), and for one whose ending is in that
+ * checkout already. A run is in the checkout while the engine holds its `workspace: main` task in flight, as `inFlight` counts one, so a
+ * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
+ * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
+ * flight is read once for every claim (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
  */
 export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
   const ending = steps.find((s) => s.workspace === 'main');
-  // Cheap, and first: a run reads the store only where a person's word would file its own ending (`endingAsked`) — the approval of one that
-  // has not run, or the ask for a try of one that has. A run with no such word is waiting for nothing, and one whose ending is in that
-  // checkout is not waiting for it either; neither needs anybody else's claim read.
   if (!ending || run.cancelledAt || endingAsked(run, ending, readAsks(run.id).asks) === undefined) return undefined;
   const runs = listRuns();
-  // The cap on runs in flight, read once for every claim here: a run it holds files nothing, so its ending claims nothing (`mainClaim`).
   const slots = await runSlots(e, runs);
   const mine = await mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
@@ -345,13 +343,17 @@ export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow
 }
 
 /**
- * A run's claim on the repository's own checkout, as a pass reads it now (`MainClaim`) — or undefined for a run with no ending step, and
- * for one whose ending the pass would neither find there nor file.
+ * A run's claim on the repository's own checkout, as a pass reads it now (`MainClaim`) — or undefined for a run with no ending step, for a
+ * record whose workflow does not read, and for one whose ending the pass would neither find there nor file.
  *
  * Every run is read the same way, this one and the others, so the two readings cannot drift. A step is IN that checkout while the engine
  * holds its task in flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold
  * every other run's ending for ever — but a run somebody called off holds it while its session is still there, between `wf cancel` asking
  * the engine to stop it and the engine settling it, because that session is still merging in that directory.
+ *
+ * An ending that lands on its check holds it too, from its filing until the run has landed its merge: while its check runs on that merge,
+ * and while the merge is staged there and not yet committed or aborted — a run called off included, whose merge a pass still aborts. Whose
+ * merge it is is asked of git only where one is in progress, which the file system says with no git (`mergeInProgress`).
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
@@ -366,19 +368,16 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
     steps = stepsOf(run);
   } catch {
     return undefined;
-  } // a record whose workflow no longer reads files nothing
+  }
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || !isGitRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
   if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
-  // And an ending that lands on its check has it from its filing until the run has landed its merge: while its check runs on that merge,
-  // and while the merge is staged there and not yet committed or aborted — a run called off included, whose merge a pass still aborts.
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
     const { views, phaseOf } = await taskPhases(e, run);
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
-    // Whose merge it is is asked of git only where one is in progress, which the file system says with no git.
     const merging = mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none';
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
@@ -421,9 +420,62 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
 }
 
 /**
- * `advance`, and whether the run is at rest once the pass is done (`atRest`): `blockers` names each clause that holds it out (`restBlockers`),
- * and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`), which is all of git a pass asks of a
- * run at rest.
+ * `advance`, and whether the run is at rest once the pass is done (`atRest`): `blockers` names each clause that holds it out
+ * (`restBlockers`), and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`), which is all of
+ * git a pass asks of a run at rest.
+ *
+ * The pass reads a person's asks afresh, adopts what a pass before it filed and never wrote down, and then, in this order:
+ * - stops a cancelled run's tasks, on every pass and not only in `wf cancel`, which stops what it saw in flight: a step filed after it
+ *   looked, and one a pass filed and died before writing down (`unrecordedSteps`), are stopped too. A task the engine already holds a
+ *   stop request for is not asked again.
+ * - hands off every finished step, failed and stopped too (`handOffOwed`): commits what it left uncommitted and collects what it named
+ *   from its workspace root (`collectArtifacts`), before its check is filed and before a later step merges it or works in its workspace.
+ *   A merge carries commits, not working trees, so the run commits what a step leaves, as every step is told (`closeoutContract`).
+ *   Nothing is handed off for a run `wf rm` forgot after this pass read it: a `--no-worktree` run's workspace is a person's checkout. A
+ *   hand-off is marked once for the try, unless git refused the commit, which the next pass tries again; a mark made is always written,
+ *   or the next pass would commit a person's edits as the step's.
+ * - lands or aborts an ending's staged merge (`landEnding`) before anything reads where the ending stands, so the pass that lands it
+ *   reads it landed, and no try of it is filed over a merge still staged.
+ * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
+ *   what it has filed included, so the order a pass takes the runs in decides nothing.
+ * - lifts a person's hold on the pass that reads every run it names shipped (`parentOf`), and goes on on that pass. A lift sticks, as a
+ *   start after `--after` does; only the hold this pass read is lifted (`removeHold`), so one put again since stays; and one that names
+ *   no run is never lifted here (`holdAdvice`).
+ * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
+ *   person approved, a run called off. What waits on it is filed on this same pass, since the run reads it settled once it signed
+ *   (`phaseOfView`); a close the engine refuses is a note, and asked again by the next pass.
+ * - files a run's roots only while it has nothing filed, once every run it waits on (`--after`) has shipped (`runReady`), and while the
+ *   cap on runs in flight leaves it a slot (`runAdmitted`); a run that has started never reads its parents again.
+ * - words the feed (`feedWords`) off what it read before it filed anything, and reads nothing again for it: a step it files reaches the
+ *   feed on the next pass, as the engine's `pending`.
+ * - files the tries due, then the rounds, then the checks, then the ready steps, each under the id the run derives and looked up first,
+ *   since filing an id the engine already holds would journal it twice. Before each filing it reads the store again (`mayFile`): a run
+ *   called off, forgotten, pruned or held while the pass was at work — a worktree cut can take minutes — is filed nothing more on this
+ *   pass, and a worktree cut for it stays for `wf rm` to find. A step's files directory is made before its brief names it, and again for
+ *   its check, for a step filed without one.
+ * - writes when, on the first pass the cap holds the run (`slotHeldAt`), what its wait for a slot is counted from, and says so once.
+ * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
+ *   branch a person deleted after its merge is on the base (`isShipped`).
+ * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
+ *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next.
+ *
+ * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
+ * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its
+ * harness, or asked for while it was and working again since — stops the session and files nothing; a later pass, once the task has
+ * settled, files the try. A recheck files no session, only its check, under the new try's id. A person's nudge of a step whose task is held
+ * open and waits for their word is that task's next turn, in the session that signed, under the same id (`answerHeld`); any other try, and
+ * every round, of a task that waits closes it first and is filed as a task of its own. A nudge with no session to continue starts a new
+ * one, and its brief says so. A new session of a loop's target within a round is handed the round's findings off the looping step's try
+ * that asked (`askingTry`). A round continues the target's session under its next try's id, and every other step of the loop moves behind,
+ * unfiled, for a later pass to file (`roundFiled`).
+ *
+ * A check is filed on the `check` harness, so it outlives the pass, has a deadline, and is stopped by a cancel; its command is the one
+ * the run froze, never the workspace's it judges. It is filed once, with no attempt again: a suite run until it passes would let a
+ * flaky suite decide what ships. An ending's check gets no `WF_BASE_REF`: it judges the merge staged in the checkout against HEAD, and
+ * installs first what that merge's lockfile asks for (`checkoutParts`). Nothing is ready on a check in the pass that files it.
+ *
+ * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
+ * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
  */
 async function advanceRun(
   e: Engine,
@@ -432,61 +484,26 @@ async function advanceRun(
 ): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
   const steps = stepsOf(run);
 
-  // Every try's session, or only the current ones: what the earlier ones cost is read by nothing here unless a cap is in force
-  // (`underBudget`), and a step answered without limit grows that read for ever.
   const { views, phaseOf } = await taskPhases(e, run, { earlierTries: underBudget(steps, run) });
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);
-  // What each try has cost, as the engine has measured it: a step over its budget is filed nothing more on the run's word.
   const spendOf = spendReader(views);
-  // A person's word, read on every pass: an ask made while this pass was elsewhere is read by the next.
   const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
   const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks, spendOf);
   const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, spendOf);
   const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked, spendOf);
 
-  // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
-  //
-  // `wf cancel` stops what it can SEE in flight, and this pass may have filed a step moments
-  // after it looked. One tick later that step is asked to stop too, so the window costs a few
-  // seconds of work rather than a session nobody is watching. Level-triggered, like the rest: the
-  // mark is the desired state and every tick reconciles toward it, instead of the system trusting
-  // that one command did everything.
   if (run.cancelledAt) {
-    // A step a pass filed and died before writing down is stopped too: the record does not name it, and nothing else would.
     const unrecorded = await unrecordedSteps(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, spendOf);
     const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(phaseOf(taskId)));
     for (const { taskId } of [...inFlight(run, phaseOf), ...live]) {
-      // Skipped once the engine already has the request on its record, so a task taking a tick or
-      // two to settle does not collect a stop-requested event every four seconds.
       if (!views.get(taskId)?.state.stopRequested) await e.stop(taskId);
     }
   }
 
-  // Anything a finished step left uncommitted is committed for it, BEFORE a later step merges.
-  //
-  // A merge carries commits, not working trees. While steps shared one directory that did not
-  // matter — a file written was a file the next step could read — but the moment steps fork, an
-  // uncommitted file is invisible downstream and the next step answers a question it never saw.
-  // Measured the hard way: a review wrote REVIEW.md, did not commit, and the responder merged a
-  // branch that did not contain it. Asking every step's prose to remember is not a contract — so
-  // this IS the contract: every step is told the run commits what it leaves (`closeoutContract`),
-  // which is also exactly what a sandboxed step that cannot write git's metadata needs.
-  //
-  // Every finished step, failed and stopped too, until its check is filed or a later step works in its
-  // workspace: the check judges the committed tree, and nothing it leaves behind — nor the next step's
-  // work in progress — is committed under this step's name (`handOffDue`).
-  //
-  // And on the same passes, what a finished step named from its workspace root is collected into its files directory: before its check
-  // is filed, and before a step after it works in its workspace (`collectArtifacts`).
-  //
-  // Only while the record is there, read at the moment of each: a run `wf rm` forgot after this pass read it is not handed off — a
-  // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
-  // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
   let markedHandedOff = false;
-  // Only where there is somewhere to hand one off from (`handOffOwed`).
   const collected = within('act', () =>
     handOffOwed(steps, run, phaseOf).flatMap((name) => {
       if (!fs.existsSync(runFile(run.id))) return [];
@@ -494,7 +511,6 @@ async function advanceRun(
       let handed: ReturnType<typeof handOff>;
       if (isGitRun(run)) handed = handOff(record.workspace!, name);
       else folderPlace(runsDir()).handOff(run, name);
-      // Once for the try, unless git refused the commit — a hook, a signature — which the next pass tries again.
       if (!(handed && 'error' in handed)) {
         run.steps[name] = { ...record, handedOff: record.taskId! };
         markedHandedOff = true;
@@ -503,21 +519,9 @@ async function advanceRun(
     }),
   );
 
-  // The merge an ending that lands on its check staged in the repository's checkout is committed on its check's word, or aborted — before
-  // anything reads where the ending stands, so the pass that lands it reads it landed, and a try of it is never filed over a merge still
-  // staged. Level-triggered: after a restart, of the daemon or the machine, a pass reads the checkout and the engine as they are, and a
-  // merge whose session and check have both stopped running is committed or aborted then (`landingDue`).
   const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
 
-  // Two runs' ending steps never work in one checkout at once (`checkoutHold`): while another run's `workspace: main` task is unsettled
-  // there, this run's is not filed, whatever its approval says. Read from the world on this pass, including what the pass has already
-  // filed, so the order a pass takes the runs in decides nothing, and a restart changes nothing.
   const checkout = await checkoutHold(e, run, steps);
-  // A person's hold lifts on the pass that reads every run it names shipped, as `--after` reads shipped (`parentOf`), and the run goes on
-  // on this same pass. Level-triggered: a hold is a wait on the world, so a pass after a restart reads the same runs and lifts it the same.
-  // A lift sticks, as a start after `--after` does: a run that shipped and is then reverted does not hold the run again. Only the hold this
-  // pass read is lifted (`removeHold`): one put again since, by a person who lifted it by hand, names what this pass never read, and stays.
-  // One that names no run is never lifted here, and says so (`holdAdvice`).
   const liftNotes: string[] = [];
   if (run.hold && !run.cancelledAt && run.hold.until.length) {
     let shipped = true;
@@ -532,14 +536,9 @@ async function advanceRun(
   }
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const { check, retry, round, blocked, status } = assessed;
-  // A step's task held open that waits for a word nobody is to give is closed (`holdsOpen`): an ungated step that signed off, a gate a person
-  // approved, a run called off. The engine settles it as it signed, on its next pass; the run has read it as settled since it signed
-  // (`phaseOfView`), so what waits on it is filed on this pass all the same. Level-triggered: a close the engine refuses is said, and asked
-  // again by the next pass that reads the task waiting.
   const waits = waitsForWord(views);
   const closed = new Set<string>();
   const closeNotes: string[] = [];
-  /** Close a task that waits, and say why not where the engine refuses: undefined once it is closed. */
   const closeWaiting = async (name: string, taskId: string): Promise<string | undefined> => {
     const refused = await closeHeld(e, taskId);
     if (!refused) closed.add(taskId);
@@ -552,20 +551,13 @@ async function advanceRun(
     if (refused) closeNotes.push(refused);
   }
   const awaitsWord = (taskId: string | null | undefined): boolean => Boolean(taskId && waits(taskId) && !closed.has(taskId));
-  // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
-  // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
   const parent = await parentsOf(e, run);
   const starting = !hasStarted(run);
-  // And a run with nothing filed files its roots only while the cap on runs in flight leaves a slot (`runAdmitted`): one that wants a slot and
-  // is not admitted is held, and files nothing.
   const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped, steps);
   const admitted = runAdmitted(run, slot, steps);
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
-  // What the pass judged, as `wf ls` words it, for the feed (`recordFeed`) — worded here, off what this pass read before it filed anything: a
-  // step filed below has no view on this pass, and would read `unknown`. So a step's filing reaches the feed a pass late, as the engine's
-  // `pending`. Off the same reads as the judgement, and nothing read again: the feed only reports what the pass decided on.
   const feed = feedWords(
     listing(
       steps,
@@ -592,18 +584,9 @@ async function advanceRun(
     (name) => closeoutOf(views, run, name),
   );
 
-  // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
-  // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
-  // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
   const notes: string[] = [...askNotes, ...collected, ...landing.notes, ...liftNotes, ...closeNotes];
-  // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
-  // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
-  // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
-  // filed on this pass. A pruned run is called off the same way: whatever a person's ask says, what it would file works in a worktree
-  // `wf prune` removed, or inherits one — and the marker is written before the first removal, so a pass that read the run a moment
-  // before stops here too. And a held run: a person who holds it while this pass is at work holds what the pass would file next.
   let calledOff = false;
   const mayFile = (): boolean =>
     !(calledOff ||=
@@ -624,10 +607,6 @@ async function advanceRun(
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step];
-    // A try of a step whose task has not settled — its session blocked by its harness, or asked for while it was and working again since: the
-    // session is stopped first, and nothing is filed. Asked once — a task the engine already holds the request for is not asked again — and a
-    // later pass, once the task has settled, reads the try due as one of a stopped step, and files it. Nothing is carried between the two: a
-    // pass after a restart reads the same engine record, and does the same.
     if (r.stopFirst) {
       if (!views.get(record.taskId!)?.state.stopRequested) {
         await e.stop(record.taskId!);
@@ -640,7 +619,6 @@ async function advanceRun(
     }
     if (!mayFile()) continue;
     const said = `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`;
-    // A recheck files no session. Its check is filed below with the others, under the new try's id.
     if (r.mode === 'recheck') {
       tried.push(r.step);
       notes.push(said);
@@ -649,9 +627,6 @@ async function advanceRun(
       continue;
     }
 
-    // A person's nudge of a step whose task is held open and waits for their word — it signed off blocked, or waits at its gate — is an
-    // answer to that task (`answers`): its next turn, in the session that signed, under the same id. Any other try of a task that waits —
-    // `--fresh`, `--model` — closes it first, and is filed as its own task, as every try was before tasks were held open.
     const answers =
       awaitsWord(record.taskId) &&
       r.by === 'ask' &&
@@ -666,19 +641,12 @@ async function advanceRun(
       }
     }
     const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
-    // A try an earlier pass filed and never wrote down was adopted above. Looked up once more all the same,
-    // as a check is: filing an id the engine already holds would journal it twice.
     if (answers || !(await e.view(taskId)).state.brief) {
       const files = artifactsDir(run, r.step);
       fs.mkdirSync(files, { recursive: true });
-      // A nudge continues the last try's session. With none to continue — a session the harness never
-      // reported — the try starts a new one, and its brief says so.
       const remote = isRemoteHarness(step.harness);
       const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(views, record.taskId!) : undefined;
-      // What the check said, as data in the brief: the frozen command, its exit, and both tails.
       const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
-      // A new session of a loop's target within a round owes replies to the round's findings, and is handed them as its first try was:
-      // off the looping step's try that asked, since the looping step's own place is unfiled until the target is verified.
       const asking = resumeFrom ? undefined : askingTry(steps, run, r.step);
       const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
       const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
@@ -710,27 +678,18 @@ async function advanceRun(
               ...(r.message !== undefined ? { message: r.message } : {}),
               ...(r.budget !== undefined ? { budget: r.budget } : {}),
               resumed: Boolean(resumeFrom),
-              // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
               ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-              // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
-              // A gated step that signed off was sent back from its gate.
               status: tried,
               ...(refusal ? { refusal } : {}),
-              // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allowedTools:` denies again.
               ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
-              // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
               ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
             },
             undefined,
             undefined,
             inputsDir(run),
           );
-      // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
-      // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it. A turn's cap is its own, as a task's is (agent-runtime's `answer`).
       const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf));
       if (answers) {
-        // The brief of a nudge that continues the session, told as the turn's words: the runtime hands the session the answer in place of
-        // the brief, in the session it continues. The tools, the model and the fence are the task's, as filed.
         const refused = await answerHeld(e, taskId, brief, budgetUsd);
         if (refused) {
           notes.push(`${r.step}: ${refused}`);
@@ -743,31 +702,21 @@ async function advanceRun(
           cwd: record.workspace ?? run.workspace,
           harness: step.harness,
           ...localFields(step, () => ({
-            // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
             config: {
-              // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
-              // after a `--model` try continues that session as it cached it.
+              /** A fresh try runs on the model it asked for, or the step's; any other try on the model its session was started on. */
               model: r.mode === 'fresh' ? (r.model ?? step.model) : sessionModel(step, record),
               effort: step.effort,
-              // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
               contextTokens: sessionContext(step, steps),
               permissionMode: modeOf(step),
-              // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
               tools: step.tools,
               disallowedTools: filedDenies(step, run),
               allowedTools: step.allowedTools,
-              // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
               background: step.background,
-              // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
               budgetUsd,
-              // The agent `wf start` rendered for it: a try is told what the step is.
               claude: told.claude,
             },
             resumeFrom,
-            // Held open when it signs, as the step's first try is (`holdsOpenOn`).
             ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-            // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
-            // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
             closeoutSchema: closeoutSchemaOf(step, steps),
           })),
           deadlineSeconds: step.deadlineSeconds,
@@ -776,14 +725,9 @@ async function advanceRun(
     tried.push(r.step);
     notes.push(said);
     run.steps[r.step] = nextTry(record, r, taskId);
-    // Sent back from an ending that stopped on the base branch: its try moves behind in the same write, so it waits for the work again.
     for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
   }
 
-  // Another round: a looping step said `again: true` with rounds left, or a person's `wf round` took a loop out of rounds once more. The
-  // loop's target goes on in its workspace, its session continued under its next try's id and handed what the looping step declared, as data.
-  // Every other step of the loop moves behind, unfiled, and a later pass files each once what it waits on is verified — a new session. To the
-  // engine, this is one more task.
   const looped: string[] = [];
   for (const r of round) {
     if (!mayFile()) break;
@@ -791,8 +735,6 @@ async function advanceRun(
     const target = steps.find((s) => s.name === r.target)!;
     const record = run.steps[r.target];
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
-    // A round is a task of its own, never a turn: a target whose task still waits for a word is closed first. It signed off verified to be
-    // looped at all, so the sweep above has closed it already, unless the engine refused.
     if (awaitsWord(record.taskId)) {
       const refused = await closeWaiting(r.target, record.taskId!);
       if (refused) {
@@ -804,7 +746,6 @@ async function advanceRun(
     notes.push(
       `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
     );
-    // A round an earlier pass filed and never wrote down was adopted above. Looked up once more all the same, as a try is.
     if (!(await e.view(taskId)).state.brief) {
       const files = artifactsDir(run, r.target);
       fs.mkdirSync(files, { recursive: true });
@@ -812,7 +753,7 @@ async function advanceRun(
       const told = toldOf(run, target);
       await e.file({
         id: taskId,
-        // Read off the closeout that asked for the round, before the record moves it behind.
+        /** Read off the closeout that asked for the round, before the record moves it behind (`roundFiled`). */
         brief: composeBrief(
           told.step,
           run,
@@ -834,11 +775,8 @@ async function advanceRun(
         ),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
-        // A loop's target is never a remote agent (`validateLoops`); guarded all the same, as every filing is.
         ...localFields(target, () => ({
-          // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
           config: {
-            // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
             model: sessionModel(target, record),
             effort: target.effort,
             contextTokens: sessionContext(target, steps),
@@ -856,7 +794,6 @@ async function advanceRun(
           },
           resumeFrom,
           ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
-          // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
           closeoutSchema: closeoutSchemaOf(target, steps),
         })),
         deadlineSeconds: target.deadlineSeconds,
@@ -865,25 +802,16 @@ async function advanceRun(
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
   }
 
-  // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
-  // An engine task on the `check` harness, so it outlives this pass, has a deadline, and is stopped
-  // by a cancel like anything else. Nothing is ready on it in this pass — a follower waits for the
-  // check to SETTLE, on a later one.
   const checked: string[] = [];
   for (const name of [...check, ...rechecked]) {
     if (!mayFile()) break;
     const step = steps.find((s) => s.name === name)!;
     const workspace = run.steps[name].workspace ?? run.workspace;
     const taskId = checkTaskId(run, name);
-    // A check an earlier pass filed and never wrote down was adopted above, before this list was made.
-    // Looked up once more all the same: filing an id the engine already holds would journal it twice.
     if (!(await e.view(taskId)).state.brief) {
       fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
-      // Made here as well as at filing: a step filed before the run made these has none.
       const files = artifactsDir(run, name);
       fs.mkdirSync(files, { recursive: true });
-      // An ending's check runs in the repository's checkout, whose `node_modules` was installed from the base's lockfile: where the
-      // merge staged there asks for packages it lacks, the check installs them first (`checkScript`), and the brief says why.
       const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
       if (install)
         notes.push(
@@ -892,12 +820,9 @@ async function advanceRun(
       await e.file({
         id: taskId,
         harness: 'check',
-        // The command from the workflow this run froze — never from the workspace it is about to judge.
         brief: checkBrief(
           step.check!,
           {
-            // No base to diff against in the repository's checkout: an ending's check judges the merge staged there, against HEAD, which a
-            // check reads from MERGE_HEAD itself, and the run's base is by then an older commit of the branch it merges onto.
             WF_RUN: run.id,
             WF_STEP: name,
             ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
@@ -908,8 +833,6 @@ async function advanceRun(
           install,
         ),
         cwd: workspace,
-        // One attempt, as every task is (the runtime makes one a start): a check that refused has said what it has to say, and running
-        // a suite until it passes would let a flaky suite decide what ships.
         deadlineSeconds: CHECK_DEADLINE_SECONDS,
       });
     }
@@ -917,18 +840,13 @@ async function advanceRun(
     checked.push(name);
   }
 
-  /** The harness's own id for a step's session — what `--resume` takes (`sessionIn`). */
   const sessionOf = (stepName: string): string | undefined => {
     const taskId = run.steps[stepName]?.taskId;
     return taskId ? sessionIn(views, taskId) : undefined;
   };
 
-  // A run that waited on runs starts from its base branch as it stands now, with their work on it — not as it stood at `wf start`,
-  // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
-  // from it. A run with no `after` keeps the base `wf start` recorded, as before.
   if (ready.length && starting && run.after?.length && isGitRun(run))
     run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
-  // What those runs concluded, for the roots' briefs (`## From run <id>`): read on the same pass, and never again.
   const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
 
   const filed: string[] = [];
@@ -937,24 +855,21 @@ async function advanceRun(
     const step = steps.find((s) => s.name === name)!;
     const place = await within('act', () => workspaceFor(run, steps, step));
     notes.push(...place.notes.map((note) => `${name}: ${note}`));
-    // Asked again after the cut, which can take minutes: the worktree stays for `wf rm` to find, and nothing is filed into it.
     if (!mayFile()) break;
-    // Made before the step is told of it, so the directory its brief names is there when it starts.
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const told = toldOf(run, step);
 
     const taskId = await e.file({
-      // The task id is chosen, not generated, so the harness session reads `ae/<run>-<step>/1`.
-      // A person scanning their sessions then sees which run and which step, and two steps of one
-      // run share a prefix — which is what makes a resumed step legible as a continuation rather
-      // than a duplicate. A step of a loop filed for a later round is on a later try, and its id says which.
+      /**
+       * Chosen, not generated (`stepTaskId`): a person scanning their sessions sees which run and which step, two steps of one run share a
+       * prefix, and a step filed on a later try or round says which.
+       */
       id: stepTaskId(run, name, tryOf(run, name)),
-      // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
-      // assessment that made it ready just read, so it is handed what it was filed on.
-      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
-      // that waited on runs, what they concluded.
-      // A remote agent's names nothing of this machine (`remoteBrief`).
+      /**
+       * Read off the closeouts the assessment that made the step ready read, so it is handed what it was filed on; a remote agent's names
+       * nothing of this machine (`remoteBrief`).
+       */
       brief: isRemoteHarness(step.harness)
         ? remoteBrief(step, run, steps, signedOff, undefined, step.after.length ? undefined : parents)
         : composeBrief(
@@ -973,60 +888,41 @@ async function advanceRun(
       harness: step.harness,
       deadlineSeconds: step.deadlineSeconds,
       ...localFields(step, () => ({
-        // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+        /**
+         * The harness's arguments, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow this run froze. The
+         * runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`).
+         */
         config: {
           model: step.model,
           effort: step.effort,
-          // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
-          // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
           contextTokens: sessionContext(step, steps),
-          // Left to the engine's default (`auto`) unless the step says otherwise. A job asks nobody in any mode: a call it may not make
-          // is denied, recorded, and the session carries on (agent-runtime's open issue 28, M1).
           permissionMode: modeOf(step),
-          // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
           tools: step.tools,
-          // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings. An ending that lands on its check may
-          // not commit its merge either: the run does, on the check's word (`filedDenies`).
           disallowedTools: filedDenies(step, run),
           allowedTools: step.allowedTools,
-          // A job (`claude -p`) unless the step says `background: true`, which runs it as a session a person can talk to (`claude --bg`).
           background: step.background,
-          // What is left of the cap for this session, where its harness keeps one: a job — `claude` without `background: true`, and
-          // `claude-detached` (`budgetUsdFor`). A step on a later round has spent some of it. A background session keeps none: the parser refuses a
-          // budget beside it. A harness argument, handed to the harness as its own cap: the runtime judges no budget, and whether the step went
-          // over is this package's (`ownStatus`, `held`).
           budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
-          // Its agent as `wf start` rendered it for Claude Code: the instructions in the system prompt, the skills a plugin (`renderedFlags`);
-          // and the bridge to claude.ai when the step says `remote: true` (`toldOf`).
           claude: told.claude,
         },
         resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
-        // Held open when it signs, on a Claude Code job (`holdsOpenOn`): a person's answer to it — a blocked sign-off answered, a send-back from
-        // its gate — is the task's next turn, and the run closes it once nothing waits on a person's word (`holdsOpen`).
         ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-        // The shape of the step's closing statement, with the fields its `output:` declares — from the
-        // workflow this run froze, never the folder. The engine hands it to the harness and records the
-        // answer without reading it; what the fields mean is ours — see `Closeout`.
-        // A loop's target is asked for `replies` from its first round, so every round continues its session under this same schema.
+        /**
+         * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).
+         */
         closeoutSchema: closeoutSchemaOf(step, steps),
       })),
     });
-    // The tries a round moved behind stay with it.
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  // The first pass the cap holds a run writes when, and says so once: what the run's timeline counts its wait for a slot from.
   const heldFirst = Boolean(held && !run.slotHeldAt && mayFile());
   if (heldFirst) {
     run.slotHeldAt = new Date().toISOString();
     notes.push(`${assessed.ready.join(', ')}: ${slotWord(held!)} — filed once a run in flight settles`);
   }
-  // A finished run's result branches, as git has them now: the commits `wf decide` offers to ship, kept so that git can still be asked
-  // whether they are on the base once a person has deleted the branch after the merge (`isShipped`). Written only when a tip moved.
   const tipped = isGitRun(run) ? tipBranches(run, steps, status) : [];
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
-  // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
   const wrote = Boolean(
     filed.length ||
     checked.length ||
@@ -1041,8 +937,6 @@ async function advanceRun(
     landing.landed,
   );
   if (wrote) rewriteRun(run);
-  // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
-  // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
 
   const advanced: Advanced = {
@@ -1055,12 +949,10 @@ async function advanceRun(
     blocked,
     notes,
     waiting,
-    // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
     inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
     feed,
   };
-  // Whether the next pass, its inputs unchanged, would read the same and do nothing: what `tick` may answer from its memo (`rest.ts`).
   const ending = steps.find((s) => s.workspace === 'main');
   const facts: RestFacts = {
     run,
@@ -1082,10 +974,10 @@ async function advanceRun(
 
 /**
  * The steps a pass hands off now (`handOffDue`), where there is somewhere to hand one off from: none of a pruned run, which owed none when
- * its worktrees went (`pruneRefusal`), and no step whose workspace is no longer on disk — removed by hand, or before `wf prune` was there to
- * write it down — since what the step left went with it. A hand-off tried there fails on every pass and says nothing, and kept the run out of
- * the tick's memo of runs at rest for good (70 of the owner's 195 runs on 2026-09-25, two git processes each a pass), and `wf prune` refused
- * the run as still owed one. What the pass hands off, what its memo judges, and what `wf prune` waits for, read off this one function.
+ * its worktrees went (`pruneRefusal`), and no step whose workspace is not on disk — removed by hand, or with no record of the removal —
+ * since what the step left went with it; a hand-off tried there would fail on every pass, keep the run out of the tick's memo of runs at
+ * rest, and have `wf prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `wf prune` waits
+ * for, read off this one function.
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));
@@ -1103,7 +995,12 @@ export function resultTips(run: GitRun): Record<string, string> {
  * Land the merge the run's ending staged in the repository's checkout, where one lands on its check (`landingDue`): commit it with the
  * message its closeout gave, or abort it, and write on the step's record (in memory — `advance` writes the run) what was done, once for the
  * try. A commit git refuses — a hook, a signature — aborts the merge, and says git's words. An abort git refuses is said, and nothing is
- * written, so the next pass tries again. Nothing is done for a run `wf rm` forgot while this pass was at work.
+ * written, so the next pass tries again. Nothing is done for a run `wf rm` forgot while this pass was at work. Level-triggered: after a
+ * restart, of the daemon or the machine, the pass reads the checkout and the engine as they are, and lands then a merge whose session and
+ * check have both stopped running.
+ *
+ * Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): they are removed before the
+ * record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
  *
  * What the pass does when it finds MERGE_HEAD in the checkout with nothing of the ending running: a merge that is not this run's — every
  * commit it names is not a tip of the run's result branches — is left alone, the person's or the other run's; one that is this run's is
@@ -1136,8 +1033,6 @@ function landEnding(
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
   const write = (landed: Landed, note: string) => {
-    // Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): removed before the
-    // record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
     const dropped =
       'commit' in landed
         ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
@@ -1206,7 +1101,8 @@ export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<
 
 /**
  * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
- * the filing's by the runtime: undefined once answered, as `closeHeld`.
+ * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a nudge's brief, which the runtime hands the session it
+ * continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
  */
 async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: number | undefined): Promise<string | undefined> {
   try {
@@ -1229,11 +1125,11 @@ const localFields = <T extends object>(step: Workflow, fields: () => T): T | Rec
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
- * rendered them (`rendersAgent`, `renderedFlags`), and as before where it did not — a record from before 2026-09-25, a codex step — or where
- * the rendered folder is no longer there (`unrendered`): a flag naming a file that is not there would end the session at its start, so its
- * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). And
- * bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true` — never a default: Claude Code's own
- * flag, among its others (`claude.remoteControl`), first, where the runtime put it while it was a harness argument (until 2026-09-25).
+ * rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is filed with
+ * no flags and told everything in its brief. Where the rendered folder is not there (`unrendered`), a flag naming a file that is not there
+ * would end the session at its start, so its brief tells it its skills whole, read again from where a start of this run's folder finds
+ * them (`skillsAgain`). Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by
+ * default: as Claude Code's own flag, first among its others (`claude.remoteControl`).
  */
 function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
@@ -1255,7 +1151,7 @@ function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlag
  * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
  * is unchanged: its terminal steps are its result.
  *
- * It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
+ * It never throws: a parent whose record or workflow does not read, a step never filed, a task the engine holds
  * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
  * and the roots are filed all the same.
  */
@@ -1343,7 +1239,7 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  *
  * First, what the engine's tick saw waiting is admitted per pool under `WF_MAX_CONCURRENT` (`toAdmit`), off the views its pass built from its
  * one observation of each harness; the engine starts it on its next pass. So a task filed on this pass is admitted on the next and started on
- * the one after, and a slot freed is taken a pass later than when the engine admitted by itself (thin runtime stage 4c).
+ * the one after, and a slot freed is taken a pass after it is freed.
  *
  * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is done
  * is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far — and
@@ -1383,27 +1279,35 @@ export async function tick(
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 }
 
+/**
+ * The pass `tick` meters: the runtime's own pass, then every run judged off the views it reported (`reportedEngine`) — a task it did not
+ * report, settled or changed by this pass since, is read off the engine's record where it is settled. In this order:
+ * - the memo is brought up to the engine's feed after the runtime's pass (`restingPass`), so what it appended on it — a settled task's
+ *   `measured` — is read on this one, and what is appended after is read on the next; a run `wf rm` forgot leaves the memo.
+ * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
+ *   own.
+ * - queued tasks are admitted off the views the runtime's pass reported (`toAdmit`), never off a read of `e.list()` or `e.view`, which
+ *   would ask each harness again; with nothing to admit the engine is not called, since a call costs two reads of its totals.
+ * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
+ *   its slot; then one queued card, while a slot is free.
+ * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
+ *
+ * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
+ * flight; the runtime's own line for that cause is said once, on the run's line. Any other error is thrown. An engine's report that
+ * carries no refusals — a test's fake — is read as having none.
+ */
 async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolean): Promise<Pass> {
   const report = await engine.tick();
-  // Every read of a task below takes the view the runtime's pass built of it off its one observation; one the pass did not report — settled,
-  // or changed by this pass since — is the engine's, read off its record where it is settled (`reportedEngine`).
   const e = reportedEngine(engine, report.views ?? []);
-  // After the runtime's pass, so what it appended on it — a settled task's `measured` — is read on this one. What is appended after is
-  // read on the next, and a run the memo answers on this pass in between was read at rest before it: nothing is lost, only a pass later.
   const resting = await restingPass(e, memo, verify);
   const ran = ceilings();
-  // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
   within('act', () => recordCeilings(ran));
   const cap = ran.runs;
   const runs = listRuns();
-  // A run `wf rm` forgot is forgotten here too.
   if (resting) {
     const listed = new Set(runs.map((r) => r.id));
     for (const id of memo.runs.keys()) if (!listed.has(id)) memo.runs.delete(id);
   }
-  // Which queued tasks start, off the views the runtime's pass built from its one observation: a read of `e.list()` or `e.view` here would
-  // ask each harness again (`admission.ts`). The runtime starts what is admitted on its next pass.
-  // A word with nothing in it is not said: a call to the engine is counted, in `act`, with two reads of its totals.
   const admitting = toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions });
   if (admitting.length) await e.admit(admitting);
   const done = new Map<string, Advanced>();
@@ -1418,20 +1322,17 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
       return undefined;
     }
   };
-  // A finished run is judged as every other is, on every pass — from the memo while nothing it was judged by has changed (`advanceResting`).
   for (const run of runs.filter(hasStarted)) {
     const advanced = await judged(run);
     if (advanced) done.set(run.id, advanced);
   }
   let counted = [...done.values()].filter((a) => a.inFlight).length + unjudged.size;
-  // A run with nothing filed as well, with its slot: one called off before it started rests like a finished one.
   for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
     const advanced = await judged(run, { inFlight: counted, cap });
     if (advanced) done.set(run.id, advanced);
     if (!advanced || advanced.inFlight) counted++;
   }
   const queue = slotFree({ inFlight: counted, cap }) ? within('act', () => startQueued(repo, runs)) : undefined;
-  // Last, and apart: what the pass judged, written where it changed. A feed that cannot be written costs the report, never the pass.
   let feedError: string | undefined;
   try {
     recordFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
@@ -1440,7 +1341,6 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
   } catch (err) {
     feedError = `the feed (${feedFile()}) was not written on this pass: ${(err as Error).message}`;
   }
-  // An engine's report from before the runtime reported refusals — a test's fake — carries none.
   const refused = report.refused ?? [];
   const causes = new Set(unjudged.values());
   const unreadable = [
@@ -1455,8 +1355,6 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
     ...(unreadable.length ? { unreadable } : {}),
   };
 }
-
-// ─── runs at rest ───────────────────────────────────────────────────────────
 
 /**
  * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
@@ -1490,7 +1388,8 @@ type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: 
  * The memo brought up to the engine's feed — every run a task of which appended since takes it out — and the store stamped, before the pass
  * reads a record. Undefined, and nothing answered from memory, for an engine with no feed: without it nothing says a task moved.
  *
- * A memo that has read nothing reads the feed from its end: it holds no run a line before could concern. A feed that went back — a journal
+ * A memo that has read nothing reads the feed from its end: it holds no run a line before could concern. A journal with no feed yet
+ * answers with the cursor it was given, and the memo then reads from the start on the next pass. A feed that went back — a journal
  * replaced or cut — or cannot be read empties the memo, and the next pass reads it from its end again.
  */
 async function restingPass(e: Engine, memo: RestMemo, verify: boolean): Promise<RestingPass | undefined> {
@@ -1499,7 +1398,6 @@ async function restingPass(e: Engine, memo: RestMemo, verify: boolean): Promise<
     if (memo.cursor === undefined) {
       memo.runs.clear();
       const { cursor } = await e.feed(Number.MAX_SAFE_INTEGER);
-      // A journal with no feed yet answers with the cursor it was given: nothing has been written, so the next pass reads from the start.
       memo.cursor = cursor >= Number.MAX_SAFE_INTEGER ? 0 : cursor;
     } else {
       const { entries, cursor } = await e.feed(memo.cursor);
@@ -1581,7 +1479,7 @@ async function advanceResting(e: Engine, run: Run, resting: RestingPass | undefi
   return advanced;
 }
 
-/** Each run with its workflow's steps, for `momentumOf`; a run whose workflow no longer reads names no task. */
+/** Each run with its workflow's steps, for `momentumOf`; a run whose workflow does not read names no task. */
 function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Workflow[] }> {
   for (const run of runs) {
     let steps: Workflow[];
@@ -1593,8 +1491,6 @@ function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Work
     yield { run, steps };
   }
 }
-
-// ─── what the pass cost ─────────────────────────────────────────────────────
 
 /** The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a task is `act`. */
 const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
@@ -1617,12 +1513,14 @@ type EngineIo = ReturnType<Engine['io']>;
 /** The runtime's running totals, or undefined for an engine that keeps none (a test's fake). */
 const ioOf = (e: Engine): EngineIo | undefined => (typeof e.io === 'function' ? e.io() : undefined);
 
-/** Each harness's observes between two of the runtime's totals. */
+/**
+ * Each harness's observes between two of the runtime's totals, for a harness observed in between; `unread` only where some observe could
+ * not read, and read as none from totals that carry no count of it.
+ */
 const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined): Record<string, HarnessCost> =>
   Object.fromEntries(
     Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
       const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
-      // `unread` only when some observe could not read: a runtime from before it has none, and a pass that read everything says nothing of it.
       const unread = (o.unread ?? 0) - (b.unread ?? 0);
       return o.calls > b.calls
         ? [
@@ -1692,7 +1590,7 @@ const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: Eng
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
  * passes — what `wf ls` and `wf decide` say. None, and nothing read, with no cap or no run that has nothing filed. A record whose workflow
- * no longer reads is left out, as nothing of it could be filed.
+ * does not read is left out, as nothing of it could be filed.
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, the caller's own (`WF_MAX_RUNS`, refused by name when it is not a count).

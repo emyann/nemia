@@ -18,9 +18,8 @@
  * (`a2a/handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameParts, type Attempt, type Sighting } from '../core/domain.ts';
-import type { SessionState } from '../core/session.ts';
-import type { SpawnRequest } from '../harness/seam.ts';
+import { nameParts, type Attempt, type Sighting, type SessionState } from '../core/index.ts';
+import type { SpawnRequest } from '../harness/index.ts';
 
 /**
  * The runtime's A2A extension. On a message, it marks a spawn: a session started under the name the message gives. On a

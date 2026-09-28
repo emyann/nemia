@@ -32,8 +32,8 @@ import { Client, type Transport } from '@a2a-js/sdk/client';
 import { ServerCallContext, type A2ARequestHandler } from '@a2a-js/sdk/server';
 import { A2AError, TaskNotCancelableError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
-import type { Event, Sighting, Usage } from '../core/domain.ts';
-import { Journal } from '../core/engine/journal.ts';
+import type { Event, Sighting, Usage } from '../core/index.ts';
+import { Journal } from '../core/engine/index.ts';
 import {
   Runner,
   RunnerError,
@@ -43,7 +43,7 @@ import {
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
-} from '../harness/seam.ts';
+} from '../harness/index.ts';
 import {
   cardOf,
   HarnessFailed,

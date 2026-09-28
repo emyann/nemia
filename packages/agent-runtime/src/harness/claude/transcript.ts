@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Usage } from '../../core/domain.ts';
+import type { Usage } from '../../core/index.ts';
 import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 

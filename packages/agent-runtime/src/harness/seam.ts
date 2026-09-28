@@ -19,7 +19,7 @@
  * `Runner.claude` needs that runner as a value, and the runner builds the error, so each would import the other.
  */
 import { Context, Effect, Layer } from 'effect';
-import type { Sighting, Usage } from '../core/domain.ts';
+import type { Sighting, Usage } from '../core/index.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
 import { RunnerError } from './error.ts';

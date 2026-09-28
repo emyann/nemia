@@ -27,8 +27,7 @@
  */
 import { Effect } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState } from '../core/session.ts';
-import type { Sighting, Usage } from '../core/domain.ts';
+import type { SessionState, Sighting, Usage } from '../core/index.ts';
 import { Runner, RunnerError } from './seam.ts';
 import { renderTranscript } from './claude/transcript.ts';
 import type { HarnessArgs } from './args.ts';

@@ -4,22 +4,38 @@
 import { Effect, Exit, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Said, type Sighting, type State } from '../core/domain.ts';
-import { isLive, phaseWordOf, waitsOnPerson } from '../core/session.ts';
-import { argsRefusalOf } from '../harness/args.ts';
-import { Journal } from '../core/engine/journal.ts';
-import { Runner, RunnerError, type ExpectedSession, type RunnerOps } from '../harness/seam.ts';
-import { claudeSayRefuses } from '../harness/claude/inbox.ts';
-import { isClaudeJob } from '../harness/claude/code.ts';
-import { isTranscriptCursor, noTranscript } from '../harness/transcript.ts';
+import { fold, nameFor, isLive, phaseWordOf, waitsOnPerson, type Said, type Sighting, type State } from '../core/index.ts';
+import {
+  argsRefusalOf,
+  Runner,
+  RunnerError,
+  isTranscriptCursor,
+  noTranscript,
+  composite,
+  type ExpectedSession,
+  type RunnerOps,
+} from '../harness/index.ts';
+import {
+  Journal,
+  ioCounts,
+  tickMemoLayer,
+  admit,
+  answer,
+  answerRefusalOf,
+  close,
+  file,
+  filingOf,
+  refusalOf,
+  requestStop,
+  everyView,
+  tick,
+  tickRefusalOf,
+  viewOfState,
+  viewsOf,
+} from '../core/engine/index.ts';
+import { claudeSayRefuses, isClaudeJob, claudeDetached } from '../harness/claude/index.ts';
 import { codex } from '../harness/codex/codex.ts';
-import { claudeDetached } from '../harness/claude/code.ts';
-import { composite } from '../harness/seam.ts';
-import { a2aOps, type SeamOps } from '../a2a/client.ts';
-import { ioCounts } from '../core/engine/tally.ts';
-import { tickMemoLayer } from '../core/engine/memo.ts';
-import { admit, answer, answerRefusalOf, close, file, filingOf, refusalOf, requestStop } from '../core/engine/filing.ts';
-import { everyView, tick, tickRefusalOf, viewOfState, viewsOf } from '../core/engine/engine.ts';
+import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import {
   journalOf,
   handleOf,

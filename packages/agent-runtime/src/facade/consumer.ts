@@ -3,26 +3,31 @@
  * options, the task it files and the engine it gets — each adapted to the engine's services here, and what the door
  * refuses of them.
  */
-import type { Event, Input, Said } from '../core/domain.ts';
-import type { HarnessArgs } from '../harness/args.ts';
-import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from '../core/engine/journal.ts';
-import { claudeOps } from '../harness/claude/bg.ts';
-import type { RunnerOps, Transcript, TranscriptCursor } from '../harness/seam.ts';
-import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from '../harness/claude/vocabulary.ts';
-import { claudeCodeOps } from '../harness/claude/code.ts';
-import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
+import type { Event, Input, Said } from '../core/index.ts';
+import type { HarnessArgs, RunnerOps, Transcript, TranscriptCursor } from '../harness/index.ts';
 import {
-  remoteConfigRefusal,
-  remoteOps,
-  remoteRefuses,
-  type Credentials,
-  type MissingCredential,
-  type RemoteAgent,
-} from '../a2a/remote.ts';
-import type { IoCounts } from '../core/engine/tally.ts';
+  Journal,
+  JournalError,
+  ADMIT_INSTEAD,
+  type Cursor,
+  type FeedEntry,
+  type FeedRefusal,
+  type IoCounts,
+  type RefusedMove,
+  type TaskList,
+  type TaskView,
+} from '../core/engine/index.ts';
+import {
+  claudeOps,
+  CLAUDE_CONTEXT_TOKENS,
+  bridgeAsked,
+  claudeBgRefuses,
+  claudeCodeRefuses,
+  claudeCodeOps,
+} from '../harness/claude/index.ts';
+import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
+import { remoteConfigRefusal, remoteOps, remoteRefuses, type Credentials, type MissingCredential, type RemoteAgent } from '../a2a/index.ts';
 import { promiseOps, wrap, type PromiseRunner } from './promise.ts';
-import { ADMIT_INSTEAD } from '../core/engine/filing.ts';
-import type { RefusedMove, TaskList, TaskView } from '../core/engine/engine.ts';
 
 /**
  * A store, in Promises. Implement this to keep the engine's records in your own database. Every `append` goes on the `feed`

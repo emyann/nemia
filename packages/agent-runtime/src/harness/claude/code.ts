@@ -19,7 +19,7 @@
 import { Effect } from 'effect';
 import os from 'node:os';
 import path from 'node:path';
-import { nameParts, type Sighting } from '../../core/domain.ts';
+import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../detached/detached.ts';

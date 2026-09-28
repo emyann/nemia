@@ -63,9 +63,8 @@ import {
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { formerStateOf, isSessionState, type SessionState } from '../core/session.ts';
-import type { Sighting } from '../core/domain.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/seam.ts';
+import { formerStateOf, isSessionState, type SessionState, type Sighting } from '../core/index.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 
 /**

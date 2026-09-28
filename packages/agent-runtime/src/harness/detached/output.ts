@@ -3,7 +3,7 @@
  * one result, and `claude -p`'s stream of events — its closeout, what it consumed and cost, whether it spent its budget,
  * and what it was denied. Pure functions of the text.
  */
-import type { Denial, Usage } from '../../core/domain.ts';
+import type { Denial, Usage } from '../../core/index.ts';
 import type { HarnessOutput } from './detached.ts';
 
 /**

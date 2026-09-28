@@ -26,22 +26,22 @@ export type {
 export { createEngine } from './facade/engine.ts';
 export type { PromiseRunner, PromiseSighting } from './facade/promise.ts';
 export { codex } from './harness/codex/codex.ts';
-export { claudeDetached } from './harness/claude/code.ts';
+export { claudeDetached } from './harness/claude/index.ts';
 /** The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to. */
-export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
-export type { Credentials, MissingCredential, RemoteAgent } from './a2a/remote.ts';
+export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts';
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
-export { remoteConfigRefusal } from './a2a/remote.ts';
-export { denialText, nameFor } from './core/domain.ts';
-export { refusedText } from './core/engine/engine.ts';
-export { retiredKeyRefusal } from './core/engine/filing.ts';
-export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
-export type { SessionState, Ended, Outcome } from './core/session.ts';
-export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness/args.ts';
-export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
-export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/seam.ts';
-export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/journal.ts';
-export type { IoCounts } from './core/engine/tally.ts';
-export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/engine.ts';
+export { remoteConfigRefusal } from './a2a/index.ts';
+export { denialText, nameFor } from './core/index.ts';
+export { refusedText } from './core/engine/index.ts';
+export { retiredKeyRefusal } from './core/engine/index.ts';
+export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/index.ts';
+export type { SessionState, Ended, Outcome } from './core/index.ts';
+export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness/index.ts';
+export type { ClaudeFlags } from './harness/claude/index.ts';
+export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/index.ts';
+export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/index.ts';
+export type { IoCounts } from './core/engine/index.ts';
+export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';

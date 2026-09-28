@@ -322,8 +322,8 @@ export const runs = new Hono()
     if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
     try {
       const p = await prune(e, id, { ...how, yes: true });
-      // The package's words as `wf prune` prints them after the run's id (`pruneLines`), which the page already names.
-      if (p.kind === 'refused') return c.json({ error: `Not pruned: ${p.refusal}` }, 409);
+      // The package's words alone, as `DELETE …` sends `forget`'s: the page says `Not pruned` above them itself (`Refusal`).
+      if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
       if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
       return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
     } catch (err) {

@@ -183,7 +183,7 @@ test('REFUSED at shipped defaults: a finished run nobody merged, pruned without 
     const res = await pruneOn('p-unmerged', how);
     assert.equal(res.status, 409, JSON.stringify(how));
     const { error } = await res.json();
-    assert.equal(error, `Not pruned: ${said.refusal}`);
+    assert.equal(error, said.refusal);
     assert.match(error, /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/);
     assert.ok(error.includes(`wf prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
     assert.deepEqual(stateOf('p-unmerged'), before, JSON.stringify(how));
@@ -212,8 +212,8 @@ test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf p
     const res = await pruneOn('p-running', how);
     assert.equal(res.status, 409, JSON.stringify(how));
     const { error } = await res.json();
-    assert.equal(error, `Not pruned: ${said.refusal}`);
-    assert.match(error, /^Not pruned: it is not over — wf decide p-running says it is still running/);
+    assert.equal(error, said.refusal);
+    assert.match(error, /^it is not over — wf decide p-running says it is still running/);
     assert.deepEqual(stateOf('p-running'), before, JSON.stringify(how));
   }
 });
@@ -223,8 +223,8 @@ test('REFUSED at shipped defaults: a folder run is a 409 in the words of `wf pru
   const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
   assert.equal(res.status, 409);
   const { error } = await res.json();
-  assert.equal(error, `Not pruned: ${said.refusal}`);
-  assert.match(error, /^Not pruned: a folder run: its steps' folders are its work/);
+  assert.equal(error, said.refusal);
+  assert.match(error, /^a folder run: its steps' folders are its work/);
   assert.ok(fs.existsSync(path.join(work, 'write')));
   assert.equal(fs.existsSync(path.join(root, 'runs', 'p-folder.pruned')), false);
 });

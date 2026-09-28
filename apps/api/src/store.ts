@@ -17,6 +17,8 @@ export const e = engine();
 
 export type TaskView = Awaited<ReturnType<typeof e.view>>;
 export type Views = ReadonlyMap<string, TaskView>;
+/** Each task a read left out because its journal does not read, by id, with why in the runtime's words (`list`'s `unreadable`). */
+export type Unreadable = ReadonlyMap<string, string>;
 
 /**
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
@@ -43,21 +45,34 @@ const tasksOf = (run: Run): string[] =>
     ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
   ]);
 
+/** The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read. */
+export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
+  const taskId = tasksOf(run).find((id) => unreadable.has(id));
+  return taskId === undefined ? undefined : { taskId, why: unreadable.get(taskId)! };
+}
+
 /**
  * The views a request judges `runs` by, and the engine it hands the package's `parentOf` for the runs they wait on: the tasks of those runs
  * and of the runs they wait on or are held until, found among `store`, over one look at the harnesses (`list(taskIds)`), which reads their
  * journals and no other and asks `claude agents` only for a background session in flight among them — once, however many. A task of a run
  * waited on that the views do not hold, filed since, is viewed (`seenBy`).
  *
+ * A task whose journal does not read is in `unreadable` and in no view, as the runtime leaves it out: one entry no runtime wrote costs the
+ * runs that read that task (`unreadableOf`), never the others.
+ *
  * Before, every request read every journal in the store (`everyView`: 1,850 on the live store on 2026-09-25) for the handful of runs not at
  * rest. And a run waited on was read a `view` a task, its journal once more: 632 journals on the second request of the live store, where
  * reading the parents here too reads what the runs moving and their parents have filed, once.
  */
-export async function viewsFor(runs: readonly Run[], store: () => readonly Run[] = listRuns): Promise<{ views: Views; reader: typeof e }> {
+export async function viewsFor(
+  runs: readonly Run[],
+  store: () => readonly Run[] = listRuns,
+): Promise<{ views: Views; reader: typeof e; unreadable: Unreadable }> {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
-  const views: Views = new Map((await e.list(read.flatMap(tasksOf))).map((view) => [view.id, view]));
-  return { views, reader: seenBy(views) };
+  const listed = await e.list(read.flatMap(tasksOf));
+  const views: Views = new Map(listed.views.map((view) => [view.id, view]));
+  return { views, reader: seenBy(views), unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) };
 }
 
 /**
@@ -65,10 +80,10 @@ export async function viewsFor(runs: readonly Run[], store: () => readonly Run[]
  *
  * `list` observes the harnesses once and folds every task's journal against that; `view` observes
  * afresh on each call. A task the engine has no record of is simply absent, which reads exactly as
- * `view`'s empty state does: no brief, so `unknown`.
+ * `view`'s empty state does: no brief, so `unknown`. So is one whose journal does not read, which the runtime leaves out.
  */
 export async function everyView(): Promise<Views> {
-  return new Map((await e.list()).map((view) => [view.id, view]));
+  return new Map((await e.list()).views.map((view) => [view.id, view]));
 }
 
 /**

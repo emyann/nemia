@@ -71,6 +71,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   heldUntil: [],
   holding: null,
   toDecide: null,
+  unreadable: null,
   ...extra,
 });
 

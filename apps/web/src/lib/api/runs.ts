@@ -65,6 +65,11 @@ export type RunSummary = {
   onYou: string[];
   /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
   toDecide: RunToDecide | null;
+  /**
+   * Why the run is not judged, when a task it reads has a journal that does not read, in the runtime's words; null for every run whose
+   * tasks read. Such a run is answered off its record alone: `running`, moving, the unreadable step's status `unreadable`.
+   */
+  unreadable: string | null;
 };
 
 /** Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while it is. */

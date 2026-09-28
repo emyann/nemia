@@ -77,7 +77,7 @@ test('a record with no `id` is refused by name, with where it is and what to do 
 
 test("a frozen step's `after` that is no list is refused at its path, saying what is there and what wf writes", () => {
   const record = aRecord('r-after');
-  (record.workflow as Array<Record<string, unknown>>)[1]!.after = 'implement';
+  (record.workflow as Array<Record<string, unknown>>)[1].after = 'implement';
   put('r-after', record);
   const said = refusalOf('r-after');
   assert.ok(said.includes('its `workflow.1.after` is "implement", where wf writes'), said);
@@ -85,7 +85,7 @@ test("a frozen step's `after` that is no list is refused at its path, saying wha
 
 test('a frozen step with no name, a step record with no task, and a folder run with no place kind are each refused at their field', () => {
   const noName = aRecord('r-noname');
-  delete (noName.workflow as Array<Record<string, unknown>>)[0]!.name;
+  delete (noName.workflow as Array<Record<string, unknown>>)[0].name;
   put('r-noname', noName);
   assert.ok(refusalOf('r-noname').includes('its `workflow.0.name` is missing'));
 
@@ -131,13 +131,13 @@ test('`listRuns` leaves out a record that does not read, says so with its fix, a
 
 test('a key the tick does not name survives a read and a rewrite, and so does a frozen step key it does not name', () => {
   const record: Record<string, unknown> = { ...aRecord('r-newer'), fromANewerWf: { kept: true } };
-  (record.workflow as Array<Record<string, unknown>>)[0]!.aNewStepKey = 3;
+  (record.workflow as Array<Record<string, unknown>>)[0].aNewStepKey = 3;
   put('r-newer', record);
   const run = readRun('r-newer');
   assert.ok(rewriteRun(run));
   const written = JSON.parse(fs.readFileSync(runFile('r-newer'), 'utf8')) as Record<string, unknown>;
   assert.deepEqual(written.fromANewerWf, { kept: true });
-  assert.equal((written.workflow as Array<Record<string, unknown>>)[0]!.aNewStepKey, 3);
+  assert.equal((written.workflow as Array<Record<string, unknown>>)[0].aNewStepKey, 3);
 });
 
 test("the oldest shapes on the owner's store read: no frozen workflow, `disallow:` on a frozen step, an earlier try, a landing and a slot", () => {
@@ -162,18 +162,18 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
   });
   const old = readRun('r-old');
   assert.equal(old.workflow, undefined);
-  assert.equal(old.steps.implement!.tries![0]!.then, 'retries');
+  assert.equal(old.steps.implement.tries![0].then, 'retries');
 
   // A step frozen before `disallow:` was renamed reads under the name it has now, and is written back under both.
   const renamed = aRecord('r-renamed');
-  (renamed.workflow as Array<Record<string, unknown>>)[0]!.disallow = ['SendMessage'];
+  (renamed.workflow as Array<Record<string, unknown>>)[0].disallow = ['SendMessage'];
   put('r-renamed', renamed);
   const run: Run = readRun('r-renamed');
-  assert.deepEqual(run.workflow![0]!.disallowedTools, ['SendMessage']);
+  assert.deepEqual(run.workflow![0].disallowedTools, ['SendMessage']);
   rewriteRun(run);
   const written = JSON.parse(fs.readFileSync(runFile('r-renamed'), 'utf8')) as { workflow: Array<Record<string, unknown>> };
-  assert.deepEqual(written.workflow[0]!.disallowedTools, ['SendMessage']);
-  assert.deepEqual(written.workflow[0]!.disallow, ['SendMessage']);
+  assert.deepEqual(written.workflow[0].disallowedTools, ['SendMessage']);
+  assert.deepEqual(written.workflow[0].disallow, ['SendMessage']);
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

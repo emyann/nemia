@@ -125,7 +125,7 @@ test('the three names that joined decide every case as the one they join: no new
   ] as const) {
     const [mine, theirs] = [corpusIn(joined), corpusIn(as)];
     assert.equal(mine.length, theirs.length);
-    mine.forEach((c, i) => assert.deepEqual(read(c), read(theirs[i]!), `${joined} as ${as}: ${c.name}`));
+    mine.forEach((c, i) => assert.deepEqual(read(c), read(theirs[i]), `${joined} as ${as}: ${c.name}`));
   }
 });
 
@@ -411,14 +411,14 @@ test("a journal written before the words changed folds and settles as it did: it
     ['succeeded', 'stopped', 'failed'],
   );
   assert.deepEqual(
-    views.map((v) => v.state.attempts[0]!.ended),
+    views.map((v) => v.state.attempts[0].ended),
     ['done', 'stopped', 'failed'],
     'the ends are read in the words they were written in',
   );
-  assert.deepEqual(views[0]!.state.attempts[0]!.closeout, { outcome: 'done' });
+  assert.deepEqual(views[0].state.attempts[0].closeout, { outcome: 'done' });
   ids.forEach((id, i) => {
     const now = fs.readFileSync(file(id), 'utf8');
-    assert.ok(now.startsWith(before[i]!), `${id}: nothing written before is rewritten`);
-    assert.doesNotMatch(now.slice(before[i]!.length), /"observed"/, `${id}: and no end written again`);
+    assert.ok(now.startsWith(before[i]), `${id}: nothing written before is rewritten`);
+    assert.doesNotMatch(now.slice(before[i].length), /"observed"/, `${id}: and no end written again`);
   });
 });

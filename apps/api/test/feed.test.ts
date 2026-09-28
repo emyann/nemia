@@ -124,7 +124,7 @@ test("a transition the tick writes to the feed arrives on the stream as it is wr
     const [removed] = pass({});
     said = await readUntil(reader, text, (s) => s.length >= 3);
     assert.deepEqual(said[2], { event: 'removed', data: JSON.stringify(removed), id: String(end()) });
-    assert.equal(JSON.parse(said[2]!.data!).word, 'removed');
+    assert.equal(JSON.parse(said[2].data).word, 'removed');
   } finally {
     await reader.cancel();
   }
@@ -145,11 +145,11 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
     all.map((b) => [b.event, b.data]),
     lines.map((l) => [l.step ? 'step' : 'run', JSON.stringify(l)]),
   );
-  assert.equal(all[2]!.id, String(end()));
+  assert.equal(all[2].id, String(end()));
   // Each id is where a read takes up after that line, and no other.
   for (const [i, b] of all.entries()) assert.deepEqual(readFeed(Number(b.id)).lines, lines.slice(i + 1));
 
-  const again = await open('?after=0', { 'Last-Event-ID': all[0]!.id! });
+  const again = await open('?after=0', { 'Last-Event-ID': all[0].id! });
   const resumed = await readUntil(again.reader, again.text, (s) => s.length >= 2);
   pass({ 'r-1': planAt('failed') });
   const more = await readUntil(again.reader, again.text, (s) => s.length >= 3);
@@ -159,21 +159,21 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
     all.slice(1).map((b) => b.id),
     'the header wins over the address: the second and third, not the first',
   );
-  assert.equal(JSON.parse(more[2]!.data!).word, 'failed', 'and then what is written next');
+  assert.equal(JSON.parse(more[2].data!).word, 'failed', 'and then what is written next');
 
-  const fromSecond = await open(`?after=${all[1]!.id}`);
+  const fromSecond = await open(`?after=${all[1].id}`);
   const third = await readUntil(fromSecond.reader, fromSecond.text, (s) => s.length >= 2);
   await fromSecond.reader.cancel();
   assert.deepEqual(
     third.map((b) => b.id),
-    [all[2]!.id, more[2]!.id],
+    [all[2].id, more[2].id],
     'from the second event on',
   );
 
   const empty = await open('?after=');
   const whole = await readUntil(empty.reader, empty.text, (s) => s.length >= 4);
   await empty.reader.cancel();
-  assert.equal(whole[0]!.id, all[0]!.id, 'an empty `after` is none: from the start');
+  assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
 });
 
 test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID', async () => {
@@ -222,7 +222,7 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
   pass({ 'r-1': planAt('failed') });
   await readUntil(reader, text, (s) => s.length >= 1);
 
-  const first = fs.readFileSync(feedFile(), 'utf8').split('\n')[0]!;
+  const first = fs.readFileSync(feedFile(), 'utf8').split('\n')[0];
   fs.writeFileSync(feedFile(), `${first}\n`);
   // Resolves only once the api closes the stream; a stream that went on trying would reach the bound.
   const said = await readUntil(reader, text, () => false);
@@ -246,8 +246,8 @@ test('a read that fails for a beat is said once, `retrying`, and cleared by the 
         return;
       }
       const failed = await readUntil(reader, text, (s) => s.length >= 1);
-      assert.equal(failed[0]!.event, 'unreadable');
-      const { error, retrying } = JSON.parse(failed[0]!.data!);
+      assert.equal(failed[0].event, 'unreadable');
+      const { error, retrying } = JSON.parse(failed[0].data!);
       assert.equal(retrying, true, 'a read that failed, not a feed that cannot be read from again');
       assert.match(error, /EACCES/);
       // More than two of the watch's beats (1 s): each fails again, and none is said again. An absence, so a bound of time is all
@@ -285,7 +285,7 @@ test('a stream whose reader goes leaves no watcher behind: each open stream hold
   // One event each: each stream's watch has started.
   for (const s of streams) await readUntil(s.reader, s.text, (said) => said.length >= 1);
   assert.equal(watchers(), 3, 'one watcher a stream');
-  await streams[0]!.reader.cancel();
+  await streams[0].reader.cancel();
   await until(
     () => watchers() === 2,
     () => `${watchers()} watchers, with one of three readers gone`,

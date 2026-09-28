@@ -249,7 +249,7 @@ test('a task journalled on claude before a job was its default runs --bg with no
   // Its filing as it was written then: the same session, the config saying nothing of a mode.
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
-  const event = JSON.parse(filed!);
+  const event = JSON.parse(filed);
   delete event.config.background;
   fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
   assert.equal((await engine.view(id)).state.config?.background, undefined, 'the record names no mode');
@@ -302,7 +302,7 @@ test('at shipped defaults, a job is told on its stdin: the words, verbatim, as t
 
   await engine.say(id, 'and the web app');
   await until(() => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
-  assert.equal(fake.stdin('job-told')![2]!.message.content, 'and the web app', 'in the order they were said');
+  assert.equal(fake.stdin('job-told')![2].message.content, 'and the web app', 'in the order they were said');
   await engine.stop(id);
   await engine.tick();
 });
@@ -391,7 +391,7 @@ test('refused: a task journalled on claude before a job was its default, in bypa
   const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
-  const event = JSON.parse(filed!);
+  const event = JSON.parse(filed);
   delete event.config.background;
   fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
   await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);

@@ -326,7 +326,7 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
     ['repo', '.draft'],
     ['yours', '.git'],
   ]) {
-    assert.equal((await stepPage(where!, name!, 'implement')).status, 404, `${where} ${name}`);
+    assert.equal((await stepPage(where, name, 'implement')).status, 404, `${where} ${name}`);
   }
 
   const broken = await stepPage('repo', 'broken', 'implement');
@@ -336,7 +336,7 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
   for (const step of ['nope', 'README', 'review.md', '..%2F..%2Fbroken%2Freview', '..%2Freview.json']) {
     const res = await stepPage('repo', 'good', step);
     assert.equal(res.status, 404, step);
-    const said = ((await res.json()) as { error: string }).error as string;
+    const said = ((await res.json()) as { error: string }).error;
     assert.ok(said.startsWith(`No step '${decodeURIComponent(step)}' in workflow good (${good}). Its steps are: implement, review.`), said);
     assert.ok(!said.includes('afer') && !said.includes('"again"'), `${step}: nothing of another file`);
   }

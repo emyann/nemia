@@ -34,20 +34,19 @@ const commitOn = (repo: string, branch: string, from: string, what: string) => {
   git(repo, 'checkout', '-q', 'main');
   return git(repo, 'rev-parse', branch);
 };
-const aRun = (repo: string, fields: Partial<GitRun>): GitRun =>
-  ({
-    id: `r-${Math.random().toString(36).slice(2, 6)}`,
-    workspace: repo,
-    brief: 'b',
-    workflowDir: '/nowhere',
-    createdAt: '2026-09-25T00:00:00Z',
-    steps: {},
-    repo,
-    isolate: true,
-    baseRef: git(repo, 'rev-parse', 'main'),
-    branch: 'main',
-    ...fields,
-  }) as GitRun;
+const aRun = (repo: string, fields: Partial<GitRun>): GitRun => ({
+  id: `r-${Math.random().toString(36).slice(2, 6)}`,
+  workspace: repo,
+  brief: 'b',
+  workflowDir: '/nowhere',
+  createdAt: '2026-09-25T00:00:00Z',
+  steps: {},
+  repo,
+  isolate: true,
+  baseRef: git(repo, 'rev-parse', 'main'),
+  branch: 'main',
+  ...fields,
+});
 
 /** Every shape a result branch can be in against its run's base, on two base branches, and bases git cannot read. */
 const shapes = () => {
@@ -145,7 +144,7 @@ test('a primed reader asks git once for a repository, where one question at a ti
   const one = await spawned(oneByOne);
   const read = await spawned(branchReader());
   assert.deepEqual(read.value, one.value);
-  assert.ok(one.value.every(([s]) => s!.where === 'on'));
+  assert.ok(one.value.every(([s]) => s.where === 'on'));
   assert.equal(one.git, 40, "twice for each branch: within the base branch, and within the run's base");
   assert.equal(read.git, 1, 'one for-each-ref for the repository');
 });
@@ -206,6 +205,6 @@ test('a base branch the repository does not have costs two more listings, and th
   );
   assert.deepEqual(value.heads, headsOf(repo));
   // The listing git refused, the branches alone, the listing again without the base it cannot read, and that run's own questions.
-  const own = await metered(async () => branchStandings(runs[1]!, ['wf/r-0'], oneByOne));
+  const own = await metered(async () => branchStandings(runs[1], ['wf/r-0'], oneByOne));
   assert.equal(tallies!.kinds.git.spawned, 3 + own.tallies!.kinds.git.spawned);
 });

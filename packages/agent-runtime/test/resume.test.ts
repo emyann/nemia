@@ -111,14 +111,14 @@ test("a session resumed under the same id is read for its new attempt: its own c
     const [row] = claude.rows();
     await sleep(10);
     append(
-      row!.sessionId,
+      row.sessionId,
       prompt('the prompt'),
       response('msg_1', call('tu_1', 'Read')),
       response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
     );
     // Last written long before it is read, so nothing but the attempt keeps that read from the next one.
-    age(row!.sessionId, 30_000);
-    claude.set(row!.name, { state: 'done' });
+    age(row.sessionId, 30_000);
+    claude.set(row.name, { state: 'done' });
     await engine.tick();
     const [was] = (await engine.view(first)).state.attempts;
     assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' });
@@ -141,15 +141,15 @@ test("a session resumed under the same id is read for its new attempt: its own c
       brief: 'give your closeout',
       cwd: tmp('cwd'),
       closeoutSchema: schema,
-      resumeFrom: row!.sessionId,
+      resumeFrom: row.sessionId,
     });
     await engine.tick();
     const [resumed] = claude.rows();
     assert.equal(resumed?.name, `ae/${retry}/1`);
-    assert.equal(resumed?.sessionId, row!.sessionId, 'the same id');
+    assert.equal(resumed?.sessionId, row.sessionId, 'the same id');
 
     // Listed final before it has written a word, to a view: the first try's read is not this attempt's.
-    claude.set(resumed!.name, { state: 'done' });
+    claude.set(resumed.name, { state: 'done' });
     assert.deepEqual(
       (await engine.view(retry)).usage,
       { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
@@ -160,7 +160,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
     // so a record of the first try's count cannot pass for the retry's.
     await sleep(10);
     append(
-      row!.sessionId,
+      row.sessionId,
       prompt('give your closeout'),
       response('msg_3', { type: 'text', text: 'Giving it.' }),
       response('msg_4', call('tu_3', 'Bash')),
@@ -205,11 +205,11 @@ test('a statement read as nothing from a final sighting is read again once the t
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
-    append(row!.sessionId, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
-    age(row!.sessionId, 30_000);
+    append(row.sessionId, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
+    age(row.sessionId, 30_000);
 
     // Listed final between two turns, for one observation, and seen only by a view: nothing said yet.
-    claude.set(row!.name, { state: 'done' });
+    claude.set(row.name, { state: 'done' });
     assert.deepEqual((await engine.view(id)).usage, {
       turns: 1,
       toolCalls: 1,
@@ -223,12 +223,12 @@ test('a statement read as nothing from a final sighting is read again once the t
       firstCacheWriteTokens: 0,
     });
     // Kept while the transcript says it has not been written since — shown by writing and putting the mtime back.
-    append(row!.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
-    age(row!.sessionId, 30_000);
+    append(row.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
+    age(row.sessionId, 30_000);
     assert.equal((await engine.view(id)).usage?.turns, 1, 'no newer than the read: kept');
 
     // It went on and gave its closeout. The transcript is newer than the read, and the tick reads it again.
-    append(row!.sessionId, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
+    append(row.sessionId, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
     await engine.tick();
 
     const v = await engine.view(id);

@@ -161,8 +161,8 @@ export function branchReader(): BranchReader {
         .slice(1 + bases.length * 2)
         .join(' ')
         .replace(/^refs\/heads\//, '');
-      heads.set(branch, words[0]!);
-      bases.forEach((_, k) => each[k]!.set(branch, Number(words[1 + k * 2])));
+      heads.set(branch, words[0]);
+      bases.forEach((_, k) => each[k].set(branch, Number(words[1 + k * 2])));
     }
     return { heads, each };
   };
@@ -203,7 +203,7 @@ export function branchReader(): BranchReader {
       return;
     }
     r.heads ??= listed.heads;
-    fresh.forEach((b, k) => r.ahead.set(b, listed.each[k]!));
+    fresh.forEach((b, k) => r.ahead.set(b, listed.each[k]));
   };
 
   /** The bases `prime` was handed for each repository, listed on the first question about it. */

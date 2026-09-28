@@ -71,7 +71,7 @@ const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
     lines.push(args.join(' '));
   };
   try {
-    await main(argv, e as Parameters<typeof main>[1]);
+    await main(argv, e);
   } finally {
     console.log = log;
   }
@@ -266,7 +266,7 @@ test('wf start from a directory that is no repository: a folder team starts, and
   process.chdir(NOT_A_REPO);
   try {
     const out = await printed(['start', 'a note on tides', '--workflows', TEAM]);
-    const id = out[0]!.split(' ')[0]!;
+    const id = out[0].split(' ')[0];
     assert.equal(readRun(id).place?.kind, 'folder');
     assert.ok(
       out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`),
@@ -325,7 +325,7 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
     const out = await printed(['start', file]);
-    const run = readRun(out[0]!.split(' ')[0]!);
+    const run = readRun(out[0].split(' ')[0]);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', 'a-note-on-tides-old', false]);
     assert.ok(
       out.some(
@@ -401,7 +401,7 @@ test("the shipped note team is a folder team: it starts with no repository, and 
  * a key. A folder step is fenced to its own directory (`dontAsk`), so each of them has to be inside it and on disk.
  */
 const pathsNamed = (brief: string): string[] =>
-  [...brief.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]!).filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'));
+  [...brief.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]).filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'));
 
 test('a folder team with a fan-in, given files at its start: what each brief tells a step to read is inside its own folder, and on disk', async () => {
   // Every path a folder brief used to name for these two — the run's `inputs/`, and the folders of the steps a fan-in waits on — sat
@@ -556,7 +556,7 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
 
   // The send-back, on the record as the run writes it, and what a does about it: the file c would read again is gone, renamed into another.
   const record = readRun(run.id);
-  record.steps.c = sentBack(record.steps.c!);
+  record.steps.c = sentBack(record.steps.c);
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
   fs.rmSync(path.join(work, 'a', 'gone.md'));
   fs.writeFileSync(path.join(work, 'a', 'said.md'), '# what it says now\n');
@@ -609,7 +609,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   fs.symlinkSync(outside, path.join(work, 'c', 'given'));
 
   const record = readRun(run.id);
-  record.steps.c = sentBack(record.steps.c!);
+  record.steps.c = sentBack(record.steps.c);
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
   let said = '';
   let filed: string[] = [];

@@ -669,12 +669,12 @@ test('a run nobody has decided stays on the floor, whatever Show finished says, 
     ['ends', 'ahead', 'shipped'],
   );
   // And a list from an api that carries no `toDecide` at all reads as one with nothing to decide, rather than taking the floor down.
-  const old = [{ ...runs[1]!, toDecide: undefined as unknown as RunSummary['toDecide'] }];
+  const old = [{ ...runs[1], toDecide: undefined as unknown as RunSummary['toDecide'] }];
   assert.deepEqual(
     floorRuns(old, false).map((r) => r.id),
     [],
   );
-  assert.equal(toDecideOf(old[0]!), null);
+  assert.equal(toDecideOf(old[0]), null);
 });
 
 test('a run that waits on a person stays on the floor, whatever Show finished says, until the person has answered', () => {
@@ -720,10 +720,10 @@ test('a run that waits on a person stays on the floor, whatever Show finished sa
     floorRuns(runs, true).map((r) => r.id),
     ['gated', 'blocked', 'called-off', 'refused'],
   );
-  assert.equal(waitsOnYou(runs[2]!), false, 'a cancelled run waits on nobody');
-  assert.equal(standingOf(runs[0]!), 'waiting on you');
+  assert.equal(waitsOnYou(runs[2]), false, 'a cancelled run waits on nobody');
+  assert.equal(standingOf(runs[0]), 'waiting on you');
   // Level-triggered: once the plan is approved the run moves again, and once it is finished, answered, it goes with the rest.
-  const approved = { ...runs[0]!, status: 'running' as const, moving: true, waitingOnYou: [], onYou: [] };
+  const approved = { ...runs[0], status: 'running' as const, moving: true, waitingOnYou: [], onYou: [] };
   assert.deepEqual(
     floorRuns([approved], false).map((r) => r.id),
     ['gated'],
@@ -986,7 +986,7 @@ test("a graph unfolding over the diamond's top, one side and its bottom, and not
   assert.deepEqual(overlapping(at, spans), []);
   // Laid out together, as the diamond it was: the top and bottom level with the middle of the sides.
   const [a, b, c, d] = ids.map((id) => at.get(id)!);
-  assert.deepEqual([a!.y, d!.y], [(b!.y + c!.y) / 2, (b!.y + c!.y) / 2]);
+  assert.deepEqual([a.y, d.y], [(b.y + c.y) / 2, (b.y + c.y) / 2]);
   assert.deepEqual(placeRuns(['x', ...ids], at, null, spans, DIAMOND), at, 'and the pass after moves nothing');
 });
 

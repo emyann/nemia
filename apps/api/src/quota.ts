@@ -157,7 +157,7 @@ function windowsOf(limits: Record<string, unknown>, now: number): QuotaWindow[] 
     return [
       {
         key,
-        label: LABELS[key]!,
+        label: LABELS[key],
         usedPercentage: w.utilization,
         resetsAt,
         reset: resetsAt !== null && at <= now,

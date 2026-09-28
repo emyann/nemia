@@ -123,8 +123,8 @@ test("a task that asked for a closeout, whose session goes quiet without one, en
     const [row] = claude.rows();
 
     // It ended its turn with words and no StructuredOutput, and has written nothing for ten minutes.
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
     const v = await engine.view(id);
@@ -150,8 +150,8 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
 
     await engine.tick();
     const v = await engine.view(id);
@@ -172,8 +172,8 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     const said = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     const v = await engine.view(said);
     assert.equal(v.state.settled, 'succeeded');
@@ -227,6 +227,6 @@ test("THE HARNESS'S `done` without a statement is said to have stated nothing to
       w.state.attempts.map((a) => [a.ended, a.reason]),
       [['done', 'harness']],
     );
-    assert.equal('stated' in w.state.attempts[0]!, false);
+    assert.equal('stated' in w.state.attempts[0], false);
   });
 });

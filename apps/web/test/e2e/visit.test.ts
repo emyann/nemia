@@ -42,7 +42,7 @@ function endsSaying(ended: Ended, first: RegExp, more: RegExp[], shot: string): 
     const last = lastSaid(stream);
     assert.match(last[0] ?? '', first, said(ended));
     assert.equal(last.length, 2 + more.length, said(ended));
-    more.forEach((line, i) => assert.match(last[1 + i]!, line, said(ended)));
+    more.forEach((line, i) => assert.match(last[1 + i], line, said(ended)));
     assert.match(last.at(-1)!, new RegExp(`^  what it looked like: \\S+/${shot}$`), said(ended));
   }
 }

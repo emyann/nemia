@@ -437,7 +437,7 @@ const optionsRefusalOf = (options: EngineOptions): string | undefined => {
     if (typeof h === 'object' && h !== null && Object.hasOwn(h, 'pool')) {
       return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`admission.ts\`). ${ADMIT_INSTEAD}`;
     }
-    const remote = typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, h as Record<string, unknown>) : undefined;
+    const remote = typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, h) : undefined;
     if (remote) return remote;
   }
   if (options.credentials !== undefined && typeof options.credentials !== 'function') {
@@ -463,7 +463,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   if (!Object.hasOwn(harnesses, spec.harness)) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
   }
-  const h = harnesses[spec.harness]!;
+  const h = harnesses[spec.harness];
   // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
   // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
   const { contextTokens, background } = spec.config ?? {};
@@ -480,7 +480,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
     if (!range) {
       const windowed = Object.keys(harnesses)
         .filter((name) => {
-          const o = harnesses[name]!;
+          const o = harnesses[name];
           return isClaude(o) || (isSpec(o) && o.contextTokens);
         })
         .map((name) => `\`${name}\``);
@@ -494,7 +494,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
   if (bridgeAsked(spec) && isSpec(h)) {
     const bridged = Object.keys(harnesses)
-      .filter((name) => isClaude(harnesses[name]!))
+      .filter((name) => isClaude(harnesses[name]))
       .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`claude.remoteControl\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`claude.remoteControl\` off.` : "Leave `claude.remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
@@ -503,7 +503,7 @@ const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Recor
   if (spec.config?.claude !== undefined && isSpec(h) && !h.claudeFlags) {
     const takers = Object.keys(harnesses)
       .filter((name) => {
-        const o = harnesses[name]!;
+        const o = harnesses[name];
         return isClaude(o) || (isSpec(o) && o.claudeFlags);
       })
       .map((name) => `\`${name}\``);
@@ -578,7 +578,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const runners = Object.fromEntries(
     Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential)).map(([name, ops]): [string, SeamOps] => [
       name,
-      counted(name, isRemote(harnesses[name]!) ? ops : a2aOps(name, ops, events)),
+      counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
     ]),
   );
   // The engine's one memo of the settled tasks its passes may skip (`tick-memo.ts`): made here, once, so it lives as long as
@@ -619,7 +619,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
       const state = fold(taskId, events);
       const last = state.attempts.at(-1);
-      const { find, observe, observeFor } = runners[harnessOf(state)]!;
+      const { find, observe, observeFor } = runners[harnessOf(state)];
       // Told this task's own sessions, where the harness can be: a view of a Claude Code job lists the jobs and asks no `claude agents`.
       const look = observeFor
         ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness }))).pipe(Effect.map((o) => o.seen))
@@ -695,7 +695,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
           { exitCode: 2 },
         );
       }
-      return go(taskIds === undefined ? everyView() : viewsOf(taskIds as string[]));
+      return go(taskIds === undefined ? everyView() : viewsOf(taskIds));
     },
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) =>
@@ -705,7 +705,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
           if (!v.sessionId) return '(no session yet)';
           // Asked of the task's own harness, not of whichever reported the session this pass: a session its
           // harness has released is in no observation, and its transcript is still there to read.
-          return yield* runners[harnessOf(v.state)]!.logs(v.sessionId);
+          return yield* runners[harnessOf(v.state)].logs(v.sessionId);
         }),
       ),
     transcript: async (taskId, after) => {
@@ -716,13 +716,13 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // The task's own harness, as for `logs`, and observed by that harness alone: a board asks this every
       // second while a session runs, and no other harness's registry can name the session.
       const harness = harnessOf(state);
-      const runner = runners[harness]!;
+      const runner = runners[harness];
       const read = runner.transcriptOf;
       if (!read)
         throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
       // A cursor is its reader's. The engine's own readers give one shape, and one they did not give is
       // refused at the door; a PromiseRunner's is passed through as it gave it.
-      const h = harnesses[harness]!;
+      const h = harnesses[harness];
       if (after !== undefined && (isClaude(h) || isSpec(h)) && !isTranscriptCursor(after)) {
         throw refuse(
           `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
@@ -748,8 +748,8 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const state = fold(taskId, events);
       // The task's own harness, as for `transcript`: only its registry can name the session, and only it has a way in.
       const harness = harnessOf(state);
-      const runner = runners[harness]!;
-      const h = harnesses[harness]!;
+      const runner = runners[harness];
+      const h = harnesses[harness];
       const deliver = runner.say;
       const last = state.attempts.at(-1);
       if (!deliver) {

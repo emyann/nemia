@@ -93,7 +93,7 @@ let memo = freshRestMemo();
 const pass = () => tick(e, { repo: ROOT, memo });
 
 /** The task a run's one step is filed as. */
-const taskOf = (runId: string) => readRun(runId).steps.work!.taskId!;
+const taskOf = (runId: string) => readRun(runId).steps.work.taskId!;
 
 /** Passes until the run's step is at work, as its harness lists it. */
 const atWork = async (runId: string) => {

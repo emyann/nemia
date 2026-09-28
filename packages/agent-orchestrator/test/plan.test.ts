@@ -174,7 +174,7 @@ const IDS: Record<string, string> = { a: 'parse-the-flag-1x2y', b: 'document-it-
 const startedOf = (names: readonly string[]): Planned[] =>
   planOrder(parsePlan(DIAMOND))
     .filter((c) => names.includes(c.name))
-    .map((c) => ({ card: c, runId: IDS[c.name]!, workflowDir: `/repo/workflows/${c.workflow}` }));
+    .map((c) => ({ card: c, runId: IDS[c.name], workflowDir: `/repo/workflows/${c.workflow}` }));
 
 test('`wf plan` prints a line per card, parents first: the card, its run, its workflow as the card names it, and what it waits on, by card and by run', () => {
   assert.deepEqual(planLines(startedOf(['a', 'b', 'c', 'd'])), [
@@ -193,7 +193,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     repo: '/repo',
     folderOf: (c: { workflow: string }) => `/repo/workflows/${c.workflow.replace('./flows/', '')}`,
   };
-  assert.deepEqual(planStopped({ card: cards[2]!, why: 'the disk is full', rest: [cards[3]!] }, startedOf(['a', 'b']), opts).split('\n'), [
+  assert.deepEqual(planStopped({ card: cards[2], why: 'the disk is full', rest: [cards[3]] }, startedOf(['a', 'b']), opts).split('\n'), [
     'wf plan stopped at c.md: the disk is full',
     'The runs it started stand, and the tick files each as its edges allow: a (parse-the-flag-1x2y), b (document-it-3z4w). Cancel one with wf cancel <runId>.',
     'Start the rest by hand, parents first, once what stopped c.md is fixed — each --after the run of a card it waits on:',
@@ -201,7 +201,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     "  wf start '/plans/q3/d.md' --workflows '/repo/workflows/dev' --repo '/repo' --after document-it-3z4w --after <c's run id>",
   ]);
   assert.deepEqual(
-    planStopped({ card: cards[0]!, why: 'not a git repository', rest: cards.slice(1) }, [], opts)
+    planStopped({ card: cards[0], why: 'not a git repository', rest: cards.slice(1) }, [], opts)
       .split('\n')
       .slice(0, 4),
     [
@@ -214,7 +214,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
   // Quoted for the shell: a space, and a quote, in a path.
   const spaced = { dir: "/home/me/plans/q3 it's", repo: '/code/my app', folderOf: () => '/code/my app/workflows/dev' };
   assert.equal(
-    planStopped({ card: cards[0]!, why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
+    planStopped({ card: cards[0], why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
     `  wf start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`,
   );
 });

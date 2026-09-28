@@ -218,7 +218,7 @@ export type BuildRefused = { error: string; steps: string[] };
  */
 export function stepsNamed(message: string, names: readonly string[]): string[] {
   const cycle = /^these steps wait on each other: (.+)$/.exec(message);
-  if (cycle) return cycle[1]!.split(', ').filter((name) => names.includes(name));
+  if (cycle) return cycle[1].split(', ').filter((name) => names.includes(name));
   const refusedName = names.find((name) => stepNameRefusal(name) === message);
   if (refusedName !== undefined) return [refusedName];
   const twice = names.find((name) => message.startsWith(`two steps are named ${name}, `));
@@ -591,14 +591,14 @@ function write(
       return { file, was: undefined };
     }
   });
-  const schemasWritten = writing.filter((s, i) => s.text !== before[i]!.was).map((s) => s.file);
+  const schemasWritten = writing.filter((s, i) => s.text !== before[i].was).map((s) => s.file);
   // Every schema the save has reached, the one it is writing among them: what is put back should that write fail, or a later one, or the
   // folder. A write that fails partway has changed the file all the same, so a schema counts as written before the write, not after it.
   const written: SchemaWas[] = [];
   let result;
   try {
     for (const [i, { file, text }] of writing.entries()) {
-      written.push(before[i]!);
+      written.push(before[i]);
       fs.writeFileSync(path.join(dir, file), text);
     }
     result = writeWorkflow(dir, steps, readme, { places });

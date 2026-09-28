@@ -48,7 +48,7 @@ test('no file names another project the owner chose to describe instead', () => 
 
 test('REFUSED: each name, in a sentence, a link, a comment, a quote or another case', () => {
   const [kanban, research, sdk, runtime, adapter, author, tool] = NAMES as [string, string, string, string, string, string, string];
-  const cap = (w: string) => w[0]!.toUpperCase() + w.slice(1);
+  const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
   for (const line of [
     `This is ${cap(kanban)} Kanban's terminal tool call.`,
     `[the kanban](https://${kanban}-agent.${research}.com/docs/user-guide/features/kanban)`,

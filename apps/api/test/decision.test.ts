@@ -663,7 +663,7 @@ test("a diff is cut a file at a time: named by its header, a rename as both ends
       ['new file.test.ts', DIFF_LINES, 10],
     ],
   );
-  assert.equal(files[2]!.lines.at(-1), long[DIFF_LINES - 6]);
+  assert.equal(files[2].lines.at(-1), long[DIFF_LINES - 6]);
 });
 
 test("a run `assess` calls running while a step waits on a person is decided on: its terminal steps' branches read, and no command yet", async () => {

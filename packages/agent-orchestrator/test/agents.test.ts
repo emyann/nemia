@@ -284,7 +284,7 @@ test("a schema the agent's output: names is read beside the agent, and one the s
   const steps = loadWorkflows(path.join(dir, 'dev'));
   const check = steps.find((s) => s.name === 'check')!;
   assert.equal(check.output?.file, 'review.schema.json');
-  assert.deepEqual(Object.keys((check.output!.schema as { properties: object }).properties), ['verdict']);
+  assert.deepEqual(Object.keys((check.output.schema as { properties: object }).properties), ['verdict']);
   const judge = steps.find((s) => s.name === 'judge')!;
   assert.deepEqual(Object.keys((judge.output!.schema as { properties: object }).properties), ['ok']);
 });
@@ -299,7 +299,7 @@ test('REFUSED at shipped defaults: a broken agent, only when a step names it, na
     'linked/build.md': '---\nagent: linked\n---\n',
   });
   fs.symlinkSync(path.join(dir, 'elsewhere', 'linked.md'), path.join(dir, 'agents', 'linked.md'));
-  assert.equal(loadWorkflows(path.join(dir, 'dev'))[0]!.model, 'opus', 'a broken agent beside it stops no step that does not name it');
+  assert.equal(loadWorkflows(path.join(dir, 'dev'))[0].model, 'opus', 'a broken agent beside it stops no step that does not name it');
   const broken = refusal(() => loadWorkflows(path.join(dir, 'bad')));
   assert.ok(
     broken.startsWith(
@@ -499,9 +499,9 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
   assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;
-  assert.equal(build!.model, 'opus');
-  assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
-  assert.deepEqual(build!.agent, {
+  assert.equal(build.model, 'opus');
+  assert.equal(build.body, 'Implement what you are asked.\n\nBuild it.');
+  assert.deepEqual(build.agent, {
     name: 'implementer',
     keys: [],
     body: 'Build it.',
@@ -533,7 +533,7 @@ test("`wf start` names each node's agent beside it — by the agent's name, not 
   });
   const { main } = await import('../src/cli.ts');
   await main(['start', 'build it', '--workflows', path.join(dir, 'dev'), '--repo', repo], {} as never);
-  const [id, said] = printed[0]!.split('  ');
+  const [id, said] = printed[0].split('  ');
   assert.ok(id, printed.join('\n'));
   assert.equal(said, '3 step(s): build (coder) → judge (critic) → wrap');
 });

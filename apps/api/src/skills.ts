@@ -162,12 +162,12 @@ export function listSkills(repo: string, home: string = HOME, shipped: string = 
   for (const [name, at] of [...found.at].sort(([a], [b]) => a.localeCompare(b))) {
     if (at instanceof WorkflowError) {
       // One repository's two places for skills both have it: only when the store is in that repository, and nothing says which is given.
-      places[0]!.skills.push({ ...skillRow(name, path.join(places[0]!.dir, name), 'yours', usedBy(name)), entry: null, error: at.message });
+      places[0].skills.push({ ...skillRow(name, path.join(places[0].dir, name), 'yours', usedBy(name)), entry: null, error: at.message });
       where.set(name, 'yours');
       continue;
     }
     const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';
-    places[from === 'yours' ? 0 : 1]!.skills.push(skillRow(name, at, from, usedBy(name)));
+    places[from === 'yours' ? 0 : 1].skills.push(skillRow(name, at, from, usedBy(name)));
     where.set(name, from);
   }
   places.push({

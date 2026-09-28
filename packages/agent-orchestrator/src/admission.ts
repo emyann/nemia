@@ -18,7 +18,7 @@ export const POOLS: Readonly<Record<string, string>> = { claude: 'claude', 'clau
 /** The pool a task's harness counts against; a task with no harness takes the runtime's name for it, `default`. */
 export const poolOf = (harness: string | undefined): string => {
   const h = harness ?? 'default';
-  return Object.hasOwn(POOLS, h) ? POOLS[h]! : h;
+  return Object.hasOwn(POOLS, h) ? POOLS[h] : h;
 };
 
 /**

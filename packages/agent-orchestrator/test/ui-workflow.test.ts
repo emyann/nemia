@@ -47,7 +47,7 @@ function unreachableSkills(step: { body: string; tools?: string[] }): string[] {
   const text = said(step.body);
   const problems = new Set<string>();
   for (const [, file] of text.matchAll(/`(\.claude\/skills\/[^`/]+\/SKILL\.md)`/g)) {
-    if (!fs.existsSync(path.join(REPO, file!))) problems.add(`${file} is not in the repository`);
+    if (!fs.existsSync(path.join(REPO, file))) problems.add(`${file} is not in the repository`);
   }
   const loads = !step.tools || step.tools.includes('Skill');
   for (const [, name] of text.matchAll(/\bthe ([\w-]+) skill\b/g)) {
@@ -71,26 +71,26 @@ test("the ui workflow loads as two steps, the loop between them and the ship aft
     ],
   );
   assert.deepEqual([steps.review?.loop, steps.review?.rounds], ['implement', 3]);
-  assert.deepEqual(loopSpan(ui, steps.review!), ['implement', 'review']);
+  assert.deepEqual(loopSpan(ui, steps.review), ['implement', 'review']);
   assert.deepEqual(
     terminalSteps(ui).map((s) => s.name),
     ['ship'],
   );
   // A chain: review works in implement's workspace, so each round it reads the change as it stands.
-  assert.deepEqual(workspacePlan(ui, steps.review!), { kind: 'inherit', from: 'implement' });
+  assert.deepEqual(workspacePlan(ui, steps.review), { kind: 'inherit', from: 'implement' });
 });
 
 test('look and respond are gone: both steps use the look skill, which the repository carries, and the loop answers the review', () => {
   for (const gone of ['look.md', 'look.schema.json', 'respond.md'])
     assert.equal(fs.existsSync(path.join(WORKFLOWS, 'ui', gone)), false, `${gone} is gone`);
   // Since agents card 1b both are told so by their agents' skills, `look-at-a-page` and `read-a-screenshot`.
-  assert.ok(told(steps.implement!).includes('Before you sign off, use the look skill on every page you changed'), told(steps.implement!));
-  assert.ok(told(steps.review!).includes('Read the diff.'), told(steps.review!));
+  assert.ok(told(steps.implement).includes('Before you sign off, use the look skill on every page you changed'), told(steps.implement));
+  assert.ok(told(steps.review).includes('Read the diff.'), told(steps.review));
   assert.ok(
-    told(steps.review!).includes("use the look skill on implement's screenshots and on the pages, side by side"),
-    told(steps.review!),
+    told(steps.review).includes("use the look skill on implement's screenshots and on the pages, side by side"),
+    told(steps.review),
   );
-  assert.ok(!said(steps.review!.body).includes('Read the diff.'), 'and the review is the skill, not the body');
+  assert.ok(!said(steps.review.body).includes('Read the diff.'), 'and the review is the skill, not the body');
 
   // The skill the two briefs name is there, under that name, and the one browser tool it forbids is refused by the settings too.
   const skill = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md'), 'utf8');
@@ -103,14 +103,14 @@ test('look and respond are gone: both steps use the look skill, which the reposi
 test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
   // review has the Skill tool, and its skill `read-a-screenshot` names the file too. The guard is exercised on a copy without the tool.
   assert.equal(steps.review?.tools?.includes('Skill'), true);
-  const fenced = { ...steps.review!, tools: steps.review!.tools!.filter((t) => t !== 'Skill') };
+  const fenced = { ...steps.review, tools: steps.review.tools.filter((t) => t !== 'Skill') };
   // The ship looks at nothing: it merges, and runs the check.
   for (const step of ui.filter((s) => s.name !== 'ship')) {
     assert.match(told(step), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
     assert.deepEqual(unreachableSkills({ ...step, body: told(step) }), [], step.name);
   }
 
-  const review = { ...steps.review!, body: told(steps.review!) };
+  const review = { ...steps.review, body: told(steps.review) };
   const file = '`.claude/skills/look/SKILL.md`';
   assert.deepEqual(unreachableSkills({ ...fenced, body: review.body.replaceAll(file, 'the skill') }), [
     'the look skill is named, and this step has no Skill tool and is not told its file',
@@ -133,10 +133,10 @@ test('implement is checked by the build, and in a browser only on the merged tre
 test('implement declares the screenshots it looked at and the pages they show, and only review reads them', () => {
   assert.equal(steps.implement?.harness, 'claude');
   assert.equal(steps.implement?.output?.file, 'implement.schema.json');
-  const declared = steps.implement!.output!.schema.properties as Record<string, { type: string; items: unknown }>;
+  const declared = steps.implement.output.schema.properties as Record<string, { type: string; items: unknown }>;
   assert.deepEqual(Object.keys(declared), ['screenshots', 'pages']);
   for (const field of ['screenshots', 'pages'])
-    assert.deepEqual([declared[field]!.type, declared[field]!.items], ['array', { type: 'string' }], field);
+    assert.deepEqual([declared[field].type, declared[field].items], ['array', { type: 'string' }], field);
   assert.deepEqual(
     ui.filter((s) => s.input?.includes('implement')).map((s) => s.name),
     ['review'],
@@ -144,7 +144,7 @@ test('implement declares the screenshots it looked at and the pages they show, a
 });
 
 test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk, denied build and e2e — and implement has every tool', () => {
-  const { harness, after, input, tools, disallowedTools, permissionMode, output, loop, rounds } = steps.review!;
+  const { harness, after, input, tools, disallowedTools, permissionMode, output, loop, rounds } = steps.review;
   assert.deepEqual(
     { harness, after, input, tools, disallowedTools, permissionMode, output: output?.file, loop, rounds },
     {
@@ -188,7 +188,7 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
   for (const [folder, check] of Object.entries(CHECKS)) {
     const dir = path.join(REPO, 'workflows', folder);
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
-    const ship = byName.ship!;
+    const ship = byName.ship;
     assert.ok(ship, `${folder} has an ending step`);
     const { after, workspace, gate, harness, model, disallowedTools, check: own, tools, loop } = ship;
     assert.deepEqual(
@@ -207,12 +207,12 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
       folder,
     );
     // Its check is implement's, the same line: what the work was judged by is what the merged tree is judged by.
-    assert.equal(own, byName.implement!.check, `${folder}: ship's check is implement's`);
+    assert.equal(own, byName.implement.check, `${folder}: ship's check is implement's`);
     // And the message the run commits the merge with is the step's closeout, one required string.
     assert.equal(ship.output?.file, 'shipper.schema.json', folder);
     const schema = closeoutSchemaOf(ship, loadWorkflows(dir)) as { required: string[]; properties: Record<string, { type: string }> };
     assert.ok(schema.required.includes('message'), `${folder}: a sign-off gives its message`);
-    assert.equal(schema.properties.message!.type, 'string');
+    assert.equal(schema.properties.message.type, 'string');
     assert.equal(
       terminalSteps(loadWorkflows(dir))
         .map((s) => s.name)
@@ -312,7 +312,7 @@ test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`,
   for (const dir of folders) {
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
     assert.deepEqual(byName.implement?.disallowedTools, IMPLEMENT_DENIED, `${dir}: implement`);
-    const review = byName.review!;
+    const review = byName.review;
     if (review.harness === 'codex') {
       assert.deepEqual(
         [review.sandbox, review.permissionMode, review.disallowedTools],
@@ -339,7 +339,7 @@ test('`wf decide` on a ui review reads each finding as a place — the file and 
       again: true,
     },
   };
-  assert.deepEqual(outputLines(steps.review!, said), [
+  assert.deepEqual(outputLines(steps.review, said), [
     'findings:',
     '  - apps/web/src/components/StepNode.tsx:12',
     `    what: ${what}`,
@@ -357,7 +357,7 @@ type Findings = {
 
 test("review's schema is the shipped review's, `again` and all, with a finding's place a file and a line or a page and a theme", () => {
   const shipped = loadWorkflows(WORKFLOWS).find((s) => s.name === 'review')!.output!.schema;
-  const schema = steps.review!.output!.schema;
+  const schema = steps.review.output!.schema;
   assert.deepEqual(schema.required, shipped.required);
   assert.deepEqual(schema.properties.again, shipped.properties.again);
 
@@ -368,15 +368,15 @@ test("review's schema is the shipped review's, `again` and all, with a finding's
   const [code, page] = findings.items.properties.where.anyOf;
   assert.equal(findings.items.properties.where.anyOf.length, 2);
   assert.deepEqual(
-    [code!.required, code!.additionalProperties, page!.required, page!.additionalProperties],
+    [code.required, code.additionalProperties, page.required, page.additionalProperties],
     [['file', 'line'], false, ['page', 'theme'], false],
   );
-  assert.deepEqual(code!.properties, { file: theirs.file, line: theirs.line }, 'a file and a line, as the shipped review names them');
-  assert.deepEqual((page!.properties.theme as { enum: string[] }).enum, ['light', 'dark', 'both']);
+  assert.deepEqual(code.properties, { file: theirs.file, line: theirs.line }, 'a file and a line, as the shipped review names them');
+  assert.deepEqual((page.properties.theme as { enum: string[] }).enum, ['light', 'dark', 'both']);
 });
 
 test('REFUSED: a review finding that names neither a file nor a page — nor half of one, nor both at once — in the closeout review is filed with', () => {
-  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.review!, Object.values(steps)));
+  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.review, Object.values(steps)));
   const closeout = (...findings: unknown[]) => ({
     outcome: 'done',
     summary: 'Read and looked.',
@@ -496,12 +496,12 @@ test("review is handed implement's screenshots and pages, and not its summary, b
     artifacts: [shot],
     output: { screenshots: [shot], pages: ['/'] },
   };
-  const brief = composeBrief(steps.review!, run, ui, (name) => (name === 'implement' ? told : undefined), '/wf/runs/r-1/artifacts/review');
+  const brief = composeBrief(steps.review, run, ui, (name) => (name === 'implement' ? told : undefined), '/wf/runs/r-1/artifacts/review');
   assert.match(brief, /\n## From implement\n/);
   assert.ok(brief.includes(JSON.stringify(shot)), brief);
   assert.doesNotMatch(brief, /IMPLEMENTER-ACCOUNT/);
   assert.match(brief, /\n## Round 1 of 3\n/);
-  assert.deepEqual(closeoutSchemaOf(steps.review!, Object.values(steps)).required, [
+  assert.deepEqual(closeoutSchemaOf(steps.review, Object.values(steps)).required, [
     'outcome',
     'summary',
     'artifacts',

@@ -2444,7 +2444,7 @@ test("the detail carries where each step's time went — per try and per check, 
   );
   // Each try as the package has it, less `used`, which the api words as `wf decide` does (asserted above).
   const lessUsed = (tries: ReadonlyArray<{ used?: unknown }>) => JSON.parse(JSON.stringify(tries.map(({ used: _, ...x }) => x)));
-  assert.deepEqual(lessUsed(implement.timeline), lessUsed(theirs.steps.implement!));
+  assert.deepEqual(lessUsed(implement.timeline), lessUsed(theirs.steps.implement));
 
   // A try filed since is read on from where the last read of the feed stopped: its filing is known on the next poll, and not `not known`.
   ran('r-60-implement-try3', 'codex', T(40), T(40, 7));

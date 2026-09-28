@@ -48,7 +48,7 @@ const board = async () => {
 
 test('the views of some tasks are their views, each journal read once and the harness observed once for all those in flight', async () => {
   const { engine, counts, settled, flying, queued } = await board();
-  const asked = [flying[1]!, settled[0]!, queued, flying[0]!, settled[0]!];
+  const asked = [flying[1], settled[0], queued, flying[0], settled[0]];
   const one = async (id: string) => engine.view(id);
   const expected = await Promise.all([...new Set(asked)].map(one));
 
@@ -101,14 +101,14 @@ const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z'
 
 test('a task whose journal holds an entry no runtime wrote is left out of `list()` and `list(ids)` and named once, as the pass says it; the others are answered', async () => {
   const { engine, root, settled, flying, queued } = await board();
-  const [bad, other] = [flying[1]!, flying[0]!];
+  const [bad, other] = [flying[1], flying[0]];
   const file = path.join(root, 'tasks', `${bad}.jsonl`);
   fs.appendFileSync(file, MISWRITTEN);
   const said = (await engine.tick()).unreadable;
   assert.equal(said.length, 1);
-  assert.ok(said[0]!.startsWith(`${bad}'s journal (${file}), entry `), said[0]);
+  assert.ok(said[0].startsWith(`${bad}'s journal (${file}), entry `), said[0]);
 
-  const some = await engine.list([other, bad, settled[0]!, bad]);
+  const some = await engine.list([other, bad, settled[0], bad]);
   assert.deepEqual(
     some.views.map((v) => v.id),
     [other, settled[0]],

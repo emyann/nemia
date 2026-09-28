@@ -114,7 +114,7 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
     await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
     // And a step a pass filed and never wrote down — on a cancelled run too, where a pass that read it before the cancel may be filing it now.
     for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
-      run.steps[name] = { ...run.steps[name]!, taskId };
+      run.steps[name] = { ...run.steps[name], taskId };
     }
   }
   const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
@@ -318,7 +318,7 @@ export async function prune(
     await adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
     await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
     for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
-      run.steps[name] = { ...run.steps[name]!, taskId };
+      run.steps[name] = { ...run.steps[name], taskId };
     }
     decided = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind;
     const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
@@ -407,7 +407,7 @@ export async function prune(
       freed = kept.bytes;
     } catch (err) {
       freed = Math.max(0, kept.bytes - diskBytes(kept.path));
-      left.push({ path: kept.path, files: (err as Error).message.split('\n')[0]! });
+      left.push({ path: kept.path, files: (err as Error).message.split('\n')[0] });
     }
   }
   const filesWent = freed !== undefined && (freed > 0 || !lstatOf(kept!.path));
@@ -464,7 +464,7 @@ function resolved(p: string): string {
 /** What git said when it refused, in one line: the first of its stderr, or of the error. */
 const gitWords = (err: unknown): string => {
   const { stderr, message } = err as { stderr?: string; message?: string };
-  return (stderr?.trim() || message || String(err)).split('\n')[0]!;
+  return (stderr?.trim() || message || String(err)).split('\n')[0];
 };
 
 /**

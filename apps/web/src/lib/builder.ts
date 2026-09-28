@@ -119,7 +119,7 @@ export function connect(steps: readonly DraftStep[], source: string, target: str
  */
 export function disconnect(steps: readonly DraftStep[], id: string): DraftStep[] {
   const loop = /^loop:(.+)->(.+)$/.exec(id);
-  if (loop) return changed(steps, loop[1]!, (spec) => ({ ...spec, loop: null, rounds: null }));
+  if (loop) return changed(steps, loop[1], (spec) => ({ ...spec, loop: null, rounds: null }));
   const after = /^(.+)->(.+)$/.exec(id);
   if (!after) return [...steps];
   const [, from, to] = after as unknown as [string, string, string];

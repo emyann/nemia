@@ -87,7 +87,7 @@ function parseCard(file: string, text: string): Card {
     );
   }
   const brief = bodyOf(file, body);
-  return { name: file.slice(0, -'.md'.length), file, workflow: keys.workflow!, after: afterOf(file, keys.after), body: brief };
+  return { name: file.slice(0, -'.md'.length), file, workflow: keys.workflow, after: afterOf(file, keys.after), body: brief };
 }
 
 /** A card's body, its run's brief — refused when empty, since a card with nothing to ask is not a card. */
@@ -237,12 +237,12 @@ export function planOrder(cards: readonly Card[]): Card[] {
     if (next < 0) {
       const cycle = cycleIn(pending);
       refuse(
-        `${cycle.map((c) => c.file).join(', ')} wait on each other — ${cycle.map((c, i) => `${c.name} after ${cycle[(i + 1) % cycle.length]!.name}`).join(', ')} — so none of them could ever start. Take one of those cards out of the other's \`after:\`.`,
+        `${cycle.map((c) => c.file).join(', ')} wait on each other — ${cycle.map((c, i) => `${c.name} after ${cycle[(i + 1) % cycle.length].name}`).join(', ')} — so none of them could ever start. Take one of those cards out of the other's \`after:\`.`,
       );
     }
     const [card] = pending.splice(next, 1);
-    order.push(card!);
-    placed.add(card!.name);
+    order.push(card);
+    placed.add(card.name);
   }
   return order;
 }
@@ -254,7 +254,7 @@ export function planOrder(cards: readonly Card[]): Card[] {
 function cycleIn(pending: readonly Card[]): Card[] {
   const byName = new Map(pending.map((c) => [c.name, c]));
   const walked: Card[] = [];
-  let at = pending[0]!;
+  let at = pending[0];
   while (!walked.includes(at)) {
     walked.push(at);
     at = byName.get(at.after.find((a) => byName.has(a))!)!;

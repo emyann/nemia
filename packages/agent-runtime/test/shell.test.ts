@@ -121,8 +121,8 @@ test('a session held busy by a background shell, its closeout the last word in i
     assert.equal(row?.status, 'busy', 'its process is doing something: the shell it left running');
 
     // It ran for ten minutes, signed off ten minutes ago, and has written nothing since; the shell loops on.
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
     const v = await engine.view(id);
@@ -146,8 +146,8 @@ test('a session held busy whose transcript is still advancing is left alone — 
     const [row] = claude.rows();
 
     // A statement it may yet revise: it gave one a second ago and is still going.
-    wrote(row!.sessionId, 1_000, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 1_000, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
     const v = await engine.view(id);
@@ -166,14 +166,14 @@ test('a session held busy that gave no closeout is left where it was: the existi
     const [row] = claude.rows();
 
     // It ended its turn with words and nothing else, ten minutes ago, and its process is still busy.
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
-    claude.set(row!.name, { startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     assert.equal((await engine.view(id)).state.attempts[0]?.ended, null, 'a busy session with nothing said is not quiet');
 
     // Idle, the quiescence floor reads it as it always has: quiet, with no statement — `stated: false`, which the layer
     // above reads as unsigned (the engine judged it `unsigned` itself until stage 4a).
-    claude.set(row!.name, { status: 'idle' });
+    claude.set(row.name, { status: 'idle' });
     await engine.tick();
     const v = await engine.view(id);
     assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.stated], ['done', false]);
@@ -190,8 +190,8 @@ test('a session the registry lists `shell` is not busy at all: the quiescence fl
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!.sessionId, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    claude.set(row!.name, { status: 'shell', startedAt: Date.now() - 20 * MINUTES });
+    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+    claude.set(row.name, { status: 'shell', startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
     const v = await engine.view(id);

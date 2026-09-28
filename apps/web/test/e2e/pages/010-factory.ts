@@ -101,7 +101,7 @@ export default {
     const checkout = path.join(store!, 'checkout');
     for (const [i, card] of QUEUED.entries()) {
       const ghost = lane.locator(`a[data-ghost="${card.name}"]`);
-      await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]!], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
+      await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
       await expectTexts(ghost.locator('[data-ghost-title]'), [card.title], `and its first line (${card.title})`);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
       const repo = card === QUEUE.third ? "wf up's repository" : path.basename(checkout);

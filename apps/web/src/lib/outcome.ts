@@ -63,7 +63,7 @@ export function outputKind(schema: unknown, value: unknown, images: ReadonlySet<
   }
   if (value.every((item) => typeof item === 'string')) return 'list';
   if (!value.every(isRecord)) return 'json';
-  const records = value as Array<Record<string, unknown>>;
+  const records = value;
   const keys = new Set(records.flatMap((item) => Object.keys(item)));
   return recordsKind(
     keys,

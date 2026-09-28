@@ -8,7 +8,8 @@ import { OUT, REPO, store } from '../world.ts';
 
 /** Every file under `dir`, by its path in it, with what it holds: what a copy is held to, byte for byte. */
 function tree(dir: string): Array<[string, string]> {
-  return (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+  return fs
+    .readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry): [string, string] => [
       path.relative(dir, path.join(entry.parentPath, entry.name)),

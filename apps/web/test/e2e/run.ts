@@ -122,11 +122,11 @@ function startServer(name: string, args: string[], cwd: string, env: NodeJS.Proc
       const m = listening.exec(output());
       if (m) {
         clearTimeout(timer);
-        resolve(m[1]!);
+        resolve(m[1]);
       }
     };
-    child.stdout!.on('data', read);
-    child.stderr!.on('data', read);
+    child.stdout.on('data', read);
+    child.stderr.on('data', read);
     // After it resolved, a rejection is a no-op; a server that dies mid-run shows as failed requests.
     child.on('exit', (code, signal) => fail(`exited (${signal ?? `code ${code}`}) before it was listening`));
     child.on('error', (err) => fail(`could not start: ${err.message}`));

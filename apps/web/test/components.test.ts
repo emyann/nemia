@@ -223,7 +223,7 @@ function runWith(note: string | null): RunDetail {
 
 test("the inspector's Details show a step's note under its chip", () => {
   const run = runWith(exhaustedNote);
-  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
+  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
   const chip = html.indexOf('data-state="exhausted"');
   const note = html.indexOf(`<p data-note="true"`);
   assert.ok(chip >= 0, 'the chip is in the Details');
@@ -232,7 +232,7 @@ test("the inspector's Details show a step's note under its chip", () => {
 
   const bare = runWith(null);
   assert.doesNotMatch(
-    renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0]!, onClose: () => {} })),
+    renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0], onClose: () => {} })),
     /data-note/,
   );
 });
@@ -243,7 +243,7 @@ function runOf(
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0]!, status }] };
+  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0], status }] };
 }
 
 /**
@@ -311,7 +311,7 @@ test('a step a person has sent round or asked to retry is no gate from the momen
  */
 function loopRun(notes: { implement: string | null; review: string | null }): RunDetail {
   const base = runWith(null);
-  const step = { ...base.steps[0]!, status: 'unverified · done', spec: null };
+  const step = { ...base.steps[0], status: 'unverified · done', spec: null };
   return {
     ...base,
     status: 'running',
@@ -370,9 +370,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
   ]);
 
   const due = stepEdges(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
-  assert.deepEqual([due[1]!.label, due[1]!.data], ['round 2 of 3', { state: 'running', loop: true }]);
+  assert.deepEqual([due[1].label, due[1].data], ['round 2 of 3', { state: 'running', loop: true }]);
   const first = stepEdges(loopRun({ implement: null, review: null }));
-  assert.deepEqual([first[1]!.label, first[1]!.data], [undefined, { state: 'to-come', loop: true }]);
+  assert.deepEqual([first[1].label, first[1].data], [undefined, { state: 'to-come', loop: true }]);
 
   // A run with no loop draws no edge back.
   const chain = { ...run, graph: { roots: ['implement', 'review'], edges: [] } };
@@ -423,7 +423,7 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
   const [, back] = stepEdges(
     loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' }),
   );
-  const html = withMotion(false, () => edgeMarkup(back!));
+  const html = withMotion(false, () => edgeMarkup(back));
   const d = pathOf(html);
   assert.ok(d?.startsWith('M 524,110 C 524,'), html);
   assert.ok(d?.endsWith(' 112,110'), `it ends at implement, where the arrow is: ${d}`);
@@ -459,7 +459,7 @@ function runOfSteps(steps: Array<[name: string, status: string, after?: string]>
     status: 'running',
     waitingOnYou: [],
     graph: { roots: steps.filter(([, , from]) => !from).map(([name]) => name), edges },
-    steps: steps.map(([name, status]) => ({ ...base.steps[0]!, name, status, note: null })),
+    steps: steps.map(([name, status]) => ({ ...base.steps[0], name, status, note: null })),
   };
 }
 
@@ -489,8 +489,8 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
     const markup = html.get(id)!;
     const motions = travelling(markup);
     assert.equal(motions.length, 1, `one dot on ${id}: ${markup}`);
-    assert.ok(motions[0]!.includes(` path="${pathOf(markup)}"`), `along the edge's own path: ${markup}`);
-    assert.ok(motions[0]!.includes(` dur="${TRAVEL_SECONDS}s"`) && motions[0]!.includes(' repeatCount="indefinite"'), motions[0]);
+    assert.ok(motions[0].includes(` path="${pathOf(markup)}"`), `along the edge's own path: ${markup}`);
+    assert.ok(motions[0].includes(` dur="${TRAVEL_SECONDS}s"`) && motions[0].includes(' repeatCount="indefinite"'), motions[0]);
     assert.match(markup, /<circle [^>]*fill="var\(--edge-running\)"/, 'the dot in the running colour');
     assert.match(markup, /stroke:var\(--edge-running\);stroke-width:2"/, 'on a solid line in the running colour');
     assert.match(markup, /data-state="running"/);
@@ -609,7 +609,7 @@ test("a card at rest draws its run's steps as a rail: a pill each in its state, 
     html,
   );
   const arrows = Object.fromEntries(
-    [...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1]!.replaceAll('&gt;', '>'), m[2]]),
+    [...html.matchAll(/<g data-arrow="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1].replaceAll('&gt;', '>'), m[2]]),
   );
   assert.deepEqual(arrows, {
     'step:implement->step:review': 'running',
@@ -654,11 +654,11 @@ test("a loop's edge back moves as a running edge does while its round is due, al
   const [, due] = stepEdges(
     loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
   );
-  const html = withMotion(false, () => edgeMarkup(due!));
+  const html = withMotion(false, () => edgeMarkup(due));
   const d = pathOf(html);
   assert.ok(d?.startsWith('M 524,110 C 524,'), `still from under the looping step: ${d}`);
   assert.equal(travelling(html).length, 1, html);
-  assert.ok(travelling(html)[0]!.includes(` path="${d}"`), 'along its curve');
+  assert.ok(travelling(html)[0].includes(` path="${d}"`), 'along its curve');
   assert.match(html, /stroke:var\(--edge-running\);stroke-width:2;stroke-dasharray:5 4/);
   assert.match(html, />round 2 of 3<\/text>/);
   assert.ok(html.indexOf('<animateMotion') < html.indexOf('>round 2 of 3</text>'), 'the dot passes under the round, not over it');
@@ -674,23 +674,23 @@ test('where the person asked for reduced motion nothing travels — on a running
   const [, due] = stepEdges(
     loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
   );
-  assert.equal((running!.markerEnd as EdgeMarker).color, 'var(--edge-running)');
+  assert.equal((running.markerEnd as EdgeMarker).color, 'var(--edge-running)');
 
   // Asked for; and a server, with no browser to ask, which sets nothing moving either.
   for (const reduce of [true, undefined]) {
-    const edge = withMotion(reduce, () => edgeMarkup(running!));
+    const edge = withMotion(reduce, () => edgeMarkup(running));
     assert.deepEqual(travelling(edge), [], `a running edge, reduce: ${reduce}`);
     assert.match(edge, /data-state="running"/);
     assert.match(edge, /stroke:var\(--edge-running\);stroke-width:2"/, 'told apart by its colour');
     assert.match(edge, /marker-end="url\(&#x27;#arrow&#x27;\)"/, 'and its arrow');
     assert.doesNotMatch(edge, /<circle/, 'no shape waiting to travel');
-    const loop = withMotion(reduce, () => edgeMarkup(due!));
+    const loop = withMotion(reduce, () => edgeMarkup(due));
     assert.deepEqual(travelling(loop), [], `a loop whose round is due, reduce: ${reduce}`);
     assert.match(loop, />round 2 of 3<\/text>/);
     assert.deepEqual(travelling(withMotion(reduce, legendMarkup)), [], `the legend, reduce: ${reduce}`);
   }
   // Where the person has not asked, the same edge and the legend's running sample move.
-  assert.equal(travelling(withMotion(false, () => edgeMarkup(running!))).length, 1);
+  assert.equal(travelling(withMotion(false, () => edgeMarkup(running))).length, 1);
   assert.equal(travelling(withMotion(false, legendMarkup)).length, 1);
 });
 
@@ -728,9 +728,9 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
     loop: 'implement',
     rounds: 3,
   };
-  const looping = { ...run.steps[0]!, spec };
+  const looping = { ...run.steps[0], spec };
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
-  const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
+  const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
   assert.deepEqual(
     labels.slice(at('after'), at('after') + 4),
@@ -762,12 +762,12 @@ test('a thought is drawn folded: a line that says it thought, and its text only 
   const [withText, without] = foldTranscript(thoughts).map((turn) =>
     renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })),
   );
-  assert.match(withText!, /data-turn="thinking"/);
-  assert.match(withText!, /aria-expanded="false"/);
-  assert.doesNotMatch(withText!, /data-expanded/, 'folded: its fold is not marked expanded');
-  assert.match(withText!, /<p>Thought<\/p>/);
-  assert.doesNotMatch(withText!, /The word goes in a file/, 'folded: its text is not drawn until it is opened');
-  assert.match(without!, /<p>Thought, with no text kept<\/p>/, 'a thought the harness kept no text for says so');
+  assert.match(withText, /data-turn="thinking"/);
+  assert.match(withText, /aria-expanded="false"/);
+  assert.doesNotMatch(withText, /data-expanded/, 'folded: its fold is not marked expanded');
+  assert.match(withText, /<p>Thought<\/p>/);
+  assert.doesNotMatch(withText, /The word goes in a file/, 'folded: its text is not drawn until it is opened');
+  assert.match(without, /<p>Thought, with no text kept<\/p>/, 'a thought the harness kept no text for says so');
 });
 
 test('a tool call is drawn with its result: folded, how its result says it went; opened, what it was given and what came back', () => {
@@ -808,7 +808,7 @@ test('a StructuredOutput call is drawn as the closeout, named, with its outcome 
       },
     },
   ]);
-  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn!, live: false, last: true, tail: true }));
+  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn, live: false, last: true, tail: true }));
   assert.match(html, /aria-label="Closeout"/);
   assert.match(html, />Closeout<\/h3>/);
   assert.match(html, /data-outcome="blocked"/);
@@ -823,7 +823,7 @@ test('in a live fold with nothing said after it, every call still waiting is run
     { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run typecheck' } } },
   ];
   const turns = foldTranscript(pending);
-  const fold = turns[1]!;
+  const fold = turns[1];
   assert.ok(fold.kind === 'tools');
   assert.equal(tailStart(turns), 1, 'the fold is in the tail');
   const states = (live: boolean, tail: boolean) =>
@@ -842,7 +842,7 @@ test("REFUSED: a closed fold draws none of its calls, and a closed call none of 
     { id: 'toolu_test', at, role: 'user', kind: 'tool_result', result: { text: 'pass 233', isError: false } },
     { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: { file_path: 'README.md' } } },
   ]);
-  const fold = turns[0]!;
+  const fold = turns[0];
   assert.ok(fold.kind === 'tools');
   const closed = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false }));
   assert.match(closed, /aria-expanded="false"/);
@@ -851,7 +851,7 @@ test("REFUSED: a closed fold draws none of its calls, and a closed call none of 
   const opened = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false, defaultOpen: true }));
   assert.equal([...opened.matchAll(/data-turn="tool"/g)].length, 2, 'opened: both calls');
 
-  const call = fold.turns[0]!;
+  const call = fold.turns[0];
   assert.ok(call.kind === 'tool');
   const folded = renderToStaticMarkup(createElement(ToolCallView, { call: call.call, running: false }));
   assert.doesNotMatch(folded, />Parameters<\/h4>|pass 233/, 'a closed call draws neither its input nor its result');
@@ -964,12 +964,12 @@ test('two texts with footnotes on one page name theirs apart — no id twice, ea
       createElement(Markdown, null, 'Two[^1].\n\n[^1]: Second.'),
     ),
   );
-  const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]!);
+  const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(ids.length, 6, 'a reference, a label and a note, in each');
   assert.equal(new Set(ids).size, ids.length, `no id twice: ${ids.join(', ')}`);
-  for (const [, href] of html.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(href!), `#${href} names an element on the page`);
+  for (const [, href] of html.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(href), `#${href} names an element on the page`);
   for (const [, label] of html.matchAll(/aria-describedby="([^"]+)"/g))
-    assert.ok(ids.includes(label!), `${label} names an element on the page`);
+    assert.ok(ids.includes(label), `${label} names an element on the page`);
 });
 
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
@@ -1040,7 +1040,7 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, e
   assert.match(html, />step 02</);
   assert.match(html, /title="review">review</);
   assert.match(html, />claude · opus</);
-  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
+  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2])]);
   assert.deepEqual(
     lines,
     [
@@ -1079,7 +1079,7 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, e
 test("a step that sets nothing is drawn on the defaults: its harness's own effort and tools under its head, and nothing else", async () => {
   const html = await specMarkup(unset);
   assert.match(html, />default harness · default model</);
-  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
+  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2])]);
   assert.deepEqual(
     lines,
     [
@@ -1097,7 +1097,7 @@ test("a step that sets nothing is drawn on the defaults: its harness's own effor
 test("a step on the builder has handles a person draws with — out on the right, in on the left, and a loop's out and in underneath, apart — and says it is unsaved or refused", async () => {
   const html = await specMarkup({ ...unset, harness: 'claude', check: 'npm test' }, { unsaved: true, refused: true, selected: true });
   const handles = [...html.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="([^"]*)"[^>]*>/g)].map((m) => {
-    const classes = m[3]!.split(' ');
+    const classes = m[3].split(' ');
     const type = classes.includes('source') ? 'source' : 'target';
     return [type, m[2], m[1] ?? null, classes.includes('connectable'), classes.includes('connectablestart')];
   });
@@ -1243,7 +1243,7 @@ test('the agent-facing chips are amber and the check-affecting ones outlined red
       ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
     ],
   );
-  assert.match(chips[0]!.cls, /\bbg-amber-100\b/);
+  assert.match(chips[0].cls, /\bbg-amber-100\b/);
   for (const chip of chips.slice(1)) {
     assert.match(chip.cls, /\bring-red-400\b/);
     assert.doesNotMatch(chip.cls, /\bbg-/, 'an outline, not a fill');
@@ -1270,7 +1270,7 @@ test('the lesson chip is green with what was written, amber when nothing was, an
       renderToStaticMarkup(createElement(LessonChip, { lesson })),
     );
     assert.ok(m, lesson.state);
-    return { state: m[1], cls: m[2]!, text: m[3] };
+    return { state: m[1], cls: m[2], text: m[3] };
   };
   const written = chip({ said: 'CLAUDE.md +2 −0', state: 'written' });
   assert.deepEqual([written.state, written.text], ['written', 'lesson · CLAUDE.md +2 −0']);
@@ -1352,7 +1352,7 @@ test('the Decide section copies its commands and runs none: a button per command
   assert.equal(buttons.length, commands.length, html);
   for (const [i, button] of buttons.entries()) {
     assert.match(button, /\bdata-copy="true"/);
-    assert.ok(button.includes(`aria-label="Copy: ${commands[i]!.command}"`), button);
+    assert.ok(button.includes(`aria-label="Copy: ${commands[i].command}"`), button);
   }
   for (const { command } of commands) assert.ok(html.includes(`>${command}</code>`), command);
   // The once-more line's words, without the command it is followed by on the line below.
@@ -1374,8 +1374,8 @@ test("the inspector's Details say what a step used and what it cost beside its a
       ...renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} })).matchAll(
         /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
       ),
-    ].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
-  const labels = rows(run.steps[0]!);
+    ].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
+  const labels = rows(run.steps[0]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
   assert.deepEqual(
     labels.slice(at('latest took'), at('latest took') + 3).map(([l, v]) => [l, l === 'latest took' ? '…' : v]),
@@ -1387,7 +1387,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
   );
 
   const measured = {
-    ...run.steps[0]!,
+    ...run.steps[0],
     used: {
       ...UNMEASURED,
       usage: { turns: 12, costUsd: 0.004 },
@@ -1402,7 +1402,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
     ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
   );
   // A step not filed has run nothing: said once, never a table of dashes — and what its spec says still below (none, on this fixture).
-  const unfiledStep = { ...run.steps[0]!, taskId: null, used: null };
+  const unfiledStep = { ...run.steps[0], taskId: null, used: null };
   const unfiled = Object.fromEntries(rows(unfiledStep));
   assert.deepEqual([unfiled.attempts, unfiled.used, unfiled.cost, unfiled.task], [undefined, undefined, undefined, undefined]);
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step: unfiledStep, onClose: () => {} }));
@@ -1504,14 +1504,14 @@ const threeTries: StepTry[] = [
 
 test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
   const run = runWith('round 2 of 3');
-  const step = { ...run.steps[0]!, name: 'implement', status: 'running (working)', attempts: threeTries[2]!.attempts, tries: threeTries };
+  const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: threeTries[2].attempts, tries: threeTries };
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
   const section = /<section aria-label="Rounds"[\s\S]*?<\/section>/.exec(html)?.[0];
   assert.ok(section, `a Rounds section: ${html}`);
   const rows = [...section.matchAll(/<li data-try="(\d+)"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => [
     m[1],
-    /aria-current="true"/.test(m[2]!),
-    textsOf(m[3]!),
+    /aria-current="true"/.test(m[2]),
+    textsOf(m[3]),
   ]);
   assert.deepEqual(rows, [
     ['1', false, ['round 1 · try 1', 'closeout', 'r-1-implement', '#1 · 12m 30s', 'check', 'exit 1']],
@@ -1528,14 +1528,14 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
     ],
   );
   // The attempts above it are the current try's, and say which try that is.
-  const facts = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]);
+  const facts = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]).join(' ')]);
   assert.deepEqual(facts.slice(0, 2), [
     ['try', 'round 2 · try 3 (round)'],
     ['attempts', '2'],
   ]);
 
   // One try: no Rounds, and no `try` above the attempts.
-  const once = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
+  const once = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
   assert.doesNotMatch(once, /aria-label="Rounds"|>try<\/dt>/);
   assert.match(once, />attempts<\/dt>/);
 });
@@ -1562,7 +1562,7 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   const tries = threeTries.map((t) =>
     t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output, missing: ['notes'], schema }) } : t,
   );
-  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2], none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
 
   // First the outcome, in words, and who said it; then the summary.
@@ -1601,7 +1601,7 @@ test("the Output tab opens on the outcome and who said it, then draws each field
 
   // Replies read as they did, `finding → answer · why`, each text markdown, and the answer a badge.
   assert.deepEqual(
-    [...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')),
+    [...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]).join(' ')),
     [
       'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
       "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
@@ -1621,8 +1621,8 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   const folds = (markup: string) =>
     [...markup.matchAll(/<details data-try="(\d+)"([^>]*)><summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => [
       m[1],
-      /\bopen\b/.test(m[2]!),
-      textsOf(m[3]!).join(''),
+      /\bopen\b/.test(m[2]),
+      textsOf(m[3]).join(''),
     ]);
   assert.deepEqual(folds(html), [
     ['2', false, 'round 1 · try 2 (retries) — done'],
@@ -1632,7 +1632,7 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   assert.ok(html.indexOf('Answered the review.') < html.indexOf('<details'), "the selected try's summary is above the folds");
 
   // An earlier try selected: its closeout on top, and the current one folded with the rest.
-  const earlier = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'No closeout yet.' }));
+  const earlier = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="1"[^>]*>[\s\S]*?<\/p>/.exec(earlier)![0]), ['round 1 · try 1']);
   assert.deepEqual(folds(earlier), [
     ['3', false, 'round 2 · try 3 (round) · current — done'],
@@ -1641,10 +1641,10 @@ test("the Output tab opens on the outcome and who said it, then draws each field
   assert.ok(earlier.indexOf('Added the cache.') < earlier.indexOf('<details'), earlier);
 
   // A try still running says what it was told to, by nobody; a step on its first try has no folds and no label.
-  const none = renderToStaticMarkup(createElement(TryCloseouts, { tries: threeTries, selected: threeTries[2]!, none: 'No closeout yet.' }));
+  const none = renderToStaticMarkup(createElement(TryCloseouts, { tries: threeTries, selected: threeTries[2], none: 'No closeout yet.' }));
   assert.match(none, /<p data-outcome="no closeout" data-by="nobody"/);
   assert.match(none, /<p data-reason="true"[^>]*>No closeout yet\.<\/p>/);
-  const first = renderToStaticMarkup(createElement(TryCloseouts, { tries: [tries[2]!], selected: tries[2]!, none: 'No closeout yet.' }));
+  const first = renderToStaticMarkup(createElement(TryCloseouts, { tries: [tries[2]], selected: tries[2], none: 'No closeout yet.' }));
   assert.doesNotMatch(first, /<details|data-shown-try/);
 });
 
@@ -1661,8 +1661,8 @@ test("a plan's files are a table, its path over its change; its steps a list; a 
   ];
   const approach = `Cache it.\n\nThen **expire** it: ${'a reason '.repeat(10)}`;
   const output = { approach, files: [{ path: 'src/cache.ts', change: 'New.' }], steps: ['Write it.', 'Test it.'], screenshots: [shot] };
-  const tries = [{ ...threeTries[2]!, attempts: ranOnce, closeout: closeoutSaying('A plan.', { output, artifacts }) }];
-  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: '-' }));
+  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: closeoutSaying('A plan.', { output, artifacts }) }];
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
   assert.deepEqual(
     [...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]),
     [
@@ -1684,7 +1684,7 @@ test("a plan's files are a table, its path over its change; its steps a list; a 
 test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
   const unsigned = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
   const tries = threeTries.map((t) => (t.try === 1 ? { ...t, attempts: unsigned, closeout: null } : t));
-  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: 'unused' }));
   assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [
     'unsigned',
     'no statement: the machine’s reason',
@@ -1698,7 +1698,7 @@ test("a try that ended with no statement says the machine's reason, unsigned, in
     /data-closeout|Raw/,
     'no statement, so nothing to draw nor show raw',
   );
-  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2], none: 'No closeout yet.' }));
   assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unsigned<\/summary>/);
 });
 
@@ -1707,7 +1707,7 @@ test('a try whose statement could not be read says so, why, and shows it whole a
   const tries = threeTries.map((t) =>
     t.try === 1 ? { ...t, closeout: null, unreadable: { error: 'unparseable: Unterminated string in JSON', raw: said } } : t,
   );
-  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: 'unused' }));
   assert.deepEqual(textsOf(/<p data-outcome="unreadable" data-by="unreadable"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [
     'unreadable',
     'said by the agent, not readable',
@@ -1721,7 +1721,7 @@ test('a try whose statement could not be read says so, why, and shows it whole a
     /<section aria-label="As it came"[^>]*>[\s\S]*?<pre data-raw="true"[^>]*>\{&quot;outcome&quot;: &quot;done&quot;, &quot;summary&quot;: &quot;Cut off<\/pre>/,
     'the statement, untouched',
   );
-  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2], none: 'No closeout yet.' }));
   assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unreadable<\/summary>/);
 });
 
@@ -1739,19 +1739,19 @@ test("a closeout's image is drawn inline, its name its alt, opening full-size in
     }),
   );
   const [image, text, other, bare] = html.split('<li ').slice(1);
-  assert.match(image!, /data-artifact="image"/);
-  assert.ok(image!.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
+  assert.match(image, /data-artifact="image"/);
+  assert.ok(image.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
   assert.match(
-    image!,
+    image,
     /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt="shot\.png"/,
     'the image inside the link that opens it',
   );
-  assert.match(image!, />shot\.png · 47\.1 KB<\/figcaption>/);
-  assert.ok(text!.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
-  assert.match(text!, />notes\.txt<\/a><\/span>/, 'a link, and nothing after it');
-  assert.match(other!, />trace\.zip<\/a><span[^>]*> · 2\.3 MB<\/span>/);
-  assert.match(bare!, /data-artifact="path"[^>]*>RESPONSE\.md<\/span>/);
-  assert.doesNotMatch(bare!, /<a /);
+  assert.match(image, />shot\.png · 47\.1 KB<\/figcaption>/);
+  assert.ok(text.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
+  assert.match(text, />notes\.txt<\/a><\/span>/, 'a link, and nothing after it');
+  assert.match(other, />trace\.zip<\/a><span[^>]*> · 2\.3 MB<\/span>/);
+  assert.match(bare, /data-artifact="path"[^>]*>RESPONSE\.md<\/span>/);
+  assert.doesNotMatch(bare, /<a /);
   assert.equal(html.match(/<img /g)?.length, 1, 'only the image is drawn');
   assert.match(renderToStaticMarkup(createElement(Artifacts, { artifacts: [] })), />none named</);
 });
@@ -1765,13 +1765,13 @@ test("a closeout's file `wf prune --artifacts` removed is its path and when it w
     }),
   );
   const [pruned, bare] = html.split('<li ').slice(1);
-  assert.match(pruned!, /data-artifact="pruned"/);
-  assert.ok(pruned!.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
+  assert.match(pruned, /data-artifact="pruned"/);
+  assert.ok(pruned.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
   const time = renderToStaticMarkup(when(at));
-  assert.ok(pruned!.includes(`> — its files were removed at ${time} (wf prune --artifacts)</span>`), pruned);
-  assert.ok(!textsOf(pruned!).join(' ').includes(at), 'the moment is drawn as `when` draws it, never as the api spells it');
-  assert.doesNotMatch(pruned!, /<a |<img /);
-  assert.match(bare!, /data-artifact="path"/, 'a path the prune did not reach is the path, as before');
+  assert.ok(pruned.includes(`> — its files were removed at ${time} (wf prune --artifacts)</span>`), pruned);
+  assert.ok(!textsOf(pruned).join(' ').includes(at), 'the moment is drawn as `when` draws it, never as the api spells it');
+  assert.doesNotMatch(pruned, /<a |<img /);
+  assert.match(bare, /data-artifact="path"/, 'a path the prune did not reach is the path, as before');
 });
 
 test("the spec says what a step runs with: the workflow's word where it sets one, the engine's marked `default` where it does not, and a dash for a step not filed", () => {
@@ -1781,7 +1781,7 @@ test("the spec says what a step runs with: the workflow's word where it sets one
         ...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(
           /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
         ),
-      ].map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+      ].map((m) => [m[1], textsOf(m[2]).join(' ')]),
     );
   const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline];
   const unset: StepSpec = {
@@ -1934,7 +1934,7 @@ test('a step on a remote A2A agent says the agent and its address, and no model,
         ...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(
           /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
         ),
-      ].map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+      ].map((m) => [m[1], textsOf(m[2]).join(' ')]),
     );
   const spec: StepSpec = {
     harness: 'a2a:reviewer',
@@ -2005,7 +2005,7 @@ function needing(
   return {
     ...run,
     steps: [
-      { ...run.steps[0]!, needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs },
+      { ...run.steps[0], needs: null, blockedByHarness: false, waitingFor: null, lastLine: null, asked: null, denied: null, ...needs },
     ],
   };
 }
@@ -2069,8 +2069,8 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.match(html, /^<section aria-label="Answer"/);
   const rows = new Map(
     [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
-      m[2]!,
-      { kind: m[1]!, html: m[3]! },
+      m[2],
+      { kind: m[1], html: m[3] },
     ]),
   );
   assert.deepEqual(
@@ -2084,7 +2084,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     ],
   );
   // What the row says a step needs: a question as its markdown, under `asks:`, and any other need as a sentence.
-  const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]!).join(' ');
+  const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]).join(' ');
   const buttons = (name: string) =>
     [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [
       m[1],
@@ -2143,10 +2143,8 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
     { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
     { step: 'bare', kind: 'denied', calls: null },
   ]);
-  const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]),
-  );
-  const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]!).join(' ');
+  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2], m[3]]));
+  const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' ');
   assert.equal(
     said('notes'),
     "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
@@ -2245,7 +2243,7 @@ test('the tries say `your answer` beside a try a person answered, and above its 
   const answered = threeTries.map((t) => ({ ...t, answer: t.try === 2 ? answer : null }));
   const rounds = renderToStaticMarkup(createElement(Closeouts.Rounds, { tries: answered, selected: 3, onSelect: () => {} }));
   assert.deepEqual(
-    [...rounds.matchAll(/<li data-try="(\d+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /data-your-answer/.test(m[2]!)]),
+    [...rounds.matchAll(/<li data-try="(\d+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /data-your-answer/.test(m[2])]),
     [
       ['1', false],
       ['2', true],
@@ -2260,14 +2258,14 @@ test('the tries say `your answer` beside a try a person answered, and above its 
   );
 
   const selected = renderToStaticMarkup(
-    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[1]!, none: 'No closeout yet.' }),
+    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[1], none: 'No closeout yet.' }),
   );
   assert.ok(
     selected.indexOf('your answer:') >= 0 && selected.indexOf('your answer:') < selected.indexOf('Fixed the failing test.'),
     selected,
   );
   const folded = renderToStaticMarkup(
-    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[2]!, none: 'No closeout yet.' }),
+    createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[2], none: 'No closeout yet.' }),
   );
   const fold = /<details data-try="2"[\s\S]*?<\/details>/.exec(folded)![0];
   assert.ok(fold.indexOf('your answer:') >= 0 && fold.indexOf('your answer:') < fold.indexOf('Fixed the failing test.'), fold);
@@ -2281,7 +2279,7 @@ const bannerMarkup = (run: RunDetail) =>
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
   const base = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   const asks = {
-    ...base.steps[0]!,
+    ...base.steps[0],
     name: 'implement',
     taskId: 't-2',
     status: 'succeeded · BLOCKED',
@@ -2290,7 +2288,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]!] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -2298,7 +2296,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   assert.ok(texts.includes('asks: Which database?'), html);
   // After the step's name, which is a tag of its own.
   assert.ok(texts.includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`), html);
-  const items = new Map([...html.matchAll(/<li data-need="(\w+)" data-step="(\w+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
+  const items = new Map([...html.matchAll(/<li data-need="(\w+)" data-step="(\w+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2], m[3]]));
   assert.doesNotMatch(items.get('implement')!, /<form|<button|<textarea/, 'a question is answered from the Decide section, not the banner');
   // For the session the harness blocked, after what it said last: a form that asks, its box optional, and one button, enabled with nothing written.
   const review = items.get('review')!;
@@ -2319,7 +2317,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
 
   // Asked: what the tick does with it, in `wf ls`'s words, and nothing to press.
   const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
-  const held = { ...base.steps[0]!, note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
+  const held = { ...base.steps[0], note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(asked.includes(`<p data-note="true" class="font-mono text-xs">${note}</p></li>`), asked);
   assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/);
@@ -2329,7 +2327,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   assert.ok(textsOf(asked).includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`), asked);
 
   // A harness that says nothing about what for: the need alone, with no empty line under it.
-  const mute = bannerMarkup({ ...run, steps: [asks, { ...base.steps[0]!, waitingFor: null }] });
+  const mute = bannerMarkup({ ...run, steps: [asks, { ...base.steps[0], waitingFor: null }] });
   assert.ok(textsOf(mute).includes(`is blocked by the harness: ${LOGIN}`), mute);
   assert.doesNotMatch(mute, /data-advice/);
 });
@@ -2355,7 +2353,7 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
     ...run,
     steps: [
       {
-        ...base.steps[0]!,
+        ...base.steps[0],
         needs: null,
         blockedByHarness: false,
         lastLine: null,
@@ -2384,8 +2382,8 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
     footer[2],
     '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>',
   );
-  const spec = { ...atGate().steps[0]!.spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
-  const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } as RunDetail['steps'][number]['attempts'] }));
+  const spec = { ...atGate().steps[0].spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
+  const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/);
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no attempt yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
@@ -2393,10 +2391,10 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
 });
 
 test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
-  const theme = { ...atGate().steps[0]!, name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
   const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
-  const both = bannerMarkup({ ...run, steps: [run.steps[0]!, theme] });
-  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
+  const both = bannerMarkup({ ...run, steps: [run.steps[0], theme] });
+  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
     textsOf(line).join(''),
     `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1`,
@@ -2412,7 +2410,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
   assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
-  const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1]!, m[2]!]));
+  const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
   const buttons = (form: string) =>
     [...forms.get(form)!.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
@@ -2500,7 +2498,7 @@ const toShip = {
  */
 function endingRun(over: Partial<RunDetail> = {}): RunDetail {
   const run = runWith(null);
-  const base = run.steps[0]!;
+  const base = run.steps[0];
   const implement = {
     ...base,
     name: 'implement',
@@ -2602,10 +2600,10 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const run = endingRun();
   assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
   // Another step waiting on you is still said, beside the decision.
-  const theme = { ...run.steps[0]!, name: 'theme', status: 'failed ✗ check (exit 1)', closeout: null, approve: null, gate: null };
+  const theme = { ...run.steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', closeout: null, approve: null, gate: null };
   const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
   assert.match(both, /^<section aria-label="Waiting on you"/);
-  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
+  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
     textsOf(line).join(''),
     'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1',
@@ -2614,10 +2612,10 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
 
 test('the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off', async () => {
   const [implement, ship] = endingRun().steps;
-  assert.equal(Gates.endsTheRun(ship!), true, "it works in the repository's own checkout");
-  assert.equal(Gates.endsTheRun(implement!), false, 'the work does not');
+  assert.equal(Gates.endsTheRun(ship), true, "it works in the repository's own checkout");
+  assert.equal(Gates.endsTheRun(implement), false, 'the work does not');
   assert.equal(Gates.endsTheRun({ spec: null }), false, 'nor a step nothing defines any more');
-  assert.equal(Gates.endsTheRun({ spec: { ...ship!.spec!, workspace: null } }), false, 'nor one in a worktree of the run');
+  assert.equal(Gates.endsTheRun({ spec: { ...ship.spec!, workspace: null } }), false, 'nor one in a worktree of the run');
 
   // Its gate holds before the step is filed, so the word for a gate not yet held is about the work, never about this step signing off.
   const held = { awaiting: false, approval: null };
@@ -2642,7 +2640,7 @@ test("what an ending step would act on, beside its gate: the branch's standing a
     said: 'wf/r-1/implement is ahead of main by 3 commits',
     stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
   };
-  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1]! }));
+  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
   assert.match(html, /^<section aria-label="What ship would act on"/);
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
@@ -2656,7 +2654,7 @@ test("what an ending step would act on, beside its gate: the branch's standing a
   assert.ok(texts.includes('RESPONSE.md'), html);
 
   // A run with no result branch of its own, and one whose decision could not be read: said, not left blank.
-  const none = withDecision(run, decidedAs([]), createElement(Gates.ActsOn, { run, step: run.steps[1]! }));
+  const none = withDecision(run, decidedAs([]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
   assert.ok(textsOf(none).includes('No result branch of its own: the work is on the base branch.'), none);
 });
 
@@ -2696,19 +2694,19 @@ test("a step's facts say `workspace` only where the step says it: the step that 
   const [implement, ship] = endingRun().steps;
   const rowsOf = (step: RunDetail['steps'][number]) => specRows(step.spec!).map(([key, value]) => [key, value === null ? null : 'set']);
   assert.ok(
-    rowsOf(ship!).some(([key]) => key === 'workspace'),
-    JSON.stringify(rowsOf(ship!)),
+    rowsOf(ship).some(([key]) => key === 'workspace'),
+    JSON.stringify(rowsOf(ship)),
   );
-  assert.equal(rowsOf(ship!).find(([key]) => key === 'workspace')![1], 'set');
+  assert.equal(rowsOf(ship).find(([key]) => key === 'workspace')![1], 'set');
   assert.ok(
-    !rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: null } }).some(([key]) => key === 'workspace'),
+    !rowsOf({ ...ship, spec: { ...ship.spec!, workspace: null } }).some(([key]) => key === 'workspace'),
     'a step in a worktree says nothing',
   );
   assert.ok(
-    !rowsOf({ ...ship!, spec: { ...ship!.spec!, workspace: undefined as unknown as null } }).some(([key]) => key === 'workspace'),
+    !rowsOf({ ...ship, spec: { ...ship.spec!, workspace: undefined as unknown as null } }).some(([key]) => key === 'workspace'),
     'nor a detail from an api without the key',
   );
-  assert.ok(!implement!.spec, 'and the work of this fixture has no spec at all, which is not a row either');
+  assert.ok(!implement.spec, 'and the work of this fixture has no spec at all, which is not a row either');
 });
 
 test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
@@ -2833,7 +2831,7 @@ test('the edges between cards are drawn as every edge is: from a run into each c
       data: { state: 'to-come', loop: false },
     },
   ]);
-  const [done, toCome] = [edgeMarkup(edges[0]!), edgeMarkup(edges[1]!)];
+  const [done, toCome] = [edgeMarkup(edges[0]), edgeMarkup(edges[1])];
   assert.match(toCome, /data-state="to-come"[^>]*stroke-dasharray:5 4|stroke-dasharray:5 4[^>]*data-state="to-come"/);
   assert.match(done, /data-state="done"/);
   assert.doesNotMatch(done, /stroke-dasharray/);
@@ -2877,7 +2875,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
     ...base,
     steps: [
       {
-        ...base.steps[0]!,
+        ...base.steps[0],
         name: 'implement',
         timeline: [
           {
@@ -2900,7 +2898,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
         ],
       },
       {
-        ...base.steps[0]!,
+        ...base.steps[0],
         name: 'review',
         timeline: [
           {
@@ -2913,7 +2911,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
           },
         ],
       },
-      { ...base.steps[0]!, name: 'respond', timeline: [] },
+      { ...base.steps[0], name: 'respond', timeline: [] },
     ],
     timeline: { rounds: [total(1, '14s', '20m40s', 'still going')], run: total(null, '14s', '20m40s, 1 still running', 'still going') },
   };
@@ -2934,7 +2932,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
     ],
     html,
   );
-  const cell = (name: string) => [...html.matchAll(new RegExp(`data-cell="${name}"[^>]*>([^<]*)<`, 'g'))].map((m) => unescaped(m[1]!));
+  const cell = (name: string) => [...html.matchAll(new RegExp(`data-cell="${name}"[^>]*>([^<]*)<`, 'g'))].map((m) => unescaped(m[1]));
   assert.deepEqual(cell('queued'), ['12s', '1s', '1s', '14s']);
   assert.deepEqual(cell('ran'), ['19m42s', '58s', 'still running, no end yet', '20m40s, 1 still running']);
   assert.ok(
@@ -3008,7 +3006,7 @@ const pricedRun = (
   cancelledAt: string | null = null,
 ): RunDetail => {
   const run = runOf(status, { waitingOnYou, cancelledAt });
-  return { ...run, steps: [{ ...run.steps[0]!, ...cost }] };
+  return { ...run, steps: [{ ...run.steps[0], ...cost }] };
 };
 
 test("a step's node says what its tries cost, of its cap where it has one — red once they cost it or more — and a step past its budget is a human gate", () => {
@@ -3016,7 +3014,7 @@ test("a step's node says what its tries cost, of its cap where it has one — re
   const costOf = (html: string) => /<p data-cost="(\w+)"[^>]*class="([^"]*)"><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
   const [, state, className, said] = costOf(over) ?? [];
   assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
-  assert.match(className!, /\btext-red-700\b/);
+  assert.match(className, /\btext-red-700\b/);
   assert.equal(gateDrawn(over), true, 'over budget waits on you: a human gate');
   assert.equal(
     gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))),
@@ -3058,9 +3056,9 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
   const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
   const rows = (step: RunDetail['steps'][number]) =>
     Object.fromEntries(
-      [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]),
+      [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]),
     );
-  const step = run.steps[0]!;
+  const step = run.steps[0];
   const over = { ...step, ...priced(4.25, 3, true) };
   assert.equal(rows(over).spent, '$4.25 of $3');
   assert.match(markup(over), /<span data-spent="over" class="[^"]*\btext-red-700\b[^"]*">\$4\.25 of \$3<\/span>/);
@@ -3072,8 +3070,8 @@ test("the inspector's Details say what every try cost of its cap — `spent`, re
   const twice = {
     ...step,
     tries: [
-      { ...step.tries[0]!, current: false },
-      { ...step.tries[0]!, try: 2 },
+      { ...step.tries[0], current: false },
+      { ...step.tries[0], try: 2 },
     ],
   };
   assert.equal(rows({ ...twice, ...priced(2.95, null) }).spent, '$2.95');
@@ -3104,7 +3102,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
     ...base,
     steps: [
       {
-        ...base.steps[0]!,
+        ...base.steps[0],
         timeline: [
           { try: 1, round: 1, session: span('t-1'), sessionOf: null, check: span('t-1-check'), used: used(1.75) },
           { try: 2, round: 2, session: span('t-2'), sessionOf: null, check: null, used: used(null) },
@@ -3123,8 +3121,8 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
   // Before `used`, which runs long: in view without scrolling the table.
   assert.match(html, /<th scope="col"[^>]*>ran<\/th><th scope="col"[^>]*>cost<\/th><th scope="col"[^>]*>used<\/th><\/tr><\/thead>/);
   const rows = [...html.matchAll(/<tr ([^>]*)>([\s\S]*?)<\/tr>/g)].map((m) => [
-    /data-task="(\w+)"/.exec(m[1]!)?.[1] ?? /data-total="([^"]+)"/.exec(m[1]!)?.[1],
-    /<td data-cell="cost"[^>]*>([^<]*)<\/td>/.exec(m[2]!)?.[1],
+    /data-task="(\w+)"/.exec(m[1])?.[1] ?? /data-total="([^"]+)"/.exec(m[1])?.[1],
+    /<td data-cell="cost"[^>]*>([^<]*)<\/td>/.exec(m[2])?.[1],
   ]);
   assert.deepEqual(rows, [
     ['session', '$1.75'],
@@ -3281,8 +3279,8 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   ]);
   const rows = new Map(
     [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
-      m[2]!,
-      { kind: m[1]!, html: m[3]! },
+      m[2],
+      { kind: m[1], html: m[3] },
     ]),
   );
   assert.deepEqual(
@@ -3309,7 +3307,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   // The box for what to tell the try: its label, and whether it is closed; none on a row that has none.
   const said = (name: string) => {
     const label = /<label for="[^"]+" class="sr-only">([^<]*)<\/label><textarea [^>]*>/.exec(rows.get(name)!.html);
-    return label ? [unescaped(label[1]!), /\bdisabled=""/.test(label[0])] : null;
+    return label ? [unescaped(label[1]), /\bdisabled=""/.test(label[0])] : null;
   };
 
   const tokens = textsOf(rows.get('tokens')!.html);
@@ -3402,7 +3400,7 @@ const readOnlyReach = (
     ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
     ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
   ].map((c) => {
-    const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command]!, source: '.claude/settings.json' } : null);
+    const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command], source: '.claude/settings.json' } : null);
     return { ...c, denied: rule(denied) ?? (dontAsk ? rule(asks) : null), asks: rule(asks) };
   });
 const allowedMarkup = (allowed: StepReach['allowed'], readOnly: StepReach['readOnly']) =>
@@ -3586,7 +3584,7 @@ async function refusedMarkup(
     }),
   );
   const texts = textsOf(html);
-  return { head: texts[0]!, reread: /Read the folder again/.test(html), said: texts[1]! };
+  return { head: texts[0], reread: /Read the folder again/.test(html), said: texts[1] };
 }
 
 test('a save the api refused — a 4xx — says nothing was written, and only a 409 offers to read the folder again', async () => {
@@ -3747,7 +3745,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
     edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     [{ id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } }],
   );
-  assert.match(edgeMarkup(edges[0]!), /stroke-dasharray:5 4/);
+  assert.match(edgeMarkup(edges[0]), /stroke-dasharray:5 4/);
 });
 
 const { HandedOn } = await import('../src/components/Closeout.tsx');
@@ -3784,11 +3782,11 @@ function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): 
     ...run,
     steps: [
       {
-        ...step!,
+        ...step,
         approve: closeout ? 'approve review' : null,
         closeout,
-        tries: [{ ...step!.tries[0]!, closeout }],
-      } as RunDetail['steps'][number],
+        tries: [{ ...step.tries[0], closeout }],
+      },
     ],
   };
 }
@@ -3796,7 +3794,7 @@ function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): 
 const tabSelected = (html: string): string | undefined => /aria-selected="true"[^>]*>([A-Za-z]+)</.exec(html)?.[1];
 
 test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
-  const inspect = (run: RunDetail) => withClient(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
+  const inspect = (run: RunDetail) => withClient(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
   const atGate = inspect(gatedRun(planCloseout));
   assert.equal(tabSelected(atGate), 'Output');
   assert.match(atGate, /data-field="approach"/, 'the Output tab is drawn: the approach is there without a press');
@@ -4086,7 +4084,7 @@ test("the repository's agent lists the skills it gives read-only: no Remove, no 
 });
 
 const SKILL_DETAIL = {
-  skill: PLACES[0]!.skills[0],
+  skill: PLACES[0].skills[0],
   version: 'v1',
   draft: {
     name: 'write-a-note',
@@ -4164,7 +4162,7 @@ function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
     cancelledAt: null,
     steps: [
       {
-        ...run.steps[0]!,
+        ...run.steps[0],
         name: 'try',
         status: 'done',
         taskId: 't-t',

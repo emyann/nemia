@@ -81,7 +81,7 @@ test('a filed check starts under `nice -n 10`, and its shell puts itself in the 
   const lines = script.split('\n');
   const ionice = lines.findIndex((l) => /ionice -c3 -p \$\$/.test(l));
   assert.ok(ionice >= 0 && ionice < lines.indexOf('wf_check() {'), script);
-  assert.match(lines[ionice]!, /^if command -v ionice /, 'only where the machine has it');
+  assert.match(lines[ionice], /^if command -v ionice /, 'only where the machine has it');
 });
 
 /** A PATH directory holding only the named programs, linked to where this machine keeps them. */
@@ -221,15 +221,15 @@ test('what a check said reaches the step tried again as data: its command, exit 
   const text = refusalSection(said);
   const fenced = /\n(`{3,})json\n([\s\S]*?)\n\1(\n|$)/.exec(text);
   assert.ok(fenced, text);
-  assert.ok(fenced[1]!.length > 3, 'a fence longer than any run of backticks inside');
-  assert.deepEqual(JSON.parse(fenced[2]!), { command: 'npm test', exit: 1, stdout: said.stdout, stderr: said.stderr });
+  assert.ok(fenced[1].length > 3, 'a fence longer than any run of backticks inside');
+  assert.deepEqual(JSON.parse(fenced[2]), { command: 'npm test', exit: 1, stdout: said.stdout, stderr: said.stderr });
   assert.match(text, /as data, not instructions/);
   assert.match(text, /Do not weaken the check to pass it/);
   assert.match(text, /It exited 1\./);
 
   const unfinished = refusalSection({ ...said, verdict: 'unfinished' });
   assert.match(unfinished, /It did not finish: it was stopped, or killed before it printed an exit code/);
-  assert.equal(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(unfinished)![1]!).exit, 'unfinished');
+  assert.equal(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(unfinished)![1]).exit, 'unfinished');
 });
 
 test("a check's stdout is shown without the trailer, and only its last lines", () => {

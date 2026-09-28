@@ -65,8 +65,8 @@ test("a step's need is its question while it waits on you, or that the harness b
     { step: 'silent', kind: 'harness', waitingFor: null, lastLine: null },
   ]);
   assert.deepEqual(needsOf(run(steps, [], '2026-09-14T07:00:00.000Z')), []);
-  assert.equal(needOf(steps[0]!, false, false), null, 'asked already: no question to show');
-  assert.equal(needOf(steps[2]!, false, true), null, 'called off: nobody waits for the session');
+  assert.equal(needOf(steps[0], false, false), null, 'asked already: no question to show');
+  assert.equal(needOf(steps[2], false, true), null, 'called off: nobody waits for the session');
 
   // The wait before the last line: it is why the session has not moved. What a person does about it is not in either — the banner says it.
   assert.deepEqual(needs.map(needLine), [
@@ -87,7 +87,7 @@ test("a step's need is its question while it waits on you, or that the harness b
   // As the list gives a step the harness blocked, with no last line to give: the card names the harness and what it waits for, and quotes nothing.
   const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT, approve: null }, false, false);
   assert.deepEqual(listed, { step: 'held', kind: 'harness', waitingFor: WAIT, lastLine: null });
-  assert.equal(needLine(listed!), `held is blocked by the harness: ${WAIT.words}`);
+  assert.equal(needLine(listed), `held is blocked by the harness: ${WAIT.words}`);
 });
 
 test("a step at its gate needs its approval, in `wf ls`'s words, while it waits on you — none once approved or sent back, and none on a run called off; the Decide section offers it nothing, since Approve is in its section", () => {
@@ -96,8 +96,8 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
   const needs = needsOf(run(steps, ['plan', 'theme']));
   assert.deepEqual(needs, [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
   // The words name the step already: the card and the node say them as they are.
-  assert.equal(needLine(needs[0]!), 'approve plan');
-  assert.equal(needText(needs[0]!), 'approve plan');
+  assert.equal(needLine(needs[0]), 'approve plan');
+  assert.equal(needText(needs[0]), 'approve plan');
   // Sent back, the api waits on nobody for it and carries no `approve`; approved, it reads as it stands and carries none either.
   assert.equal(needOf(plan, false, false), null, 'not waiting on you: nothing to approve');
   assert.equal(needOf({ ...plan, approve: null }, true, false), null, 'no need the api does not carry');
@@ -175,7 +175,7 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
     { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--fresh, with your answer) — the next tick files it' },
   ]);
   // A blocked step the api does not name as waiting on you is offered nothing: what waits is the api's word.
-  assert.deepEqual(offersOf(run([steps[0]!], [])), []);
+  assert.deepEqual(offersOf(run([steps[0]], [])), []);
   assert.deepEqual(offersOf(run(steps, waiting, '2026-09-14T07:00:00.000Z')), [], 'nothing on a run called off');
   const kinds = (needs: Need[]) => needs.map((n) => n.kind);
   assert.deepEqual(kinds(needsOf(run(steps, waiting))), ['asks'], 'the banner names the step that asks');

@@ -119,7 +119,7 @@ test('REFUSED: a git allow for -C, grep, fetch, a verb that writes, a bare git, 
   for (const rule of refused) {
     const said = refusals([...allow, rule]);
     assert.equal(said.length, 1, `${rule} is refused: ${said.join('; ')}`);
-    assert.ok(said[0]!.startsWith(`${rule}: `), said[0]);
+    assert.ok(said[0].startsWith(`${rule}: `), said[0]);
   }
   // Refused for what it is, not only for being off the list: put on the list, a rule that writes is refused all the same.
   READS.push('Bash(git -C:*)', 'Bash(git commit:*)');

@@ -176,7 +176,7 @@ const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unkno
 /** A run whose implement is on the try after the run's one sign-off nudge, spent: what `retriesDue` leaves an unsigned step to a person on. */
 const signedOffOnce = (r: Run): Run => ({
   ...r,
-  steps: { ...r.steps, implement: { ...r.steps.implement!, tries: [{ taskId: 't0', then: 'signoff' }] } },
+  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', then: 'signoff' }] } },
 });
 
 test('a fresh run files only the step with nothing in front of it', () => {
@@ -385,9 +385,9 @@ test('a resumed step is told only its own prose — it already has the context',
 
 test('a sequential chain stays in one workspace — the line of work continues', () => {
   const chain = [step('implement'), step('review', ['implement']), step('respond', ['review'])];
-  assert.deepEqual(workspacePlan(chain, chain[0]!), { kind: 'fork', from: null });
-  assert.deepEqual(workspacePlan(chain, chain[1]!), { kind: 'inherit', from: 'implement' });
-  assert.deepEqual(workspacePlan(chain, chain[2]!), { kind: 'inherit', from: 'review' });
+  assert.deepEqual(workspacePlan(chain, chain[0]), { kind: 'fork', from: null });
+  assert.deepEqual(workspacePlan(chain, chain[1]), { kind: 'inherit', from: 'implement' });
+  assert.deepEqual(workspacePlan(chain, chain[2]), { kind: 'inherit', from: 'review' });
 });
 
 test('SIBLINGS FORK — two concurrent steps never share a directory', () => {
@@ -406,7 +406,7 @@ test('SIBLINGS FORK — two concurrent steps never share a directory', () => {
 
 test('a fan-in MERGES its predecessors — `after: a, b` means "and give me both"', () => {
   const fan = [step('a'), step('b'), step('c'), step('merge', ['a', 'b', 'c'])];
-  assert.deepEqual(workspacePlan(fan, fan[3]!), { kind: 'merge', from: 'a', also: ['b', 'c'] });
+  assert.deepEqual(workspacePlan(fan, fan[3]), { kind: 'merge', from: 'a', also: ['b', 'c'] });
 });
 
 test('the merge base is deterministic, whatever order `after` was written in', () => {
@@ -417,15 +417,15 @@ test('the merge base is deterministic, whatever order `after` was written in', (
 
 test('several roots each fork from the base — a run may start wide', () => {
   const wide = [step('a'), step('b')];
-  assert.deepEqual(workspacePlan(wide, wide[0]!), { kind: 'fork', from: null });
-  assert.deepEqual(workspacePlan(wide, wide[1]!), { kind: 'fork', from: null });
+  assert.deepEqual(workspacePlan(wide, wide[0]), { kind: 'fork', from: null });
+  assert.deepEqual(workspacePlan(wide, wide[1]), { kind: 'fork', from: null });
 });
 
 test("`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch", () => {
   const ending: Workflow = { name: 'ship', after: ['review'], body: 'ship it', workspace: 'main', gate: true };
   const dev = [step('implement'), step('review', ['implement']), ending];
   assert.deepEqual(workspacePlan(dev, ending), { kind: 'main' }, 'said by the step, not by the shape');
-  assert.deepEqual(workspacePlan(dev, dev[1]!), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
+  assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
   // The result is what the ending step would merge: review's branch, never `main`, which every question about a result would answer yes.
   assert.deepEqual(
     resultSteps(dev).map((s) => s.name),
@@ -596,7 +596,7 @@ test('a step in the checkout is told the one place its files go: the run hands n
   assert.match(artifactsContract(FILES, true), /`wf decide` reads a path named from\nthe workspace root as `not collected`/);
   // Every other step is told both ways, as it was.
   assert.match(
-    composeBrief(dev[1]!, r, dev, () => undefined, FILES),
+    composeBrief(dev[1], r, dev, () => undefined, FILES),
     /\n## Files for the steps after you\n/,
   );
   assert.match(artifactsContract(FILES), /Or leave it in this workspace/);
@@ -730,7 +730,7 @@ test('`slot: none`: a run of a workflow that says it is never in flight for the 
   ];
   assert.deepEqual([...heldRuns(runs, 1)], [], 'one slot, and the work takes it');
   assert.deepEqual(
-    [...heldRuns([{ ...runs[0]!, ...need(running, { t1: 'running' }) }, runs[1]!], 1)],
+    [...heldRuns([{ ...runs[0], ...need(running, { t1: 'running' }) }, runs[1]], 1)],
     [['work', { inFlight: 1, cap: 1 }]],
     'counted, it would have held the work',
   );
@@ -793,7 +793,7 @@ test('`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 o
     [held.steps.map((s) => s.status), held.slot, held.waitingOnYou],
     [['waiting for a run slot (2 of 2 in flight)', 'waiting'], slot, []],
   );
-  assert.equal(Object.hasOwn(listing(STEPS, fresh, shown({}), () => undefined, asked).steps[0]!, 'slot'), false);
+  assert.equal(Object.hasOwn(listing(STEPS, fresh, shown({}), () => undefined, asked).steps[0], 'slot'), false);
   assert.equal(
     Object.hasOwn(
       listing(STEPS, fresh, shown({}), () => undefined, asked),
@@ -817,7 +817,7 @@ test('`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 o
     () => undefined,
     slot,
   );
-  assert.deepEqual([started.steps[0]!.status, started.slot], ['running', undefined]);
+  assert.deepEqual([started.steps[0].status, started.slot], ['running', undefined]);
   const cancelled = listing(
     STEPS,
     run({ implement: null, review: null }, CANCELLED),
@@ -833,7 +833,7 @@ test('`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 o
     () => undefined,
     slot,
   );
-  assert.deepEqual([cancelled.steps[0]!.status, cancelled.slot], ['waiting', undefined]);
+  assert.deepEqual([cancelled.steps[0].status, cancelled.slot], ['waiting', undefined]);
   const waits = listing(
     STEPS,
     run({ implement: null, review: null }, { after: ['a-1x2y'] }),
@@ -849,7 +849,7 @@ test('`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 o
     () => undefined,
     slot,
   );
-  assert.deepEqual([waits.steps[0]!.status, waits.slot], ['waiting on a-1x2y', undefined]);
+  assert.deepEqual([waits.steps[0].status, waits.slot], ['waiting on a-1x2y', undefined]);
 });
 
 test('`wf up` says both ceilings in words: sessions at work per pool, and runs in flight — `no cap` when none', () => {
@@ -1230,7 +1230,7 @@ test('a step without `check:` gets no check, and its follower is filed on its wo
   const a = assess(STEPS, run({ implement: 't1', review: null }), p, signedDone, asked);
   assert.deepEqual(a.check, []);
   assert.deepEqual(a.ready, ['review']);
-  assert.equal(stepStatus(STEPS[0]!, run({ implement: 't1' }), p, signedDone, asked), 'unverified');
+  assert.equal(stepStatus(STEPS[0], run({ implement: 't1' }), p, signedDone, asked), 'unverified');
 });
 
 test("a signed step with `check:` is due its check, and its follower is NOT filed on the engine's succeeded", () => {
@@ -1246,14 +1246,14 @@ test('a check already filed is checking, and is never due a second time', () => 
     const p = phases({ t1: 'succeeded', c1: c });
     const a = assess(CHECKED, r, p, signedDone, asked);
     assert.deepEqual([a.check, a.ready, a.status], [[], [], 'running'], c);
-    assert.equal(stepStatus(CHECKED[0]!, r, p, signedDone, asked), 'checking');
+    assert.equal(stepStatus(CHECKED[0], r, p, signedDone, asked), 'checking');
   }
 });
 
 test('a check that exits 0 verifies the step, and only then is its follower filed', () => {
   const p = phases({ t1: 'succeeded', c1: 'succeeded' });
   assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked).ready, ['review']);
-  assert.equal(stepStatus(CHECKED[0]!, withCheck('c1'), p, signedDone, asked), 'verified');
+  assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'verified');
 });
 
 test('a check that does not exit 0 fails the step: its follower is never filed, whatever the agent said', () => {
@@ -1261,7 +1261,7 @@ test('a check that does not exit 0 fails the step: its follower is never filed, 
     const p = phases({ t1: 'succeeded', c1: c });
     const a = assess(CHECKED, withCheck('c1'), p, signedDone, asked);
     assert.deepEqual([a.ready, a.blocked, a.status], [[], ['review'], 'failed'], c);
-    assert.equal(stepStatus(CHECKED[0]!, withCheck('c1'), p, signedDone, asked), 'failed (check)');
+    assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'failed (check)');
   }
 });
 
@@ -1270,7 +1270,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one satisfies not
   const none = () => undefined;
   const a = assess(CHECKED, withCheck(null), p, none, asked);
   assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'failed'], 'no signed work to check');
-  assert.equal(stepStatus(CHECKED[0]!, withCheck(null), p, none, asked), 'unsigned');
+  assert.equal(stepStatus(CHECKED[0], withCheck(null), p, none, asked), 'unsigned');
   // Without a check the same holds: going quiet is not saying done.
   assert.deepEqual(assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready, []);
 });
@@ -1293,22 +1293,22 @@ test('UNSIGNED, though the engine settles it `failed`: a session that went quiet
   const none = () => undefined;
   /** The engine's record: asked for a closeout, and its last attempt ended `unsigned`. */
   const quiet = () => 'unsigned' as const;
-  assert.equal(stepStatus(STEPS[0]!, r, failed, none, quiet), 'unsigned');
-  assert.equal(stepStatus(STEPS[0]!, r, failed, none, asked), 'failed', 'its attempt ended for another reason');
-  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'stopped' }), none, quiet), 'stopped', 'a person stopped it');
-  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'running' }), none, quiet), 'running', 'nudged, and not settled');
+  assert.equal(stepStatus(STEPS[0], r, failed, none, quiet), 'unsigned');
+  assert.equal(stepStatus(STEPS[0], r, failed, none, asked), 'failed', 'its attempt ended for another reason');
+  assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'stopped' }), none, quiet), 'stopped', 'a person stopped it');
+  assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'running' }), none, quiet), 'running', 'nudged, and not settled');
   assert.equal(
-    stepStatus(STEPS[0]!, r, failed, () => said('blocked'), quiet),
+    stepStatus(STEPS[0], r, failed, () => said('blocked'), quiet),
     'blocked',
   );
 
   const brief = (askedCloseout: typeof asked | typeof quiet) =>
-    composeBrief(STEPS[0]!, r, STEPS, undefined, undefined, undefined, {
+    composeBrief(STEPS[0], r, STEPS, undefined, undefined, undefined, {
       try: 2,
       by: 'ask',
       mode: 'nudge',
       resumed: true,
-      status: stepStatus(STEPS[0]!, r, failed, none, askedCloseout),
+      status: stepStatus(STEPS[0], r, failed, none, askedCloseout),
     });
   const quietly = decision(STEPS, r, failed, nothingShipped, none, quiet);
   assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['blocked', ['implement'], []]);
@@ -1363,14 +1363,14 @@ test("UNSIGNED is the LAST attempt's word: a task journalled before stage 4a par
 
   const lostLast = closeoutAsked(viewed('unsigned', 'lost'));
   assert.equal(lostLast('t1'), true, 'asked, and its last attempt ended for another reason');
-  assert.equal(stepStatus(STEPS[0]!, r, failed, none, lostLast), 'failed');
+  assert.equal(stepStatus(STEPS[0], r, failed, none, lostLast), 'failed');
   const broke = decision(STEPS, r, failed, nothingShipped, none, lostLast);
   assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
   assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, lostLast).waitingOnYou, []);
 
   const quietLast = closeoutAsked(viewed('lost', 'unsigned'));
   assert.equal(quietLast('t1'), 'unsigned');
-  assert.equal(stepStatus(STEPS[0]!, r, failed, none, quietLast), 'unsigned');
+  assert.equal(stepStatus(STEPS[0], r, failed, none, quietLast), 'unsigned');
   assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, quietLast).waitingOnYou, ['implement']);
   assert.equal(closeoutAsked(viewed('unsigned', 'unsigned'))('t1'), 'unsigned', 'quiet twice is quiet');
 });
@@ -1415,7 +1415,7 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
 
   const quiet = viewed('succeeded', [unstated]);
   assert.equal(closeoutAsked(quiet)('t1'), 'unsigned');
-  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
+  assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
   assert.deepEqual(listing(STEPS, r, shown({ t1: 'succeeded' }), none, closeoutAsked(quiet)).waitingOnYou, ['implement']);
   assert.equal(
     closeoutAsked(viewed('succeeded', [{ ended: 'failed', reason: 'lost' }, unstated]))('t1'),
@@ -1685,7 +1685,7 @@ const SPENT: EarlierTry[] = [
   { taskId: 't-b', check: { taskId: 'c-b' }, then: 'retries' },
 ];
 /** The JSON a brief carries in a fenced block, however long its fence. */
-const dataIn = (brief: string) => JSON.parse(/\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]!);
+const dataIn = (brief: string) => JSON.parse(/\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]);
 
 test("a try's ids are derived from its number, and the first try's are the ids a run had before tries", () => {
   const first = onTry();
@@ -1737,8 +1737,8 @@ test('REFUSED past `retries:`: no try is due, and the step waits on you as it di
   );
   // A person's tries are theirs: they do not spend what the run may spend on its own.
   const yours: EarlierTry[] = [
-    { ...SPENT[0]!, then: 'nudge' },
-    { ...SPENT[1]!, then: 'fresh' },
+    { ...SPENT[0], then: 'nudge' },
+    { ...SPENT[1], then: 'fresh' },
   ];
   assert.deepEqual(
     assess(RETRIED, onTry(yours), p, signedDone, asked, () => 1).retry.map((r) => [r.try, r.by]),
@@ -1792,7 +1792,7 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
   const d = decision(RETRIED, onTry(SPENT), phases({ t1: 'succeeded', c1: 'failed' }), nothingShipped, signedDone, asked, () => 1);
   assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck], [['implement'], []]);
   assert.match(
-    retryLines(RETRIED, onTry(SPENT), d, phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked)[0]!,
+    retryLines(RETRIED, onTry(SPENT), d, phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked)[0],
     /^implement: failed \(check\)\. Continue its session.*wf retry r-1 implement .*retries: 2, 2 spent/,
   );
 });
@@ -1811,7 +1811,7 @@ test("a person's ask is due for the step's next try only, once: an ask for a try
     () => 'unfinished',
     [askFor(2, 'fresh', 'opus')],
   );
-  assert.deepEqual([l.steps[0]!.note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
+  assert.deepEqual([l.steps[0].note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
 
   // Honoured: try 2 is on the record, its check running. The same ask is spent, and nothing is due for it.
   const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, then: 'recheck' }], 'c2');
@@ -1874,7 +1874,7 @@ test("the current try decides the step: try 2 verified files what waits on it, a
   const l = listing(RETRIED, r, shown({ t1: 'succeeded', c1: 'succeeded' }), signedOff({ implement: said('done') }), asked);
   assert.deepEqual(l.steps[0], { name: 'implement', status: 'verified ✓', branch: null, note: 'try 2, by retries: 2' });
   assert.equal(
-    tryNote(RETRIED[0]!, { taskId: 't', tries: [{ taskId: 'a', then: 'fresh', model: 'opus' }] }),
+    tryNote(RETRIED[0], { taskId: 't', tries: [{ taskId: 'a', then: 'fresh', model: 'opus' }] }),
     'try 2, fresh on opus, on your word',
   );
   assert.deepEqual(
@@ -2018,7 +2018,7 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     ],
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note,
+    listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
     'try 2 asked (--nudge) — stopping its session, then the tick files it',
     'a session working again: stopped first, and said so',
   );
@@ -2028,7 +2028,7 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     { step: 'implement', try: 2, mode: 'nudge', by: 'ask' },
   ]);
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'stopped' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note,
+    listing(STEPS, r, shown({ t1: 'stopped' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
     'try 2 asked (--nudge) — the next tick files it',
   );
 });
@@ -2170,7 +2170,7 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
       [],
       undefined,
       waitingOf,
-    ).steps[0]!.status;
+    ).steps[0].status;
 
   assert.equal(lsWith('needs-human', waiting), 'needs-human: waiting for a permission prompt');
   // One row per step: `cli.ts` pads this status to the width of the widest and prints the branch after it, so a newline the harness
@@ -2184,7 +2184,7 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
     'a harness that says nothing reads as it did before',
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({})).steps[0]!.status,
+    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({})).steps[0].status,
     'needs-human',
     'and so does a caller that asks nothing',
   );
@@ -2273,13 +2273,13 @@ test("`wf ls` says what a step's current try was denied in its note, never in it
     { name: 'implement', status: 'unverified · done', branch: null, note: 'denied: Skill(look), Bash(pytest)' },
     'the status every reader compares is the one it was without the denials',
   );
-  assert.equal(review!.note, undefined, 'a step denied nothing says nothing');
+  assert.equal(review.note, undefined, 'a step denied nothing says nothing');
   assert.deepEqual(
     ls(),
     ls(() => []),
     'a caller that asks nothing reads as one told of none',
   );
-  assert.equal(ls()[0]!.note, undefined);
+  assert.equal(ls()[0].note, undefined);
   // Beside whatever else its note says, after it.
   const tried = listing(
     RETRIED,
@@ -2299,7 +2299,7 @@ test("`wf ls` says what a step's current try was denied in its note, never in it
     undefined,
     () => undefined,
     (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
-  ).steps[0]!;
+  ).steps[0];
   assert.match(tried.note ?? '', /^try 2.* · denied: Bash\(npm\)$/, "the current try's task, not the try before it");
 });
 
@@ -2356,7 +2356,7 @@ test("a person's answer rides on the ask to the try it files: due with it, and s
     () => 'unfinished',
     [answered],
   );
-  assert.equal(l.steps[0]!.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+  assert.equal(l.steps[0].note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
 });
 
 test("`## Your answer` is the person's text, untouched in a fence, inside `## Try <n>` after on whose word and before the check's refusal — and a try without one is told exactly what it was", () => {
@@ -2471,7 +2471,7 @@ test('a try a person answered says so on `wf ls` — read off the ask, never the
       [],
       [],
       answers,
-    ).steps[0]!.note;
+    ).steps[0].note;
   assert.equal(listed([answer]), 'try 2, nudged on your word, answered');
   assert.equal(listed(), 'try 2, nudged on your word', 'no ask read, nothing said');
 
@@ -2485,7 +2485,7 @@ test('a try a person answered says so on `wf ls` — read off the ask, never the
   assert.equal(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh'), message: 'm' }]), undefined, 'asked fresh on the default model');
   assert.equal(
     tryNote(
-      RETRIED[0]!,
+      RETRIED[0],
       onOpus.steps.implement,
       RETRIED,
       Boolean(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh', 'opus'), message: 'm' }])),
@@ -2548,7 +2548,7 @@ const reviewSaid = (extra: Record<string, unknown> = {}): Closeout => ({
   needs: undefined,
   output: { findings: FOUND, ...extra },
 });
-const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]!);
+const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]);
 
 test('a step is filed with the closeout and the fields it declares, merged — still strict, and the base untouched', () => {
   assert.equal(closeoutSchemaOf(step('implement'), []), CLOSEOUT_SCHEMA, 'a step that declares nothing is filed as before');
@@ -2809,7 +2809,7 @@ test('a step is told where its files go, before its closeout — a fresh step, a
     assert.ok(told < brief.indexOf('\n## When you are finished\n'), 'the closeout stays last');
   }
   // What it will be judged by, then where its files go, then how to finish.
-  assert.ok(briefs[2]!.indexOf('\n## Before you sign off\n') < briefs[2]!.indexOf('\n## Files for the steps after you\n'));
+  assert.ok(briefs[2].indexOf('\n## Before you sign off\n') < briefs[2].indexOf('\n## Files for the steps after you\n'));
   assert.match(artifactsContract(FILES), /given the same directory as `WF_ARTIFACTS`/);
   assert.match(
     artifactsContract(FILES),
@@ -2894,7 +2894,7 @@ const LOOP: Workflow[] = [
   { ...step('review', ['implement']), output: { file: 'review.schema.json', schema: LOOPING }, loop: 'implement', rounds: 3 },
   step('ship', ['review']),
 ];
-const [IMPLEMENT, LOOPING_REVIEW] = [LOOP[0]!, LOOP[1]!];
+const [IMPLEMENT, LOOPING_REVIEW] = [LOOP[0], LOOP[1]];
 /** How review signed off: its findings, whether to go round again, and a summary that must travel nowhere. */
 const reviewed = (again: unknown): Closeout => ({
   outcome: 'done',
@@ -2937,7 +2937,7 @@ const inRound = (n: number, extra: Partial<GitRun> = {}): Run => {
 /** Round `n` with review not filed yet: implement's try is the one at work. */
 const reviewDue = (n: number): Run => {
   const r = inRound(n);
-  return { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review!.tries } } };
+  return { ...r, steps: { ...r.steps, review: { taskId: null, tries: r.steps.review.tries } } };
 };
 const ALL_SUCCEEDED = (): TaskPhase => 'succeeded';
 /** implement's closeout — with replies past round 1 — and review's, saying `again`. */
@@ -3018,7 +3018,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   // `rounds: 1`: the first round is the last.
   const once = LOOP.map((s) => (s.loop ? { ...s, rounds: 1 } : s));
   assert.deepEqual(assess(once, inRound(1), ALL_SUCCEEDED, saidIn(1, true), asked).round, []);
-  assert.equal(stepStatus(once[1]!, inRound(1), ALL_SUCCEEDED, saidIn(1, true), asked, once), 'exhausted');
+  assert.equal(stepStatus(once[1], inRound(1), ALL_SUCCEEDED, saidIn(1, true), asked, once), 'exhausted');
 });
 
 test("a person's `wf round` takes an exhausted loop once more, once: an ask for a round the record holds is spent", () => {
@@ -3028,7 +3028,7 @@ test("a person's `wf round` takes an exhausted loop once more, once: an ask for 
     { step: 'review', target: 'implement', round: 4, by: 'ask' },
   ]);
   const l = listing(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(4)]);
-  assert.deepEqual([l.steps[1]!.note, l.waitingOnYou], ['round 4 asked (wf round) — the next tick files implement', []]);
+  assert.deepEqual([l.steps[1].note, l.waitingOnYou], ['round 4 asked (wf round) — the next tick files implement', []]);
   // Not the next round, or a loop that is not out of rounds: nothing is due.
   assert.deepEqual(assess(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(5)]).round, []);
   assert.deepEqual(assess(LOOP, inRound(2), ALL_SUCCEEDED, saidIn(2, false), asked, none, [], [roundAskFor(3)]).round, []);
@@ -3081,16 +3081,16 @@ test("a person's `wf accept` ends a loop out of rounds on their word: what waits
   assert.deepEqual(roundLines(LOOP, r, d), [], '`wf decide` offers the round no more');
 
   // What it is all for: a gated ending goes to its gate and is approved or not as ever, rather than never being filed at all.
-  const GATED: Workflow[] = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2]!, gate: true }];
+  const GATED: Workflow[] = [IMPLEMENT, LOOPING_REVIEW, { ...LOOP[2], gate: true }];
   const filed: Run = { ...r, steps: { ...r.steps, ship: { taskId: 's1' } } };
   const saidShip = (name: string) => (name === 'ship' ? signedDone() : said(name));
   assert.deepEqual(assess(GATED, r, ALL_SUCCEEDED, said, asked).ready, ['ship']);
-  assert.equal(stepStatus(GATED[2]!, filed, ALL_SUCCEEDED, saidShip, asked, GATED), 'awaiting approval');
+  assert.equal(stepStatus(GATED[2], filed, ALL_SUCCEEDED, saidShip, asked, GATED), 'awaiting approval');
   // And a gate on the looping step itself, which a round un-holds: a person's word ends the loop, so that gate holds now too.
-  const GATED_LOOP: Workflow[] = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]!];
-  assert.equal(stepStatus(GATED_LOOP[1]!, r, ALL_SUCCEEDED, said, asked, GATED_LOOP), 'awaiting approval');
+  const GATED_LOOP: Workflow[] = [IMPLEMENT, { ...LOOPING_REVIEW, gate: true }, LOOP[2]];
+  assert.equal(stepStatus(GATED_LOOP[1], r, ALL_SUCCEEDED, said, asked, GATED_LOOP), 'awaiting approval');
   assert.equal(
-    stepStatus(GATED_LOOP[1]!, inRound(3), ALL_SUCCEEDED, said, asked, GATED_LOOP),
+    stepStatus(GATED_LOOP[1], inRound(3), ALL_SUCCEEDED, said, asked, GATED_LOOP),
     'exhausted',
     'and not while it is still asking',
   );
@@ -3175,7 +3175,7 @@ test('REFUSED: `wf accept` takes a loop out of rounds with `again` still true, a
     why(acceptAsk(LOOP, inRound(1), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(1, true), asked)),
     /^review asked for another round, and `rounds: 3` has 2 left, so the next tick files round 2 itself/,
   );
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const held: SpendOf = (id) => (id === 'i1' || id === 'i2' ? { usd: 2, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
   assert.match(
     why(acceptAsk(BUDGETED_LOOP, inRound(2), 'review', ENOUGH, ALL_SUCCEEDED, saidIn(2, true), asked, [], held)),
@@ -3201,7 +3201,7 @@ test('REFUSED: `wf accept` takes a loop out of rounds with `again` still true, a
 
 test('the step after an accepted loop is handed the words and the findings the loop left open: `## Accepted`, then `## From review` without `again`', () => {
   const said = saidIn(3, true);
-  const brief = composeBrief(LOOP[2]!, inRound(3, acceptedTry(3)), LOOP, said);
+  const brief = composeBrief(LOOP[2], inRound(3, acceptedTry(3)), LOOP, said);
   assert.match(brief, /\n## Accepted\n/);
   assert.match(brief, /review judged this work and asked for another round after the 3 `rounds: 3` allows\./);
   assert.match(brief, /\(`wf accept`, try 3, at 2026-09-20T14:05:00\.000Z\)/);
@@ -3211,7 +3211,7 @@ test('the step after an accepted loop is handed the words and the findings the l
   assert.ok(!/^\s*again:/m.test(brief), '`again` is not a finding, and says nothing to a shipper');
   assert.ok(!brief.includes('REVIEWER-SUMMARY'), 'a summary travels nowhere, here as anywhere');
   // A run where no loop was accepted composes as it always did.
-  assert.doesNotMatch(composeBrief(LOOP[2]!, inRound(3), LOOP, said), /## Accepted/);
+  assert.doesNotMatch(composeBrief(LOOP[2], inRound(3), LOOP, said), /## Accepted/);
 });
 
 test("a round moves every step of the loop behind it: the target continued under its next try's id, the rest unfiled until what they wait on is verified", () => {
@@ -3239,7 +3239,7 @@ test("a round moves every step of the loop behind it: the target continued under
     test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', then: 'round' }] },
     review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', then: 'round' }] },
   } satisfies Run['steps']);
-  assert.equal(r.steps.implement!.tries, undefined, 'the record it was given is not written into');
+  assert.equal(r.steps.implement.tries, undefined, 'the record it was given is not written into');
   assert.deepEqual(
     [roundOf(next, 'review'), stepTaskId(next, 'test', 2), checkTaskId(next, 'implement')],
     [2, 'r-1-test-try2', 'r-1-implement-try2-check'],
@@ -3251,7 +3251,7 @@ test("a round moves every step of the loop behind it: the target continued under
   assert.deepEqual([running.ready, running.round, running.status], [[], [], 'running']);
   const checked: Run = {
     ...next,
-    steps: { ...next.steps, implement: { ...next.steps.implement!, check: { taskId: 'r-1-implement-try2-check' } } },
+    steps: { ...next.steps, implement: { ...next.steps.implement, check: { taskId: 'r-1-implement-try2-check' } } },
   };
   assert.deepEqual(
     assess(chain, checked, phases({ 'r-1-implement-try2': 'succeeded', 'r-1-implement-try2-check': 'succeeded' }), replied, asked).ready,
@@ -3309,7 +3309,7 @@ test("one schema for a loop's target, every round: `replies` is asked for from r
     }),
   );
   // A step no step loops to is filed as before — the looping step included, and the target in a workflow without the loop.
-  assert.equal(closeoutSchemaOf(LOOP[2]!, LOOP), CLOSEOUT_SCHEMA);
+  assert.equal(closeoutSchemaOf(LOOP[2], LOOP), CLOSEOUT_SCHEMA);
   assert.deepEqual(closeoutSchemaOf(LOOPING_REVIEW, LOOP).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
   assert.equal(closeoutSchemaOf(IMPLEMENT, [IMPLEMENT]), CLOSEOUT_SCHEMA);
   assert.match(
@@ -3400,7 +3400,7 @@ test("round 1's empty `replies` go nowhere: not a declared output, not handed to
   assert.doesNotMatch(second, /"replies"/);
   // A step that reads implement's output (`input: implement`) is handed nothing of it.
   const reader: Workflow = { ...step('ship', ['review']), input: ['implement'] };
-  const steps = [LOOP[0]!, LOOP[1]!, reader];
+  const steps = [LOOP[0], LOOP[1], reader];
   const brief = composeBrief(reader, inRound(1), steps, reads, FILES);
   assert.doesNotMatch(brief, /"replies"|IMPLEMENTER-SUMMARY/);
   // And the target's own round-1 brief says what to answer, where the round-2 brief says what is owed.
@@ -3741,7 +3741,7 @@ test("a pass records the tips of a finished run's result branches — succeeded 
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
   const branched = (rest: Partial<GitRun> = {}): Run => {
     const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
-    for (const name of ['a', 'b', 'c']) r.steps[name]!.branch = `wf/r-1/${name}`;
+    for (const name of ['a', 'b', 'c']) r.steps[name].branch = `wf/r-1/${name}`;
     return r;
   };
   assert.deepEqual(tipBranches(branched(), fan, 'succeeded'), ['wf/r-1/c'], 'the result branch, and no other');
@@ -3749,10 +3749,10 @@ test("a pass records the tips of a finished run's result branches — succeeded 
   assert.deepEqual([tipBranches(branched(), fan, 'running'), tipBranches(branched(), fan, 'cancelled')], [[], []]);
   assert.deepEqual(tipBranches(branched({ isolate: false }), fan, 'succeeded'), []);
   const onBase = branched();
-  onBase.steps.c!.branch = 'main';
+  onBase.steps.c.branch = 'main';
   assert.deepEqual(tipBranches(onBase, fan, 'succeeded'), [], 'a run that worked on its base branch has no result branch');
   const chain = run({ implement: 't1', review: 't2' });
-  chain.steps.implement!.branch = chain.steps.review!.branch = 'wf/r-1/implement';
+  chain.steps.implement.branch = chain.steps.review.branch = 'wf/r-1/implement';
   assert.deepEqual(tipBranches(chain, STEPS, 'succeeded'), ['wf/r-1/implement']);
 
   const seenOnce = tipsSeen(branched(), ['wf/r-1/c'], { 'wf/r-1/c': 'aaa', 'wf/r-1/a': 'zzz' });
@@ -3880,7 +3880,7 @@ test('REFUSED at `wf start --after`, on either side, when a folder run is involv
   };
   const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
     'a-1': { record: record('a-1') },
-    'n-1': { record: folder as unknown as Run },
+    'n-1': { record: folder },
   };
   const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
   assert.equal(
@@ -4083,7 +4083,7 @@ test("`wf ls` notes a step whose current try's session a person told something �
     'no note for a step nobody told',
   );
   const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
-  assert.equal(rows(onTry2, { t2: 'running (working)' }, { implement: 1 })[0]!.note, 'try 2, nudged on your word · said to 1×');
+  assert.equal(rows(onTry2, { t2: 'running (working)' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });
 
@@ -4108,11 +4108,11 @@ test('`## Said to your session` goes inside `## Try <n>` on a try that continues
   assert.ok(told.includes('## Said to your session\n\nA person said these to your session while the last try ran (`wf say`).'), told);
   assert.ok(
     told.includes(
-      `At ${said[0]!.at}:\n\n\`\`\`text\n${said[0]!.text}\n\`\`\`\n\nAt ${said[1]!.at}:\n\n\`\`\`\`text\n${said[1]!.text}\n\`\`\`\`\n\n## Your answer`,
+      `At ${said[0].at}:\n\n\`\`\`text\n${said[0].text}\n\`\`\`\n\nAt ${said[1].at}:\n\n\`\`\`\`text\n${said[1].text}\n\`\`\`\`\n\n## Your answer`,
     ),
     told,
   );
-  assert.match(briefOf({ ...nudge, said: [said[0]!] }), /A person said this to your session/);
+  assert.match(briefOf({ ...nudge, said: [said[0]] }), /A person said this to your session/);
   // The run's own nudge carries them too. A new session is given none of the last one's: a fresh try, or a nudge with no session to continue.
   assert.ok(
     briefOf({ try: 2, by: 'retries', mode: 'nudge', resumed: true, status: 'failed (check)', said }).includes('## Said to your session'),
@@ -4302,14 +4302,14 @@ test("REFUSED before, now honoured: an ask written while the harness blocked a s
     ],
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note,
+    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
     'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
   );
 
   // Refused as before: a task the engine has no record of is stopped for no ask, and `wf ls` says nothing of one; a recheck, which no
   // session could have been asked for, is not honoured on a working step.
   assert.deepEqual(assess(STEPS, r, phases({}), nothingSigned, asked, () => undefined, [askFor(2)]).retry, []);
-  assert.equal(listing(STEPS, r, shown({}), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined);
+  assert.equal(listing(STEPS, r, shown({}), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note, undefined);
   assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2, 'recheck')]).retry, []);
   assert.deepEqual(
     assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(3)]).retry,
@@ -4396,11 +4396,11 @@ const B4 = () => {
 test("the timeline of a step with two tries and two checks: each filed, spawned and ended, queued filed → spawned and ran spawned → ended, off the engine and the run's tries", () => {
   const { r, views, filed } = B4();
   const t = timeline(r, views, filed);
-  const [first, second] = t.steps.implement!;
-  assert.deepEqual([first!.try, first!.round, first!.sessionOf, second!.try, second!.round], [1, 1, null, 2, 1]);
+  const [first, second] = t.steps.implement;
+  assert.deepEqual([first.try, first.round, first.sessionOf, second.try, second.round], [1, 1, null, 2, 1]);
   const times = (s: typeof first.session) =>
     s && { at: s.at, filedAt: s.filedAt, spawnedAt: s.spawnedAt, endedAt: s.endedAt, queued: s.queued, ran: s.ran };
-  assert.deepEqual(times(first!.session), {
+  assert.deepEqual(times(first.session), {
     at: 'ended',
     filedAt: clock(0),
     spawnedAt: clock(0, 12),
@@ -4408,7 +4408,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
     queued: '12s',
     ran: '19m42s',
   });
-  assert.deepEqual(times(first!.check), {
+  assert.deepEqual(times(first.check), {
     at: 'ended',
     filedAt: clock(19, 56),
     spawnedAt: clock(19, 57),
@@ -4416,7 +4416,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
     queued: '1s',
     ran: '58s',
   });
-  assert.deepEqual(times(second!.session), {
+  assert.deepEqual(times(second.session), {
     at: 'ended',
     filedAt: clock(21),
     spawnedAt: clock(21, 3),
@@ -4424,7 +4424,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
     queued: '3s',
     ran: '5m35s',
   });
-  assert.deepEqual(times(second!.check), {
+  assert.deepEqual(times(second.check), {
     at: 'ended',
     filedAt: clock(26, 40),
     spawnedAt: clock(26, 40),
@@ -4432,11 +4432,11 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
     queued: '0s',
     ran: '57s',
   });
-  assert.equal(first!.session!.queuedMs, 12_000);
-  assert.equal(first!.session!.ranMs, 1_182_000);
+  assert.equal(first.session!.queuedMs, 12_000);
+  assert.equal(first.session!.ranMs, 1_182_000);
   // What each session used, beside it; a try whose session measured nothing has none.
-  assert.deepEqual(first!.used, { turns: 54, toolCalls: 146, inputTokens: 17_000_000, outputTokens: 210_000 });
-  assert.equal(second!.used, undefined);
+  assert.deepEqual(first.used, { turns: 54, toolCalls: 146, inputTokens: 17_000_000, outputTokens: 210_000 });
+  assert.equal(second.used, undefined);
 
   // No loop went round: one round, and the run's total is its sums — 12s + 1s + 3s + 0s queued; 19m42s + 58s + 5m35s + 57s ran — and its wall, first filed → last ended.
   assert.deepEqual(t.rounds, [], 'no loop: no round is totalled, and the run is');
@@ -4456,7 +4456,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
     },
   );
 
-  assert.deepEqual(timelineLines(t.steps.implement!), [
+  assert.deepEqual(timelineLines(t.steps.implement), [
     'timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · 146 tool calls · 17M in · 210k out',
     '          try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s',
     '          try 2        filed 08:21:00Z  spawned 08:21:03Z  ended 08:26:38Z  queued 3s  ran 5m35s  used not measured',
@@ -4468,11 +4468,11 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
 
 test('a try still running has no end, says so, and holds the totals open: no wall, and its run time left out of the sum and named', () => {
   const { r, views, filed } = B4();
-  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement!.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'nudge' }] };
+  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'nudge' }] };
   views.set('t3', task([[clock(30, 2), clock(30, 5), null]], null));
   filed.set('t3', clock(30));
   const t = timeline(r, views, filed);
-  const running = t.steps.implement!.at(-1)!;
+  const running = t.steps.implement.at(-1)!;
   assert.deepEqual(
     {
       at: running.session!.at,
@@ -4485,7 +4485,7 @@ test('a try still running has no end, says so, and holds the totals open: no wal
   );
   assert.equal(running.check, null, 'a try whose check was never filed has no check on the clock');
   assert.equal(
-    timelineLines(t.steps.implement!).at(-1),
+    timelineLines(t.steps.implement).at(-1),
     '          try 3        filed 08:30:00Z  spawned 08:30:05Z  no end yet, still running  queued 5s  used not measured',
   );
   assert.deepEqual([t.run.inFlight, t.run.wallMs, t.run.ran, t.run.wall], [1, null, '27m12s, 1 still running', 'still going']);
@@ -4493,22 +4493,23 @@ test('a try still running has no end, says so, and holds the totals open: no wal
   // Filed and waiting for a slot, then a slot taken and not spawned: neither has a queue time yet, and neither is 0.
   views.set('t3', { state: { brief: 'filed', settled: null, attempts: [] } });
   assert.deepEqual(
-    (({ at, queued, ran, queuedMs }) => ({ at, queued, ran, queuedMs }))(timeline(r, views, filed).steps.implement!.at(-1)!.session!),
+    (({ at, queued, ran, queuedMs }) => ({ at, queued, ran, queuedMs }))(timeline(r, views, filed).steps.implement.at(-1)!.session!),
     { at: 'queued', queued: 'waiting for a slot', ran: '—', queuedMs: null },
   );
   views.set('t3', task([[clock(30, 2), null, null]], null));
-  assert.deepEqual(
-    (({ at, queued, queuedMs }) => ({ at, queued, queuedMs }))(timeline(r, views, filed).steps.implement!.at(-1)!.session!),
-    { at: 'starting', queued: 'not spawned yet', queuedMs: null },
-  );
+  assert.deepEqual((({ at, queued, queuedMs }) => ({ at, queued, queuedMs }))(timeline(r, views, filed).steps.implement.at(-1)!.session!), {
+    at: 'starting',
+    queued: 'not spawned yet',
+    queuedMs: null,
+  });
 });
 
 test("a run with one step and no check: one try, no check, and the run's total is that session", () => {
   const r = run({ implement: 't1' });
   const t = timeline(r, new Map([['t1', task([[clock(0, 1), clock(0, 4), clock(9, 4)]], 'succeeded')]]), new Map([['t1', clock(0)]]));
-  assert.equal(t.steps.implement!.length, 1);
+  assert.equal(t.steps.implement.length, 1);
   assert.deepEqual(
-    [t.steps.implement![0]!.check, t.steps.implement![0]!.session!.queued, t.steps.implement![0]!.session!.ran],
+    [t.steps.implement[0].check, t.steps.implement[0].session!.queued, t.steps.implement[0].session!.ran],
     [null, '4s', '9m00s'],
   );
   assert.deepEqual(timelineTotalLines(t), ['timeline  run  queued 4s  ran 9m00s  wall 9m04s']);
@@ -4536,12 +4537,12 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     ['closed', held('between attempts', { closed: true })],
   ] as const) {
     const t = timeline(r, new Map([['t1', view]]), filed);
-    const session = t.steps.implement![0]!.session!;
+    const session = t.steps.implement[0].session!;
     assert.deepEqual([session.at, session.endedAt, session.ran], ['ended', clock(9, 4), '9m00s'], said);
     assert.deepEqual([t.run.inFlight, t.run.ran, t.run.wall], [0, '9m00s', '9m04s'], `${said}: nothing of the run in flight`);
   }
   // Signed and not held open, between attempts: the engine starts another, so it is still running — as it was.
-  assert.equal(timeline(r, new Map([['t1', held('between attempts')]]), filed).steps.implement![0]!.session!.at, 'running');
+  assert.equal(timeline(r, new Map([['t1', held('between attempts')]]), filed).steps.implement[0].session!.at, 'running');
 
   // A person answered at 18:00, ten hours on; the second turn ran 5 minutes, signed and was closed. Ran: 9 minutes and 5, not ten hours.
   const secondTurn = {
@@ -4566,20 +4567,20 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     ]),
     filed,
   );
-  assert.deepEqual([answered.steps.implement![0]!.session!.ranMs, answered.run.ran, answered.run.wall], [14 * 60_000, '14m00s', '10h05m']);
+  assert.deepEqual([answered.steps.implement[0].session!.ranMs, answered.run.ran, answered.run.wall], [14 * 60_000, '14m00s', '10h05m']);
   // And while that second turn runs, the task is running again.
   const running = timeline(
     r,
     new Map([['t1', held('running (working)', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]),
     filed,
   );
-  assert.deepEqual([running.steps.implement![0]!.session!.at, running.run.inFlight], ['running', 1]);
+  assert.deepEqual([running.steps.implement[0].session!.at, running.run.inFlight], ['running', 1]);
 });
 
 test('REFUSED: a queue time the feed cannot give is `not known`, never 0 — and a task the engine has no record of is said, not timed', () => {
   const { r, views } = B4();
   const t = timeline(r, views);
-  const session = t.steps.implement![0]!.session!;
+  const session = t.steps.implement[0].session!;
   assert.deepEqual(
     [session.queuedMs, session.queued, session.ran],
     [null, 'not known', '19m42s'],
@@ -4589,10 +4590,10 @@ test('REFUSED: a queue time the feed cannot give is `not known`, never 0 — and
   assert.ok(!timelineTotalLines(t).some((line) => /queued 0s/.test(line)), timelineTotalLines(t).join('\n'));
 
   views.delete('c2');
-  const lost = timeline(r, views, B4().filed).steps.implement![1]!.check!;
+  const lost = timeline(r, views, B4().filed).steps.implement[1].check!;
   assert.deepEqual([lost.at, lost.queued, lost.ran], ['unknown', 'not on the record', 'not on the record']);
   assert.equal(
-    timelineLines(timeline(r, views, B4().filed).steps.implement!).at(-1),
+    timelineLines(timeline(r, views, B4().filed).steps.implement).at(-1),
     '          try 2 check  the engine has no record of c2',
   );
 });
@@ -4687,18 +4688,18 @@ test('a recheck ran no session: the try it reached names the session it checked 
   r.steps.implement = {
     taskId: 't2',
     check: { taskId: 'c3' },
-    tries: [...r.steps.implement!.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'recheck' }],
+    tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'recheck' }],
   };
   views.set('c3', task([[clock(40, 1), clock(40, 1), clock(41)]], 'succeeded'));
   filed.set('c3', clock(40));
   const t = timeline(r, views, filed);
-  const rechecked = t.steps.implement!.at(-1)!;
+  const rechecked = t.steps.implement.at(-1)!;
   assert.deepEqual(
     [rechecked.try, rechecked.session, rechecked.sessionOf, rechecked.check!.ran, rechecked.used],
     [3, null, 2, '59s', undefined],
   );
   assert.equal(t.run.tasks, 5, "t1, c1, t2, c2 and c3: try 2's session once");
-  assert.equal(timelineLines(t.steps.implement!)[4], "          try 3        its session is try 2's, checked again");
+  assert.equal(timelineLines(t.steps.implement)[4], "          try 3        its session is try 2's, checked again");
 
   // review loops back to implement: round 2's tries total apart from round 1's, and the run's is both.
   const looped = run(
@@ -4727,7 +4728,7 @@ test('a recheck ran no session: the try it reached names the session it checked 
     { ...step('review', ['implement']), loop: 'implement', rounds: 3 },
   ]);
   assert.deepEqual(
-    lt.steps.review!.map((x) => x.round),
+    lt.steps.review.map((x) => x.round),
     [1, 2],
   );
   assert.deepEqual(
@@ -4742,8 +4743,8 @@ test('a recheck ran no session: the try it reached names the session it checked 
     '          round 2  queued 1m10s  ran 6m50s  wall 9m00s',
     '          run      queued 1m40s  ran 20m20s  wall 25m00s',
   ]);
-  assert.equal(timelineLines(lt.steps.review!)[1]!.startsWith('timeline'), false);
-  assert.match(timelineLines(lt.steps.review!)[1]!, /^ {10}try 2 · round 2  filed 08:21:00Z/);
+  assert.equal(timelineLines(lt.steps.review)[1].startsWith('timeline'), false);
+  assert.match(timelineLines(lt.steps.review)[1], /^ {10}try 2 · round 2  filed 08:21:00Z/);
 });
 
 test('durations read as the operator measures them', () => {
@@ -4839,7 +4840,7 @@ test("REFUSED: a round's total counts only the steps its loop files again — a 
   const bt = timeline(
     both,
     bothViews,
-    new Map([...bothViews.keys()].map((id) => [id, bothViews.get(id)!.state.attempts[0]!.startedAt])),
+    new Map([...bothViews.keys()].map((id) => [id, bothViews.get(id)!.state.attempts[0].startedAt])),
     two,
   );
   assert.deepEqual(
@@ -4925,7 +4926,7 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   const p = phases(REFUSED_TWICE);
   const spent = spends({ t0: 1.75, t1: 2.5 });
   assert.equal(
-    stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent, () => 1),
+    stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, spent, () => 1),
     'over budget',
   );
   const a = assess(
@@ -4968,7 +4969,7 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
     spent,
   );
   assert.deepEqual(
-    [l.steps[0]!.status, l.steps[0]!.note, l.waitingOnYou],
+    [l.steps[0].status, l.steps[0].note, l.waitingOnYou],
     ['over budget $4.25 of $3', 'try 2, by retries: 2', ['implement']],
   );
   const d = decision(
@@ -4999,7 +5000,7 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   // At its cap nothing is left, and any session spends something: held as past it.
   const atCap = spends({ t0: 1.5, t1: 1.5 });
   assert.equal(
-    stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, atCap, () => 1),
+    stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, atCap, () => 1),
     'over budget',
     '$3.00 of $3',
   );
@@ -5025,7 +5026,7 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
     ['no cost measured', () => undefined],
   ] as Array<[string, SpendOf]>) {
     assert.equal(
-      stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, under, () => 1),
+      stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, under, () => 1),
       'failed (check)',
       why,
     );
@@ -5059,17 +5060,17 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
         [],
         () => 0,
         under,
-      ).steps[0]!.status,
+      ).steps[0].status,
       'failed ✗ check (exit 1)',
       why,
     );
   }
   // A step with no `budget:` is never over one; nor is one read with nothing of what was spent.
   assert.equal(
-    stepStatus(RETRIED[0]!, r, p, signedDone, asked, RETRIED, spent, () => 1),
+    stepStatus(RETRIED[0], r, p, signedDone, asked, RETRIED, spent, () => 1),
     'failed (check)',
   );
-  assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED), 'failed (check)');
+  assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED), 'failed (check)');
 });
 
 test("a step over its budget is tried again only on a person's `--budget` above what it spent: the try carries the cap, the record keeps it, and a try past the new cap is held again", () => {
@@ -5097,19 +5098,19 @@ test("a step over its budget is tried again only on a person's `--budget` above 
     'a recheck costs nothing, and needs none',
   );
 
-  const raised = nextTry(r.steps.implement!, { step: 'implement', try: 3, mode: 'fresh', budget: 10, by: 'ask' }, 't2');
+  const raised = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'fresh', budget: 10, by: 'ask' }, 't2');
   assert.deepEqual(raised.tries?.at(-1), { taskId: 't1', check: { taskId: 'c1' }, then: 'fresh', budget: 10 });
-  assert.equal(tryNote(BUDGETED[0]!, raised), 'try 3, fresh, on your word, budget $10');
+  assert.equal(tryNote(BUDGETED[0], raised), 'try 3, fresh, on your word, budget $10');
   const on3: Run = { ...r, steps: { ...r.steps, implement: { ...raised, check: { taskId: 'c2' } } } };
-  assert.equal(budgetOf(BUDGETED[0]!, on3.steps.implement), 10, 'in force from the try it was raised for');
+  assert.equal(budgetOf(BUDGETED[0], on3.steps.implement), 10, 'in force from the try it was raised for');
   const p3 = phases({ ...REFUSED_TWICE, t2: 'succeeded', c2: 'failed' });
   assert.equal(
-    stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 5 }), () => 1),
+    stepStatus(BUDGETED[0], on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 5 }), () => 1),
     'failed (check)',
     '$9.25 of $10: `retries:` may try it',
   );
   assert.equal(
-    stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 6 }), () => 1),
+    stepStatus(BUDGETED[0], on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 6 }), () => 1),
     'over budget',
     '$10.25 of $10: held again',
   );
@@ -5190,21 +5191,21 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   const p = phases({ t1: 'failed' });
   const ended = spends({ t1: 3.02 }, ['t1']);
   const nothingSaid = () => undefined;
-  assert.equal(stepStatus(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED, ended), 'budget exhausted');
+  assert.equal(stepStatus(DETACHED[0], r, p, nothingSaid, asked, DETACHED, ended), 'budget exhausted');
   assert.equal(
-    stepStatus(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED),
+    stepStatus(DETACHED[0], r, p, nothingSaid, asked, DETACHED),
     'failed',
     'read with nothing of what the engine measured, the failure it settled',
   );
   // The runtime settles a capped task as its harness ended the session, and judges no budget (stage 4b): a cap reached on a session its
   // harness called done is judged here, and read as spent as a failed one was when the runtime settled every cut `failed`.
   assert.equal(
-    stepStatus(DETACHED[0]!, r, phases({ t1: 'succeeded' }), nothingSaid, asked, DETACHED, ended),
+    stepStatus(DETACHED[0], r, phases({ t1: 'succeeded' }), nothingSaid, asked, DETACHED, ended),
     'budget exhausted',
     'a cut its harness called done',
   );
   assert.equal(
-    ownStatus(DETACHED[0]!, r, phases({ t1: 'stopped' }), nothingSaid, asked, DETACHED, ended),
+    ownStatus(DETACHED[0], r, phases({ t1: 'stopped' }), nothingSaid, asked, DETACHED, ended),
     'stopped',
     'a person stopped it: theirs, not the cap',
   );
@@ -5235,7 +5236,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
     () => 0,
     ended,
   );
-  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
   const d = decision(
     DETACHED,
     r,
@@ -5251,7 +5252,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   );
   assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['blocked', ['implement'], []]);
   assert.deepEqual(
-    retryable(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED, () => false, ended),
+    retryable(DETACHED[0], r, p, nothingSaid, asked, DETACHED, () => false, ended),
     {
       status: 'budget exhausted',
       modes: ['nudge', 'fresh'],
@@ -5260,7 +5261,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
     },
   );
   assert.deepEqual(
-    retryable(STEPS[0]!, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), nothingSaid, asked, STEPS, () => false, ended)
+    retryable(STEPS[0], run({ implement: 't1', review: null }), phases({ t1: 'failed' }), nothingSaid, asked, STEPS, () => false, ended)
       .raise,
     undefined,
     'no `budget:`, nothing to raise',
@@ -5312,7 +5313,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
       [],
       () => 0,
       unmeasured,
-    ).steps[0]!.status,
+    ).steps[0].status,
     'budget exhausted at $3',
   );
 });
@@ -5320,31 +5321,31 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
 const deniedSpend =
   (denied: Record<string, string[]>): SpendOf =>
   (id) =>
-    id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id]! } : undefined;
+    id in denied ? { usd: 0, measured: 0, unmeasured: 0, budgetEnded: false, denied: denied[id] } : undefined;
 
 test('a step that says `denials: fail` and signed off denied a call reads denied: nothing after it filed, no check of it run, never tried by `retries:`, waited on by a person — and without the key, or without a denial, it reads as it did', () => {
   const DENYING: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, denials: 'fail' }, step('review', ['implement'])];
   const r = run({ implement: 't1', review: null });
   const p = phases({ t1: 'succeeded' });
   const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
-  assert.equal(stepStatus(DENYING[0]!, r, p, signedDone, asked, DENYING, denied), 'denied');
+  assert.equal(stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, denied), 'denied');
   assert.equal(
-    stepStatus(DENYING[0]!, r, p, signedDone, asked, DENYING, deniedSpend({ t1: [] })),
+    stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, deniedSpend({ t1: [] })),
     'checking',
     'denied nothing: its check is what comes',
   );
   assert.equal(
-    stepStatus(CHECKED[0]!, r, p, signedDone, asked, CHECKED, denied),
+    stepStatus(CHECKED[0], r, p, signedDone, asked, CHECKED, denied),
     'checking',
     'no `denials:` line: a denial is a note, never a stop',
   );
   assert.equal(
-    stepStatus(DENYING[0]!, r, p, () => undefined, asked, DENYING, denied),
+    stepStatus(DENYING[0], r, p, () => undefined, asked, DENYING, denied),
     'unsigned',
     'what it did not sign is said first',
   );
   assert.equal(
-    stepStatus(DENYING[0]!, r, p, () => ({ ...said('blocked') }), asked, DENYING, denied),
+    stepStatus(DENYING[0], r, p, () => ({ ...said('blocked') }), asked, DENYING, denied),
     'blocked',
     'a step that stopped itself said why',
   );
@@ -5416,12 +5417,12 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
     (id) => denied(id)?.denied ?? [],
   );
   assert.deepEqual(
-    [l.steps[0]!.status, l.steps[0]!.note, l.waitingOnYou],
+    [l.steps[0].status, l.steps[0].note, l.waitingOnYou],
     ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
   );
 
   assert.deepEqual(
-    retryable(DENYING[0]!, r, p, signedDone, asked, DENYING, () => false, denied),
+    retryable(DENYING[0], r, p, signedDone, asked, DENYING, () => false, denied),
     { status: 'denied', modes: ['nudge', 'fresh'], blockedByHarness: false },
   );
   const refusal = (how: RetryHow) =>
@@ -5444,7 +5445,7 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
   );
   assert.equal(refusal({ mode: 'fresh' }), null);
   assert.equal(refusal({ mode: 'nudge' }), null);
-  const GATED: Workflow[] = [{ ...DENYING[0]!, gate: true }, DENYING[1]!];
+  const GATED: Workflow[] = [{ ...DENYING[0], gate: true }, DENYING[1]];
   assert.equal(
     approvalRefusal(GATED, r, 'implement', undefined, p, signedDone, asked, () => undefined, [], denied),
     'implement signed off, and its harness denied its try a call, which `denials: fail` does not pass on: there is nothing to approve. See what it was denied: wf decide r-1.',
@@ -5452,11 +5453,11 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
   );
 
   // Past its budget too: held there, as a step that stopped on its own work is, and named for both — the raise is what a new session needs.
-  const BUDGETED: Workflow[] = [{ ...DENYING[0]!, budget: 3 }, DENYING[1]!];
+  const BUDGETED: Workflow[] = [{ ...DENYING[0], budget: 3 }, DENYING[1]];
   const over: SpendOf = (id) =>
     id === 't1' ? { usd: 4, measured: 1, unmeasured: 0, budgetEnded: false, denied: ['Bash(pytest)'] } : undefined;
   assert.deepEqual(
-    [stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, over), ownStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, over)],
+    [stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, over), ownStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, over)],
     ['over budget', 'denied'],
   );
   const od = decision(
@@ -5473,13 +5474,13 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
     over,
   );
   assert.match(
-    retryLines(BUDGETED, r, od, p, signedDone, asked, over)[0]!,
+    retryLines(BUDGETED, r, od, p, signedDone, asked, over)[0],
     /^implement: over budget \(denied\), \$4\.00 of \$3\. Raise its cap above \$4\.00/,
   );
 
   // A new try is read on its own task: denied nothing, it goes on to its check.
   const again = run({ implement: 't2', review: null });
-  assert.equal(stepStatus(DENYING[0]!, again, phases({ t2: 'succeeded' }), signedDone, asked, DENYING, denied), 'checking');
+  assert.equal(stepStatus(DENYING[0], again, phases({ t2: 'succeeded' }), signedDone, asked, DENYING, denied), 'checking');
 });
 
 test("`wf decide` offers a denied step a new session with the bare `wf retry <run> <step> --fresh`, and names the rule for the folder's `allowedTools:` a new run needs — a write as `Edit(//…)`, a command as `Bash(word:*)` — and nothing on a pruned run", () => {
@@ -5505,7 +5506,7 @@ test("`wf decide` offers a denied step a new session with the bare `wf retry <ru
     "implement: denied — its harness denied its try calls, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md), Bash(pytest:*) to the folder's allowedTools:, which allows them. This run's allowedTools: is frozen at wf start, so a try of it is denied the same again. A new session, told to do without it:  wf retry r-1 implement --fresh  (or continue its session: wf retry r-1 implement)",
   ]);
   assert.equal(
-    /:  (wf [^(]*?)\s*(?:\(|$)/.exec(lines[0]!)![1],
+    /:  (wf [^(]*?)\s*(?:\(|$)/.exec(lines[0])![1],
     'wf retry r-1 implement --fresh',
     'the first command on the line is the bare offer',
   );
@@ -5520,7 +5521,7 @@ test("a denied step's offer names a rule the next run can match: a path in its w
   const DENYING: Workflow[] = [{ ...step('implement'), denials: 'fail' }, step('review', ['implement'])];
   const wt = '/home/me/.agent-workflows/worktrees/r-1/implement';
   const r = run({ implement: 't1', review: null });
-  const placed: Run = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement!, workspace: wt } } };
+  const placed: Run = { ...r, steps: { ...r.steps, implement: { ...r.steps.implement, workspace: wt } } };
   const p = phases({ t1: 'succeeded' });
   const denied = deniedSpend({ t1: [`Write(${wt}/notes.md)`, 'Write(/home/me/.agent-workflows/runs/r-1/artifacts/implement/shot.png)'] });
   const d = decision(
@@ -5538,10 +5539,10 @@ test("a denied step's offer names a rule the next run can match: a path in its w
   );
   const [line] = retryLines(DENYING, placed, d, p, signedDone, asked, denied);
   assert.match(
-    line!,
+    line,
     /add Edit\(notes\.md\), Edit\(\/\/home\/me\/\.agent-workflows\/runs\/\*\/artifacts\/implement\/shot\.png\) to the folder's allowedTools:/,
   );
-  assert.doesNotMatch(line!, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
+  assert.doesNotMatch(line, /r-1\/implement\/notes|runs\/r-1\//, 'no rule names this run');
 });
 
 test("a denied step's offer gives no allow rule for a call its own disallowedTools: may have denied, since a deny beats every allow, and says which rule", () => {
@@ -5646,7 +5647,7 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
   const said = saidIn(3, true);
   const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
   assert.deepEqual(
-    [l.steps[1]!.status, l.steps[1]!.note, l.waitingOnYou],
+    [l.steps[1].status, l.steps[1].note, l.waitingOnYou],
     ['rounds exhausted', `round 3 of 3, and it asked again — no round more, ${since}`, []],
   );
   const d = decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked);
@@ -5658,7 +5659,7 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
   assert.match(retryRefusal(LOOP, r, 'review', { mode: 'fresh' }, ALL_SUCCEEDED, said, asked)!, /was pruned at/);
 
   // Held on a budget: the round would raise a cap, and nothing is filed on a pruned run, raised or not.
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const held = inRound(1, { pruned });
   const heldSaid = saidIn(1, true);
   const spent = spends({ i1: 4.25, r1: 0.5 });
@@ -5676,7 +5677,7 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
     () => 0,
     spent,
   );
-  assert.deepEqual([hl.steps[1]!.note, hl.waitingOnYou], [`round 1 of 3, and it asked again, past a budget — no round more, ${since}`, []]);
+  assert.deepEqual([hl.steps[1].note, hl.waitingOnYou], [`round 1 of 3, and it asked again, past a budget — no round more, ${since}`, []]);
   assert.doesNotMatch(JSON.stringify(hl), offered);
   const hd = decision(
     BUDGETED_LOOP,
@@ -5703,7 +5704,7 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
 });
 
 test('REFUSED past a budget in a loop: `again: true` files no round while a step of the loop is over its budget — both read over budget — and `wf round` goes once more only with `--budget` above what that step spent, which the round keeps', () => {
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const r = inRound(1);
   const said = saidIn(1, true);
   const spent = spends({ i1: 4.25, r1: 0.5 });
@@ -5824,12 +5825,12 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
     [],
     'nor one not above what implement spent',
   );
-  const filed = roundFiled(BUDGETED_LOOP, r, due[0]!, 'i2');
+  const filed = roundFiled(BUDGETED_LOOP, r, due[0], 'i2');
   assert.deepEqual(
-    [filed.implement!.tries, filed.review!.tries],
+    [filed.implement.tries, filed.review.tries],
     [[{ taskId: 'i1', check: { taskId: 'c1' }, then: 'round', budget: 10 }], [{ taskId: 'r1', then: 'round' }]],
   );
-  assert.equal(budgetOf(BUDGETED_LOOP[0]!, filed.implement), 10, 'the raised cap is in force from the round it was raised for');
+  assert.equal(budgetOf(BUDGETED_LOOP[0], filed.implement), 10, 'the raised cap is in force from the round it was raised for');
 
   // Under its budget, or with no cost measured, the loop goes round on review's word, as it did.
   for (const under of [spends({ i1: 2.5 }), () => undefined] as SpendOf[]) {
@@ -5850,7 +5851,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
     );
   }
   // A step that did the work and is not asked for again keeps its word, over budget or not: what waits on it is filed.
-  assert.equal(stepStatus(BUDGETED_LOOP[0]!, r, ALL_SUCCEEDED, saidIn(1, false), asked, BUDGETED_LOOP, spent), 'verified');
+  assert.equal(stepStatus(BUDGETED_LOOP[0], r, ALL_SUCCEEDED, saidIn(1, false), asked, BUDGETED_LOOP, spent), 'verified');
   assert.deepEqual(
     assess(
       BUDGETED_LOOP,
@@ -5869,7 +5870,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
 });
 
 test('a round asked past a budget holds no step of its loop on the pass before it is filed: after `wf round --budget`, nothing reads over budget and the run waits on nobody — with no round asked, or one asked without a raise above what was spent, both still read held', () => {
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const r = inRound(1);
   const said = saidIn(1, true);
   const spent = spends({ i1: 4.25, r1: 0.5 });
@@ -5928,7 +5929,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
   assert.ok(!raised.words.some((w) => w.startsWith('over budget')), raised.words.join(' | '));
   assert.deepEqual(raised.l.waitingOnYou, []);
   assert.deepEqual(
-    [raised.l.steps[1]!.note, raised.l.steps.map((s) => s.cost)],
+    [raised.l.steps[1].note, raised.l.steps.map((s) => s.cost)],
     ['round 2 asked (wf round --budget 10) — the next tick files implement', ['$4.25', '$0.50', undefined]],
   );
   assert.deepEqual(raised.d, { kind: 'running', waiting: ['review'] });
@@ -5973,7 +5974,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
 });
 
 test('at the cap and past a budget: the loop reads rounds exhausted, and its once more asks for `--budget` too — refused on a loop with no step over its budget', () => {
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const r = inRound(3);
   const said = saidIn(3, true);
   const spent = spends({ i1: 1, i2: 1, i3: 1.5 });
@@ -6013,7 +6014,7 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
       [],
       () => 0,
       spent,
-    ).steps[1]!.note,
+    ).steps[1].note,
     'round 3 of 3, and it asked again — once more: wf round r-1 review --budget <amount>',
   );
   assert.match(
@@ -6057,7 +6058,7 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
 });
 
 test("an accepted loop is over nobody's budget: no step of it is held, since no round will be filed — and a `--budget` ask left behind files nothing", () => {
-  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]];
   const said = saidIn(3, true);
   const spent = spends({ i1: 1.5, i2: 1.5, i3: 1.5 });
   const r = inRound(3, acceptedTry(3));
@@ -6105,9 +6106,9 @@ test('a step that signed off blocked past its budget reads blocked while its ses
   const r = run({ implement: 't1', review: null });
   const stuck = (name: string) => (name === 'implement' ? said('blocked') : undefined);
   const spent = spends({ t1: 4 });
-  assert.equal(stepStatus(B[0]!, r, phases({ t1: 'running' }), stuck, asked, B, spent), 'blocked');
+  assert.equal(stepStatus(B[0], r, phases({ t1: 'running' }), stuck, asked, B, spent), 'blocked');
   const settled = phases({ t1: 'succeeded' });
-  assert.equal(stepStatus(B[0]!, r, settled, stuck, asked, B, spent), 'over budget');
+  assert.equal(stepStatus(B[0], r, settled, stuck, asked, B, spent), 'over budget');
   const d = decision(
     B,
     r,
@@ -6178,7 +6179,7 @@ test("`wf ls`' words: each step's tries' cost beside its word once one was measu
     () => 0,
     partly,
   );
-  assert.deepEqual([part.steps[0]!.cost, part.cost], ['≥$1.00', '≥$1.00'], 'a part never reads as the whole');
+  assert.deepEqual([part.steps[0].cost, part.cost], ['≥$1.00', '≥$1.00'], 'a part never reads as the whole');
   const over = listing(
     BUDGETED,
     refusedTwice(),
@@ -6319,7 +6320,7 @@ test('a try on the timeline says what its session cost beside what it used, wher
   const views = new Map([
     ['t1', task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', { turns: 54, costUsd: 3.012, apiMs: 486_000 })],
   ]);
-  assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement!), [
+  assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement), [
     'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
   ]);
 });
@@ -6334,7 +6335,7 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
   for (const [why, m, verdict] of cases) {
     const p = phases(m);
     const v = () => verdict;
-    assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent, v), 'failed (check)', why);
+    assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, spent, v), 'failed (check)', why);
     const a = assess(BUDGETED, r, p, signedDone, asked, v, [], [], () => false, spent);
     assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], why);
     const d = decision(BUDGETED, r, p, nothingShipped, signedDone, asked, v, [], [], () => false, spent);
@@ -6347,7 +6348,7 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
       why,
     );
     const l = listing(BUDGETED, r, shown(m), signedOff({ implement: said('done') }), asked, v, [], [], [], [], () => 0, spent);
-    assert.deepEqual([l.steps[0]!.status, l.steps[0]!.cost, l.waitingOnYou], ['failed ✗ check (unfinished)', '$4.25', ['implement']], why);
+    assert.deepEqual([l.steps[0].status, l.steps[0].cost, l.waitingOnYou], ['failed ✗ check (unfinished)', '$4.25', ['implement']], why);
 
     const refusal = (how: RetryHow) => retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, v, [], () => false, spent);
     assert.equal(refusal({ mode: 'recheck' }), null, `${why}: the recheck costs nothing`);
@@ -6375,7 +6376,7 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
   }
   // The same step whose check refused is over budget, as before: the verdict is what tells the two apart.
   assert.equal(
-    stepStatus(BUDGETED[0]!, r, phases(REFUSED_TWICE), signedDone, asked, BUDGETED, spent, () => 1),
+    stepStatus(BUDGETED[0], r, phases(REFUSED_TWICE), signedDone, asked, BUDGETED, spent, () => 1),
     'over budget',
   );
 });
@@ -6414,8 +6415,8 @@ test('a try past a budget is told why its last try ended on its own work — uns
   const p = phases({ t1: 'succeeded' });
   assert.deepEqual(
     [
-      stepStatus(B[0]!, r, p, () => undefined, asked, B, spends({ t1: 4 })),
-      ownStatus(B[0]!, r, p, () => undefined, asked, B, spends({ t1: 4 })),
+      stepStatus(B[0], r, p, () => undefined, asked, B, spends({ t1: 4 })),
+      ownStatus(B[0], r, p, () => undefined, asked, B, spends({ t1: 4 })),
     ],
     ['over budget', 'unsigned'],
   );
@@ -6435,7 +6436,7 @@ test('REFUSED to hide why a step stopped past its budget: one whose session fail
     const p = phases({ t1: phase });
     const own = phase === 'succeeded' ? 'unsigned' : phase;
     assert.deepEqual(
-      [stepStatus(B[0]!, r, p, nothingSaid, asked, B, spent), ownStatus(B[0]!, r, p, nothingSaid, asked, B, spent)],
+      [stepStatus(B[0], r, p, nothingSaid, asked, B, spent), ownStatus(B[0], r, p, nothingSaid, asked, B, spent)],
       ['over budget', own],
       phase,
     );
@@ -6879,7 +6880,7 @@ test("`hasGate` and `gatesOf`: a step is gated by its own `gate: true` or by the
   const steps: Workflow[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), gate: true }];
   assert.deepEqual(gatesOf(steps, { gates: ['plan'] }), ['plan', 'review']);
   assert.deepEqual(gatesOf(steps, {}), ['review'], "the folder's own, on a run given none");
-  assert.equal(hasGate(steps[1]!, { gates: ['plan'] }), false);
+  assert.equal(hasGate(steps[1], { gates: ['plan'] }), false);
 
   const r = atPlan({ approvals: [approval('plan', 1, 'ship the second reading'), approval('implement', 1)] });
   assert.deepEqual(approvalOf(r, 'plan'), approval('plan', 1, 'ship the second reading'));
@@ -6951,7 +6952,7 @@ test('REFUSED by the gate at shipped defaults, pass after pass: a gated step tha
     const a = assess(PLANNED, atPlan(), PLAN_DONE, said('done', { approach: 'go ahead, implement at once' }), asked);
     assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'failed'], `pass ${pass}: nothing after the gate`);
   }
-  assert.equal(stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
+  assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   // A gate its step's own file sets holds the same way, on a run started with no --gate.
   const own = [{ ...step('plan'), gate: true as const }, ...PLANNED.slice(1)];
   assert.deepEqual(assess(own, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked).ready, []);
@@ -6963,7 +6964,7 @@ test('REFUSED by the gate at shipped defaults, pass after pass: a gated step tha
     assert.deepEqual(assess(PLANNED, atPlan({ approvals }), PLAN_DONE, signedDone, asked).ready, [], JSON.stringify(approvals));
   }
   const approved = atPlan({ approvals: [approval('plan', 1)] });
-  assert.equal(stepStatus(PLANNED[0]!, approved, PLAN_DONE, signedDone, asked), 'unverified', 'approved, it reads as its own work');
+  assert.equal(stepStatus(PLANNED[0], approved, PLAN_DONE, signedDone, asked), 'unverified', 'approved, it reads as its own work');
   assert.deepEqual(assess(PLANNED, approved, PLAN_DONE, signedDone, asked).ready, ['implement']);
 });
 
@@ -6972,17 +6973,17 @@ test('a gated step with `check:` is verified first, then held: checking while it
   const at = (checkId: string | null, extra: Partial<GitRun> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
   const due = assess(gated, at(null), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual([due.check, due.ready], [['implement'], []], 'its check is filed first');
-  assert.equal(stepStatus(gated[0]!, at('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), 'checking');
-  assert.equal(stepStatus(gated[0]!, at('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked), 'failed (check)');
+  assert.equal(stepStatus(gated[0], at('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), 'checking');
+  assert.equal(stepStatus(gated[0], at('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked), 'failed (check)');
   const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
-  assert.equal(stepStatus(gated[0]!, at('c1'), passed, signedDone, asked), 'awaiting approval');
+  assert.equal(stepStatus(gated[0], at('c1'), passed, signedDone, asked), 'awaiting approval');
   assert.deepEqual(assess(gated, at('c1'), passed, signedDone, asked).ready, []);
   assert.deepEqual(assess(gated, at('c1', { approvals: [approval('implement', 1)] }), passed, signedDone, asked).ready, ['review']);
   // A step that did not finish its work is not at its gate: blocked is blocked, unsigned unsigned.
   const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'which reading?' });
-  assert.equal(stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, blocked, asked), 'blocked');
+  assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, blocked, asked), 'blocked');
   assert.equal(
-    stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, () => undefined, asked),
+    stepStatus(PLANNED[0], atPlan(), PLAN_DONE, () => undefined, asked),
     'unsigned',
   );
 });
@@ -7007,7 +7008,7 @@ test("a gated looping step is held when it hands on (`again: false`), and not wh
   assert.deepEqual([round.round.map((x) => x.round), round.ready], [[2], []], 'the round is filed');
   const handed = assess(looped, r, p, again(false), asked);
   assert.deepEqual(
-    [stepStatus(looped[1]!, r, p, again(false), asked, looped), handed.ready, handed.blocked],
+    [stepStatus(looped[1], r, p, again(false), asked, looped), handed.ready, handed.blocked],
     ['awaiting approval', [], ['ship']],
   );
 });
@@ -7029,7 +7030,7 @@ test('`wf ls` at a gate: the step reads `awaiting approval`, with the two comman
   );
 
   const approved = listing(PLANNED, atPlan({ approvals: [approval('plan', 1)] }), shownAs({ t1: 'succeeded' }), signedDone, asked);
-  assert.deepEqual([approved.steps[0]!.status, approved.steps[0]!.note, approved.waitingOnYou], ['unverified · done', undefined, []]);
+  assert.deepEqual([approved.steps[0].status, approved.steps[0].note, approved.waitingOnYou], ['unverified · done', undefined, []]);
   const cancelled = listing(PLANNED, atPlan(CANCELLED), shownAs({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual(cancelled.waitingOnYou, [], 'a run called off waits on nobody');
 });
@@ -7175,7 +7176,7 @@ test('REFUSED by `approvalRefusal`, by name: empty words, a step the run does no
 });
 
 test('sending back from a gate is `wf retry --message`: a step at its gate — or approved, with nothing after it filed yet — may be tried with words, and is REFUSED without them or with --recheck; once what follows is filed, it has handed on', () => {
-  const at = retryable(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked, PLANNED);
+  const at = retryable(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked, PLANNED);
   assert.deepEqual([at.status, at.modes, at.sendsBack], ['awaiting approval', ['nudge', 'fresh'], true]);
   const refusal = (r: Run, how: RetryHow, p = PLAN_DONE) => retryRefusal(PLANNED, r, 'plan', how, p, signedDone, asked);
   assert.equal(refusal(atPlan(), { mode: 'nudge', message: 'store the flag before you parse it' }), null);
@@ -7215,7 +7216,7 @@ test('sending back from a gate is `wf retry --message`: a step at its gate — o
     { gates: ['implement'], steps: { implement: { taskId: 't1', check: { taskId: 'c1' } } }, approvals: [approval('implement', 1)] },
   );
   const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
-  assert.equal(retryable(terminal[0]!, last, passed, signedDone, asked, terminal).sendsBack, undefined);
+  assert.equal(retryable(terminal[0], last, passed, signedDone, asked, terminal).sendsBack, undefined);
   assert.equal(
     retryRefusal(terminal, last, 'implement', { mode: 'nudge', message: 'one more thing' }, passed, signedDone, asked),
     'implement is verified: its check passed, and there is nothing to try again.',
@@ -7240,21 +7241,21 @@ test('sending back from a gate is `wf retry --message`: a step at its gate — o
 
 test("a send-back's brief says why the step is back — its handoff waited at its gate, and a person sent it back — beside what they want changed; `triedFrom` names that for a gated step that signed off, and a step's own ending otherwise; `spentApprovals` are those of a try the step is past", () => {
   assert.equal(
-    triedFrom(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
+    triedFrom(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
     'awaiting approval',
   );
   assert.equal(
-    triedFrom(PLANNED[0]!, atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
+    triedFrom(PLANNED[0], atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
     'awaiting approval',
     'approved, and sent back all the same',
   );
   assert.equal(
-    triedFrom(PLANNED[0]!, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
+    triedFrom(PLANNED[0], atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined),
     'unverified',
   );
   assert.equal(
     triedFrom(
-      PLANNED[0]!,
+      PLANNED[0],
       atPlan(),
       phases({ t1: 'failed' }),
       () => undefined,
@@ -7265,7 +7266,7 @@ test("a send-back's brief says why the step is back — its handoff waited at it
     'failed',
   );
 
-  const brief = retrySection(PLANNED[0]!, {
+  const brief = retrySection(PLANNED[0], {
     try: 2,
     by: 'ask',
     mode: 'nudge',
@@ -7339,7 +7340,7 @@ test("REFUSED at a gate: `cancelPlan` calls a run waiting at its gate off — it
 test('every step after an approved gate is handed the approval and its words under `## Approved`, as data — the step after the gate and the one after that, beside what was asked for and before where to look; no step before the gate, none after a gate not approved, and a run with no gate composes as it always did', () => {
   const words = 'Ship the second reading.\nKeep --flag public: say so in the README.';
   const approved = atPlan({ approvals: [approval('plan', 1, words)] });
-  const implement = composeBrief(PLANNED[1]!, approved, PLANNED);
+  const implement = composeBrief(PLANNED[1], approved, PLANNED);
   const section = [
     '## Approved',
     '',
@@ -7354,12 +7355,12 @@ test('every step after an approved gate is handed the approval and its words und
     '```',
   ].join('\n');
   assert.ok(implement.includes(`## What was asked for\n\nadd a flag\n\n${section}\n\n## Where to look`), implement);
-  assert.ok(composeBrief(PLANNED[2]!, approved, PLANNED).includes(section), 'and the reviewer after it');
-  assert.ok(!composeBrief(PLANNED[0]!, approved, PLANNED).includes('## Approved'), 'not the gated step itself');
-  assert.ok(!composeBrief(PLANNED[1]!, atPlan(), PLANNED).includes('## Approved'), 'not before it is approved');
+  assert.ok(composeBrief(PLANNED[2], approved, PLANNED).includes(section), 'and the reviewer after it');
+  assert.ok(!composeBrief(PLANNED[0], approved, PLANNED).includes('## Approved'), 'not the gated step itself');
+  assert.ok(!composeBrief(PLANNED[1], atPlan(), PLANNED).includes('## Approved'), 'not before it is approved');
   assert.equal(
-    composeBrief(PLANNED[1]!, run({ plan: 't1', implement: null, review: null }), PLANNED),
-    composeBrief(PLANNED[1]!, run({ plan: 't1', implement: null, review: null }, { approvals: [approval('plan', 1, words)] }), PLANNED),
+    composeBrief(PLANNED[1], run({ plan: 't1', implement: null, review: null }), PLANNED),
+    composeBrief(PLANNED[1], run({ plan: 't1', implement: null, review: null }, { approvals: [approval('plan', 1, words)] }), PLANNED),
     'an approval of a step with no gate hands nothing on',
   );
 
@@ -7368,7 +7369,7 @@ test('every step after an approved gate is handed the approval and its words und
     { plan: 't1', implement: 't2', review: null },
     { gates: ['plan', 'implement'], approvals: [approval('implement', 1, 'the ```fence``` stays'), approval('plan', 1)] },
   );
-  const review = composeBrief(PLANNED[2]!, both, PLANNED);
+  const review = composeBrief(PLANNED[2], both, PLANNED);
   assert.ok(
     review.includes(
       'A person read what plan and implement handed on and approved it before anything after them was filed: each closeout waited at a',
@@ -7384,7 +7385,7 @@ test('every step after an approved gate is handed the approval and its words und
 
   // A step that continues another's session is handed the approval too: it is new to it.
   const resumed: Workflow[] = [step('plan'), { ...step('implement', ['plan']), resume: 'plan' }];
-  assert.match(composeBrief(resumed[1]!, approved, resumed), /^do implement\n## Approved\n/);
+  assert.match(composeBrief(resumed[1], approved, resumed), /^do implement\n## Approved\n/);
 });
 
 test('`gateLines`: what `wf decide` prints under a gated step — `approved 23:10Z` with its words, or awaiting approval with the two commands — and nothing for a step with no gate or one not signed off', () => {
@@ -7423,7 +7424,7 @@ test("REFUSED at a gate, pass after pass: a wordless ask for the next try — as
   for (let pass = 1; pass <= 3; pass++) {
     const a = assess(PLANNED, atPlan(), PLAN_DONE, signedDone, asked, () => undefined, [wordless]);
     assert.deepEqual(
-      [a.retry, a.ready, stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked)],
+      [a.retry, a.ready, stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked)],
       [[], [], 'awaiting approval'],
       `pass ${pass}`,
     );
@@ -7447,8 +7448,8 @@ test("REFUSED at a gate, pass after pass: a wordless ask for the next try — as
     () => undefined,
     [wordless],
   );
-  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
-  assert.match(l.steps[0]!.note ?? '', /^approve it: wf approve r-1 plan/, 'no try said to be due');
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.match(l.steps[0].note ?? '', /^approve it: wf approve r-1 plan/, 'no try said to be due');
 
   assert.equal(
     approvalRefusal(PLANNED, atPlan(), 'plan', undefined, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
@@ -7469,7 +7470,7 @@ test("REFUSED at a gate, pass after pass: a wordless ask for the next try — as
 
 test('REFUSED as already approved, in words that hold: while it may still be sent back, the send-back is offered; once it has handed on — what waits on it filed, or nothing waiting on it — it says so, and offers no `wf retry` that would be refused', () => {
   const approved = (r: Run, p: (id: string) => TaskPhase, steps = PLANNED) =>
-    approvalRefusal(steps, r, steps[0]!.name, undefined, p, signedDone, asked);
+    approvalRefusal(steps, r, steps[0].name, undefined, p, signedDone, asked);
   assert.equal(
     approved(atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE),
     'try 1 of plan is already approved, at 2026-09-16T23:10:00.000Z: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry r-1 plan --message "<objection>".',
@@ -7568,7 +7569,7 @@ test('REFUSED while the work is being sent back: approving an ending would take 
 });
 
 test("a send-back at an ending step's gate goes to the work: the step before it may be tried again with words, and is REFUSED without them", () => {
-  const review = ENDS[1]!;
+  const review = ENDS[1];
   const at = retryable(review, atEnd(), DONE, signedDone, asked, ENDS);
   assert.deepEqual([at.status, at.modes, at.sendsBack], ['unverified', ['nudge', 'fresh'], true]);
   // REFUSED without them, in the sentence it says: the step at the gate is ship, not review, and both commands it names are ones that are
@@ -7644,7 +7645,7 @@ test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfil
     says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.",
   });
   assert.equal(
-    toDecideWords(atEnd(), l.toDecide!),
+    toDecideWords(atEnd(), l.toDecide),
     "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit. — wf approve r-1 ship",
   );
   // Approved and filed, it is a step like any other and waits on nobody.
@@ -7653,7 +7654,7 @@ test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfil
     approvals: [approval('ship', 1, 'merge it')],
   });
   const after = listing(ENDS, ran, shownAs({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked);
-  assert.deepEqual([after.steps[2]!.status, after.waitingOnYou, after.toDecide], ['unverified · done', [], undefined]);
+  assert.deepEqual([after.steps[2].status, after.waitingOnYou, after.toDecide], ['unverified · done', [], undefined]);
 });
 
 test("a run at its ending step's gate is not shipped while its result is off the base, and nothing that waits on it starts — but one whose result a person merged by hand has, as git says, and any other gate holds whatever git says", () => {
@@ -7730,7 +7731,7 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
   );
   assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
   assert.equal(
-    l.steps[2]!.note,
+    l.steps[2].note,
     'wf/r-1/implement is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel r-1',
   );
   assert.equal(
@@ -8015,7 +8016,7 @@ test("an ending step's brief carries one way of handing a file over, not two: th
   );
   assert.doesNotMatch(ending, /WF_ARTIFACTS/, "and it runs no check of the run's, so there is none to name");
   // Every other step is told both ways, as it was: its workspace is the run's, and what it leaves there is collected and committed.
-  const work = composeBrief(ENDS[1]!, atEnd(), ENDS, undefined, FILES);
+  const work = composeBrief(ENDS[1], atEnd(), ENDS, undefined, FILES);
   assert.ok(work.includes('\n## Files for the steps after you\n'), work);
   assert.ok(work.includes('- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root'), work);
   assert.doesNotMatch(work, /## Files for the person who decides/);
@@ -8120,7 +8121,7 @@ test('REFUSED once pruned: a step at its gate is offered no approval and no send
     asked,
   );
   assert.deepEqual(
-    [l.steps[2]!.note, l.waitingOnYou, l.toDecide],
+    [l.steps[2].note, l.waitingOnYou, l.toDecide],
     [
       'not approved, and never can be: the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (wf prune)',
       [],
@@ -8141,7 +8142,7 @@ test('REFUSED at an ending gate: `wf rm` holds the run and `wf cancel` calls it 
   );
   // A gate that holds a step which has run still says what the approval files: what waits on it.
   const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
-  const gatedReview: Workflow[] = [ENDS[0]!, { ...ENDS[1]!, gate: true }, ENDS[2]!];
+  const gatedReview: Workflow[] = [ENDS[0], { ...ENDS[1], gate: true }, ENDS[2]];
   assert.match(
     String(forgetRefusal(gatedReview, run({ implement: 't1', review: 't2', ship: null }), DONE, [], signedDone, asked)),
     /review waits at its gate for your approval, and what waits on it is filed once it is approved/,
@@ -8159,7 +8160,7 @@ test('a run called off holds no ending gate: nothing files it, so its ending rea
   assert.equal(stepStatus(SHIP, off, DONE, signedDone, asked, ENDS), 'waiting');
   const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
   const l = listing(ENDS, off, shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);
-  assert.deepEqual([l.steps[2]!.status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+  assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 });
 
 test("REFUSED while the work goes round again: an ending's gate does not hold on a looping step that asked for another round, and nothing is to be decided in the pass that files it", () => {
@@ -8208,7 +8209,7 @@ test("REFUSED while the work goes round again: an ending's gate does not hold on
     /^ship is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once review has handed on/,
   );
   const l = listing(looping, r, (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'), said(true), asked);
-  assert.deepEqual([l.steps[2]!.status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+  assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 
   // `again: false`: the loop has handed on, and the gate holds as it does after any work.
   const handed = assess(
@@ -8234,7 +8235,7 @@ test("REFUSED while the work goes round again: an ending's gate does not hold on
       'where nothing of ship has run and your approval is what files it. Approve it: wf approve r-1 ship — or send the work back: wf retry r-1 review --message "<objection>".',
   });
   // A loop whose follower is a step like any other says what it always said: what waits on it HAS been filed.
-  const plain: Workflow[] = [looping[0]!, looping[1]!, step('docs', ['review'])];
+  const plain: Workflow[] = [looping[0], looping[1], step('docs', ['review'])];
   const withDocs = run({}, { steps: { ...r.steps, docs: { taskId: 't3', workspace: '/wt', branch: 'wf/r-1/implement' } } });
   assert.deepEqual(roundAsk(plain, withDocs, 'review', DONE, said(false), asked), {
     refusal:
@@ -8274,7 +8275,7 @@ test('REFUSED while a send-back is being filed: an ending held at its gate reads
     () => undefined,
     [ask],
   );
-  assert.deepEqual([l.steps[2]!.status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+  assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 
   // All three read the window the same way, and `wf approve` refuses in it: `wf decide` names the work as what the run waits on and says
   // nothing of the ending's gate, where it used to print the approval that was being refused at that same moment.
@@ -8357,7 +8358,7 @@ test("a gate on the last step of a folder that merges nothing: approving accepts
     AHEAD,
   );
   assert.deepEqual(held.toDecide, { kind: 'approve', step: 'review', says: null });
-  assert.equal(toDecideWords(r, held.toDecide!), 'review has signed off at its gate — wf approve r-1 review');
+  assert.equal(toDecideWords(r, held.toDecide), 'review has signed off at its gate — wf approve r-1 review');
 
   // Approved: nothing merges its branch, so the run is one to decide until git says the branch landed.
   const approved = () =>
@@ -8438,23 +8439,23 @@ test("UNSIGNED, the run nudges it ITSELF once a round before it waits on you: th
   const a = assess(STEPS, r, failed, none, unsignedEnd);
   assert.deepEqual([a.retry.map((x) => x.by), a.status], [['signoff'], 'running'], 'the run is moving, and waiting on nobody');
   assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, unsignedEnd).waitingOnYou, [], 'nor does wf ls put it on you');
-  assert.equal(dueNote(STEPS[0]!, r, due(r)[0]!), 'try 2 due — a nudge to sign off, once a round: its session ended without its closeout');
+  assert.equal(dueNote(STEPS[0], r, due(r)[0]), 'try 2 due — a nudge to sign off, once a round: its session ended without its closeout');
   assert.equal(
     retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, failed, none, unsignedEnd),
     'the run nudges implement itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try 2. Wait for it: wf ls r-1.',
   );
 
   // Filed, the try is behind it as `signoff`, and it continues the session on the model it ran on.
-  const nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement!, due(r)[0]!, 't2') } };
-  assert.deepEqual(nudged.steps.implement!.tries, [{ taskId: 't1', then: 'signoff' }]);
+  const nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement, due(r)[0], 't2') } };
+  assert.deepEqual(nudged.steps.implement.tries, [{ taskId: 't1', then: 'signoff' }]);
   assert.equal(signoffsSpent(nudged.steps.implement), 1);
-  assert.equal(tryNote(STEPS[0]!, nudged.steps.implement), 'try 2, nudged to sign off by the run');
+  assert.equal(tryNote(STEPS[0], nudged.steps.implement), 'try 2, nudged to sign off by the run');
 
   // Once a round. The nudge ended unsigned too: the step is yours, and the run says a nudge was tried.
   const again = phases({ t2: 'failed' });
   assert.deepEqual(retriesDue(STEPS, nudged, again, none, unsignedEnd), [], 'never twice in a round');
   assert.deepEqual(listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).waitingOnYou, ['implement']);
-  assert.equal(listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).steps[0]!.note, 'try 2, nudged to sign off by the run');
+  assert.equal(listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).steps[0].note, 'try 2, nudged to sign off by the run');
   // A person's try in between spends nothing, and does not free another.
   const byYou = {
     ...nudged,
@@ -8523,11 +8524,11 @@ test("the run's sign-off nudge is told in its owner's words, pinned — the tool
   );
   const r = run({ implement: 't1', review: null });
   const briefing = (resumed: boolean): RetryBriefing => ({ try: 2, by: 'signoff', mode: 'nudge', resumed, status: 'unsigned' });
-  const brief = composeBrief(STEPS[0]!, r, STEPS, undefined, undefined, undefined, briefing(true));
+  const brief = composeBrief(STEPS[0], r, STEPS, undefined, undefined, undefined, briefing(true));
   assert.ok(brief.startsWith(`## Try 2\n\n${SIGNOFF}\n`), brief);
   assert.match(brief, /## When you are finished/, 'with the closeout contract after it, as on every try');
   // With no session to continue, a new one has no last turn to be told of: it is told as any try is, and who filed it.
-  const fresh = retrySection(STEPS[0]!, briefing(false));
+  const fresh = retrySection(STEPS[0], briefing(false));
   assert.ok(!fresh.includes(SIGNOFF), fresh);
   assert.match(
     fresh,
@@ -8591,16 +8592,16 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
     ),
   ];
   for (const brief of briefs) assert.doesNotMatch(brief, /\bgit\b|branch|commit|worktree|repositor/i, brief);
-  assert.match(briefs[0]!, /This step works in a folder the run made for it/);
-  assert.match(briefs[1]!, /This folder has already been worked in by: write\. Their work is on disk here\./);
+  assert.match(briefs[0], /This step works in a folder the run made for it/);
+  assert.match(briefs[1], /This folder has already been worked in by: write\. Their work is on disk here\./);
   assert.match(
-    briefs[2]!,
+    briefs[2],
     /The steps before you worked in folders of their own, which this one is not\. What each left has been copied into this folder:\n\n- write: `given\/from\/write`/,
   );
-  assert.match(briefs[3]!, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
-  assert.doesNotMatch(briefs[3]!, /merged/);
-  assert.match(briefs[4]!, /An earlier one worked on this step in this folder, and what it left is still here\./);
-  assert.match(briefs[5]!, /your last one could not be continued\. What it left is in this folder\./);
+  assert.match(briefs[3], /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
+  assert.doesNotMatch(briefs[3], /merged/);
+  assert.match(briefs[4], /An earlier one worked on this step in this folder, and what it left is still here\./);
+  assert.match(briefs[5], /your last one could not be continued\. What it left is in this folder\./);
   // One way to hand a file over, and it is inside the fence. The directory the run keeps sits beside the folder, and a step of a folder
   // team runs in `dontAsk` (`validateFolderMode`): named it, the session would be denied writing there and would have handed nothing over.
   for (const brief of briefs) {
@@ -8620,7 +8621,7 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
   // that its folder is not theirs, which would tell the writer to leave its own note alone.
   const continued = (r: Run, from: string, to: string): Run => ({
     ...r,
-    steps: { ...r.steps, [to]: { ...r.steps[to]!, workspace: r.steps[from]!.workspace } },
+    steps: { ...r.steps, [to]: { ...r.steps[to], workspace: r.steps[from].workspace } },
   });
   const again = [
     composeBrief(
@@ -8643,8 +8644,8 @@ test("a folder run is briefed on folders, never on git: a chain continues its pa
       { loop: 'critic', round: 2, rounds: 3, by: 'again', resumed: false },
     ),
   ];
-  assert.match(again[0]!, /This folder has already been worked in by: review\. Their work is on disk here\./);
-  assert.match(again[1]!, /This folder has already been worked in by: critic\. Their work is on disk here\./);
+  assert.match(again[0], /This folder has already been worked in by: review\. Their work is on disk here\./);
+  assert.match(again[1], /This folder has already been worked in by: critic\. Their work is on disk here\./);
   for (const brief of again) assert.doesNotMatch(brief, /which this one is not|copied into this folder/, brief);
   // A fork's side tried again, beside a sibling in a folder of its own and the parent it did not continue: here is its own, the rest are not.
   const side = composeBrief(
@@ -8723,7 +8724,7 @@ const due = (
   message: string | undefined = 'Add a flag',
   verdict?: Verdict,
 ) => {
-  const { check: _filed, ...unfiled } = r.steps.ship!;
+  const { check: _filed, ...unfiled } = r.steps.ship;
   const at = check ? r : { ...r, steps: { ...r.steps, ship: unfiled } };
   return landingDue(
     LANDER,
@@ -8846,7 +8847,7 @@ test('REFUSED: landingDue aborts a merge it is not to commit — a check that re
 
 test('REFUSED: landingDue reads no git where no landing can be due — its session or its check in flight, or an ending that did not sign off done with nothing staged', () => {
   const read = (r: Run, own: StepStatus, ship: TaskPhase, check: TaskPhase | undefined, staged: boolean) => {
-    const { check: _filed, ...unfiled } = r.steps.ship!;
+    const { check: _filed, ...unfiled } = r.steps.ship;
     const at = check ? r : { ...r, steps: { ...r.steps, ship: unfiled } };
     return landingDue(
       LANDER,
@@ -8991,7 +8992,7 @@ test("REFUSED: wf rm of a run whose ending's merge is staged and not landed, wit
     'nothing staged, and nothing landed yet',
   );
   assert.equal(
-    forget({ ...r, steps: { ...r.steps, ship: { ...r.steps.ship!, landed: { commit: 'merged0' } } } }, 'none'),
+    forget({ ...r, steps: { ...r.steps, ship: { ...r.steps.ship, landed: { commit: 'merged0' } } } }, 'none'),
     null,
     'landed, it is forgotten',
   );

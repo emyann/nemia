@@ -487,7 +487,7 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
     '    cost  $3.01',
   ]);
   assert.match(
-    lines[check + 3]!,
+    lines[check + 3],
     /^    timeline  try 1 .*  used 29 turns · 93 tool calls · 6\.35M in · 112k out · api 8m06s · tools 2s  cost \$3\.01$/,
   );
   const review = indexOf(lines, '  review');
@@ -512,8 +512,8 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
   };
   const listed = await ls(run.id);
   assert.equal(listed[0], `${run.id}  add sub  $3.51`);
-  assert.match(listed[1]!, /^   implement      verified ✓  \$3\.01 +\S/);
-  assert.match(listed[2]!, /^   review         unverified · done  \$0\.50 +\S/);
+  assert.match(listed[1], /^   implement      verified ✓  \$3\.01 +\S/);
+  assert.match(listed[2], /^   review         unverified · done  \$0\.50 +\S/);
 
   // The run the other screen tests read measured no cost: no dollar on either screen, and the run's cost says not measured.
   const unmeasured = await awaiting();
@@ -621,14 +621,14 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   const run = start({ brief: 'add sub', repo, workflowDir: dir });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
-  const work = readRun(run.id).steps.implement!;
+  const work = readRun(run.id).steps.implement;
   write(work.workspace!, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n');
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
   const branch = work.branch!;
-  assert.equal(readRun(run.id).steps.ship!.taskId, null, 'nothing of the ending is filed without a person');
+  assert.equal(readRun(run.id).steps.ship.taskId, null, 'nothing of the ending is filed without a person');
 
   const lines = await screen(t, e, run.id);
   indexOf(
@@ -661,7 +661,7 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
   const run = start({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
-  const work = readRun(run.id).steps.implement!;
+  const work = readRun(run.id).steps.implement;
   fs.appendFileSync(path.join(work.workspace!, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
@@ -670,7 +670,7 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
   settle(`${run.id}-implement-check`, 'succeeded');
   await advance(e, readRun(run.id));
   settle(`${run.id}-review`, 'succeeded', SIGNED);
-  const branch = readRun(run.id).steps.review!.branch!;
+  const branch = readRun(run.id).steps.review.branch!;
 
   // At the gate: the word is asked for, and the step's own instructions are not read back as what happens next.
   const held = await screen(t, e, run.id);
@@ -758,7 +758,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   const worked = await screen(t, e, direct.id);
   assert.equal(readRun(direct.id).steps.review?.branch, undefined, 'the terminal step has no branch: the fallback is what answers');
   const where = indexOf(worked, '  touched  main');
-  assert.match(worked[where + 1]!, /^ {4}packages\/x\s+1 file\s+\+1 −0$/, worked.slice(where, where + 3).join('\n'));
+  assert.match(worked[where + 1], /^ {4}packages\/x\s+1 file\s+\+1 −0$/, worked.slice(where, where + 3).join('\n'));
 });
 
 test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
@@ -810,7 +810,7 @@ test('`wf ls` views each task once, and runs added in a repository it already re
     const more = start({ brief: `more ${k}`, repo, workflowDir: folder(), isolate: false, ...(k === 1 ? { after: [first] } : {}) });
     branchOff(repo, `wf/${more.id}`, () => write(repo, `more-${k}.txt`, 'x\n'));
     const record = readRun(more.id);
-    record.steps.implement = { ...record.steps.implement!, branch: `wf/${more.id}` };
+    record.steps.implement = { ...record.steps.implement, branch: `wf/${more.id}` };
     fs.writeFileSync(path.join(ROOT, 'runs', `${more.id}.json`), JSON.stringify(record, null, 2));
   }
   const after = await ls();

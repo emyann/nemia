@@ -836,7 +836,8 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
       `${step}: \`${key}\` is ${JSON.stringify(value) ?? `a ${typeof value}`}, and a frontmatter line holds a word, a number or a list: an object would be written as \`[object Object]\`.`,
     );
   } else {
-    text = String(value as string | number | boolean | bigint | symbol);
+    // oxlint-disable-next-line typescript/no-base-to-string -- the branches above took an object and a function, a narrowing tsc reads and this rule does not
+    text = String(value);
   }
   if (/[\r\n]/.test(text)) {
     refuse(
@@ -921,7 +922,7 @@ function codexSandboxNamed<K extends string>(
     );
   }
   const sandbox = sandboxNamed(word);
-  if (!SANDBOXES.codex!.includes(sandbox)) return meta;
+  if (!SANDBOXES.codex.includes(sandbox)) return meta;
   const { permissionMode: _, ...rest } = meta;
   return { ...rest, sandbox } as Partial<Record<K | 'permissionMode' | 'sandbox', string>>;
 }
@@ -936,7 +937,7 @@ const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? '
  */
 export const formerSandbox = (word: string): string | undefined => {
   const sandbox = sandboxNamed(word);
-  return SANDBOXES.codex!.includes(sandbox) ? sandbox : undefined;
+  return SANDBOXES.codex.includes(sandbox) ? sandbox : undefined;
 };
 
 /**
@@ -949,7 +950,7 @@ export const modeOf = (step: Pick<Workflow, 'permissionMode' | 'sandbox'>): stri
 type Spelled = Partial<Record<string, string>>;
 
 /** The key a frontmatter line names: its own, or the one its former name is now (`FORMER_KEYS`). */
-const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written]! : written);
+const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : written);
 
 /**
  * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A line
@@ -1040,7 +1041,7 @@ const VOCABULARY = {
 /** The two fences, each one harness's: what a step on the other harness is told to write instead. */
 const FENCE_ELSEWHERE = {
   permissionMode: (word: string) =>
-    `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex!.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
+    `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
   sandbox: () =>
     `\`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${CLAUDE_MODES.join(', ')} — with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`. Write \`permissionMode:\` instead, or run the step on codex`,
 } as const;
@@ -1549,7 +1550,7 @@ export type DeniedAt = { cwd?: string; runId?: string };
 /** A call or a rule, `Tool` or `Tool(what)`, split. Pure. */
 const callOf = (written: string): { tool: string; what?: string } => {
   const call = /^([^()]+)\((.*)\)$/s.exec(written);
-  return call ? { tool: call[1]!, what: call[2]! } : { tool: written };
+  return call ? { tool: call[1], what: call[2] } : { tool: written };
 };
 
 /** A directory as a prefix: no trailing slash. */
@@ -2033,7 +2034,7 @@ function entryValue(file: string, key: EntryKey, written: string): string | stri
   if (written.startsWith("'")) {
     const m = /^'((?:[^']|'')*)'$/.exec(written);
     return m
-      ? m[1]!.replace(/''/g, "'")
+      ? m[1].replace(/''/g, "'")
       : cannot("is not one quoted line: a quote inside it is written '', and nothing follows the closing quote");
   }
   if (/^[{&*!%@`]/.test(written)) return cannot('starts with a character YAML reads as something other than text');

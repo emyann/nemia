@@ -134,8 +134,8 @@ export const breakdownLines = (c: PassCost): string[] => {
     String(c.phases[p].spawned),
   ]);
   const head = ['phase', 'ms', 'calls', 'read', 'processes'];
-  const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k]!.length)));
-  const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]!) : cell.padStart(widths[k]!))).join('  ')}`;
+  const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k].length)));
+  const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]) : cell.padStart(widths[k]))).join('  ')}`;
   const harnesses = Object.entries(c.harnesses)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(

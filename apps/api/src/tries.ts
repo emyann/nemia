@@ -171,7 +171,7 @@ export function triesOf(
   const earlier = record?.tries ?? [];
   // The turn of its task the i-th earlier try was: a held task a person answered keeps each try they answered under its one id. A recheck
   // replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them).
-  const turnAt = (i: number): number => earlier.slice(0, i).filter((t) => t.taskId === earlier[i]!.taskId && t.then !== 'recheck').length;
+  const turnAt = (i: number): number => earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
   // The step's record as it stood on its n-th try: the tries behind that one.
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   // What a person said to the n-th try, asked of the record as it stood then: `answerOf` reads a step's current try.

@@ -162,11 +162,11 @@ const boxer =
       names,
       label:
         kind === 'step'
-          ? names[0]!
+          ? names[0]
           : kind === 'more'
             ? `+${names.length}`
             : `${names.length} ${done ? 'done' : names.length === 1 ? 'step' : 'steps'}`,
-      state: kind === 'step' ? stateOf(names[0]!) : null,
+      state: kind === 'step' ? stateOf(names[0]) : null,
       live: names.some((name) => isLiveStep(stateOf(name), cancelled)),
       done,
     };

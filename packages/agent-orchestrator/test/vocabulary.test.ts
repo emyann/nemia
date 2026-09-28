@@ -70,16 +70,16 @@ test("the parser's permission modes, sandboxes and efforts are the engine's, har
 test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word added, a harness forgotten', () => {
   const without = (list: readonly string[], word: string) => list.filter((w) => w !== word);
   const lists = { permissionMode: PERMISSION_MODES, sandbox: SANDBOXES, effort: EFFORTS };
-  assert.deepEqual(drift({ ...lists, permissionMode: { ...PERMISSION_MODES, claude: without(PERMISSION_MODES.claude!, 'manual') } }), [
+  assert.deepEqual(drift({ ...lists, permissionMode: { ...PERMISSION_MODES, claude: without(PERMISSION_MODES.claude, 'manual') } }), [
     'permissionMode on claude: the engine takes manual, and the parser refuses it at load',
   ]);
-  assert.deepEqual(drift({ ...lists, sandbox: { codex: without(SANDBOXES.codex!, 'read-only') } }), [
+  assert.deepEqual(drift({ ...lists, sandbox: { codex: without(SANDBOXES.codex, 'read-only') } }), [
     'sandbox on codex: the engine takes read-only, and the parser refuses it at load',
   ]);
-  assert.deepEqual(drift({ ...lists, sandbox: { codex: [...SANDBOXES.codex!, 'bypassPermissions'] } }), [
+  assert.deepEqual(drift({ ...lists, sandbox: { codex: [...SANDBOXES.codex, 'bypassPermissions'] } }), [
     'sandbox on codex: the parser takes bypassPermissions, and the engine refuses it when the step is filed',
   ]);
-  assert.deepEqual(drift({ ...lists, effort: { ...EFFORTS, 'claude-detached': [...EFFORTS['claude-detached']!, 'minimal'] } }), [
+  assert.deepEqual(drift({ ...lists, effort: { ...EFFORTS, 'claude-detached': [...EFFORTS['claude-detached'], 'minimal'] } }), [
     'effort on claude-detached: the parser takes minimal, and the engine refuses it when the step is filed',
   ]);
   const { codex: _, ...forgotten } = EFFORTS;
@@ -87,7 +87,7 @@ test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word ad
     `effort on codex: the engine takes ${CODEX_EFFORTS.join(', ')}, and the parser refuses it at load`,
   ]);
   // The sandboxes back under `permissionMode`, as they were until 2026-09-23: two keys' lists, each wrong.
-  assert.deepEqual(drift({ ...lists, permissionMode: { ...PERMISSION_MODES, codex: SANDBOXES.codex! }, sandbox: {} }), [
+  assert.deepEqual(drift({ ...lists, permissionMode: { ...PERMISSION_MODES, codex: SANDBOXES.codex }, sandbox: {} }), [
     'permissionMode on codex: the parser takes read-only, workspace-write, danger-full-access, and the engine refuses it when the step is filed',
     'sandbox on codex: the engine takes read-only, workspace-write, danger-full-access, and the parser refuses it at load',
   ]);
@@ -122,7 +122,7 @@ test("every word the parser takes, the engine's own refusal takes too — asked 
     // The engine's task names either fence `permissionMode`: what the tick files a step's sandbox as (`modeOf`).
     for (const permissionMode of [...(PERMISSION_MODES[h] ?? []), ...(SANDBOXES[h] ?? [])])
       assert.equal(refuses({ brief: 'b', cwd: '/w', config: { permissionMode } }), undefined, `${h} ${permissionMode}`);
-    for (const effort of EFFORTS[h]!) assert.equal(refuses({ brief: 'b', cwd: '/w', config: { effort } }), undefined, `${h} ${effort}`);
+    for (const effort of EFFORTS[h]) assert.equal(refuses({ brief: 'b', cwd: '/w', config: { effort } }), undefined, `${h} ${effort}`);
   }
   // `claude` is the engine's `claude`, whose refusal is Claude Code's lists in either mode — the same `claudeDetached.refuses` is.
   assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached']);
@@ -140,7 +140,7 @@ test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and th
     });
     return args[args.indexOf('-s') + 1];
   };
-  for (const sandbox of SANDBOXES.codex!) {
+  for (const sandbox of SANDBOXES.codex) {
     assert.equal(sandboxOf(`---\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
     assert.equal(sandboxOf(`---\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`), sandbox, `the former line, ${sandbox}`);
   }

@@ -260,7 +260,7 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
   const { filed } = await walk(dir);
   assert.deepEqual(chainDifferences(filed), []);
   assert.deepEqual(
-    (filed[0]!.closeoutSchema as { required: string[] }).required,
+    (filed[0].closeoutSchema as { required: string[] }).required,
     ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'],
     'the first try',
   );
@@ -316,8 +316,8 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
   const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
   assert.deepEqual(
     chainDifferences([
-      { ...chain[1]!, id: 'r-implement' },
-      { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' },
+      { ...chain[1], id: 'r-implement' },
+      { ...chain[1], closeoutSchema: reordered, resumeFrom: 'native-r-implement' },
     ]),
     ["r-implement-try2: closeoutSchema is not r-implement's"],
   );

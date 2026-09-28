@@ -425,7 +425,7 @@ const START: Guarded = {
 export function folderOf(name: string, from: WorkflowSource | undefined, repo: string, home: string): { dir: string } | Refusal {
   const sources = sourcesOf(repo, home);
   const found = sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name));
-  if (found.length === 1) return { dir: path.join(found[0]!.dir, name) };
+  if (found.length === 1) return { dir: path.join(found[0].dir, name) };
   if (found.length > 1) {
     return {
       status: 409,

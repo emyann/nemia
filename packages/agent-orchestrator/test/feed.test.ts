@@ -219,7 +219,7 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   const run = start({ brief: 'the ship gate', repo, workflowDir: ending });
   await tick(b.e);
   // Work on the step's branch, as a session leaves it: a branch that never moved is read by git as merged already.
-  const branch = readRun(run.id).steps.implement!.branch!;
+  const branch = readRun(run.id).steps.implement.branch!;
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' }).trim();
   git('update-ref', `refs/heads/${branch}`, git('commit-tree', `${branch}^{tree}`, '-p', branch, '-m', 'the work'));
@@ -574,7 +574,7 @@ test('a watch hands each line on with its own cursor: the byte after it, in byte
   }
   assert.equal(got.at(-1)!.cursor, whole.cursor, "the last line's cursor is the end a read hands out");
   assert.equal(
-    got[2]!.cursor - got[1]!.cursor > Buffer.byteLength(line('r-b', 'running')) + 1,
+    got[2].cursor - got[1].cursor > Buffer.byteLength(line('r-b', 'running')) + 1,
     true,
     "the torn line's bytes are counted into the next line's cursor",
   );
@@ -618,7 +618,7 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
     // Truncated to nothing: said once, and the watch reads the feed the tick writes again from its start — the transition among it.
     fs.truncateSync(FEED, 0);
     await printed(() => cuts().length === 1, 'the truncation is said');
-    assert.match(cuts()[0]!, /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    assert.match(cuts()[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
     await tick(b.e);
@@ -628,7 +628,7 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
     const before = out.length;
     fs.rmSync(FEED);
     await printed(() => cuts().length === 2, 'the deletion is said');
-    assert.match(cuts()[1]!, /the feed was deleted under this watch/);
+    assert.match(cuts()[1], /the feed was deleted under this watch/);
     await approve(b.e, run.id, 'plan');
     for (let i = 0; i < 2; i++) await tick(b.e);
     await printed(() => /\splan\s+(?!awaiting)/.test(out.slice(before)), 'the approval after the deletion is delivered');
@@ -643,7 +643,7 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
     fs.renameSync(next, FEED);
     await printed(() => out.slice(at).includes('r-new'), 'the replacement is read');
     assert.equal(cuts().length, 3);
-    assert.match(cuts()[2]!, /the feed was replaced under this watch/);
+    assert.match(cuts()[2], /the feed was replaced under this watch/);
 
     // Once each: every beat after reads on, and says nothing more — no `past the end`, ever.
     const quiet = err;
@@ -679,7 +679,7 @@ test('`wf watch` says it is watching only once it holds its cursor: a feed cut t
       assert.ok(performance.now() < bound, 'the truncation was not said in 10s');
       await new Promise((r) => setTimeout(r, 20));
     }
-    assert.match(err[0]!, /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
+    assert.match(err[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
   } finally {
     watch.stop();
   }

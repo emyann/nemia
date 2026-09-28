@@ -1,7 +1,7 @@
 import { memo, useId, type ComponentProps, type ReactNode } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { fencedCode, labelFootnotes, languageOf, type TextNode } from '../lib/markdown';
+import { fencedCode, labelFootnotes, languageOf } from '../lib/markdown';
 import { cn } from '../lib/utils';
 import { CodeBlock } from './ai-elements/code-block';
 
@@ -63,7 +63,7 @@ const COMPONENTS: Components = {
     );
   },
   pre: ({ node }) => {
-    const { code, className } = fencedCode(node as TextNode | undefined);
+    const { code, className } = fencedCode(node);
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px]" />;
   },
   code: ({ node: _node, className, ...props }) => (

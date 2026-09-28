@@ -236,7 +236,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       if (steps[0]?.until) await steps[0].until;
       const reply = turn === 1 ? steps[0]?.reply : undefined;
       if (reply !== undefined) {
-        const first = steps[0]!;
+        const first = steps[0];
         replied++;
         bus.publish(
           AgentEvent.message({

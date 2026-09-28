@@ -479,7 +479,7 @@ export function judge(
  * on you, what `wf ls` asks of you, in its words (`onYouWords`).
  */
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou'>): StepNeeds {
-  const view = run.steps[name]?.taskId ? views.get(run.steps[name]!.taskId!) : undefined;
+  const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
   const status = judged.words.get(name)!;
   const atGate = status === 'awaiting approval' && judged.waitingOnYou.includes(name);
@@ -488,7 +488,7 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
   // (`nameFor`, the engine's). Only for a step the harness blocked: nothing else has a wait for a person to answer.
   const word = blockedByHarness ? view?.waitingFor : undefined;
   const attempt = view?.state.attempts.at(-1)?.n;
-  const calls = view ? deniedOf(views)(run.steps[name]!.taskId!) : [];
+  const calls = view ? deniedOf(views)(run.steps[name].taskId!) : [];
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
@@ -496,12 +496,12 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
       ? {
           words: waitingWords(word),
           advice: answerIn(
-            attempt === undefined ? null : nameFor(run.steps[name]!.taskId!, attempt),
+            attempt === undefined ? null : nameFor(run.steps[name].taskId!, attempt),
             isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined,
           ),
         }
       : null,
-    approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
+    approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0] : null,
     denied: calls.length ? { words: deniedWords(calls), calls } : null,
   };
 }

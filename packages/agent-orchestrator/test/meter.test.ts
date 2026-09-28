@@ -58,7 +58,7 @@ const loop = (passes: number, everyMs: number): string[] => {
     const now = k * everyMs;
     interval = addPass(interval, COST, now);
     if (summaryDue(interval, now)) {
-      said.push(summaryLine(interval!, now));
+      said.push(summaryLine(interval, now));
       interval = undefined;
     }
   }
@@ -86,7 +86,7 @@ test('the line says the heaviest phases over the interval, the bytes read, the p
 test('the breakdown names every phase, each harness observed, and what measuring cost', () => {
   const lines = breakdownLines(COST);
   assert.equal(lines[0], 'the last pass, at 2026-09-25T10:00:00.000Z: 212 ms, 12 run records read, 812.0 kB read, 1 process started');
-  assert.match(lines[1]!, /^ {2}phase +ms +calls +read +processes$/);
+  assert.match(lines[1], /^ {2}phase +ms +calls +read +processes$/);
   for (const p of PHASES)
     assert.ok(
       lines.some((l) => new RegExp(`^  ${p} +`).test(l)),

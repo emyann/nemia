@@ -104,7 +104,7 @@ test('the shipped pages are refused with one of theirs deleted', () => {
   // The real NAMES, over a copy of the real pages less one: the list is what knows it is gone.
   const dir = scratch('hkb-e2e-pages-');
   fs.cpSync(PAGES_DIR, dir, { recursive: true });
-  const gone = pageFiles(dir)[0]!;
+  const gone = pageFiles(dir)[0];
   fs.rmSync(path.join(dir, gone));
   assert.throws(
     () => pageFiles(dir),

@@ -468,7 +468,7 @@ test('wf retry refuses --model and --budget on a remote step, in the words its l
 test("a remote step after a run (`--after`) is told that run's work stays here and is summarised below, never that it is in its workspace", () => {
   const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\n---\nReview it.\n']]);
   const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;
-  const built = parseFolder([['build', '---\n---\nBuild.\n']])[0]!;
+  const built = parseFolder([['build', '---\n---\nBuild.\n']])[0];
   const parents = [
     {
       run: 'r-0',
@@ -477,7 +477,7 @@ test("a remote step after a run (`--after`) is told that run's work stays here a
     },
     { run: 'r-00', unreadable: 'its record is gone' },
   ] as never;
-  const brief = remoteBrief(steps[0]!, run, steps, undefined, undefined, parents);
+  const brief = remoteBrief(steps[0], run, steps, undefined, undefined, parents);
   assert.match(
     brief,
     /## From run r-0\n\nThis run waited on r-0 \(`--after`\) and started once it shipped\. Its work stays on the machine that runs this workflow and is not sent to you: what it was asked\nand what its last steps said when they signed off are summarised below/,
@@ -493,7 +493,7 @@ test("a remote step after a run (`--after`) is told that run's work stays here a
 test("a remote step's try is a new task, told which try and what a person said, with no path", () => {
   const steps = parseFolder([['ask', '---\nharness: a2a:reviewer\nretries: 1\n---\nReview it.\n']]);
   const run = { id: 'r-1', brief: 'a review', steps: {}, workflowDir: '/store/workflows/w' } as never;
-  const brief = remoteBrief(steps[0]!, run, steps, undefined, {
+  const brief = remoteBrief(steps[0], run, steps, undefined, {
     try: 2,
     by: 'ask',
     mode: 'nudge',
@@ -506,7 +506,7 @@ test("a remote step's try is a new task, told which try and what a person said, 
     /## Try 2\n\nThe last try of this step ended `failed`\. A person asked for this try \(`wf retry`\), with what they said below\. This is a new task/,
   );
   assert.match(brief, /## Your answer\n\n[`~]+text\nLook at the tables too\.\n/);
-  const auto = remoteBrief(steps[0]!, run, steps, undefined, { try: 2, by: 'retries', mode: 'nudge', resumed: false, status: 'failed' });
+  const auto = remoteBrief(steps[0], run, steps, undefined, { try: 2, by: 'retries', mode: 'nudge', resumed: false, status: 'failed' });
   assert.match(auto, /The run filed this try itself: this step declares `retries: 1`\./);
   assert.doesNotMatch(auto, /\/store/);
 });

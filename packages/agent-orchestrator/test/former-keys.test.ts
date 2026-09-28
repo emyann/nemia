@@ -56,7 +56,7 @@ const team = (write: string, writer: string): string => {
 test('`wf start` on a folder that writes `disallow:` or `allow:` starts the run under the new names, and names each file and line to rename', async (t) => {
   const dir = team('disallow: SendMessage', 'allow: Edit(**)');
   const printed = await printedBy(t, ['start', 'write it', '--workflows', dir, '--repo', aRepo(), '--no-worktree']);
-  const id = printed[0]!.split(' ')[0]!;
+  const id = printed[0].split(' ')[0];
   const write = readRun(id).workflow!.find((s) => s.name === 'write')!;
   assert.deepEqual([write.disallowedTools, write.allowedTools], [['SendMessage'], ['Edit(**)']], 'the run started, its lists read');
   const said = printed.join('\n');

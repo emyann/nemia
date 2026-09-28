@@ -53,7 +53,7 @@ export function gateOfStep(
 }
 
 /** Who a send-back names in a sentence: the one step, or `the work` where there are several to pick from. */
-export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0]! : 'the work');
+export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0] : 'the work');
 
 /**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes. `approve to run ship on main,

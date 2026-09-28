@@ -596,7 +596,7 @@ test('REFUSED: a page of a listing whose last page was served, of one dropped, o
   // Left part-way, then outnumbered: the oldest of more than OPEN_LISTINGS open is dropped, and the rest still served.
   const tokens: string[] = [];
   for (let i = 0; i <= OPEN_LISTINGS; i++) tokens.push((await h.handler.listTasks(listing({ pageSize: 1 }), ctx)).nextPageToken);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[0] }), ctx), refused(tokens[0]!));
+  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[0] }), ctx), refused(tokens[0]));
   assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[1] }), ctx)).tasks.length, 1);
   assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens.at(-1) }), ctx)).tasks.length, 1);
 
@@ -742,9 +742,9 @@ test('a session is answered as the harness sees it, and else as the journal has 
 test('a spawn that continues a session carries it as its context, and the harness is handed it as `resumeFrom`', async () => {
   const h = harness();
   await h.handler.sendMessage(spawn('ae/t-1/2', { contextId: 'conv-a' }), ctx);
-  assert.equal((h.acted()[0]![1] as SpawnRequest).resumeFrom, 'conv-a');
+  assert.equal((h.acted()[0][1] as SpawnRequest).resumeFrom, 'conv-a');
   await h.handler.sendMessage(spawn('ae/t-2/1', { contextId: '' }), ctx);
-  assert.equal((h.acted()[1]![1] as SpawnRequest).resumeFrom, undefined, 'no context is a cold start');
+  assert.equal((h.acted()[1][1] as SpawnRequest).resumeFrom, undefined, 'no context is a cold start');
 });
 
 test("a listing by context is every attempt that continued the conversation, whatever the runtime's task", async () => {
@@ -780,16 +780,16 @@ test('a listing carries what each session closed with only when it asks for arti
     [[], []],
     "A2A's default: no artifacts",
   );
-  assert.deepEqual(sightingOf(bare.tasks[0]!)?.closeout, closeout, 'the sighting, which the engine reads, is whole either way');
+  assert.deepEqual(sightingOf(bare.tasks[0])?.closeout, closeout, 'the sighting, which the engine reads, is whole either way');
   const full = await h.handler.listTasks({ ...listing(), includeArtifacts: true }, ctx);
   assert.deepEqual(
     full.tasks.map((t) => t.artifacts.map((a) => a.artifactId)),
     [['closeout'], []],
   );
-  assert.deepEqual(closeoutOf(full.tasks[0]!), { outcome: 'done' });
+  assert.deepEqual(closeoutOf(full.tasks[0]), { outcome: 'done' });
   // Paged: each page asks for itself.
   const first = await h.handler.listTasks({ ...listing({ pageSize: 1 }), includeArtifacts: true }, ctx);
-  assert.equal(first.tasks[0]!.artifacts.length, 1);
+  assert.equal(first.tasks[0].artifacts.length, 1);
   const rest = await h.handler.listTasks({ ...listing({ pageSize: 1, pageToken: first.nextPageToken }) }, ctx);
   assert.deepEqual(
     rest.tasks.map((t) => t.id),
@@ -838,7 +838,7 @@ test('a signed session its task holds open is INPUT_REQUIRED on a read, listed b
     inList.map((t) => t.status!.state),
     [TaskState.TASK_STATE_COMPLETED],
   );
-  assert.deepEqual(sightingOf(inList[0]!), job, 'observe reads the harness, unchanged');
+  assert.deepEqual(sightingOf(inList[0]), job, 'observe reads the harness, unchanged');
 
   const gone = harness();
   gone.journal.set('t-h', held());

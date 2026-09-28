@@ -66,7 +66,7 @@ test('REFUSED: a test file that leaves a root scratch cannot remove fails, and n
   assert.equal(kept.length, 1, 'its root kept');
   assert.notEqual(status, 0, `its test passes, and the file fails:\n${out}`);
   assert.match(out, /scratch: the file left 0 process\(es\) and 1 root\(s\) behind/);
-  assert.ok(out.includes(path.join(tmp, kept[0]!)), 'the root it left named');
+  assert.ok(out.includes(path.join(tmp, kept[0])), 'the root it left named');
 });
 
 test('a process whose only tie to a root is its environment is found in it, and reaped', async () => {

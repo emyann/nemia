@@ -314,7 +314,7 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   assert.deepEqual([...sessions.keys()], [nameFor(good, 1)]);
   assert.equal(first.unreadable.length, 1);
   assert.ok(
-    first.unreadable[0]!.startsWith(
+    first.unreadable[0].startsWith(
       `${bad}'s journal (${journal}), entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
     ),
     first.unreadable[0],
@@ -342,8 +342,8 @@ test('a feed entry no runtime wrote is skipped: the pass that meets it says it o
   assert.equal((await engine.view(id)).phase, 'succeeded');
   assert.equal(meets.unreadable.length, 2);
   assert.ok(
-    meets.unreadable[0]!.startsWith(`the feed (${feedFile}), entry `) &&
-      meets.unreadable[0]!.includes('is no event this runtime writes (its kind is "nudged"'),
+    meets.unreadable[0].startsWith(`the feed (${feedFile}), entry `) &&
+      meets.unreadable[0].includes('is no event this runtime writes (its kind is "nudged"'),
     meets.unreadable[0],
   );
   assert.deepEqual((await engine.tick()).unreadable, [], 'said once: the cursor is past it');
@@ -754,7 +754,7 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
     const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { budgetUsd: 0.25 } });
     const [filed] = await journal.read(id);
     assert.deepEqual((filed as { config?: object }).config, { budgetUsd: 0.25 }, 'on the record, for the runner');
-    assert.equal('budgetUsd' in filed!, false, 'and nowhere else');
+    assert.equal('budgetUsd' in filed, false, 'and nowhere else');
     assert.equal((await engine.view(id)).state.config?.budgetUsd, 0.25);
   }
 });

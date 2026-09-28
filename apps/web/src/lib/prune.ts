@@ -111,7 +111,7 @@ export function unmergedWarning(id: string, awaiting: Awaiting): string {
 
 /** The choice selected first: the least a prune gives back that the api would take. */
 export function firstChoice(offer: PruneOffer): PruneChoice {
-  return offer.choices.find((choice) => !choice.unavailable) ?? offer.choices[0]!;
+  return offer.choices.find((choice) => !choice.unavailable) ?? offer.choices[0];
 }
 
 /** The question the second press answers: the run and what it gives back, and for a run nobody merged, the warning again. */

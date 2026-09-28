@@ -44,7 +44,7 @@ export const codexOutput = (output: string): HarnessOutput => {
     }
     if (event.type === 'turn.started') started++;
     else if (event.type === 'turn.completed') {
-      const count = (key: string) => (typeof event.usage?.[key] === 'number' ? (event.usage[key] as number) : undefined);
+      const count = (key: string) => (typeof event.usage?.[key] === 'number' ? event.usage[key] : undefined);
       const input = count('input_tokens');
       const out = count('output_tokens');
       const read = count('cached_input_tokens');
@@ -192,7 +192,7 @@ export const denialOf = (tool: string, input: unknown): Denial => {
     return typeof v === 'string' && v.trim() ? v.trim() : undefined;
   };
   const what =
-    tool === 'Bash' ? at('command')?.split(/\s+/)[0] : tool === 'Skill' ? at('skill') : FILE_KEYS[tool] ? at(FILE_KEYS[tool]!) : undefined;
+    tool === 'Bash' ? at('command')?.split(/\s+/)[0] : tool === 'Skill' ? at('skill') : FILE_KEYS[tool] ? at(FILE_KEYS[tool]) : undefined;
   return what ? { tool, what } : { tool };
 };
 

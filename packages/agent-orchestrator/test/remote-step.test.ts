@@ -31,7 +31,7 @@ const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
     lines.push(args.join(' '));
   };
   try {
-    await main(argv, e as Parameters<typeof main>[1]);
+    await main(argv, e);
   } finally {
     console.log = log;
   }
@@ -61,7 +61,7 @@ async function started(dir: string): Promise<string> {
   process.chdir(ROOT);
   try {
     const lines = await printed(['start', 'a note on tides', '--workflows', dir, '--input', GIVEN]);
-    return lines[0]!.split(/\s+/)[0]!;
+    return lines[0].split(/\s+/)[0];
   } finally {
     process.chdir(cwd);
   }
@@ -103,7 +103,7 @@ async function remoteRun(name: string, answer: Answer, secret: string | undefine
 test('a step on a remote agent is sent its brief, with the secret its card asks for, and the Task it completes signs it off', async () => {
   const { server, id, e, decided, listed } = await remoteRun('reviewer', { text: 'It is right.' }, 's3cret');
   assert.equal(server.sent.length, 1, 'one message, one Task');
-  const brief = server.sent[0]!;
+  const brief = server.sent[0];
   assert.match(brief, /^Read the note and say whether it is right\.\n\n## What was asked for\n\na note on tides\n/);
   assert.match(brief, /Files were given with it \(`wf start --input`\): `tides\.md`\. They stay on the machine that runs this workflow/);
   assert.equal(brief.includes(ROOT), false, `the brief names no path of this machine: ${brief}`);

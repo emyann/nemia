@@ -161,14 +161,14 @@ test("a loop's edge is labelled with the round it is on past the first — the l
       step('implement', 'unverified', implement),
       step('review', 'unverified', review),
     ]);
-    assert.equal(back!.label, label, `review: ${review}; implement: ${implement}`);
+    assert.equal(back.label, label, `review: ${review}; implement: ${implement}`);
     assert.equal(loopLabel([review, implement], rounds), label);
   }
 });
 
 test('an edge runs while work moves along it — into a step at work or at its check, or back round a loop whose next round is due — and not otherwise', () => {
   const loopState = (review: string | null, implement: string | null = null) =>
-    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]!
+    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]
       .state;
   assert.equal(
     loopState('round 2 of 3 due — review asked again, and the next tick files implement'),
@@ -188,7 +188,7 @@ test('an edge runs while work moves along it — into a step at work or at its c
     assert.equal(loopState(review, implement), 'to-come', `review: ${review}; implement: ${implement}`);
 
   const into = (state: StepState, from: StepState = 'verified') =>
-    edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0]!.state;
+    edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0].state;
   assert.equal(into('working'), 'running', 'its session is at work');
   assert.equal(into('checking'), 'running', 'its check is running');
   // Nothing is moving into a human gate, a refused check, a step asking a person, one that ended badly, or one not filed.
@@ -246,8 +246,8 @@ test('every edge colour is given in both themes — a colour named and never giv
   for (const colour of new Set(named)) {
     const name = /^var\((--[\w-]+)\)$/.exec(colour)?.[1];
     assert.ok(name, colour);
-    assert.ok(light[1]!.includes(`${name}:`), `${name} in the light theme`);
-    assert.ok(dark[1]!.includes(`${name}:`), `${name} in the dark theme`);
+    assert.ok(light[1].includes(`${name}:`), `${name} in the light theme`);
+    assert.ok(dark[1].includes(`${name}:`), `${name} in the dark theme`);
   }
 });
 

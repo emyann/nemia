@@ -4,7 +4,7 @@ import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
 import { cardQuery, workflowNameOf } from '../lib/api';
 
-// `inbox_`: at /inbox/$name, and not drawn inside the Inbox page, which has no outlet for it.
+/** The page of an inbox card, at /inbox/$name: `inbox_` draws it on its own, not inside the Inbox page, which has no outlet for it. */
 export const Route = createFileRoute('/inbox_/$name')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(cardQuery(params.name)),
   component: CardPage,

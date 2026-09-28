@@ -46,10 +46,10 @@ type Step = RunDetail['steps'][number];
 const LANDING_MS = 3_000;
 
 /**
- * Opened on a step (`?step=`), the page is brought to its inspector, which sits under the banners and Decide, below the first screen: a
- * person who pressed Read the plan would otherwise be reading the Decide section. Decide grows once its decision is read, after the page has
- * drawn, so a scroll made once lands short of the inspector; this one is made again each time the page's height changes, for a few seconds,
- * and never once the person scrolls, presses a key or touches the page themselves.
+ * Brings the page to `target`, the section that holds the inspector, when it is opened on a `step` (`?step=`): the inspector sits under the
+ * banners and Decide, below the first screen, where a person who pressed Read the plan would otherwise be reading the Decide section. Decide
+ * grows once its decision is read, after the page has drawn, so the scroll is made again each time `target`'s parent, the article, changes
+ * height — for `LANDING_MS`, and never once the person scrolls, presses a key or touches the page themselves (`TAKEN_BACK`).
  */
 function useLanding(target: RefObject<HTMLElement | null>, step: string | undefined) {
   useEffect(() => {
@@ -58,7 +58,6 @@ function useLanding(target: RefObject<HTMLElement | null>, step: string | undefi
     const bring = () => el.scrollIntoView({ block: 'start' });
     bring();
     const resized = new ResizeObserver(bring);
-    // The article: what grows above the inspector grows it.
     resized.observe(el.parentElement ?? document.body);
     const done = () => {
       resized.disconnect();
@@ -74,10 +73,13 @@ function useLanding(target: RefObject<HTMLElement | null>, step: string | undefi
 /** What a person does to move the page themselves, which ends a landing. */
 const TAKEN_BACK = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
+/**
+ * The page of a run, keyed by run, so the step selected and where the nodes were dragged belong to the run they were on. A run removed
+ * while the page is open is said to be gone: the query keeps its last read, which is not drawn as if the run were still there.
+ */
 function RunPage() {
   const { runId } = Route.useParams();
   const { data: run, error } = useSuspenseQuery(runQuery(runId));
-  // Removed while the page was open: its last read is kept by the query, and not drawn as if it were still there.
   if (runGone(error)) {
     return (
       <div className="space-y-3">
@@ -86,15 +88,30 @@ function RunPage() {
       </div>
     );
   }
-  // Keyed by run: the step selected and where the nodes were dragged belong to the run they were on.
   return <Run key={run.id} run={run} />;
 }
 
+/**
+ * One run, top to bottom: what is left to decide about its result, above who else it waits on, as `wf ls` prints the two; the runs it waits
+ * on and a person's hold; its warning; its id, with what it has cost, every step's tries, once a cost was measured (`≥` where an ended
+ * attempt has none on it), what the same sessions read, by price, where every one of them measured it, what it was started from, and, once
+ * it is over, what it holds on disk to give back as `wf prune` does; then Decide, between the banners and the canvas, for a run with
+ * something to decide and never while it runs: an answer to give, or a try a person has asked for, since a session the harness blocked is
+ * continued from the banner and Decide draws it only once its try is asked; the graph, with the inspector of the step selected; the brief,
+ * with the inbox card it was started from under it, as `wf decide` puts it under the run's line; its facts; its timeline; and each step's
+ * section.
+ *
+ * Its facts: a folder run has no repository, base or branch, and names where its work is instead, the one thing a person needs to find what
+ * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
+ * once `wf prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
+ *
+ * A link to another step of the run while its page is open opens that one, seen as the render that reads the new link runs. A step the
+ * folder has lost since it was clicked is off the canvas, and its inspector goes with it.
+ */
 function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
   const { step: linked } = Route.useSearch();
   const [selected, setSelected] = useState<string | null>(linked ?? null);
-  // A link to another step of the run while its page is open opens that one: seen as the render that reads the new link runs.
   const [seen, setSeen] = useState(linked);
   if (linked !== seen) {
     setSeen(linked);
@@ -103,14 +120,12 @@ function Run({ run }: { run: RunDetail }) {
   const steps = useRef<HTMLElement>(null);
   useLanding(steps, linked);
   const close = useCallback(() => setSelected(null), []);
-  // A step the folder has lost since it was clicked is off the canvas, and its panel goes with it.
   const inspected = run.steps.find((s) => s.name === selected);
 
   return (
     <article className="space-y-6">
       <BackToRuns />
 
-      {/* What is left to decide about the result, above who else the run waits on, as `wf ls` prints the two. */}
       <ToDecideBanner run={run} />
 
       <NeedsBanner run={run} />
@@ -128,14 +143,12 @@ function Run({ run }: { run: RunDetail }) {
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          {/* What the run has cost, every step's tries, once a cost was measured: `≥` where an ended attempt has none on it. */}
           {run.cost && (
             <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
               <span className="text-neutral-500">cost </span>
               <span className="font-mono">{run.cost.said}</span>
             </p>
           )}
-          {/* Beside it, what the same sessions read, by price — where every one of them measured it. */}
           {run.read && (
             <p
               data-run-read
@@ -147,13 +160,10 @@ function Run({ run }: { run: RunDetail }) {
           )}
           <StartedFrom run={run} />
           {run.try && <RemoveRun id={run.id} />}
-          {/* Once it is over, what it holds on disk given back, as `wf prune` gives it: nothing is offered of a run still moving. */}
           <PruneRun run={run} />
         </div>
       </header>
 
-      {/* Between the banner and the canvas, for a run with something to decide — never while it runs — an answer to give, or a try a person
-          has asked for. A session the harness blocked is continued from the banner, and draws it only once its try is asked. */}
       {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
 
       <section ref={steps} aria-label="The run's steps as a graph" className="flex scroll-mt-4 flex-col gap-4 md:flex-row">
@@ -165,7 +175,6 @@ function Run({ run }: { run: RunDetail }) {
 
       <section className="space-y-4">
         <Markdown>{run.brief}</Markdown>
-        {/* Under the brief, as `wf decide` puts it under the run's line: the inbox card it was started from. */}
         {run.fromNote && (
           <p data-from={run.from?.inbox} className="text-sm text-neutral-500">
             {run.fromNote}
@@ -173,8 +182,6 @@ function Run({ run }: { run: RunDetail }) {
         )}
         <Facts
           rows={[
-            // A folder run has no repository, no base and no branch, and a row of dashes where they belong says nothing. Where its
-            // work is instead — the one thing a person needs to find what it made.
             ...(run.place === 'folder'
               ? ([['work', pathRow(run.work)]] satisfies Array<[string, ReactNode]>)
               : ([
@@ -183,10 +190,8 @@ function Run({ run }: { run: RunDetail }) {
                   ['branch', code(run.branch)],
                 ] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
-            // When it started — its first step filed — and the wait before it, which a run started `--after` runs spends doing nothing.
             ['started', startedRow(run)],
             ['cancelled', run.cancelledAt && when(run.cancelledAt)],
-            // Only once `wf prune` removed its worktrees: the run is read as it ended, and nothing of it can be tried again.
             ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
             ['workflow', code(run.workflowDir)],
           ]}
@@ -204,7 +209,8 @@ function Run({ run }: { run: RunDetail }) {
 
 /**
  * When `wf prune` removed a run's worktrees, how many and what they held, and what it kept — in `wf prune`'s words. And when `--artifacts`
- * removed its files, what that freed: the files then go from what is kept.
+ * removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the files went
+ * later than the worktrees, each at its own time.
  */
 function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
@@ -221,7 +227,6 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
     );
   }
   const files = `its files, ${bytesWord(artifacts.bytes)} freed; its branches and record are kept`;
-  // One prune took both, or its files alone; or the files went later than the worktrees, each at its own time.
   return (
     <span data-pruned data-files-pruned title={title}>
       {!worktrees.length ? (
@@ -248,17 +253,34 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
   </span>
 );
 
+/**
+ * One step's section: its state, its spec, its check, what it is told, its facts, its files, then its gate or what it handed on.
+ *
+ * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
+ * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a
+ * permission rule names it, which is what its work may be short of; what its current try consumed, in `wf decide`'s words, `not measured`
+ * where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt cache marked; and
+ * what every try has cost together, and of its cap where it has one, red once past it.
+ *
+ * A folder step's files: what it left in its folder, which is the whole of what it made — the files its closeout named and the ones it
+ * forgot to, each with its size, a text file readable in a tab, and what the api serves by no name, a directory or a link, by its path — so
+ * *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read says so instead, where an empty list
+ * would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
+ *
+ * At its gate — waiting on you as `wf ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`) — the
+ * gate, with what the step handed on, every field it declared, which is what a person approves, beside Approve and Send back. An ending
+ * step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing on, and shows instead the work it would act on
+ * (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its files, since approving is what runs it. An ending
+ * that has already run — filed, aborted, retried — is at its gate for its own closeout, as any gated step is. A send-back names the steps
+ * the package names (`sendBackTo`): the step itself once it has run, or the steps it waits on. Once approved, under the step: when, and the
+ * words every step after the gate is handed — or, for the step that ends the run, what its own approval filed and the terms it acts on.
+ */
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
   const runId = run.id;
   const { spec, closeout, gate } = step;
-  // Waiting at its gate on you, as `wf ls` asks it (`approve`): on a run nobody called off, and not sent back already.
   const atGate = gateOffered(step, runCancelled);
-  // An ending step's gate, which holds before the step is filed (`endsTheRun`): it has no closeout of its own, and what a person approves is
-  // the work it would act on — the branch's standing and diff stat, and each work step's closeout with its files (`ActsOn`).
   const ends = endsTheRun(step);
-  // An ending that has already run — filed, aborted, retried — is at its gate for its own closeout, as any gated step is.
   const acts = atGate && ends && step.taskId === null;
-  // The steps a send-back names, as the package names them (`sendBackTo`): the step itself once it has run, or the steps it waits on.
   const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
   const handedOn = closeout && (
     <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
@@ -293,28 +315,17 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       <Facts
         rows={[
-          // A folder step's folder, where a git step's branch goes: the directory it worked in, copyable.
           run.place === 'folder' ? ['folder', pathRow(step.workspace)] : ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
-          // Its gate, where it has one: a person's word files what follows it — or, for the step that ends the run, the step itself.
           ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
-          // What the harness denied its current try, every call as a permission rule names it: what its work may be short of.
           ...(step.denied ? ([['denied', deniedRow(step.denied.calls)]] satisfies Array<[string, ReactNode]>) : []),
-          // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
-          // What its sessions read, by price, where anything measured it: the peak and a rebuilt cache marked.
           ...readRows(step.used),
-          // What every try has cost together, and of its cap where it has one: red once past it.
           ...spentRows(step),
         ]}
       />
 
-      {/* What a folder step left in its folder, which is the whole of what it made: the files its closeout named and the ones it
-          forgot to, each with its size, and a text file readable in a tab — and what the api serves by no name, a directory or a
-          link, by its path, so *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read
-          says so instead: an empty list there would say the step made nothing when nobody could look. A git step's work is its
-          branch, and has no such list. */}
       {run.place === 'folder' && step.taskId !== null && (
         <div aria-label="Files" data-files className="text-xs text-neutral-500">
           {step.filesError === null ? (
@@ -328,8 +339,6 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         </div>
       )}
 
-      {/* At its gate, the gate, with what it handed on — which is what a person approves, every field it declared — beside Approve and
-          Send back. At an ending step's gate, what it would act on instead: it has handed nothing on, and approving is what runs it. */}
       {atGate ? (
         acts ? (
           <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -343,8 +352,6 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         handedOn
       )}
 
-      {/* Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
-          what its own approval filed and the terms it acts on. */}
       {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
   );

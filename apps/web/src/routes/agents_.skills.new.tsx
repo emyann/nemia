@@ -6,7 +6,7 @@ import { createSkill, type SkillDraft } from '../lib/api';
 import { invalidateSkills } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
 
-// `agents_`: at /agents/skills/new, and not drawn inside the Agents page, which has no outlet for it.
+/** The New skill page, at /agents/skills/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
 export const Route = createFileRoute('/agents_/skills/new')({
   component: NewSkillPage,
 });

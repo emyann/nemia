@@ -47,9 +47,15 @@ test('a crash exits 1 and prints its message, with no stack: wf ls over a store 
   assert.ok(!/^\s+at /m.test(stderr), `no stack: ${stderr}`);
 });
 
-test('an error exits with its exitCode only when that is a positive whole number, and 1 otherwise', () => {
+test('an error exits with its exitCode only when that is a whole number from 1 to 255, and 1 otherwise', () => {
   assert.equal(exitCodeOf(Object.assign(new Error('refused'), { exitCode: 2 })), 2);
   assert.equal(exitCodeOf(Object.assign(new Error('stopped'), { exitCode: 130 })), 130);
+  assert.equal(exitCodeOf(Object.assign(new Error('highest'), { exitCode: 255 })), 255);
+  assert.equal(
+    exitCodeOf(Object.assign(new Error('odd'), { exitCode: 256 })),
+    1,
+    'REFUSED: a code whose low byte is 0, which exits as a success',
+  );
   assert.equal(exitCodeOf(new Error('crash')), 1, 'no code is a crash');
   assert.equal(exitCodeOf(Object.assign(new Error('odd'), { exitCode: 0 })), 1, 'REFUSED: an error exiting 0, as a success');
   assert.equal(exitCodeOf(Object.assign(new Error('odd'), { exitCode: -2 })), 1, 'REFUSED: a negative code');

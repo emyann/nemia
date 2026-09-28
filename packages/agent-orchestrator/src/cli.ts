@@ -312,13 +312,10 @@ const usage = (message: string): never => {
   throw Object.assign(new Error(message), { exitCode: 2 });
 };
 
-/**
- * What `wf` exits with on what `main` threw: a refusal's own code (`exitCode` 2, a sentence saying what to do next), so a script tells
- * it from a crash, which exits 1. A code that is no positive whole number, 0 included, is no refusal's: an error never exits as a success.
- */
+/** What `wf` exits with on what `main` threw: its `exitCode` when that is a whole number from 1 to 255, and 1 otherwise. */
 export const exitCodeOf = (thrown: unknown): number => {
   const code = (thrown as { exitCode?: unknown } | null | undefined)?.exitCode;
-  return typeof code === 'number' && Number.isInteger(code) && code > 0 ? code : 1;
+  return typeof code === 'number' && Number.isInteger(code) && code > 0 && code <= 255 ? code : 1;
 };
 
 const PLAN_HELP = `wf plan <folder> [--repo .]

@@ -88,7 +88,8 @@ every folder uses) and nothing else. A folder holds at most six source files; on
 which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
 import between two folders names the file it needs wherever the face would close a cycle — `agents/` reads the runs'
 judgement and `runs/` an agent's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
-files need each other's values. Test: `apps/api/test/layout.test.ts`.
+files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:
+`apps/api/test/layout.test.ts`.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package, so a change elsewhere alone is not in their package's turbo cache

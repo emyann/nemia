@@ -2,7 +2,8 @@
  * The api's layout, held by path (`docs/architecture.md`): the root of `src` holds the process, the mount, the guard, the store and the
  * body reader; every other file sits in a feature folder of at most six source files, which has a face (`index.ts`) when it has two or
  * more and none when it has one; `app.ts` mounts a folder through its face; a face holds nothing but re-exports by name. No two source
- * files need each other's values, no source file imports a test, and every api path `.oxlintrc.json` names is a file that is there.
+ * files need each other's values, no source file imports a test, no file or folder is named `utils`, `helpers`, `common`, `shared` or
+ * `misc`, and every api path `.oxlintrc.json` names is a file that is there.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -228,6 +229,20 @@ function layoutBreaches(files: string[]): string[] {
   return out;
 }
 
+/** The names of a module about nothing in particular: a split follows the feature, and what a feature shares lives in its own file. */
+const GENERIC = ['utils', 'helpers', 'common', 'shared', 'misc'];
+
+/** Where a folder or a file of `src` is named for no feature: its whole name, the `.ts` aside, is one of `GENERIC`. */
+const genericNames = (files: string[]): string[] =>
+  files.flatMap((f) =>
+    f
+      .replace(/\.ts$/, '')
+      .split('/')
+      .slice(1)
+      .filter((part) => GENERIC.includes(part))
+      .map((part) => `${f} is named \`${part}\`, which says no feature: name it for what it does, beside the code that uses it`),
+  );
+
 /** Where `app.ts` mounts a folder past its face: a folder with an `index.ts` is reached through it. */
 const pastFaces = (file: string, imports: Import[], files: string[]): string[] =>
   imports.flatMap(({ spec }) => {
@@ -307,4 +322,19 @@ test('every face holds only re-exports by name', () => {
     faces.flatMap((f) => faceBody(f, read(f))),
     [],
   );
+});
+
+test('REFUSED: a file or a folder named utils, helpers, common, shared or misc; a name that only holds one is let through', () => {
+  assert.deepEqual(genericNames(['src/runs/utils.ts', 'src/helpers.ts', 'src/shared/runs.ts']), [
+    'src/runs/utils.ts is named `utils`, which says no feature: name it for what it does, beside the code that uses it',
+    'src/helpers.ts is named `helpers`, which says no feature: name it for what it does, beside the code that uses it',
+    'src/shared/runs.ts is named `shared`, which says no feature: name it for what it does, beside the code that uses it',
+  ]);
+  assert.deepEqual(genericNames(['src/runs/utility-words.ts', 'src/steps/logs.ts', 'src/common-runs/misc-free.ts', 'src/utils.tsx']), []);
+});
+
+test('no file or folder of src is named for no feature', () => {
+  const files = sourceFiles();
+  assert.ok(files.length >= 30, 'the scan reads the folders');
+  assert.deepEqual(genericNames(files), []);
 });

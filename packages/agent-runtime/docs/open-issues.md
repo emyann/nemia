@@ -80,7 +80,7 @@ cannot be told apart from what its parent spent. `claude-detached` records what 
 ### 6. The Effect door's `file` refuses no harness's words
 
 **Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
-words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade.ts`), because that is where the
+words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade/consumer.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the

@@ -34,7 +34,7 @@ export class FileRefused extends Schema.TaggedError<FileRefused>()('FileRefused'
 /**
  * The keys a task refuses, since the runtime makes one attempt per start: each is refused present, whatever its value,
  * since a key taken and then dropped is a promise nobody keeps. The words say where trying again goes. `ae`'s brief
- * refuses the same keys in the same words (`RETIRED_BRIEF_KEYS` and `retiredKeyRefusal`, in `cli.ts`).
+ * refuses the same keys in the same words (`RETIRED_BRIEF_KEYS` and `retiredKeyRefusal`, in `cli/main.ts`).
  */
 export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
   maxAttempts: "the runtime makes one attempt per start, and trying again is the caller's",
@@ -51,7 +51,7 @@ export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\`
 /**
  * What to do instead of a ceiling, pools or a priority, none of which the runtime keeps: the layer above chooses what starts,
  * and when. Shared by every refusal of them — `priority` here, the pass's arguments, `createEngine`'s `maxConcurrent` and a
- * harness's `pool` (`facade.ts`), and `AE_MAX_CONCURRENT` (`cli.ts`).
+ * harness's `pool` (`facade/consumer.ts`), and `AE_MAX_CONCURRENT` (`cli/main.ts`).
  */
 export const ADMIT_INSTEAD =
   'File tasks `queued: true` and `admit` each when it may start (`ae admit <id>`); in a workflow the orchestrator admits by pool under `WF_MAX_CONCURRENT`.';
@@ -75,7 +75,7 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
  * journals as `null` and would stop its task on the first pass. The harness's arguments under `config` are the adapter's to
  * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
- * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade.ts`), which this
+ * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade/consumer.ts`), which this
  * door never learns.
  */
 export const refusalOf = (spec: Filing): string | undefined => {

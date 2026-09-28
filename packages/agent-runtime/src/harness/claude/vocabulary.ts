@@ -143,7 +143,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 /**
  * What Claude Code run as `claude -p` cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a bridge to claude.ai,
  * which only a background session opens, and which `claudeFlagsOf` would otherwise spell onto a prompt that runs and exits. The
- * engine's own door words it with the harnesses that do bridge (`harnessRefusalOf` in `facade.ts`); this is the Effect door's.
+ * engine's own door words it with the harnesses that do bridge (`harnessRefusalOf` in `facade/consumer.ts`); this is the Effect door's.
  */
 export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??

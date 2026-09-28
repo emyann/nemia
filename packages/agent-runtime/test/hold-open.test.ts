@@ -30,7 +30,7 @@ import {
 } from '../src/index.ts';
 import { createEngine, type PromiseJournal, type PromiseRunner } from '../src/facade.ts';
 import { fold } from '../src/core/domain.ts';
-import { parseBrief, taskLine } from '../src/cli.ts';
+import { parseBrief, taskLine } from '../src/cli/main.ts';
 import { scratch } from './scratch.ts';
 
 /** Sign the session `name` off: done, with a closeout given after its attempt started. */

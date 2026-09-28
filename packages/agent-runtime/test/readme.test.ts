@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRIEF_KEYS } from '../src/cli.ts';
+import { BRIEF_KEYS } from '../src/cli/main.ts';
 
 const pkg = fileURLToPath(new URL('..', import.meta.url));
 const read = (p: string) => fs.readFileSync(path.join(pkg, p), 'utf8');
@@ -107,7 +107,7 @@ test('the README names no file that does not exist, and every source file is in 
 
 test('the README uses no `ae` verb the CLI does not have, and names every key a brief has', () => {
   const readme = read('README.md');
-  assert.deepEqual(unknownVerbs(readme, read('src/cli.ts')), []);
+  assert.deepEqual(unknownVerbs(readme, read('src/cli/main.ts')), []);
   assert.deepEqual(unnamedKeys(readme, BRIEF_KEYS), []);
 });
 
@@ -116,5 +116,5 @@ test('the README keeps no count of tests or lines by hand', () => {
 });
 
 test("the README's claim that the CLI imports no Effect is true", () => {
-  assert.doesNotMatch(read('src/cli.ts'), /from 'effect'/);
+  assert.doesNotMatch(read('src/cli/main.ts'), /from 'effect'/);
 });

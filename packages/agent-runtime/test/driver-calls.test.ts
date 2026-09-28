@@ -20,7 +20,7 @@ import { Effect } from 'effect';
 import { a2aOps } from '../src/a2a/client.ts';
 import { HarnessHandler } from '../src/a2a/handler.ts';
 import { createEngine, type PromiseRunner, type Sighting } from '../src/facade.ts';
-import { promiseOps } from '../src/runner-promise.ts';
+import { promiseOps } from '../src/facade/promise.ts';
 import { scratch } from './scratch.ts';
 
 /** The verbs a driver may be asked directly, the only ones: `refuses` judges a task before any session exists. */

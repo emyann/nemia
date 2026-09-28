@@ -8,7 +8,7 @@
  * it must land where `lifecycleOf` then says; and every edge of the machine must be taken by some case, so the table holds
  * no edge the runtime cannot reach. An event with no edge is refused, at shipped defaults, and the refusal is `decide`'s answer.
  *
- * The tick's memo (`tick-memo.ts`) skips a settled task until the feed names it, and folds it again when the feed does. That is
+ * The tick's memo (`core/engine/memo.ts`) skips a settled task until the feed names it, and folds it again when the feed does. That is
  * sound only if a settled task stays settled whatever is appended to it, and decides nothing whatever the pass sees — an attempt
  * left open, a session live or blocked, a clock past its deadline and every grace window.
  */

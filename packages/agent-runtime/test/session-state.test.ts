@@ -21,7 +21,7 @@ import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/bg.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
-import { promiseOps } from '../src/runner-promise.ts';
+import { promiseOps } from '../src/facade/promise.ts';
 import { createEngine, type PromiseRunner } from '../src/facade.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from './scratch.ts';

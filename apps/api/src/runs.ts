@@ -2,17 +2,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import {
-  type BranchReader,
-  branchReader,
-  forget,
-  listRuns,
-  prune,
-  runStartedAt,
-  unhold,
-  unreadableJournal,
-  wordOfView,
-} from 'agent-orchestrator';
+import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, wordOfView } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { readBody, type BodyIssue } from './body.ts';
 import { decisionOf } from './decision.ts';
@@ -42,8 +32,8 @@ import {
   judgedSteps,
   noSuchRun,
   stepNames,
+  judgedUnlessUnreadable,
   type Unreadable,
-  unreadableOf,
   type Views,
   viewsFor,
   viewsOf,
@@ -176,10 +166,10 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
 
 /**
  * A run a task of which does not read, answered off its record: what it asked, where, its steps and their graph, and each step's word off
- * the views that did read — the unreadable task's `unreadable` — with `why` said in `unreadable`. Nothing judged: the tick does not advance
+ * the views that did read — the unreadable task's `unreadable` — with `said` as `unreadable`. Nothing judged: the tick does not advance
  * it either, and counts it in flight, so it is `running` and moving until the journal reads again.
  */
-function unjudged(run: Run, views: Views, unreadable: Unreadable, why: string): Omit<RunSummary, 'startedAt'> {
+function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string): Omit<RunSummary, 'startedAt'> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const wordOf = (taskId: string | null | undefined) =>
@@ -218,14 +208,11 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, why: string): 
     waitingOnYou: [],
     onYou: [],
     toDecide: null,
-    unreadable: `${run.id}'s record reads, but ${/[.!?]$/.test(why) ? why : `${why}.`} So the board does not judge the run, and the tick does not advance it, until that journal reads again.`,
+    unreadable: said,
   };
 }
 
-/**
- * A run judged, or answered off its record (`unjudged`) when a task it reads does not: one of its own the read left out (`unreadableOf`), or
- * one of a run it waits on, whose view rejects in the runtime's words (`unreadableJournal`). Any other failure fails the request.
- */
+/** A run judged, or answered off its record (`unjudged`) when a task it reads does not (`judgedUnlessUnreadable`). */
 async function judgedOrNot(
   run: Run,
   views: Views,
@@ -233,15 +220,8 @@ async function judgedOrNot(
   reader: typeof e,
   git: BranchReader,
 ): Promise<Judged | { unjudged: Omit<RunSummary, 'startedAt'> }> {
-  const own = unreadableOf(run, unreadable);
-  if (own) return { unjudged: unjudged(run, views, unreadable, `the journal of its task ${own.taskId} does not: ${own.why}`) };
-  try {
-    return await summarize(run, views, reader, git);
-  } catch (err) {
-    const why = unreadableJournal(err);
-    if (why === undefined) throw err;
-    return { unjudged: unjudged(run, views, unreadable, `the journal of a task of a run it waits on does not: ${why}`) };
-  }
+  const one = await judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git));
+  return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable) };
 }
 
 /** Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try, agents.ts). */
@@ -388,11 +368,17 @@ export const runs = new Hono()
     });
     return c.json(summaries);
   })
+  /**
+   * A run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does not, in the words the
+   * list says it with (`RunSummary.unreadable`).
+   */
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
-    return c.json(await detail(run));
+    const full = await detail(run);
+    if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
+    return c.json(full);
   })
   /**
    * A try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it. Only a try: any other run is removed

@@ -21,7 +21,7 @@ import {
 } from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, runCapOf, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { everyView, seenBy } from './store.ts';
+import { everyView, judgedUnlessUnreadable, seenBy } from './store.ts';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
@@ -46,11 +46,15 @@ export type Ceilings = {
   pass: PassCost | null;
 };
 
+/** A run a task of which does not read (`judgedUnlessUnreadable`), as a pass counts it: in flight, and asking the cap for nothing more. */
+const UNJUDGED = { inFlight: true, wants: false } as const;
+
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), judged as `runSlots` judges them — every run read as a pass reads it,
  * a record whose workflow no longer reads left out — off one observation of the harnesses (`everyView`), which the package's `runSlots` would
  * make once per task. `runSlots` answers the held runs alone, and the count in flight is what the board says; so its judgement is made here
  * with the package's own pure parts (`slotNeed`, `heldRuns`), and the api's test holds `held` to what `runSlots` answers on the same store.
+ * A run a task of which does not read, its own or a run's it waits on, is counted in flight unjudged, as the tick counts it (`UNJUDGED`).
  */
 export async function ceilingsOf(): Promise<Ceilings> {
   const last = lastCeilings() ?? null;
@@ -58,7 +62,7 @@ export async function ceilingsOf(): Promise<Ceilings> {
   const cap = last?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
   if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
   const runs = listRuns();
-  const views = await everyView();
+  const { views, unreadable } = await everyView();
   const reader = seenBy(views);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
@@ -69,22 +73,25 @@ export async function ceilingsOf(): Promise<Ceilings> {
     } catch {
       continue;
     }
-    const { asks, rounds } = readAsks(run.id);
-    const a = assess(
-      steps,
-      run,
-      phase,
-      closeoutReader(views, run),
-      closeoutAsked(views),
-      exitVerdicts(views, run),
-      asks,
-      rounds,
-      harnessBlocked(views),
-      spendReader(views),
-    );
-    const parents = new Map<string, ParentRun>();
-    if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps) });
+    const need = await judgedUnlessUnreadable(run, unreadable, async () => {
+      const { asks, rounds } = readAsks(run.id);
+      const a = assess(
+        steps,
+        run,
+        phase,
+        closeoutReader(views, run),
+        closeoutAsked(views),
+        exitVerdicts(views, run),
+        asks,
+        rounds,
+        harnessBlocked(views),
+        spendReader(views),
+      );
+      const parents = new Map<string, ParentRun>();
+      if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
+      return slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps);
+    });
+    needs.push({ id: run.id, createdAt: run.createdAt, ...('judged' in need ? need.judged : UNJUDGED) });
   }
   return {
     last,

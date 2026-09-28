@@ -2,6 +2,7 @@
  * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: `GET /api/runs` answers every other
  * run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in runs.ts) — as the
  * tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to see if it shipped.
+ * A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -12,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { Ceilings } from '../src/ceilings.ts';
 import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
@@ -145,4 +147,33 @@ test('GET /api/runs answers every run while one task journal holds an entry no r
     child.unreadable ?? 'null',
   );
   assert.deepEqual(child.after, ['r-bad']);
+});
+
+test("a run a task of which does not read has its page refused in the list's words, and every other run answered in full", async () => {
+  const list = new Map(((await (await app.request('/api/runs')).json()) as RunSummary[]).map((run) => [run.id, run]));
+  for (const id of ['r-bad', 'r-child']) {
+    const res = await app.request(`/api/runs/${id}`);
+    const body = (await res.json()) as { error?: string };
+    assert.equal(res.status, 502, JSON.stringify(body));
+    assert.equal(body.error, list.get(id)!.unreadable, `${id}'s page and the list say one thing`);
+  }
+  for (const id of ['r-good', 'r-sibling']) {
+    const res = await app.request(`/api/runs/${id}`);
+    assert.equal(res.status, 200, await res.clone().text());
+  }
+});
+
+test('GET /api/ceilings answers while a task journal does not read, and counts the runs that read it in flight, as the tick does', async () => {
+  const was = process.env.WF_MAX_RUNS;
+  process.env.WF_MAX_RUNS = '4';
+  try {
+    const res = await app.request('/api/ceilings');
+    assert.equal(res.status, 200, await res.clone().text());
+    const ceilings = (await res.json()) as Ceilings;
+    assert.equal(ceilings.cap, 4);
+    assert.deepEqual([...(ceilings.inFlight ?? [])].sort(), ['r-bad', 'r-child']);
+  } finally {
+    if (was === undefined) delete process.env.WF_MAX_RUNS;
+    else process.env.WF_MAX_RUNS = was;
+  }
 });

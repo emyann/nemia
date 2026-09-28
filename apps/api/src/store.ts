@@ -3,7 +3,7 @@
  * its id, its workflow and the steps it is judged by, and the feed's filing times — read on from where the last read stopped.
  */
 import fs from 'node:fs';
-import { engine, HOME, listRuns, loadWorkflows, readFilings } from 'agent-orchestrator';
+import { engine, HOME, listRuns, loadWorkflows, readFilings, unreadableJournal } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
@@ -52,6 +52,31 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
 }
 
 /**
+ * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): a task of its own
+ * the read left out (`unreadableOf`), or one of a run it waits on, whose view rejects in the runtime's words (`unreadableJournal`). As the tick
+ * leaves such a run unjudged and counts it in flight. Any other failure rejects.
+ */
+export async function judgedUnlessUnreadable<T>(
+  run: Run,
+  unreadable: Unreadable,
+  judge: () => Promise<T>,
+): Promise<{ judged: T } | { unreadable: string }> {
+  const own = unreadableOf(run, unreadable);
+  if (own) return { unreadable: unjudgedWords(run, `the journal of its task ${own.taskId} does not: ${own.why}`) };
+  try {
+    return { judged: await judge() };
+  } catch (err) {
+    const why = unreadableJournal(err);
+    if (why === undefined) throw err;
+    return { unreadable: unjudgedWords(run, `the journal of a task of a run it waits on does not: ${why}`) };
+  }
+}
+
+/** Why `run` is not judged, whole: what reads, what does not (`why`), and what that costs until it reads. */
+const unjudgedWords = (run: Run, why: string): string =>
+  `${run.id}'s record reads, but ${/[.!?]$/.test(why) ? why : `${why}.`} So the board does not judge the run, and the tick does not advance it, until that journal reads again.`;
+
+/**
  * The views a request judges `runs` by, and the engine it hands the package's `parentOf` for the runs they wait on: the tasks of those runs
  * and of the runs they wait on or are held until, found among `store`, over one look at the harnesses (`list(taskIds)`), which reads their
  * journals and no other and asks `claude agents` only for a background session in flight among them — once, however many. A task of a run
@@ -80,10 +105,15 @@ export async function viewsFor(
  *
  * `list` observes the harnesses once and folds every task's journal against that; `view` observes
  * afresh on each call. A task the engine has no record of is simply absent, which reads exactly as
- * `view`'s empty state does: no brief, so `unknown`. So is one whose journal does not read, which the runtime leaves out.
+ * `view`'s empty state does: no brief, so `unknown`. One whose journal does not read is in `unreadable` instead, and in no view
+ * (`judgedUnlessUnreadable`).
  */
-export async function everyView(): Promise<Views> {
-  return new Map((await e.list()).views.map((view) => [view.id, view]));
+export async function everyView(): Promise<{ views: Views; unreadable: Unreadable }> {
+  const listed = await e.list();
+  return {
+    views: new Map(listed.views.map((view) => [view.id, view])),
+    unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])),
+  };
 }
 
 /**

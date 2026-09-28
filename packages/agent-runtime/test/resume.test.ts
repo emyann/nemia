@@ -2,12 +2,13 @@
  * A resumed attempt reads its own closeout and its own usage, at shipped defaults — a fake `claude` that
  * keeps a registry, and a transcript file where Claude Code keeps one.
  *
- * `--resume` keeps the session id, and the runner kept what it read from a finished session by that id,
- * for good. So a nudged retry was handed its first try's statement and usage, to the byte; and a read
- * taken while the registry listed a session final for one observation — by a `view`, which observes
- * without stepping — was kept as "nothing said" after the session went on and said something
- * (`let-a-step-say-which-tools-i-v27t-implement`, 2026-09-13). What is checked is what `createEngine()`
- * writes on the record.
+ * `--resume` keeps the session id, so a read of a finished session belongs to its attempt, not to the id: a
+ * nudged retry is read from its own start, never handed its first try's statement and usage; and a read taken
+ * while the registry lists a session final for one observation — by a `view`, which observes without stepping —
+ * is read again once the transcript is newer than it. A transcript's mtime is put back, so that nothing but the
+ * attempt keeps one attempt's read from the next. What is checked is what `createEngine()` writes on the
+ * record. Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set
+ * before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,6 @@ import { scratch } from './scratch.ts';
 const tmp = (label: string) => scratch(`ae-resume-${label}-`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { createEngine } = await import('../src/facade.ts');
@@ -77,8 +77,6 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   }
 };
 
-// ─── the transcript ─────────────────────────────────────────────────────────
-
 const transcript = (sessionId: string) => path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
 /** Entries appended to the session's transcript, each stamped now. */
 const append = (sessionId: string, ...entries: object[]) => {
@@ -97,15 +95,12 @@ const prompt = (content: string) => ({ type: 'user', message: { role: 'user', co
 const response = (id: string, ...content: object[]) => ({ type: 'assistant', message: { id, role: 'assistant', content, usage: TOKENS } });
 const call = (id: string, name: string, input: object = {}) => ({ type: 'tool_use', id, name, input });
 
-// ─── refusals ───────────────────────────────────────────────────────────────
-
 test("a session resumed under the same id is read for its new attempt: its own closeout, not the last one's, and usage since its own start", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
     const schema = { type: 'object' };
 
-    // The first try gives its closeout and is listed done: its end is written with both.
     const first = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema });
     await engine.tick();
     const [row] = claude.rows();
@@ -116,26 +111,28 @@ test("a session resumed under the same id is read for its new attempt: its own c
       response('msg_1', call('tu_1', 'Read')),
       response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
     );
-    // Last written long before it is read, so nothing but the attempt keeps that read from the next one.
     age(row.sessionId, 30_000);
     claude.set(row.name, { state: 'done' });
     await engine.tick();
     const [was] = (await engine.view(first)).state.attempts;
-    assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' });
-    assert.deepEqual(was?.usage, {
-      turns: 2,
-      toolCalls: 2,
-      inputTokens: 200,
-      uncachedTokens: 20,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 180,
-      outputTokens: 10,
-      peakContextTokens: 100,
-      firstContextTokens: 100,
-      firstCacheWriteTokens: 0,
-    });
+    assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' }, 'the first try, listed done, ends with its closeout');
+    assert.deepEqual(
+      was?.usage,
+      {
+        turns: 2,
+        toolCalls: 2,
+        inputTokens: 200,
+        uncachedTokens: 20,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 180,
+        outputTokens: 10,
+        peakContextTokens: 100,
+        firstContextTokens: 100,
+        firstCacheWriteTokens: 0,
+      },
+      'the first try ends with its usage: two responses',
+    );
 
-    // The retry continues that session, and the harness keeps its id.
     const retry = await engine.file({
       config: { background: true },
       brief: 'give your closeout',
@@ -145,10 +142,9 @@ test("a session resumed under the same id is read for its new attempt: its own c
     });
     await engine.tick();
     const [resumed] = claude.rows();
-    assert.equal(resumed?.name, `ae/${retry}/1`);
+    assert.equal(resumed?.name, `ae/${retry}/1`, 'the retry continues that session');
     assert.equal(resumed?.sessionId, row.sessionId, 'the same id');
 
-    // Listed final before it has written a word, to a view: the first try's read is not this attempt's.
     claude.set(resumed.name, { state: 'done' });
     assert.deepEqual(
       (await engine.view(retry)).usage,
@@ -156,8 +152,6 @@ test("a session resumed under the same id is read for its new attempt: its own c
       "nothing since its own start — not the first try's count",
     );
 
-    // It carries on, gives a closeout of its own, and is listed done — in three responses, where the first try took two,
-    // so a record of the first try's count cannot pass for the retry's.
     await sleep(10);
     append(
       row.sessionId,
@@ -208,26 +202,27 @@ test('a statement read as nothing from a final sighting is read again once the t
     append(row.sessionId, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
     age(row.sessionId, 30_000);
 
-    // Listed final between two turns, for one observation, and seen only by a view: nothing said yet.
     claude.set(row.name, { state: 'done' });
-    assert.deepEqual((await engine.view(id)).usage, {
-      turns: 1,
-      toolCalls: 1,
-      inputTokens: 100,
-      uncachedTokens: 10,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 90,
-      outputTokens: 5,
-      peakContextTokens: 100,
-      firstContextTokens: 100,
-      firstCacheWriteTokens: 0,
-    });
-    // Kept while the transcript says it has not been written since — shown by writing and putting the mtime back.
+    assert.deepEqual(
+      (await engine.view(id)).usage,
+      {
+        turns: 1,
+        toolCalls: 1,
+        inputTokens: 100,
+        uncachedTokens: 10,
+        cacheWriteTokens: 0,
+        cacheReadTokens: 90,
+        outputTokens: 5,
+        peakContextTokens: 100,
+        firstContextTokens: 100,
+        firstCacheWriteTokens: 0,
+      },
+      'listed final between two turns, for one observation, and seen only by a view: nothing said yet',
+    );
     append(row.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
     age(row.sessionId, 30_000);
     assert.equal((await engine.view(id)).usage?.turns, 1, 'no newer than the read: kept');
 
-    // It went on and gave its closeout. The transcript is newer than the read, and the tick reads it again.
     append(row.sessionId, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
     await engine.tick();
 

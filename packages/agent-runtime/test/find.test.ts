@@ -2,11 +2,17 @@
  * Finding one session by its name without `claude agents`, at shipped defaults — a fake `claude` that keeps a registry
  * and counts every `agents` call, registration files where Claude Code writes them, and transcript files.
  *
- * Every `view` observed every harness, and for Claude Code that is `claude agents --json`, a third of a second on the
- * machine this was written on: a board's open stream on a running step made two such calls a second, and the api's
- * list one per step per poll. A session's own registration names it, so a read that needs only which session a task
- * runs is answered from that file, and a view of a task with no attempt in flight from its record. A read that needs a
- * session's state still observes, and where a registration and the registry disagree, it takes the registry's word.
+ * To observe Claude Code is to run `claude agents --json`, a process a call, and a board's open stream and the api's list
+ * view often. A session's own registration names it, so a read that needs only which session a task runs is answered
+ * from that file, and a view of a task with no attempt in flight from its record. A read that needs a session's state
+ * still observes, and where a registration and the registry disagree, it takes the registry's word.
+ *
+ * - A registration whose session id is empty is not taken: `transcript` would read `''` for as long as the attempt runs,
+ *   and never observe.
+ * - A task whose harness the engine no longer has is viewed off its record, and no other harness is asked, since none
+ *   can name its sessions: the pass reads such a task the same way (`composite`: its names unread, its spawn refused).
+ * - Where Claude Code keeps registrations is read when a runner is made, and transcripts when it is loaded, so
+ *   `CLAUDE_CONFIG_DIR` is set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +26,6 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-find-${label}-`);
 
-// Where Claude Code keeps registrations is read when a runner is made, and transcripts when it is loaded: set first.
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
@@ -127,16 +132,14 @@ test("a session registered under its attempt's name is found by it: its conversa
     assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it'], "the running attempt's conversation");
     assert.equal(claude.agents(), before, 'read with no `claude agents` call');
 
-    // Its state is the registry's: a view of the attempt in flight still asks.
-    assert.equal((await engine.view(id)).phase, 'running (working)');
+    assert.equal((await engine.view(id)).phase, 'running (working)', "its state is the registry's");
     assert.equal(claude.agents(), before + 1, 'a view of an attempt in flight observes');
 
-    // Ended and settled: its phase and its session's id are on the record, and no registry is asked.
     claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', status: 'idle' })));
     await engine.tick();
     const settled = claude.agents();
     const v = await engine.view(id);
-    assert.equal(v.phase, 'succeeded');
+    assert.equal(v.phase, 'succeeded', 'ended and settled: its phase is on the record');
     assert.equal(v.sessionId, row.sessionId, 'the id its end was recorded with');
     assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it']);
     assert.equal(claude.agents(), settled, 'a settled task is viewed, and read, with no `claude agents` call');
@@ -189,13 +192,11 @@ test('a name no running session registered is not found — nor an interactive s
   register(session, process.pid, { pid: process.pid + 1 });
   assert.equal(await find(session.name), undefined, 'a file that names a pid other than the one it is named for');
 
-  // A session id that is no id: taken, `transcript` would read `''` for as long as the attempt runs, and never observe.
   register(session, process.pid, { sessionId: '' });
   assert.equal(await find(session.name), undefined, 'a registration whose session id is empty');
   register(session, process.pid, { sessionId: undefined });
   assert.equal(await find(session.name), undefined, 'a registration with no session id');
 
-  // A link in the registration's place, to a registration that would be found where it is: not followed.
   const file = path.join(sessions, `${process.pid}.json`);
   const elsewhere = path.join(tmp('elsewhere'), `${process.pid}.json`);
   register(session);
@@ -226,7 +227,6 @@ test("a registration and the registry that disagree: the registry's word is take
     await engine.tick();
     const [row] = claude.rows();
 
-    // The registry has the session stopped. A registration still names its name, live, and as another session.
     const other = randomUUID();
     register({ name: row.name, sessionId: other });
     claude.setRows([{ ...row, state: 'stopped', status: 'idle' }]);
@@ -310,8 +310,7 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
   }
 });
 
-test("a view asks its task's own harness and no other — and a task whose harness the engine no longer has is viewed off its record, asking no harness", async () => {
-  /** A harness that cannot `find`, as a `check` or Codex cannot, and counts every observe. */
+test("a view asks its task's own harness and no other, on harnesses that cannot find, as a check or Codex cannot — and a task whose harness the engine no longer has is viewed off its record, asking no harness", async () => {
   const harness = (label: string) => {
     const sessions = new Map<string, Sighting>();
     const counts = { observe: 0 };
@@ -352,9 +351,6 @@ test("a view asks its task's own harness and no other — and a task whose harne
     "each read of the task in flight asks b's, once; the settled task's, none (`settled-view.test.ts`)",
   );
 
-  // The same board, without b. No other harness can name b's sessions, so none is asked: the view is the record's, as the pass reads
-  // such a task (`composite`: its names unread, its spawn refused). Before 2026-09-25 it was viewed on the fallback, where a remote
-  // agent's Task was looked for in Claude Code's registry on every view (found in review of thin runtime stage 6, part 2, round 3).
   const c = harness('c');
   for (const [name, s] of b.sessions) c.sessions.set(name, s);
   const reopened = createEngine({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' });

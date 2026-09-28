@@ -112,10 +112,11 @@ export type RunDetail = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk. Its branches, record and files are
-   * kept, and none of its steps can be tried again. Null on a run never pruned.
+   * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk. Its branches and record are kept,
+   * and none of its steps can be tried again. `artifacts` is when `wf prune --artifacts` removed its files too, and what that freed; null
+   * while they are kept. Null on a run never pruned.
    */
-  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }> } | null;
+  pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */

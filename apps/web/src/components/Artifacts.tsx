@@ -9,7 +9,8 @@ export const bytesWord = (bytes: number): string =>
 
 /**
  * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;
- * anything else as a link with its size. Any other path as the path, as the closeout gave it.
+ * anything else as a link with its size. One `wf prune --artifacts` removed as its path, greyed, and when it went. Any other path as the
+ * path, as the closeout gave it.
  *
  * `size` puts every file's size beside its name, and says so when there are none: for a list of what a folder holds rather than of
  * what a step named, where the size is part of what a person came to see.
@@ -31,6 +32,15 @@ const linkClass = 'font-mono font-medium text-neutral-900 underline underline-of
 
 /** One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. */
 export function ArtifactView({ artifact, size = false }: { artifact: StepArtifact; size?: boolean }) {
+  // Gone with the run's files, not missing: the path it had, and when `wf prune --artifacts` removed it.
+  if ('pruned' in artifact) {
+    return (
+      <span data-artifact="pruned">
+        <span className="font-mono text-neutral-500">{artifact.path}</span>
+        <span className="text-neutral-500"> — {artifact.pruned}</span>
+      </span>
+    );
+  }
   if (!('url' in artifact)) {
     return (
       <span data-artifact="path" className="font-mono">

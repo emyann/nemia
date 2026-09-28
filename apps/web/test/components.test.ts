@@ -66,6 +66,8 @@ type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
+type StepUsed = import('../src/lib/api.ts').StepUsed;
+type Decidable = import('../src/lib/api.ts').Decidable;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
@@ -83,13 +85,15 @@ const titleOf = (html: string): string | undefined =>
 
 test("a chip carries the step's note after what its state means, on hover — and only a note it was given", () => {
   const withNote = renderToStaticMarkup(
-    createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, note: exhaustedNote }),
+    createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
   );
   assert.match(withNote, /data-state="exhausted"/);
   assert.equal(titleOf(withNote), `${stateMeaning.exhausted}\n${exhaustedNote}`);
 
   for (const note of [null, undefined, '']) {
-    const without = renderToStaticMarkup(createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, note }));
+    const without = renderToStaticMarkup(
+      createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note }),
+    );
     assert.equal(titleOf(without), stateMeaning.exhausted, String(note));
   }
 });
@@ -102,22 +106,48 @@ test('a note under a chip is the note as `wf ls` prints it, and nothing at all f
 
 const at = '2026-09-13T00:00:00.000Z';
 
+/** A step's usage as the api gives it where nobody measured any: `wf decide`'s words, and nothing counted. */
+const UNMEASURED: StepUsed = {
+  usage: null,
+  used: 'not measured',
+  cost: 'not measured',
+  costUsd: null,
+  apiMs: null,
+  toolMs: null,
+  read: null,
+  peak: null,
+  rebuilt: 0,
+};
+
 /** A run of one looping step out of rounds, as GET /api/runs/:id gives it, with `note` on its step. */
 function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
     brief: 'Go round again',
     repo: '/code/app',
+    place: 'git',
+    work: null,
     workflowDir: '/code/app/workflow',
+    try: null,
     baseRef: 'abc123',
     branch: 'main',
     isolate: true,
     createdAt: at,
+    startedAt: at,
     cancelledAt: null,
+    pruned: null,
+    onDisk: { worktrees: true, files: true },
+    after: [],
+    waiting: null,
+    heldUntil: [],
+    holding: null,
     status: 'failed',
     moving: false,
+    cost: null,
+    read: null,
     waitingOnYou: ['review'],
     onYou: ['review'],
+    toDecide: null,
     gates: [],
     warning: null,
     graph: { roots: ['review'], edges: [] },
@@ -130,13 +160,29 @@ function runWith(note: string | null): RunDetail {
         told: null,
         taskId: 't-1',
         workspace: null,
+        files: [],
+        filesError: null,
         branch: 'wf/r-1/implement',
         status: 'rounds exhausted',
         note,
+        needs: null,
+        blockedByHarness: false,
+        waitingFor: null,
+        approve: null,
+        denied: null,
+        gate: null,
+        accepted: null,
+        lastLine: null,
+        said: [],
+        asked: null,
         closeout: null,
+        unreadable: null,
         check: null,
         attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
-        used: { usage: null, used: 'not measured', cost: 'not measured' },
+        used: UNMEASURED,
+        spent: null,
+        budget: null,
+        raise: null,
         tries: [
           {
             try: 1,
@@ -148,6 +194,8 @@ function runWith(note: string | null): RunDetail {
             status: 'rounds exhausted',
             check: null,
             closeout: null,
+            unreadable: null,
+            answer: null,
             attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
           },
         ],
@@ -167,6 +215,7 @@ function runWith(note: string | null): RunDetail {
         queued: '—',
         ran: '—',
         wall: 'not known',
+        cost: null,
       },
     },
   };
@@ -664,13 +713,16 @@ test('the legend draws an edge in each state as the canvas draws it: dashed and 
 
 test("the inspector's Details show `loop` and `rounds` beside `after` on a looping step, and not on another", () => {
   const run = runWith(null);
-  const spec = {
+  const spec: StepSpec = {
     harness: 'codex',
     model: null,
     effort: null,
+    context: null,
     after: ['implement'],
+    workspace: null,
     resume: null,
     permissionMode: null,
+    sandbox: null,
     tools: null,
     deadlineSeconds: null,
     loop: 'implement',
@@ -956,6 +1008,8 @@ const unset: WorkflowStepSpec = {
   tools: null,
   disallowedTools: [],
   allowedTools: [],
+  denials: null,
+  background: null,
   remote: null,
   deadlineSeconds: null,
   budget: null,
@@ -1274,19 +1328,23 @@ test('the Decide section copies its commands and runs none: a button per command
     { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null },
     { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null },
   ] as const;
-  const decision = {
+  const decision: Decidable = {
+    standings: [],
     touched: [{ branch: 'wf/r-1/implement', radius: radiusWith({ agentFacing: ['CLAUDE.md'] }) }],
-    lesson: { said: 'CLAUDE.md +2 −0', state: 'written' as const },
+    lesson: { said: 'CLAUDE.md +2 −0', state: 'written' },
     sensitive: [
       { branch: 'wf/r-1/implement', files: [{ path: 'packages/x/test/add.test.ts', lines: ['@@ -1 +1,451 @@'], cut: 3 }], error: null },
     ],
     used: {},
     total: {
+      ...UNMEASURED,
       usage: { toolCalls: 34 },
       used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured',
-      cost: 'not measured',
     },
+    cost: null,
+    overBudget: null,
     commands: [...commands],
+    awaiting: null,
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(html, /^<section aria-label="Decide"/);
@@ -1331,9 +1389,11 @@ test("the inspector's Details say what a step used and what it cost beside its a
   const measured = {
     ...run.steps[0]!,
     used: {
+      ...UNMEASURED,
       usage: { turns: 12, costUsd: 0.004 },
       used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured',
       cost: '$0.004',
+      costUsd: 0.004,
     },
   };
   const said = Object.fromEntries(rows(measured));
@@ -1409,6 +1469,8 @@ const threeTries: StepTry[] = [
       refused: { exit: 'exit 1', stdout: null, stderr: { lines: [], truncated: false }, unreadable: null },
     },
     closeout: closeoutSaying('Added the cache.'),
+    unreadable: null,
+    answer: null,
   },
   {
     try: 2,
@@ -1421,6 +1483,8 @@ const threeTries: StepTry[] = [
     attempts: ranOnce,
     check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: 'passed', refused: null },
     closeout: closeoutSaying('Fixed the failing test.'),
+    unreadable: null,
+    answer: null,
   },
   {
     try: 3,
@@ -1433,6 +1497,8 @@ const threeTries: StepTry[] = [
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
     check: { command: 'npm test', taskId: null, verdict: null, refused: null },
     closeout: null,
+    unreadable: null,
+    answer: null,
   },
 ];
 
@@ -1724,8 +1790,10 @@ test("the spec says what a step runs with: the workflow's word where it sets one
     effort: null,
     context: null,
     after: [],
+    workspace: null,
     resume: null,
     permissionMode: null,
+    sandbox: null,
     tools: null,
     deadlineSeconds: null,
     loop: null,
@@ -1919,7 +1987,7 @@ const { NeedsBanner, ToDecideBanner } = await import('../src/components/Needs.ts
 const { decisionStamp } = await import('../src/lib/decide.ts');
 const Closeouts = await import('../src/components/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
-type Offer = import('../src/lib/asks.ts').Offer;
+type Answer = import('../src/lib/asks.ts').Answer;
 
 const LOGIN =
   'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -1985,7 +2053,7 @@ test("a step's node says how many calls its current try was denied, whole, and w
 });
 
 /** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */
-const offersMarkup = (offers: Offer[]) =>
+const offersMarkup = (offers: Answer[]) =>
   renderToStaticMarkup(
     createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })),
   );
@@ -2104,13 +2172,17 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
 });
 
 test('the Decide section puts the answers first, before what there is to decide, and its commands still only copy', () => {
-  const decision = {
+  const decision: Decidable = {
+    standings: [],
     touched: [],
-    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' },
     sensitive: [],
     used: {},
-    total: { usage: null, used: 'not measured', cost: 'not measured' },
-    commands: [{ label: 'ship it' as const, command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
+    total: UNMEASURED,
+    cost: null,
+    overBudget: null,
+    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
+    awaiting: null,
   };
   const offers = createElement(
     QueryClientProvider,
@@ -2128,16 +2200,20 @@ test('the Decide section puts the answers first, before what there is to decide,
 });
 
 test("the Decide section's accept row takes a reason and presses it; every other row still only copies", () => {
-  const decision = {
+  const decision: Decidable = {
+    standings: [],
     touched: [],
-    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' },
     sensitive: [],
     used: {},
-    total: { usage: null, used: 'not measured', cost: 'not measured' },
+    total: UNMEASURED,
+    cost: null,
+    overBudget: null,
+    awaiting: null,
     commands: [
-      { label: 'once more' as const, command: 'wf round r-1 review', said: null },
+      { label: 'once more', command: 'wf round r-1 review', said: null },
       {
-        label: 'accept' as const,
+        label: 'accept',
         command: 'wf accept r-1 review --message "<why>"',
         said: 'review: enough — go on with what is there:  wf accept r-1 review --message "<why>"',
       },
@@ -2411,6 +2487,9 @@ const toShip = {
   kind: 'approve' as const,
   step: 'ship',
   says: SHIPS,
+  // An ending: a send-back goes to the work it waits on, not to the step itself.
+  back: ['implement'],
+  onto: 'main',
   said: `${SHIPS} — wf approve r-1 ship`,
   command: 'wf approve r-1 ship',
 };
@@ -2448,9 +2527,11 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
       model: null,
       effort: null,
       after: ['review'],
+      context: null,
       workspace: 'main',
       resume: null,
       permissionMode: null,
+      sandbox: null,
       tools: null,
       deadlineSeconds: null,
       loop: null,
@@ -2706,6 +2787,9 @@ test('the edges between cards are drawn as every edge is: from a run into each c
         note: null,
         needs: null,
         blockedByHarness: false,
+        waitingFor: null,
+        approve: null,
+        denied: null,
       },
     ],
   });
@@ -2782,12 +2866,12 @@ test("the run page's timeline: a row per try's session and per check, in the api
     ran: string,
     wall: string,
     loop: string | null = round === null ? null : 'review',
-  ): TimelineTotal => ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
+  ): TimelineTotal => ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall, cost: null });
   const base = runWith(null);
-  const used = {
+  const used: StepUsed = {
+    ...UNMEASURED,
     usage: { turns: 54 },
     used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured',
-    cost: 'not measured',
   };
   const run: RunDetail = {
     ...base,
@@ -3009,13 +3093,10 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
     queued: '0s',
     ran: '0s',
   });
-  const used = (cost: number | null) => ({
-    usage: null,
-    used: 'not measured',
+  const used = (cost: number | null): StepUsed => ({
+    ...UNMEASURED,
     cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`,
     costUsd: cost,
-    apiMs: null,
-    toolMs: null,
   });
   const base = runWith(null);
   const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
@@ -3062,15 +3143,17 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
 
 test("the Decide section says why a step past its budget is held — `wf decide`'s OVER BUDGET line — and what every try of the run cost", () => {
   const line = 'OVER BUDGET, waiting on you: tokens ($4.25 of $3)  — the run files nothing more for it on its own; nothing after it ran';
-  const decision = {
+  const decision: Decidable = {
+    standings: [],
     touched: [],
-    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' },
     sensitive: [],
     used: {},
-    total: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+    total: UNMEASURED,
     cost: 'run $6.35 measured · 2 attempts not measured',
     overBudget: line,
     commands: [],
+    awaiting: null,
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
@@ -3138,15 +3221,17 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   assert.match(large, /<span data-peak="large"[^>]*>peak 250k, past 200k with no cap<\/span>/);
 
   // On the Decide section, beside the total's cost.
-  const decision = {
+  const decision: Decidable = {
+    standings: [],
     touched: [],
-    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const },
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' },
     sensitive: [],
     used: {},
     total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'),
     cost: 'run $6.80',
     overBudget: null,
     commands: [],
+    awaiting: null,
   };
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
   assert.match(
@@ -3643,7 +3728,18 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
     after: [],
     heldUntil,
     steps: [
-      { name: 'plan', taskId: `t-${id}`, branch: null, status: 'awaiting approval', note: null, needs: null, blockedByHarness: false },
+      {
+        name: 'plan',
+        taskId: `t-${id}`,
+        branch: null,
+        status: 'awaiting approval',
+        note: null,
+        needs: null,
+        blockedByHarness: false,
+        waitingFor: null,
+        approve: null,
+        denied: null,
+      },
     ],
   });
   const edges = afterEdges([card('p', []), card('h', ['p'])]);
@@ -3862,7 +3958,8 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
     onSave: () => {},
   });
   return renderToStaticMarkup(
-    createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, form)),
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props of a component that requires it, and a .ts file has no JSX.
+    createElement(RouterContextProvider, { router, children: createElement(QueryClientProvider, { client }, form) }),
   );
 }
 
@@ -4040,7 +4137,8 @@ async function routedWith(element: ReturnType<typeof createElement>, data: Array
   const client = new QueryClient();
   for (const [key, value] of data) client.setQueryData(key, value);
   return renderToStaticMarkup(
-    createElement(RouterContextProvider, { router: router as never }, createElement(QueryClientProvider, { client }, element)),
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props of a component that requires it, and a .ts file has no JSX.
+    createElement(RouterContextProvider, { router, children: createElement(QueryClientProvider, { client }, element) }),
   );
 }
 

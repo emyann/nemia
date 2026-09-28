@@ -299,7 +299,7 @@ test("every dev* folder, and ui, ends in `ship`: gated, in the repository's chec
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
   // The deny is what keeps review from them: the settings allow both, so in dontAsk nothing else would.
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as {
-    permissions: { allowedTools: string[] };
+    permissions: { allow: string[] };
   };
   for (const rule of REVIEW_DENIED)
     assert.ok(settings.permissions.allow.includes(rule), `${rule} is allowed by the settings, word for word`);
@@ -331,7 +331,6 @@ test('`wf decide` on a ui review reads each finding as a place — the file and 
     outcome: 'done',
     summary: 'Read and looked.',
     artifacts: [],
-    needs: null,
     output: {
       findings: [
         { where: { file: 'apps/web/src/components/StepNode.tsx', line: 12 }, what },

@@ -18,7 +18,7 @@ import {
   stepAnchor,
   type Need,
 } from '../src/lib/asks.ts';
-import type { RetryMode, RunDetail } from '../src/lib/api.ts';
+import type { RetryMode, RunDetail, RunToDecide } from '../src/lib/api.ts';
 
 const LOGIN =
   'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -85,7 +85,7 @@ test("a step's need is its question while it waits on you, or that the harness b
   assert.deepEqual(needs.map(needNodeText), ['asks: Which database?', WAIT.words, 'blocked by the harness']);
 
   // As the list gives a step the harness blocked, with no last line to give: the card names the harness and what it waits for, and quotes nothing.
-  const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT }, false, false);
+  const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT, approve: null }, false, false);
   assert.deepEqual(listed, { step: 'held', kind: 'harness', waitingFor: WAIT, lastLine: null });
   assert.equal(needLine(listed!), `held is blocked by the harness: ${WAIT.words}`);
 });
@@ -110,9 +110,11 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
       kind: 'approve',
       step: 'ship',
       says: 'Merge it.',
+      back: ['implement'],
+      onto: 'main',
       said: 'Merge it. — wf approve r ship',
       command: 'wf approve r ship',
-    } as const,
+    } satisfies RunToDecide,
   };
   assert.deepEqual(needsOf(ending), [], 'the to-decide line says it');
   // Another step's own gate, mid-workflow, is still asked for beside it.
@@ -126,7 +128,7 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
       branches: ['wf/r/implement'],
       said: 'wf/r/implement is ahead of main, and nothing has merged it — wf decide r',
       command: 'wf decide r',
-    } as const,
+    } satisfies RunToDecide,
   };
   assert.deepEqual(needsOf(ahead), [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
   // A gate's step is answered where its closeout is, not among the answers.
@@ -154,7 +156,7 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
     step('plan', 'succeeded · BLOCKED', {
       needs: 'Which plan?',
       note: 'try 2 asked (--fresh, with your answer) — the next tick files it',
-      asked: { try: 2, mode: 'fresh', model: null, message: 'The small one.' },
+      asked: { try: 2, mode: 'fresh', model: null, message: 'The small one.', stopFirst: false },
     }),
     // Out of rounds: `wf round`, among the commands, and no try.
     step('review', 'rounds exhausted'),

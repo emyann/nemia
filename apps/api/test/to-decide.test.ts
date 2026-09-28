@@ -15,6 +15,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDecision } from '../src/decision.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-to-decide-');
@@ -128,41 +131,19 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
   );
 }
 
-const detailOf = async (id: string) =>
-  (await (await app.request(`/api/runs/${id}`)).json()) as {
-    status: string;
-    waitingOnYou: string[];
-    onYou: string[];
-    toDecide: {
-      kind: string;
-      step?: string;
-      says?: string | null;
-      back?: string[];
-      onto?: string;
-      branches?: string[];
-      said: string;
-      command: string;
-    } | null;
-    steps: Array<{ name: string; status: string; spec: { workspace: string | null } | null }>;
-  };
-const listedOf = async (id: string) =>
-  ((await (await app.request('/api/runs')).json()) as Array<{ id: string }>).find((r) => r.id === id) as Awaited<
-    ReturnType<typeof detailOf>
-  >;
-const decisionOf = async (id: string) =>
-  (await (await app.request(`/api/runs/${id}/decision`)).json()) as {
-    standings?: Array<{
-      branch: string;
-      where: string;
-      commits?: number;
-      said: string;
-      stat: string | null;
-      merge: Record<string, unknown> | null;
-    }>;
-    commands?: Array<{ label: string; command: string }>;
-    nothing?: string;
-    running?: true;
-  };
+const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const listedOf = async (id: string) => {
+  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  assert.ok(run, `${id} is on the list`);
+  return run;
+};
+const decisionOf = async (id: string) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as RunDecision;
+/** A decision with something to decide: where the branches stand, and the commands. */
+const decidableOf = async (id: string) => {
+  const decision = await decisionOf(id);
+  assert.ok('commands' in decision, JSON.stringify(decision));
+  return decision;
+};
 
 const { repo, base } = aRepo();
 
@@ -215,28 +196,28 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
 });
 
 test("the decision of a run at its ending's gate offers the approval and the send-back, and never `git merge` by hand: its ending is what merges", async () => {
-  const { commands, standings } = await decisionOf('r-ending');
+  const { commands, standings } = await decidableOf('r-ending');
   assert.deepEqual(
-    commands?.map((c) => c.label),
+    commands.map((c) => c.label),
     ['approve', 'send back'],
   );
   assert.deepEqual(
-    commands?.map((c) => c.command),
+    commands.map((c) => c.command),
     [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`],
   );
   // The result it would act on is the work's branch, not the ending step's own — which has none, working in the repository's checkout
   // (`resultSteps`). Read for the facts under the run, whatever the list is spared.
   assert.deepEqual(
-    standings?.map((b) => [b.branch, b.where]),
+    standings.map((b) => [b.branch, b.where]),
     [['wf/r-ending/implement', 'ahead']],
   );
 });
 
 test('whether the result still merges onto the base, as the base is now: clean, then the file it conflicts in once main has moved under it — and read on the decision, never on the list', async () => {
   const id = 'r-ending';
-  const clean = await decisionOf(id);
+  const clean = await decidableOf(id);
   assert.deepEqual(
-    clean.standings?.map((s) => s.merge),
+    clean.standings.map((s) => s.merge),
     [{ clean: true, said: 'merges cleanly onto main' }],
   );
 
@@ -254,9 +235,9 @@ test('whether the result still merges onto the base, as the base is now: clean, 
       [],
       'the list the Factory polls asks git no merge',
     );
-    const conflicted = await decisionOf(id);
+    const conflicted = await decidableOf(id);
     assert.deepEqual(
-      conflicted.standings?.map((s) => s.merge),
+      conflicted.standings.map((s) => s.merge),
       [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }],
     );
     // A trial in git's object store alone: the checkout, its index and main are as they were.
@@ -292,14 +273,14 @@ test("an ending that waits on several steps offers a send-back to each, and one 
       ship: { taskId: null },
     },
   });
-  const wideGate = await decisionOf(fan);
+  const wideGate = await decidableOf(fan);
   assert.deepEqual(
-    wideGate.commands?.map((c) => c.label),
+    wideGate.commands.map((c) => c.label),
     ['approve', 'send back', 'send back'],
     'a send-back for each step the objection could be about',
   );
   assert.deepEqual(
-    wideGate.commands?.map((c) => c.command),
+    wideGate.commands.map((c) => c.command),
     [`wf approve ${fan} ship`, `wf retry ${fan} implement --message "<objection>"`, `wf retry ${fan} docs --message "<objection>"`],
   );
 
@@ -313,15 +294,15 @@ test("an ending that waits on several steps offers a send-back to each, and one 
     workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true }],
     steps: { ship: { taskId: null } },
   });
-  const lone = await decisionOf(alone);
+  const lone = await decidableOf(alone);
   assert.deepEqual(
-    lone.commands?.map((c) => [c.label, c.command]),
+    lone.commands.map((c) => [c.label, c.command]),
     [['approve', `wf approve ${alone} ship`]],
   );
   // Neither is handed `git merge` by hand: the ending step is what merges.
   for (const { commands } of [wideGate, lone]) {
     assert.deepEqual(
-      commands?.filter((c) => c.label === 'ship it' || c.label === 'drop it'),
+      commands.filter((c) => c.label === 'ship it' || c.label === 'drop it'),
       [],
     );
   }
@@ -400,9 +381,9 @@ test('an ending that ran on its approval and stopped on the base branch offers b
       ship: { taskId: `${id}-ship`, workspace: repo, branch: 'main' },
     },
   });
-  const { commands } = await decisionOf(id);
+  const { commands } = await decidableOf(id);
   assert.deepEqual(
-    commands?.map((c) => [c.label, c.command]),
+    commands.map((c) => [c.label, c.command]),
     [
       ['send back', `wf retry ${id} review --message "<objection>"`],
       ['once more', `wf retry ${id} ship`],
@@ -429,7 +410,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
 
   // The facts under the result, as `wf decide` prints them: where the branch stands, and how much it changed.
-  const { standings, commands } = await decisionOf(id);
+  const { standings, commands } = await decidableOf(id);
   assert.deepEqual(standings, [
     {
       branch,
@@ -442,7 +423,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   ]);
   // And the commands a person runs by hand, which this folder leaves to them.
   assert.deepEqual(
-    commands?.map((c) => c.label),
+    commands.map((c) => c.label),
     ['ship it', 'drop it'],
   );
 });

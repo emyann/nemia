@@ -11,6 +11,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { Acceptance } from 'agent-orchestrator';
+import type { RunDecision } from '../src/decision.ts';
+import type { RunDetail } from '../src/detail.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-accept-');
@@ -147,7 +150,7 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
   for (const site of ['cross-site', 'same-site', 'none']) {
     const res = await acceptOver('review', body, { ...BOARD, 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith(
         `POST /api/runs/${R}/steps/review/accept refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a loop a person accepts`,
@@ -160,7 +163,7 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
     const res = await acceptOver('review', body, { ...BOARD, host });
     assert.equal(res.status, 403, host);
     assert.ok(
-      (await res.json()).error.startsWith(
+      ((await res.json()) as { error: string }).error.startsWith(
         `POST /api/runs/${R}/steps/review/accept refuses a request addressed to ${host}: the api accepts the work of a loop out of rounds as it stands only for a request to this machine`,
       ),
     );
@@ -168,7 +171,7 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
   for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
     const res = await acceptOver('review', body, { ...BOARD, 'content-type': type });
     assert.equal(res.status, 415, type);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(error.startsWith(`POST /api/runs/${R}/steps/review/accept takes its body as \`content-type: application/json\``), error);
     assert.ok(error.endsWith('Send `{ "message": "<why>" }`, with that header.'), error);
   }
@@ -186,14 +189,14 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
   for (const [body, words] of bodies) {
     const res = await acceptOver('review', body);
     assert.equal(res.status, 400, JSON.stringify(body));
-    assert.match((await res.json()).error, words);
+    assert.match(((await res.json()) as { error: string }).error, words);
   }
   const noRun = await acceptOver('review', { message: WHY }, BOARD, 'r-nope');
   assert.equal(noRun.status, 404);
-  assert.match((await noRun.json()).error, /^No run 'r-nope' in this store/);
+  assert.match(((await noRun.json()) as { error: string }).error, /^No run 'r-nope' in this store/);
   const noStep = await acceptOver('deploy', { message: WHY });
   assert.equal(noStep.status, 404);
-  assert.match((await noStep.json()).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
+  assert.match(((await noStep.json()) as { error: string }).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
 
   // Required, as `--message` is: left out, empty, or nothing but whitespace — on a loop the package would otherwise accept.
   for (const [body, words] of [
@@ -203,7 +206,7 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
   ] as const) {
     const res = await acceptOver('review', body);
     assert.equal(res.status, 422, JSON.stringify(body));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     const message = (body as { message?: string }).message;
     assert.equal(error, acceptWordsRefusal(message, `wf accept ${R} review`));
     // The package's own sentence, and the one `accept()` refuses with.
@@ -235,7 +238,7 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
   for (const [run, step, words] of cases) {
     const res = await acceptOver(step, { message: WHY }, BOARD, run);
     assert.equal(res.status, 409, `${run} ${step}`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, await acceptRefuses(step, WHY, run));
     assert.match(error, words);
     nothingWritten(`${run} ${step}, which the package will not accept`, run);
@@ -246,7 +249,7 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
   try {
     const res = await acceptOver('review', { message: WHY });
     assert.equal(res.status, 409);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, await acceptRefuses('review', WHY));
     assert.match(error, /^round 3 of review's loop is already asked for \(at [^)]+\), and the next tick files it/);
     assert.deepEqual(asked(), [path.basename(file)], 'the round ask alone');
@@ -259,7 +262,7 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
 test("an acceptance as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `wf accept` writes it, the record untouched — and the detail reads it under the loop, which waits on nobody and is offered no more; a second acceptance refused", async () => {
   const res = await acceptOver('review', { message: WHY });
   assert.equal(res.status, 202, await res.clone().text());
-  const took = await res.json();
+  const took = (await res.json()) as Acceptance & { file: string };
   assert.deepEqual({ ...took, at: undefined }, { step: 'review', try: 2, at: undefined, message: WHY, file: acceptFile(R, 'review', 2) });
   assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
   assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });
@@ -267,8 +270,8 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
   assert.equal(stops(), 0, 'and stopped nothing');
 
-  const run = await (await app.request(`/api/runs/${R}`)).json();
-  const review = run.steps.find((s: { name: string }) => s.name === 'review');
+  const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
+  const review = run.steps.find((s) => s.name === 'review')!;
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
   // As `wf ls` has it until the tick files what waits: the loop over on the person's word, and nobody waited on.
   const words = await list(engine(), readRun(R));
@@ -276,12 +279,13 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.equal(review.status, listed.status);
   assert.notEqual(review.status, 'exhausted');
   assert.deepEqual(run.waitingOnYou, []);
-  const commands: Array<{ label: string }> = (await (await app.request(`/api/runs/${R}/decision`)).json()).commands ?? [];
+  const decision = (await (await app.request(`/api/runs/${R}/decision`)).json()) as RunDecision;
+  const commands = 'commands' in decision ? decision.commands : [];
   assert.ok(!commands.some((c) => c.label === 'accept'), `accept is offered no more: ${JSON.stringify(commands)}`);
 
   const again = await acceptOver('review', { message: 'Something else.' });
   assert.equal(again.status, 409);
-  const { error } = await again.json();
+  const { error } = (await again.json()) as { error: string };
   assert.ok(error.startsWith(`try 2 of review is already accepted, at ${took.at}: its loop is over on your word`), error);
   assert.equal(error, await acceptRefuses('review', 'Something else.'));
   assert.deepEqual(asked(), ['accept-review-2']);

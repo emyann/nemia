@@ -14,6 +14,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { scratch } from './scratch.ts';
+import type { StepTranscript } from '../src/steps.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-transcript-${label}-`);
 
@@ -212,7 +213,7 @@ test('a held step that signed waits on a person, and nothing of it runs: its con
 
 test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
   assert.equal((await engine().view('t-answered')).phase, 'between attempts');
-  const body = await (await app.request(url('answered'))).json();
+  const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
   assert.equal(body.live, true);
   assert.equal(body.events.length, 8);
 });
@@ -226,13 +227,13 @@ test('a cursor no read gave is refused with a 400 that says what to pass — on 
     const res = await app.request(route, { headers });
     assert.equal(res.status, 400, route);
     assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${route}: an answer, not a stream`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, /^`page-2` is not a cursor a read of this conversation gave\. Pass the `cursor` the last read returned/, route);
     assert.match(error, /or none to read from the start\.$/, route);
   }
   const fromStart = await app.request(url('implement', '?after='));
   assert.equal(fromStart.status, 200, 'an empty `after` is none: read from the start');
-  assert.equal((await fromStart.json()).events.length, 8);
+  assert.equal(((await fromStart.json()) as StepTranscript).events.length, 8);
 });
 
 test('a run or a step that does not exist is a 404, worded as the log route words it; a task the engine lost is a 404 that names it', async () => {
@@ -245,13 +246,13 @@ test('a run or a step that does not exist is a 404, worded as the log route word
   for (const route of [`/api/runs/r-nope/steps/implement/transcript`, `/api/runs/r-nope/steps/implement/transcript/stream`]) {
     const res = await app.request(route);
     assert.equal(res.status, 404, route);
-    assert.match((await res.json()).error, /^No run 'r-nope' in this store\./, route);
+    assert.match(((await res.json()) as { error: string }).error, /^No run 'r-nope' in this store\./, route);
   }
   for (const route of [url('lost'), streamUrl('lost')]) {
     const res = await app.request(route);
     assert.equal(res.status, 404, route);
     assert.match(
-      (await res.json()).error,
+      ((await res.json()) as { error: string }).error,
       /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
       route,
     );
@@ -264,7 +265,10 @@ test('a step not filed yet has no conversation and nothing live to follow', asyn
   assert.deepEqual(await res.json(), { events: [], cursor: null, live: false });
   const stream = await app.request(streamUrl('review'));
   assert.equal(stream.status, 404);
-  assert.match((await stream.json()).error, /^Step 'review' of run 'r-talk' is not filed yet, so it has no session to follow\./);
+  assert.match(
+    ((await stream.json()) as { error: string }).error,
+    /^Step 'review' of run 'r-talk' is not filed yet, so it has no session to follow\./,
+  );
 });
 
 test("the stream of a settled task sends each event, the read's cursor as the id of the last, then `settled` — and closes", async () => {
@@ -373,7 +377,7 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
   fs.mkdirSync(transcriptFile(sessionId));
   const res = await app.request(url('broken'));
   assert.equal(res.status, 502);
-  const { error } = await res.json();
+  const { error } = (await res.json()) as { error: string };
   assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
   assert.match(error, /`wf logs r-talk broken` reads its output from the command line\.$/);
 });
@@ -402,7 +406,10 @@ test(
     assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
     const answered = await app.request(url('flaky'));
     assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
-    assert.match((await answered.json()).error, /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/);
+    assert.match(
+      ((await answered.json()) as { error: string }).error,
+      /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/,
+    );
     // Some beats of it.
     await sleep(2_500);
 

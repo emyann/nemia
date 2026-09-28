@@ -32,7 +32,13 @@ and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record
 - **A time measured on a machine is a floor, never a ceiling.** `meter-store.test.ts` spun 30 ms in its fake and wanted the runtime's
   share under 30: a process parked for 21 ms after the spin failed it at 30.8. Assert what a meter moves as an identity — the phases
   add up to no more than the pass — and force the park with a load hook that adds the time after the spin (same run).
-- `npm run typecheck` — `tsc --noEmit` per package.
+- `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under `test/e2e/tsconfig.json`,
+  which its script runs second). Until 2026-09-28 the orchestrator's, the api's and the web's tsconfigs included `src` alone, and 934
+  errors stood in their tests, one of them a test passing for the wrong reason (`vocabulary.test.ts` handed each harness's
+  refusal a fence and an effort where the task no longer carries them, and read its `undefined` as accepting them); `agent-orchestrator/test/suite.test.ts` now refuses a
+  file under a package's `test/` that no tsconfig its `typecheck` script runs includes. A body read off a response is `unknown`: name
+  the api's own answer type (`(await res.json()) as RunDetail`), and a wrong type passed on purpose to prove a refusal says so with
+  `as never` where it does (learned by the run that typechecked the tests).
 - `npm run lint` — oxlint (`.oxlintrc.json`: its correctness rules, type-aware, React's and jsx-a11y's, and the suspicious rules that find
   a bug) and `oxfmt --check` (`.oxfmtrc.json`: width 140, code only, never markdown or JSON). `npm run format` writes the layout; run it
   before you commit, since a check refuses a file it would move. Every shipped `check:` runs `npm run lint` after the types. A rule turned
@@ -422,11 +428,11 @@ and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record
   `packages/agent-runtime/test/contract.test.ts` refuses a path into its `src` by any route, `import.meta.resolve` included.
 - **A name moved out of `run.ts` leaves the `agent-orchestrator/run` subpath, and the api's tests read that subpath by `await import`.**
   `const { messageRefusal } = await import('agent-orchestrator/run')` in `apps/api/test/asks.test.ts` is no `import … from` line, so a
-  scan of static imports misses it, and no typecheck sees it: neither agent-orchestrator's nor the api's `tsconfig.json` includes `test/`.
-  Only the api's suite fails. Before moving a name out of `run.ts`, grep the workspace for `agent-orchestrator/run'`, and re-export from
+  scan of static imports misses it, and until 2026-09-28 no typecheck saw it, since neither agent-orchestrator's nor the api's
+  `tsconfig.json` included `test/`. The api's typecheck reads it now and fails on a name the subpath no longer exports. Before moving a name out of `run.ts`, grep the workspace for `agent-orchestrator/run'`, and re-export from
   `run.ts` what the api reads there, from a module beneath it, so no cycle (learned by the run that moved *trying again* into `retry.ts`).
 - **The same holds for `agent-orchestrator/workflow`, and a name that leaves it for the root is a contract change.** The api's tests took
-  `loadWorkflows` from `await import('agent-orchestrator/workflow')`, which nothing typechecks; moved into `workflow-store.ts`, the readers
+  `loadWorkflows` from `await import('agent-orchestrator/workflow')`, which nothing typechecked then (the api's typecheck reads it since 2026-09-28); moved into `workflow-store.ts`, the readers
   are exported from `agent-orchestrator`, and `./workflow` is the pure format (`packages/agent-orchestrator/test/contract.test.ts` refuses a
   reader back on it). Before moving a name out of `workflow.ts`, grep the workspace for `agent-orchestrator/workflow'` (learned by the run
   that wrote `docs/architecture.md`).
@@ -612,11 +618,12 @@ and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record
   in it (`grep -n "wf round \|wf retry \|wf approve \|wf accept " src/*.ts`), not against the callers you remember (learned by the run
   that made a pruned run say it was pruned).
 - **A field moved under another key makes every untyped read of it pass for the wrong reason.** When the ten harness arguments went
-  under `config`, the orchestrator's and the api's tests — not typechecked — still read `spec.contextTokens` and `f.model`: each one
+  under `config`, the orchestrator's and the api's tests — not typechecked until 2026-09-28 — still read `spec.contextTokens` and `f.model`: each one
   asserting a value failed, and each asserting `undefined` passed, and `chainDifferences` in `session-cache.test.ts` compared
-  `undefined` with `undefined` on every key and found a chain that changes its model the same as one that keeps it. Grep the
-  untyped tests for the old key, read the passing ones too, and check a comparison still fails with a mutant (learned by the run
-  that made the harness's arguments one `config`). The runtime refuses the old place at `file` (`argsRefusalOf`), which is how an
+  `undefined` with `undefined` on every key and found a chain that changes its model the same as one that keeps it. Every
+  package's tests are typechecked now, so a typed read of the old key fails `npm run typecheck`; a read through a cast, a `Record` or
+  JSON still passes, so grep the tests for the old key, read the passing ones too, and check a comparison still fails with a mutant
+  (learned by the run that made the harness's arguments one `config`). The runtime refuses the old place at `file` (`argsRefusalOf`), which is how an
   untyped `...(worktree ? { worktree: true } : {})` in its own tests was found at all.
 - **A flag only Claude Code has is filed under `config.claude`, never as a harness argument of its own.** The runtime grows no named
   field per harness flag (the owner, 2026-09-25). A key stays named on `HarnessArgs` only when more than one harness is given it,
@@ -733,7 +740,7 @@ and `~/.agent-engine` (`AE_ROOT`), since a new default would orphan every record
   runtime's `budget` end away (a cut is `limit: 'budget'` beside a `harness` end now), and the plan said the api and the board read no
   budget field: they read the attempt's `reason`, through `endWords`, and would have drawn a capped try as `failed · harness`. A fact
   that replaces a runtime word is mapped back in `endWords`, and the api's `app.test.ts` reads a journal of each shape. And widening a
-  condition in `ownStatus` to a new phase made an untyped test that left out the required `spendOf` throw: a test's call that omits an
+  condition in `ownStatus` to a new phase made a test, untyped then, that left out the required `spendOf` throw: a test's call that omits an
   argument passes only while the code never reaches it (learned by thin runtime stage 4b).
 - **A test that slices a source file between two names reads to its end once the second name is gone.** "`decide` never reads
   a harness argument" in `agent-runtime/test/engine.test.ts` took `decide`'s text as `slice(indexOf('export function decide('),

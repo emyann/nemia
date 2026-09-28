@@ -258,7 +258,7 @@ test('the system prompt drawn unset is the default, and picking the default writ
 });
 
 test("a copy that moves only the version keeps the form's key for that version alone, and anything else read after it remounts the form", () => {
-  const was = listing({ source: 'scribe file', version: 'v1', schema: { type: 'object' } });
+  const was = listing({ source: 'scribe file', version: 'v1', schema: { file: 'scribe.schema.json', text: '{"type":"object"}' } });
   const kept = keptAfterCopy(was, { ...was, version: 'v2' }, 'v1');
   assert.deepEqual(kept, { key: 'v1', version: 'v2' }, 'the file is the same: the draft stays, and the save sends v2');
   assert.equal(formKeyOf('v2', kept), 'v1', 'the version the copy moved to keeps the mounted form');
@@ -267,14 +267,14 @@ test("a copy that moves only the version keeps the form's key for that version a
 });
 
 test("REFUSED to keep the draft over a copy: the agent's file or its schema changed meanwhile, as another writer's edit would", () => {
-  const was = listing({ source: 'scribe file', version: 'v1', schema: { type: 'object' } });
+  const was = listing({ source: 'scribe file', version: 'v1', schema: { file: 'scribe.schema.json', text: '{"type":"object"}' } });
   assert.equal(
     keptAfterCopy(was, { ...was, source: 'edited elsewhere', version: 'v2' }, 'v1'),
     null,
     'the file changed: the form is read again',
   );
   assert.equal(
-    keptAfterCopy(was, { ...was, schema: { type: 'string' }, version: 'v2' }, 'v1'),
+    keptAfterCopy(was, { ...was, schema: { file: 'scribe.schema.json', text: '{"type":"string"}' }, version: 'v2' }, 'v1'),
     null,
     'the schema changed: the form is read again',
   );

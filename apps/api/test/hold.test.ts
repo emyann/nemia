@@ -13,6 +13,10 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDecision } from '../src/decision.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunHolding } from '../src/judged.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-hold-');
@@ -219,44 +223,24 @@ const BOARD = {
 };
 const post = (route: string, body: unknown) => app.request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
-type Holding = {
-  at: string;
-  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
-  word: string;
-  advice: string;
-  onYou: boolean;
-};
-type Step = { name: string; status: string; note: string | null; approve: string | null; raise: unknown; asked: unknown };
-type Run = {
-  id: string;
-  heldUntil: string[];
-  holding: Holding | null;
-  waitingOnYou: string[];
-  onYou: string[];
-  moving: boolean;
-  status: string;
-  toDecide: unknown;
-  steps: Step[];
-};
-
-const listed = async (): Promise<Map<string, Run>> => {
+const listed = async (): Promise<Map<string, RunSummary>> => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  return new Map(((await res.json()) as Run[]).map((r) => [r.id, r]));
+  return new Map(((await res.json()) as RunSummary[]).map((r) => [r.id, r]));
 };
-const detail = async (id: string): Promise<Run> => {
+const detail = async (id: string): Promise<RunDetail> => {
   const res = await app.request(`/api/runs/${id}`);
   assert.equal(res.status, 200);
-  return res.json() as Promise<Run>;
+  return (await res.json()) as RunDetail;
 };
 const decisionOf = async (id: string) => {
   const res = await app.request(`/api/runs/${id}/decision`);
   assert.equal(res.status, 200);
-  return res.json();
+  return (await res.json()) as RunDecision;
 };
 
 /** The holds as the api gives them, back in the package's shape. */
-const asWaits = (holding: Holding | null): Wait[] =>
+const asWaits = (holding: RunHolding | null | undefined): Wait[] =>
   (holding?.runs ?? []).map((w) => ({
     run: w.run,
     ...(w.missing ? { missing: true as const } : {}),
@@ -376,16 +360,19 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
     const hold = fs.readFileSync(holdFile(id), 'utf8');
     fs.rmSync(holdFile(id));
     try {
-      const { commands } = await decisionOf(id);
+      const decided = await decisionOf(id);
+      assert.ok('commands' in decided, `${id}: ${JSON.stringify(decided)}`);
+      const { commands } = decided;
       assert.ok(
-        commands.some((c: { command: string }) => command.test(c.command)),
+        commands.some((c) => command.test(c.command)),
         `${id}: ${JSON.stringify(commands)}`,
       );
     } finally {
       write(holdFile(id), hold);
     }
   }
-  assert.ok((await decisionOf(GATE)).holding, 'the hold is back');
+  const back = await decisionOf(GATE);
+  assert.ok('holding' in back && back.holding, 'the hold is back');
 });
 
 test('a step over its budget on a held run is offered no raise, and `wf decide` says nothing waits on you for it — the run is held, not over budget on you', async () => {
@@ -431,7 +418,7 @@ test("REFUSED at shipped defaults: every verb the board sends for a held run —
   for (const [id, route, body, verb] of cases) {
     const res = await post(route, body);
     assert.equal(res.status, 409, route);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, await refusal(verb), route);
     const what = route.endsWith('approve')
       ? 'an approval'
@@ -516,6 +503,7 @@ test('a run waiting on runs and held as well is both, as `wf decide` says both: 
   assert.equal(run.holding.word, 'held until p-live ships');
   const body = await decisionOf(AFTER);
   assert.deepEqual(Object.keys(body).sort(), ['holding', 'waiting']);
+  assert.ok('waiting' in body);
   assert.deepEqual(body.holding, run.holding);
   assert.equal(body.waiting.word, 'waiting on p-live');
   const said = await decide(engine(), AFTER);
@@ -574,11 +562,13 @@ test('a hold lifted on the board is lifted as `wf hold --off` lifts it: its file
   const page = await detail(LIFT);
   assert.deepEqual([page.heldUntil, page.holding], [[], null]);
   assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
-  assert.ok((await decisionOf(LIFT)).commands.some((c: { command: string }) => c.command === `wf approve ${LIFT} plan`));
+  const decided = await decisionOf(LIFT);
+  assert.ok('commands' in decided, JSON.stringify(decided));
+  assert.ok(decided.commands.some((c) => c.command === `wf approve ${LIFT} plan`));
   // Lifted, it is held no more: a second lift is the package's refusal.
   const again = await lift(LIFT);
   assert.equal(again.status, 409);
-  assert.equal((await again.json()).error, await refusal(async () => unhold(LIFT)));
+  assert.equal(((await again.json()) as { error: string }).error, await refusal(async () => unhold(LIFT)));
 });
 
 test('a hold written by hand on a pruned run is lifted, as `wf hold --off` lifts it: nothing of the run is filed again either way', async () => {
@@ -595,7 +585,7 @@ test('REFUSED at shipped defaults: a lift of a run nobody holds — one never he
     const before = filesOf(id);
     const res = await lift(id);
     assert.equal(res.status, 409, id);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, await refusal(async () => unhold(id)), id);
     assert.match(error, new RegExp(`^${id} is not held, so there is no hold to lift`), id);
     assert.deepEqual(filesOf(id), before, id);
@@ -609,7 +599,7 @@ test('REFUSED at shipped defaults: a lift of a run the store has not — none by
     const before = fs.readdirSync(path.join(root, 'runs')).sort();
     const res = await lift(id);
     assert.equal(res.status, 404, id);
-    assert.match((await res.json()).error, new RegExp(`^No run '${id}' in this store`), id);
+    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
     assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
   }
   assert.ok(fs.existsSync(holdFile('h-removed')), 'the stray hold file is left for `wf hold --off` or a person');
@@ -626,7 +616,7 @@ test('REFUSED at shipped defaults: a lift from a page on another site, addressed
   for (const [headers, status, words] of cases) {
     const res = await lift(GATE, headers);
     assert.equal(res.status, status, JSON.stringify(headers));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, words);
     assert.match(error, new RegExp(`^DELETE /api/runs/${GATE}/hold `));
     assert.equal(fs.readFileSync(holdFile(GATE), 'utf8'), held);

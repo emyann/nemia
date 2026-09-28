@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import type { KeyField, KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
   addStep,
   connect,
@@ -215,6 +215,7 @@ test("a folder written goes into the page's listing in the listing's order: the 
     steps: [],
     graph: { roots: [], edges: [] },
     schemas: [],
+    folderTeam: false,
     version: '0',
     error: null,
   });
@@ -321,38 +322,45 @@ test('a step moved to another agent shows what that agent gives it, and nothing 
 });
 
 test("a step's form has its harness's fence alone: a permission mode on Claude Code, a sandbox on codex", () => {
-  const harness = {
+  const harness: KeyField = {
     key: 'harness',
     meaning: '',
     kind: 'choice',
     choices: ['claude', 'codex', 'claude-detached'],
     byHarness: null,
-  } as const;
-  const permissionMode = { byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] } };
-  const sandbox = { byHarness: { codex: ['read-only'] } };
-  const form = { keys: [harness] } as unknown as Pick<KeyForm, 'keys'>;
+  };
+  const permissionMode = {
+    key: 'permissionMode',
+    byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] },
+  } satisfies Pick<KeyField, 'key' | 'byHarness'>;
+  const sandbox = { key: 'sandbox', byHarness: { codex: ['read-only'] } } satisfies Pick<KeyField, 'key' | 'byHarness'>;
+  const form: Pick<KeyForm, 'keys' | 'remote'> = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode'] } };
   assert.deepEqual([takes(form, sandbox, 'codex'), takes(form, permissionMode, 'codex')], [true, false]);
   assert.deepEqual([takes(form, sandbox, 'claude'), takes(form, permissionMode, 'claude')], [false, true]);
-  assert.equal(takes(form, { byHarness: null }, 'codex'), true, "a key that is not a harness word is every harness's");
+  assert.equal(
+    takes(form, { key: 'deadlineSeconds', byHarness: null }, 'codex'),
+    true,
+    "a key that is not a harness word is every harness's",
+  );
   assert.equal(takes(form, sandbox, 'nowhere'), true, 'a harness the form does not know is judged on save');
   assert.equal(UNSET.sandbox, null);
 });
 
 test('a step on a remote A2A agent has none of the keys the package refuses there, whether or not the form lists the agent', () => {
-  const harness = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'a2a:reviewer'], byHarness: null } as const;
-  const form = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode', 'tools', 'check'] } } as unknown as Pick<
-    KeyForm,
-    'keys' | 'remote'
-  >;
-  const model = { key: 'model', byHarness: { claude: ['opus'], codex: ['gpt-5.5'] } } as const;
-  const tools = { key: 'tools', byHarness: null } as const;
-  const deadline = { key: 'deadlineSeconds', byHarness: null } as const;
+  const harness: KeyField = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'a2a:reviewer'], byHarness: null };
+  const form: Pick<KeyForm, 'keys' | 'remote'> = {
+    keys: [harness],
+    remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode', 'tools', 'check'] },
+  };
+  const model = { key: 'model', byHarness: { claude: ['opus'], codex: ['gpt-5.5'] } } satisfies Pick<KeyField, 'key' | 'byHarness'>;
+  const tools = { key: 'tools', byHarness: null } satisfies Pick<KeyField, 'key' | 'byHarness'>;
+  const deadline = { key: 'deadlineSeconds', byHarness: null } satisfies Pick<KeyField, 'key' | 'byHarness'>;
   assert.deepEqual(
     [takes(form, model, 'a2a:reviewer'), takes(form, tools, 'a2a:reviewer'), takes(form, deadline, 'a2a:reviewer')],
     [false, false, true],
   );
   assert.equal(takes(form, tools, 'a2a:gone'), false, 'a name the store no longer declares is still remote');
   assert.deepEqual([takes(form, model, 'claude'), takes(form, tools, 'claude')], [true, true], 'a harness of ours keeps them');
-  // An api from before remote agents sends no `remote`: nothing is hidden for it.
+  // An api from before remote agents sends no `remote`: nothing is hidden for it. Cast on purpose: the type says every api sends one.
   assert.equal(takes({ keys: form.keys } as unknown as Pick<KeyForm, 'keys' | 'remote'>, tools, 'a2a:reviewer'), true);
 });

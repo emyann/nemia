@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
-import type { TaskPhase } from '../src/run.ts';
+import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-ship-');
@@ -19,10 +19,31 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { accept, advance, approve, artifactFiles, artifactsDir, cancel, decide, forget, isShipped, list, readRun, retry, round, start } =
-  await import('../src/runner.ts');
+const {
+  accept,
+  advance,
+  approve,
+  artifactFiles,
+  artifactsDir,
+  cancel,
+  decide,
+  forget,
+  isGitRun,
+  isShipped,
+  list,
+  readRun,
+  retry,
+  round,
+  start,
+} = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 const { abortMerge, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
+
+/** A run this file started on a repository, as `isShipped` reads one: a git run. */
+const gitRun = (run: Run): GitRun => {
+  assert.ok(isGitRun(run), `${run.id} works on a repository`);
+  return run;
+};
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 // The shipped agents, beside every folder this file makes under ROOT: the shipped ship.md names `agent: shipper`, and its recipe is there.
@@ -218,7 +239,7 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   // Pass after pass: the gate is read off the world each time, and nothing is spent while it holds.
   const again = await advance(e, readRun(id));
   assert.deepEqual([again.filed, again.checked, again.tried], [[], [], []]);
-  assert.equal(isShipped(readRun(id), branch), false);
+  assert.equal(isShipped(gitRun(readRun(id)), branch), false);
 });
 
 test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — the run has shipped as git reads it, a run `--after` it starts, every screen agrees, and `wf approve` names `wf cancel` instead", async (t) => {
@@ -230,7 +251,7 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
 
   // A person merges the result by hand, as happened to the run that built the checkout hold. Nobody tells the run.
   git(repo, 'merge', '--no-ff', '--no-edit', branch);
-  assert.equal(isShipped(readRun(id), branch), true);
+  assert.equal(isShipped(gitRun(readRun(id)), branch), true);
 
   // `wf ls`: nothing to decide, nobody waited on, and the ending's line says where the branch stands and the one command there still is.
   const listed = await list(e, readRun(id));
@@ -309,7 +330,7 @@ test('`wf rm` of a run whose ending never ran and whose result a person merged b
   const held = await forget(e, id);
   assert.equal(held.kind, 'refused', 'at its gate with the branch ahead, the run is held');
   assert.match(
-    held.kind === 'refused' ? held.refusal : '',
+    held.kind === 'refused' ? (held.refusal ?? '') : '',
     new RegExp(`ship waits at its gate for your approval, and it is filed once it is approved: wf approve ${id} ship`),
   );
 
@@ -382,7 +403,7 @@ test("an approved ending with no check of its own is filed, in the repository's 
   assert.equal(git(repo, 'log', '-1', '--format=%s'), 'Add sub', 'under the subject the step wrote');
   assert.equal(git(repo, 'log', '-1', '--format=%(trailers)'), '', 'with no trailer');
   assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout, the message included');
-  assert.equal(isShipped(record, branch), true);
+  assert.equal(isShipped(gitRun(record), branch), true);
   const { decision, toDecide, standings } = await decide(e, id);
   assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
   // The run committed nothing of its own in that checkout: the merge commit is the step's, and the only one.
@@ -1021,7 +1042,7 @@ test("a run with nothing filed is held by the checkout like any other: its endin
   git(repo, 'commit', '--no-edit');
   settle(`${parent.id}-ship`, 'succeeded', SIGNED);
   await advance(e, readRun(parent.id));
-  assert.equal(isShipped(readRun(parent.id), parent.branch), true);
+  assert.equal(isShipped(gitRun(readRun(parent.id)), parent.branch), true);
 
   // Another run at its ending's gate, its word the older, and the merge-only child of the shipped run.
   const other = await atTheGate({ repo, board: shared });
@@ -1087,7 +1108,7 @@ test('a sent-back ending merges nothing: the work is filed again, the checkout i
   const held = await advance(e, readRun(id));
   assert.deepEqual(held.filed, [], 'and the gate holds the ending again');
   assert.deepEqual((await list(e, readRun(id))).toDecide?.kind, 'approve');
-  assert.equal(isShipped(readRun(id), branch), false);
+  assert.equal(isShipped(gitRun(readRun(id)), branch), false);
 });
 
 test("REFUSED at the ending's gate, at shipped defaults: a send-back with no words names the step at the gate — ship, not the work — and the two commands it names are honoured", async () => {
@@ -1188,7 +1209,7 @@ test("a check that refuses leaves the checkout clean: the abort the ending's pro
   await advance(e, readRun(id));
   const record = readRun(id);
   assert.equal(git(repo, 'status', '--porcelain'), '', 'nor does the run commit what a step left in that checkout');
-  assert.equal(isShipped(record, branch), false);
+  assert.equal(isShipped(gitRun(record), branch), false);
   const { decision } = await decide(e, id);
   assert.equal(decision.kind, 'awaiting');
   if (decision.kind !== 'awaiting') return;

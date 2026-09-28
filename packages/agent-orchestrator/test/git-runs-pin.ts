@@ -64,6 +64,7 @@ const valueOf = (step: Workflow, field: string): unknown => {
           : `${step.name}'s ${field}`;
 };
 
+// As a harness writes it, `needs: null` (the schema's nullable), not the parsed `Closeout`'s absent key: the pinned fixture was recorded so.
 const closeout = (step: Workflow): Closeout =>
   ({
     outcome: 'done',
@@ -75,7 +76,7 @@ const closeout = (step: Workflow): Closeout =>
       ...(step.loop ? { again: false } : {}),
       replies: [],
     },
-  }) as Closeout;
+  }) as unknown as Closeout;
 
 /** No step waits on it: a folder's last steps, the ones a failure is pinned on. */
 const terminal = (steps: readonly Workflow[]) => steps.filter((s) => !steps.some((o) => o.after.includes(s.name))).map((s) => s.name);

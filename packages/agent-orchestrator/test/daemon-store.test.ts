@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
+import type { Engine, RefusedMove, TickReport } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-daemon-');
@@ -67,6 +67,18 @@ const read = () =>
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
 
 /** An engine whose tick counts the passes and runs `each` on each, which may throw to stop the daemon. */
+/** A pass's report that did nothing, with what a test says of it. */
+const pass = (said: Partial<TickReport> = {}): TickReport => ({
+  tasks: 0,
+  actions: 0,
+  running: {},
+  views: [],
+  ms: 0,
+  observed: {},
+  refused: [],
+  ...said,
+});
+
 const engineOf = (
   each: (pass: number) => void = () => {
     throw STOP;
@@ -74,10 +86,10 @@ const engineOf = (
 ) => {
   const e = {
     passes: 0,
-    tick: async () => {
+    tick: async (): Promise<TickReport> => {
       e.passes++;
       each(e.passes);
-      return { tasks: 0, actions: [], running: {}, views: [] };
+      return pass();
     },
     admit: async () => [],
   };
@@ -502,15 +514,15 @@ test('REFUSED at shipped defaults: `wf tick --stats` while a daemon holds the st
 
 test('`wf up` says a move the runtime refused once while it lasts, and again once it clears and comes back — in its log, beside its other lines', async (t) => {
   clear();
-  const stuck = { taskId: 't-stuck', state: 'working', event: 'SESSION_LIVE' };
-  const other = { taskId: 't-other', state: 'ending', event: 'CLOSED' };
+  const stuck: RefusedMove = { taskId: 't-stuck', state: 'working', event: 'SESSION_LIVE' };
+  const other: RefusedMove = { taskId: 't-other', state: 'ending', event: 'CLOSED' };
   // What each pass's report says was refused: pass 5 has cleared it, pass 6 has it back.
   const byPass = [[stuck], [stuck], [stuck, other], [stuck, other], [], [stuck], [stuck]];
   const e = engineOf();
   e.tick = async () => {
     e.passes++;
     if (e.passes > byPass.length) throw STOP;
-    return { tasks: 2, actions: [], running: {}, views: [], refused: byPass[e.passes - 1]! };
+    return pass({ tasks: 2, refused: byPass[e.passes - 1]! });
   };
   const { printed, threw } = await typed(t, ['up', '1'], e);
   assert.equal(threw, STOP);
@@ -531,9 +543,9 @@ test('`wf up` says a move the runtime refused once while it lasts, and again onc
 
 test('`wf tick` says every move its one pass refused', async (t) => {
   clear();
-  const stuck = { taskId: 't-stuck', state: 'submitted', event: 'READY' };
+  const stuck: RefusedMove = { taskId: 't-stuck', state: 'submitted', event: 'READY' };
   const e = engineOf();
-  e.tick = async () => ({ tasks: 1, actions: [], running: {}, views: [], refused: [stuck, stuck] });
+  e.tick = async () => pass({ tasks: 1, refused: [stuck, stuck] });
   const { printed, threw } = await typed(t, ['tick'], e);
   assert.equal(threw, undefined);
   assert.deepEqual(

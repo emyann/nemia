@@ -15,8 +15,9 @@ const root = scratch('hkb-api-remote-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
 const { needsOf } = await import('../src/judged.ts');
-type TaskView = import('agent-orchestrator').TaskView;
-type Run = import('agent-orchestrator').Run;
+type TaskView = import('../src/store.ts').TaskView;
+type Run = import('agent-orchestrator/run').Run;
+type RunDetail = import('../src/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -65,9 +66,9 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   const res = await app.request('/api/runs/r-remote');
   assert.equal(res.status, 200);
   const text = await res.text();
-  const [ask] = JSON.parse(text).steps;
-  assert.deepEqual(ask.filed.remote, { name: 'reviewer', address: 'https://agents.example.com/reviewer' });
-  assert.equal(ask.filed.runsIn, null, "no mode: the agent runs under its own party's fence");
+  const [ask] = (JSON.parse(text) as RunDetail).steps;
+  assert.deepEqual(ask.filed?.remote, { name: 'reviewer', address: 'https://agents.example.com/reviewer' });
+  assert.equal(ask.filed?.runsIn, null, "no mode: the agent runs under its own party's fence");
   assert.equal(text.includes('s3cret'), false, 'the query string, which can carry a key, is on no answer');
 
   // An agent given by its card is addressed by the card's first interface.
@@ -75,7 +76,7 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
     path.join(root, 'a2a-agents.json'),
     JSON.stringify({ reviewer: { card: { supportedInterfaces: [{ url: 'https://a2a.example.org/rpc', protocolBinding: 'JSONRPC' }] } } }),
   );
-  assert.deepEqual((await (await app.request('/api/runs/r-remote')).json()).steps[0].filed.remote, {
+  assert.deepEqual(((await (await app.request('/api/runs/r-remote')).json()) as RunDetail).steps[0].filed?.remote, {
     name: 'reviewer',
     address: 'https://a2a.example.org/rpc',
   });
@@ -83,11 +84,14 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   // Taken out of the file since, or the file refused as it stands: the name, which is on the task, and no address.
   completed('t-gone', 'a2a:critic');
   oneStep('r-gone', 'a2a:critic', 't-gone');
-  assert.deepEqual((await (await app.request('/api/runs/r-gone')).json()).steps[0].filed.remote, { name: 'critic', address: null });
+  assert.deepEqual(((await (await app.request('/api/runs/r-gone')).json()) as RunDetail).steps[0].filed?.remote, {
+    name: 'critic',
+    address: null,
+  });
   write(path.join(root, 'a2a-agents.json'), '{ "reviewer": ');
   const refused = await app.request('/api/runs/r-remote');
   assert.equal(refused.status, 200, 'the page is still drawn');
-  assert.deepEqual((await refused.json()).steps[0].filed.remote, { name: 'reviewer', address: null });
+  assert.deepEqual(((await refused.json()) as RunDetail).steps[0].filed?.remote, { name: 'reviewer', address: null });
   fs.rmSync(path.join(root, 'a2a-agents.json'));
 });
 

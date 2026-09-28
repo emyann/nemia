@@ -2152,8 +2152,9 @@ What was built:
 - **`wf prune --artifacts`** removes `runs/<id>/artifacts/` beside the worktrees, a link among the files as a link, and says what each
   held and what the whole freed. It keeps prune's rules: a run not over, one held, a folder run, and a finished run not merged without
   `--unmerged` are refused (an in-place run, which never reads shipped, in words of its own); the mark is written first, and a prune that
-  removed nothing puts back the mark the run had. A run whose worktrees are gone, or that cut none, may still have its files pruned. A `--unmerged` an earlier plain prune was given does
-  not carry over to the files: a run still waiting on its decision loses them only to a prune given `--unmerged` for them (review, round 2).
+  removed nothing puts back the mark the run had. A run whose worktrees are gone, or that cut none, may still have its files pruned. A
+  `--unmerged` an earlier plain prune was given does not carry over to the files: a run still waiting on its decision loses them only to
+  a prune given `--unmerged` for them (review, round 2).
 - **What stays, and why.** The record, the asks and the engine's journals are what `wf decide` and the board read. The inputs are a
   person's own files. The rendered prompts say what each step was told, and cost a megabyte. The check logs say why a check refused. A
   folder run's `work/` is its work, and a folder run is refused.

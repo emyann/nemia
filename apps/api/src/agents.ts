@@ -10,6 +10,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   AgentWriteError,
@@ -42,6 +43,7 @@ import {
   type RoleKey,
   type SkillsFound,
 } from 'agent-orchestrator/workflow';
+import { readBody, valueAt, type BodyIssue, type Words } from './body.ts';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { judgedNow } from './runs.ts';
@@ -100,8 +102,6 @@ export type AgentListing = {
 const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
@@ -273,6 +273,60 @@ const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<it
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
 const TRY_SHAPE = '`{ "brief": "<what the agent is asked to do>" }`';
 
+/** An agent's name, refused where it is not one in the package's words (`agentNameRefusal`, through `draftWords`). */
+const AgentName = Schema.String.check(Schema.makeFilter((name: string) => agentNameRefusal(name) === undefined));
+
+/**
+ * A page drawn before agents card 2 sends the card file it edited — `card` and `cardText`, or `skillsText` from before 2026-09-25. Taken as
+ * nothing, the edit would be lost unsaid; the card is generated from the agent's skills now, so each is refused, saying so. An own null too.
+ */
+const RETIRED = ['card', 'cardText', 'skillsText'] as const;
+
+/** The keys of a draft after its name, in the order they are refused: a key's value is the package's to judge, in its words. */
+const DRAFT_FIELDS = {
+  card: Schema.optionalKey(Schema.Never),
+  cardText: Schema.optionalKey(Schema.Never),
+  skillsText: Schema.optionalKey(Schema.Never),
+  description: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  skills: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  systemPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  keys: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
+  body: Schema.optionalKey(Schema.String),
+  schema: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
+};
+const POST_BODY = Schema.Struct({ name: AgentName, ...DRAFT_FIELDS });
+/** A put's `name`, left out or null, is the agent's own, from the path. */
+const PUT_BODY = Schema.Struct({ version: Schema.NonEmptyString, name: Schema.optionalKey(Schema.NullOr(AgentName)), ...DRAFT_FIELDS });
+const DELETE_BODY = Schema.Struct({ version: Schema.NonEmptyString });
+const TRY_BODY = Schema.Struct({ brief: Schema.String });
+
+/** Why a draft's key is not one (400), by the first its schema refused, and what to send instead. */
+function draftWords(route: string, shape: string): Words {
+  return ({ path: [key, inner], kind, input }: BodyIssue, body: unknown) => {
+    const wrong = (what: string) => `${route}: ${what}. Send ${shape}.`;
+    if (key === 'name' && kind === 'check') return agentNameRefusal(input) ?? wrong('`name` is not a name');
+    if (key === 'name') return wrong(`\`name\` is the agent's name, a string, and this request's was ${JSON.stringify(input)}`);
+    if (RETIRED.some((retired) => retired === key)) {
+      const sent = RETIRED.filter((retired) => valueAt(body, [retired]) !== undefined);
+      return wrong(
+        `${sent.map((retired) => `\`${retired}\``).join(' and ')} named the card file beside the agent, which is retired: since agents card 2 its card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page open since before then sends it: reload it, and save again`,
+      );
+    }
+    if (key === 'description') return wrong('`description` is a line of text, or null');
+    if (key === 'skills')
+      return wrong(
+        '`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null',
+      );
+    if (key === 'systemPrompt') return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
+    if (key === 'keys' && inner !== undefined)
+      return wrong(`\`keys.${String(inner)}\` is written as a string, as its line in the file is — ${JSON.stringify(input)} is not one`);
+    if (key === 'keys') return wrong('`keys` is an object of the role keys the agent sets');
+    if (key === 'body') return wrong("`body` is the agent's instructions, a string");
+    if (key === 'schema') return wrong('`schema` is the result schema its `output:` names, `{ "file", "text" }`, or null');
+    return `${route} takes a JSON object: ${shape}.`;
+  };
+}
+
 /** What a try answers with: the run it started, which the board follows on the run's page. */
 export type AgentTried = { id: string };
 
@@ -316,61 +370,19 @@ function yoursOnly(route: string, from: string, name: string | null, repo: strin
   };
 }
 
-/** The request's JSON body, or why it has none. */
-async function jsonOf(req: { json: () => Promise<unknown> }, route: string, shape: string): Promise<{ body: unknown } | Refusal> {
-  try {
-    return { body: await req.json() };
-  } catch {
-    return { status: 400, error: `${route} takes a JSON body: ${shape}.` };
-  }
-}
-
-/** A draft from a body, its shape checked: a key's value is judged by the package, which says what is wrong with it in its words. */
-function draftOf(
-  body: Record<string, unknown>,
-  name: unknown,
-  route: string,
-  shape: string,
-): { draft: AgentDraft; schema: AgentSchema | null } | Refusal {
-  const wrong = (what: string) => ({ status: 400 as const, error: `${route}: ${what}. Send ${shape}.` });
-  if (typeof name !== 'string') return wrong(`\`name\` is the agent's name, a string, and this request's was ${JSON.stringify(name)}`);
-  // A page drawn before agents card 2 sends the card file it edited — `card` and `cardText`, or `skillsText` from before 2026-09-25. Taken as
-  // nothing, the edit would be lost unsaid; the card is generated from the agent's skills now, so it is refused, saying so. An own null too.
-  const retired = ['card', 'cardText', 'skillsText'].filter((key) => Object.hasOwn(body, key));
-  if (retired.length)
-    return wrong(
-      `${retired.map((key) => `\`${key}\``).join(' and ')} named the card file beside the agent, which is retired: since agents card 2 its card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page open since before then sends it: reload it, and save again`,
-    );
-  if (body.description != null && typeof body.description !== 'string') return wrong('`description` is a line of text, or null');
-  if (body.skills != null && typeof body.skills !== 'string')
-    return wrong(
-      '`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null',
-    );
-  if (body.systemPrompt != null && typeof body.systemPrompt !== 'string')
-    return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
-  if (body.keys !== undefined && !isObject(body.keys)) return wrong('`keys` is an object of the role keys the agent sets');
-  const keys = (body.keys ?? {}) as Record<string, unknown>;
-  const bad = Object.entries(keys).find(([, value]) => value !== null && typeof value !== 'string');
-  if (bad) return wrong(`\`keys.${bad[0]}\` is written as a string, as its line in the file is — ${JSON.stringify(bad[1])} is not one`);
-  if (body.body !== undefined && typeof body.body !== 'string') return wrong("`body` is the agent's instructions, a string");
-  const schema = body.schema ?? null;
-  if (schema !== null && (!isObject(schema) || typeof schema.file !== 'string' || typeof schema.text !== 'string'))
-    return wrong('`schema` is the result schema its `output:` names, `{ "file", "text" }`, or null');
-  const description = typeof body.description === 'string' && body.description.trim() ? body.description.trim() : null;
-  const line = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value.trim() : null);
-  const trimmed = Object.fromEntries(
-    Object.entries(keys).map(([key, value]) => [key, typeof value === 'string' && value.trim() ? value.trim() : null]),
-  );
+/** A draft off a decoded body, each line trimmed, and one with nothing in it unset. */
+function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { draft: AgentDraft; schema: AgentSchema | null } {
+  const line = (value: string | null | undefined): string | null => (value?.trim() ? value.trim() : null);
   return {
     draft: {
       name,
-      description,
+      description: line(body.description),
       skills: line(body.skills),
       systemPrompt: line(body.systemPrompt),
-      keys: trimmed as AgentDraft['keys'],
-      body: (body.body as string | undefined) ?? '',
+      keys: Object.fromEntries(Object.entries(body.keys ?? {}).map(([key, value]) => [key, line(value)])),
+      body: body.body ?? '',
     },
-    schema: schema as AgentSchema | null,
+    schema: body.schema ?? null,
   };
 }
 
@@ -474,13 +486,11 @@ export const agents = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const where = yoursOnly(route, from, null, repoOf());
     if (where) return c.json({ error: where.error }, where.status);
-    const read = await jsonOf(c.req, route, POST_SHAPE);
+    const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, draftWords(route, POST_SHAPE));
     if ('status' in read) return c.json({ error: read.error }, read.status);
-    if (!isObject(read.body)) return c.json({ error: `${route} takes a JSON object: ${POST_SHAPE}.` }, 400);
-    const place = placeOf(from, typeof read.body.name === 'string' ? read.body.name : null, route);
+    const place = placeOf(from, read.body.name, route);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    const given = draftOf(read.body, read.body.name, route, POST_SHAPE);
-    if ('status' in given) return c.json({ error: given.error }, given.status);
+    const given = draftOf(read.body, read.body.name);
     const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo: repoOf() }, 201);
     return c.json(answer.body, answer.status);
   })
@@ -499,25 +509,15 @@ export const agents = new Hono()
     if (where) return c.json({ error: where.error }, where.status);
     const place = placeOf(from, name, route);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    const read = await jsonOf(c.req, route, PUT_SHAPE);
+    const drafted = draftWords(route, PUT_SHAPE);
+    const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, (issue, body) =>
+      issue.path[0] === 'version'
+        ? `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(issue.input)}.`
+        : drafted(issue, body),
+    );
     if ('status' in read) return c.json({ error: read.error }, read.status);
-    if (!isObject(read.body)) return c.json({ error: `${route} takes a JSON object: ${PUT_SHAPE}.` }, 400);
     const { version } = read.body;
-    if (typeof version !== 'string' || !version) {
-      return c.json(
-        {
-          error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(version)}.`,
-        },
-        400,
-      );
-    }
-    const to = read.body.name ?? name;
-    if (typeof to === 'string' && to !== name) {
-      const wrong = agentNameRefusal(to);
-      if (wrong) return c.json({ error: wrong }, 400);
-    }
-    const given = draftOf(read.body, to, route, PUT_SHAPE);
-    if ('status' in given) return c.json({ error: given.error }, given.status);
+    const given = draftOf(read.body, read.body.name ?? name);
     const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo: repoOf() }, 200);
     return c.json(answer.body, answer.status);
   })
@@ -549,16 +549,15 @@ export const agents = new Hono()
     if (where) return c.json({ error: where.error }, where.status);
     const place = placeOf(from, name, route);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    const read = await jsonOf(c.req, route, TRY_SHAPE);
+    const read = await readBody(
+      c.req,
+      TRY_BODY,
+      `${route} takes a JSON body: ${TRY_SHAPE}.`,
+      (_, body) =>
+        `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
+    );
     if ('status' in read) return c.json({ error: read.error }, read.status);
-    const brief = isObject(read.body) ? read.body.brief : undefined;
-    if (typeof brief !== 'string')
-      return c.json(
-        {
-          error: `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(brief)}.`,
-        },
-        400,
-      );
+    const { brief } = read.body;
     if (!brief.trim())
       return c.json(
         {
@@ -624,17 +623,15 @@ export const agents = new Hono()
     if (where) return c.json({ error: where.error }, where.status);
     const place = placeOf(from, name, route);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    const read = await jsonOf(c.req, route, DELETE_SHAPE);
+    const read = await readBody(
+      c.req,
+      DELETE_BODY,
+      `${route} takes a JSON body: ${DELETE_SHAPE}.`,
+      (_, body) =>
+        `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['version']))}.`,
+    );
     if ('status' in read) return c.json({ error: read.error }, read.status);
-    const version = isObject(read.body) ? read.body.version : undefined;
-    if (typeof version !== 'string' || !version) {
-      return c.json(
-        {
-          error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(version)}.`,
-        },
-        400,
-      );
-    }
+    const { version } = read.body;
     try {
       // The repository the board serves is read too, for a step its workflows are given this agent by; another is not known here.
       return c.json(removeAgent(place.dir, name, { version, repo: repoOf() }));

@@ -16,6 +16,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentSkillsFound,
@@ -45,6 +46,7 @@ import {
   type SkillCost,
   type SkillDraft,
 } from 'agent-orchestrator/workflow';
+import { readBody, valueAt, type BodyIssue, type Words } from './body.ts';
 import { HOME_REPO, repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { placesOf } from './workflows.ts';
@@ -220,6 +222,81 @@ const DRAFT_SHAPE =
 const POST_SHAPE = `${COPY_SHAPE}, or \`{ "skill": ${DRAFT_SHAPE.slice(1, -1)} }\``;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/skills/yours/<name> answers it>", "skill": ${DRAFT_SHAPE.slice(1, -1)} }\`, or \`{ "version": "…", "preload": true or false }\``;
 
+/** A skill's keys, in the order they are refused; each value is then judged by the package, which says what is wrong with it in its words. */
+const SKILL_KEYS = {
+  name: Schema.String,
+  title: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  description: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tags: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.String))),
+  examples: Schema.optionalKey(Schema.NullOr(Schema.Array(Schema.String))),
+  preload: Schema.optionalKey(Schema.Boolean),
+  body: Schema.String,
+};
+
+/** A skill as a request sends it, a key no skill has kept, so it is refused once every key a skill has is read (`skillDraftFrom`). */
+const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
+
+/** A new skill: one HKB ships, copied, or one you wrote (`oneOf` says which the request sent). */
+const POST_BODY = Schema.Struct({ copy: Schema.optionalKey(Schema.String), skill: Schema.optionalKey(SKILL_DRAFT) });
+
+/** A skill changed at its version: written whole, or its `preload:` alone (`oneOf` says which the request sent). */
+const PUT_BODY = Schema.Struct({
+  version: Schema.NonEmptyString,
+  skill: Schema.optionalKey(SKILL_DRAFT),
+  preload: Schema.optionalKey(Schema.Boolean),
+});
+
+/** Why a body sent both of `one` and `other`, or neither (400), in the route's words; undefined when it sent one. */
+function oneOf(body: unknown, one: string, other: string, said: (sent: 'both' | 'neither') => string): string | undefined {
+  const has = (key: string) => valueAt(body, [key]) !== undefined;
+  return has(one) === has(other) ? said(has(one) ? 'both' : 'neither') : undefined;
+}
+
+/** Why `skill` is not a skill (400), by the first of its keys refused, `path` from the skill down. */
+function draftWords([key]: ReadonlyArray<PropertyKey>, skill: unknown, route: string, shape: string): string {
+  const wrong = (what: string) => `${route}: ${what}. Send ${shape}.`;
+  if (key === 'name')
+    return wrong(`\`name\` is the skill's name, its folder, a string, and this request's was ${JSON.stringify(valueAt(skill, ['name']))}`);
+  if (key === 'title' || key === 'description') return wrong(`\`${key}\` is a line of text, or null`);
+  if (key === 'tags' || key === 'examples') return wrong(`\`${key}\` is a list of lines of text, or null`);
+  if (key === 'preload') return wrong('`preload` is true or false');
+  if (key === 'body')
+    return wrong(`\`body\` is the skill's instructions, a string, and this request's was ${JSON.stringify(valueAt(skill, ['body']))}`);
+  return wrong(`\`skill\` is the skill, an object, and this request's was ${JSON.stringify(skill)}`);
+}
+
+/** A POST's `oneOf` sentence. */
+const copyOrSkill = (route: string) => (sent: 'both' | 'neither') =>
+  `${route} takes one of \`copy\` — a skill HKB ships, copied — and \`skill\` — one you wrote — and this request sent ${sent}. Send ${POST_SHAPE}.`;
+
+/** A PUT's `oneOf` sentence. */
+const skillOrPreload = (route: string) => (sent: 'both' | 'neither') =>
+  `${route} takes one of \`skill\` — the whole skill, from its form — and \`preload\` — its switch alone — and this request sent ${sent}. Send ${PUT_SHAPE}.`;
+
+/** Why a POST's body is not a new skill: not an object, not one of `copy` and `skill`, then the one it sent. */
+function postWords(route: string): Words {
+  return ({ path: [key, ...rest], input }: BodyIssue, body: unknown) => {
+    if (key === undefined) return `${route} takes a JSON object: ${POST_SHAPE}.`;
+    const one = oneOf(body, 'skill', 'copy', copyOrSkill(route));
+    if (one) return one;
+    if (key === 'skill') return draftWords(rest, valueAt(body, ['skill']), route, POST_SHAPE);
+    return `${route}: \`copy\` is the name of the skill HKB ships to copy, a string, and this request's was ${JSON.stringify(input)}. Send ${COPY_SHAPE}.`;
+  };
+}
+
+/** Why a PUT's body is not a change of the skill `name`: not an object, no version, not one of `skill` and `preload`, then the one it sent. */
+function putWords(route: string, name: string): Words {
+  return ({ path: [key, ...rest], input }: BodyIssue, body: unknown) => {
+    if (key === undefined) return `${route} takes a JSON object: ${PUT_SHAPE}.`;
+    if (key === 'version')
+      return `${route} takes the \`version\` the skill was read at, as GET /api/skills/yours/${name} answers it, so a change of a skill that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(input)}.`;
+    const one = oneOf(body, 'skill', 'preload', skillOrPreload(route));
+    if (one) return one;
+    if (key === 'skill') return draftWords(rest, valueAt(body, ['skill']), route, PUT_SHAPE);
+    return `${route}: \`preload\` is true or false, and this request's was ${JSON.stringify(input)}. Send ${PUT_SHAPE}.`;
+  };
+}
+
 /** A write of a skill, as the guard's refusals word it (guard.ts). */
 const skillGuard = (route: string, method: 'POST' | 'PUT'): Guarded => ({
   route,
@@ -341,36 +418,24 @@ export function skillDetail(
   return { skill, version: skillVersion(dir) ?? '', draft, body, users, copyHint };
 }
 
-/** A draft from a body, its shape checked: each value is then judged by the package, which says what is wrong with it in its words. */
-function skillDraftFrom(body: unknown, route: string, shape: string): SkillDraft | Refusal {
-  const wrong = (what: string): Refusal => ({ status: 400, error: `${route}: ${what}. Send ${shape}.` });
-  if (!isObject(body)) return wrong(`\`skill\` is the skill, an object, and this request's was ${JSON.stringify(body)}`);
-  const text = (key: string) => body[key] == null || typeof body[key] === 'string';
-  const list = (key: string) =>
-    body[key] == null || (Array.isArray(body[key]) && (body[key] as unknown[]).every((item) => typeof item === 'string'));
-  if (typeof body.name !== 'string')
-    return wrong(`\`name\` is the skill's name, its folder, a string, and this request's was ${JSON.stringify(body.name)}`);
-  for (const key of ['title', 'description']) if (!text(key)) return wrong(`\`${key}\` is a line of text, or null`);
-  for (const key of ['tags', 'examples']) if (!list(key)) return wrong(`\`${key}\` is a list of lines of text, or null`);
-  if (body.preload !== undefined && typeof body.preload !== 'boolean') return wrong('`preload` is true or false');
-  if (typeof body.body !== 'string')
-    return wrong(`\`body\` is the skill's instructions, a string, and this request's was ${JSON.stringify(body.body)}`);
-  const known = ['name', 'title', 'description', 'tags', 'examples', 'preload', 'body'];
-  const unknown = Object.keys(body).filter((key) => !known.includes(key));
-  if (unknown.length)
-    return wrong(`${unknown.map((key) => `\`${key}\``).join(' and ')} ${unknown.length > 1 ? 'are' : 'is'} no key of a skill's`);
+/** A draft from a skill as sent, refused (400) when it has a key no skill has: each value is then judged by the package, in its words. */
+function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: string): SkillDraft | Refusal {
+  const unknown = Object.keys(skill).filter((key) => !Object.hasOwn(SKILL_KEYS, key));
+  if (unknown.length) {
+    const keys = unknown.map((key) => `\`${key}\``).join(' and ');
+    return { status: 400, error: `${route}: ${keys} ${unknown.length > 1 ? 'are' : 'is'} no key of a skill's. Send ${shape}.` };
+  }
+  const { name, title, description, tags, examples, preload, body } = skill;
   return {
-    name: body.name,
-    title: body.title as string | null | undefined,
-    description: body.description as string | null | undefined,
-    tags: body.tags as string[] | null | undefined,
-    examples: body.examples as string[] | null | undefined,
-    ...(body.preload !== undefined && { preload: body.preload as boolean }),
-    body: body.body,
+    name,
+    title,
+    description,
+    tags: tags && [...tags],
+    examples: examples && [...examples],
+    ...(preload !== undefined && { preload }),
+    body,
   };
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** A refusal of the package's write, as the api answers it. */
 function writeRefused(err: unknown): Refusal | { status: 500; error: string } {
@@ -458,35 +523,18 @@ export const skills = new Hono()
         },
         400,
       );
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `${route} takes a JSON body: ${POST_SHAPE}.` }, 400);
-    }
-    if (!isObject(body)) return c.json({ error: `${route} takes a JSON object: ${POST_SHAPE}.` }, 400);
-    if (Object.hasOwn(body, 'skill') === Object.hasOwn(body, 'copy')) {
-      return c.json(
-        {
-          error: `${route} takes one of \`copy\` — a skill HKB ships, copied — and \`skill\` — one you wrote — and this request sent ${Object.hasOwn(body, 'skill') ? 'both' : 'neither'}. Send ${POST_SHAPE}.`,
-        },
-        400,
-      );
-    }
-    if (Object.hasOwn(body, 'skill')) {
-      const draft = skillDraftFrom(body.skill, route, POST_SHAPE);
+    const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, postWords(route));
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const { copy: name, skill } = read.body;
+    const one = oneOf(read.body, 'skill', 'copy', copyOrSkill(route));
+    if (one) return c.json({ error: one }, 400);
+    if (skill) {
+      const draft = skillDraftFrom(skill, route, POST_SHAPE);
       if ('status' in draft) return c.json({ error: draft.error }, draft.status);
       const answer = written(draft, null, repoOf());
       return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
     }
-    const name = body.copy;
-    if (typeof name !== 'string')
-      return c.json(
-        {
-          error: `${route}: \`copy\` is the name of the skill HKB ships to copy, a string, and this request's was ${JSON.stringify(name)}. Send ${COPY_SHAPE}.`,
-        },
-        400,
-      );
+    if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
     let copied: SkillCopied;
     try {
       copied = copySkill(SHIPPED_SKILLS, library, name);
@@ -519,33 +567,14 @@ export const skills = new Hono()
         },
         400,
       );
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `${route} takes a JSON body: ${PUT_SHAPE}.` }, 400);
-    }
-    if (!isObject(body)) return c.json({ error: `${route} takes a JSON object: ${PUT_SHAPE}.` }, 400);
-    const { version } = body;
-    if (typeof version !== 'string' || !version) {
-      return c.json(
-        {
-          error: `${route} takes the \`version\` the skill was read at, as GET /api/skills/yours/${name} answers it, so a change of a skill that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(version)}.`,
-        },
-        400,
-      );
-    }
-    if (Object.hasOwn(body, 'skill') === Object.hasOwn(body, 'preload')) {
-      return c.json(
-        {
-          error: `${route} takes one of \`skill\` — the whole skill, from its form — and \`preload\` — its switch alone — and this request sent ${Object.hasOwn(body, 'skill') ? 'both' : 'neither'}. Send ${PUT_SHAPE}.`,
-        },
-        400,
-      );
-    }
+    const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, putWords(route, name));
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const { version, skill, preload } = read.body;
+    const one = oneOf(read.body, 'skill', 'preload', skillOrPreload(route));
+    if (one) return c.json({ error: one }, 400);
     let change: SkillChange;
-    if (Object.hasOwn(body, 'skill')) {
-      const draft = skillDraftFrom(body.skill, route, PUT_SHAPE);
+    if (skill) {
+      const draft = skillDraftFrom(skill, route, PUT_SHAPE);
       if ('status' in draft) return c.json({ error: draft.error }, draft.status);
       if (draft.name !== name) {
         return c.json(
@@ -556,13 +585,10 @@ export const skills = new Hono()
         );
       }
       change = draft;
+    } else if (preload !== undefined) {
+      change = { name, preload };
     } else {
-      if (typeof body.preload !== 'boolean')
-        return c.json(
-          { error: `${route}: \`preload\` is true or false, and this request's was ${JSON.stringify(body.preload)}. Send ${PUT_SHAPE}.` },
-          400,
-        );
-      change = { name, preload: body.preload };
+      return c.json({ error: skillOrPreload(route)('neither') }, 400);
     }
     const answer = written(change, version, repoOf());
     return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);

@@ -17,6 +17,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import { Hono, type Context } from 'hono';
 import {
   addToInbox,
@@ -32,9 +33,10 @@ import {
   readInbox,
   type InboxListing,
 } from 'agent-orchestrator';
+import { decodeBody, readBody, valueAt, type BodyIssue } from './body.ts';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, type KeyRow, type WorkflowSource } from './workflows.ts';
+import { folderOf, type KeyRow } from './workflows.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -71,8 +73,6 @@ export type InboxQueueAnswer = {
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /** The inbox as the package lists it, each entry with its body and when its file was written (`InboxEntry`). */
@@ -93,6 +93,30 @@ export function listInbox(): InboxEntry[] {
 
 const FILE_SHAPE =
   '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — and `"repo": "<absolute path>"` for the repository it is about';
+
+/**
+ * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, and `from` says where it is
+ * read from only beside one (`filingOf`).
+ */
+const FILE_BODY = Schema.Struct({
+  body: Schema.String,
+  workflow: Schema.optionalKey(Schema.String.check(Schema.makeFilter((name: string) => name !== '' && !/[\\/]/.test(name)))),
+  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
+  repo: Schema.optionalKey(Schema.String),
+});
+
+/** Why `POST /api/inbox`'s body is not a filing (400), by the first key its schema refused. */
+function fileWords({ path: [key], input }: BodyIssue): string {
+  if (key === 'body')
+    return `\`body\` is the idea, as \`wf inbox add "<idea>"\` takes it: text. This request's was ${JSON.stringify(input) ?? 'left out'}: ${FILE_SHAPE}.`;
+  if (key === 'workflow')
+    return `\`workflow\` names what runs the card, as GET /api/workflows lists a workflow: a folder's name, or left out for a card that says nothing of it. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'from')
+    return `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.`;
+  if (key === 'repo')
+    return `\`repo\` is the repository the idea is about, as \`wf inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(input)}.`;
+  return `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.`;
+}
 
 /** A filing, as the guard's refusals word it. */
 const FILE: Guarded = {
@@ -140,6 +164,9 @@ const queueGuard = (name: string, off: boolean): Guarded =>
         shape: QUEUE_SHAPE,
       };
 
+/** The one JSON body a queue takes: `{}`, an object with no key. */
+const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
+
 /**
  * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the api does
  * not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a `workflow` sent is
@@ -153,12 +180,14 @@ function queueBodyRefusal(route: string, text: string): Refusal | null {
   } catch {
     return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.` };
   }
-  if (isObject(body) && Object.keys(body).length === 0) return null;
-  const named =
-    isObject(body) && 'workflow' in body
-      ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
-      : '';
-  return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}` };
+  const decoded = decodeBody(QUEUE_BODY, body, () => {
+    const named =
+      valueAt(body, ['workflow']) !== undefined
+        ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
+        : '';
+    return `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}`;
+  });
+  return 'status' in decoded ? decoded : null;
 }
 
 /**
@@ -187,37 +216,12 @@ function queueRefusalStatus(name: string): 404 | 409 | 422 {
  * found, absolute, since its name would be looked for where it is not. Whether the idea, the workflow and the repo make a card is the package's
  * to say (`addToInbox`).
  */
-function filingOf(body: unknown, repo: string, home: string): { text: string; workflow?: string; repo?: string } | Refusal {
-  if (!isObject(body)) return { status: 400, error: `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.` };
+function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { text: string; workflow?: string; repo?: string } | Refusal {
   const { body: text, workflow, from, repo: about } = body;
-  if (typeof text !== 'string') {
-    return {
-      status: 400,
-      error: `\`body\` is the idea, as \`wf inbox add "<idea>"\` takes it: text. This request's was ${JSON.stringify(text) ?? 'left out'}: ${FILE_SHAPE}.`,
-    };
-  }
-  if (workflow !== undefined && (typeof workflow !== 'string' || !workflow || /[\\/]/.test(workflow))) {
-    return {
-      status: 400,
-      error: `\`workflow\` names what runs the card, as GET /api/workflows lists a workflow: a folder's name, or left out for a card that says nothing of it. This request's was ${JSON.stringify(workflow)}.`,
-    };
-  }
-  if (from !== undefined && from !== 'repo' && from !== 'yours') {
-    return {
-      status: 400,
-      error: `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.`,
-    };
-  }
   if (from !== undefined && workflow === undefined) {
     return {
       status: 400,
       error: "`from` says where the card's workflow is read from, and this request names no `workflow`. Name one, or leave both out.",
-    };
-  }
-  if (about !== undefined && typeof about !== 'string') {
-    return {
-      status: 400,
-      error: `\`repo\` is the repository the idea is about, as \`wf inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(about)}.`,
     };
   }
   // An absolute path written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start records
@@ -228,7 +232,7 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
     ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
   };
   if (workflow === undefined) return filing;
-  const folder = folderOf(workflow, from as WorkflowSource | undefined, repo, home);
+  const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
   const byName = path.dirname(folder.dir) === path.join(repo, 'workflows') && (filing.repo === undefined || filing.repo === repo);
   return { ...filing, workflow: byName ? workflow : folder.dir };
@@ -287,13 +291,9 @@ export const inbox = new Hono()
   .post('/api/inbox', async (c) => {
     const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.` }, 400);
-    }
-    const asked = filingOf(body, repoOf(), HOME);
+    const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const asked = filingOf(read.body, repoOf(), HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     try {
       const { card, file } = addToInbox({

@@ -278,6 +278,24 @@ test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 4
   assert.deepEqual(inboxAsIs(), before);
 });
 
+test("REFUSED at shipped defaults: a queue's body that is JSON and not `{}` — null, a workflow named null — is a 400 saying what was sent, word for word, and nothing is written", async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Queue me not', workflow: 'dev' });
+  const before = inboxAsIs();
+  const route = `POST /api/inbox/${card.name}/queue`;
+  const takes = `${route} takes no body, or \`{}\`: the card is named in the path, and queued on the workflow it names`;
+  const res = await queue(card.name, JSON_TYPE, 'null');
+  assert.equal(res.status, 400);
+  assert.equal(((await res.json()) as { error: string }).error, `${takes}, and this request sent null.`);
+  const named = await queue(card.name, JSON_TYPE, '{"workflow":null}');
+  assert.equal(named.status, 400);
+  assert.equal(
+    ((await named.json()) as { error: string }).error,
+    `${takes}, and this request sent {"workflow":null}. A card is queued on the workflow it names: file it with one, or queue it with \`wf inbox queue <name> --workflow <w>\`, which writes both.`,
+  );
+  assert.deepEqual(inboxAsIs(), before);
+});
+
 test('REFUSED at shipped defaults: a queue or its taking back another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — is refused before anything is read, and nothing is written', async () => {
   clear();
   const { card } = addToInbox({ text: 'Queue me', workflow: 'dev' });

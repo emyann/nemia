@@ -368,6 +368,60 @@ test("refusals carry the package's words: a key, a value, a name, a name taken, 
   await refused(send('DELETE', '/api/agents/yours/reviewer', {}), 400, /takes the `version` the agent was read at/);
 });
 
+test("REFUSED at shipped defaults: each key of a draft sent as the wrong type is a 400 in the api's words, naming the key and what to send — and nothing is written", async () => {
+  const post = (body: unknown) => send('POST', '/api/agents/yours', body);
+  await refused(post([scribe]), 400, /^POST \/api\/agents\/yours takes a JSON object: `\{ "name": "<agent>"/);
+  await refused(
+    post({ ...scribe, name: 7 }),
+    400,
+    /^POST \/api\/agents\/yours: `name` is the agent's name, a string, and this request's was 7\. Send `\{/,
+  );
+  await refused(post({ ...scribe, description: 7 }), 400, /^POST \/api\/agents\/yours: `description` is a line of text, or null\. Send /);
+  for (const keys of [[], null, 'model: opus'])
+    await refused(
+      post({ ...scribe, keys }),
+      400,
+      /^POST \/api\/agents\/yours: `keys` is an object of the role keys the agent sets\. Send /,
+    );
+  await refused(
+    post({ ...scribe, keys: { model: ['opus'] } }),
+    400,
+    /`keys\.model` is written as a string, as its line in the file is — \["opus"\] is not one\. Send /,
+  );
+  await refused(post({ ...scribe, body: 7 }), 400, /^POST \/api\/agents\/yours: `body` is the agent's instructions, a string\. Send /);
+  for (const schema of ['scribe.schema.json', { file: 'scribe.schema.json' }, { file: 'scribe.schema.json', text: {} }])
+    await refused(
+      post({ ...scribe, schema }),
+      400,
+      /^POST \/api\/agents\/yours: `schema` is the result schema its `output:` names, `\{ "file", "text" \}`, or null\. Send /,
+    );
+
+  const reviewer = (await listed()).find((a) => a.from === 'yours' && a.name === 'reviewer')!;
+  const put = (body: unknown) => send('PUT', '/api/agents/yours/reviewer', { ...scribe, version: reviewer.version, ...(body as object) });
+  await refused(
+    put({ name: 7 }),
+    400,
+    /^PUT \/api\/agents\/yours\/reviewer: `name` is the agent's name, a string, and this request's was 7\. Send /,
+  );
+  await refused(put({ name: 'x.md' }), 400, /^`x\.md` is not an agent's name/);
+  await refused(
+    put({ version: 7 }),
+    400,
+    /^PUT \/api\/agents\/yours\/reviewer takes the `version` the agent was read at[^]*This request's was 7\.$/,
+  );
+  await refused(
+    put({ description: false }),
+    400,
+    /^PUT \/api\/agents\/yours\/reviewer: `description` is a line of text, or null\. Send `\{ "version"/,
+  );
+  await refused(
+    send('DELETE', '/api/agents/yours/reviewer', { version: 7 }),
+    400,
+    /^DELETE \/api\/agents\/yours\/reviewer takes the `version` the agent was read at[^]*This request's was 7\.$/,
+  );
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
+});
+
 test('an agent is listed with what it says it can do: its card, generated from its skills, one entry each, read off its SKILL.md', async () => {
   const reviewer = (await listed()).find((a) => a.from === 'repo' && a.name === 'reviewer')!;
   assert.equal(reviewer.cardError, null);

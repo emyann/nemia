@@ -17,6 +17,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentsFor,
@@ -46,6 +47,7 @@ import {
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
+import { NotBlank, readBody, valueAt, type BodyIssue } from './body.ts';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -369,10 +371,41 @@ export function foldersIn(dir: string): string[] {
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const SHAPE =
   '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
+
+/** Why a start with no card and no brief is not one (422). */
+const NO_BRIEF = `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
+
+/**
+ * `POST /api/runs`'s body, its keys in the order they are refused: a card's name is refused where it is not one, in the package's words
+ * (`inboxNameRefusal`), before its brief is read, and a brief that is no text is refused as a card's (400) or as none (422, `startWords`).
+ */
+const START_BODY = Schema.Struct({
+  workflow: Schema.NonEmptyString,
+  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
+  after: Schema.optionalKey(Schema.Array(NotBlank)),
+  card: Schema.optionalKey(Schema.String.check(Schema.makeFilter((card: string) => inboxNameRefusal(card) === undefined))),
+  brief: Schema.optionalKey(Schema.String),
+});
+
+/** Why `POST /api/runs`'s body is not a start, by the first key its schema refused. */
+function startWords({ path: [key], input }: BodyIssue, body: unknown): string | Refusal {
+  if (key === 'workflow') return `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.`;
+  if (key === 'from')
+    return `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${String(valueAt(body, ['workflow']))}'.`;
+  if (key === 'after')
+    return `\`after\` is the runs this one waits on, by id, as \`wf start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(valueAt(body, ['after']))}. GET /api/runs lists the runs there are.`;
+  if (key === 'card') {
+    return typeof input === 'string'
+      ? (inboxNameRefusal(input) ?? `POST /api/runs takes a JSON object: ${SHAPE}.`)
+      : `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(input)}. GET /api/inbox lists the cards.`;
+  }
+  if (key === 'brief' && valueAt(body, ['card']) !== undefined)
+    return `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'brief') return { status: 422, error: NO_BRIEF };
+  return `POST /api/runs takes a JSON object: ${SHAPE}.`;
+}
 
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
@@ -420,8 +453,8 @@ export type Asked =
   | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
 
 /**
- * What `POST /api/runs` starts, or why it does not: the body's shape (400), the workflow it names (404, 409), and the
- * brief (422) — the api's own, since `start()` takes any string and `wf start` prints its help for none.
+ * What `POST /api/runs` starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
+ * own, since `start()` takes any string and `wf start` prints its help for none. The body's shape (400) is `START_BODY`'s.
  *
  * `after` is only shaped here: a list of run ids, as `wf start --after <runId>` takes each, and never a blank one, which the CLI refuses
  * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
@@ -431,49 +464,14 @@ export type Asked =
  * brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as
  * `wf start <card> --brief ""` is.
  */
-function startOf(body: unknown, repo: string, home: string): Asked | Refusal {
-  if (!isObject(body)) return { status: 400, error: `POST /api/runs takes a JSON object: ${SHAPE}.` };
+function startOf(body: typeof START_BODY.Type, repo: string, home: string): Asked | Refusal {
   const { workflow, brief, from, after, card } = body;
-  if (typeof workflow !== 'string' || !workflow)
-    return { status: 400, error: `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.` };
-  if (from !== undefined && from !== 'repo' && from !== 'yours') {
-    return {
-      status: 400,
-      error: `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${workflow}'.`,
-    };
-  }
-  if (after !== undefined && (!Array.isArray(after) || !after.every((id) => typeof id === 'string' && id.trim() !== ''))) {
-    return {
-      status: 400,
-      error: `\`after\` is the runs this one waits on, by id, as \`wf start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(after)}. GET /api/runs lists the runs there are.`,
-    };
-  }
-  if (card !== undefined) {
-    if (typeof card !== 'string') {
-      return {
-        status: 400,
-        error: `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(card)}. GET /api/inbox lists the cards.`,
-      };
-    }
-    const refused = inboxNameRefusal(card);
-    if (refused) return { status: 400, error: refused };
-    if (brief !== undefined && typeof brief !== 'string') {
-      return {
-        status: 400,
-        error: `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(brief)}.`,
-      };
-    }
-  }
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
-  if (card !== undefined) return { dir: folder.dir, brief: brief as string | undefined, after, card: card as string };
-  if (typeof brief !== 'string' || !brief.trim()) {
-    return {
-      status: 422,
-      error: `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`,
-    };
-  }
-  return { dir: folder.dir, brief: brief.trim(), after };
+  const waits = after && [...after];
+  if (card !== undefined) return { dir: folder.dir, brief, after: waits, card };
+  if (brief === undefined || !brief.trim()) return { status: 422, error: NO_BRIEF };
+  return { dir: folder.dir, brief: brief.trim(), after: waits };
 }
 
 /**
@@ -561,13 +559,9 @@ export const workflows = new Hono()
     const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
     const repo = repoOf();
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST /api/runs takes a JSON body: ${SHAPE}.` }, 400);
-    }
-    const asked = startOf(body, repo, HOME);
+    const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const asked = startOf(read.body, repo, HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     if (asked.card !== undefined) {
       try {

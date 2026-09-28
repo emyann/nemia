@@ -2,17 +2,26 @@
  * A person's asks of a run, for the board: another try of a step, another round of a loop, words for a running session, an approval at a
  * gate and an acceptance of a loop out of rounds — five writes, each through the package's own verb and guarded as a start is (guard.ts).
  */
+import { Schema } from 'effect';
 import { Hono } from 'hono';
 import { accept, approve, budgetRefusal, messageRefusal, retry, type RetryHow, round, type Said, say } from 'agent-orchestrator';
 import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-orchestrator/run';
+import { NotBlank, readBody, type BodyIssue } from './body.ts';
 import { type Guarded, type Refusal, refusedBeforeReading } from './guard.ts';
 import { e, findRun, noSuchRun, taskOfStep } from './store.ts';
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
 const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount> }`';
+const RETRY_BODY = Schema.Struct({
+  mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
+  model: Schema.optionalKey(NotBlank),
+  message: Schema.optionalKey(Schema.String),
+  budget: Schema.optionalKey(Schema.Number),
+});
 
 /** The body `POST …/round` takes: `wf round`'s arguments, as JSON. */
 const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
+const ROUND_BODY = Schema.Struct({ step: Schema.optionalKey(NotBlank), budget: Schema.optionalKey(Schema.Number) });
 
 /** An ask for another round of a run's loop, as the guard's refusals word it (guard.ts). */
 const roundGuard = (id: string): Guarded => ({
@@ -38,6 +47,7 @@ const retryGuard = (id: string, step: string): Guarded => ({
 
 /** The body `POST …/approve` takes: `wf approve`'s `--message`, as JSON. */
 const APPROVE_SHAPE = '`{ "message"?: "<words>" }`';
+const APPROVE_BODY = Schema.Struct({ message: Schema.optionalKey(Schema.String) });
 
 /** An approval of a step waiting at its gate, as the guard's refusals word it (guard.ts). */
 const approveGuard = (id: string, step: string): Guarded => ({
@@ -52,6 +62,8 @@ const approveGuard = (id: string, step: string): Guarded => ({
 
 /** The body `POST …/accept` takes: `wf accept`'s `--message`, as JSON — required, as the command line requires it. */
 const ACCEPT_SHAPE = '`{ "message": "<why>" }`';
+/** Its words are required as `acceptWordsRefusal` says, in the package's words: the schema types them only. */
+const ACCEPT_BODY = Schema.Struct({ message: Schema.optionalKey(Schema.String) });
 
 /** An acceptance of a loop out of rounds, as the guard's refusals word it (guard.ts). */
 const acceptGuard = (id: string, step: string): Guarded => ({
@@ -64,10 +76,9 @@ const acceptGuard = (id: string, step: string): Guarded => ({
   shape: ACCEPT_SHAPE,
 });
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /** The body `POST …/say` takes: the words, as `wf say` takes them. */
 const SAY_SHAPE = '`{ "text": "<words>" }`';
+const SAY_BODY = Schema.Struct({ text: Schema.String });
 
 /** Words for a step's running session, as the guard's refusals word them (guard.ts). */
 const sayGuard = (id: string, step: string): Guarded => ({
@@ -81,82 +92,55 @@ const sayGuard = (id: string, step: string): Guarded => ({
 });
 
 /**
- * Why a `budget` in a body is not a number (400), in the api's words, or null: the package's `--budget` is typed as digits, and has no words
- * for JSON. A number not above zero is the package's to refuse.
+ * Why a `budget` in a body is not a number, in the api's words: the package's `--budget` is typed as digits, and has no words for JSON. A
+ * number not above zero is the package's to refuse.
  */
-function budgetTypeRefusal(budget: unknown, as: string, shape: string): Refusal | null {
-  if (budget === undefined || typeof budget === 'number') return null;
-  return {
-    status: 400,
-    error: `\`budget\` is the cap to raise to, as \`${as} --budget <amount>\` takes it: dollars, as a JSON number above zero, like 5 or 2.50. This request's was ${JSON.stringify(budget)}: ${shape}.`,
-  };
-}
+const budgetWords = (budget: unknown, as: string, shape: string): string =>
+  `\`budget\` is the cap to raise to, as \`${as} --budget <amount>\` takes it: dollars, as a JSON number above zero, like 5 or 2.50. This request's was ${JSON.stringify(budget)}: ${shape}.`;
+
+/** Why `POST …/retry`'s body is not an ask (400), by the first key its schema refused. */
+const retryWords = ({ path: [key], input }: BodyIssue): string => {
+  if (key === 'mode')
+    return `\`mode\` is how to try the step again, as \`wf retry\` takes it: "nudge" continues its session, told what happened; "fresh" starts a new session on its branch; "recheck" runs its check again and files no session. This request's was ${JSON.stringify(input) ?? 'left out'}: ${RETRY_SHAPE}.`;
+  if (key === 'model')
+    return `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does: a name, or left out for the step's own. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'message')
+    return `\`message\` is what to tell the step, as \`wf retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}.`;
+  if (key === 'budget') return budgetWords(input, 'wf retry', RETRY_SHAPE);
+  return `POST …/retry takes a JSON object: ${RETRY_SHAPE}.`;
+};
 
 /**
- * How a try is asked for, off `POST …/retry`'s body — or why the body is not an ask (400): `wf retry`'s one way, the model its
- * `--model` names, which is a new session's, `--message`, and `--budget`, the cap a step over its budget is raised to — a JSON number above
- * zero, one that is not refused in the package's words (`budgetRefusal`). Whether the message and the budget may ride on the ask is the
- * package's to say (`messageRefusal`, `budgetRefusal`), and whether the step may be tried again that way, with that cap (`retryRefusal`).
+ * How a try is asked for, off `POST …/retry`'s decoded body — or why it is not an ask (400): `wf retry`'s one way, the model its `--model`
+ * names, which is a new session's, `--message`, and `--budget`, the cap a step over its budget is raised to — a JSON number above zero, one
+ * that is not refused in the package's words (`budgetRefusal`). Whether the message and the budget may ride on the ask is the package's to
+ * say (`messageRefusal`, `budgetRefusal`), and whether the step may be tried again that way, with that cap (`retryRefusal`).
  */
-function howOf(body: unknown, command: string): RetryHow | Refusal {
-  if (!isObject(body)) return { status: 400, error: `POST …/retry takes a JSON object: ${RETRY_SHAPE}.` };
-  const { mode, model, message, budget } = body;
-  if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') {
+function howOf(how: RetryHow, command: string): RetryHow | Refusal {
+  if (how.model !== undefined && how.mode !== 'fresh') {
     return {
       status: 400,
-      error: `\`mode\` is how to try the step again, as \`wf retry\` takes it: "nudge" continues its session, told what happened; "fresh" starts a new session on its branch; "recheck" runs its check again and files no session. This request's was ${JSON.stringify(mode) ?? 'left out'}: ${RETRY_SHAPE}.`,
+      error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
     };
   }
-  if (model !== undefined && (typeof model !== 'string' || !model.trim())) {
-    return {
-      status: 400,
-      error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does: a name, or left out for the step's own. This request's was ${JSON.stringify(model)}.`,
-    };
-  }
-  if (model !== undefined && mode !== 'fresh') {
-    return {
-      status: 400,
-      error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${mode}".`,
-    };
-  }
-  if (message !== undefined && typeof message !== 'string') {
-    return {
-      status: 400,
-      error: `\`message\` is what to tell the step, as \`wf retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(message)}.`,
-    };
-  }
-  const typed = budgetTypeRefusal(budget, 'wf retry', RETRY_SHAPE);
-  if (typed) return typed;
-  const how: RetryHow = {
-    mode,
-    ...(model !== undefined ? { model } : {}),
-    ...(message !== undefined ? { message } : {}),
-    ...(budget !== undefined ? { budget: budget as number } : {}),
-  };
   // Not above zero: not an amount, as `wf retry --budget` refuses one, in the package's words.
   if (how.budget !== undefined && !(how.budget > 0)) return { status: 400, error: budgetRefusal(how, command)! };
   return how;
 }
 
 /**
- * What a round is asked for with, off `POST …/round`'s body — or why the body is not an ask (400): the looping step, which `wf round` takes
- * when the run has more than one loop, and `--budget`, the cap each step of the loop over its budget is raised to. Whether the loop may go
- * round, with that cap, is the package's to say (`roundAsk`, through `round()`).
+ * Why `POST …/round`'s body is not an ask (400), by the first key its schema refused: the looping step, which `wf round` takes when the run
+ * has more than one loop, and `--budget`, the cap each step of the loop over its budget is raised to. Whether the loop may go round, with
+ * that cap, is the package's to say (`roundAsk`, through `round()`) — a number not above zero included, before anything of the run is decided.
  */
-function roundHowOf(body: unknown, id: string): { step?: string; budget?: number } | Refusal {
-  if (!isObject(body)) return { status: 400, error: `POST …/round takes a JSON object: ${ROUND_SHAPE}.` };
-  const { step, budget } = body;
-  if (step !== undefined && (typeof step !== 'string' || !step.trim())) {
-    return {
-      status: 400,
-      error: `\`step\` names the looping step whose loop goes round again, as \`wf round ${id} <step>\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(step)}: ${ROUND_SHAPE}.`,
-    };
-  }
-  // A number not above zero is refused by `round()`, in the package's words, before anything of the run is decided (`roundAsk`).
-  const typed = budgetTypeRefusal(budget, `wf round ${id}`, ROUND_SHAPE);
-  if (typed) return typed;
-  return { ...(step !== undefined ? { step } : {}), ...(budget !== undefined ? { budget: budget as number } : {}) };
-}
+const roundWords =
+  (id: string) =>
+  ({ path: [key], input }: BodyIssue): string => {
+    if (key === 'step')
+      return `\`step\` names the looping step whose loop goes round again, as \`wf round ${id} <step>\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${ROUND_SHAPE}.`;
+    if (key === 'budget') return budgetWords(input, `wf round ${id}`, ROUND_SHAPE);
+    return `POST …/round takes a JSON object: ${ROUND_SHAPE}.`;
+  };
 
 export const asks = new Hono()
   // The board's second write: a person's ask for another try of a step — the answer to a step that signed off blocked, a nudge, a
@@ -177,13 +161,9 @@ export const asks = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const found = taskOfStep(id, step);
     if ('error' in found) return c.json({ error: found.error }, 404);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/retry takes a JSON body: ${RETRY_SHAPE}.` }, 400);
-    }
-    const how = howOf(body, `wf retry ${id} ${step}`);
+    const read = await readBody(c.req, RETRY_BODY, `POST …/retry takes a JSON body: ${RETRY_SHAPE}.`, retryWords);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const how = howOf(read.body, `wf retry ${id} ${step}`);
     if ('status' in how) return c.json({ error: how.error }, how.status);
     // A budget on a recheck, which files no session to spend it, is the package's to refuse before the run is read, as a message on one is.
     const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
@@ -218,14 +198,9 @@ export const asks = new Hono()
     );
     if (refused) return c.json({ error: refused.error }, refused.status);
     if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/round takes a JSON body: ${ROUND_SHAPE}.` }, 400);
-    }
-    const how = roundHowOf(body, id);
-    if ('status' in how) return c.json({ error: how.error }, how.status);
+    const read = await readBody(c.req, ROUND_BODY, `POST …/round takes a JSON body: ${ROUND_SHAPE}.`, roundWords(id));
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const how = read.body;
     if (how.step !== undefined) {
       const found = taskOfStep(id, how.step);
       if ('error' in found) return c.json({ error: found.error }, 404);
@@ -262,23 +237,14 @@ export const asks = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const found = taskOfStep(id, step);
     if ('error' in found) return c.json({ error: found.error }, 404);
-    let body: unknown;
+    const read = await readBody(c.req, SAY_BODY, `POST …/say takes a JSON body: ${SAY_SHAPE}.`, ({ path: [key], input }) =>
+      key === 'text'
+        ? `\`text\` is the words to hand the step's session, as \`wf say ${id} ${step} "<words>"\` takes them: text. This request's was ${JSON.stringify(input) ?? 'left out'}: ${SAY_SHAPE}.`
+        : `POST …/say takes a JSON object: ${SAY_SHAPE}.`,
+    );
+    if ('status' in read) return c.json({ error: read.error }, read.status);
     try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/say takes a JSON body: ${SAY_SHAPE}.` }, 400);
-    }
-    if (!isObject(body)) return c.json({ error: `POST …/say takes a JSON object: ${SAY_SHAPE}.` }, 400);
-    if (typeof body.text !== 'string') {
-      return c.json(
-        {
-          error: `\`text\` is the words to hand the step's session, as \`wf say ${id} ${step} "<words>"\` takes them: text. This request's was ${JSON.stringify(body.text) ?? 'left out'}: ${SAY_SHAPE}.`,
-        },
-        400,
-      );
-    }
-    try {
-      const { said } = await say(e, id, step, body.text);
+      const { said } = await say(e, id, step, read.body.text);
       // Accepted: the session's harness took the words, and the engine journalled them. Whether the session reads them is the session's.
       return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
     } catch (err) {
@@ -303,22 +269,13 @@ export const asks = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const found = taskOfStep(id, step);
     if ('error' in found) return c.json({ error: found.error }, 404);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/approve takes a JSON body: ${APPROVE_SHAPE}.` }, 400);
-    }
-    if (!isObject(body)) return c.json({ error: `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.` }, 400);
-    const { message } = body;
-    if (message !== undefined && typeof message !== 'string') {
-      return c.json(
-        {
-          error: `\`message\` is the words to approve with, which every step after the gate is handed, as \`wf approve ${id} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(message)}: ${APPROVE_SHAPE}.`,
-        },
-        400,
-      );
-    }
+    const read = await readBody(c.req, APPROVE_BODY, `POST …/approve takes a JSON body: ${APPROVE_SHAPE}.`, ({ path: [key], input }) =>
+      key === 'message'
+        ? `\`message\` is the words to approve with, which every step after the gate is handed, as \`wf approve ${id} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`
+        : `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.`,
+    );
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const { message } = read.body;
     const empty = approvalWordsRefusal(message, `wf approve ${id} ${step}`);
     if (empty) return c.json({ error: empty }, 422);
     try {
@@ -351,22 +308,13 @@ export const asks = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const found = taskOfStep(id, step);
     if ('error' in found) return c.json({ error: found.error }, 404);
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: `POST …/accept takes a JSON body: ${ACCEPT_SHAPE}.` }, 400);
-    }
-    if (!isObject(body)) return c.json({ error: `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.` }, 400);
-    const { message } = body;
-    if (message !== undefined && typeof message !== 'string') {
-      return c.json(
-        {
-          error: `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`wf accept ${id} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(message)}: ${ACCEPT_SHAPE}.`,
-        },
-        400,
-      );
-    }
+    const read = await readBody(c.req, ACCEPT_BODY, `POST …/accept takes a JSON body: ${ACCEPT_SHAPE}.`, ({ path: [key], input }) =>
+      key === 'message'
+        ? `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`wf accept ${id} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(input)}: ${ACCEPT_SHAPE}.`
+        : `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.`,
+    );
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const { message } = read.body;
     const words = acceptWordsRefusal(message, `wf accept ${id} ${step}`);
     if (words) return c.json({ error: words }, 422);
     try {

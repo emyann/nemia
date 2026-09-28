@@ -531,6 +531,12 @@ test("REFUSED at shipped defaults: a round's budget not above zero, or a word, i
     const res = await askRound(body);
     assert.equal(res.status, 400, JSON.stringify(body));
   }
+  const named = await askRound({ step: 42 });
+  assert.ok(
+    ((await named.json()) as Refused).error.startsWith(
+      `\`step\` names the looping step whose loop goes round again, as \`wf round ${R} <step>\` does: a name, or left out for a run with one loop. This request's was 42: \``,
+    ),
+  );
 
   const refusals: Array<[string | undefined, number | undefined, string]> = [
     ['review', 2, '--budget 2 is not above $2.10, what implement has cost'],

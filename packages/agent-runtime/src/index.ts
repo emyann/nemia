@@ -54,21 +54,21 @@ export type {
   TranscriptCursor,
   TranscriptEvent,
 } from './runner.ts';
-export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness-args.ts';
-export type { HarnessArgs } from './harness-args.ts';
-export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
-export { detachedOps, STALE_MS } from './runner-detached.ts';
-export type { HarnessSpec } from './runner-detached.ts';
+export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/args.ts';
+export type { HarnessArgs } from './harness/args.ts';
+export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
+export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
+export type { HarnessSpec } from './harness/detached/detached.ts';
 export { remoteOps } from './a2a-remote.ts';
 export type { Credentials, RemoteAgent } from './a2a-remote.ts';
-export { codex } from './runner-codex.ts';
+export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 export { composite } from './runner-composite.ts';
-export { sdkRunner } from './runner-sdk.ts';
+export { sdkRunner } from './harness/sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/domain.ts';
 export type { SessionState, Ended, Outcome } from './core/session.ts';
 export { denialText, fold, nameFor } from './core/domain.ts';
-export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';

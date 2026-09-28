@@ -28,10 +28,10 @@ process.env.CLAUDE_CONFIG_DIR = config;
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
 const { claudeOps } = await import('../src/runner.ts');
-const { claudeTranscriptEvents } = await import('../src/runner-claude-transcript.ts');
-const { detachedOps } = await import('../src/runner-detached.ts');
-const { codex } = await import('../src/runner-codex.ts');
-const { codexRolloutEvents } = await import('../src/runner-codex-transcript.ts');
+const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
+const { detachedOps } = await import('../src/harness/detached/detached.ts');
+const { codex } = await import('../src/harness/codex/codex.ts');
+const { codexRolloutEvents } = await import('../src/harness/codex/transcript.ts');
 const { claudeDetached } = await import('../src/runner-claude-detached.ts');
 
 /** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns are. */

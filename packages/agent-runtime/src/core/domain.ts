@@ -17,12 +17,12 @@
  *
  * Why there are no leases here: for a harness that keeps its own registry, the session is owned by
  * the harness and outlives us, so "is it still running" is a question we ASK. For one that does
- * not, `runner-detached.ts` keeps the registry and a heartbeat, and answers the same question with
+ * not, `harness/detached/detached.ts` keeps the registry and a heartbeat, and answers the same question with
  * the same word. Either way the answer arrives as a `SessionState` — A2A's word for a task's state — and nothing in this
  * file can tell which kind of harness produced it.
  */
 
-import type { HarnessArgs } from '../harness-args.ts';
+import type { HarnessArgs } from '../harness/args.ts';
 import { transition, type LifecycleEvent, type LifecycleState, type Move, type Refusal } from './lifecycle.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Ended, type Outcome, type SessionState } from './session.ts';
 
@@ -331,7 +331,7 @@ export type Said = { at: string; attempt: number; text: string };
 
 /**
  * A person's answer to a task held open, and what the turn it starts gives its configuration for itself when they gave any
- * (`TURN_ARGS` in `harness-args.ts`: its spend cap), over the task's own. Carried whole, never opened here. See the `input` event.
+ * (`TURN_ARGS` in `harness/args.ts`: its spend cap), over the task's own. Carried whole, never opened here. See the `input` event.
  */
 export type Input = { at: string; text: string; config?: HarnessArgs };
 

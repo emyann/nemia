@@ -2,7 +2,7 @@
  * The runtime's core never opens a task's harness arguments.
  *
  * `domain.ts` decides, `lifecycle.ts` holds the edges it decides by, and `engine.ts` applies; how a session is started — its model, its tools, its window — is the
- * adapter's, carried on the task as one `config` (`src/harness-args.ts`) and handed to the runner at spawn and release.
+ * adapter's, carried on the task as one `config` (`src/harness/args.ts`) and handed to the runner at spawn and release.
  * A read of one in the core is the second workload leaking in: the day `decide` branches on a model, the engine knows
  * about a harness. So this reads the three files' code, comments left out, and refuses a harness argument named there,
  * and `config` opened — by a member, an index, a destructuring, a spread, `in` or an `Object.*` walk. Passing it on whole
@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { HARNESS_ARGS } from '../src/harness-args.ts';
+import { HARNESS_ARGS } from '../src/harness/args.ts';
 
 const CORE = [
   'src/core/session.ts',
@@ -84,7 +84,7 @@ test('engine.ts hands the whole config to every spawn, so a runner is given what
   assert.match(
     code,
     /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s,
-    "a turn's own config (an answer's) is laid over the task's by `configForTurn`, in `harness-args.ts`, never in engine.ts",
+    "a turn's own config (an answer's) is laid over the task's by `configForTurn`, in `harness/args.ts`, never in engine.ts",
   );
   assert.match(code, /runner\s*\.release\(\s*session,\s*state\.config\b/);
 });

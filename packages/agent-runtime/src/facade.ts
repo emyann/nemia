@@ -15,15 +15,15 @@ import path from 'node:path';
 import os from 'node:os';
 import { fold, nameFor, type Event, type Input, type Said, type Sighting, type State } from './core/domain.ts';
 import { isLive, phaseWordOf, waitsOnPerson } from './core/session.ts';
-import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness/args.ts';
 import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './core/engine/journal.ts';
 import { claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
-import { claudeSayRefuses } from './runner-claude-inbox.ts';
-import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './runner-claude-vocabulary.ts';
-import { claudeCodeOps, isClaudeJob } from './runner-claude-code.ts';
-import { isTranscriptCursor, noTranscript } from './runner-transcript.ts';
-import { detachedOps, type HarnessSpec } from './runner-detached.ts';
-import { codex } from './runner-codex.ts';
+import { claudeSayRefuses } from './harness/claude/inbox.ts';
+import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from './harness/claude/vocabulary.ts';
+import { claudeCodeOps, isClaudeJob } from './harness/claude/code.ts';
+import { isTranscriptCursor, noTranscript } from './harness/transcript.ts';
+import { detachedOps, type HarnessSpec } from './harness/detached/detached.ts';
+import { codex } from './harness/codex/codex.ts';
 import { claudeDetached } from './runner-claude-detached.ts';
 import { composite } from './runner-composite.ts';
 import { a2aOps, type SeamOps } from './a2a-client.ts';
@@ -888,12 +888,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
 }
 
 export type { PromiseRunner, PromiseSighting } from './runner-promise.ts';
-export { codex } from './runner-codex.ts';
+export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './runner-claude-detached.ts';
 /** The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to. */
-export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';
-export type { HarnessSpec } from './runner-detached.ts';
+export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
+export type { HarnessSpec } from './harness/detached/detached.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.ts';
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
 export { remoteConfigRefusal } from './a2a-remote.ts';
@@ -902,8 +902,8 @@ export { refusedText } from './core/engine/engine.ts';
 export { retiredKeyRefusal } from './core/engine/filing.ts';
 export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
 export type { SessionState, Ended, Outcome } from './core/session.ts';
-export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
-export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
+export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness/args.ts';
+export type { ClaudeFlags } from './harness/claude/vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/journal.ts';
 export type { IoCounts } from './core/engine/tally.ts';

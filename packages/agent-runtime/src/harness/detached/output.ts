@@ -3,8 +3,8 @@
  * one result, and `claude -p`'s stream of events — its closeout, what it consumed and cost, whether it spent its budget,
  * and what it was denied. Pure functions of the text.
  */
-import type { Denial, Usage } from './core/domain.ts';
-import type { HarnessOutput } from './runner-detached.ts';
+import type { Denial, Usage } from '../../core/domain.ts';
+import type { HarnessOutput } from './detached.ts';
 
 /**
  * The item types a Codex `exec --json` stream carries: two that are tool calls and one that is said.

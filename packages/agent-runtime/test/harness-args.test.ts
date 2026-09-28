@@ -1,5 +1,5 @@
 /**
- * The checks every harness shares of a task's `config`, in their own file (`src/harness-args.ts`), and asked through the
+ * The checks every harness shares of a task's `config`, in their own file (`src/harness/args.ts`), and asked through the
  * `Runner` — each made to refuse, at shipped defaults.
  *
  * `test/refusal.test.ts` holds their words at both doors. A harness argument filed beside `config` is refused naming where
@@ -9,10 +9,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { argsRefusalOf, configForTurn, HARNESS_ARGS, TURN_ARGS, turnArgsRefusalOf, type HarnessArgs } from '../src/harness-args.ts';
+import { argsRefusalOf, configForTurn, HARNESS_ARGS, TURN_ARGS, turnArgsRefusalOf, type HarnessArgs } from '../src/harness/args.ts';
 import { Runner, testOps, type RunnerOps } from '../src/runner.ts';
 import { composite } from '../src/runner-composite.ts';
-import { sdkRunner } from '../src/runner-sdk.ts';
+import { sdkRunner } from '../src/harness/sdk.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { file, type Filing } from '../src/core/engine/filing.ts';
 

@@ -16,9 +16,9 @@
  *
  * Claude Code's `--bg` runner (`claudeOps`) stays here, beside the seam: `Runner.claude` needs it as a value, and it
  * builds `RunnerError`, so in a file of its own the two would import each other. What it reads and writes lives beside
- * this file, each in its own: the transcript reader (`runner-transcript.ts`), a Claude session's transcript and usage
- * (`runner-claude-transcript.ts`), Claude Code's vocabulary (`runner-claude-vocabulary.ts`), its inbox
- * (`runner-claude-inbox.ts`), and MCP (`runner-mcp.ts`).
+ * this file, each in its own: the transcript reader (`harness/transcript.ts`), a Claude session's transcript and usage
+ * (`harness/claude/transcript.ts`), Claude Code's vocabulary (`harness/claude/vocabulary.ts`), its inbox
+ * (`harness/claude/inbox.ts`), and MCP (`harness/mcp.ts`).
  */
 import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
@@ -27,18 +27,18 @@ import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionState } from './core/session.ts';
 import type { Sighting, Usage } from './core/domain.ts';
-import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
+import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './harness/claude/inbox.ts';
 import {
   claudeTranscriptEvents,
   lastStructuredOutput,
   renderTranscript,
   transcriptFile,
   transcriptUsage,
-} from './runner-claude-transcript.ts';
-import { claudeFlagsOf, worktreeName } from './runner-claude-vocabulary.ts';
-import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
-import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './runner-mcp.ts';
-import { readTranscript } from './runner-transcript.ts';
+} from './harness/claude/transcript.ts';
+import { claudeFlagsOf, worktreeName } from './harness/claude/vocabulary.ts';
+import { argsRefusalOf, type HarnessArgs } from './harness/args.ts';
+import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from './harness/mcp.ts';
+import { readTranscript } from './harness/transcript.ts';
 import { countSpawn, readTextAsync } from './core/engine/tally.ts';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {

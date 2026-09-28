@@ -20,7 +20,7 @@ import { decide, fold, nameFor, observe, type Action, type Sighting } from '../s
 import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type SessionState } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/runner.ts';
-import { detachedStateOf } from '../src/runner-detached.ts';
+import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { promiseOps } from '../src/runner-promise.ts';
 import { createEngine, type PromiseRunner } from '../src/facade.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';

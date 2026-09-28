@@ -20,7 +20,7 @@ import {
   StoredFeedEntrySchema,
   type StoredEvent,
 } from '../event-schema.ts';
-import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness-args.ts';
+import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead, readText } from './tally.ts';
 
 /**
@@ -152,7 +152,7 @@ const argsOf = (config: Record<string, unknown>): HarnessArgs =>
  * The former shapes a journal an older runtime wrote may carry, and what each is read as:
  *
  * - A `filed` event with any of the harness's arguments (`HARNESS_ARGS`) at its top level, beside the task's own fields:
- *   they are moved under `config` (`harness-args.ts`), where a value already there is kept, since `config` is the newer
+ *   they are moved under `config` (`harness/args.ts`), where a value already there is kept, since `config` is the newer
  *   word. So `fold` reads one shape, and a store holding tasks filed in both shapes lists them alike.
  * - The spend cap as the runtime's own field, `budgetUsd`: on a `filed` event it is lifted as above, being one of the
  *   harness's arguments; on an `input` it is moved under that turn's `config`.

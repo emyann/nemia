@@ -3,11 +3,11 @@
  * the spec of `claude-detached`, the harness whose output is one JSON object at its exit.
  */
 import type { SpawnRequest } from './runner.ts';
-import type { HarnessIO, HarnessSpec } from './runner-detached.ts';
-import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeFlagsOf, claudePrintRefuses, worktreeName } from './runner-claude-vocabulary.ts';
-import { claudeResultOutput } from './runner-detached-output.ts';
-import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
+import type { HarnessIO, HarnessSpec } from './harness/detached/detached.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile } from './harness/claude/transcript.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeFlagsOf, claudePrintRefuses, worktreeName } from './harness/claude/vocabulary.ts';
+import { claudeResultOutput } from './harness/detached/output.ts';
+import { checkoutMcpConfig, claudeMcpArgs } from './harness/mcp.ts';
 
 /**
  * The arguments `claude -p` is given, whichever of the engine's specs runs it, given how its output is to be printed: the

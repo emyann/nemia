@@ -1,12 +1,12 @@
 /**
  * A Codex thread's rollout, read: where it is, and its records as events — the counterpart of
- * `runner-claude-transcript.ts`, for the `codex` spec (`runner-codex.ts`).
+ * `harness/claude/transcript.ts`, for the `codex` spec (`harness/codex/codex.ts`).
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { TranscriptEvent } from './runner.ts';
-import { isoTime } from './runner-transcript.ts';
+import type { TranscriptEvent } from '../../runner.ts';
+import { isoTime } from '../transcript.ts';
 
 const rollouts = new Map<string, string>();
 

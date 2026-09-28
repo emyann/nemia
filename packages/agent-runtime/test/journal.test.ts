@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Journal, type JournalError } from '../src/core/engine/journal.ts';
 import type { Event, Usage } from '../src/core/domain.ts';
 import { HarnessArgsSchema, type StoredEvent } from '../src/core/event-schema.ts';
-import type { HarnessArgs } from '../src/harness-args.ts';
+import type { HarnessArgs } from '../src/harness/args.ts';
 import { scratch } from './scratch.ts';
 
 const root = () => scratch('ae-journal-');

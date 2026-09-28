@@ -42,7 +42,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `background`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness-args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -285,7 +285,7 @@ tags are identity-based, and two copies in one tree do not see each other's serv
 who never imports Effect can never have that problem.
 
 Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — `refusalOf` in
-`src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness-args.ts` for the checks every harness shares
+`src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness/args.ts` for the checks every harness shares
 of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built with `Runner.of`
 alone is no way round them; `test/refusal.test.ts` holds both doors to both — and fails
 with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
@@ -319,7 +319,7 @@ Three are wired:
 **Why two mechanisms and not one.** Claude Code keeps a registry of background sessions and will
 answer questions about them from any process. Codex has no such thing: `codex exec` runs in the
 foreground and exits. So for Codex we detach a worker per session and keep the registry ourselves
-(`bin/ae-worker.ts` writes it, `src/runner-detached.ts` reads it).
+(`bin/ae-worker.ts` writes it, `src/harness/detached/detached.ts` reads it).
 
 That costs exactly one thing: **a heartbeat**. A worker that gets killed leaves a run file saying
 `working` forever, and nothing on disk tells that apart from a session thinking hard. So the worker
@@ -788,7 +788,7 @@ and `tty`: whether anything may attach to the workload, declared on the workload
 | a `PromiseRunner` | asked nothing: handed `claude.remoteControl` on the spawn, to honour or not |
 
 **It was a harness argument of its own until 2026-09-25**, `config.remoteControl`. That place is refused at both doors, at any
-value, `false` included, at the top level too, naming the new one (`FORMER_ARGS` in `src/harness-args.ts`), and a journal
+value, `false` included, at the top level too, naming the new one (`FORMER_ARGS` in `src/harness/args.ts`), and a journal
 filed before reads as filed under `claude` (`upgrade` in `src/core/engine/journal.ts`): `true` as the flag, first in the bag, and `false`,
 which asked for nothing, dropped. Nothing on disk is rewritten. The argv did not move: `packages/agent-orchestrator/test/argv.test.ts`
 pins what the shipped supervisor and dev's implement are spawned with, recorded before the move.
@@ -1694,22 +1694,22 @@ selector, and it is why no attempt can ever run twice.
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
-| `src/harness-args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
+| `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
 | `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — and Claude Code's `--bg` runner, which stays beside it: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so apart the two files would import each other |
-| `src/runner-transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
-| `src/runner-claude-transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
-| `src/runner-claude-vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
-| `src/runner-claude-inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
-| `src/runner-mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
-| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
-| `src/runner-codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
-| `src/runner-codex-transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
-| `src/runner-detached-output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
+| `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
+| `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
+| `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
+| `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
+| `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
+| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
+| `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
+| `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
+| `src/harness/detached/output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
 | `src/runner-claude-detached.ts` | Claude Code run as `claude -p`, detached by us: its spec |
-| `src/runner-claude-code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape |
+| `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
-| `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
+| `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/runner-promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/a2a-map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a-handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |

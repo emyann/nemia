@@ -23,7 +23,7 @@ import {
 } from '../domain.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
-import { configForTurn } from '../../harness-args.ts';
+import { configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession } from '../../runner.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
@@ -173,7 +173,7 @@ export const step = Effect.fn('step')(function* (taskId: string, observed: Reado
  *    attempt continues and what it is told are facts on the record, never re-derived later.
  * 2. `spawn` asks the runner for the session, with what it continues and what it is told read off the journal rather than
  *    recomputed: the decision was made when the attempt was started, possibly by an engine that has since died. The harness's
- *    arguments are handed on unopened, the runner's to read (`harness-args.ts`): an answer may give its turn its own, laid
+ *    arguments are handed on unopened, the runner's to read (`harness/args.ts`): an answer may give its turn its own, laid
  *    over the filing's without being read (`configForTurn`), and a task never answered has the filing's. A spawn that fails
  *    is answered by what the harness can vouch for:
  *    - `refused`, nothing started: the attempt ends `failed`, `unstartable`, in the harness's words, through the lifecycle's

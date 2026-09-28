@@ -14,19 +14,19 @@
  *
  * What it buys: this file has no idea what a harness is. It needs a command, a working directory
  * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The two shipped are
- * `codex` (`runner-codex.ts`) and `claudeDetached` (`runner-claude-detached.ts`).
+ * `codex` (`harness/codex/codex.ts`) and `claudeDetached` (`runner-claude-detached.ts`).
  */
 import { Effect, Result, Schema, SchemaIssue } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Denial, Sighting, Usage } from './core/domain.ts';
-import type { SessionState } from './core/session.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from './runner.ts';
-import { writeMcpConfig } from './runner-mcp.ts';
-import { readTranscript } from './runner-transcript.ts';
-import { countSpawn, readText } from './core/engine/tally.ts';
+import type { Denial, Sighting, Usage } from '../../core/domain.ts';
+import type { SessionState } from '../../core/session.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../../runner.ts';
+import { writeMcpConfig } from '../mcp.ts';
+import { readTranscript } from '../transcript.ts';
+import { countSpawn, readText } from '../../core/engine/tally.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -149,7 +149,7 @@ export type HarnessOutput = {
 export const STALE_MS = 30_000;
 
 /** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
-export const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
+export const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
 const isDirectory = (p: string) => {
   try {

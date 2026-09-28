@@ -7,8 +7,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { transcriptUsage } from '../src/runner-claude-transcript.ts';
-import { codexOutput } from '../src/runner-detached-output.ts';
+import { transcriptUsage } from '../src/harness/claude/transcript.ts';
+import { codexOutput } from '../src/harness/detached/output.ts';
 import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/core/domain.ts';
 

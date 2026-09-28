@@ -58,9 +58,9 @@ import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a-client.ts';
-import { codex } from '../src/runner-codex.ts';
-import { codexRolloutFile } from '../src/runner-codex-transcript.ts';
-import { detachedOps } from '../src/runner-detached.ts';
+import { codex } from '../src/harness/codex/codex.ts';
+import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
+import { detachedOps } from '../src/harness/detached/detached.ts';
 import { scratch } from './scratch.ts';
 
 const live = process.env.AE_LIVE === '1';

@@ -66,7 +66,7 @@
       "files": [
         "packages/agent-runtime/src/core/event-schema.ts",
         "packages/agent-runtime/src/core/engine/journal.ts",
-        "packages/agent-runtime/src/runner-detached.ts",
+        "packages/agent-runtime/src/harness/detached/detached.ts",
         "packages/agent-orchestrator/src/store.ts",
         "packages/agent-orchestrator/src/daemon-store.ts",
         "packages/agent-orchestrator/src/inbox-store.ts",

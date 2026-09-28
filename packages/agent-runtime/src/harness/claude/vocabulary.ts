@@ -3,7 +3,7 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
-import type { SpawnRequest } from './runner.ts';
+import type { SpawnRequest } from '../../runner.ts';
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that

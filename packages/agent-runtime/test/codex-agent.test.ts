@@ -34,8 +34,8 @@ import { cardOf } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a-map.ts';
 import { createEngine, nameFor } from '../src/facade.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { codex } from '../src/runner-codex.ts';
-import { detachedOps } from '../src/runner-detached.ts';
+import { codex } from '../src/harness/codex/codex.ts';
+import { detachedOps } from '../src/harness/detached/detached.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 

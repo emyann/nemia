@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { awaitsAdmission, fold, waitsForInput, type Input, type State } from '../domain.ts';
 import { Journal } from './journal.ts';
-import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness-args.ts';
+import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../runner.ts';
 
 /** What `file` journals: a task as a person files it. */
@@ -74,7 +74,7 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
  * journals as `null` and would stop its task on the first pass. The harness's arguments under `config` are the adapter's to
- * check (`argsRefusalOf` in `harness-args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
+ * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
  * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade.ts`), which this
  * door never learns.
  */

@@ -55,7 +55,7 @@ need that work somewhere else first. A session whose task a person or a deadline
 
 ### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
 
-`agent-runtime/src/runner-detached-output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`agent-runtime/src/harness/detached/output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
 prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
 is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
@@ -95,7 +95,7 @@ and one line of `refusalOf` (its cases fail).
 
 **What changed again** (2026-09-23, thin runtime stage 1, part 1). The harness's arguments are one `config` on the task
 (`HarnessArgs`), and the checks of them that every harness shares left `refusalOf` for the adapter side, in the same words:
-`argsRefusalOf` in `harness-args.ts` — an empty model or effort, tool lists and permission rules, `mcp`, `remoteControl`
+`argsRefusalOf` in `harness/args.ts` — an empty model or effort, tool lists and permission rules, `mcp`, `remoteControl`
 and `contextTokens` that are not values of their kind — with three new refusals of where an argument is (one beside
 `config`, a `config` that is no object, a key in it that is no argument). Every `Runner` asks them first through
 `Runner.layer`'s `refuses`, then its own `RunnerOps.refuses`, which `composite` forwards to the task's harness; the Effect
@@ -165,7 +165,7 @@ has no Codex servers configured.
 `transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
-(`claudeResultOutput` in `agent-runtime/src/runner-detached-output.ts`). Low priority, like issue 4: this
+(`claudeResultOutput` in `agent-runtime/src/harness/detached/output.ts`). Low priority, like issue 4: this
 harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
 
 **Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
@@ -386,7 +386,7 @@ does anything to a background session, since workers run on the model's whole wi
   The control, a session that never compacted, agreed to the token (34,869 and 365). Its `costUsd` was right throughout: it
   is the `cost-state`'s own. **Fixed**: an attempt whose lines hold a `compact_boundary` takes its tokens from the
   `cost-state` the way it takes its cost — its own share of the total — and has none while no `cost-state` is written,
-  rather than a count missing its compactions (`transcriptUsage` in `src/runner-claude-transcript.ts`). The `claude -p` session's transcript
+  rather than a count missing its compactions (`transcriptUsage` in `src/harness/claude/transcript.ts`). The `claude -p` session's transcript
   then read 1,327,896 input tokens, what its result's `modelUsage` said.
 
 **What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on
@@ -477,7 +477,7 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
 
 Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
-`config.background: true` (`src/runner-claude-code.ts`); since part 2a (the same day) a job reads its brief, and the words
+`config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
 `/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12).
 
@@ -737,7 +737,7 @@ finished session as listed, so the memo keeps it. Each observe that left somethi
 - **The deadline ends an unread attempt without stopping what may run under it.** Past its deadline, an attempt whose harness could
   not be read gets `DEADLINE_PASSED` with no sighting, so `live` is false and the edge records the end, `failed`, `deadline`, with no
   `stop`: the session was unread, not gone. A `--bg` session is let go by `release` on the next pass that reads it, since the memo
-  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`runner-claude-code.ts`), so a job past
+  keeps an unread finished session looked for; a Claude Code job's `release` does nothing (`harness/claude/code.ts`), so a job past
   its deadline on a pass that could not read it runs on to its own end, in its worktree, after its attempt is recorded ended. This
   predates the change (a failed read was an empty map, and read the same). Neither fix is small: a stop needs the session's id, which
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
@@ -1082,7 +1082,7 @@ known.
 ### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
 
 A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
-(`src/runner-detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
+(`src/harness/detached/detached.ts`). `stop` signals only a pid above 0 — `process.kill(0, …)` would signal the runtime's own process
 group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
 `stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
 answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is

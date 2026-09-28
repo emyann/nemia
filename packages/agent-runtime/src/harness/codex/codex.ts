@@ -5,12 +5,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { SpawnRequest } from './runner.ts';
-import type { HarnessSpec } from './runner-detached.ts';
-import { codexOutput } from './runner-detached-output.ts';
-import { codexRolloutEvents, codexRolloutFile } from './runner-codex-transcript.ts';
-import { codexMcpServerNames, codexMcpServers } from './runner-mcp.ts';
-import { countSpawn } from './core/engine/tally.ts';
+import type { SpawnRequest } from '../../runner.ts';
+import type { HarnessSpec } from '../detached/detached.ts';
+import { codexOutput } from '../detached/output.ts';
+import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
+import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
+import { countSpawn } from '../../core/engine/tally.ts';
 
 /**
  * The project paths a Codex config trusts.

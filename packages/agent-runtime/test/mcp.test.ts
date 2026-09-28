@@ -19,9 +19,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
 import { claudeOps } from '../src/runner.ts';
-import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
-import { codex } from '../src/runner-codex.ts';
-import { codexMcpServerNames } from '../src/runner-mcp.ts';
+import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
+import { codex } from '../src/harness/codex/codex.ts';
+import { codexMcpServerNames } from '../src/harness/mcp.ts';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-mcp-${label}-`);

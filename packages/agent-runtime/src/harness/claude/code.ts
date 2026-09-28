@@ -1,7 +1,7 @@
 /**
  * Claude Code as the engine runs it by default: a step is a job, and a session a person means to reach is a background one.
  *
- * A job is `claude -p`, detached by the engine's worker (`runner-detached.ts`): it runs its brief to completion and exits,
+ * A job is `claude -p`, detached by the engine's worker (`harness/detached/detached.ts`): it runs its brief to completion and exits,
  * so its end is its exit and its result — no registry to read, no quiet rule, a spend cap it keeps. Under `-p` no mode
  * waits on a prompt; a call it may not make is denied and the session carries on, and the result says what was denied.
  * It reads its brief on its stdin, and words a person says while it works after it, until its result. A background session
@@ -16,14 +16,14 @@
 import { Effect } from 'effect';
 import os from 'node:os';
 import path from 'node:path';
-import type { Sighting } from './core/domain.ts';
-import { nameParts } from './core/domain.ts';
-import { claudeOps, type ClaudeOptions, type Observation, type RunnerOps } from './runner.ts';
-import { detachedFind, detachedOps, type HarnessSpec } from './runner-detached.ts';
-import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from './runner-claude-detached.ts';
-import { claudeTranscriptEvents, claudeTranscriptFile } from './runner-claude-transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudePrintRefuses } from './runner-claude-vocabulary.ts';
-import { claudeStreamOutput } from './runner-detached-output.ts';
+import type { Sighting } from '../../core/domain.ts';
+import { nameParts } from '../../core/domain.ts';
+import { claudeOps, type ClaudeOptions, type Observation, type RunnerOps } from '../../runner.ts';
+import { detachedFind, detachedOps, type HarnessSpec } from '../detached/detached.ts';
+import { CLAUDE_SESSION_ID_PATTERN, claudePrepare, claudePrintFlags } from '../../runner-claude-detached.ts';
+import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
+import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudePrintRefuses } from './vocabulary.ts';
+import { claudeStreamOutput } from '../detached/output.ts';
 
 /**
  * A step run as a job: `claude -p`, its output a stream. The stream's first line names the session, so its id is known

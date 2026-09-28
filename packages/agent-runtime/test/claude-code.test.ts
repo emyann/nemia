@@ -16,8 +16,8 @@ const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 /** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
-const { claudeCodeOps, claudeJob } = await import('../src/runner-claude-code.ts');
-const { claudeCodeRefuses, claudeRefuses } = await import('../src/runner-claude-vocabulary.ts');
+const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts');
+const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
@@ -592,7 +592,7 @@ test('REFUSED at shipped defaults: a bridge in `config.claude` on the claude -p 
 });
 
 test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, in `config.claude` — and every flag a spawn gives is on that list', async () => {
-  const { CLAUDE_OWNED_FLAGS } = await import('../src/runner-claude-vocabulary.ts');
+  const { CLAUDE_OWNED_FLAGS } = await import('../src/harness/claude/vocabulary.ts');
   const { claudeDetached } = await import('../src/runner-claude-detached.ts');
   const request = { name: 'ae/t/1', brief: 'b', cwd: '/r', resumeFrom: BG_ID, closeoutSchema: { type: 'object' }, config: EVERYTHING };
   const io = { checkoutMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };

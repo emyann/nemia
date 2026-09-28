@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { claudeOps, QUIESCENT_AFTER_MS } from '../src/runner.ts';
-import { lastStructuredOutput } from '../src/runner-claude-transcript.ts';
+import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
 import { createEngine } from '../src/facade.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import type { Event } from '../src/core/domain.ts';

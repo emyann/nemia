@@ -27,11 +27,11 @@
  */
 import { Effect } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState } from './core/session.ts';
-import type { Sighting, Usage } from './core/domain.ts';
-import { Runner, RunnerError } from './runner.ts';
-import { renderTranscript } from './runner-claude-transcript.ts';
-import type { HarnessArgs } from './harness-args.ts';
+import type { SessionState } from '../core/session.ts';
+import type { Sighting, Usage } from '../core/domain.ts';
+import { Runner, RunnerError } from '../runner.ts';
+import { renderTranscript } from './claude/transcript.ts';
+import type { HarnessArgs } from './args.ts';
 
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: SessionState; abort: AbortController; toolCalls: number; usage?: Usage };

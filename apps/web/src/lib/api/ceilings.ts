@@ -1,4 +1,4 @@
-/** The cap on runs in flight (`GET /api/ceilings`, apps/api/src/ceilings.ts). */
+/** The cap on runs in flight (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
@@ -22,9 +22,9 @@ export type PassCost = {
 };
 
 /**
- * Mirrors `Ceilings` in apps/api/src/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before any pass wrote it),
- * the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none — the runs it holds, and
- * what the last pass cost (`pass`, null before any pass wrote it).
+ * Mirrors `Ceilings` in apps/api/src/factory/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before
+ * any pass wrote it), the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none —
+ * the runs it holds, and what the last pass cost (`pass`, null before any pass wrote it).
  */
 export type Ceilings = {
   last: { sessions: number; runs: number } | null;

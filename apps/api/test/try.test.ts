@@ -69,9 +69,9 @@ fs.writeFileSync(
 
 const { app } = await import('../src/app.ts');
 const { start } = await import('agent-orchestrator');
-type RunSummary = import('../src/runs.ts').RunSummary;
-type RunDetail = import('../src/detail.ts').RunDetail;
-type AgentListing = import('../src/agents.ts').AgentListing;
+type RunSummary = import('../src/runs/runs.ts').RunSummary;
+type RunDetail = import('../src/detail/detail.ts').RunDetail;
+type AgentListing = import('../src/agents/agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>

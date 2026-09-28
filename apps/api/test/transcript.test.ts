@@ -15,7 +15,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { scratch } from './scratch.ts';
-import type { StepTranscript } from '../src/steps.ts';
+import type { StepTranscript } from '../src/steps/steps.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-transcript-${label}-`);
 

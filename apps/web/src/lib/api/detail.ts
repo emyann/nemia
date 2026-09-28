@@ -1,4 +1,7 @@
-/** A run's detail, as its page reads it (`GET /api/runs/:id`, apps/api/src/detail.ts): each step's spec, filing, gate, tries and timeline. */
+/**
+ * A run's detail, as its page reads it (`GET /api/runs/:id`, apps/api/src/detail/detail.ts): each step's spec, filing, gate, tries and
+ * timeline.
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
@@ -10,25 +13,30 @@ import type { StepArtifact, StepAttempts, StepCheck, StepCloseout, StepTry, Step
 import type { RunRead, StepUsed } from './usage.ts';
 
 /**
- * Mirrors `StepBudget` in apps/api/src/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to — as its
- * author writes one (`said`, `$3`), what its tries have cost of it (`of`, `$4.25 of $3`, null until measured), and whether that is the cap or more.
+ * Mirrors `StepBudget` in apps/api/src/detail/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to
+ * — as its author writes one (`said`, `$3`), what its tries have cost of it (`of`, `$4.25 of $3`, null until measured), and whether that is
+ * the cap or more.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
 /**
- * Mirrors `StepRaise` in apps/api/src/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its loop's round
- * (`round`) — and what the budget has to be more than, as the package refuses less. For a try, the ways the package takes it (`modes`,
- * `recheck` among them where a check did not pass, needing no raise) and how the step ended on its own work, its budget aside (`own`, the
- * package's word: `blocked`, `unsigned`, `failed (check)` …), which its word, `over budget`, does not say. For a round, none, and null.
+ * Mirrors `StepRaise` in apps/api/src/detail/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its
+ * loop's round (`round`) — and what the budget has to be more than, as the package refuses less. For a try, the ways the package takes it
+ * (`modes`, `recheck` among them where a check did not pass, needing no raise) and how the step ended on its own work, its budget aside
+ * (`own`, the package's word: `blocked`, `unsigned`, `failed (check)` …), which its word, `over budget`, does not say. For a round, none,
+ * and null.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
 
-/** Mirrors `StepApproval` in apps/api/src/detail.ts: a person's approval of the try a gated step is on — when, and the words given with it. */
+/**
+ * Mirrors `StepApproval` in apps/api/src/detail/detail.ts: a person's approval of the try a gated step is on — when, and the words given
+ * with it.
+ */
 export type StepApproval = { try: number; at: string; message: string | null };
 
 /**
- * Mirrors `StepGate` in apps/api/src/detail.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval` — and
- * `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
+ * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval`
+ * — and `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
@@ -36,12 +44,12 @@ export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 export type StepAcceptance = { try: number; at: string; message: string };
 
 /**
- * Mirrors `StepAsked` in apps/api/src/detail.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
- * where `stopFirst`, because the harness blocked it.
+ * Mirrors `StepAsked` in apps/api/src/detail/detail.ts: a try a person asked for, which the next tick files — once it has stopped the
+ * step's session where `stopFirst`, because the harness blocked it.
  */
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
 
-/** Mirrors `StepSpec` in apps/api/src/detail.ts. */
+/** Mirrors `StepSpec` in apps/api/src/detail/detail.ts. */
 export type StepSpec = {
   harness: string | null;
   model: string | null;
@@ -68,7 +76,7 @@ export type StepSpec = {
 };
 
 /**
- * Mirrors `StepFiled` in apps/api/src/detail.ts: what the engine filed a step's current try with. Each field is null where the
+ * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the
  * task was filed without it — no deadline, which is no limit, and the harness's own model, effort and tools. `askedModel` is
  * the model a person's `wf retry --model` asked this try for; `runsIn` the permission mode the session runs in, as its harness
  * decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a Codex sandbox narrowed by `tools` — and
@@ -92,7 +100,7 @@ export type StepFiled = {
   remote: { name: string; address: string | null } | null;
 };
 
-/** Mirrors `RunDetail` in apps/api/src/detail.ts. */
+/** Mirrors `RunDetail` in apps/api/src/detail/detail.ts. */
 export type RunDetail = {
   id: string;
   brief: string;
@@ -224,8 +232,9 @@ export type TaskSpan = {
 };
 
 /**
- * Mirrors `StepTimelineTry` in apps/api/src/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
- * is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in `wf decide`'s words.
+ * Mirrors `StepTimelineTry` in apps/api/src/detail/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached,
+ * whose session is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in
+ * `wf decide`'s words.
  */
 export type StepTimelineTry = {
   try: number;
@@ -237,9 +246,9 @@ export type StepTimelineTry = {
 };
 
 /**
- * Mirrors `StepTimelineTotal` in apps/api/src/detail.ts — `TimelineTotal` in agent-orchestrator's timeline.ts, with its cost: a round of a loop — `loop` its
- * looping step, counting the steps that round files again — or the run's, every step's (`loop` and `round` null); sums over its tasks, and its
- * wall, in words; and what the sessions in it cost, null where none was measured.
+ * Mirrors `StepTimelineTotal` in apps/api/src/detail/detail.ts — `TimelineTotal` in agent-orchestrator's timeline.ts, with its cost: a
+ * round of a loop — `loop` its looping step, counting the steps that round files again — or the run's, every step's (`loop` and `round`
+ * null); sums over its tasks, and its wall, in words; and what the sessions in it cost, null where none was measured.
  */
 export type TimelineTotal = {
   loop: string | null;

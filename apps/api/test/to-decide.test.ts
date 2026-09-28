@@ -16,9 +16,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunDecision } from '../src/decision.ts';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunDecision } from '../src/decide/decision.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 const root = scratch('hkb-api-to-decide-');
 process.env.WF_ROOT = root;
@@ -32,7 +32,7 @@ process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
 const { app } = await import('../src/app.ts');
-const { mergesOnto } = await import('../src/merge.ts');
+const { mergesOnto } = await import('../src/decide/merge.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

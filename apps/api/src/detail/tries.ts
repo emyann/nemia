@@ -11,10 +11,10 @@ import {
   tryNote,
 } from 'agent-orchestrator/run';
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
-import { artifactOf, type StepArtifact } from './artifacts.ts';
-import { wordOf } from './judged.ts';
-import { checkIn, type StepCheck } from './logs.ts';
-import { bare, type TaskView, type Views } from './store.ts';
+import { artifactOf, type StepArtifact } from '../steps/artifacts.ts';
+import { wordOf } from '../runs/judged.ts';
+import { checkIn, type StepCheck } from '../steps/logs.ts';
+import { bare, type TaskView, type Views } from '../store.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
 export type StepReply = { finding: string; answer: string; why: string };

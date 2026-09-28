@@ -46,8 +46,8 @@ import {
   type StepStatus,
 } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
-import { folderFiles, type StepArtifact } from './artifacts.ts';
-import { type RunGraph, runGraph } from './graph.ts';
+import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
+import { type RunGraph, runGraph } from '../runs/graph.ts';
 import {
   holdsIn,
   judge,
@@ -61,8 +61,8 @@ import {
   standingsOf,
   type StepNeeds,
   waitsIn,
-} from './judged.ts';
-import { checksOf, type StepCheck } from './logs.ts';
+} from '../runs/judged.ts';
+import { checksOf, type StepCheck } from '../steps/logs.ts';
 import {
   bare,
   e,
@@ -75,7 +75,7 @@ import {
   viewsFor,
   workflowsOf,
   workFolderOf,
-} from './store.ts';
+} from '../store.ts';
 import {
   attemptsIn,
   closeoutIn,
@@ -86,7 +86,7 @@ import {
   triesOf,
   unreadableIn,
 } from './tries.ts';
-import { tryOf } from './try.ts';
+import { tryOf } from '../agents/try.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
 /**

@@ -1,4 +1,4 @@
-/** A step's conversation, read and followed (`/api/runs/:id/steps/:step/transcript`, apps/api/src/steps.ts). */
+/** A step's conversation, read and followed (`/api/runs/:id/steps/:step/transcript`, apps/api/src/steps/steps.ts). */
 import { get } from './read.ts';
 
 /**
@@ -15,7 +15,10 @@ export type TranscriptEvent = {
   result?: { text: string; isError: boolean };
 };
 
-/** Mirrors `StepTranscript` in apps/api/src/steps.ts: the events from a cursor, the cursor to ask again from, and whether more may come. */
+/**
+ * Mirrors `StepTranscript` in apps/api/src/steps/steps.ts: the events from a cursor, the cursor to ask again from, and whether more may
+ * come.
+ */
 export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean };
 
 /** Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events. */

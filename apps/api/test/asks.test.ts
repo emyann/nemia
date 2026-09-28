@@ -14,8 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { scratch } from './scratch.ts';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-asks-${label}-`);
 

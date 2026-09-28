@@ -21,10 +21,10 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 const { app } = await import('../src/app.ts');
 const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } =
   await import('agent-orchestrator');
-type InboxEntry = import('../src/inbox.ts').InboxEntry;
-type InboxCardPage = import('../src/inbox.ts').InboxCardPage;
-type InboxFiled = import('../src/inbox.ts').InboxFiled;
-type RunDetail = import('../src/detail.ts').RunDetail;
+type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
+type InboxCardPage = import('../src/inbox/inbox.ts').InboxCardPage;
+type InboxFiled = import('../src/inbox/inbox.ts').InboxFiled;
+type RunDetail = import('../src/detail/detail.ts').RunDetail;
 /** What POST /api/runs answers a card it started (201): the run, the card, and whether the card left the inbox — and why not. */
 type CardStarted = { id: string; card: string; removed: boolean; why?: string; ignoredRepo?: string };
 type Refused = { error: string };

@@ -71,13 +71,13 @@
         "packages/agent-orchestrator/src/daemon-store.ts",
         "packages/agent-orchestrator/src/inbox-store.ts",
         "apps/api/src/body.ts",
-        "apps/api/src/agents.ts",
-        "apps/api/src/asks.ts",
-        "apps/api/src/builder.ts",
-        "apps/api/src/inbox.ts",
-        "apps/api/src/runs.ts",
-        "apps/api/src/skills.ts",
-        "apps/api/src/workflows.ts"
+        "apps/api/src/agents/agents.ts",
+        "apps/api/src/asks/asks.ts",
+        "apps/api/src/workflows/builder.ts",
+        "apps/api/src/inbox/inbox.ts",
+        "apps/api/src/runs/runs.ts",
+        "apps/api/src/agents/skills.ts",
+        "apps/api/src/workflows/workflows.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",

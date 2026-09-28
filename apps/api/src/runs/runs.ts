@@ -4,9 +4,9 @@ import { Schema } from 'effect';
 import { Hono } from 'hono';
 import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, unjudgedWord } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
-import { readBody, type BodyIssue } from './body.ts';
-import { decisionOf } from './decision.ts';
-import { detail } from './detail.ts';
+import { readBody, type BodyIssue } from '../body.ts';
+import { decisionOf } from '../decide/index.ts';
+import { detail } from '../detail/index.ts';
 import {
   type Asked,
   holdsIn,
@@ -23,8 +23,8 @@ import {
 } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { restingMemo, restingRead } from './resting.ts';
-import { refusedBeforeReading, type Guarded } from './guard.ts';
-import { tryOf } from './try.ts';
+import { refusedBeforeReading, type Guarded } from '../guard.ts';
+import { tryOf } from '../agents/try.ts';
 import {
   e,
   filedTimes,
@@ -38,7 +38,7 @@ import {
   viewsFor,
   viewsOf,
   workflowsOf,
-} from './store.ts';
+} from '../store.ts';
 
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
 export type RunSummary = {

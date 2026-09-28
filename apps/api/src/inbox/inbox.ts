@@ -33,10 +33,10 @@ import {
   readInbox,
   type InboxListing,
 } from 'agent-orchestrator';
-import { decodeBody, readBody, valueAt, type BodyIssue } from './body.ts';
-import { repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, type KeyRow } from './workflows.ts';
+import { decodeBody, readBody, valueAt, type BodyIssue } from '../body.ts';
+import { repoOf } from '../capabilities/capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { folderOf, type KeyRow } from '../workflows/workflows.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,

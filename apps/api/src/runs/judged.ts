@@ -55,7 +55,7 @@ import {
   waitsOf,
 } from 'agent-orchestrator/run';
 import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
-import { bare, e, judgedSteps, type Views } from './store.ts';
+import { bare, e, judgedSteps, type Views } from '../store.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];

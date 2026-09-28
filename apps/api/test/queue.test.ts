@@ -31,9 +31,9 @@ const base = git('rev-parse', 'HEAD').trim();
 const { app } = await import('../src/app.ts');
 const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } =
   await import('agent-orchestrator');
-type InboxEntry = import('../src/inbox.ts').InboxEntry;
-type Ceilings = import('../src/ceilings.ts').Ceilings;
-type InboxQueueAnswer = import('../src/inbox.ts').InboxQueueAnswer;
+type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
+type Ceilings = import('../src/factory/ceilings.ts').Ceilings;
+type InboxQueueAnswer = import('../src/inbox/inbox.ts').InboxQueueAnswer;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };

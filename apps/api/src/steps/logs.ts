@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { checkStderr, phaseOfView, verdictWord } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { e, type Views } from './store.ts';
+import { e, type Views } from '../store.ts';
 
 /**
  * The command a step is judged by, and what it said once it refused.

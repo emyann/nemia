@@ -1,11 +1,14 @@
-/** What the repository offers a step, and what each step gets (`GET /api/capabilities`, apps/api/src/capabilities.ts and reach.ts). */
+/**
+ * What the repository offers a step, and what each step gets (`GET /api/capabilities`, apps/api/src/capabilities/capabilities.ts and
+ * reach.ts).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 
-/** Mirrors `Described` in apps/api/src/capabilities.ts: a skill or an agent, and the file it was read from. */
+/** Mirrors `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
 
-/** Mirrors `McpServer` in apps/api/src/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
+/** Mirrors `McpServer` in apps/api/src/capabilities/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
 export type McpServer = {
   name: string;
   source: string;
@@ -25,8 +28,8 @@ export type McpServer = {
 export type Rule = { rule: string; source: string };
 
 /**
- * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on `measuredAt` with
- * `version` — data, never claimed current.
+ * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on
+ * `measuredAt` with `version` — data, never claimed current.
  */
 export type MeasuredTools = {
   harness: string;
@@ -41,8 +44,9 @@ export type MeasuredTools = {
 };
 
 /**
- * Mirrors `READ_ONLY_COMMANDS` in apps/api/src/capabilities.ts: the Bash commands Claude Code runs without a rule in every mode, unless a deny
- * names them — `measured` running so on `measuredAt` with `version`, the rest only `documented` — data, never claimed current.
+ * Mirrors `READ_ONLY_COMMANDS` in apps/api/src/capabilities/capabilities.ts: the Bash commands Claude Code runs without a rule in every
+ * mode, unless a deny names them — `measured` running so on `measuredAt` with `version`, the rest only `documented` — data, never claimed
+ * current.
  */
 export type ReadOnlyCommands = {
   harness: string;
@@ -56,9 +60,10 @@ export type ReadOnlyCommands = {
 };
 
 /**
- * Mirrors `StepReach` in apps/api/src/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on Claude Code, the
- * built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled server's tools; the deny
- * rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is denied without a prompt.
+ * Mirrors `StepReach` in apps/api/src/capabilities/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on
+ * Claude Code, the built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled
+ * server's tools; the deny rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is
+ * denied without a prompt.
  */
 export type StepReach = {
   workflow: string;
@@ -116,7 +121,10 @@ export type StepReach = {
   readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
 };
 
-/** Mirrors `CapabilitiesWithSteps` in apps/api/src/reach.ts: what the repository the api runs in offers a step, and what each step gets. */
+/**
+ * Mirrors `CapabilitiesWithSteps` in apps/api/src/capabilities/reach.ts: what the repository the api runs in offers a step, and what each
+ * step gets.
+ */
 export type Capabilities = {
   repo: string;
   skills: Described[];

@@ -1046,7 +1046,7 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   package are filed as W15 `six-findings-the-last-review-6no7` (`dev`, so the first run to end at `ship`'s gate) — the two that
   matter: nothing keeps two runs' ending steps out of one checkout at once, and the ending's brief still carries the artifacts
   contract's "leave it in this workspace". **Until W15 lands, approve one `ship` at a time.** The seventh is the board's:
-  `commandsOf` (`apps/api/src/decision.ts`) offers `git merge` for a run whose ending merges — for the board run after B17. Seen on
+  `commandsOf` (`apps/api/src/decide/decision.ts`) offers `git merge` for a run whose ending merges — for the board run after B17. Seen on
   B16's pictures and not from it: at 1280px the Factory's hint text runs under *Reset layout*.
   Later that evening: W13, three rounds, $57.50, **merged, `2ea2128`** — `workflows/supervisor/` and `slot: none`; nothing starts a
   supervisor, which stays the operator's act, and its review left three findings (a stale sha in its brief, "never type git" held

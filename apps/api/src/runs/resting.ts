@@ -15,7 +15,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { evictedBy, headsOf, restStamps } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
-import { e } from './store.ts';
+import { e } from '../store.ts';
 
 /** One run's answer and what it was judged on. */
 type Kept<T> = { stamp: string; record: string; tips: Readonly<Record<string, string | null>>; answer: T };

@@ -34,7 +34,7 @@ checked; the P2 item *workspaces at the Factory's level* is most of it.
 In the order they block.
 
 1. **The api's one repository.** `repoOf()` is `HKB_REPO || HOME_REPO`, and `HOME_REPO` is the api's own checkout
-   (`apps/api/src/capabilities.ts:66-69`); `HKB_REPO` is set by the e2e alone. Starting a run (`workflows.ts:430, 460`),
+   (`apps/api/src/capabilities/capabilities.ts:66-69`); `HKB_REPO` is set by the e2e alone. Starting a run (`workflows.ts:430, 460`),
    starting an inbox card (`startFromInbox({ callerRepo: repoOf() })`, `workflows.ts:442`), filing a card (`inbox.ts:194-197`),
    the workflow list (`sourcesOf(repoOf())`, `workflows.ts:139-146, 388`), `GET /api/repository` (`workflows.ts:424`), the
    Agents page (`agents.ts:214-221`) and the capabilities (`capabilities.ts:74-88`) all answer for it. `/api/runs` already

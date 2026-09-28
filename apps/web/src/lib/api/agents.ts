@@ -1,4 +1,4 @@
-/** The agents, and the writes of one of yours (apps/api/src/agents.ts). */
+/** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { SchemaFile } from './builder.ts';
@@ -35,14 +35,15 @@ export type AgentRoleKey =
   | 'remote'
   | 'output';
 
-/** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
+/** Mirrors `AgentUser` in apps/api/src/agents/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
 
 /**
- * Mirrors `AgentListing` in apps/api/src/agents.ts: one agent — its keys as its file writes them, its instructions, the result schema its
- * `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each SKILL.md,
- * or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its sessions
- * are given and its system prompt as its lines write them (null for none), its file as written, the version a write carries, the nodes that name it, and the parser's refusal of a file that does not read.
+ * Mirrors `AgentListing` in apps/api/src/agents/agents.ts: one agent — its keys as its file writes them, its instructions, the result
+ * schema its `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each
+ * SKILL.md, or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its
+ * sessions are given and its system prompt as its lines write them (null for none), its file as written, the version a write carries, the
+ * nodes that name it, and the parser's refusal of a file that does not read.
  */
 export type AgentListing = {
   name: string;
@@ -69,7 +70,7 @@ export type AgentListing = {
   /**
    * Why it cannot be tried from the board — the repository's, a name a try's folder cannot take, a harness the try's Claude Code fence does not
    * reach, `remote: true` — and the command that copies it to yours when that is the fix, in the store the api reads; null when nothing does.
-   * Mirrors `Untried` in apps/api/src/try.ts, whose words the try's route refuses with.
+   * Mirrors `Untried` in apps/api/src/agents/try.ts, whose words the try's route refuses with.
    */
   untried: { why: string; copy: string | null } | null;
 };
@@ -106,7 +107,7 @@ export type AgentDraft = {
   schema?: SchemaFile;
 };
 
-/** Mirrors `AgentSaved` in apps/api/src/agents.ts: the agent as it now reads, and its files by name. */
+/** Mirrors `AgentSaved` in apps/api/src/agents/agents.ts: the agent as it now reads, and its files by name. */
 export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
 
 /**
@@ -146,7 +147,7 @@ export const saveAgent = (name: string, version: string, draft: AgentDraft): Pro
 export const removeAgent = (name: string, version: string): Promise<{ removed: string[] }> =>
   agentWrite('DELETE', `/api/agents/yours/${encodeURIComponent(name)}`, { version });
 
-/** Mirrors `AgentTried` in apps/api/src/agents.ts: the run a try started, which its page follows. */
+/** Mirrors `AgentTried` in apps/api/src/agents/agents.ts: the run a try started, which its page follows. */
 export type AgentTried = { id: string };
 
 /**

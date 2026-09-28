@@ -14,9 +14,9 @@ process.env.WF_ROOT = scratch('hkb-api-daemon-');
 const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
 
 const { app } = await import('../src/app.ts');
-const { daemonOf } = await import('../src/daemon.ts');
+const { daemonOf } = await import('../src/factory/daemon.ts');
 const { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } = await import('agent-orchestrator');
-type Daemon = import('../src/daemon.ts').Daemon;
+type Daemon = import('../src/factory/daemon.ts').Daemon;
 type DaemonFile = import('agent-orchestrator').DaemonFile;
 
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */

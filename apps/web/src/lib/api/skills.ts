@@ -1,6 +1,6 @@
 /**
  * The skills an agent of yours can be given, a skill HKB ships copied into your library, one skill on its page, and one of yours written on the
- * board (apps/api/src/skills.ts).
+ * board (apps/api/src/agents/skills.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
@@ -15,7 +15,9 @@ export type SkillSource = 'yours' | 'repo' | 'shipped';
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
 
-/** Mirrors `SkillRow` in apps/api/src/skills.ts: one skill as the picker lists it, its card entry or why no agent can be given it. */
+/**
+ * Mirrors `SkillRow` in apps/api/src/agents/skills.ts: one skill as the picker lists it, its card entry or why no agent can be given it.
+ */
 export type SkillRow = {
   name: string;
   from: SkillSource;

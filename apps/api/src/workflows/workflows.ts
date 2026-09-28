@@ -47,10 +47,10 @@ import {
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
-import { NotBlank, readBody, valueAt, type BodyIssue } from './body.ts';
-import { repoOf } from './capabilities.ts';
-import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { graphOf, type RunGraph } from './graph.ts';
+import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
+import { repoOf } from '../capabilities/capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { graphOf, type RunGraph } from '../runs/graph.ts';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = 'repo' | 'yours';

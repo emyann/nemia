@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunDetail } from '../src/detail.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its module loads. */
 const root = scratch('hkb-api-read-');

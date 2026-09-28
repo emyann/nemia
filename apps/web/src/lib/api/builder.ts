@@ -1,12 +1,15 @@
-/** The builder's form and its writes of a folder of yours (apps/api/src/builder.ts). */
+/** The builder's form and its writes of a folder of yours (apps/api/src/workflows/builder.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { ListedStep, WorkflowListing, WorkflowStepSpec } from './workflows.ts';
 
-/** Mirrors `KeyKind` in apps/api/src/builder.ts: how a key is set on a step's form. */
+/** Mirrors `KeyKind` in apps/api/src/workflows/builder.ts: how a key is set on a step's form. */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
-/** Mirrors `KeyField` in apps/api/src/builder.ts: one key of a step's form, its line of meaning, how it is set, and the words it may take. */
+/**
+ * Mirrors `KeyField` in apps/api/src/workflows/builder.ts: one key of a step's form, its line of meaning, how it is set, and the words it
+ * may take.
+ */
 export type KeyField = {
   key: keyof WorkflowStepSpec;
   meaning: string;
@@ -16,9 +19,10 @@ export type KeyField = {
 };
 
 /**
- * Mirrors `KeyForm` in apps/api/src/builder.ts: every key a step may set, in the package's order, the harness a step runs on when it names none,
- * the keys a step with an agent takes from it (`roleKeys`), what each agent of yours gives a step (`agents`), and how a step names a remote
- * A2A agent — `harness: <prefix><name>` — with the keys such a step may not set (`remote`), which the form leaves off it (`takes`).
+ * Mirrors `KeyForm` in apps/api/src/workflows/builder.ts: every key a step may set, in the package's order, the harness a step runs on when
+ * it names none, the keys a step with an agent takes from it (`roleKeys`), what each agent of yours gives a step (`agents`), and how a step
+ * names a remote A2A agent — `harness: <prefix><name>` — with the keys such a step may not set (`remote`), which the form leaves off it
+ * (`takes`).
  */
 export type KeyForm = {
   keys: KeyField[];
@@ -35,7 +39,7 @@ export const keyFormQuery = queryOptions({
   staleTime: Infinity,
 });
 
-/** Mirrors `WorkflowSaved` in apps/api/src/builder.ts: a folder written, read back from disk, and its files by name. */
+/** Mirrors `WorkflowSaved` in apps/api/src/workflows/builder.ts: a folder written, read back from disk, and its files by name. */
 export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
 
 /**

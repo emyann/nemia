@@ -20,8 +20,8 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-type AgentListing = import('../src/agents.ts').AgentListing;
-type AgentSaved = import('../src/agents.ts').AgentSaved;
+type AgentListing = import('../src/agents/agents.ts').AgentListing;
+type AgentSaved = import('../src/agents/agents.ts').AgentSaved;
 
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const STORE = path.join(root, 'workflows');
@@ -631,7 +631,7 @@ test("REFUSED at shipped defaults: skills or a system prompt not written as text
 test('an agent is answered as an A2A Agent Card, with what it leaves out said beside it and never inside it', async () => {
   const res = await app.request('/api/agents/repo/reviewer/card');
   assert.equal(res.status, 200, await res.clone().text());
-  const answer = (await res.json()) as import('../src/agents.ts').AgentCardAnswer;
+  const answer = (await res.json()) as import('../src/agents/agents.ts').AgentCardAnswer;
   assert.equal(answer.servedOverA2A, false);
   assert.match(answer.why, /Nothing here serves reviewer over A2A/);
   assert.match(answer.why, /`supportedInterfaces` REQUIRED/);

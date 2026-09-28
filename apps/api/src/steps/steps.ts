@@ -5,7 +5,7 @@ import { phaseOfView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
-import { e, taskOfStep, type TaskView, workFolderOf } from './store.ts';
+import { e, taskOfStep, type TaskView, workFolderOf } from '../store.ts';
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;

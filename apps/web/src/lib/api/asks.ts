@@ -1,4 +1,6 @@
-/** What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (apps/api/src/asks.ts). */
+/**
+ * What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (apps/api/src/asks/asks.ts).
+ */
 
 /** Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, and to which attempt of its task. */
 export type Said = { at: string; attempt: number; text: string };

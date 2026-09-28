@@ -14,10 +14,10 @@ import { scratch } from './scratch.ts';
 const root = scratch('hkb-api-remote-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
-const { needsOf } = await import('../src/judged.ts');
+const { needsOf } = await import('../src/runs/judged.ts');
 type TaskView = import('../src/store.ts').TaskView;
 type Run = import('agent-orchestrator/run').Run;
-type RunDetail = import('../src/detail.ts').RunDetail;
+type RunDetail = import('../src/detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

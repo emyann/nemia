@@ -12,9 +12,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import type { RunDecision } from '../src/decision.ts';
-import type { RunDetail } from '../src/detail.ts';
-import type { RunSummary } from '../src/runs.ts';
+import type { RunDecision } from '../src/decide/decision.ts';
+import type { RunDetail } from '../src/detail/detail.ts';
+import type { RunSummary } from '../src/runs/runs.ts';
 
 const root = scratch('hkb-api-budget-');
 process.env.WF_ROOT = root;

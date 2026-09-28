@@ -19,8 +19,8 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/builder.ts');
-const { listWorkflows, versionOf: versionIn } = await import('../src/workflows.ts');
+const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/workflows/builder.ts');
+const { listWorkflows, versionOf: versionIn } = await import('../src/workflows/workflows.ts');
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 const { loadWorkflows, writeWorkflow } = await import('agent-orchestrator');
@@ -37,11 +37,11 @@ const {
   STEP_KEY_MEANINGS,
   STEP_KEYS,
 } = await import('agent-orchestrator/workflow');
-type KeyForm = import('../src/builder.ts').KeyForm;
-type WorkflowSaved = import('../src/builder.ts').WorkflowSaved;
-type BuildRefused = import('../src/builder.ts').BuildRefused;
-type ListedStep = import('../src/workflows.ts').ListedStep;
-type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
+type KeyForm = import('../src/workflows/builder.ts').KeyForm;
+type WorkflowSaved = import('../src/workflows/builder.ts').WorkflowSaved;
+type BuildRefused = import('../src/workflows/builder.ts').BuildRefused;
+type ListedStep = import('../src/workflows/workflows.ts').ListedStep;
+type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
 
 const STORE = path.join(root, 'workflows');
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'dev');

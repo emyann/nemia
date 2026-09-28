@@ -467,7 +467,7 @@ test('a folder that writes a list under its former name — `disallow:`, `allow:
   assert.equal(stale.status, 422, `a page that sends the lists under their former names is refused: ${JSON.stringify(refusal)}`);
   assert.match(
     refusal.error,
-    /^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\./,
+    /^write: `disallow` is `disallowedTools`'s former name, which a file may still say but nothing writes\. Send `disallowedTools` — a page that sends the former name is stale: reload it, and save again\./,
   );
   assert.deepEqual(snapshot(dir), before, 'nothing written');
 
@@ -497,7 +497,7 @@ test('a codex step that names its sandbox under the former key `permissionMode:`
   assert.equal(stale.status, 422, JSON.stringify(refusal));
   assert.equal(
     refusal.error,
-    'review: `permissionMode: read-only` on a step that runs on codex is what `sandbox:` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send `sandbox: read-only` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.',
+    'review: `permissionMode: read-only` on a step that runs on codex is the former name of `sandbox:` there, which a file may still say but nothing writes. Send `sandbox: read-only` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.',
   );
   assert.deepEqual(refusal.steps, ['review']);
   assert.deepEqual(snapshot(dir), before, 'nothing written');

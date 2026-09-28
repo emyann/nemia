@@ -712,7 +712,7 @@ test('`wf prune --artifacts` marks the run before its files go, and a prune that
   assert.match(
     pruneLines(never).at(-1)!,
     new RegExp(
-      `^   kept what is left in ${escaped(path.join(ROOT, 'runs', inPlace.id, 'artifacts'))}: .*EACCES.* — what is still there is read as before; wf prune ${inPlace.id} --unmerged --artifacts removes it once it can be$`,
+      `^   kept what is left in ${escaped(path.join(ROOT, 'runs', inPlace.id, 'artifacts'))}: .*EACCES.* — what is still there is kept, and read as it is; wf prune ${inPlace.id} --unmerged --artifacts removes it once it can be$`,
     ),
   );
   assert.ok(!under('runs', `${inPlace.id}.pruned`), 'a run never pruned is not marked');
@@ -830,11 +830,11 @@ test('pruneLines and sizeOf say what a person reads', () => {
   const files = { path: '/s/runs/r-1/artifacts', files: 'EACCES' } as const;
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files], unmerged: true }).at(-1),
-    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is read as before; wf prune r-1 --unmerged --artifacts removes it once it can be',
+    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; wf prune r-1 --unmerged --artifacts removes it once it can be',
     'files that would not go are offered the prune that removes them later: given --unmerged, repeated, or a run nobody decided is refused it',
   );
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files] }).at(-1),
-    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is read as before; wf prune r-1 --artifacts removes it once it can be',
+    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; wf prune r-1 --artifacts removes it once it can be',
   );
 });

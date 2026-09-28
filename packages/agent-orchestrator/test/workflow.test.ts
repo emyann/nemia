@@ -22,7 +22,10 @@ import { loadAgents } from '../src/workflow-store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES, SANDBOXES } from '../src/workflow.ts';
 import {
   asNamed,
+  autoDropped,
+  cardRetired,
   codexModeLine,
+  codexModeWritten,
   FORMER_KEYS,
   formerKeyLine,
   formerKeysIn,
@@ -1045,7 +1048,7 @@ test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which writ
   assert.throws(
     () => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft),
     refusedWith(
-      /^write: `disallow` is `disallowedTools`'s former name, which a file written before 2026-09-23 may still say but nothing writes\. Send `disallowedTools` — a page open since before then sends the former name: reload it, and save again\.$/,
+      /^write: `disallow` is `disallowedTools`'s former name, which a file may still say but nothing writes\. Send `disallowedTools` — a page that sends the former name is stale: reload it, and save again\.$/,
     ),
   );
   assert.throws(
@@ -1156,7 +1159,7 @@ test('`wf start` is told which files still write a former name: the steps, then 
   assert.deepEqual(formerKeysIn('no frontmatter\nallow: x\n'), []);
   assert.equal(
     formerKeyLine('w/write.md', 'allow'),
-    "w/write.md: `allow:` is read as `allowedTools:`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.",
+    "w/write.md: `allow:` is read as `allowedTools:`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.",
   );
   const root = folder({
     'team/write.md': '---\nagent: writer\ndisallow: SendMessage\n---\n',
@@ -1215,7 +1218,7 @@ test("a codex step frozen with its sandbox as `permissionMode` is read as `sandb
 test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
   assert.equal(
     codexModeLine('w/review.md', 'bypassPermissions'),
-    "w/review.md: `permissionMode: bypassPermissions` is read as `sandbox: danger-full-access`, Codex's own name for its sandbox, which a codex step says since 2026-09-23. The former line is still read; rename it, or save the file from the board, which writes `sandbox:`.",
+    "w/review.md: `permissionMode: bypassPermissions` is read as `sandbox: danger-full-access`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes `sandbox:`.",
   );
   const root = folder({
     'team/review.md': '---\nharness: codex\npermissionMode: read-only\n---\nReview.\n',
@@ -1422,7 +1425,7 @@ test('REFUSED: a codex step that names its sandbox under both names, keeping the
       () => fm('review', `harness: codex\npermissionMode: ${old}\nsandbox: ${now}`),
       (e: Error) =>
         e.message ===
-        `review: \`permissionMode: ${old}\` and \`sandbox: ${now}\` are both set, and on codex they are one key: until 2026-09-23 a codex step named its sandbox as \`permissionMode:\`, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
+        `review: \`permissionMode: ${old}\` and \`sandbox: ${now}\` are both set, and on codex they are one key: \`permissionMode:\` is the former name of a codex step's sandbox, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
       old,
     );
   }
@@ -2639,7 +2642,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
 test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sandbox as `permissionMode`, as a page open since before 2026-09-23 does', () => {
   const said = (file: string, word: string, as: string) => (e: Error) =>
     e.message ===
-    `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until 2026-09-23, which a file written before may still say but nothing writes. Send \`sandbox: ${as}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
+    `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send \`sandbox: ${as}\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
   assert.throws(
     () => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'read-only' } as StepDraft),
     said('review', 'read-only', 'read-only'),
@@ -2878,4 +2881,42 @@ test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folde
     () => parseFolder(cycle),
     (e: Error) => e instanceof WorkflowError && e.message === words,
   );
+});
+
+test('REFUSED: a date, a card, a finding or a measured version in the words a person reads of a former key, a retired card file or a refusal', () => {
+  const said = (fn: () => unknown): string => {
+    try {
+      fn();
+    } catch (e) {
+      return (e as Error).message;
+    }
+    return assert.fail('refused');
+  };
+  const builder = new Map([['builder', parseAgent('builder', '---\nsystemPrompt: no-coding\n---\nYou build.\n')]]);
+  const words = [
+    formerKeyLine('w/write.md', 'allow'),
+    codexModeLine('w/review.md', 'read-only'),
+    codexModeWritten('w/review.md', 'read-only'),
+    cardRetired('agents/builder.md', 'card'),
+    autoDropped('claude', 'haiku', undefined)!,
+    said(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft)),
+    said(() => fm('review', 'harness: codex\npermissionMode: read-only\nsandbox: read-only')),
+    said(() => fm('review', 'harness: codex\nbudget: 5')),
+    said(() => fm('watch', 'background: true\nbudget: 5')),
+    said(() => parseFolder([['write', '---\nworkspace: folder\nbackground: true\n---\nWrite.\n']])),
+    said(() => parseAgent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n')),
+    said(() =>
+      parseFolder(
+        [
+          ['plan', '---\n---\nPlan.\n'],
+          ['build', '---\nagent: builder\nafter: plan\nresume: plan\n---\n'],
+        ],
+        undefined,
+        builder,
+      ),
+    ),
+  ];
+  for (const w of words) {
+    assert.doesNotMatch(w, /\d{4}-\d{2}-\d{2}|\bcard \d|\(F\d+|\bmeasured\b|\d+\.\d+\.\d+|minutes/, w);
+  }
 });

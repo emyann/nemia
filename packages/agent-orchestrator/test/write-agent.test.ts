@@ -374,11 +374,11 @@ test('REFUSED at shipped defaults: a card sent with its agent, which is generate
   const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
   refused(
     () => writeAgent(AGENTS, scribe, { version: null, card: { file: 'scribe.skills.json', text } } as never),
-    /^`card` is not written with an agent since agents card 2: its card is generated from its skills\./,
+    /^`card` is not written with an agent: its card is generated from its skills\./,
   );
   refused(
     () => writeAgent(AGENTS, scribe, { version: null, card: undefined } as never),
-    /^`card` is not written with an agent since agents card 2/,
+    /^`card` is not written with an agent: its card is generated from its skills/,
   );
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and nothing of it is written');
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.skills.json')), false);

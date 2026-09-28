@@ -4042,7 +4042,7 @@ export function pruneLines(p: Pruning): string[] {
     ...p.left.map((l) =>
       'git' in l
         ? `   kept ${l.path}: git would not remove it — ${l.git}; look in it before anything is forced: git -C ${l.path} status`
-        : `   kept what is left in ${l.path}: ${l.files} — what is still there is read as before; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: true })} removes it once it can be`,
+        : `   kept what is left in ${l.path}: ${l.files} — what is still there is kept, and read as it is; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: true })} removes it once it can be`,
     ),
   ];
 }

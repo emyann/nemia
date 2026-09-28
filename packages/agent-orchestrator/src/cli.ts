@@ -528,7 +528,7 @@ function planHow(argv: string[]): { repo?: string } {
       '--workflows':
         'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
       '--input':
-        "wf plan does not take --input: a card's inputs are not a thing yet. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.",
+        'wf plan does not take --input: a card has no input files of its own. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.',
       '--gate':
         "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
       '--no-worktree':

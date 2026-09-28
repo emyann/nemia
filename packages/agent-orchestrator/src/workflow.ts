@@ -749,7 +749,7 @@ export function autoDropped(
     permissionMode === undefined
       ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
       : 'says `permissionMode: auto`';
-  return `${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about (F21, Claude Code 2.1.282, measured)`;
+  return `${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about`;
 }
 
 /**
@@ -896,13 +896,6 @@ const unknownKey = (step: string, key: string): string =>
 export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disallow: 'disallowedTools', allow: 'allowedTools' };
 
 /**
- * When `sandbox:` took over from `permissionMode:`, the engine's task field, as the name of a codex step's sandbox: what the refusal of both
- * on one step quotes (`codexSandboxNamed`). Not a line of `FORMER_KEYS`, since `permissionMode` is still a key — Claude Code's — and is
- * former only on codex.
- */
-const SANDBOX_SINCE = '2026-09-23';
-
-/**
  * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes for
  * the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a codex
  * sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
@@ -917,7 +910,7 @@ function codexSandboxNamed<K extends string>(
   if (harness !== 'codex' || word === undefined) return meta;
   if (meta.sandbox !== undefined) {
     refuse(
-      `${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: until ${SANDBOX_SINCE} a codex step named its sandbox as \`permissionMode:\`, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
+      `${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: \`permissionMode:\` is the former name of a codex step's sandbox, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
     );
   }
   const sandbox = sandboxNamed(word);
@@ -1382,14 +1375,14 @@ export function dollarsOf(written: string): number | undefined {
  * The reason `codex exec` keeps no budget, in the engine's words (agent-runtime's `codex.refuses`), which `test/vocabulary.test.ts`
  * holds this copy to: a cap there is one nothing reads.
  */
-const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none: 0.154.0 has no such flag, and reports no cost to cap';
+const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none: it takes no such flag, and reports no cost to cap';
 
 /**
  * Why a `claude --bg` session keeps no budget, in the engine's words (agent-runtime's `claudeCodeRefuses`), which `test/vocabulary.test.ts`
  * holds this copy to.
  */
 const BACKGROUND_KEEPS_NO_CAP =
-  'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured)';
+  'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session spends past a cap it is given';
 
 /**
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), on codex, and beside `background: true`, as the engine refuses a
@@ -2415,7 +2408,7 @@ export const isCardFile = (value: string): boolean => !value.includes(',') && /\
 export function cardRetired(file: string, key: 'card' | 'skills', named?: string): string {
   const line = named === undefined ? `\`${key}\`` : `\`${key}: ${named}\``;
   const it = named === undefined ? 'the file it names' : named;
-  return `${file}: ${line} names a card file, which is retired: since agents card 2 an agent's card is generated from its \`skills:\`, an entry for each skill made from its SKILL.md's frontmatter (its \`title:\` or \`name:\`, \`description:\`, \`tags:\` and \`examples:\`), and from the agent's own \`description:\` when it has none. Delete the line, and ${it} beside the agent; to say what the agent can do, give it skills.`;
+  return `${file}: ${line} names a card file, which is retired: an agent's card is generated from its \`skills:\`, an entry for each skill made from its SKILL.md's frontmatter (its \`title:\` or \`name:\`, \`description:\`, \`tags:\` and \`examples:\`), and from the agent's own \`description:\` when it has none. Delete the line, and ${it} beside the agent; to say what the agent can do, give it skills.`;
 }
 
 /** `skills:` as the names it lists, refused unless each is a skill's name (`SKILL_NAME`), once. */
@@ -2460,7 +2453,7 @@ function composedRefusal(
 ): string | undefined {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
   if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
-    return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with (F13): it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
+    return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with: it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
   }
   if (isRemoteHarness(step.harness)) {
     if (listed)
@@ -2478,7 +2471,7 @@ function composedRefusal(
   }
   if (!listed) return undefined;
   const why =
-    'the tool a session loads a skill with: Claude Code gives a session only what its tools allow, and a skill it cannot load is a name in its prompt and nothing more (F11, measured)';
+    'the tool a session loads a skill with: Claude Code gives a session only what its tools allow, and a skill it cannot load is a name in its prompt and nothing more';
   if (step.tools !== undefined && !step.tools.includes('Skill')) {
     return `${named}: ${listed} gives the agent skills, and \`tools: ${step.tools.join(', ')}\` has no \`Skill\`, ${why}. Add \`Skill\` to \`tools:\`, or delete \`skills:\`.`;
   }
@@ -2533,10 +2526,10 @@ export function renderAgent(draft: AgentDraft): string {
   const sent = (draft as { card?: unknown }).card;
   if (sent != null)
     refuse(
-      `${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page open since before then sends it: reload it, and save again.`,
+      `${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page that sends it is stale: reload it, and save again.`,
     );
   if (draft.skills != null && isCardFile(String(draft.skills))) {
-    refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page open since before then sends it: reload it, and save again.`);
+    refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page that sends it is stale: reload it, and save again.`);
   }
   const own: Record<AgentOwnKey, string | null | undefined> = {
     description: draft.description,
@@ -2694,7 +2687,7 @@ export function formerKeysIn(text: string): string[] {
  * carry on.
  */
 const formerKeyWritten = (file: string, former: string): string =>
-  `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file written before 2026-09-23 may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page open since before then sends the former name: reload it, and save again.`;
+  `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page that sends the former name is stale: reload it, and save again.`;
 
 /**
  * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read from a
@@ -2703,15 +2696,15 @@ const formerKeyWritten = (file: string, former: string): string =>
  * codex that kept its Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
-  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until ${SANDBOX_SINCE}, which a file written before may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
+  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
 
 /** What `wf start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
 export const codexModeLine = (file: string, word: string): string =>
-  `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox, which a codex step says since ${SANDBOX_SINCE}. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
+  `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
 /** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
 export const formerKeyLine = (file: string, former: string): string =>
-  `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
+  `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
 /**
  * What a workflow is for, in its author's words, from the text of its folder's README: the first paragraph, its lines joined into one.
@@ -2883,7 +2876,7 @@ function validateFolderMode(steps: readonly Workflow[]): void {
     : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
     `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
-      ' — a read or a write outside the folder can, and an unattended background session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).' +
+      ' — a read or a write outside the folder can, and an unattended background session then waits for ever on a prompt nobody answers.' +
       ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
       " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
@@ -2985,7 +2978,7 @@ function renamedKeys(step: Workflow): Workflow {
 }
 
 /**
- * A codex step frozen with its sandbox under the former key (`SANDBOX_SINCE`): its sandbox is the field `permissionMode` — the engine's task field,
+ * A codex step frozen with its sandbox under the former key: its sandbox is the field `permissionMode` — the engine's task field,
  * which the step carried under that name — and the key `permissionMode` among its agent's `keys` and `given`. Read so, the tick would file
  * it with no sandbox, and Codex would run it in `workspace-write`: wider than a reviewer written `read-only`, and said nowhere. So the field
  * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a record written with both — `withFormerNames` — keeps `sandbox`'s.

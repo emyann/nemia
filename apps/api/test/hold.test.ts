@@ -19,7 +19,7 @@ const root = scratch('hkb-api-hold-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { accept, approve, decide, engine, heldRefusal, holdAdvice, holdWord, list, readRun, retry, round } = await import('agent-orchestrator');
+const { accept, approve, decide, engine, heldRefusal, holdAdvice, holdWord, list, readRun, retry, round, unhold } = await import('agent-orchestrator');
 type Wait = import('agent-orchestrator').Wait;
 
 const git = (...args: string[]) =>
@@ -380,4 +380,99 @@ test("a run waiting on runs and held as well is both, as `wf decide` says both: 
   assert.equal(body.waiting.word, 'waiting on p-live');
   const said = await decide(engine(), AFTER);
   assert.deepEqual(asWaits(body.holding), said.holding);
+});
+
+/** A lift as the board sends it: a DELETE with an empty JSON body, through the same guard as every write. */
+const lift = (id: string, headers: Record<string, string> = BOARD) => app.request(`/api/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
+
+/** Every file of a run in the store's `runs/`, and what each holds: what a refusal must leave as it was. */
+const filesOf = (id: string): Record<string, string> => Object.fromEntries(fs.readdirSync(path.join(root, 'runs'))
+  .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
+  .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]));
+
+/** As `h-gate`, held until p-live: lifted by the tests below, so none of the others reads it. */
+const LIFT = 'h-lift';
+writeRun(LIFT, [{ name: 'plan', after: [], body: 'Plan it.', harness: 'codex' }, { ...implement, after: ['plan'] }], {
+  plan: { taskId: `${LIFT}-plan`, branch: `wf/${LIFT}/plan` }, implement: { taskId: null },
+});
+fs.writeFileSync(path.join(root, 'runs', `${LIFT}.json`), JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${LIFT}.json`), 'utf8')), gates: ['plan'] }));
+signedOff(`${LIFT}-plan`, DONE);
+
+/** Pruned, as `wf prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with none. */
+const PRUNED = { at: at(50), worktrees: [] };
+for (const id of ['h-pruned-held', 'h-pruned']) {
+  writeRun(id, [implement, review], { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, review: { taskId: null } });
+  signedOff(`${id}-implement`, DONE);
+  write(path.join(root, 'runs', `${id}.pruned`), JSON.stringify(PRUNED));
+}
+
+test("a hold lifted on the board is lifted as `wf hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again", async () => {
+  holdOn(LIFT, ['p-live']);
+  assert.equal((await listed()).get(LIFT)!.holding?.word, 'held until p-live ships');
+  const res = await lift(LIFT);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { id: LIFT, lifted: true, hold: { at: HELD_AT, until: ['p-live'] } });
+  assert.equal(fs.existsSync(holdFile(LIFT)), false);
+  const run = (await listed()).get(LIFT)!;
+  assert.deepEqual([run.heldUntil, run.holding, run.onYou], [[], null, ['approve plan']]);
+  const page = await detail(LIFT);
+  assert.deepEqual([page.heldUntil, page.holding], [[], null]);
+  assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
+  assert.ok((await decisionOf(LIFT)).commands.some((c: { command: string }) => c.command === `wf approve ${LIFT} plan`));
+  // Lifted, it is held no more: a second lift is the package's refusal.
+  const again = await lift(LIFT);
+  assert.equal(again.status, 409);
+  assert.equal((await again.json()).error, await refusal(async () => unhold(LIFT)));
+});
+
+test('a hold written by hand on a pruned run is lifted, as `wf hold --off` lifts it: nothing of the run is filed again either way', async () => {
+  holdOn('h-pruned-held', ['p-live']);
+  assert.ok((await listed()).get('h-pruned-held')!.holding, 'the board says the hold, so it offers the lift');
+  const res = await lift('h-pruned-held');
+  assert.equal(res.status, 200);
+  assert.equal(fs.existsSync(holdFile('h-pruned-held')), false);
+  assert.ok(fs.existsSync(path.join(root, 'runs', 'h-pruned-held.pruned')), 'still pruned');
+});
+
+test('REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `wf hold --off`, and nothing is written', async () => {
+  for (const id of ['p-live', 'h-pruned']) {
+    const before = filesOf(id);
+    const res = await lift(id);
+    assert.equal(res.status, 409, id);
+    const { error } = await res.json();
+    assert.equal(error, await refusal(async () => unhold(id)), id);
+    assert.match(error, new RegExp(`^${id} is not held, so there is no hold to lift`), id);
+    assert.deepEqual(filesOf(id), before, id);
+  }
+});
+
+test('REFUSED at shipped defaults: a lift of a run the store has not — none by that id, one removed with its hold file left behind, an id no run can have — is a 404, and nothing is written', async () => {
+  // Removed: `wf rm` took the record, and a hold file stands where it was.
+  write(holdFile('h-removed'), JSON.stringify({ at: HELD_AT, until: ['p-live'] }));
+  for (const id of ['no-such-run', 'h-removed', 'Not_A_Run']) {
+    const before = fs.readdirSync(path.join(root, 'runs')).sort();
+    const res = await lift(id);
+    assert.equal(res.status, 404, id);
+    assert.match((await res.json()).error, new RegExp(`^No run '${id}' in this store`), id);
+    assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
+  }
+  assert.ok(fs.existsSync(holdFile('h-removed')), 'the stray hold file is left for `wf hold --off` or a person');
+});
+
+test('REFUSED at shipped defaults: a lift from a page on another site, addressed to another name, or not sent as JSON, before anything is read, and the hold stands', async () => {
+  const held = fs.readFileSync(holdFile(GATE), 'utf8');
+  const cases: Array<[Record<string, string>, number, RegExp]> = [
+    [{ ...BOARD, 'sec-fetch-site': 'cross-site' }, 403, /refuses a request made by a page on another site/],
+    [{ ...BOARD, 'sec-fetch-site': 'same-site' }, 403, /refuses a request made by a page on another site/],
+    [{ ...BOARD, host: 'evil.example:8787' }, 403, /refuses a request addressed to evil\.example:8787/],
+    [{ ...BOARD, 'content-type': 'text/plain' }, 415, /takes its body as `content-type: application\/json`/],
+  ];
+  for (const [headers, status, words] of cases) {
+    const res = await lift(GATE, headers);
+    assert.equal(res.status, status, JSON.stringify(headers));
+    const { error } = await res.json();
+    assert.match(error, words);
+    assert.match(error, new RegExp(`^DELETE /api/runs/${GATE}/hold `));
+    assert.equal(fs.readFileSync(holdFile(GATE), 'utf8'), held);
+  }
 });

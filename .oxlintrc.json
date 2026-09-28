@@ -127,7 +127,6 @@
     },
     {
       "files": ["packages/agent-orchestrator/**"],
-      "excludeFiles": ["packages/agent-orchestrator/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",

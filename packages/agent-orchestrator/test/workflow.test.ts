@@ -1,5 +1,14 @@
 /**
  * The format, and the two ways a folder of markdown is not a workflow.
+ *
+ * What the tests of a folder team's permission modes hold, beyond their names:
+ * - A background session (`claude --bg`) in `acceptEdits` or `auto` sits on its first call outside its folder waiting on a permission
+ *   prompt nobody answers; `dontAsk` denies instead and `bypassPermissions` allows instead. Every other mode is refused by the name of
+ *   the step in it, and the fixture puts that step second, so a rule that only reads the first step fails.
+ * - A job waits on nobody in any mode: `claude -p` in a folder is denied each call it cannot make and exits on its own, and so a claude
+ *   step with no `background: true` passes in every mode, as `claude-detached` does, which is `claude -p` by another road. `codex exec`
+ *   is not interactive and has one shell fenced by its `sandbox:`, so a codex folder team is never judged on Claude Code's words,
+ *   which would tell it to write a `permissionMode: dontAsk` codex does not take.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,7 +139,6 @@ const folderRefusal = (dir: string): WorkflowError => {
 
 test("a README in a workflow folder is not a step, and its first paragraph is the workflow's description", () => {
   const dir = folder({
-    // A title, then the paragraph, then more.
     'README.md': '# dev\n\nImplement what was asked,\nthen review it.\n\nA second paragraph.\n',
     'implement.md': '---\nharness: claude\n---\nImplement it.\n',
     'review.md': '---\nafter: implement\n---\nReview it.\n',
@@ -139,20 +147,26 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
     loadWorkflows(dir).map((s) => s.name),
     ['implement', 'review'],
   );
-  assert.equal(workflowDescription(dir), 'Implement what was asked, then review it.');
+  assert.equal(
+    workflowDescription(dir),
+    'Implement what was asked, then review it.',
+    'the paragraph after the title, and not the one after it',
+  );
 
-  // Any case, and with frontmatter a step would be refused for (`title` is not a key a step has): skipped, not parsed,
-  // and the frontmatter is not the description.
   const lower = folder({ 'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n', 'implement.md': 'Implement it.\n' });
   assert.deepEqual(
     loadWorkflows(lower).map((s) => s.name),
     ['implement'],
+    'a readme in any case, with frontmatter a step would be refused for, is skipped, not parsed',
   );
-  assert.equal(workflowDescription(lower), 'A change a person will see.');
+  assert.equal(workflowDescription(lower), 'A change a person will see.', 'and its frontmatter is not the description');
 
-  // No README, or one with only a title: no description.
-  assert.equal(workflowDescription(folder({ 'implement.md': 'Implement it.\n' })), null);
-  assert.equal(workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': 'Implement it.\n' })), null);
+  assert.equal(workflowDescription(folder({ 'implement.md': 'Implement it.\n' })), null, 'no README: no description');
+  assert.equal(
+    workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': 'Implement it.\n' })),
+    null,
+    'a README with only a title: no description',
+  );
   assert.equal(workflowDescription(path.join(scratch('wf-none-'), 'no-such-folder')), null);
 });
 
@@ -170,14 +184,13 @@ test('REFUSED: a folder of workflows is not a workflow, and the refusal names th
     'dev/README.md': '# dev\n',
     'dev/implement.md': 'Implement it.\n',
     'ui/implement.md': 'Implement it.\n',
-    // A folder with only a README holds no workflow to name.
     'notes/README.md': '# notes\n',
   });
   const e = folderRefusal(dir);
   assert.equal(e.exitCode, 2);
   assert.ok(
     e.message.includes(`it holds workflows, each a folder of steps: dev, ui. Name one of them: ${path.join(dir, 'dev')}.`),
-    e.message,
+    `a folder with only a README holds no workflow to name: ${e.message}`,
   );
 });
 
@@ -198,18 +211,22 @@ test('resuming a step on a different harness is refused', () => {
 test("`orderSteps`: every step after each step its `after` names, and otherwise as given — by name, as a folder lists them — so an order that already runs forward is kept, and a loop's edge back orders nothing", () => {
   const names = (steps: readonly Workflow[]) => orderSteps(steps).map((s) => s.name);
   const byName = (steps: readonly Workflow[]) => [...steps].sort((a, b) => (a.name < b.name ? -1 : 1));
-  // plan → implement ⇄ review, given in the folder's order: alphabetical.
-  assert.deepEqual(names([step('implement', ['plan']), step('plan'), { ...step('review', ['implement']), loop: 'implement' }]), [
-    'plan',
-    'implement',
-    'review',
-  ]);
-  // A fan-out as a folder lists it: the siblings by name, and the join after both.
+  assert.deepEqual(
+    names([step('implement', ['plan']), step('plan'), { ...step('review', ['implement']), loop: 'implement' }]),
+    ['plan', 'implement', 'review'],
+    "plan → implement ⇄ review, given in the folder's order: alphabetical",
+  );
   const fan = [step('m', ['b', 'z']), step('z', ['a']), step('b', ['a']), step('a')];
-  assert.deepEqual(names(byName(fan)), ['a', 'b', 'z', 'm']);
-  // Two roots and a follower as a folder lists them: the follower once its root is placed, though its name sorts first.
-  assert.deepEqual(names(byName([step('x'), step('b', ['x']), step('c')])), ['c', 'x', 'b']);
-  // An order that already runs forward — a workflow frozen so, which the board lists as its record has it — is kept as given, not sorted.
+  assert.deepEqual(
+    names(byName(fan)),
+    ['a', 'b', 'z', 'm'],
+    'a fan-out as a folder lists it: the siblings by name, and the join after both',
+  );
+  assert.deepEqual(
+    names(byName([step('x'), step('b', ['x']), step('c')])),
+    ['c', 'x', 'b'],
+    'two roots and a follower as a folder lists them: the follower once its root is placed, though its name sorts first',
+  );
   const frozen = [
     step('build'),
     step('test'),
@@ -223,24 +240,35 @@ test("`orderSteps`: every step after each step its `after` names, and otherwise 
   assert.deepEqual(
     names(frozen),
     frozen.map((s) => s.name),
+    'an order that already runs forward, a workflow frozen so, which the board lists as its record has it, is kept as given, not sorted',
   );
   assert.deepEqual(names([step('a'), step('z', ['a']), step('b', ['a']), step('m', ['b', 'z'])]), ['a', 'z', 'b', 'm']);
-  // Given out of order, only what comes before what it waits on moves: the root first, the siblings as given, the join after both.
-  assert.deepEqual(names(fan), ['a', 'z', 'b', 'm']);
-  // `resume:` is in `after` already.
-  assert.deepEqual(names([parseWorkflow('respond', '---\nresume: implement\n---\nanswer it\n'), step('implement')]), [
-    'implement',
-    'respond',
-  ]);
-  // It ends on what `validate` refuses, for a record read back: an `after` naming no step here orders nothing, and steps waiting on each other go last, as given.
-  assert.deepEqual(names([step('b', ['ghost']), step('a', ['b'])]), ['b', 'a']);
-  assert.deepEqual(names([step('y', ['x']), step('x', ['y']), step('a')]), ['a', 'y', 'x']);
-  // Pure: what it was given is left as it was.
+  assert.deepEqual(
+    names(fan),
+    ['a', 'z', 'b', 'm'],
+    'given out of order, only what comes before what it waits on moves: the root first, the siblings as given, the join after both',
+  );
+  assert.deepEqual(
+    names([parseWorkflow('respond', '---\nresume: implement\n---\nanswer it\n'), step('implement')]),
+    ['implement', 'respond'],
+    '`resume:` is in `after` already',
+  );
+  assert.deepEqual(
+    names([step('b', ['ghost']), step('a', ['b'])]),
+    ['b', 'a'],
+    'on what validate refuses, for a record read back: an after naming no step here orders nothing',
+  );
+  assert.deepEqual(
+    names([step('y', ['x']), step('x', ['y']), step('a')]),
+    ['a', 'y', 'x'],
+    'and steps waiting on each other go last, as given',
+  );
   const given = [step('b', ['a']), step('a')];
   orderSteps(given);
   assert.deepEqual(
     given.map((s) => s.name),
     ['b', 'a'],
+    'pure: what it was given is left as it was',
   );
 });
 
@@ -379,13 +407,13 @@ test('the terminal steps are where the work ends up', () => {
     ['integrate'],
   );
 
-  // A workflow may deliberately end wide; then there is more than one place to look.
   assert.deepEqual(
     terminalSteps([
       { name: 'a', after: [], body: 'x' },
       { name: 'b', after: [], body: 'x' },
     ]).map((s) => s.name),
     ['a', 'b'],
+    'a workflow may end wide, and then there is more than one place to look',
   );
 });
 
@@ -413,7 +441,6 @@ test("a step that works in the repository's checkout is the workflow's last: REF
     [...chain, { name: 'publish', after: ['review'], body: 'x' }],
     /^ship: `workspace: main` runs the step in the repository's own checkout, and publish ends the workflow beside it, so both could be working in that one directory at once\. A run has one ending: make ship wait on publish, or delete the line\.$/,
   );
-  // Two of them side by side: each is refused for the other.
   refused(
     [
       { name: 'a', after: [], body: 'x', workspace: 'main' },
@@ -431,12 +458,11 @@ test('the shipped examples are valid workflows too', () => {
 
   assert.equal(fansOut(loadWorkflows(path.join(examples, 'fanout'))), true, 'two roots meeting at integrate');
 
-  // The splitter proposes parts; it does not file them. So it is one step that runs on its own,
-  // and the concurrency it argues about happens in the runs a person starts after reading PLAN.md.
   const split = loadWorkflows(path.join(examples, 'split'));
   assert.deepEqual(
     split.map((s) => s.name),
     ['split'],
+    'the splitter proposes parts and files none: one step on its own; the runs a person starts after reading PLAN.md are concurrent',
   );
   assert.deepEqual(split[0].after, [], 'nothing precedes it — splitting is the first thing');
   assert.equal(fansOut(split), false);
@@ -446,9 +472,6 @@ test('the shipped examples are valid workflows too', () => {
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
-  // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts. And `background:`, which is
-  // Claude Code's alone and keeps no `budget:`: read below too. And `sandbox:`, which is Codex's, and this step runs on Claude Code.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
@@ -477,20 +500,24 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     .join('\n')}\n---\nDo the work.\n`;
   const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
   const ending = fm('ship', 'after: review\nworkspace: main');
-  assert.equal(ending.workspace, 'main');
+  assert.equal(ending.workspace, 'main', 'workspace: is read on a step of its own: no step may set it beside a check:');
   const watching = fm('supervise', 'slot: none');
-  assert.equal(watching.slot, 'none');
+  assert.equal(watching.slot, 'none', "slot: is read on a step of its own: it is a workflow of one step's");
   const attached = parseWorkflow(
     'build',
     '---\nagent: implementer\n---\nBuild it.\n',
     undefined,
     new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]),
   );
-  assert.equal(attached.agent?.name, 'implementer');
+  assert.equal(
+    attached.agent?.name,
+    'implementer',
+    'agent: names an agent the step is resolved with, and test/agents.test.ts reads it too',
+  );
   const session = fm('supervise', 'background: true');
-  assert.equal(session.background, true);
+  assert.equal(session.background, true, "background: is read on a step of its own: it is Claude Code's alone, and keeps no budget:");
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
-  assert.equal(fenced.sandbox, 'read-only');
+  assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
   const all = {
     ...w,
     workspace: ending.workspace,
@@ -525,8 +552,11 @@ function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<stri
 
 test("every key a step has has one line of meaning, in the keys' order — a count's in its refusal's words", () => {
   assert.equal(meaningsRefusal(STEP_KEYS, STEP_KEY_MEANINGS), null);
-  // The counts' lines are the words `countOf` refuses a value with.
-  assert.equal(STEP_KEY_MEANINGS.deadlineSeconds, 'the seconds the engine lets the step run before stopping it');
+  assert.equal(
+    STEP_KEY_MEANINGS.deadlineSeconds,
+    'the seconds the engine lets the step run before stopping it',
+    "the counts' lines are the words countOf refuses a value with",
+  );
   assert.equal(STEP_KEY_MEANINGS.retries, 'how many times the run re-files the step after its check refuses it');
   assert.equal(STEP_KEY_MEANINGS.rounds, 'how many rounds `loop:` may run, the first included');
   assert.throws(
@@ -666,12 +696,12 @@ test('REFUSED: a context: that is not a number of tokens, one outside what the h
   );
   assert.throws(() => fm('implement', 'context: 99999'), refusedWith(/is 99999 tokens, and claude takes/));
   assert.throws(() => fm('implement', 'context: 1000001'), refusedWith(/is 1000001 tokens, and claude takes/));
-  // Claude Code's own flag reads a bare 200 as thousands. The step does not guess: it says what to write.
   assert.throws(
     () => fm('implement', 'context: 200'),
     refusedWith(
       /`context: 200` is 200 tokens, and claude takes a window from 100k to 1000k tokens .*For 200 thousand, write `context: 200k`\.$/,
     ),
+    "Claude Code's own flag reads a bare 200 as thousands: the step does not guess, it says what to write",
   );
   assert.throws(
     () => fm('review', 'harness: codex\ncontext: 200k'),
@@ -701,16 +731,16 @@ test("REFUSED: a step that continues another's session with a context window of 
       /^respond: `context: 150k`, and it continues implement's session, which runs on the model's whole window\. A session keeps one window: delete the line, and respond continues on implement's\.$/,
     ),
   );
-  // Through a chain: a step that continues respond continues implement's session.
   assert.throws(
     () => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\ncontext: 300k\n---\nmore\n']]),
     refusedWith(/^more: `context: 300k`, and it continues respond's session, which runs on `context: 200k`/),
+    "through a chain: a step that continues respond continues implement's session",
   );
-  // The same window, written another way, is the same window; none inherits it.
   const same = folder('context: 200k', 'context: 200000');
   assert.deepEqual(
     same.map((s) => sessionContext(s, same)),
     [200_000, 200_000],
+    'the same window, written another way, is the same window; none inherits it',
   );
   const inherits = folder('context: 200k', 'harness: claude');
   assert.deepEqual(
@@ -789,13 +819,12 @@ test('disallowedTools: is the rules the harness is given to deny, one rule per e
     'mcp__playwright__browser_run_code_unsafe',
     'Read(//home/**)',
   ]);
-  // A quote is legal inside a rule, whichever entry comes after it: `tools:`'s quote check refused the first order and took the second.
   for (const q of [`'`, `"`]) {
     const rule = `Bash(git commit -m ${q}wip${q})`;
     assert.deepEqual(
       fm('review', `disallowedTools: ${rule}, SendMessage`).disallowedTools,
       [rule, 'SendMessage'],
-      `${q}: a quoted rule, then another`,
+      `${q}: a quote is legal inside a rule, whichever entry comes after it: a quoted rule, then another`,
     );
     assert.deepEqual(
       fm('review', `disallowedTools: SendMessage, ${rule}`).disallowedTools,
@@ -884,8 +913,11 @@ test('allowedTools: is the rules the harness is given to allow without asking, o
   assert.equal(fm('review', 'harness: claude').allowedTools, undefined, 'absent: only what the permission mode allows by itself');
   for (const h of ['claude', 'claude-detached'])
     assert.deepEqual(fm('write', `harness: ${h}\nallowedTools: Edit(**)`).allowedTools, ['Edit(**)'], h);
-  // The deny list beside it, on the same step: neither is the other's opposite, and a deny still beats an allow.
-  assert.deepEqual(fm('write', 'allowedTools: Edit(**)\ndisallowedTools: SendMessage').allowedTools, ['Edit(**)']);
+  assert.deepEqual(
+    fm('write', 'allowedTools: Edit(**)\ndisallowedTools: SendMessage').allowedTools,
+    ['Edit(**)'],
+    "the deny list beside it, on the same step: neither is the other's opposite, and a deny still beats an allow",
+  );
 });
 
 test("REFUSED: an allowedTools: that names no rule, or an entry that is not one rule — the deny list's refusals in the allow list's words", () => {
@@ -922,14 +954,13 @@ test("REFUSED: an allowedTools: that names no rule, or an entry that is not one 
 });
 
 test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, which Claude Code takes and never matches', () => {
-  // Measured on Claude Code 2.1.278: with `allowedTools: Write(**)` the shipped note writer could not write its own `note.md`
-  // — "Permission to use Write has been denied" — while the harness said, on a stderr nobody reads, that the rule "is not
-  // matched by file permission checks". With `Edit(**)` it wrote inside its folder and was denied outside it.
   assert.throws(
     () => fm('write', 'allowedTools: Write(**)'),
     refusedWith(
       /^write: `allowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./,
     ),
+    'with allowedTools: Write(**), a note writer is denied its own note.md while Claude Code says on stderr that the rule "is not ' +
+      'matched by file permission checks"; with Edit(**) it writes inside its folder and is denied outside it',
   );
   assert.throws(
     () => fm('write', 'allowedTools: Edit(**), NotebookEdit(notes/**)'),
@@ -943,21 +974,20 @@ test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, w
       h,
     );
   }
-  // The deny list is read in the same check, so a rule it can never match is refused there too: taken, the step reads as fenced and is not.
   assert.throws(
     () => fm('write', 'disallowedTools: Write(**)'),
     refusedWith(
       /^write: `disallowedTools: Write\(\*\*\)` has `Write\(\*\*\)`, and Claude Code matches a file write against `Edit` rules alone: it takes this rule, warns that it is not matched, and allows the write anyway — so the step would be fenced by nothing while its file reads as fenced\. Write `Edit\(\*\*\)` instead: an `Edit` rule covers every file-editing tool, Write, NotebookEdit with it\./,
     ),
+    'the deny list is read in the same check: taken, a rule it can never match leaves the step reading as fenced when it is not',
   );
   assert.throws(
     () => fm('write', 'disallowedTools: SendMessage, NotebookEdit(notes/**)'),
     refusedWith(/has `NotebookEdit\(notes\/\*\*\)`.*Write `Edit\(notes\/\*\*\)` instead/),
     'wherever in the deny list it sits',
   );
-  // Allowed: the rule that works, in either list, and the bare name, which has no path to miss.
-  assert.deepEqual(fm('write', 'allowedTools: Edit(**)').allowedTools, ['Edit(**)']);
-  assert.deepEqual(fm('write', 'disallowedTools: Edit(../**)').disallowedTools, ['Edit(../**)']);
+  assert.deepEqual(fm('write', 'allowedTools: Edit(**)').allowedTools, ['Edit(**)'], 'allowed: the rule that works');
+  assert.deepEqual(fm('write', 'disallowedTools: Edit(../**)').disallowedTools, ['Edit(../**)'], 'in either list');
   assert.deepEqual(fm('write', 'allowedTools: Write').allowedTools, ['Write'], 'no path, so no file permission check to miss');
   assert.deepEqual(fm('write', 'disallowedTools: Write').disallowedTools, ['Write'], 'the bare name denies the tool itself');
 });
@@ -985,12 +1015,18 @@ test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are st
     'the same step, field for field',
   );
   assert.equal(Object.hasOwn(old, 'allow') || Object.hasOwn(old, 'disallow'), false, 'and no field under the former name');
-  // An agent's file reads them the same way.
   const agent = parseAgent('writer', '---\ndescription: Writes\nallow: Edit(**)\n---\nWrite.\n');
-  assert.deepEqual(agent.keys, parseAgent('writer', '---\ndescription: Writes\nallowedTools: Edit(**)\n---\nWrite.\n').keys);
+  assert.deepEqual(
+    agent.keys,
+    parseAgent('writer', '---\ndescription: Writes\nallowedTools: Edit(**)\n---\nWrite.\n').keys,
+    "an agent's file reads them the same way",
+  );
   assert.deepEqual(agent.keys, { allowedTools: 'Edit(**)' });
-  // Written back, a step read under the former name is written under the new one: saved from the board, the file is renamed.
-  assert.match(renderStep(old), /^disallowedTools: Bash\(git push \*\), SendMessage$/m);
+  assert.match(
+    renderStep(old),
+    /^disallowedTools: Bash\(git push \*\), SendMessage$/m,
+    'written back, a step read under the former name is written under the new one: saved from the board, the file is renamed',
+  );
   assert.match(renderStep(old), /^allowedTools: Edit\(\*\*\), Bash\(npm test\)$/m);
   assert.doesNotMatch(renderStep(old), /^(dis)?allow:/m);
 });
@@ -1016,8 +1052,10 @@ test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which writ
     () => renderAgent({ name: 'writer', body: 'Write.', keys: { allow: 'Edit(**)' } } as never),
     refusedWith(/^agents\/writer\.md: `allow` is `allowedTools`'s former name, .* Send `allowedTools`/),
   );
-  // Unset, it is nothing to write, as any key is.
-  assert.doesNotThrow(() => renderStep({ name: 'write', after: [], body: 'Write.', allow: null } as unknown as StepDraft));
+  assert.doesNotThrow(
+    () => renderStep({ name: 'write', after: [], body: 'Write.', allow: null } as unknown as StepDraft),
+    'unset, it is nothing to write, as any key is',
+  );
 });
 
 test('REFUSED: a list set under both its names, naming both lines and which one to keep', () => {
@@ -1081,7 +1119,6 @@ test('a frozen step under the former names is read under the new ones (`asNamed`
     disallowedTools: ['SendMessage'],
     allowedTools: ['Edit(**)'],
   });
-  // Resolved against an agent, the record names what was the step's own and what it was given under the former names too.
   const resolved = {
     name: 'write',
     after: [],
@@ -1090,17 +1127,24 @@ test('a frozen step under the former names is read under the new ones (`asNamed`
     disallow: ['SendMessage'],
     agent: { name: 'writer', keys: ['allow'], body: '', given: { disallow: 'SendMessage' } },
   } as unknown as Workflow;
-  assert.deepEqual(asNamed(resolved), {
-    name: 'write',
-    after: [],
-    body: 'Write.',
-    allowedTools: ['Edit(**)'],
-    disallowedTools: ['SendMessage'],
-    agent: { name: 'writer', keys: ['allowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
-  });
-  // A record that somehow holds both keeps the new name's value: it is the one a newer writer put there.
+  assert.deepEqual(
+    asNamed(resolved),
+    {
+      name: 'write',
+      after: [],
+      body: 'Write.',
+      allowedTools: ['Edit(**)'],
+      disallowedTools: ['SendMessage'],
+      agent: { name: 'writer', keys: ['allowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
+    },
+    "resolved against an agent, the record names what was the step's own and what it was given under the former names too",
+  );
   const both = { name: 'write', after: [], body: 'Write.', allow: ['Read'], allowedTools: ['Edit(**)'] } as unknown as Workflow;
-  assert.deepEqual(asNamed(both), { name: 'write', after: [], body: 'Write.', allowedTools: ['Edit(**)'] });
+  assert.deepEqual(
+    asNamed(both),
+    { name: 'write', after: [], body: 'Write.', allowedTools: ['Edit(**)'] },
+    "a record that holds both keeps the new name's value: it is the one a newer writer put there",
+  );
 });
 
 test('`wf start` is told which files still write a former name: the steps, then the agents they name, and nothing of a folder on the new names', () => {
@@ -1114,7 +1158,6 @@ test('`wf start` is told which files still write a former name: the steps, then 
     formerKeyLine('w/write.md', 'allow'),
     "w/write.md: `allow:` is read as `allowedTools:`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.",
   );
-  // The agents are beside the workflow folder (`agentsDir`), as the shipped ones are in `workflows/agents/`.
   const root = folder({
     'team/write.md': '---\nagent: writer\ndisallow: SendMessage\n---\n',
     'team/review.md': '---\nafter: write\n---\nReview.\n',
@@ -1141,27 +1184,32 @@ test("a codex step frozen with its sandbox as `permissionMode` is read as `sandb
     harness: 'codex',
     sandbox: 'danger-full-access',
   });
-  // Resolved against an agent: the key among what the step set and what it was given.
   const resolved = {
     ...frozen,
     agent: { name: 'reviewer', keys: ['permissionMode'], body: '', given: { harness: 'codex', permissionMode: 'workspace-write' } },
   } as unknown as Workflow;
-  assert.deepEqual(asNamed(resolved).agent, {
-    name: 'reviewer',
-    keys: ['sandbox'],
-    body: '',
-    given: { harness: 'codex', sandbox: 'workspace-write' },
-  });
-  // A record written with both — today's, for an older daemon — keeps `sandbox`'s value, and reads as the step it was written from.
+  assert.deepEqual(
+    asNamed(resolved).agent,
+    {
+      name: 'reviewer',
+      keys: ['sandbox'],
+      body: '',
+      given: { harness: 'codex', sandbox: 'workspace-write' },
+    },
+    'resolved against an agent: the key among what the step set and what it was given',
+  );
   const today = fm('review', 'harness: codex\nsandbox: read-only');
   const written = JSON.parse(JSON.stringify(withFormerNames(today))) as Workflow;
-  assert.deepEqual([written.sandbox, written.permissionMode], ['read-only', 'read-only']);
+  assert.deepEqual(
+    [written.sandbox, written.permissionMode],
+    ['read-only', 'read-only'],
+    "a record is written with both, for an older daemon, and keeps sandbox's value",
+  );
   assert.deepEqual(asNamed(written), JSON.parse(JSON.stringify(today)), 'read back off the record as it was written');
   assert.equal(asNamed(today), today, 'nothing to rename, nothing copied');
-  // Claude Code's `permissionMode` is its own key: neither read as a sandbox nor copied to one.
   const claude = fm('implement', 'permissionMode: dontAsk');
-  assert.equal(asNamed(claude), claude);
-  assert.equal(withFormerNames(claude), claude);
+  assert.equal(asNamed(claude), claude, "Claude Code's permissionMode is its own key: not read as a sandbox");
+  assert.equal(withFormerNames(claude), claude, 'nor copied to one');
 });
 
 test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
@@ -1249,7 +1297,6 @@ test('REFUSED: a budget: that is not an amount above zero — 0, a negative, a w
     );
   for (const bad of ['-1', '-2.50', 'five', 'lots', '1e3', '.5', '2.', 'Infinity', 'NaN', '5 5'])
     refusedAs(bad, /is not an amount\. .*a number above zero, in digits — for example `budget: 5`/);
-  // The unit is what the author meant, so the refusal writes the amount without it.
   refusedAs('$5', /^implement: `budget: \$5` is not an amount\. .* in digits with no unit — `budget: 5`\.$/);
   refusedAs('2.50 USD', /with no unit — `budget: 2\.50`\.$/);
   refusedAs(
@@ -1288,20 +1335,19 @@ test("permissionMode: yolo is refused with the modes of the step's own harness",
         'review: `sandbox: yolo` is not a sandbox codex has. On codex it is one of: read-only, workspace-write, danger-full-access.',
       ),
   );
-  // A sandbox written as a permission mode on Claude Code is told where it belongs, under the key it is written with there.
   assert.throws(
     () => fm('implement', 'permissionMode: read-only'),
     (e: Error) =>
       /not a mode claude has .*`read-only` is a sandbox codex has, written `sandbox: read-only` on a step that runs on codex/.test(
         e.message,
       ),
+    'a sandbox written as a permission mode on Claude Code is told where it belongs, under the key it is written with there',
   );
 
   assert.equal(fm('review', 'harness: codex\nsandbox: read-only').sandbox, 'read-only');
   assert.equal(fm('x', 'harness: claude-detached\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
   assert.equal(fm('x', 'permissionMode: auto').permissionMode, 'auto');
-  // The engine's word, which the first copies refused: Claude Code's `manual`.
-  assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual');
+  assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual', "the engine's word, Claude Code's manual, is a mode");
 });
 
 test('REFUSED: `permissionMode:` on a codex step that names no sandbox, with words naming `sandbox:` — wherever the harness line is', () => {
@@ -1313,12 +1359,11 @@ test('REFUSED: `permissionMode:` on a codex step that names no sandbox, with wor
     () => fm('review', 'harness: codex\npermissionMode: yolo'),
     (e: Error) => e.message.startsWith('review: `permissionMode: yolo` is not a key codex takes. ') && namesSandbox(e),
   );
-  // Claude Code's own modes are no sandbox either — but `bypassPermissions`, which the engine took on codex as its widest sandbox, is read below.
   for (const mode of PERMISSION_MODES.claude.filter((m) => m !== 'bypassPermissions')) {
     assert.throws(
       () => fm('review', `permissionMode: ${mode}\nharness: codex`),
       (e: Error) => e.message.startsWith(`review: \`permissionMode: ${mode}\` is not a key codex takes. `) && namesSandbox(e),
-      mode,
+      `${mode}: Claude Code's own modes are no sandbox either; bypassPermissions, codex's widest sandbox to the engine, is read apart`,
     );
   }
 });
@@ -1360,8 +1405,11 @@ test('a codex step that names its sandbox as `permissionMode:`, as every one did
     assert.equal(step.permissionMode, undefined, 'read as the one key, never as both');
     assert.equal(fm('review', `permissionMode: ${sandbox}\nharness: codex`).sandbox, sandbox, 'wherever the harness line is');
   }
-  // The engine took Claude Code's widest mode as Codex's widest sandbox: read under Codex's name for it.
-  assert.equal(fm('review', 'harness: codex\npermissionMode: bypassPermissions').sandbox, 'danger-full-access');
+  assert.equal(
+    fm('review', 'harness: codex\npermissionMode: bypassPermissions').sandbox,
+    'danger-full-access',
+    "the engine takes Claude Code's widest mode as Codex's widest sandbox: read under Codex's name for it",
+  );
 });
 
 test('REFUSED: a codex step that names its sandbox under both names, keeping the new one', () => {
@@ -1403,8 +1451,6 @@ test('frontmatter that never closes is refused; a file saved on Windows keeps it
   assert.deepEqual(crlf.after, ['implement']);
   assert.equal(parseWorkflow('x', '---\n---\nbody').body, 'body', 'an empty frontmatter is still frontmatter');
 });
-
-// ─── what a step declares, and what it reads ────────────────────────────────
 
 /**
  * A workflow folder: `implement`, then `review` declaring `output: review.schema.json`, then whatever
@@ -1450,11 +1496,14 @@ test('`output:` is read at load — the file as the step names it, and the schem
   assert.deepEqual(outputFields(review), ['findings']);
   assert.equal(steps.find((s) => s.name === 'implement')!.output, undefined, 'absent means the step declares nothing');
 
-  // Relative to the workflow folder, not to wherever `wf start` was typed.
   fs.mkdirSync(path.join(dir, 'schemas'));
   fs.renameSync(path.join(dir, 'review.schema.json'), path.join(dir, 'schemas', 'review.json'));
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: schemas/review.json\n---\nreview it\n');
-  assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')!.output?.schema, FINDINGS);
+  assert.deepEqual(
+    loadWorkflows(dir).find((s) => s.name === 'review')!.output?.schema,
+    FINDINGS,
+    'relative to the workflow folder, not to wherever wf start was typed',
+  );
 });
 
 test('an `output:` file that is not there is refused at load, with the fix', () => {
@@ -1463,10 +1512,10 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
     /^review: `output: review\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/,
   );
   assert.match(refusal({ 'review.schema.json': null, 'review.schema.json.md': 'not the schema\n' }), /is not there/);
-  // A step read without its folder has nowhere to read the file from, and does not pretend it has none.
   assert.throws(
     () => parseWorkflow('review', '---\noutput: review.schema.json\n---\nreview it\n'),
     /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/,
+    'a step read without its folder has nowhere to read the file from, and does not pretend it has none',
   );
 });
 
@@ -1486,16 +1535,16 @@ test('REFUSED at load: an `output:` naming a file outside the workflow folder �
     `review: \`output: schemas/../../review.schema.json\` ${fix}`,
     'out, however it is spelled',
   );
-  // Read without its folder, it is refused all the same: where the file is, not whether it can be read.
   assert.throws(
     () => parseWorkflow('review', naming(outside)['review.md']),
     (e: Error) => e.message === `review: \`output: ${outside}\` ${fix}`,
+    'read without its folder, it is refused all the same: where the file is, not whether it can be read',
   );
 
-  // The same file, and a path that only passes through a folder, inside, loads.
   assert.deepEqual(
     loadWorkflows(outputFolder({ ...naming('schemas/../review.schema.json') })).find((s) => s.name === 'review')!.output?.schema,
     FINDINGS,
+    'the same file, by a path that only passes through a folder, inside, loads',
   );
 });
 
@@ -1527,8 +1576,11 @@ test('an output schema that is not strict is refused, and says where', () => {
   });
   assert.match(refusal({ 'review.schema.json': deep }), /not strict at findings\[\]\.fix\.anyOf\[1\]: `patch` is not in `required`/);
 
-  // Not a schema of fields at all.
-  assert.match(refusal({ 'review.schema.json': '{ "findings": ' }), /`output: review\.schema\.json` is not JSON \(/);
+  assert.match(
+    refusal({ 'review.schema.json': '{ "findings": ' }),
+    /`output: review\.schema\.json` is not JSON \(/,
+    'not a schema of fields at all',
+  );
   for (const shape of [[], { type: 'array', items: {} }, { type: 'object', properties: {}, required: [], additionalProperties: false }]) {
     assert.match(
       refusal({ 'review.schema.json': shape }),
@@ -1536,10 +1588,10 @@ test('an output schema that is not strict is refused, and says where', () => {
       JSON.stringify(shape),
     );
   }
-  // Only `properties` is merged into the closeout: a definition beside them would not reach the harness.
   assert.match(
     refusal({ 'review.schema.json': { ...FINDINGS, $defs: { finding: items } } }),
     /sets `\$defs` beside its fields, and only its `properties` are merged/,
+    'only properties is merged into the closeout: a definition beside them would not reach the harness',
   );
 });
 
@@ -1574,22 +1626,25 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
   );
   assert.deepEqual(fm('integrate', 'after: a, b\ninput: a, b').input, ['a', 'b'], 'a list, like `after`');
   assert.equal(fm('x', 'after: a').input, undefined, 'absent means the step reads nothing');
-  // A step handed a resume without the `after` the parser adds is still reading finished work.
-  validate([
-    step('implement'),
-    { ...step('review', ['implement']), output: { file: 'r.json', schema: FINDINGS as never } },
-    { name: 'respond', after: [], resume: 'review', input: ['review'], body: 'x' },
-  ]);
+  assert.doesNotThrow(
+    () =>
+      validate([
+        step('implement'),
+        { ...step('review', ['implement']), output: { file: 'r.json', schema: FINDINGS as never } },
+        { name: 'respond', after: [], resume: 'review', input: ['review'], body: 'x' },
+      ]),
+    'a step handed a resume without the after the parser adds is still reading finished work',
+  );
 
   const notAfter =
     /respond: `input: review`, but respond does not wait on review — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
   assert.match(refusal(respond('after: implement\ninput: review')), notAfter);
   assert.match(refusal(respond('input: review')), notAfter, 'a root reads nothing');
-  // Directly: a step two back has finished too, but the key names what this step waits on.
   const implementDeclares = { 'implement.md': '---\noutput: review.schema.json\n---\nimplement it\n' };
   assert.match(
     refusal({ ...implementDeclares, ...respond('after: review\ninput: implement') }),
     /respond: `input: implement`, but respond does not wait on implement/,
+    'directly: a step two back has finished too, but the key names what this step waits on',
   );
 });
 
@@ -1611,23 +1666,20 @@ test('an output schema is read strict wherever an object can sit — and one tha
     'review.schema.json': { type: 'object', properties: { product }, required: ['product'], additionalProperties: false },
   });
 
-  // The review's case: a definition nested under the field, and a reference to it. The walk read neither,
-  // and the schema loaded with a loose object in it.
   assert.match(
     refusal(around({ $defs: { value: loose }, $ref: '#/properties/product/$defs/value' })),
     /^review: `output: review\.schema\.json` uses `\$ref` at product\. The run checks a schema is strict by reading it, and does not follow references .* Inline what it points at, and delete `\$ref`\./,
+    'a definition nested under the field, and a reference to it: a walk that read neither would load a loose object',
   );
-  // However strict the target: what is checked must be what the harness is handed, not what a pointer says it is.
   const strict = { ...loose, required: ['optional'], additionalProperties: false };
   for (const ref of ['$ref', '$dynamicRef', '$recursiveRef']) {
     assert.match(
       refusal(around({ $defs: { value: strict }, [ref]: '#/properties/product/$defs/value' })),
       new RegExp(`uses \`\\${ref}\` at product\\.`),
-      ref,
+      `${ref}, however strict the target: what is checked must be what the harness is handed, not what a pointer says it is`,
     );
   }
 
-  // Every keyword that holds a schema is read.
   const under: Array<[object, string]> = [
     [{ type: 'string', $defs: { value: loose } }, 'product.$defs.value'],
     [{ type: 'string', definitions: { value: loose } }, 'product.definitions.value'],
@@ -1659,12 +1711,10 @@ test('an output schema is read strict wherever an object can sit — and one tha
     assert.match(
       refusal(around(product)),
       new RegExp(`is not strict at ${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: \`optional\` is not in \`required\``),
-      at,
+      `${at}: every keyword that holds a schema is read`,
     );
   }
 });
-
-// ─── the edge back: `loop:` and `rounds:` ───────────────────────────────────
 
 /** implement → review, declaring `findings` and `again`, with `reviewKeys` beside `after` and `output` — and whatever `files` add or replace. */
 const loopFiles = (reviewKeys: string, files: Record<string, string | object | null> = {}) => ({
@@ -1687,7 +1737,6 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
   assert.equal(loadWorkflows(outputFolder(loopFiles('loop: implement\nrounds: 1'))).find((s) => s.name === 'review')!.rounds, 1);
   assert.deepEqual([steps[0].loop, steps[0].rounds], [undefined, undefined], 'a step with no loop counts no rounds');
 
-  // A step between, a step after the loop — not in it — and a second loop that starts where the first ends.
   const chain = [
     step('implement'),
     step('test', ['implement']),
@@ -1696,8 +1745,12 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
     looping('proof', ['docs'], 'docs'),
   ];
   validate(chain);
-  assert.deepEqual(loopSpan(chain, chain[2]), ['implement', 'test', 'review']);
-  assert.deepEqual(loopSpan(chain, chain[4]), ['docs', 'proof']);
+  assert.deepEqual(loopSpan(chain, chain[2]), ['implement', 'test', 'review'], 'a step between is in the loop');
+  assert.deepEqual(
+    loopSpan(chain, chain[4]),
+    ['docs', 'proof'],
+    'a step after the loop is not in it, and a second loop starts where the first ends',
+  );
   assert.deepEqual(loopSpan(chain, chain[1]), [], 'a step with no loop spans nothing');
 });
 
@@ -1825,7 +1878,6 @@ test('`workspace: folder` runs a step in a folder the run makes, with a check an
   );
   refused(team('folder', 'main'), /^s0 says `workspace: folder`, and s1 does not/);
 
-  // And at load, from a folder of files, as a person writes them.
   assert.throws(
     () =>
       parseFolder([
@@ -1833,6 +1885,7 @@ test('`workspace: folder` runs a step in a folder the run makes, with a check an
         ['review', '---\nafter: write\n---\nReview.\n'],
       ]),
     (e: WorkflowError) => e.exitCode === 2 && e.message.startsWith('write says `workspace: folder`, and review does not'),
+    'and at load, from a folder of files, as a person writes them',
   );
 });
 
@@ -1853,12 +1906,10 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       pattern.source,
     );
 
-  // A background session (`claude --bg`) asks, and nobody is there: measured on Claude Code 2.1.278, where one in `acceptEdits` and one in
-  // `auto` each sat on the first call outside their folder with `waitingFor: 'permission prompt'`. The two modes that never ask are
-  // `dontAsk`, which denies instead, and `bypassPermissions`, which allows instead.
-  assert.doesNotThrow(() => validate(team('dontAsk', 'bypassPermissions')));
-  // Every other mode the parser takes is refused, and the step that is in one is named — the second here, so a rule that only ever looked
-  // at the first would fail.
+  assert.doesNotThrow(
+    () => validate(team('dontAsk', 'bypassPermissions')),
+    'the two modes that never ask: dontAsk, which denies instead, and bypassPermissions, which allows instead',
+  );
   for (const mode of ['default', 'acceptEdits', 'plan', 'manual', 'auto']) {
     refused(
       team('dontAsk', mode),
@@ -1867,22 +1918,15 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       ),
     );
   }
-  // The line left off is the same defect: the engine files such a task in `auto`.
   refused(
     team('dontAsk', undefined),
     /^s1: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/,
   );
-  // And the fix is named, all three ways.
   refused(
     team(undefined),
     /Delete `background: true`, and the step runs as a job, which asks nobody in any mode; or write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step in `dontAsk` that must write its own work needs `allowedTools: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/,
   );
 
-  // A job waits on nobody in any mode: `claude -p` in `auto`, `dontAsk`, `default` and `acceptEdits`, in folders under `/tmp`, was denied each
-  // call it could not make and exited on its own (agent-runtime's open issue 28, M1, 2.1.280). So a claude step without `background: true`
-  // passes in every mode — named `false`, or left off — and so does `claude-detached`, which is `claude -p` by another road. And codex:
-  // `codex exec` is not interactive, and has one shell fenced by its `sandbox:`. Judged on Claude's words, a codex folder team
-  // in `workspace-write` was once refused and told to write `permissionMode: dontAsk`, which codex does not take.
   const on = (harness: string | undefined, background: boolean | undefined, ...modes: Array<string | undefined>): Workflow[] =>
     modes.map((mode, i) => ({
       name: `s${i}`,
@@ -1914,11 +1958,11 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
     'and a claude step that names no mode, which a job runs in `auto`',
   );
 
-  // A team that is not a folder team is not judged on this at all: a git run's steps work in a checkout a person opened, with settings of
-  // its own, and every mode has always been theirs to choose — a background session's too.
-  assert.doesNotThrow(() => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]));
+  assert.doesNotThrow(
+    () => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]),
+    "a team that is not a folder team is not judged on this: a git run's steps work in a checkout a person opened, with its settings",
+  );
 
-  // At load, from files: the same refusal reaches a person writing a folder of markdown.
   assert.throws(
     () => parseFolder([['write', '---\nworkspace: folder\nbackground: true\npermissionMode: acceptEdits\n---\nWrite.\n']]),
     (e: WorkflowError) =>
@@ -1926,6 +1970,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       e.message.startsWith(
         'write: `workspace: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and `permissionMode: acceptEdits` can',
       ),
+    'at load, from files: the same refusal reaches a person writing a folder of markdown',
   );
 });
 
@@ -1996,10 +2041,13 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
       /^supervise: `denials: fail` stops the step on a call the harness denied, and `background: true` runs it as a Claude Code background session \(`claude --bg`\), whose denials are not read \(agent-runtime's open issue 28\) — so the line would never stop anything\. Delete `background: true` to run the step as a job \(`claude -p`\), which records each call it was denied, or delete `denials: fail`\.$/,
     ),
   );
-  // Written back after `allowedTools`, before `background`, and read back as the step.
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
-  assert.equal(renderStep(step), ['---', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'));
-  assert.deepEqual(parseWorkflow('review', renderStep(step)), step);
+  assert.equal(
+    renderStep(step),
+    ['---', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
+    'written back after allowedTools, before background',
+  );
+  assert.deepEqual(parseWorkflow('review', renderStep(step)), step, 'and read back as the step');
 });
 
 test("`allowRuleOf`: the rule a folder's `allowedTools:` takes for a call the harness denied — a file edit by any tool as `Edit(…)`, an absolute path from the root, a command by its first word and whatever follows it; any other call as it was denied", () => {
@@ -2014,9 +2062,11 @@ test("`allowRuleOf`: the rule a folder's `allowedTools:` takes for a call the ha
   assert.equal(allowRuleOf('SendMessage'), 'SendMessage');
   assert.equal(allowRuleOf('mcp__playwright__browser_click'), 'mcp__playwright__browser_click');
   assert.equal(allowRuleOf('Write(/tmp/a (copy).md)'), 'Edit(//tmp/a (copy).md)', 'a path with brackets in it is the path');
-  // Every rule it words for a file edit is one `allowedTools:` takes: `fileRuleRefusal` refuses a path rule on any other file-editing tool.
   for (const denied of ['Write(/tmp/w/notes.md)', 'MultiEdit(src/a.ts)', 'NotebookEdit(n.ipynb)', 'Bash(pytest)']) {
-    assert.doesNotThrow(() => fm('review', `allowedTools: ${allowRuleOf(denied)}`), denied);
+    assert.doesNotThrow(
+      () => fm('review', `allowedTools: ${allowRuleOf(denied)}`),
+      `${denied}: every rule it words for a file edit is one allowedTools: takes, which refuses a path rule on another file-editing tool`,
+    );
   }
 });
 
@@ -2067,20 +2117,19 @@ test("`disallowedBy`: the step's own deny rule that may have denied a call, whic
     'a directory names what is under it',
   );
   assert.equal(disallowedBy('Skill(look)', ['Skill(look)']), 'Skill(look)');
-  // Refused: a rule on another tool, another command, another path, another skill; a relative rule with no directory to read it from.
-  assert.equal(disallowedBy('Bash(pytest)', ['Bash(npm run build)', 'SendMessage']), undefined);
-  assert.equal(disallowedBy('Bash(npm)', ['Read']), undefined);
-  assert.equal(disallowedBy('Write(/tmp/x)', ['Edit(//etc/**)']), undefined);
+  assert.equal(disallowedBy('Bash(pytest)', ['Bash(npm run build)', 'SendMessage']), undefined, 'not by a rule on another command');
+  assert.equal(disallowedBy('Bash(npm)', ['Read']), undefined, 'nor on another tool');
+  assert.equal(disallowedBy('Write(/tmp/x)', ['Edit(//etc/**)']), undefined, 'nor on another path');
   assert.equal(disallowedBy('Write(/etc/hostsx)', ['Edit(//etc/hosts)']), undefined, 'a path is matched whole');
   assert.equal(disallowedBy('Read(/w/r-7/implement/a.ts)', ['Edit(**)'], at), undefined, 'an `Edit` rule is no `Read` rule');
-  assert.equal(disallowedBy('Write(/w/r-7/implement/src/a.ts)', ['Edit(secrets/**)'], at), undefined);
+  assert.equal(disallowedBy('Write(/w/r-7/implement/src/a.ts)', ['Edit(secrets/**)'], at), undefined, 'nor on another relative path');
   assert.equal(
     disallowedBy('Write(/w/r-7/implement/secrets/k.pem)', ['Edit(secrets/**)']),
     undefined,
     'no directory: a relative rule is not read',
   );
   assert.equal(disallowedBy('Write(/home/me/x)', ['Edit(~/x)'], at), undefined, "`~` is nobody's here");
-  assert.equal(disallowedBy('Skill(look)', ['Skill(shadcn)']), undefined);
+  assert.equal(disallowedBy('Skill(look)', ['Skill(shadcn)']), undefined, 'nor on another skill');
   assert.equal(disallowedBy('SendMessage', []), undefined);
 });
 
@@ -2118,7 +2167,6 @@ test("REFUSED at load: `slot: none` on a step of a workflow that has another —
     [watcher, { name: 'implement', after: [], body: 'x' }],
     /^supervise: `slot: none` takes this step's whole RUN out of the cap on runs in flight \(WF_MAX_RUNS\), and this workflow has implement beside it — a slot is a run's, not a step's, so implement would run outside the cap too\. A run that takes no slot is one step: a session that watches the other runs\. Delete the line, or give supervise a folder of its own\.$/,
   );
-  // Wherever it is written: on the first step of a chain, on the last, or on a step beside another.
   refused(
     [
       { name: 'implement', after: [], body: 'x' },
@@ -2153,9 +2201,12 @@ test("REFUSED at load: a `resume:` on a step that runs in the repository's check
     /`workspace: main` runs the step in the repository's own checkout, and `resume: review`/,
     'whichever order the two lines are written in',
   );
-  // And each key on its own is read as it was: `resume:` implies `after:`, and an ending step waits on what it acts on.
-  assert.deepEqual([fm('ship', 'resume: review').resume, fm('ship', 'resume: review').after], ['review', ['review']]);
-  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
+  assert.deepEqual(
+    [fm('ship', 'resume: review').resume, fm('ship', 'resume: review').after],
+    ['review', ['review']],
+    'each key on its own is read as it was: resume: implies after:',
+  );
+  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main', 'and an ending step waits on what it acts on');
 });
 
 test("REFUSED at load: a `check:` on a step that runs in the repository's checkout with no `gate: true` — the run would commit onto the base branch on the check's word, which only a person's approval may start", () => {
@@ -2167,19 +2218,22 @@ test("REFUSED at load: a `check:` on a step that runs in the repository's checko
         e.message,
       ),
   );
-  // Whichever order the lines are written in, and with the check's own refusals still its own.
   assert.throws(
     () => fm('ship', 'check: npm test\nworkspace: main'),
     /`workspace: main` runs the step in the repository's own checkout, and `check: npm test`/,
+    'whichever order the lines are written in',
   );
   assert.throws(
     () => fm('ship', 'workspace: main\ncheck: none'),
     /`workspace: main` runs the step in the repository's own checkout, and `check: none`/,
     'the two together are refused before the check is read on its own',
   );
-  // Gated, it loads: the run executes the check on the merge the step staged, and lands or aborts it.
   const ship = fm('ship', 'workspace: main\ngate: true\ncheck: npm test');
-  assert.deepEqual([ship.workspace, ship.gate, ship.check], ['main', true, 'npm test']);
+  assert.deepEqual(
+    [ship.workspace, ship.gate, ship.check],
+    ['main', true, 'npm test'],
+    'gated, it loads: the run executes the check on the merge the step staged, and lands or aborts it',
+  );
   assert.deepEqual([fm('ship', 'check: npm test\ngate: true\nworkspace: main').check], ['npm test'], 'whichever order');
   assert.throws(
     () => fm('ship', 'workspace: main\ngate: true\ncheck: none'),
@@ -2238,8 +2292,11 @@ test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` doe
   assert.equal(fm('implement', 'remote: true').remote, true);
   assert.equal(fm('implement', 'remote: false').remote, false, 'the author said no, and it is kept');
   assert.equal(fm('implement', 'check: npm test').remote, undefined, 'never a default');
-  // Which harness bridges a session is the engine's to say, at `wf start`: the parser reads the word on any.
-  assert.equal(fm('review', 'harness: codex\nremote: true').remote, true);
+  assert.equal(
+    fm('review', 'harness: codex\nremote: true').remote,
+    true,
+    "which harness bridges a session is the engine's to say, at wf start: the parser reads the word on any",
+  );
   const refused = (lines: string, pattern: RegExp) =>
     assert.throws(
       () => fm('implement', lines),
@@ -2273,15 +2330,15 @@ test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are 
 });
 
 test('REFUSED at load: a loop a round could not file again as it was — a step in it that forks, merges or resumes, a step in two loops, a target that declares `replies`', () => {
-  // implement → review (loop: implement), and docs beside review: review forks a worktree cut once, off round 1.
   assert.match(
     refusal(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\n---\ndocument it\n' })),
     /^review: `loop: implement` files review again after implement each round, in the workspace implement works in, and review does not work there: docs waits on implement too, so review forks a worktree of its own, cut once, which would not have the next round's work\. A loop's steps are a chain/,
+    'implement → review (loop: implement), and docs beside review: review forks a worktree cut once, off the first round',
   );
-  // Read in the workflow's order, so review's merge is found before test's fork beside it.
   assert.throws(
     () => validate([step('implement'), looping('review', ['implement', 'test'], 'implement'), step('test', ['implement'])]),
     /review does not work there: it waits on implement and test, so it merges their branches into a worktree of its own/,
+    "read in the workflow's order, so review's merge is found before test's fork beside it",
   );
   assert.throws(
     () => validate([step('implement'), { ...step('test', ['implement']), resume: 'implement' }, looping('review', ['test'], 'implement')]),
@@ -2350,10 +2407,10 @@ test('REFUSED at shipped defaults: `workflowFolder` on a name the repository doe
     () => workflowFolder('./workflows/deb', repo, repo),
     refused(`no workflow folder at ${path.join(workflows, 'deb')}. ${theirs}`),
   );
-  // From the plan folder, `workflows/dev` is a path that is not there, and never the repository's dev.
   assert.throws(
     () => workflowFolder('workflows/dev', plans, repo),
     refused(`no workflow folder at ${path.join(plans, 'workflows', 'dev')}. ${theirs}`),
+    "from the plan folder, workflows/dev is a path that is not there, and never the repository's dev",
   );
   fs.writeFileSync(path.join(repo, 'brief.md'), 'a brief\n');
   assert.throws(
@@ -2397,13 +2454,17 @@ const shippedFolders = (): string[] => {
 };
 
 test("every agent step of the shipped workflows runs on a 200k window — the workflows of work, the package's own ui copy, and the supervisor", () => {
-  // Measured before it was set (agent-runtime open issue 26): a `--bg` session compacts at its window, carries on and signs off. The
-  // supervisor's session never ends and grows on every answer, which makes it the one a cap is for.
   const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
   const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui', 'supervisor'].map((name) => path.join(root, name));
   folders.push(path.join(import.meta.dirname, '..', 'workflows', 'ui'));
   for (const dir of folders) {
-    for (const step of loadWorkflows(dir)) assert.equal(step.context, 200_000, `${path.relative(root, dir)}/${step.name}.md`);
+    for (const step of loadWorkflows(dir))
+      assert.equal(
+        step.context,
+        200_000,
+        `${path.relative(root, dir)}/${step.name}.md: a background session compacts at its window, carries on and signs off, and the ` +
+          "supervisor's never ends and grows on every answer, which makes it the one a cap is for",
+      );
   }
 });
 
@@ -2436,12 +2497,12 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
       dir,
     );
   }
-  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then its own note — none. The keys
-  // its agent gives it are the agent's file's, and are not written into the step's.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
   assert.equal(
     renderStep(review),
     ['---', 'after: implement', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'),
+    "a shipped step rendered: the keys it sets in the keys' order, no comments, then its own note, none; the keys its agent gives it " +
+      "are the agent's file's, and are not written into the step's",
   );
   assert.equal(review.model, 'opus', "and the step runs with the agent's keys all the same");
   assert.doesNotMatch(
@@ -2454,9 +2515,6 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
-  // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
-  // `agent:` renders in test/agents.test.ts, which has agents to resolve it with, and `background:`, which keeps no `budget:`, below, as
-  // does `sandbox:`, which is Codex's, where this step runs on Claude Code.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'background' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
@@ -2490,7 +2548,11 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   );
   for (const key of STEP_KEYS)
     if (key !== 'workspace' && key !== 'slot' && key !== 'agent' && key !== 'background' && key !== 'sandbox')
-      assert.notEqual(step[key], undefined, key);
+      assert.notEqual(
+        step[key],
+        undefined,
+        `${key}: every key is set but workspace, slot, background and sandbox, each rendered below, and agent, in test/agents.test.ts`,
+      );
   const text = renderStep(step);
   assert.equal(
     text,
@@ -2525,37 +2587,52 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     ].join('\n'),
   );
   assert.deepEqual(parseWorkflow('review', text, read), step);
-  // `remote: false` is a setting the parser reads, and is written; `retries: 0` too.
-  assert.match(renderStep({ ...step, remote: false }), /^remote: false$/m);
+  assert.match(
+    renderStep({ ...step, remote: false }),
+    /^remote: false$/m,
+    'remote: false is a setting the parser reads, and is written; retries: 0 too',
+  );
 
-  // And `workspace: main`, which no step sets beside a `check:`: after `input`, before `harness`, and read back as the step.
   const ending = parseWorkflow('ship', '---\nafter: review\ngate: true\nworkspace: main\nharness: claude\n---\nShip it.\n');
   const rendered = renderStep(ending);
-  assert.equal(rendered, ['---', 'after: review', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'));
-  assert.deepEqual(parseWorkflow('ship', rendered), ending);
+  assert.equal(
+    rendered,
+    ['---', 'after: review', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
+    'workspace: main, which no step sets beside a check:, is written after input, before harness',
+  );
+  assert.deepEqual(parseWorkflow('ship', rendered), ending, 'and read back as the step');
 
-  // And `slot: none`, which only a workflow of one step sets: after `workspace`, before `harness`.
   const watching = parseWorkflow('supervise', '---\nharness: claude\nslot: none\nworkspace: main\n---\nWatch the runs.\n');
   const watched = renderStep(watching);
-  assert.equal(watched, ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'));
+  assert.equal(
+    watched,
+    ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
+    'slot: none, which only a workflow of one step sets, is written after workspace, before harness',
+  );
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
 
-  // And `background: true`, which keeps no `budget:`: after `allowedTools`, before `remote`; `background: false` is written too.
   const session = parseWorkflow('supervise', '---\nremote: true\nbackground: true\nallowedTools: Read\n---\nWatch the runs.\n');
   const kept = renderStep(session);
-  assert.equal(kept, ['---', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'));
+  assert.equal(
+    kept,
+    ['---', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'),
+    'background: true, which keeps no budget:, is written after allowedTools, before remote',
+  );
   assert.deepEqual(parseWorkflow('supervise', kept), session);
-  assert.match(renderStep({ ...session, background: false }), /^background: false$/m);
+  assert.match(renderStep({ ...session, background: false }), /^background: false$/m, 'background: false is written too');
 
-  // And `sandbox:`, a codex step's: after `context`, where `permissionMode` is on Claude Code, and read back as the step. One read from the
-  // former line is written under Codex's name.
   const fenced = parseWorkflow('review', '---\nsandbox: read-only\neffort: high\nharness: codex\n---\nReview it.\n');
   const fence = renderStep(fenced);
-  assert.equal(fence, ['---', 'harness: codex', 'effort: high', 'sandbox: read-only', '---', 'Review it.', ''].join('\n'));
-  assert.deepEqual(parseWorkflow('review', fence), fenced);
+  assert.equal(
+    fence,
+    ['---', 'harness: codex', 'effort: high', 'sandbox: read-only', '---', 'Review it.', ''].join('\n'),
+    "sandbox:, a codex step's, is written after context, where permissionMode is on Claude Code",
+  );
+  assert.deepEqual(parseWorkflow('review', fence), fenced, 'and read back as the step');
   assert.equal(
     renderStep(parseWorkflow('review', '---\nharness: codex\npermissionMode: bypassPermissions\n---\nReview it.\n')),
     ['---', 'harness: codex', 'sandbox: danger-full-access', '---', 'Review it.', ''].join('\n'),
+    "a sandbox read from the former line is written under Codex's name",
   );
 });
 
@@ -2575,23 +2652,27 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
     () => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'read-only' }, body: 'You review.' }),
     said('agents/reviewer.md', 'read-only', 'read-only'),
   );
-  // Written under its own name, each is taken; and a claude draft's `permissionMode` is its own.
   assert.match(
     renderStep({ name: 'review', body: 'Review it.', harness: 'codex', sandbox: 'read-only' } as StepDraft),
     /^sandbox: read-only$/m,
+    'written under its own name, each is taken',
   );
   assert.match(
     renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' }),
     /^sandbox: read-only$/m,
   );
-  assert.match(renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft), /^permissionMode: dontAsk$/m);
-  // A Claude Code mode kept by a step moved onto codex names no sandbox and no former line: written as given, for the parser to refuse
-  // naming `sandbox:` — not told to reload a page, which would send it again.
+  assert.match(
+    renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft),
+    /^permissionMode: dontAsk$/m,
+    "and a claude draft's permissionMode is its own",
+  );
   const moved = renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft);
   assert.throws(
     () => parseWorkflow('review', moved),
     (e: Error) =>
       e.message.startsWith('review: `permissionMode: dontAsk` is not a key codex takes.') && e.message.includes('Write `sandbox:` instead'),
+    'a Claude Code mode kept by a step moved onto codex is written as given, for the parser to refuse naming sandbox:, ' +
+      'not told to reload a page, which would send it again',
   );
   const agent = renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' });
   assert.match(agent, /^permissionMode: dontAsk$/m);
@@ -2615,7 +2696,6 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
     'and reads back as the step',
   );
 
-  // A draft names its `output:` by file, and the schema is read from the folder; a loop's rounds are the default when it sets none.
   const draft: StepDraft = {
     name: 'review',
     after: ['implement'],
@@ -2629,11 +2709,15 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
   assert.deepEqual(
     [parseWorkflow('review', text, read).output?.schema, parseWorkflow('review', text, read).rounds],
     [LOOPING, DEFAULT_ROUNDS],
+    "a draft names its output: by file, and the schema is read from the folder; a loop's rounds are the default when it sets none",
   );
 
-  // A body that opens on `---` keeps an empty frontmatter before it, or it would be read as one.
   const rule: StepDraft = { name: 'implement', after: [], body: '---\nThe brief, below a rule.' };
-  assert.equal(renderStep(rule), '---\n\n---\n---\nThe brief, below a rule.\n');
+  assert.equal(
+    renderStep(rule),
+    '---\n\n---\n---\nThe brief, below a rule.\n',
+    'a body that opens on --- keeps an empty frontmatter before it, or it would be read as one',
+  );
   assert.throws(
     () => parseWorkflow('implement', '---\n---\n---\nThe brief, below a rule.\n'),
     /`---` is not `key: value`/,
@@ -2681,18 +2765,18 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
     'a key set to nothing is not set',
   );
 
-  // Written as given, the break would end the line, and what follows would be a key of its own: a harness nobody chose.
   const injected = { ...step, check: 'npm test\nharness: codex' };
   assert.equal(
     message(injected),
     'review: `check` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line — commands joined with `&&`.',
+    'written as given, the break would end the line, and what follows would be a key of its own: a harness nobody chose',
   );
   assert.match(message({ ...step, model: 'opus\r' }), /^review: `model` holds a line break/);
   assert.match(message({ ...step, tools: ['Read', 'Grep\nBash'] }), /^review: `tools` holds a line break/);
-  // A key the draft sends as an object would be written `[object Object]`, a value nobody chose: refused by name instead.
   assert.equal(
     message({ ...step, model: { name: 'opus' } }),
     'review: `model` is {"name":"opus"}, and a frontmatter line holds a word, a number or a list: an object would be written as `[object Object]`.',
+    'a key the draft sends as an object would be written as a value nobody chose: refused by name instead',
   );
 
   assert.equal(
@@ -2701,7 +2785,6 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   );
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 
-  // What the parser judges, renderStep writes as given, for the parser to refuse.
   for (const [draft, lines] of [
     [{ ...step, tools: [] }, 'tools: '],
     [{ ...step, model: '' }, 'model: '],
@@ -2712,7 +2795,7 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
     [{ ...step, output: {} }, 'output: '],
   ] as const) {
     const text = renderStep(draft as unknown as StepDraft);
-    assert.ok(text.includes(`\n${lines}\n`), text);
+    assert.ok(text.includes(`\n${lines}\n`), `what the parser judges, renderStep writes as given, for the parser to refuse:\n${text}`);
     assert.throws(() => parseWorkflow('review', text), WorkflowError, lines);
   }
 });
@@ -2771,7 +2854,6 @@ test("`stepNameRefusal`: a step's name is its file's in the folder — REFUSED: 
 });
 
 test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folder: in the order of their files, validated, in the order they run — refused in the same words', () => {
-  // `a-b.md` sorts before `a.md`, though `a` sorts before `a-b`: the files' order breaks the tie, as a folder lists them.
   const files: Array<[string, string]> = [
     ['a', 'first\n'],
     ['a-b', 'second\n'],
@@ -2781,6 +2863,7 @@ test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folde
   assert.deepEqual(
     loadWorkflows(dir).map((s) => s.name),
     ['a-b', 'a', 'c'],
+    "a-b.md sorts before a.md, though a sorts before a-b: the files' order breaks the tie, as a folder lists them",
   );
   assert.deepEqual(parseFolder(files), loadWorkflows(dir));
   assert.deepEqual(parseFolder([...files].reverse()), loadWorkflows(dir), 'whatever order they are given in');

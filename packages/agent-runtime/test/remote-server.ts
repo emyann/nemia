@@ -154,6 +154,10 @@ export const mtls = (): Security => ({
   accepts: () => false,
 });
 
+/**
+ * A remote agent started as `o` says, listening once it returns. Steps a `move` hands a task before its executor waits
+ * for them are queued for that task, and the executor's wait is kept by task until a step, a cancel or the close ends it.
+ */
 export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer> {
   const bindings = o.bindings ?? ['JSONRPC', 'HTTP+JSON'];
   const script = o.script ?? (() => []);
@@ -167,7 +171,6 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const hanging = { card: false, a2a: false };
   const prefix = o.prefix ?? '';
   const turns = new Map<string, number>();
-  // Per task: steps a `move` handed over before the executor waited for them, and the executor's wait.
   const queued = new Map<string, Step[][]>();
   const waiting = new Map<string, (steps: Step[] | 'cancelled') => void>();
   let base = '';

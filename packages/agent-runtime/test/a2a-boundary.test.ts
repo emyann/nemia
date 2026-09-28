@@ -1,7 +1,7 @@
 /**
- * The A2A SDK stays inside the seam (thin runtime, stage 1 part 2): only `src/a2a-*.ts` import `@a2a-js/sdk`, by any
- * entry, and neither of the runtime's entries hands a consumer an SDK name or value. A consumer of the runtime learns no
- * protocol, and a change of SDK is a change to three files.
+ * The A2A SDK stays inside the seam: only `src/a2a-*.ts` import `@a2a-js/sdk`, by any entry, and neither of the runtime's
+ * entries hands a consumer an SDK name or value. A consumer of the runtime learns no protocol, and a change of SDK is a
+ * change to the seam's files alone.
  *
  * Each rule is made to refuse planted source first: a scan that read nothing, or matched nothing, passes too.
  */
@@ -84,9 +84,12 @@ test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type
   for (const [file, line, spec] of planted) {
     assert.deepEqual(sdkBreaches(file, `// the seam\n${line}\n`), [`${file} imports ${spec}: ${why}`], `${file}: ${line}`);
   }
-  // Not refused: the seam itself, and prose that names the SDK.
-  assert.deepEqual(sdkBreaches('src/a2a-client.ts', "import { Client } from '@a2a-js/sdk/client';"), []);
-  assert.deepEqual(sdkBreaches('src/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"), []);
+  assert.deepEqual(sdkBreaches('src/a2a-client.ts', "import { Client } from '@a2a-js/sdk/client';"), [], 'not refused: the seam itself');
+  assert.deepEqual(
+    sdkBreaches('src/engine.ts', "// import { TaskState } from '@a2a-js/sdk';\n * from '@a2a-js/sdk'"),
+    [],
+    'not refused: prose that names the SDK',
+  );
 });
 
 /** Every name and value the SDK's entries export. */

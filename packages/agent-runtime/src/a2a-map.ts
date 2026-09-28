@@ -295,9 +295,7 @@ export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiti
   });
 };
 
-// ─── a remote agent's Task, which the runtime did not make ─────────────────
-
-/** What a remote Task in an interrupted state waits for, in A2A's word for it. */
+/** What a remote agent's Task, one the runtime did not make, waits for in an interrupted state, in A2A's word for it. */
 const WAITS: ReadonlyMap<TaskState, string> = new Map([
   [TaskState.TASK_STATE_INPUT_REQUIRED, 'input'],
   [TaskState.TASK_STATE_AUTH_REQUIRED, 'authentication'],

@@ -974,8 +974,8 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
  * (r-1's ship has it)`. Pure.
  *
  * `waiting on …`, and not `waiting for …`, because the board reads the words: `stepState` (`apps/web/src/lib/status.ts`) takes `waiting`,
- * `waiting on …` and `pending` as a step not filed and anything else as one still working, so a step with no session of its own would be
- * drawn as one whose session is running. The board draws `slotWord`'s `waiting for a run slot` as working.
+ * `waiting on …` and `pending` as a step not filed, `slotWord`'s `waiting for a run slot` as a step the cap holds, and anything else as one
+ * still working, so a step with no session of its own would be drawn as one whose session is running.
  */
 export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 

@@ -244,7 +244,7 @@ function Output({ step, state, selected }: { step: Step; state: StepState; selec
     ? "No closeout on the engine's record of this try."
     : step.status.endsWith('closeout unreadable')
       ? 'It gave a closeout that could not be read.'
-      : isLive(state) || state === 'waiting'
+      : isLive(state) || state === 'waiting' || state === 'waiting-for-slot'
         ? 'No closeout yet: the step has not signed off.'
         : 'No closeout: the step ended without one.';
   return <TryCloseouts tries={step.tries} selected={selected} none={none} />;

@@ -88,9 +88,12 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
     );
   }
   if (!isolate && fansOut(steps)) {
-    throw new Error(
-      'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
-        'Either drop --no-worktree, or make the steps a chain.',
+    throw Object.assign(
+      new Error(
+        'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
+          'Either drop --no-worktree, or make the steps a chain.',
+      ),
+      { exitCode: 2 },
     );
   }
   const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;

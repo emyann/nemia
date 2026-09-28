@@ -27,6 +27,7 @@ export type StepState =
   | 'failed'
   | 'failed-check'
   | 'waiting'
+  | 'waiting-for-slot'
   | 'held'
   | 'cancelled'
   | 'unreadable'
@@ -45,6 +46,7 @@ export function stepState(status: string, runCancelled: boolean, runHeld: boolea
 /** What a hold makes `held`: a step not filed yet, and one at a human gate (`isGate`), whose answer is refused while the hold stands. */
 const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
   'waiting',
+  'waiting-for-slot',
   'blocked',
   'awaiting-approval',
   'exhausted',
@@ -58,9 +60,10 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
  * on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at most its own word, `unverified`; so is
  * `input-required`, a task held open whose turn signed and waits for a person's word with nothing running, whose word beside it says which
  * (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started `--after` runs that have not shipped, and
- * `pending` are not filed, as `waiting` is. Any other word — `running (working)`, `working (quiescent)`, `starting`, `between attempts`, or
- * one `wf ls` has that this does not know — is `working`: a step the board cannot name is shown as still going, never as done or as
- * needing you.
+ * `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the feed's `waiting for a run slot` without the
+ * count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `running (working)`, `working (quiescent)`,
+ * `starting`, `between attempts`, or one `wf ls` has that this does not know — is `working`: a step the board cannot name is shown as still
+ * going, never as done or as needing you.
  */
 function wordState(status: string, runCancelled: boolean): StepState {
   const [word = '', said] = status.split(' · ');
@@ -82,6 +85,8 @@ function wordState(status: string, runCancelled: boolean): StepState {
   if (word === 'input-required') return 'unverified';
   if (word === 'unreadable') return 'unreadable';
   if (word === 'unknown') return 'unknown';
+  if (word === 'waiting for a run slot' || word.startsWith('waiting for a run slot ('))
+    return runCancelled ? 'cancelled' : 'waiting-for-slot';
   if (word === 'waiting' || word.startsWith('waiting on ') || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
   return 'working';
 }
@@ -126,6 +131,8 @@ export const stateMeaning: Record<StepState, string> = {
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
   waiting: 'waiting: not filed yet',
+  'waiting-for-slot':
+    'waiting for a run slot: not filed yet — the cap on runs in flight (WF_MAX_RUNS) holds the run, and the tick files it once a run in flight settles, oldest held first',
   held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
   unreadable:
@@ -157,6 +164,7 @@ export const stateClass: Record<StepState, string> = {
   'failed-check':
     'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  'waiting-for-slot': 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
   held: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
   unreadable: 'border border-dashed border-red-400 text-red-800 dark:border-red-700 dark:text-red-300',

@@ -164,7 +164,7 @@ test('the board drains', async () => {
   fake.end();
   for (const id of [taskOf(jobRun.id), taskOf(bgRun.id)]) await e.stop(id);
   const deadline = Date.now() + 20_000;
-  while ((await e.list()).some((v) => !v.state.settled)) {
+  while ((await e.list()).views.some((v) => !v.state.settled)) {
     assert.ok(Date.now() < deadline, 'every task settles');
     await e.tick();
     await new Promise((r) => setTimeout(r, 50));

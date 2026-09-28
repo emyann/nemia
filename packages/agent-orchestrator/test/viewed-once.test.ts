@@ -21,7 +21,7 @@ const counting = () => {
       return { id, phase: 'done' } as unknown as TaskView;
     },
     async list() {
-      return [];
+      return { views: [], unreadable: [] };
     },
     async io() {
       return {};

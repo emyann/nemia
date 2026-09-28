@@ -124,9 +124,9 @@ const until = async (ids: string[], phase: string) => {
 
 /** Every task on the board stopped and settled, so the next case starts on an empty pool. */
 const drain = async () => {
-  for (const v of await e.list()) if (!v.state.settled) await e.stop(v.id);
+  for (const v of (await e.list()).views) if (!v.state.settled) await e.stop(v.id);
   const deadline = Date.now() + 15_000;
-  while ((await e.list()).some((v) => !v.state.settled)) {
+  while ((await e.list()).views.some((v) => !v.state.settled)) {
     assert.ok(Date.now() < deadline, 'the board drains');
     await e.tick();
     await sleep(50);

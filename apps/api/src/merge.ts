@@ -15,7 +15,10 @@ export type MergeWord = { clean: true } | { clean: false; conflicts: string[] } 
 export function mergesOnto(repo: string, onto: string, branch: string): MergeWord {
   try {
     execFileSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', onto, branch], {
-      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024,
+      cwd: repo,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 16 * 1024 * 1024,
     });
     return { clean: true };
   } catch (err) {
@@ -28,8 +31,8 @@ export function mergesOnto(repo: string, onto: string, branch: string): MergeWor
 
 /** The fact in a person's words: `merges cleanly onto main`, or which files it conflicts in, or why git could not say. */
 export const mergeWord = (merge: MergeWord, onto: string): string =>
-  ('error' in merge
+  'error' in merge
     ? `whether it merges onto ${onto} is not known: ${merge.error}`
     : merge.clean
       ? `merges cleanly onto ${onto}`
-      : `conflicts with ${onto} in ${merge.conflicts.length} file${merge.conflicts.length === 1 ? '' : 's'}: ${merge.conflicts.join(', ')}`);
+      : `conflicts with ${onto} in ${merge.conflicts.length} file${merge.conflicts.length === 1 ? '' : 's'}: ${merge.conflicts.join(', ')}`;

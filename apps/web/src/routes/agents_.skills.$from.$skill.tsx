@@ -86,13 +86,18 @@ function SkillPage() {
       </header>
 
       {skill.error !== null && (
-        <div data-skill-error className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+        <div
+          data-skill-error
+          className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+        >
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a skill, so no agent can be given it:</p>
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{skill.error}</p>
         </div>
       )}
 
-      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">{skill.dir}/SKILL.md</p>
+      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">
+        {skill.dir}/SKILL.md
+      </p>
       <SkillForm
         // A new version is a new form: what was saved or switched, as it now reads — but not while the file moved under unsaved words.
         key={shown.version}
@@ -114,7 +119,11 @@ function SkillPage() {
                   }}
                 />
               ) : (
-                readPast && <p data-skill-read-again className="text-xs text-neutral-600 dark:text-neutral-400">It has been read again since: the page shows it as it now reads.</p>
+                readPast && (
+                  <p data-skill-read-again className="text-xs text-neutral-600 dark:text-neutral-400">
+                    It has been read again since: the page shows it as it now reads.
+                  </p>
+                )
               )}
             </>
           )
@@ -145,7 +154,10 @@ function SkillPage() {
  */
 function Moved({ file, onReadAgain }: { file: string; onReadAgain: () => void }) {
   return (
-    <div data-skill-moved className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40">
+    <div
+      data-skill-moved
+      className="flex flex-wrap items-center gap-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40"
+    >
       <p className="min-w-0 flex-1 text-sm text-amber-900 dark:text-amber-200">
         {file} has changed since this form was drawn, so a save of it would write over that change and is refused. What you typed stays here
         until you read it again, which draws the form from the file as it now reads and drops it: copy out what you want to keep first.
@@ -185,12 +197,20 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
   return (
     <p data-copy-hint className="text-xs text-neutral-500">
       {from === 'yours' && detail.copyHint && (
-        <>For this repository's agents to be given it, copy it into the repository by hand — the board writes no checkout — and commit it: {code(detail.copyHint)}.</>
+        <>
+          For this repository's agents to be given it, copy it into the repository by hand — the board writes no checkout — and commit it:{' '}
+          {code(detail.copyHint)}.
+        </>
       )}
       {from === 'repo' && detail.copyHint && (
-        <>The repository's skills are read here, not written: they change with the repository, in a commit. To make one of yours from it, {code(detail.copyHint)}.</>
+        <>
+          The repository's skills are read here, not written: they change with the repository, in a commit. To make one of yours from it,{' '}
+          {code(detail.copyHint)}.
+        </>
       )}
-      {from === 'shipped' && <>Shipped with HKB, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>}
+      {from === 'shipped' && (
+        <>Shipped with HKB, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
+      )}
     </p>
   );
 }
@@ -199,7 +219,17 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
  * The switch that loads it every turn (`preload: true`), what a turn carries either way, and whom it changes: every agent that gives it. It
  * writes the file as it is on disk, so it waits while the form holds unsaved words; the repository's and HKB's are shown, not switched.
  */
-function Preload({ detail, pending, changed, onSwitch }: { detail: SkillDetail; pending: boolean; changed: boolean; onSwitch: (on: boolean) => void }) {
+function Preload({
+  detail,
+  pending,
+  changed,
+  onSwitch,
+}: {
+  detail: SkillDetail;
+  pending: boolean;
+  changed: boolean;
+  onSwitch: (on: boolean) => void;
+}) {
   const id = useId();
   const { skill } = detail;
   const mine = skill.from === 'yours';
@@ -214,12 +244,20 @@ function Preload({ detail, pending, changed, onSwitch }: { detail: SkillDetail; 
       </div>
       {skill.cost && (
         <>
-          <p data-skill-cost className="text-xs text-neutral-700 dark:text-neutral-300">Now: {costWords(skill.cost)}.</p>
+          <p data-skill-cost className="text-xs text-neutral-700 dark:text-neutral-300">
+            Now: {costWords(skill.cost)}.
+          </p>
           <p className="text-xs text-muted-foreground">{preloadWords(skill.cost)}</p>
         </>
       )}
-      <p data-skill-reach className="text-xs text-muted-foreground">{reachWords(detail.users)}</p>
-      {mine && changed && <p className="text-xs text-amber-700 dark:text-amber-400">Save or discard the changes below first: the switch writes the file as it is on disk.</p>}
+      <p data-skill-reach className="text-xs text-muted-foreground">
+        {reachWords(detail.users)}
+      </p>
+      {mine && changed && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          Save or discard the changes below first: the switch writes the file as it is on disk.
+        </p>
+      )}
     </fieldset>
   );
 }

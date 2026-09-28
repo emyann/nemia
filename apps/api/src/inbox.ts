@@ -18,7 +18,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono, type Context } from 'hono';
-import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, queueInInbox, readInbox, type InboxListing } from 'agent-orchestrator';
+import {
+  addToInbox,
+  dropFromInbox,
+  HOME,
+  INBOX_KEY_MEANINGS,
+  INBOX_KEYS,
+  inboxDir,
+  inboxNameRefusal,
+  noCardLine,
+  parseInboxCard,
+  queueInInbox,
+  readInbox,
+  type InboxListing,
+} from 'agent-orchestrator';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, type KeyRow, type WorkflowSource } from './workflows.ts';
@@ -47,7 +60,14 @@ export type InboxFiled = { name: string; file: string; workflow: string | null; 
  * `not queued` for a card taken off a queue it was not in, which writes nothing — the card's `queued:` as it now reads, and, once queued, its
  * place in the queue's order and how many are in it.
  */
-export type InboxQueueAnswer = { name: string; file: string; was: 'queued' | 'taken back' | 'not queued'; queued: string | null; place: number | null; of: number | null };
+export type InboxQueueAnswer = {
+  name: string;
+  file: string;
+  was: 'queued' | 'taken back' | 'not queued';
+  queued: string | null;
+  place: number | null;
+  of: number | null;
+};
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
@@ -99,25 +119,26 @@ const dropGuard = (name: string): Guarded => ({
 const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
 
 /** A queue of `name`, or its taking back (`off`), as the guard's refusals word it. */
-const queueGuard = (name: string, off: boolean): Guarded => (off
-  ? {
-      route: `DELETE /api/inbox/${name}/queue`,
-      does: 'takes a card off the queue',
-      forAnother: 'take one off',
-      why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
-      reach: 'take the card off the queue from the board',
-      instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
-      shape: QUEUE_SHAPE,
-    }
-  : {
-      route: `POST /api/inbox/${name}/queue`,
-      does: 'queues a card',
-      forAnother: 'queue one',
-      why: "a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names",
-      reach: 'queue the card from the board',
-      instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
-      shape: QUEUE_SHAPE,
-    });
+const queueGuard = (name: string, off: boolean): Guarded =>
+  off
+    ? {
+        route: `DELETE /api/inbox/${name}/queue`,
+        does: 'takes a card off the queue',
+        forAnother: 'take one off',
+        why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
+        reach: 'take the card off the queue from the board',
+        instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
+        shape: QUEUE_SHAPE,
+      }
+    : {
+        route: `POST /api/inbox/${name}/queue`,
+        does: 'queues a card',
+        forAnother: 'queue one',
+        why: 'a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names',
+        reach: 'queue the card from the board',
+        instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
+        shape: QUEUE_SHAPE,
+      };
 
 /**
  * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the api does
@@ -133,9 +154,10 @@ function queueBodyRefusal(route: string, text: string): Refusal | null {
     return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.` };
   }
   if (isObject(body) && Object.keys(body).length === 0) return null;
-  const named = isObject(body) && 'workflow' in body
-    ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
-    : '';
+  const named =
+    isObject(body) && 'workflow' in body
+      ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
+      : '';
   return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}` };
 }
 
@@ -169,7 +191,10 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
   if (!isObject(body)) return { status: 400, error: `POST /api/inbox takes a JSON object: ${FILE_SHAPE}.` };
   const { body: text, workflow, from, repo: about } = body;
   if (typeof text !== 'string') {
-    return { status: 400, error: `\`body\` is the idea, as \`wf inbox add "<idea>"\` takes it: text. This request's was ${JSON.stringify(text) ?? 'left out'}: ${FILE_SHAPE}.` };
+    return {
+      status: 400,
+      error: `\`body\` is the idea, as \`wf inbox add "<idea>"\` takes it: text. This request's was ${JSON.stringify(text) ?? 'left out'}: ${FILE_SHAPE}.`,
+    };
   }
   if (workflow !== undefined && (typeof workflow !== 'string' || !workflow || /[\\/]/.test(workflow))) {
     return {
@@ -177,19 +202,31 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
       error: `\`workflow\` names what runs the card, as GET /api/workflows lists a workflow: a folder's name, or left out for a card that says nothing of it. This request's was ${JSON.stringify(workflow)}.`,
     };
   }
-  if (from !== undefined && (from !== 'repo' && from !== 'yours')) {
-    return { status: 400, error: `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.` };
+  if (from !== undefined && from !== 'repo' && from !== 'yours') {
+    return {
+      status: 400,
+      error: `\`from\` is where the card's workflow is read from: "repo" or "yours", or left out when only one has a workflow of that name.`,
+    };
   }
   if (from !== undefined && workflow === undefined) {
-    return { status: 400, error: '`from` says where the card\'s workflow is read from, and this request names no `workflow`. Name one, or leave both out.' };
+    return {
+      status: 400,
+      error: "`from` says where the card's workflow is read from, and this request names no `workflow`. Name one, or leave both out.",
+    };
   }
   if (about !== undefined && typeof about !== 'string') {
-    return { status: 400, error: `\`repo\` is the repository the idea is about, as \`wf inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(about)}.` };
+    return {
+      status: 400,
+      error: `\`repo\` is the repository the idea is about, as \`wf inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(about)}.`,
+    };
   }
   // An absolute path written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start records
   // names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is, for the
   // package to refuse: the api has no directory it was typed from.
-  const filing: { text: string; workflow?: string; repo?: string } = { text, ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}) };
+  const filing: { text: string; workflow?: string; repo?: string } = {
+    text,
+    ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
+  };
   if (workflow === undefined) return filing;
   const folder = folderOf(workflow, from as WorkflowSource | undefined, repo, home);
   if ('status' in folder) return folder;
@@ -236,9 +273,14 @@ export const inbox = new Hono()
       return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
     }
     // A card's keys as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
-    const keys = entry.error === null
-      ? INBOX_KEYS.map((key) => ({ key, value: key === 'queued' ? entry.queued?.at ?? null : entry[key] ?? null, meaning: INBOX_KEY_MEANINGS[key] }))
-      : null;
+    const keys =
+      entry.error === null
+        ? INBOX_KEYS.map((key) => ({
+            key,
+            value: key === 'queued' ? (entry.queued?.at ?? null) : (entry[key] ?? null),
+            meaning: INBOX_KEY_MEANINGS[key],
+          }))
+        : null;
     return c.json({ ...entry, source, keys } satisfies InboxCardPage);
   })
   // `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line.
@@ -254,8 +296,15 @@ export const inbox = new Hono()
     const asked = filingOf(body, repoOf(), HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     try {
-      const { card, file } = addToInbox({ text: asked.text, ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}), ...(asked.repo !== undefined ? { repo: asked.repo } : {}) });
-      return c.json({ name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled, 201);
+      const { card, file } = addToInbox({
+        text: asked.text,
+        ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
+        ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
+      });
+      return c.json(
+        { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
+        201,
+      );
     } catch (err) {
       // The package's refusal, word for word (`exitCode` 2): an idea with nothing in it, a key it would write on two lines, a repo that is not
       // an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's: the inbox could not be written.
@@ -265,7 +314,12 @@ export const inbox = new Hono()
   // `wf inbox rm <name>`: a card dropped without being started.
   .delete('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
-    const refused = refusedBeforeReading(dropGuard(name), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      dropGuard(name),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     // A name that would leave the inbox, or a hidden one, in the package's words, before anything is read.
     const wrong = inboxNameRefusal(name);
@@ -310,7 +364,14 @@ async function queueRoute(c: Context, off: boolean) {
         // The queue is written all the same: the card lists at the time of the queue, until it is written again.
       }
     }
-    return c.json({ name: done.card.name, file: done.file, was: done.was, queued: done.card.queued ?? null, place: done.place ?? null, of: done.of ?? null } satisfies InboxQueueAnswer);
+    return c.json({
+      name: done.card.name,
+      file: done.file,
+      was: done.was,
+      queued: done.card.queued ?? null,
+      place: done.place ?? null,
+      of: done.of ?? null,
+    } satisfies InboxQueueAnswer);
   } catch (err) {
     if ((err as { exitCode?: unknown }).exitCode !== 2) return c.json({ error: messageOf(err) }, 500);
     return c.json({ error: messageOf(err) }, queueRefusalStatus(name));

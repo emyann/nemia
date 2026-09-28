@@ -1,5 +1,5 @@
-import * as React from "react"
-import { cn } from "cn"
+import * as React from 'react';
+import { cn } from 'cn';
 import {
   Button as ButtonPrimitive,
   composeRenderProps,
@@ -17,71 +17,41 @@ import {
   type ListBoxSectionProps as SelectGroupProps,
   type SelectProps,
   type SelectValueProps,
-} from "react-aria-components"
+} from 'react-aria-components';
 
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group"
-import { ChevronDownIcon, SearchIcon, CheckIcon } from "lucide-react"
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { ChevronDownIcon, SearchIcon, CheckIcon } from 'lucide-react';
 
-function Select<T extends object, M extends "single" | "multiple" = "single">({
-  className,
-  ...props
-}: SelectProps<T, M>) {
-  return (
-    <SelectPrimitive
-      data-slot="select"
-      className={cn("w-fit", className)}
-      {...props}
-    />
-  )
+function Select<T extends object, M extends 'single' | 'multiple' = 'single'>({ className, ...props }: SelectProps<T, M>) {
+  return <SelectPrimitive data-slot="select" className={cn('w-fit', className)} {...props} />;
 }
 
-function SelectGroup<T extends object>({
-  className,
-  ...props
-}: SelectGroupProps<T>) {
-  return (
-    <ListBoxSectionPrimitive
-      data-slot="select-group"
-      className={cn("scroll-my-1 p-1", className)}
-      {...props}
-    />
-  )
+function SelectGroup<T extends object>({ className, ...props }: SelectGroupProps<T>) {
+  return <ListBoxSectionPrimitive data-slot="select-group" className={cn('scroll-my-1 p-1', className)} {...props} />;
 }
 
-function SelectValue<T extends object>({
-  className,
-  children,
-  ...props
-}: SelectValueProps<T>) {
+function SelectValue<T extends object>({ className, children, ...props }: SelectValueProps<T>) {
   return (
     <SelectValuePrimitive
       data-slot="select-value"
-      className={cn(
-        "flex flex-1 text-left data-placeholder:text-muted-foreground",
-        className
-      )}
+      className={cn('flex flex-1 text-left data-placeholder:text-muted-foreground', className)}
       {...props}
     >
-      {typeof children === "function"
+      {typeof children === 'function'
         ? children
-        : ({ selectedItems, selectedText, defaultChildren }) =>
-            selectedItems.length > 1 ? selectedText : defaultChildren}
+        : ({ selectedItems, selectedText, defaultChildren }) => (selectedItems.length > 1 ? selectedText : defaultChildren)}
     </SelectValuePrimitive>
-  )
+  );
 }
 
 function SelectTrigger({
   className,
-  size = "default",
+  size = 'default',
   children,
   ...props
-}: Omit<React.ComponentProps<typeof ButtonPrimitive>, "children"> & {
-  children?: React.ReactNode
-  size?: "sm" | "default"
+}: Omit<React.ComponentProps<typeof ButtonPrimitive>, 'children'> & {
+  children?: React.ReactNode;
+  size?: 'sm' | 'default';
 }) {
   return (
     <ButtonPrimitive
@@ -89,56 +59,44 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         "flex w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
+        className,
       )}
       {...props}
     >
       {children}
       <ChevronDownIcon className="pointer-events-none size-4 text-muted-foreground" />
     </ButtonPrimitive>
-  )
+  );
 }
 
 function SelectContent({
   className,
   children,
-  placement = "bottom",
+  placement = 'bottom',
   offset = 4,
   crossOffset = 0,
   ...props
-}: Omit<
-  React.ComponentProps<typeof PopoverPrimitive>,
-  "className" | "children"
-> & {
-  className?: string
-  children?: React.ReactNode
+}: Omit<React.ComponentProps<typeof PopoverPrimitive>, 'className' | 'children'> & {
+  className?: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <SelectPopover
-      className={className}
-      placement={placement}
-      offset={offset}
-      crossOffset={crossOffset}
-      {...props}
-    >
+    <SelectPopover className={className} placement={placement} offset={offset} crossOffset={crossOffset} {...props}>
       <SelectList>{children}</SelectList>
     </SelectPopover>
-  )
+  );
 }
 
 function SelectPopover({
   className,
   children,
-  placement = "bottom start",
+  placement = 'bottom start',
   offset = 4,
   crossOffset = 0,
   ...props
-}: Omit<
-  React.ComponentProps<typeof PopoverPrimitive>,
-  "className" | "children"
-> & {
-  className?: string
-  children?: React.ReactNode
+}: Omit<React.ComponentProps<typeof PopoverPrimitive>, 'className' | 'children'> & {
+  className?: string;
+  children?: React.ReactNode;
 }) {
   return (
     <PopoverPrimitive
@@ -146,119 +104,94 @@ function SelectPopover({
       placement={placement}
       offset={offset}
       crossOffset={crossOffset}
-      className={cn("relative isolate z-50 w-(--trigger-width) min-w-36 origin-(--trigger-anchor-point) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:data-focused:bg-foreground/10", className )}
+      className={cn(
+        'relative isolate z-50 w-(--trigger-width) min-w-36 origin-(--trigger-anchor-point) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:fade-out-0 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:data-focused:bg-foreground/10',
+        className,
+      )}
       {...props}
     >
       {children}
     </PopoverPrimitive>
-  )
+  );
 }
 
-function SelectList<T extends object>({
-  className,
-  ...props
-}: ListBoxProps<T>) {
+function SelectList<T extends object>({ className, ...props }: ListBoxProps<T>) {
   return (
     <ListBoxPrimitive
       data-slot="select-list"
-      className={cn(
-        "group/select-list max-h-[inherit] overflow-x-hidden overflow-y-auto p-0 outline-hidden",
-        className
-      )}
+      className={cn('group/select-list max-h-[inherit] overflow-x-hidden overflow-y-auto p-0 outline-hidden', className)}
       {...props}
     />
-  )
+  );
 }
 
 function SelectInput({ className, ...props }: SearchFieldProps) {
   return (
     <SearchField
       {...props}
+      // oxlint-disable-next-line jsx-a11y/no-autofocus -- the list's search field, which the person opened the list to type into
       autoFocus
       data-slot="select-input-wrapper"
-      className={cn("p-1 pb-0", className)}
+      className={cn('p-1 pb-0', className)}
     >
       <InputGroup>
-        <InputGroupInput
-          data-slot="select-input"
-          className="[&::-webkit-search-cancel-button]:hidden"
-        />
+        <InputGroupInput data-slot="select-input" className="[&::-webkit-search-cancel-button]:hidden" />
         <InputGroupAddon>
           <SearchIcon className="size-4 shrink-0 opacity-50" />
         </InputGroupAddon>
       </InputGroup>
     </SearchField>
-  )
+  );
 }
 
-function SelectLabel({
-  className,
-  ...props
-}: React.ComponentProps<typeof HeaderPrimitive>) {
-  return (
-    <HeaderPrimitive
-      data-slot="select-label"
-      className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
-      {...props}
-    />
-  )
+function SelectLabel({ className, ...props }: React.ComponentProps<typeof HeaderPrimitive>) {
+  return <HeaderPrimitive data-slot="select-label" className={cn('px-1.5 py-1 text-xs text-muted-foreground', className)} {...props} />;
 }
 
-function SelectItem({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof ListBoxItemPrimitive>) {
+function SelectItem({ className, children, ...props }: React.ComponentProps<typeof ListBoxItemPrimitive>) {
   return (
     <ListBoxItemPrimitive
       data-slot="select-item"
-      textValue={typeof children === "string" ? children : undefined}
+      textValue={typeof children === 'string' ? children : undefined}
       className={cn(
         "relative flex w-full cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-focused:bg-accent data-focused:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
-        className
+        className,
       )}
       {...props}
     >
       {composeRenderProps(children, (children, { isSelected }) => (
         <>
-          <span className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
-            {children}
-          </span>
+          <span className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">{children}</span>
           <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
-            {isSelected ? (
-              <CheckIcon className="pointer-events-none" />
-            ) : null}
+            {isSelected ? <CheckIcon className="pointer-events-none" /> : null}
           </span>
         </>
       ))}
     </ListBoxItemPrimitive>
-  )
+  );
 }
 
-function SelectSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof SeparatorPrimitive>) {
+function SelectSeparator({ className, ...props }: React.ComponentProps<typeof SeparatorPrimitive>) {
   return (
     <SeparatorPrimitive
       data-slot="select-separator"
-      className={cn("pointer-events-none -mx-1 my-1 h-px bg-border", className)}
+      className={cn('pointer-events-none -mx-1 my-1 h-px bg-border', className)}
       {...props}
     />
-  )
+  );
 }
 
-function SelectEmpty({ className, ...props }: React.ComponentProps<"div">) {
+function SelectEmpty({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="select-empty"
       className={cn(
-        "hidden w-full justify-center py-2 text-center text-sm text-muted-foreground group-data-empty/select-list:flex",
-        className
+        'hidden w-full justify-center py-2 text-center text-sm text-muted-foreground group-data-empty/select-list:flex',
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -274,4 +207,4 @@ export {
   SelectTrigger,
   SelectValue,
   SelectEmpty,
-}
+};

@@ -71,7 +71,8 @@ const NOT_ONE = `not one of ${LABELS.join(', ')}`;
 /** The date `--since` names, as a number. Anything `Date.parse` cannot read is refused by name. */
 export const sinceOf = (text: string): number => {
   const at = Date.parse(text);
-  if (Number.isNaN(at)) refuse(`judge runs: --since takes a date, such as 2026-09-01 or 2026-09-01T00:00:00Z; ${JSON.stringify(text)} is not one.`);
+  if (Number.isNaN(at))
+    refuse(`judge runs: --since takes a date, such as 2026-09-01 or 2026-09-01T00:00:00Z; ${JSON.stringify(text)} is not one.`);
   return at;
 };
 
@@ -84,9 +85,14 @@ export const readRuns = (store: string, options: { readonly since?: number } = {
   if (!fs.existsSync(store)) refuse(`judge runs: there is no store at ${store}. Pass --store <dir>, or set WF_ROOT.`);
   let names: string[];
   try {
-    names = fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort();
+    names = fs
+      .readdirSync(dir)
+      .filter((n) => n.endsWith('.json'))
+      .sort();
   } catch (e) {
-    return refuse(`judge runs: cannot read ${dir}: ${(e as NodeJS.ErrnoException).code ?? (e as Error).message}. A store keeps its run records there; pass --store <dir>.`);
+    return refuse(
+      `judge runs: cannot read ${dir}: ${(e as NodeJS.ErrnoException).code ?? (e as Error).message}. A store keeps its run records there; pass --store <dir>.`,
+    );
   }
   const runs: Dispatched[] = [];
   const skipped: Skipped[] = [];
@@ -137,8 +143,13 @@ export const readRuns = (store: string, options: { readonly since?: number } = {
       continue;
     }
     runs.push({
-      id, folder: folder.label, web: folder.label.endsWith('-build'), plan: folder.label.startsWith('dev-planned'),
-      brief, first: firstLine(brief), ...(createdAt !== undefined ? { createdAt } : {}),
+      id,
+      folder: folder.label,
+      web: folder.label.endsWith('-build'),
+      plan: folder.label.startsWith('dev-planned'),
+      brief,
+      first: firstLine(brief),
+      ...(createdAt !== undefined ? { createdAt } : {}),
     });
   }
   // Oldest first, and the id breaks a tie: two records written in the same millisecond must not depend on readdir's order.

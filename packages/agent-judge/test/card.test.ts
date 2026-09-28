@@ -36,14 +36,20 @@ const cardFile = (text = CARD) => {
 
 test('the card is sent without its frontmatter, beside the fixed repository text', async () => {
   const record = tmp('card');
-  const { code, calls, text } = await run(['card', cardFile(), '--record', record], [answering({ web: 0.9, plan: 0.1, clear: 3, size: 1 })]);
+  const { code, calls, text } = await run(
+    ['card', cardFile(), '--record', record],
+    [answering({ web: 0.9, plan: 0.1, clear: 3, size: 1 })],
+  );
   assert.equal(code, 0);
   assert.equal(calls.length, 1);
   const sent = calls[0]!.body.state as { card: string; repository: object };
-  assert.equal(sent.card, '# Sort the inbox\n\nSort the inbox by date, newest first. Done when the api\'s test sees the order.');
+  assert.equal(sent.card, "# Sort the inbox\n\nSort the inbox by date, newest first. Done when the api's test sees the order.");
   assert.ok(!JSON.stringify(calls[0]!.body).includes('private/path') && !JSON.stringify(calls[0]!.body).includes('workflow:'));
   assert.deepEqual(Object.keys(calls[0]!.body.questions), ['web', 'plan', 'clear', 'size']);
-  assert.match(text, new RegExp(`^judge card: .*card\\.md · ${sent.card.length} characters sent, frontmatter stripped · jev-1\\.13\\.0$`, 'm'));
+  assert.match(
+    text,
+    new RegExp(`^judge card: .*card\\.md · ${sent.card.length} characters sent, frontmatter stripped · jev-1\\.13\\.0$`, 'm'),
+  );
   assert.match(text, /^ {2}web {4}P 0\.90 +yes +does it touch/m);
   assert.match(text, /^ {2}clear +score 3\.00 \/ 3 +yes/m);
   assert.match(text, /^1 request · 4 questions · 1000 input tokens · \d+ ms$/m);
@@ -53,13 +59,21 @@ test('the card is sent without its frontmatter, beside the fixed repository text
   assert.equal(again.calls.length, 0);
   assert.match(again.text, /^all on record · 0 requests$/m);
   // Nothing left the machine this time, and the first line says so.
-  assert.match(again.text, new RegExp(`^judge card: .*card\\.md · ${sent.card.length} characters, not sent, frontmatter stripped · jev-1\\.13\\.0$`, 'm'));
+  assert.match(
+    again.text,
+    new RegExp(`^judge card: .*card\\.md · ${sent.card.length} characters, not sent, frontmatter stripped · jev-1\\.13\\.0$`, 'm'),
+  );
   assert.match(again.text, /^→ dev-build$/m);
 });
 
 test('each shipped folder is reached, and every folder it can name is in workflows/', async () => {
   const folders = new Set<string>();
-  for (const [web, plan, folder] of [[0.1, 0.1, 'dev'], [0.9, 0.1, 'dev-build'], [0.1, 0.9, 'dev-planned'], [0.9, 0.9, 'dev-planned-build']] as const) {
+  for (const [web, plan, folder] of [
+    [0.1, 0.1, 'dev'],
+    [0.9, 0.1, 'dev-build'],
+    [0.1, 0.9, 'dev-planned'],
+    [0.9, 0.9, 'dev-planned-build'],
+  ] as const) {
     const { text } = await run(['card', '--text', 'Do a thing.', '--record', tmp('card')], [answering({ web, plan, clear: 3 })]);
     assert.match(text, new RegExp(`^→ ${folder}$`, 'm'));
     folders.add(folder);
@@ -68,7 +82,10 @@ test('each shipped folder is reached, and every folder it can name is in workflo
 });
 
 test('a card that does not say what done looks like stays in the inbox, whatever else it says', async () => {
-  const { text } = await run(['card', '--text', 'Make it better.', '--record', tmp('card')], [answering({ web: 0.5, plan: 0.9, clear: 1 })]);
+  const { text } = await run(
+    ['card', '--text', 'Make it better.', '--record', tmp('card')],
+    [answering({ web: 0.5, plan: 0.9, clear: 1 })],
+  );
   assert.match(text, /^→ stays in the inbox: says too little about what done looks like$/m);
 });
 
@@ -84,7 +101,11 @@ test('with no key it asks nothing, records nothing, says the judge is off, and t
   const { code, calls, text } = await run(['card', '--text', 'x', '--record', record], [answering({})], {});
   assert.equal(code, 0);
   assert.equal(calls.length, 0);
-  assert.match(text, /^judge card: .* · 1 characters, not sent, frontmatter stripped · /m, 'with the judge off the card went nowhere, and the first line says so');
+  assert.match(
+    text,
+    /^judge card: .* · 1 characters, not sent, frontmatter stripped · /m,
+    'with the judge off the card went nowhere, and the first line says so',
+  );
   assert.match(text, /^ {2}web {4}no-key/m);
   assert.match(text, /^ {2}no-key: no TYPESAFE_API_KEY in the environment — the judge is off; set the key and run again$/m);
   assert.ok(!text.includes('--reask'), 'a missing key is not a failure to re-ask');
@@ -115,7 +136,10 @@ test('judge card refuses what it cannot ask about', async () => {
   await refuses(['card', '--text'], /^judge card: --text takes a value/);
   await refuses(['card', '--text', 'x', '--force'], /^judge card: unknown option --force/);
   await refuses(['card', path.join(tmp('card'), 'missing.md')], /^judge card: cannot read .*missing\.md: ENOENT\.$/);
-  await refuses(['card', cardFile('---\nworkflow: dev\n---\n  \n')], /^judge card: the card says nothing once its frontmatter is taken off/);
+  await refuses(
+    ['card', cardFile('---\nworkflow: dev\n---\n  \n')],
+    /^judge card: the card says nothing once its frontmatter is taken off/,
+  );
   await refuses(['card', '--text', '   '], /^judge card: the card says nothing/);
   await refuses(['ask'], /^judge: no command ask/);
   const bare = await run([]);
@@ -128,7 +152,10 @@ test('only the leading frontmatter is taken off, with a BOM or CRLF, and a rule 
   assert.equal(cardText('\uFEFF---\r\nworkflow: dev\r\n---\r\nBody.'), 'Body.');
   assert.equal(cardText('Intro.\n---\nkey: value\n---\nMore.'), 'Intro.\n---\nkey: value\n---\nMore.');
   assert.equal(cardText('---\na: b\n---\nx\n---\ny'), 'x\n---\ny');
-  assert.throws(() => cardText('---\na: b\n---'), (e: Error) => /^judge card: the card says nothing/.test(e.message));
+  assert.throws(
+    () => cardText('---\na: b\n---'),
+    (e: Error) => e.message.startsWith('judge card: the card says nothing'),
+  );
 });
 
 test('dispatch reads a failure on every property as unsure about each', () => {

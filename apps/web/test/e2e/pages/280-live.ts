@@ -23,7 +23,8 @@ export default {
     await sidebar(page);
     const { id, gated } = GATED;
     const asks = path.join(store!, 'runs', `${id}.asks`);
-    if (fs.existsSync(asks)) throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
+    if (fs.existsSync(asks))
+      throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
     const header = page.locator('header[data-feed]');
     await expectVisible(page.locator('header[data-feed="open"]'), 'the header says the feed is followed (data-feed="open")');
     await idle(page);
@@ -43,8 +44,10 @@ export default {
     await page.locator(`a[href="/runs/${id}"]`).first().click();
     await page.waitForURL(new RegExp(`/runs/${id}$`));
     await idle(page);
-    if (streams !== 0) throw new Refused(`one stream of the feed a page, kept across a navigation inside the board — ${streams} more opened`);
-    if ((await header.getAttribute('data-feed')) !== 'open') throw new Refused(`the feed is still followed after the navigation — the header says ${await header.getAttribute('data-feed')}`);
+    if (streams !== 0)
+      throw new Refused(`one stream of the feed a page, kept across a navigation inside the board — ${streams} more opened`);
+    if ((await header.getAttribute('data-feed')) !== 'open')
+      throw new Refused(`the feed is still followed after the navigation — the header says ${await header.getAttribute('data-feed')}`);
 
     const gate = page.locator(`section[aria-label="The gate of ${gated}"]`);
     const approve = gate.getByRole('button', { name: 'Approve', exact: true });
@@ -54,10 +57,16 @@ export default {
     try {
       // Approved behind the page's back, and nothing said on the feed: the page does not read the run, for longer than the old poll took.
       reads = 0;
-      const answered = await page.request.post(new URL(`/api/runs/${id}/steps/${gated}/approve`, page.url()).href, { data: { message: GATED.words } });
-      if (answered.status() !== 202) throw new Refused(`the api takes the approval — it answered ${answered.status()}: ${await answered.text()}`);
+      const answered = await page.request.post(new URL(`/api/runs/${id}/steps/${gated}/approve`, page.url()).href, {
+        data: { message: GATED.words },
+      });
+      if (answered.status() !== 202)
+        throw new Refused(`the api takes the approval — it answered ${answered.status()}: ${await answered.text()}`);
       await page.waitForTimeout(OLD_POLL_WINDOW_MS);
-      if (reads !== 0) throw new Refused(`the run is not polled at the old 5 s while the feed is followed — it was read ${reads} times in ${OLD_POLL_WINDOW_MS} ms`);
+      if (reads !== 0)
+        throw new Refused(
+          `the run is not polled at the old 5 s while the feed is followed — it was read ${reads} times in ${OLD_POLL_WINDOW_MS} ms`,
+        );
       await expectCount(approval, 0, 'and the approval is not shown yet: nothing has said so');
 
       // The feed says plan moved, as the tick would: the page reads the run, and shows the approval, well before any poll.
@@ -72,7 +81,11 @@ export default {
       fs.rmSync(asks, { recursive: true, force: true });
       fed(id, gated, 'awaiting approval');
     }
-    await expectVisible(approve, `with the approval taken back, ${gated} waits at its gate again within ${LIVE_MS} ms of the feed saying so`, LIVE_MS);
+    await expectVisible(
+      approve,
+      `with the approval taken back, ${gated} waits at its gate again within ${LIVE_MS} ms of the feed saying so`,
+      LIVE_MS,
+    );
     await expectCount(approval, 0, 'and its approval is gone from under it', LIVE_MS);
     if (streams !== 0) throw new Refused(`the page kept its one stream of the feed throughout — ${streams} more opened`);
   },

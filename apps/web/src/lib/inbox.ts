@@ -20,8 +20,10 @@ const isCard = (entry: Pick<InboxEntry, 'file'>): boolean => entry.file.endsWith
  * stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
  */
 export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]): boolean =>
-  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.')
-  && (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
+  entry.name.trim() !== '' &&
+  !/[\\/\0]/.test(entry.name) &&
+  !entry.name.startsWith('.') &&
+  (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
 
 /** A start, a drop, a queue or its taking back the api refused: the card as the page listed it, what was asked, and the api's words. */
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue'; message: string };
@@ -72,7 +74,12 @@ export const namedElsewhere = (workflow: string | null, repo: string | null, her
  * workflow (`namedElsewhere`), which is not listed, so it presets nothing — a workflow of the same name here would run another workflow than the
  * card names. A relative path is read from the inbox, a folder the board does not list, and is no workflow's name, so it presets nothing.
  */
-export function presetOf(workflow: string | null, repo: string | null, here: string, workflows: readonly WorkflowListing[]): WorkflowListing | null {
+export function presetOf(
+  workflow: string | null,
+  repo: string | null,
+  here: string,
+  workflows: readonly WorkflowListing[],
+): WorkflowListing | null {
   if (!workflow || namedElsewhere(workflow, repo, here)) return null;
   const readable = workflows.filter((w) => w.error === null);
   if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(workflow)) return readable.find((w) => trimmed(w.dir) === trimmed(workflow)) ?? null;
@@ -88,7 +95,9 @@ export function presetOf(workflow: string | null, repo: string | null, here: str
  * page, so a sentence in its answer is shown to nobody. `repo` is the card's, and a card that names none has nothing to say.
  */
 export const ignoredRepoNote = (workflow: Pick<WorkflowListing, 'folderTeam'>, repo: string | undefined | null): string | null =>
-  workflow.folderTeam && repo ? `The card's repo: ${repo} is not looked at — this workflow's steps work in folders, with no git repository.` : null;
+  workflow.folderTeam && repo
+    ? `The card's repo: ${repo} is not looked at — this workflow's steps work in folders, with no git repository.`
+    : null;
 
 /**
  * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. `wf start` refuses `--after` for such a
@@ -104,12 +113,13 @@ export const afterFor = (workflow: Pick<WorkflowListing, 'folderTeam'>, after: r
 /** A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`. */
 export function ordinal(n: number): string {
   const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th');
   return `${n}${suffix}`;
 }
 
 /** What a queued card says of its place: `queued · 2nd` — or `queued` alone for one a record says was started, which has no place. */
-export const queuedWord = (queued: NonNullable<InboxEntry['queued']>): string => (queued.place ? `queued · ${ordinal(queued.place)}` : 'queued');
+export const queuedWord = (queued: NonNullable<InboxEntry['queued']>): string =>
+  queued.place ? `queued · ${ordinal(queued.place)}` : 'queued';
 
 /**
  * The queue, as the tick starts it: every card with a place, in its order (the package's `queueOrder`, whose places the listing carries) — a card
@@ -122,7 +132,8 @@ export const queueOf = (entries: readonly InboxEntry[]): InboxEntry[] =>
  * Whether the page offers Queue on a card: it names a workflow — a queued card starts on its own, on the workflow it names — it reads, it is not
  * queued, and no record says it was started. What the api would refuse otherwise, in the package's words.
  */
-export const queueable = (entry: InboxEntry): boolean => entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
+export const queueable = (entry: InboxEntry): boolean =>
+  entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
 
 /**
  * What the tick's last try of a queued card's start says, as `wf inbox` says it beside the card: refused, it waits for a person, not for a slot;

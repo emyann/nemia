@@ -18,7 +18,9 @@ const run = (fixture: string) => {
   // A child `node --test` under this one reports to it instead of running, unless it is told it is on its own.
   const { NODE_TEST_CONTEXT: _, ...env } = process.env;
   const r = spawnSync('timeout', ['-k', '5', '90', process.execPath, '--test', path.join('test', 'fixtures', fixture)], {
-    cwd: PACKAGE, env: { ...env, TMPDIR: tmp }, encoding: 'utf8',
+    cwd: PACKAGE,
+    env: { ...env, TMPDIR: tmp },
+    encoding: 'utf8',
   });
   return { status: r.status, out: `${r.stdout}${r.stderr}`, tmp };
 };
@@ -38,7 +40,11 @@ test('a test file that fails with its workers running leaves no folder and no pr
   assert.doesNotMatch(out, /scratch: the file left/, 'nothing was left for the last hook to find');
   const left = leftBehind(tmp);
   assert.deepEqual(left.entries, [], 'no folder left');
-  assert.deepEqual(left.processes.map((p) => p.args), [], 'no process left');
+  assert.deepEqual(
+    left.processes.map((p) => p.args),
+    [],
+    'no process left',
+  );
 });
 
 test('REFUSED: a test file that makes its root by hand and never stops its worker is seen to leave both', async () => {
@@ -67,13 +73,21 @@ test('a process whose only tie to a root is its environment is found in it, and 
   // A harness exec'd from a fake — `exec sleep 30` — names no root in its arguments and runs elsewhere, and still has
   // the root on its PATH, or in an AE_ROOT it inherited.
   const tmp = scratch('ae-leaks-');
-  const child = spawn('sleep', ['30'], { cwd: '/', env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH}` }, detached: true, stdio: 'ignore' });
+  const child = spawn('sleep', ['30'], {
+    cwd: '/',
+    env: { ...process.env, PATH: `${tmp}${path.delimiter}${process.env.PATH}` },
+    detached: true,
+    stdio: 'ignore',
+  });
   child.unref();
   // Read once the child has exec'd, under a bound: until then its environment is this process's.
   for (const bound = performance.now() + 10_000; !runningIn([tmp]).length;) {
     if (performance.now() > bound) break;
     await new Promise((r) => setTimeout(r, 25));
   }
-  assert.deepEqual(runningIn([tmp]).map((p) => p.pid), [child.pid]);
+  assert.deepEqual(
+    runningIn([tmp]).map((p) => p.pid),
+    [child.pid],
+  );
   assert.deepEqual(await reap([tmp]), []);
 });

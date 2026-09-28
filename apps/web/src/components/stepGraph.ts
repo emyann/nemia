@@ -1,6 +1,6 @@
 import { MarkerType } from '@xyflow/react';
 import type { RunDetail, RunSummary } from '../lib/api';
-import { edgeState, edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
+import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
 import { runEdges } from '../lib/factory';
 import { stepState, type StepState } from '../lib/status';
 import type { StateFlowEdge } from './StateEdge';
@@ -81,6 +81,8 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
  * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that waits on it, out of the one card's right
  * side and into the other's left, drawn as every edge is — dashed while the card waits, solid once its run has started.
  */
-export function afterEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>): StateFlowEdge[] {
+export function afterEdges(
+  runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>,
+): StateFlowEdge[] {
   return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
 }

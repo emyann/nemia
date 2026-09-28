@@ -23,7 +23,13 @@ export async function showFinished(page: Page): Promise<void> {
  * The fake run on the Factory: its card; the pills of its rail, at rest; and the tiles it opens into, one a step, each a button that opens
  * the step's inspector.
  */
-export function onTheFloor(page: Page): { card: Locator; pills: Locator; tiles: Locator; pill: (name: string) => Locator; tile: (name: string) => Locator } {
+export function onTheFloor(page: Page): {
+  card: Locator;
+  pills: Locator;
+  tiles: Locator;
+  pill: (name: string) => Locator;
+  tile: (name: string) => Locator;
+} {
   const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
   return {
     card,
@@ -46,7 +52,10 @@ export const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
 
 /** How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units. */
 export const zoomOf = (page: Page): Promise<number> =>
-  page.locator('.react-flow__viewport').first().evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1));
+  page
+    .locator('.react-flow__viewport')
+    .first()
+    .evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1));
 
 /**
  * A drag as a person makes one: the pointer down on `grip`, moved `by` in the canvas's units — through the floor's zoom — in a
@@ -69,7 +78,10 @@ export async function dragBy(page: Page, grip: Locator, by: { x: number; y: numb
  */
 export async function photographCard(page: Page, card: Locator, file: string): Promise<void> {
   const floor = page.locator('.react-flow').first();
-  const [frame, size] = [await floor.boundingBox(), await card.evaluate((el) => ({ width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight }))];
+  const [frame, size] = [
+    await floor.boundingBox(),
+    await card.evaluate((el) => ({ width: (el as HTMLElement).offsetWidth, height: (el as HTMLElement).offsetHeight })),
+  ];
   if (!frame) throw new Refused('the floor is on the page, to photograph a card on');
   const wanted = Math.min(1, (0.9 * frame.width) / size.width, (0.8 * frame.height) / size.height);
   for (let turns = 0; (await zoomOf(page)) < wanted * 0.97 && turns < 60; turns++) {
@@ -81,19 +93,26 @@ export async function photographCard(page: Page, card: Locator, file: string): P
     await new Promise((resolve) => setTimeout(resolve, 40));
   }
   await settled(page);
-  const [box, empty] = [await card.boundingBox(), await floor.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    for (let y = r.top + 24; y < r.bottom - 24; y += 24) {
-      for (let x = r.left + 24; x < r.right - 24; x += 24) {
-        if (document.elementFromPoint(x, y)?.classList.contains('react-flow__pane')) return { x, y };
+  const [box, empty] = [
+    await card.boundingBox(),
+    await floor.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      for (let y = r.top + 24; y < r.bottom - 24; y += 24) {
+        for (let x = r.left + 24; x < r.right - 24; x += 24) {
+          if (document.elementFromPoint(x, y)?.classList.contains('react-flow__pane')) return { x, y };
+        }
       }
-    }
-    return null;
-  })];
+      return null;
+    }),
+  ];
   if (!box || !empty) throw new Refused('an empty spot on the floor, to move it by');
   await page.mouse.move(empty.x, empty.y);
   await page.mouse.down();
-  await page.mouse.move(empty.x + frame.x + frame.width / 2 - (box.x + box.width / 2), empty.y + frame.y + frame.height / 2 - (box.y + box.height / 2), { steps: 12 });
+  await page.mouse.move(
+    empty.x + frame.x + frame.width / 2 - (box.x + box.width / 2),
+    empty.y + frame.y + frame.height / 2 - (box.y + box.height / 2),
+    { steps: 12 },
+  );
   await page.mouse.up();
   await settled(page);
   await card.screenshot({ path: file });
@@ -104,12 +123,16 @@ export async function photographCard(page: Page, card: Locator, file: string): P
 /** Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how wide and tall it is drawn. */
 export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; width: number; height: number }>> => {
   const zoom = await zoomOf(page);
-  return page.locator('.react-flow__node[data-id]').evaluateAll((nodes, z) => nodes.map((node) => {
-    const el = node as HTMLElement;
-    const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform) ?? [];
-    const box = el.getBoundingClientRect();
-    return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), width: box.width / z, height: box.height / z };
-  }), zoom);
+  return page.locator('.react-flow__node[data-id]').evaluateAll(
+    (nodes, z) =>
+      nodes.map((node) => {
+        const el = node as HTMLElement;
+        const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform) ?? [];
+        const box = el.getBoundingClientRect();
+        return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), width: box.width / z, height: box.height / z };
+      }),
+    zoom,
+  );
 };
 
 /**
@@ -119,10 +142,17 @@ export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: num
  */
 export async function expectClearOfEachOther(page: Page): Promise<void> {
   const cards = await cardsDrawn(page);
-  const over = cards.flatMap((card, i) => cards.slice(i + 1).flatMap((other) =>
-    card.x < other.x + other.width && other.x < card.x + card.width && card.y < other.y + other.height && other.y < card.y + card.height
-      ? [`${card.id}, ${Math.round(card.width)} by ${Math.round(card.height)} at ${said(card)}, and ${other.id}, ${Math.round(other.width)} by ${Math.round(other.height)} at ${said(other)} (a cell is ${CELL_HEIGHT} tall)`]
-      : []));
+  const over = cards.flatMap((card, i) =>
+    cards
+      .slice(i + 1)
+      .flatMap((other) =>
+        card.x < other.x + other.width && other.x < card.x + card.width && card.y < other.y + other.height && other.y < card.y + card.height
+          ? [
+              `${card.id}, ${Math.round(card.width)} by ${Math.round(card.height)} at ${said(card)}, and ${other.id}, ${Math.round(other.width)} by ${Math.round(other.height)} at ${said(other)} (a cell is ${CELL_HEIGHT} tall)`,
+            ]
+          : [],
+      ),
+  );
   if (over.length) throw new Refused(`no card on the floor reaches over another — ${over.join('; ')}`);
 }
 
@@ -132,23 +162,36 @@ export async function expectClearOfEachOther(page: Page): Promise<void> {
  * drawn, and a press on its Approve lands on the legend (learned by the run that kept the runs waiting on you on the floor).
  */
 export async function expectClearOfPanels(page: Page, when: string): Promise<void> {
-  const under = await page.locator('.react-flow').first().evaluate((floor) => {
-    const boxes = (selector: string) => Array.from(floor.querySelectorAll(selector)).map((el) => ({ el, box: el.getBoundingClientRect() })).filter(({ box }) => box.height > 0);
-    const panels = boxes('.react-flow__panel');
-    return boxes('.react-flow__node').flatMap(({ el, box }) =>
-      panels
-        .filter(({ box: at }) => box.left < at.right && at.left < box.right && box.top < at.bottom && at.top < box.bottom)
-        .map(({ el: panel }) => `${(el as HTMLElement).dataset.id} is under the ${panel.getAttribute('aria-label') ?? Array.from(panel.classList).join('.')} panel`));
-  });
+  const under = await page
+    .locator('.react-flow')
+    .first()
+    .evaluate((floor) => {
+      const boxes = (selector: string) =>
+        Array.from(floor.querySelectorAll(selector))
+          .map((el) => ({ el, box: el.getBoundingClientRect() }))
+          .filter(({ box }) => box.height > 0);
+      const panels = boxes('.react-flow__panel');
+      return boxes('.react-flow__node').flatMap(({ el, box }) =>
+        panels
+          .filter(({ box: at }) => box.left < at.right && at.left < box.right && box.top < at.bottom && at.top < box.bottom)
+          .map(
+            ({ el: panel }) =>
+              `${(el as HTMLElement).dataset.id} is under the ${panel.getAttribute('aria-label') ?? Array.from(panel.classList).join('.')} panel`,
+          ),
+      );
+    });
   if (under.length) throw new Refused(`${when}, the fitted floor puts no card under a panel over it — ${under.join('; ')}`);
 }
 
-export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
+export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+  Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
 export const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
-export const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
+export const cardsOf = (page: Page, ...ids: string[]): Locator =>
+  page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
 export const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
 /** The edge from a run into a card held until it ships (`wf hold`), which `runEdges` names apart from an `--after` one. */
-export const holdEdgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
+export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
+  page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
 
 /**
  * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` — or,
@@ -158,8 +201,12 @@ export const holdEdgeOf = (page: Page, from: string, to: string): Locator => pag
  */
 export async function drawEdge(page: Page, builder: Locator, from: string, to: string, loop = false): Promise<void> {
   await settled(page);
-  const source = builder.locator(`.react-flow__node[data-id="${from}"] .react-flow__handle.source[data-handlepos="${loop ? 'bottom' : 'right'}"]`);
-  const target = builder.locator(`.react-flow__node[data-id="${to}"] .react-flow__handle.target[data-handlepos="${loop ? 'bottom' : 'left'}"]`);
+  const source = builder.locator(
+    `.react-flow__node[data-id="${from}"] .react-flow__handle.source[data-handlepos="${loop ? 'bottom' : 'right'}"]`,
+  );
+  const target = builder.locator(
+    `.react-flow__node[data-id="${to}"] .react-flow__handle.target[data-handlepos="${loop ? 'bottom' : 'left'}"]`,
+  );
   await expectVisible(source, `${from}'s dot to draw from`);
   await expectVisible(target, `${to}'s dot to draw to`);
   await source.scrollIntoViewIfNeeded();
@@ -169,5 +216,9 @@ export async function drawEdge(page: Page, builder: Locator, from: string, to: s
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 });
   await page.mouse.up();
-  await expectCount(builder.locator(`.react-flow__edge[data-id="${loop ? 'loop:' : ''}${from}->${to}"]`), 1, `the ${loop ? 'loop' : 'edge'} drawn from ${from} to ${to}`);
+  await expectCount(
+    builder.locator(`.react-flow__edge[data-id="${loop ? 'loop:' : ''}${from}->${to}"]`),
+    1,
+    `the ${loop ? 'loop' : 'edge'} drawn from ${from} to ${to}`,
+  );
 }

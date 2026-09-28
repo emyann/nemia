@@ -16,8 +16,13 @@ const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
 const now = (ms = 0) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000 });
 const TASK = 't-q';
 
-const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event =>
-  ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', ...extra });
+const filed = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event => ({
+  kind: 'filed',
+  at: at(0),
+  brief: 'b',
+  cwd: '/r',
+  ...extra,
+});
 const admitted = (ms = 1): Event => ({ kind: 'admitted', at: at(ms) });
 
 // ─── the pure layer ─────────────────────────────────────────────────────────
@@ -56,14 +61,23 @@ test('the wait comes after every terminal answer: a queued task is stopped, and 
 });
 
 test('a queued task says it is queued, and an admitted one starts: the runtime keeps no ceiling to hold it back', () => {
-  assert.deepEqual(decide(fold(TASK, [filed({ queued: true })]), new Map(), now(5)), { do: 'nothing', why: 'queued — waits to be admitted' });
-  assert.deepEqual(decide(fold(TASK, [filed({ queued: true }), admitted()]), new Map(), now(5)), { do: 'start', attempt: 1, resumeFrom: undefined });
+  assert.deepEqual(decide(fold(TASK, [filed({ queued: true })]), new Map(), now(5)), {
+    do: 'nothing',
+    why: 'queued — waits to be admitted',
+  });
+  assert.deepEqual(decide(fold(TASK, [filed({ queued: true }), admitted()]), new Map(), now(5)), {
+    do: 'start',
+    attempt: 1,
+    resumeFrom: undefined,
+  });
 });
 
 test('a task held open waits for a word before each turn: the one given for its first turn does not start its second', () => {
   const signed: Event[] = [
-    filed({ queued: true, holdOpen: true, closeoutSchema: { type: 'object' } }), admitted(),
-    { kind: 'starting', at: at(2), attempt: 1 }, { kind: 'spawned', at: at(3), attempt: 1 },
+    filed({ queued: true, holdOpen: true, closeoutSchema: { type: 'object' } }),
+    admitted(),
+    { kind: 'starting', at: at(2), attempt: 1 },
+    { kind: 'spawned', at: at(3), attempt: 1 },
     { kind: 'ended', at: at(4), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'native-1', closeout: {} },
   ];
   const waiting = fold(TASK, signed);
@@ -87,19 +101,38 @@ const memoryJournal = (reads: { n: number } = { n: 0 }): PromiseJournal & { task
   const feed: FeedEntry[] = [];
   return {
     tasks,
-    async append(taskId, event) { tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); feed.push({ taskId, event }); },
-    async read(taskId) { reads.n++; return [...(tasks.get(taskId) ?? [])]; },
-    async list() { return [...tasks.keys()].sort(); },
-    async feed(after) { return { entries: feed.slice(after), cursor: feed.length }; },
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    },
+    async read(taskId) {
+      reads.n++;
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed(after) {
+      return { entries: feed.slice(after), cursor: feed.length };
+    },
   };
 };
 
 /** A harness that counts how often it is observed. */
 const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }): PromiseRunner => ({
-  async spawn(r) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
-  async observe() { observes.n++; return new Map(sessions); },
-  async stop(id) { for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' }); },
-  async logs() { return ''; },
+  async spawn(r) {
+    sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+  },
+  async observe() {
+    observes.n++;
+    return new Map(sessions);
+  },
+  async stop(id) {
+    for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
+  },
+  async logs() {
+    return '';
+  },
 });
 
 const board = () => {
@@ -117,13 +150,19 @@ test('a queued task is started by the pass after the word, not before it and not
   assert.equal(b.journal.tasks.get(id)![0]!.kind === 'filed' && (b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, true);
   const first = await b.engine.tick();
   assert.equal(b.sessions.size, 0, 'nothing starts without the word');
-  assert.deepEqual(first.views.map((v) => [v.id, v.phase, v.admission]), [[id, 'pending', 'queued']]);
+  assert.deepEqual(
+    first.views.map((v) => [v.id, v.phase, v.admission]),
+    [[id, 'pending', 'queued']],
+  );
   assert.deepEqual(await b.engine.admit([id]), [id]);
   assert.equal(b.sessions.size, 0, 'the word starts nothing by itself');
   assert.equal((await b.engine.view(id)).admission, 'admitted');
   const second = await b.engine.tick();
   assert.deepEqual([...b.sessions.keys()], [nameFor(id, 1)], 'the next pass starts it');
-  assert.deepEqual(second.views.map((v) => [v.id, v.phase, v.admission]), [[id, 'starting', undefined]]);
+  assert.deepEqual(
+    second.views.map((v) => [v.id, v.phase, v.admission]),
+    [[id, 'starting', undefined]],
+  );
 });
 
 test('a task filed with no `queued` starts on the next pass, as ever, and `file` writes the key on every filing', async () => {
@@ -141,7 +180,10 @@ test('a tick reports the view of every task it left unsettled, and none it settl
   await b.engine.tick();
   b.sessions.set(nameFor(done, 1), { ...b.sessions.get(nameFor(done, 1))!, state: 'completed' });
   const r = await b.engine.tick();
-  assert.deepEqual(r.views.map((v) => v.id), [waits]);
+  assert.deepEqual(
+    r.views.map((v) => v.id),
+    [waits],
+  );
   // The same view `view` gives of it, off the same record.
   assert.deepEqual(r.views[0], await b.engine.view(waits));
 });
@@ -153,7 +195,11 @@ test('admit is idempotent, and writes nothing for a task that waits for no word'
   assert.deepEqual(await b.engine.admit([queued, plain]), [queued]);
   assert.deepEqual(await b.engine.admit([queued]), [], 'admitted already');
   assert.equal(b.journal.tasks.get(queued)!.filter((e) => e.kind === 'admitted').length, 1);
-  assert.equal(b.journal.tasks.get(plain)!.some((e) => e.kind === 'admitted'), false, 'not filed queued');
+  assert.equal(
+    b.journal.tasks.get(plain)!.some((e) => e.kind === 'admitted'),
+    false,
+    'not filed queued',
+  );
   await b.engine.tick();
   assert.deepEqual(await b.engine.admit([queued]), [], 'started');
   assert.equal(b.journal.tasks.get(queued)!.filter((e) => e.kind === 'admitted').length, 1);
@@ -162,23 +208,34 @@ test('admit is idempotent, and writes nothing for a task that waits for no word'
 test('admit refuses a task it has no record of, and a settled one — exit 2, and nothing written for any task in the call', async () => {
   const b = board();
   const queued = await b.engine.file({ brief: 'q', cwd: '/r', queued: true });
-  await assert.rejects(b.engine.admit([queued, 'nobody']), (e: Error & { exitCode?: number }) =>
-    e.exitCode === 2 && /^admit: `nobody` is not a task on this board/.test(e.message));
-  assert.equal(b.journal.tasks.get(queued)!.some((e) => e.kind === 'admitted'), false, 'the known one was not admitted either');
+  await assert.rejects(
+    b.engine.admit([queued, 'nobody']),
+    (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message.startsWith('admit: `nobody` is not a task on this board'),
+  );
+  assert.equal(
+    b.journal.tasks.get(queued)!.some((e) => e.kind === 'admitted'),
+    false,
+    'the known one was not admitted either',
+  );
 
   const settled = await b.engine.file({ brief: 's', cwd: '/r', queued: true });
   await b.engine.stop(settled);
   await b.engine.tick();
   assert.equal((await b.engine.view(settled)).state.settled, 'stopped');
-  await assert.rejects(b.engine.admit([settled]), (e: Error & { exitCode?: number }) =>
-    e.exitCode === 2 && /^admit: `[^`]+` has settled \(stopped\)/.test(e.message));
+  await assert.rejects(
+    b.engine.admit([settled]),
+    (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^admit: `[^`]+` has settled \(stopped\)/.test(e.message),
+  );
 });
 
 test('`file` refuses a `queued` that is not true or false, at both doors, and journals nothing', async () => {
   const b = board();
   for (const queued of ['yes', 1, null]) {
-    await assert.rejects(b.engine.file({ brief: 'b', cwd: '/r', queued } as never), (e: Error & { exitCode?: number }) =>
-      e.exitCode === 2 && /^file: `queued: .*` is not a yes or a no/.test(e.message), String(queued));
+    await assert.rejects(
+      b.engine.file({ brief: 'b', cwd: '/r', queued } as never),
+      (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^file: `queued: .*` is not a yes or a no/.test(e.message),
+      String(queued),
+    );
   }
   assert.equal(b.journal.tasks.size, 0);
 });

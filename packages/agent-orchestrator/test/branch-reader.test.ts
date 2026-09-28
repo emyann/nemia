@@ -14,7 +14,12 @@ import { branchReader, branchStandings, headsOf, isShipped, oneByOne, type Branc
 import { metered } from '../src/tally.ts';
 import type { GitRun } from '../src/run.ts';
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 const ROOT = scratch('wf-branch-reader-');
 
 const aRepo = () => {
@@ -29,10 +34,20 @@ const commitOn = (repo: string, branch: string, from: string, what: string) => {
   git(repo, 'checkout', '-q', 'main');
   return git(repo, 'rev-parse', branch);
 };
-const aRun = (repo: string, fields: Partial<GitRun>): GitRun => ({
-  id: `r-${Math.random().toString(36).slice(2, 6)}`, workspace: repo, brief: 'b', workflowDir: '/nowhere', createdAt: '2026-09-25T00:00:00Z',
-  steps: {}, repo, isolate: true, baseRef: git(repo, 'rev-parse', 'main'), branch: 'main', ...fields,
-} as GitRun);
+const aRun = (repo: string, fields: Partial<GitRun>): GitRun =>
+  ({
+    id: `r-${Math.random().toString(36).slice(2, 6)}`,
+    workspace: repo,
+    brief: 'b',
+    workflowDir: '/nowhere',
+    createdAt: '2026-09-25T00:00:00Z',
+    steps: {},
+    repo,
+    isolate: true,
+    baseRef: git(repo, 'rev-parse', 'main'),
+    branch: 'main',
+    ...fields,
+  }) as GitRun;
 
 /** Every shape a result branch can be in against its run's base, on two base branches, and bases git cannot read. */
 const shapes = () => {
@@ -80,8 +95,15 @@ test('the reader says what git says one question at a time, of every shape a bra
   // The fixture has each answer: a yes with work, a yes with none, a no, gone, and ahead.
   const said = new Set(expected.flatMap((a) => a.shipped.map(String)));
   assert.deepEqual([...said].sort(), ['false', 'true', 'unchanged']);
-  assert.ok(expected.some((a) => a.standings.some((s) => s.where === 'gone')) && expected.some((a) => a.standings.some((s) => s.where === 'ahead' && s.commits === 1)));
-  assert.deepEqual(runs.map((run) => all.map((b) => isShipped(run, b))), expected.map((a) => a.shipped), 'oneByOne is isShipped');
+  assert.ok(
+    expected.some((a) => a.standings.some((s) => s.where === 'gone')) &&
+      expected.some((a) => a.standings.some((s) => s.where === 'ahead' && s.commits === 1)),
+  );
+  assert.deepEqual(
+    runs.map((run) => all.map((b) => isShipped(run, b))),
+    expected.map((a) => a.shipped),
+    'oneByOne is isShipped',
+  );
 
   const lazy = branchReader();
   assert.deepEqual(answers(lazy, runs, all), expected, 'unprimed');
@@ -91,7 +113,11 @@ test('the reader says what git says one question at a time, of every shape a bra
   const reversed = branchReader();
   reversed.prime([...runs].reverse());
   const backwards = [...all].reverse();
-  assert.deepEqual(answers(reversed, [...runs].reverse(), backwards), answers(oneByOne, [...runs].reverse(), backwards), 'in the opposite order');
+  assert.deepEqual(
+    answers(reversed, [...runs].reverse(), backwards),
+    answers(oneByOne, [...runs].reverse(), backwards),
+    'in the opposite order',
+  );
   // And the heads a memo keys the answers by are git's.
   assert.deepEqual(Object.fromEntries(primed.heads(repo)), headsOf(repo));
   assert.deepEqual(Object.fromEntries(branchReader().heads(repo)), headsOf(repo));
@@ -120,7 +146,7 @@ test('a primed reader asks git once for a repository, where one question at a ti
   const read = await spawned(branchReader());
   assert.deepEqual(read.value, one.value);
   assert.ok(one.value.every(([s]) => s!.where === 'on'));
-  assert.equal(one.git, 40, 'twice for each branch: within the base branch, and within the run\'s base');
+  assert.equal(one.git, 40, "twice for each branch: within the base branch, and within the run's base");
   assert.equal(read.git, 1, 'one for-each-ref for the repository');
 });
 
@@ -140,7 +166,10 @@ test('a base git cannot read costs the reader one more listing, not a process fo
     reader.prime(all);
     return all.map((run, k) => branchStandings(run, [`wf/r-${Math.min(k, 9)}`], reader));
   });
-  assert.deepEqual(value, all.map((run, k) => branchStandings(run, [`wf/r-${Math.min(k, 9)}`], oneByOne)));
+  assert.deepEqual(
+    value,
+    all.map((run, k) => branchStandings(run, [`wf/r-${Math.min(k, 9)}`], oneByOne)),
+  );
   // The listing git refused, the commits it can read, the listing again without the one it cannot, and that run's own question.
   assert.equal(tallies!.kinds.git.spawned, 4);
 });
@@ -155,7 +184,9 @@ test('a primed reader lists a repository on the first question about it, and one
   });
   assert.equal(value, true);
   assert.equal(tallies!.kinds.git.spawned, 1, 'the repository asked about, and not the other');
-  const idle = await metered(async () => { branchReader().prime(runs); });
+  const idle = await metered(async () => {
+    branchReader().prime(runs);
+  });
   assert.equal(idle.tallies!.kinds.git.spawned, 0);
 });
 
@@ -169,7 +200,10 @@ test('a base branch the repository does not have costs two more listings, and th
     reader.prime(runs);
     return { standings: runs.map((run) => branchStandings(run, ['wf/r-0'], reader)), heads: Object.fromEntries(reader.heads(repo)) };
   });
-  assert.deepEqual(value.standings, runs.map((run) => branchStandings(run, ['wf/r-0'], oneByOne)));
+  assert.deepEqual(
+    value.standings,
+    runs.map((run) => branchStandings(run, ['wf/r-0'], oneByOne)),
+  );
   assert.deepEqual(value.heads, headsOf(repo));
   // The listing git refused, the branches alone, the listing again without the base it cannot read, and that run's own questions.
   const own = await metered(async () => branchStandings(runs[1]!, ['wf/r-0'], oneByOne));

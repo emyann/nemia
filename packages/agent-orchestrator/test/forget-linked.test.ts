@@ -18,7 +18,12 @@ fs.symlinkSync(path.join(REAL, 'store'), ROOT);
 process.env.WF_ROOT = ROOT;
 const { advance, forget, readRun, start } = await import('../src/runner.ts');
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 
 test("REFUSED before, now forgotten: a store under a link — git lists each worktree by its real path, and `wf rm` still finds them as the run's, hands the directory's work off under the step whose it is, and removes them; nothing is held as a stray", async () => {
   const repo = fs.mkdtempSync(path.join(REAL, 'repo-'));
@@ -28,8 +33,20 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it\n');
   const tasks = new Map<string, string>();
   const e = {
-    view: async (id: string) => ({ id, phase: tasks.get(id) ?? 'pending', state: { brief: tasks.has(id) ? 'filed' : '', settled: tasks.get(id) === 'failed' ? 'failed' : null, attempts: [], stopRequested: false } }),
-    file: async (spec: { id: string }) => { tasks.set(spec.id, 'pending'); return spec.id; },
+    view: async (id: string) => ({
+      id,
+      phase: tasks.get(id) ?? 'pending',
+      state: {
+        brief: tasks.has(id) ? 'filed' : '',
+        settled: tasks.get(id) === 'failed' ? 'failed' : null,
+        attempts: [],
+        stopRequested: false,
+      },
+    }),
+    file: async (spec: { id: string }) => {
+      tasks.set(spec.id, 'pending');
+      return spec.id;
+    },
     stop: async () => {},
   } as unknown as Engine;
 
@@ -37,12 +54,21 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   await advance(e, readRun(run.id));
   const wt = readRun(run.id).steps.implement!.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
-  assert.match(git(repo, 'worktree', 'list', '--porcelain'), new RegExp(`^worktree ${fs.realpathSync(wt).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`, 'm'), 'git, by its real path');
+  assert.match(
+    git(repo, 'worktree', 'list', '--porcelain'),
+    new RegExp(`^worktree ${fs.realpathSync(wt).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`, 'm'),
+    'git, by its real path',
+  );
   tasks.set(`${run.id}-implement`, 'failed');
   fs.writeFileSync(path.join(wt, 'left.txt'), 'left\n');
 
   const forgot = await forget(e, run.id);
-  assert.deepEqual([forgot.kind, forgot.left, forgot.removed.length, forgot.handedOff.map((h) => h.step)], ['forgotten', [], 1, ['implement']]);
-  assert.ok(!fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && !fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)));
+  assert.deepEqual(
+    [forgot.kind, forgot.left, forgot.removed.length, forgot.handedOff.map((h) => h.step)],
+    ['forgotten', [], 1, ['implement']],
+  );
+  assert.ok(
+    !fs.existsSync(wt) && !fs.existsSync(path.join(ROOT, 'worktrees', run.id)) && !fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)),
+  );
   assert.equal(git(repo, 'show', '--name-only', '--format=', `wf/${run.id}/implement`), 'left.txt');
 });

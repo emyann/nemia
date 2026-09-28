@@ -18,8 +18,34 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { agentsFor, agentVersion, cardSkills, HOME, inboxDir, inboxNameRefusal, listRuns, loadWorkflows, lookupRoots, skillsFor, start, startFromInbox, workflowDescription, type Places } from 'agent-orchestrator';
-import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, SKILLS_FOLDER, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, type AgentSkill, type StepKey, type Workflow } from 'agent-orchestrator/workflow';
+import {
+  agentsFor,
+  agentVersion,
+  cardSkills,
+  HOME,
+  inboxDir,
+  inboxNameRefusal,
+  listRuns,
+  loadWorkflows,
+  lookupRoots,
+  skillsFor,
+  start,
+  startFromInbox,
+  workflowDescription,
+  type Places,
+} from 'agent-orchestrator';
+import {
+  AGENTS_FOLDER,
+  contextText,
+  isFolderTeam,
+  SKILLS_FOLDER,
+  splitFrontmatter,
+  STEP_KEY_MEANINGS,
+  STEP_KEYS,
+  type AgentSkill,
+  type StepKey,
+  type Workflow,
+} from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -124,7 +150,16 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  * the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can do,
  * generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
  */
-export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[]; agentSkills: AgentSkill[] | null };
+export type WorkflowStepPage = {
+  workflow: string;
+  from: WorkflowSource;
+  dir: string;
+  step: string;
+  body: string;
+  source: string;
+  keys: KeyRow[];
+  agentSkills: AgentSkill[] | null;
+};
 
 /**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
@@ -139,7 +174,8 @@ function keyValue(step: Workflow, key: StepKey): string | null {
 }
 
 /** Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it does. */
-export const keyRows = (step: Workflow): KeyRow[] => STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
+export const keyRows = (step: Workflow): KeyRow[] =>
+  STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
 /** Where workflows are read from, in the order they are listed: the repository's, then yours. */
 export const sourcesOf = (repo: string, home: string = HOME): Array<{ from: WorkflowSource; dir: string }> => [
@@ -149,7 +185,9 @@ export const sourcesOf = (repo: string, home: string = HOME): Array<{ from: Work
 
 /** Every workflow `repo` and `home` have: each folder in each source, by name. Loads every folder, so each can say whether it reads. */
 export function listWorkflows(repo: string, home: string = HOME): WorkflowListing[] {
-  return sourcesOf(repo, home).flatMap(({ from, dir }) => foldersIn(dir).map((name) => listed(name, from, path.join(dir, name), { repo, home })));
+  return sourcesOf(repo, home).flatMap(({ from, dir }) =>
+    foldersIn(dir).map((name) => listed(name, from, path.join(dir, name), { repo, home })),
+  );
 }
 
 /**
@@ -170,7 +208,18 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
   } catch (err) {
     return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, folderTeam: false, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, folderTeam: isFolderTeam(steps), version, error: null };
+  return {
+    name,
+    from,
+    dir,
+    description,
+    steps: steps.map(listedStep),
+    graph: graphOf(steps),
+    schemas,
+    folderTeam: isFolderTeam(steps),
+    version,
+    error: null,
+  };
 }
 
 /** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */
@@ -194,7 +243,11 @@ const listedStep = (step: Workflow): ListedStep => ({
 export function versionOf(dir: string, places: Places): string {
   let names: string[];
   try {
-    names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
+    names = fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name))
+      .map((e) => e.name)
+      .sort();
   } catch {
     names = [];
   }
@@ -209,10 +262,18 @@ export function versionOf(dir: string, places: Places): string {
   const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
   const skills = named.length ? skillsFor(dir, places) : undefined;
   const agents = named.map((agent) => {
-    const root = lookupRoots(dir, places).find((at) => fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }));
-    return [agent, root === undefined ? { missing: agent } : { at: root, version: agentVersion(path.join(root, AGENTS_FOLDER), agent, skills) }];
+    const root = lookupRoots(dir, places).find((at) =>
+      fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }),
+    );
+    return [
+      agent,
+      root === undefined ? { missing: agent } : { at: root, version: agentVersion(path.join(root, AGENTS_FOLDER), agent, skills) },
+    ];
   });
-  return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
+  return createHash('sha256')
+    .update(JSON.stringify([...files, ...agents]))
+    .digest('hex')
+    .slice(0, 16);
 }
 
 /**
@@ -240,7 +301,11 @@ function frontmatterValue(text: string, key: 'agent'): string[] {
 /** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */
 function schemasIn(dir: string): string[] {
   try {
-    return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && !e.name.startsWith('.') && e.name.endsWith('.json')).map((e) => e.name).sort();
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => !e.isDirectory() && !e.name.startsWith('.') && e.name.endsWith('.json'))
+      .map((e) => e.name)
+      .sort();
   } catch {
     return [];
   }
@@ -286,23 +351,28 @@ export function foldersIn(dir: string): string[] {
     names = fs.readdirSync(dir);
   } catch (err) {
     if (['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException).code ?? '')) return [];
-    throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`);
+    throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`, {
+      cause: err,
+    });
   }
-  return names.filter((name) => {
-    if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
-    try {
-      return fs.statSync(path.join(dir, name)).isDirectory();
-    } catch {
-      return false;
-    }
-  }).sort();
+  return names
+    .filter((name) => {
+      if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
+      try {
+        return fs.statSync(path.join(dir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort();
 }
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
+const SHAPE =
+  '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
 
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
@@ -330,7 +400,12 @@ export function folderOf(name: string, from: WorkflowSource | undefined, repo: s
     };
   }
   const there = sources.flatMap((s) => foldersIn(s.dir).map((folder) => `${folder} (${s.from})`));
-  const where = `${from ? sources.filter((s) => s.from === from).map((s) => s.dir).join('') : sources.map((s) => s.dir).join(' or ')}`;
+  const where = from
+    ? sources
+        .filter((s) => s.from === from)
+        .map((s) => s.dir)
+        .join('')
+    : sources.map((s) => s.dir).join(' or ');
   return {
     status: 404,
     error: there.length
@@ -340,7 +415,9 @@ export function folderOf(name: string, from: WorkflowSource | undefined, repo: s
 }
 
 /** What `POST /api/runs` starts: a workflow's folder, with a brief — or, for an inbox card, the card and the brief given in place of its body. */
-export type Asked = { dir: string; brief: string; after: string[] | undefined; card?: undefined } | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
+export type Asked =
+  | { dir: string; brief: string; after: string[] | undefined; card?: undefined }
+  | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
 
 /**
  * What `POST /api/runs` starts, or why it does not: the body's shape (400), the workflow it names (404, 409), and the
@@ -357,9 +434,13 @@ export type Asked = { dir: string; brief: string; after: string[] | undefined; c
 function startOf(body: unknown, repo: string, home: string): Asked | Refusal {
   if (!isObject(body)) return { status: 400, error: `POST /api/runs takes a JSON object: ${SHAPE}.` };
   const { workflow, brief, from, after, card } = body;
-  if (typeof workflow !== 'string' || !workflow) return { status: 400, error: `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.` };
+  if (typeof workflow !== 'string' || !workflow)
+    return { status: 400, error: `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.` };
   if (from !== undefined && from !== 'repo' && from !== 'yours') {
-    return { status: 400, error: `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${workflow}'.` };
+    return {
+      status: 400,
+      error: `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${workflow}'.`,
+    };
   }
   if (after !== undefined && (!Array.isArray(after) || !after.every((id) => typeof id === 'string' && id.trim() !== ''))) {
     return {
@@ -369,19 +450,28 @@ function startOf(body: unknown, repo: string, home: string): Asked | Refusal {
   }
   if (card !== undefined) {
     if (typeof card !== 'string') {
-      return { status: 400, error: `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(card)}. GET /api/inbox lists the cards.` };
+      return {
+        status: 400,
+        error: `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(card)}. GET /api/inbox lists the cards.`,
+      };
     }
     const refused = inboxNameRefusal(card);
     if (refused) return { status: 400, error: refused };
     if (brief !== undefined && typeof brief !== 'string') {
-      return { status: 400, error: `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(brief)}.` };
+      return {
+        status: 400,
+        error: `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(brief)}.`,
+      };
     }
   }
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
   if (card !== undefined) return { dir: folder.dir, brief: brief as string | undefined, after, card: card as string };
   if (typeof brief !== 'string' || !brief.trim()) {
-    return { status: 422, error: `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".` };
+    return {
+      status: 422,
+      error: `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`,
+    };
   }
   return { dir: folder.dir, brief: brief.trim(), after };
 }
@@ -411,7 +501,12 @@ export const workflows = new Hono()
   .get('/api/workflows/:from/:name/:step', (c) => {
     const { from, name, step } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
-      return c.json({ error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.` }, 400);
+      return c.json(
+        {
+          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.`,
+        },
+        400,
+      );
     }
     try {
       const folder = folderOf(name, from, repoOf(), HOME);
@@ -425,7 +520,10 @@ export const workflows = new Hono()
       }
       const found = steps.find((s) => s.name === step);
       if (!found) {
-        return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` }, 404);
+        return c.json(
+          { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
+          404,
+        );
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
       // The step's resolved agent carries its keys and words, not what its card says it can do: that is generated from the agent's skills,
@@ -435,9 +533,22 @@ export const workflows = new Hono()
       const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
       let agentSkills: AgentSkill[] | null = null;
       if (attached !== undefined && !(attached instanceof Error)) {
-        try { agentSkills = cardSkills(attached, skillsFor(folder.dir, places)); } catch { agentSkills = null; }
+        try {
+          agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
+        } catch {
+          agentSkills = null;
+        }
       }
-      return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found), agentSkills } satisfies WorkflowStepPage);
+      return c.json({
+        workflow: name,
+        from,
+        dir: folder.dir,
+        step: found.name,
+        body: found.body,
+        source,
+        keys: keyRows(found),
+        agentSkills,
+      } satisfies WorkflowStepPage);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }
@@ -461,16 +572,27 @@ export const workflows = new Hono()
     if (asked.card !== undefined) {
       try {
         // The api's repository is the caller's, as `.` is `wf start`'s: the card's `repo:` is over it. The folder is the one `folderOf` found.
-        const started = startFromInbox({ name: asked.card, callerRepo: repo, workflow: asked.dir, ...(asked.brief !== undefined ? { brief: asked.brief } : {}), ...(asked.after ? { after: asked.after } : {}) });
+        const started = startFromInbox({
+          name: asked.card,
+          callerRepo: repo,
+          workflow: asked.dir,
+          ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
+          ...(asked.after ? { after: asked.after } : {}),
+        });
         c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
         // Started all the same when the card could not be removed: the run is written, and the card lists as started until it is dropped.
         // And a card whose `repo:` the run looked at none of — a folder team's — carries it, as `wf start` prints it and a tick's line
         // says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
-        return c.json({
-          id: started.run.id, card: started.card.name, removed: started.removed,
-          ...(started.removed ? {} : { why: started.why }),
-          ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-        }, 201);
+        return c.json(
+          {
+            id: started.run.id,
+            card: started.card.name,
+            removed: started.removed,
+            ...(started.removed ? {} : { why: started.why }),
+            ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+          },
+          201,
+        );
       } catch (err) {
         const status = (err as { exitCode?: unknown }).exitCode === 2 ? cardRefusalStatus(asked.card) : 422;
         return c.json({ error: messageOf(err) }, status);

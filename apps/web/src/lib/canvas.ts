@@ -88,13 +88,27 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
     if (!source || !target || seen.has(id)) return [];
     seen.add(id);
     if (edge.kind === 'after') {
-      return [{ id, source: edge.from, target: edge.to, kind: 'after', state: edgeState(satisfiesAfter(source.state), target.state), label: null }];
+      return [
+        {
+          id,
+          source: edge.from,
+          target: edge.to,
+          kind: 'after',
+          state: edgeState(satisfiesAfter(source.state), target.state),
+          label: null,
+        },
+      ];
     }
-    return [{
-      id, source: edge.from, target: edge.to, kind: 'loop',
-      state: roundDue(source.note) ? 'running' : 'to-come',
-      label: loopLabel([source.note, target.note], edge.rounds),
-    }];
+    return [
+      {
+        id,
+        source: edge.from,
+        target: edge.to,
+        kind: 'loop',
+        state: roundDue(source.note) ? 'running' : 'to-come',
+        label: loopLabel([source.note, target.note], edge.rounds),
+      },
+    ];
   });
 }
 

@@ -30,15 +30,44 @@ export const DEFAULT_ROUNDS = 3;
 
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
-  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
+  harness: null,
+  model: null,
+  effort: null,
+  context: null,
+  after: [],
+  resume: null,
+  input: [],
+  agent: null,
+  permissionMode: null,
+  sandbox: null,
+  tools: null,
+  disallowedTools: [],
+  allowedTools: [],
+  denials: null,
+  background: null,
+  remote: null,
+  deadlineSeconds: null,
+  budget: null,
+  check: null,
+  retries: null,
+  gate: null,
+  output: null,
+  loop: null,
+  rounds: null,
 };
 
 /** A folder's steps as a draft: as they are listed, nothing pasted — and none of its lists the listing's, which the page's cache holds. */
 export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =>
   workflow.steps.map(({ name, spec, body, own }) => ({
     name,
-    spec: { ...spec, after: [...spec.after], input: [...spec.input], disallowedTools: [...spec.disallowedTools], allowedTools: [...spec.allowedTools], tools: spec.tools && [...spec.tools] },
+    spec: {
+      ...spec,
+      after: [...spec.after],
+      input: [...spec.input],
+      disallowedTools: [...spec.disallowedTools],
+      allowedTools: [...spec.allowedTools],
+      tools: spec.tools && [...spec.tools],
+    },
     body,
     own: own && { keys: [...own.keys], body: own.body },
     schema: null,
@@ -107,26 +136,31 @@ export function nameRefusal(steps: readonly DraftStep[], name: string): string |
 /** A step added: its name and what it is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
 export function addStep(steps: readonly DraftStep[], name: string, body: string): DraftStep[] {
   if (nameRefusal(steps, name)) return [...steps];
-  return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [] }, body, own: null, schema: null }];
+  return [
+    ...steps,
+    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [] }, body, own: null, schema: null },
+  ];
 }
 
 /** A step removed, and every key of another step that names it: `after`, `input`, `resume`, and `loop` with its rounds. */
 export function removeStep(steps: readonly DraftStep[], name: string): DraftStep[] {
-  return steps.filter((s) => s.name !== name).map((step) => {
-    const { spec } = step;
-    const names = spec.after.includes(name) || spec.input.includes(name) || spec.resume === name || spec.loop === name;
-    if (!names) return step;
-    return {
-      ...step,
-      spec: {
-        ...spec,
-        after: without(spec.after, name),
-        input: without(spec.input, name),
-        resume: spec.resume === name ? null : spec.resume,
-        ...(spec.loop === name ? { loop: null, rounds: null } : {}),
-      },
-    };
-  });
+  return steps
+    .filter((s) => s.name !== name)
+    .map((step) => {
+      const { spec } = step;
+      const names = spec.after.includes(name) || spec.input.includes(name) || spec.resume === name || spec.loop === name;
+      if (!names) return step;
+      return {
+        ...step,
+        spec: {
+          ...spec,
+          after: without(spec.after, name),
+          input: without(spec.input, name),
+          resume: spec.resume === name ? null : spec.resume,
+          ...(spec.loop === name ? { loop: null, rounds: null } : {}),
+        },
+      };
+    });
 }
 
 /**
@@ -138,7 +172,11 @@ export function removeStep(steps: readonly DraftStep[], name: string): DraftStep
  * key form), or none where it sets none: never the agent before's. Unset, the step keeps what its agent gave it as its own, words and all.
  */
 export function setKey<K extends keyof WorkflowStepSpec>(
-  steps: readonly DraftStep[], name: string, key: K, value: WorkflowStepSpec[K], form: Pick<KeyForm, 'roleKeys' | 'agents'> = { roleKeys: [], agents: {} },
+  steps: readonly DraftStep[],
+  name: string,
+  key: K,
+  value: WorkflowStepSpec[K],
+  form: Pick<KeyForm, 'roleKeys' | 'agents'> = { roleKeys: [], agents: {} },
 ): DraftStep[] {
   if (key === 'agent') {
     return steps.map((step) => {
@@ -155,7 +193,7 @@ export function setKey<K extends keyof WorkflowStepSpec>(
   }
   const next = changed(steps, name, (spec) => {
     const next = { ...spec, [key]: value };
-    if (key === 'loop') next.rounds = value === null ? null : spec.rounds ?? DEFAULT_ROUNDS;
+    if (key === 'loop') next.rounds = value === null ? null : (spec.rounds ?? DEFAULT_ROUNDS);
     if (key === 'resume' && typeof value === 'string' && !spec.after.includes(value)) next.after = [...spec.after, value];
     return next;
   });
@@ -178,7 +216,8 @@ export const setBody = (steps: readonly DraftStep[], name: string, body: string)
 export const setSchema = (steps: readonly DraftStep[], name: string, schema: DraftStep['schema']): DraftStep[] =>
   steps.map((step) => {
     if (step.name !== name) return step;
-    const own = schema && step.own && !step.own.keys.includes('output') ? { ...step.own, keys: [...step.own.keys, 'output' as const] } : step.own;
+    const own =
+      schema && step.own && !step.own.keys.includes('output') ? { ...step.own, keys: [...step.own.keys, 'output' as const] } : step.own;
     return { ...step, schema, spec: schema ? { ...step.spec, output: schema.file } : step.spec, own };
   });
 
@@ -194,7 +233,8 @@ export function draftGraph(steps: readonly DraftStep[]): RunGraph {
     const after = [...new Set(spec.after)].filter((from) => names.has(from) && from !== name);
     if (!after.length) roots.push(name);
     for (const from of after) edges.push({ from, to: name, kind: 'after' });
-    if (spec.loop && names.has(spec.loop) && spec.loop !== name) edges.push({ from: name, to: spec.loop, kind: 'loop', rounds: spec.rounds ?? DEFAULT_ROUNDS });
+    if (spec.loop && names.has(spec.loop) && spec.loop !== name)
+      edges.push({ from: name, to: spec.loop, kind: 'loop', rounds: spec.rounds ?? DEFAULT_ROUNDS });
   }
   return { roots, edges };
 }
@@ -228,7 +268,14 @@ export function orderOf(steps: readonly DraftStep[]): string[] {
 
 /** A step as it is compared: its keys in one order, its body, what it sets itself, and a pasted schema. */
 const said = (step: ListedStep, schema: DraftStep['schema']): string =>
-  JSON.stringify([Object.keys(step.spec).sort().map((k) => [k, step.spec[k as keyof WorkflowStepSpec]]), step.body, step.own && [[...step.own.keys].sort(), step.own.body], schema]);
+  JSON.stringify([
+    Object.keys(step.spec)
+      .sort()
+      .map((k) => [k, step.spec[k as keyof WorkflowStepSpec]]),
+    step.body,
+    step.own && [[...step.own.keys].sort(), step.own.body],
+    schema,
+  ]);
 
 /** The steps of the draft that are not as the folder was listed — changed, added, or given a schema to write — by name. */
 export function unsavedSteps(steps: readonly DraftStep[], workflow: Pick<WorkflowListing, 'steps'>): string[] {
@@ -245,10 +292,15 @@ export const toPut = (steps: readonly DraftStep[]): ListedStep[] =>
   steps.map(({ name, spec, body, own, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body, own }));
 
 /** The schemas pasted in the draft, as a save carries them: written beside the steps with them, judged with them first. */
-export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] => steps.flatMap(({ schema }) => (schema ? [{ file: schema.file, text: schema.text }] : []));
+export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] =>
+  steps.flatMap(({ schema }) => (schema ? [{ file: schema.file, text: schema.text }] : []));
 
 /** A list typed as the form's list fields take one — `Read, Grep` — as the listing has it: its names, or none for nothing typed. */
-export const listOf = (typed: string): string[] => typed.split(',').map((s) => s.trim()).filter(Boolean);
+export const listOf = (typed: string): string[] =>
+  typed
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 /** A count or an amount typed into the form, as the listing has it: null for nothing typed, and otherwise the number, which the package judges. */
 /**
@@ -274,5 +326,7 @@ export function numberOf(typed: string): number | null {
 /** A folder written, put into the page's listing in the listing's order — the repository's first, then yours, each by name — for the next read to confirm. */
 export function listedWith(list: readonly WorkflowListing[] | undefined, written: WorkflowListing): WorkflowListing[] {
   const others = (list ?? []).filter((w) => !(w.from === written.from && w.name === written.name));
-  return [...others, written].sort((a, b) => (a.from === b.from ? (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) : a.from === 'repo' ? -1 : 1));
+  return [...others, written].sort((a, b) =>
+    a.from === b.from ? (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) : a.from === 'repo' ? -1 : 1,
+  );
 }

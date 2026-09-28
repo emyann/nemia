@@ -19,11 +19,16 @@ const root = scratch('hkb-api-hold-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');
-const { accept, approve, decide, engine, heldRefusal, holdAdvice, holdWord, list, readRun, retry, round, unhold } = await import('agent-orchestrator');
+const { accept, approve, decide, engine, heldRefusal, holdAdvice, holdWord, list, readRun, retry, round, unhold } =
+  await import('agent-orchestrator');
 type Wait = import('agent-orchestrator').Wait;
 
 const git = (...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
+  execFileSync(
+    'git',
+    ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+    { cwd: repo, encoding: 'utf8' },
+  );
 const repo = fs.mkdtempSync(path.join(root, 'repo-'));
 git('init', '-q', '-b', 'main');
 fs.writeFileSync(path.join(repo, 'README.md'), '# app\n');
@@ -52,14 +57,25 @@ const journal = (taskId: string, events: object[]) =>
 const filed = { kind: 'filed', at: at(0), brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' };
 
 /** A step's task that ran once and signed off with `closeout` — its attempt with the usage the engine read of it, when it read one. */
-const signedOff = (taskId: string, closeout: object, usage?: object) => journal(taskId, [
-  filed,
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(1), attempt: 1 },
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
-  { kind: 'settled', at: at(9), outcome: 'succeeded' },
-]);
-const working = (taskId: string) => journal(taskId, [filed, { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(1), attempt: 1 }]);
+const signedOff = (taskId: string, closeout: object, usage?: object) =>
+  journal(taskId, [
+    filed,
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(1), attempt: 1 },
+    {
+      kind: 'ended',
+      at: at(9),
+      attempt: 1,
+      sessionId: `ae/${taskId}/1`,
+      observed: 'done',
+      reason: 'harness',
+      closeout,
+      ...(usage ? { usage } : {}),
+    },
+    { kind: 'settled', at: at(9), outcome: 'succeeded' },
+  ]);
+const working = (taskId: string) =>
+  journal(taskId, [filed, { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(1), attempt: 1 }]);
 
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 const BLOCKED = { outcome: 'blocked', summary: 'Two ways to go.', needs: 'Warm colours, or cool ones?', artifacts: [] };
@@ -68,10 +84,23 @@ const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, requ
 /** A run's record, as `wf start` writes it with its workflow frozen on it; cancelled as `wf cancel` marks one, with a file of its own. */
 function writeRun(id: string, workflow: object[], steps: object, more: { after?: string[]; cancelledAt?: string } = {}): void {
   const { cancelledAt, ...rest } = more;
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true, brief: `Run ${id}`, createdAt: at(0),
-    workflowDir: path.join(root, 'no-such-workflow'), workflow, steps, ...rest,
-  }));
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo,
+      workspace: repo,
+      baseRef: base,
+      branch: 'main',
+      isolate: true,
+      brief: `Run ${id}`,
+      createdAt: at(0),
+      workflowDir: path.join(root, 'no-such-workflow'),
+      workflow,
+      steps,
+      ...rest,
+    }),
+  );
   if (cancelledAt) write(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
 }
 
@@ -100,10 +129,21 @@ writeRun('p-gone', [implement], { implement: { taskId: 't-p-gone', branch: 'wf/p
 
 /** `plan → implement`, started `--gate plan`: plan signed off, and waits at its gate. */
 const GATE = 'h-gate';
-writeRun(GATE, [{ name: 'plan', after: [], body: 'Plan it.', harness: 'codex' }, { ...implement, after: ['plan'] }], {
-  plan: { taskId: `${GATE}-plan`, branch: `wf/${GATE}/plan` }, implement: { taskId: null },
-});
-fs.writeFileSync(path.join(root, 'runs', `${GATE}.json`), JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${GATE}.json`), 'utf8')), gates: ['plan'] }));
+writeRun(
+  GATE,
+  [
+    { name: 'plan', after: [], body: 'Plan it.', harness: 'codex' },
+    { ...implement, after: ['plan'] },
+  ],
+  {
+    plan: { taskId: `${GATE}-plan`, branch: `wf/${GATE}/plan` },
+    implement: { taskId: null },
+  },
+);
+fs.writeFileSync(
+  path.join(root, 'runs', `${GATE}.json`),
+  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${GATE}.json`), 'utf8')), gates: ['plan'] }),
+);
 signedOff(`${GATE}-plan`, DONE);
 holdOn(GATE, ['p-live']);
 
@@ -120,13 +160,18 @@ holdOn(LOOP, ['p-live']);
 
 /** `palette`, `budget: 1`: its one session cost $1.50 and signed off blocked — over its budget, and raised with a try. */
 const BUDGET = 'h-budget';
-writeRun(BUDGET, [{ name: 'palette', after: [], body: 'Pick a palette.', harness: 'claude', budget: 1 }], { palette: { taskId: `${BUDGET}-palette` } });
+writeRun(BUDGET, [{ name: 'palette', after: [], body: 'Pick a palette.', harness: 'claude', budget: 1 }], {
+  palette: { taskId: `${BUDGET}-palette` },
+});
 signedOff(`${BUDGET}-palette`, BLOCKED, { costUsd: 1.5 });
 holdOn(BUDGET, ['p-live']);
 
 /** `implement → review`: implement signed off blocked, and may be tried again. */
 const BLOCKS = 'h-blocked';
-writeRun(BLOCKS, [implement, review], { implement: { taskId: `${BLOCKS}-implement`, branch: `wf/${BLOCKS}/implement` }, review: { taskId: null } });
+writeRun(BLOCKS, [implement, review], {
+  implement: { taskId: `${BLOCKS}-implement`, branch: `wf/${BLOCKS}/implement` },
+  review: { taskId: null },
+});
 signedOff(`${BLOCKS}-implement`, BLOCKED);
 holdOn(BLOCKS, ['p-live']);
 
@@ -134,7 +179,14 @@ holdOn(BLOCKS, ['p-live']);
  * `implement → review`, implement signed off, review not filed: the next tick files it once the hold lifts. One for each kind of run a hold
  * can name — one that may still ship, one shipped, one cancelled, one whose branch is gone, one the store has none of — and a hold naming none.
  */
-const ON = { live: ['p-live'], shipped: ['p-shipped'], cancelled: ['p-cancelled'], gone: ['p-gone'], missing: ['no-such-run'], none: [] } as const;
+const ON = {
+  live: ['p-live'],
+  shipped: ['p-shipped'],
+  cancelled: ['p-cancelled'],
+  gone: ['p-gone'],
+  missing: ['no-such-run'],
+  none: [],
+} as const;
 for (const [kind, until] of Object.entries(ON)) {
   const id = `h-on-${kind}`;
   writeRun(id, [implement, review], { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, review: { taskId: null } });
@@ -144,7 +196,12 @@ for (const [kind, until] of Object.entries(ON)) {
 
 /** As `h-on-live`, and called off since. */
 const CANCELLED = 'h-cancelled';
-writeRun(CANCELLED, [implement, review], { implement: { taskId: `${CANCELLED}-implement`, branch: `wf/${CANCELLED}/implement` }, review: { taskId: null } }, { cancelledAt: at(40) });
+writeRun(
+  CANCELLED,
+  [implement, review],
+  { implement: { taskId: `${CANCELLED}-implement`, branch: `wf/${CANCELLED}/implement` }, review: { taskId: null } },
+  { cancelledAt: at(40) },
+);
 signedOff(`${CANCELLED}-implement`, DONE);
 holdOn(CANCELLED, ['p-live']);
 
@@ -154,17 +211,38 @@ writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'
 holdOn(AFTER, ['p-shipped', 'p-live']);
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
-const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+const BOARD = {
+  'content-type': 'application/json',
+  'sec-fetch-site': 'same-origin',
+  origin: 'http://localhost:5173',
+  host: '127.0.0.1:8787',
+};
 const post = (route: string, body: unknown) => app.request(route, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
-type Holding = { at: string; runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>; word: string; advice: string; onYou: boolean };
+type Holding = {
+  at: string;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
+  word: string;
+  advice: string;
+  onYou: boolean;
+};
 type Step = { name: string; status: string; note: string | null; approve: string | null; raise: unknown; asked: unknown };
-type Run = { id: string; heldUntil: string[]; holding: Holding | null; waitingOnYou: string[]; onYou: string[]; moving: boolean; status: string; toDecide: unknown; steps: Step[] };
+type Run = {
+  id: string;
+  heldUntil: string[];
+  holding: Holding | null;
+  waitingOnYou: string[];
+  onYou: string[];
+  moving: boolean;
+  status: string;
+  toDecide: unknown;
+  steps: Step[];
+};
 
 const listed = async (): Promise<Map<string, Run>> => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  return new Map((await res.json() as Run[]).map((r) => [r.id, r]));
+  return new Map(((await res.json()) as Run[]).map((r) => [r.id, r]));
 };
 const detail = async (id: string): Promise<Run> => {
   const res = await app.request(`/api/runs/${id}`);
@@ -178,10 +256,14 @@ const decisionOf = async (id: string) => {
 };
 
 /** The holds as the api gives them, back in the package's shape. */
-const asWaits = (holding: Holding | null): Wait[] => (holding?.runs ?? []).map((w) => ({
-  run: w.run, ...(w.missing ? { missing: true as const } : {}), ...(w.cancelledAt ? { cancelledAt: w.cancelledAt } : {}),
-  ...(w.gone.length ? { gone: w.gone } : {}), ...(w.shipped ? { shipped: true as const } : {}),
-}));
+const asWaits = (holding: Holding | null): Wait[] =>
+  (holding?.runs ?? []).map((w) => ({
+    run: w.run,
+    ...(w.missing ? { missing: true as const } : {}),
+    ...(w.cancelledAt ? { cancelledAt: w.cancelledAt } : {}),
+    ...(w.gone.length ? { gone: w.gone } : {}),
+    ...(w.shipped ? { shipped: true as const } : {}),
+  }));
 
 /** A `wf` verb that would release work, anywhere in what a surface says. */
 const VERBS = /wf (approve|retry|round|accept) /;
@@ -219,9 +301,17 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
     // And `wf decide`'s reading, which is `list`'s.
     assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, id);
     // Each step as `wf ls` words it.
-    assert.deepEqual(api.steps.map((s) => [s.name, s.status, s.note]), cli.steps.map((s) => [s.name, s.status, s.note ?? null]), id);
+    assert.deepEqual(
+      api.steps.map((s) => [s.name, s.status, s.note]),
+      cli.steps.map((s) => [s.name, s.status, s.note ?? null]),
+      id,
+    );
     const page = await detail(id);
-    assert.deepEqual({ heldUntil: page.heldUntil, holding: page.holding, moving: page.moving }, { heldUntil: api.heldUntil, holding: api.holding, moving: api.moving }, id);
+    assert.deepEqual(
+      { heldUntil: page.heldUntil, holding: page.holding, moving: page.moving },
+      { heldUntil: api.heldUntil, holding: api.holding, moving: api.moving },
+      id,
+    );
   }
   assert.deepEqual(runs.get(GATE)!.holding, {
     at: HELD_AT,
@@ -241,7 +331,11 @@ test('REFUSED while held: no step of a held run waits on you, none is offered an
     const api = runs.get(id)!;
     assert.deepEqual([api.waitingOnYou, api.onYou, api.toDecide], [[], [], null], id);
     const page = await detail(id);
-    assert.deepEqual(page.steps.map((s) => [s.approve, s.raise, s.asked]), page.steps.map(() => [null, null, null]), id);
+    assert.deepEqual(
+      page.steps.map((s) => [s.approve, s.raise, s.asked]),
+      page.steps.map(() => [null, null, null]),
+      id,
+    );
     assert.doesNotMatch(JSON.stringify(api.steps.map((s) => s.note)), VERBS, id);
   }
   // The rule, not the fixture: each of these waits on you once the hold is lifted.
@@ -272,13 +366,21 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
     assert.doesNotMatch(JSON.stringify(said.gates), VERBS, id);
   }
   // Lifted, each is offered the verb the hold refused: the decision reads the hold, not the run's steps.
-  const offered: Record<string, RegExp> = { [GATE]: /^wf approve h-gate plan$/, [LOOP]: /^wf (round|accept) h-loop review/, [BUDGET]: /^wf retry h-budget palette --budget/, [BLOCKS]: /^wf retry h-blocked implement$/ };
+  const offered: Record<string, RegExp> = {
+    [GATE]: /^wf approve h-gate plan$/,
+    [LOOP]: /^wf (round|accept) h-loop review/,
+    [BUDGET]: /^wf retry h-budget palette --budget/,
+    [BLOCKS]: /^wf retry h-blocked implement$/,
+  };
   for (const [id, command] of Object.entries(offered)) {
     const hold = fs.readFileSync(holdFile(id), 'utf8');
     fs.rmSync(holdFile(id));
     try {
       const { commands } = await decisionOf(id);
-      assert.ok(commands.some((c: { command: string }) => command.test(c.command)), `${id}: ${JSON.stringify(commands)}`);
+      assert.ok(
+        commands.some((c: { command: string }) => command.test(c.command)),
+        `${id}: ${JSON.stringify(commands)}`,
+      );
     } finally {
       write(holdFile(id), hold);
     }
@@ -286,7 +388,7 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
   assert.ok((await decisionOf(GATE)).holding, 'the hold is back');
 });
 
-test("a step over its budget on a held run is offered no raise, and `wf decide` says nothing waits on you for it — the run is held, not over budget on you", async () => {
+test('a step over its budget on a held run is offered no raise, and `wf decide` says nothing waits on you for it — the run is held, not over budget on you', async () => {
   const said = await decide(engine(), BUDGET);
   assert.deepEqual(said.decision, { kind: 'running', waiting: [] });
   assert.doesNotMatch(said.overBudgetLine ?? '', /waiting on you/);
@@ -296,22 +398,48 @@ test("a step over its budget on a held run is offered no raise, and `wf decide` 
   assert.deepEqual(page.waitingOnYou, []);
 });
 
-test('REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409 in `heldRefusal`\'s words, the verb\'s own, and nothing is written', async () => {
+test("REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409 in `heldRefusal`'s words, the verb's own, and nothing is written", async () => {
   const e = engine();
   const cases: Array<[string, string, unknown, () => Promise<unknown>]> = [
     [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }, () => approve(e, GATE, 'plan', 'Ship it.')],
-    [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'nudge', message: 'Store it first.' }, () => retry(e, GATE, 'plan', { mode: 'nudge', message: 'Store it first.' }, { stopBlocked: true })],
-    [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'nudge', message: 'Warm ones.' }, () => retry(e, BLOCKS, 'implement', { mode: 'nudge', message: 'Warm ones.' }, { stopBlocked: true })],
-    [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'nudge', message: 'Warm ones.', budget: 5 }, () => retry(e, BUDGET, 'palette', { mode: 'nudge', message: 'Warm ones.', budget: 5 }, { stopBlocked: true })],
+    [
+      GATE,
+      `/api/runs/${GATE}/steps/plan/retry`,
+      { mode: 'nudge', message: 'Store it first.' },
+      () => retry(e, GATE, 'plan', { mode: 'nudge', message: 'Store it first.' }, { stopBlocked: true }),
+    ],
+    [
+      BLOCKS,
+      `/api/runs/${BLOCKS}/steps/implement/retry`,
+      { mode: 'nudge', message: 'Warm ones.' },
+      () => retry(e, BLOCKS, 'implement', { mode: 'nudge', message: 'Warm ones.' }, { stopBlocked: true }),
+    ],
+    [
+      BUDGET,
+      `/api/runs/${BUDGET}/steps/palette/retry`,
+      { mode: 'nudge', message: 'Warm ones.', budget: 5 },
+      () => retry(e, BUDGET, 'palette', { mode: 'nudge', message: 'Warm ones.', budget: 5 }, { stopBlocked: true }),
+    ],
     [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }, () => round(e, LOOP, 'review', undefined)],
-    [LOOP, `/api/runs/${LOOP}/steps/review/accept`, { message: 'The findings are follow-up work.' }, () => accept(e, LOOP, 'review', 'The findings are follow-up work.')],
+    [
+      LOOP,
+      `/api/runs/${LOOP}/steps/review/accept`,
+      { message: 'The findings are follow-up work.' },
+      () => accept(e, LOOP, 'review', 'The findings are follow-up work.'),
+    ],
   ];
   for (const [id, route, body, verb] of cases) {
     const res = await post(route, body);
     assert.equal(res.status, 409, route);
     const { error } = await res.json();
     assert.equal(error, await refusal(verb), route);
-    const what = /approve$/.test(route) ? 'an approval' : /retry$/.test(route) ? 'a retry' : /round$/.test(route) ? 'a round' : 'an acceptance';
+    const what = route.endsWith('approve')
+      ? 'an approval'
+      : route.endsWith('retry')
+        ? 'a retry'
+        : route.endsWith('round')
+          ? 'a round'
+          : 'an acceptance';
     assert.equal(error, heldRefusal(readRun(id), what), route);
     assert.deepEqual(asked(id), [], `nothing written: ${route}`);
   }
@@ -326,15 +454,23 @@ test("a hold that lifts only by a person's hand says so (`onYou`) — one naming
     const holding = runs.get(`h-on-${kind}`)!.holding!;
     assert.equal(holding.onYou, holding.advice.includes('yours to'), kind);
   }
-  assert.deepEqual(runs.get('h-on-shipped')!.holding!.runs, [{ run: 'p-shipped', missing: false, cancelledAt: null, gone: [], shipped: true }]);
+  assert.deepEqual(runs.get('h-on-shipped')!.holding!.runs, [
+    { run: 'p-shipped', missing: false, cancelledAt: null, gone: [], shipped: true },
+  ]);
   assert.equal(runs.get('h-on-shipped')!.holding!.word, 'held until p-shipped ships — it has shipped, and the next tick lifts the hold');
-  assert.deepEqual(runs.get('h-on-cancelled')!.holding!.runs, [{ run: 'p-cancelled', missing: false, cancelledAt, gone: [], shipped: false }]);
-  assert.deepEqual(runs.get('h-on-gone')!.holding!.runs, [{ run: 'p-gone', missing: false, cancelledAt: null, gone: ['wf/p-gone/implement'], shipped: false }]);
-  assert.deepEqual(runs.get('h-on-missing')!.holding!.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [], shipped: false }]);
+  assert.deepEqual(runs.get('h-on-cancelled')!.holding!.runs, [
+    { run: 'p-cancelled', missing: false, cancelledAt, gone: [], shipped: false },
+  ]);
+  assert.deepEqual(runs.get('h-on-gone')!.holding!.runs, [
+    { run: 'p-gone', missing: false, cancelledAt: null, gone: ['wf/p-gone/implement'], shipped: false },
+  ]);
+  assert.deepEqual(runs.get('h-on-missing')!.holding!.runs, [
+    { run: 'no-such-run', missing: true, cancelledAt: null, gone: [], shipped: false },
+  ]);
   assert.equal(runs.get('h-on-none')!.holding!.word, 'held, on a hold that names no run');
 });
 
-test("a held run moves as it would unheld while its hold may lift on its own — the tick files what is due once it does — and not once only a person lifts it; nothing is due while it stands", async () => {
+test('a held run moves as it would unheld while its hold may lift on its own — the tick files what is due once it does — and not once only a person lifts it; nothing is due while it stands', async () => {
   const runs = await listed();
   const moving = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.moving]));
   assert.deepEqual(moving, { live: true, shipped: true, cancelled: false, gone: false, missing: false, none: false });
@@ -369,10 +505,14 @@ test('a held run called off reads as called off: no hold, nothing waiting on you
   assert.equal((await list(engine(), readRun(CANCELLED))).holding, undefined);
 });
 
-test("a run waiting on runs and held as well is both, as `wf decide` says both: its decision carries the wait and the hold", async () => {
+test('a run waiting on runs and held as well is both, as `wf decide` says both: its decision carries the wait and the hold', async () => {
   const run = (await listed()).get(AFTER)!;
   assert.ok(run.holding);
-  assert.deepEqual(run.holding.runs.map((w) => [w.run, w.shipped]), [['p-live', false]], 'a hold names what has not shipped');
+  assert.deepEqual(
+    run.holding.runs.map((w) => [w.run, w.shipped]),
+    [['p-live', false]],
+    'a hold names what has not shipped',
+  );
   assert.equal(run.holding.word, 'held until p-live ships');
   const body = await decisionOf(AFTER);
   assert.deepEqual(Object.keys(body).sort(), ['holding', 'waiting']);
@@ -383,19 +523,35 @@ test("a run waiting on runs and held as well is both, as `wf decide` says both: 
 });
 
 /** A lift as the board sends it: a DELETE with an empty JSON body, through the same guard as every write. */
-const lift = (id: string, headers: Record<string, string> = BOARD) => app.request(`/api/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
+const lift = (id: string, headers: Record<string, string> = BOARD) =>
+  app.request(`/api/runs/${id}/hold`, { method: 'DELETE', headers, body: '{}' });
 
 /** Every file of a run in the store's `runs/`, and what each holds: what a refusal must leave as it was. */
-const filesOf = (id: string): Record<string, string> => Object.fromEntries(fs.readdirSync(path.join(root, 'runs'))
-  .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
-  .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]));
+const filesOf = (id: string): Record<string, string> =>
+  Object.fromEntries(
+    fs
+      .readdirSync(path.join(root, 'runs'))
+      .filter((name) => name.startsWith(`${id}.`) && fs.statSync(path.join(root, 'runs', name)).isFile())
+      .map((name) => [name, fs.readFileSync(path.join(root, 'runs', name), 'utf8')]),
+  );
 
 /** As `h-gate`, held until p-live: lifted by the tests below, so none of the others reads it. */
 const LIFT = 'h-lift';
-writeRun(LIFT, [{ name: 'plan', after: [], body: 'Plan it.', harness: 'codex' }, { ...implement, after: ['plan'] }], {
-  plan: { taskId: `${LIFT}-plan`, branch: `wf/${LIFT}/plan` }, implement: { taskId: null },
-});
-fs.writeFileSync(path.join(root, 'runs', `${LIFT}.json`), JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${LIFT}.json`), 'utf8')), gates: ['plan'] }));
+writeRun(
+  LIFT,
+  [
+    { name: 'plan', after: [], body: 'Plan it.', harness: 'codex' },
+    { ...implement, after: ['plan'] },
+  ],
+  {
+    plan: { taskId: `${LIFT}-plan`, branch: `wf/${LIFT}/plan` },
+    implement: { taskId: null },
+  },
+);
+fs.writeFileSync(
+  path.join(root, 'runs', `${LIFT}.json`),
+  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${LIFT}.json`), 'utf8')), gates: ['plan'] }),
+);
 signedOff(`${LIFT}-plan`, DONE);
 
 /** Pruned, as `wf prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with none. */
@@ -406,7 +562,7 @@ for (const id of ['h-pruned-held', 'h-pruned']) {
   write(path.join(root, 'runs', `${id}.pruned`), JSON.stringify(PRUNED));
 }
 
-test("a hold lifted on the board is lifted as `wf hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again", async () => {
+test('a hold lifted on the board is lifted as `wf hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again', async () => {
   holdOn(LIFT, ['p-live']);
   assert.equal((await listed()).get(LIFT)!.holding?.word, 'held until p-live ships');
   const res = await lift(LIFT);

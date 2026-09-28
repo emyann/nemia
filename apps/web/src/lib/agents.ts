@@ -2,7 +2,19 @@ import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 import { remoteRefuses } from './builder.ts';
 
 /** The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: description, skills, systemPrompt): the order an agent's file writes them. */
-export const ROLE_KEYS: readonly AgentRoleKey[] = ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'];
+export const ROLE_KEYS: readonly AgentRoleKey[] = [
+  'harness',
+  'model',
+  'effort',
+  'context',
+  'permissionMode',
+  'sandbox',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'remote',
+  'output',
+];
 
 /** What each role key is called on the form. */
 export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
@@ -110,16 +122,22 @@ export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: st
 }
 
 /** A key's line of meaning, as the package says it for a step's key of the same name. */
-export const meaningOf = (form: KeyForm | undefined, key: AgentRoleKey): string | null => form?.keys.find((k) => k.key === key)?.meaning ?? null;
+export const meaningOf = (form: KeyForm | undefined, key: AgentRoleKey): string | null =>
+  form?.keys.find((k) => k.key === key)?.meaning ?? null;
 
 /** The skills line as the names it gives, in its order: split on commas, each trimmed, an empty one dropped. */
-export const skillList = (line: string): string[] => line.split(',').map((name) => name.trim()).filter(Boolean);
+export const skillList = (line: string): string[] =>
+  line
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
 
 /** Names as the skills line writes them: `review-a-change, write-a-note`. */
 export const skillLine = (names: readonly string[]): string => names.join(', ');
 
 /** The skills line with `name` given last, once: a name it gives already leaves it as it was. */
-export const withSkill = (line: string, name: string): string => (skillList(line).includes(name) ? line : skillLine([...skillList(line), name]));
+export const withSkill = (line: string, name: string): string =>
+  skillList(line).includes(name) ? line : skillLine([...skillList(line), name]);
 
 /** The skills line without `name`. */
 export const withoutSkill = (line: string, name: string): string => skillLine(skillList(line).filter((given) => given !== name));
@@ -147,10 +165,30 @@ export const deniedWithoutSkill = (denied: string): string => skillLine(skillLis
  * experts. Claude Code's own prompt is about 6.5k tokens, cached across turns; `no-coding` drops its coding section, about 750 of them; `own`
  * drops the lot, safety rules included, leaving the agent's instructions alone.
  */
-export const SYSTEM_PROMPT_CHOICES: ReadonlyArray<{ value: (typeof SYSTEM_PROMPTS)[number]; label: string; says: string; expert: boolean }> = [
-  { value: 'default', label: 'Works on code or files', says: "Claude Code's full instructions, then yours: about 6.5k tokens, cached.", expert: false },
-  { value: 'no-coding', label: "Doesn't write code", says: "Claude Code's instructions less its coding section: about 750 tokens fewer.", expert: false },
-  { value: 'own', label: 'Only my instructions', says: "Drops Claude Code's own, its safety rules with them — only when a person asks for it.", expert: true },
+export const SYSTEM_PROMPT_CHOICES: ReadonlyArray<{
+  value: (typeof SYSTEM_PROMPTS)[number];
+  label: string;
+  says: string;
+  expert: boolean;
+}> = [
+  {
+    value: 'default',
+    label: 'Works on code or files',
+    says: "Claude Code's full instructions, then yours: about 6.5k tokens, cached.",
+    expert: false,
+  },
+  {
+    value: 'no-coding',
+    label: "Doesn't write code",
+    says: "Claude Code's instructions less its coding section: about 750 tokens fewer.",
+    expert: false,
+  },
+  {
+    value: 'own',
+    label: 'Only my instructions',
+    says: "Drops Claude Code's own, its safety rules with them — only when a person asks for it.",
+    expert: true,
+  },
 ];
 
 /** The word a form's system prompt is drawn as: unset is `default`, which is what a session runs with. */
@@ -181,7 +219,11 @@ export const formKeyOf = (version: string, kept: KeptForm | null): string => (ke
  * its file and its schema read as they did when the form was drawn (`was`). A change to either since is someone else's, and the form is drawn
  * again from it, as for any other change, rather than saved over it.
  */
-export function keptAfterCopy(was: Pick<AgentListing, 'source' | 'schema'>, now: Pick<AgentListing, 'source' | 'schema' | 'version'>, key: string): KeptForm | null {
+export function keptAfterCopy(
+  was: Pick<AgentListing, 'source' | 'schema'>,
+  now: Pick<AgentListing, 'source' | 'schema' | 'version'>,
+  key: string,
+): KeptForm | null {
   if (now.source !== was.source || JSON.stringify(now.schema ?? null) !== JSON.stringify(was.schema ?? null)) return null;
   return { key, version: now.version };
 }
@@ -191,14 +233,23 @@ export function keptAfterCopy(was: Pick<AgentListing, 'source' | 'schema'>, now:
  * the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form was drawn again from the file as it
  * was before the save — and stayed so where the read failed.
  */
-export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null => (kept && now !== undefined && now !== kept.version ? null : kept);
+export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null =>
+  kept && now !== undefined && now !== kept.version ? null : kept;
 
 /**
  * A save settled, in the order the page must see it: moved to the new name first, when it was renamed — the old one, read again, is gone —
  * then every read the write changes read again, and only then what the page kept for the old version let go (`release`). A form a copy of a
  * skill kept is drawn under a key of its own until then, so the person's saved edit stays on the page rather than the file as it was.
  */
-export async function settleSave({ rename, invalidate, release }: { rename?: () => Promise<unknown>; invalidate: () => Promise<unknown>; release: () => void }): Promise<void> {
+export async function settleSave({
+  rename,
+  invalidate,
+  release,
+}: {
+  rename?: () => Promise<unknown>;
+  invalidate: () => Promise<unknown>;
+  release: () => void;
+}): Promise<void> {
   if (rename) await rename();
   await invalidate();
   release();
@@ -211,8 +262,13 @@ export const TRY_FENCE = "A rehearsal fenced to its own folder, not the agent's 
 export const TRY_TERMS = 'dontAsk, allowed Edit(**) in its folder, $1 to spend';
 
 /** The latest try of an agent among the runs, by when it was made; undefined when it has none. */
-export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(runs: readonly T[], agent: string): T | undefined {
-  return runs.filter((run) => run.try?.agent === agent).reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined);
+export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(
+  runs: readonly T[],
+  agent: string,
+): T | undefined {
+  return runs
+    .filter((run) => run.try?.agent === agent)
+    .reduce<T | undefined>((latest, run) => (!latest || run.createdAt > latest.createdAt ? run : latest), undefined);
 }
 
 /** Why the Try button is not pressable, or null: an empty brief, or a try of the agent still moving — the api refuses both. */

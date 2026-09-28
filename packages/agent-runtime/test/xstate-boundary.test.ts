@@ -19,14 +19,19 @@ const LIFECYCLE = 'src/lifecycle.ts';
 const SELF = 'packages/agent-runtime/test/xstate-boundary.test.ts';
 
 /** A line of prose read as nothing, as `contract.test.ts` reads one, the line kept so numbers still count. */
-const withoutComments = (text: string): string => text.split('\n').map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line)).join('\n');
+const withoutComments = (text: string): string =>
+  text
+    .split('\n')
+    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
+    .join('\n');
 
 /** Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()` (as `a2a-boundary.test.ts`). */
 function specifiersIn(text: string): string[] {
   const found = new Set<string>();
   for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
   for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
-  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g)) found.add(m[1]!);
+  for (const m of text.matchAll(/\b(?:import|require|import\.meta\.resolve|require\.resolve)\s*\(\s*['"`]([^'"`]+)['"`]/g))
+    found.add(m[1]!);
   return [...found].sort();
 }
 
@@ -35,26 +40,46 @@ function xstateBreaches(file: string, text: string): string[] {
   if (file === `packages/agent-runtime/${LIFECYCLE}` || file === SELF) return [];
   return specifiersIn(withoutComments(text))
     .filter((spec) => spec === XSTATE || spec.startsWith(`${XSTATE}/`) || spec.startsWith('@xstate/'))
-    .map((spec) => `${file} imports ${spec}: only agent-runtime's src/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there`);
+    .map(
+      (spec) =>
+        `${file} imports ${spec}: only agent-runtime's src/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there`,
+    );
 }
 
 /** Every workspace's code, tests included, by its path from the root: a test of another package importing XState is a second user of it. */
-const workspaceFiles = (): string[] => ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(ROOT, top)).flatMap((ws) =>
-  ['src', 'bin', 'test'].flatMap((dir) => {
-    const at = path.join(ROOT, top, ws, dir);
-    if (!fs.existsSync(at)) return [];
-    return (fs.readdirSync(at, { recursive: true }) as string[]).filter((f) => /\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(f) && !f.includes('node_modules'))
-      .map((f) => `${top}/${ws}/${dir}/${f}`);
-  })));
+const workspaceFiles = (): string[] =>
+  ['packages', 'apps'].flatMap((top) =>
+    fs.readdirSync(path.join(ROOT, top)).flatMap((ws) =>
+      ['src', 'bin', 'test'].flatMap((dir) => {
+        const at = path.join(ROOT, top, ws, dir);
+        if (!fs.existsSync(at)) return [];
+        return (fs.readdirSync(at, { recursive: true }) as string[])
+          .filter((f) => /\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(f) && !f.includes('node_modules'))
+          .map((f) => `${top}/${ws}/${dir}/${f}`);
+      }),
+    ),
+  );
 
 test('the scan reads every workspace, and the lifecycle imports XState — or it would pass by reading nothing', () => {
   const files = workspaceFiles();
-  for (const f of ['packages/agent-runtime/src/engine.ts', 'packages/agent-orchestrator/src/tick.ts', 'apps/api/src/app.ts', 'packages/agent-runtime/bin/ae.ts']) assert.ok(files.includes(f), f);
-  assert.ok(specifiersIn(fs.readFileSync(path.join(PKG, LIFECYCLE), 'utf8')).includes(XSTATE), 'the pattern matches the one import there is');
+  for (const f of [
+    'packages/agent-runtime/src/engine.ts',
+    'packages/agent-orchestrator/src/tick.ts',
+    'apps/api/src/app.ts',
+    'packages/agent-runtime/bin/ae.ts',
+  ])
+    assert.ok(files.includes(f), f);
+  assert.ok(
+    specifiersIn(fs.readFileSync(path.join(PKG, LIFECYCLE), 'utf8')).includes(XSTATE),
+    'the pattern matches the one import there is',
+  );
 });
 
 test('only src/lifecycle.ts imports XState, in any workspace', () => {
-  assert.deepEqual(workspaceFiles().flatMap((f) => xstateBreaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'))), []);
+  assert.deepEqual(
+    workspaceFiles().flatMap((f) => xstateBreaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'))),
+    [],
+  );
 });
 
 test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a type, a re-export, a dynamic import, another package', () => {
@@ -77,20 +102,43 @@ test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a 
 });
 
 /** The workspaces whose package.json names XState in any dependency list. */
-const dependents = (manifests: Record<string, { dependencies?: object; devDependencies?: object; peerDependencies?: object; optionalDependencies?: object }>) =>
-  Object.entries(manifests).filter(([, m]) => [m.dependencies, m.devDependencies, m.peerDependencies, m.optionalDependencies]
-    .some((deps) => Object.keys(deps ?? {}).some((d) => d === XSTATE || d.startsWith('@xstate/')))).map(([name]) => name);
+const dependents = (
+  manifests: Record<string, { dependencies?: object; devDependencies?: object; peerDependencies?: object; optionalDependencies?: object }>,
+) =>
+  Object.entries(manifests)
+    .filter(([, m]) =>
+      [m.dependencies, m.devDependencies, m.peerDependencies, m.optionalDependencies].some((deps) =>
+        Object.keys(deps ?? {}).some((d) => d === XSTATE || d.startsWith('@xstate/')),
+      ),
+    )
+    .map(([name]) => name);
 
 test('XState is a dependency of the runtime alone, pinned', () => {
-  const manifests = Object.fromEntries(['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(ROOT, top))
-    .filter((ws) => fs.existsSync(path.join(ROOT, top, ws, 'package.json')))
-    .map((ws) => [`${top}/${ws}`, JSON.parse(fs.readFileSync(path.join(ROOT, top, ws, 'package.json'), 'utf8'))])));
+  const manifests = Object.fromEntries(
+    ['packages', 'apps'].flatMap((top) =>
+      fs
+        .readdirSync(path.join(ROOT, top))
+        .filter((ws) => fs.existsSync(path.join(ROOT, top, ws, 'package.json')))
+        .map((ws) => [`${top}/${ws}`, JSON.parse(fs.readFileSync(path.join(ROOT, top, ws, 'package.json'), 'utf8'))]),
+    ),
+  );
   manifests['(root)'] = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
   assert.ok(Object.keys(manifests).length >= 5, 'every workspace read');
   assert.deepEqual(dependents(manifests), ['packages/agent-runtime']);
-  assert.match(manifests['packages/agent-runtime'].dependencies.xstate, /^\d+\.\d+\.\d+$/, 'an exact version: the lifecycle leans on how its `transition` answers a missing edge');
+  assert.match(
+    manifests['packages/agent-runtime'].dependencies.xstate,
+    /^\d+\.\d+\.\d+$/,
+    'an exact version: the lifecycle leans on how its `transition` answers a missing edge',
+  );
   // REFUSED: a second workspace that depends on it, as a dev dependency or a scoped package.
-  assert.deepEqual(dependents({ a: { dependencies: { xstate: '5' } }, b: { devDependencies: { '@xstate/react': '5' } }, c: { dependencies: { effect: '4' } } }), ['a', 'b']);
+  assert.deepEqual(
+    dependents({
+      a: { dependencies: { xstate: '5' } },
+      b: { devDependencies: { '@xstate/react': '5' } },
+      c: { dependencies: { effect: '4' } },
+    }),
+    ['a', 'b'],
+  );
 });
 
 /** The readings and the move a consumer must not be handed: they are `decide`'s, which no entry exports either. */
@@ -98,9 +146,13 @@ const JUDGEMENT = ['lifecycleOf', 'observe', 'spawnRefused', 'settledQuiet', 'Li
 
 /** What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/lifecycle.ts` exports, or a reading `decide` moves by. */
 function exportBreaches(entry: string, exported: Record<string, unknown>, inside: { names: Set<string>; values: Set<unknown> }): string[] {
-  return Object.entries(exported).flatMap(([name, value]) => inside.names.has(name) || inside.values.has(value) || JUDGEMENT.includes(name)
-    ? [`${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`]
-    : []);
+  return Object.entries(exported).flatMap(([name, value]) =>
+    inside.names.has(name) || inside.values.has(value) || JUDGEMENT.includes(name)
+      ? [
+          `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`,
+        ]
+      : [],
+  );
 }
 
 /** Every name and value XState exports, and every value `src/lifecycle.ts` does (its names are too common to refuse by: `transition`, `STATES`). */
@@ -129,8 +181,12 @@ test('REFUSED: an entry that exports an XState name, the machine or its move ren
   const lifecycle = await import('../src/lifecycle.ts');
   const { lifecycleOf } = await import('../src/domain.ts');
   const effect = { ...(await import('agent-runtime/effect')) };
-  const says = (entry: string, name: string) => `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`;
+  const says = (entry: string, name: string) =>
+    `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`;
   assert.deepEqual(exportBreaches('agent-runtime/effect', { ...effect, setup }, inside), [says('agent-runtime/effect', 'setup')]);
-  assert.deepEqual(exportBreaches('agent-runtime', { taskMachine: lifecycle.MACHINE, move: lifecycle.transition }, inside), [says('agent-runtime', 'taskMachine'), says('agent-runtime', 'move')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { taskMachine: lifecycle.MACHINE, move: lifecycle.transition }, inside), [
+    says('agent-runtime', 'taskMachine'),
+    says('agent-runtime', 'move'),
+  ]);
   assert.deepEqual(exportBreaches('agent-runtime', { lifecycleOf }, inside), [says('agent-runtime', 'lifecycleOf')]);
 });

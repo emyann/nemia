@@ -13,7 +13,10 @@ export default {
   route: `/inbox/${CARDS.rich.name}`,
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), "the sidebar lights Inbox on a card's page");
+    await expectVisible(
+      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+      "the sidebar lights Inbox on a card's page",
+    );
     const { rich } = CARDS;
     const inbox = path.join(store!, 'inbox');
     const before = filesIn(inbox);
@@ -31,11 +34,14 @@ export default {
     await expectVisible(link, `a link, as a link (${rich.link.text})`);
     const [href, target, rel] = await Promise.all([link.getAttribute('href'), link.getAttribute('target'), link.getAttribute('rel')]);
     if (href !== rich.link.href || target !== '_blank' || !rel?.split(' ').includes('noreferrer')) {
-      throw new Refused(`a link opens in a new tab and gives the page it opens nothing of this one — href ${href}, target ${target}, rel ${rel}`);
+      throw new Refused(
+        `a link opens in a new tab and gives the page it opens nothing of this one — href ${href}, target ${target}, rel ${rel}`,
+      );
     }
 
     await expectKeys(page, file, `/api/inbox/${rich.name}`, { workflow: rich.workflow });
     await expectSource(file, body, path.join(inbox, `${rich.name}.md`));
-    if (JSON.stringify(filesIn(inbox)) !== JSON.stringify(before)) throw new Refused(`a card's page writes nothing — ${inbox} changed while it was open`);
+    if (JSON.stringify(filesIn(inbox)) !== JSON.stringify(before))
+      throw new Refused(`a card's page writes nothing — ${inbox} changed while it was open`);
   },
 } satisfies PageSpec;

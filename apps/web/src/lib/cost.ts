@@ -23,6 +23,8 @@ export const pastBudget = (step: Pick<Priced, 'budget'>): boolean => step.budget
  */
 export function spentTitle(spent: Spent, of: string): string {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  const missing = spent.unmeasured ? `; ${plural(spent.unmeasured, 'ended attempt')} had no cost on ${spent.unmeasured === 1 ? 'it' : 'them'}, so it cost at least this` : '';
+  const missing = spent.unmeasured
+    ? `; ${plural(spent.unmeasured, 'ended attempt')} had no cost on ${spent.unmeasured === 1 ? 'it' : 'them'}, so it cost at least this`
+    : '';
   return `What ${of} cost, as its harness priced each session: ${plural(spent.measured, 'attempt')} measured${missing}`;
 }

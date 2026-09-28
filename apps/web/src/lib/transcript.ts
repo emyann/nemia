@@ -35,7 +35,15 @@ export type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number;
 /** What a fold holds, in order: its calls, and the thoughts and system lines between them. */
 export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
 /** Two or more calls with nothing said between them. `failed` counts results that are errors; `waiting`, calls with no result yet. */
-export type ToolsTurn = { kind: 'tools'; key: string; summary: string; turns: FoldedTurn[]; calls: number; failed: number; waiting: number };
+export type ToolsTurn = {
+  kind: 'tools';
+  key: string;
+  summary: string;
+  turns: FoldedTurn[];
+  calls: number;
+  failed: number;
+  waiting: number;
+};
 
 /** One thing the page draws. `key` stays the same while the conversation grows, so React keeps what a reader opened. */
 export type Turn = SaidTurn | ThinkingTurn | ToolTurn | ToolsTurn | CloseoutTurn | SystemTurn | ToldTurn;
@@ -79,7 +87,13 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
   for (const event of events) {
     switch (event.kind) {
       case 'tool_use': {
-        const call: ToolCall = { id: event.id, at: event.at, name: event.tool?.name ?? 'unknown tool', input: event.tool?.input, result: null };
+        const call: ToolCall = {
+          id: event.id,
+          at: event.at,
+          name: event.tool?.name ?? 'unknown tool',
+          input: event.tool?.input,
+          result: null,
+        };
         calls.set(event.id, call);
         if (call.name === CLOSEOUT_TOOL) {
           end();
@@ -94,7 +108,12 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
         const call = calls.get(event.id);
         if (call) call.result = result;
         // A result whose call is not in what was read — a transcript cut short at its start — is still shown.
-        else stretch.push({ kind: 'tool', key: `tool:${event.id}`, call: { id: event.id, at: event.at, name: 'unknown tool', input: undefined, result } });
+        else
+          stretch.push({
+            kind: 'tool',
+            key: `tool:${event.id}`,
+            call: { id: event.id, at: event.at, name: 'unknown tool', input: undefined, result },
+          });
         break;
       }
       case 'thinking':
@@ -192,7 +211,14 @@ export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { ar
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);
   const told: ToldTurn[] = [...said]
     .sort((a, b) => placed(a) - placed(b))
-    .map((s) => ({ kind: 'told', key: `told:${s.attempt}:${s.at}`, at: s.at, attempt: s.attempt, text: s.text, arrived: s.arrived ?? null }));
+    .map((s) => ({
+      kind: 'told',
+      key: `told:${s.attempt}:${s.at}`,
+      at: s.at,
+      attempt: s.attempt,
+      text: s.text,
+      arrived: s.arrived ?? null,
+    }));
   const out: Turn[] = [];
   let next = 0;
   for (const turn of turns) {
@@ -251,7 +277,10 @@ VERBS.MultiEdit = VERBS.Edit!;
 VERBS.NotebookEdit = VERBS.Edit!;
 VERBS.Agent = VERBS.Task!;
 VERBS.CommandExecution = VERBS.Bash!;
-VERBS.FileChange = { ...VERBS.Edit!, subject: (input) => (input.changes && typeof input.changes === 'object' ? Object.keys(input.changes) : []) };
+VERBS.FileChange = {
+  ...VERBS.Edit!,
+  subject: (input) => (input.changes && typeof input.changes === 'object' ? Object.keys(input.changes) : []),
+};
 
 /** An MCP tool by its server — `mcp__playwright__browser_click` is `playwright` — and any other by its name. */
 const verbOf = (name: string): Verb => {
@@ -289,10 +318,12 @@ export function detailOf(call: ToolCall): string | null {
   const input = inputOf(call);
   // Codex gives a command as its argv: `['/bin/bash', '-lc', 'npm test']`.
   const command = Array.isArray(input.command) ? input.command.at(-1) : input.command;
-  const said = [command, input.file_path, input.notebook_path, input.pattern, input.url, input.query, input.description, input.path]
-    .find((value): value is string => typeof value === 'string' && value.trim() !== '');
+  const said = [command, input.file_path, input.notebook_path, input.pattern, input.url, input.query, input.description, input.path].find(
+    (value): value is string => typeof value === 'string' && value.trim() !== '',
+  );
   if (said !== undefined) return said.trim().split('\n')[0]!;
-  if (call.name === 'FileChange' && input.changes && typeof input.changes === 'object') return Object.keys(input.changes).join(', ') || null;
+  if (call.name === 'FileChange' && input.changes && typeof input.changes === 'object')
+    return Object.keys(input.changes).join(', ') || null;
   return null;
 }
 

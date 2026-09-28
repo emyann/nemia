@@ -31,7 +31,12 @@ import type { SpawnRequest } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';
-const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' }, summary: { type: 'string' } }, required: ['outcome', 'summary'], additionalProperties: false };
+const SCHEMA = {
+  type: 'object',
+  properties: { outcome: { type: 'string' }, summary: { type: 'string' } },
+  required: ['outcome', 'summary'],
+  additionalProperties: false,
+};
 
 /**
  * What the fake `codex` is told, per session, in `fake.json` in its working directory: wait for `gate` (a file in the same
@@ -82,14 +87,17 @@ const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
 before(() => {
   bin = scratch('ae-codex-agent-bin-');
   fs.writeFileSync(path.join(bin, 'fake-codex.cjs'), FAKE);
-  fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, 'fake-codex.cjs')}" "$@"\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, 'fake-codex.cjs')}" "$@"\n`, {
+    mode: 0o755,
+  });
   process.env.PATH = `${bin}:${prev.PATH}`;
   // An empty Codex home: no operator's config trusts or serves anything to these sessions.
   process.env.CODEX_HOME = scratch('ae-codex-agent-home-');
 });
 after(() => {
   process.env.PATH = prev.PATH;
-  if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prev.CODEX_HOME;
+  if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = prev.CODEX_HOME;
 });
 
 const tmp = (label: string) => scratch(`ae-codex-agent-${label}-`);
@@ -100,10 +108,31 @@ const workdir = (fake: Fake = {}) => {
   return cwd;
 };
 const argvOf = (cwd: string): string[][] => {
-  try { return fs.readFileSync(path.join(cwd, 'argv.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; }
+  try {
+    return fs
+      .readFileSync(path.join(cwd, 'argv.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+  } catch {
+    return [];
+  }
 };
-const pidIn = (cwd: string, file: string) => { try { return Number(fs.readFileSync(path.join(cwd, file), 'utf8')); } catch { return 0; } };
-const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code !== 'ESRCH'; } };
+const pidIn = (cwd: string, file: string) => {
+  try {
+    return Number(fs.readFileSync(path.join(cwd, file), 'utf8'));
+  } catch {
+    return 0;
+  }
+};
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+};
 
 /** Until `ok` holds, under a bound of seconds: for what it waits on, never a length of time. */
 const until = async (ok: () => boolean | Promise<boolean>, what: string, ms = 15_000) => {
@@ -116,19 +145,29 @@ const until = async (ok: () => boolean | Promise<boolean>, what: string, ms = 15
 /** The codex agent over a store at `root`, as the engine's seam builds it, with no journal behind it unless given one. */
 const agent = (root: string, events: (taskId: string) => Promise<readonly import('../src/domain.ts').Event[]> = async () => []) =>
   clientOf('codex', detachedOps(codex, root), events);
-const send = (client: Client, r: SpawnRequest) => client.sendMessage({
-  tenant: '', message: messageOf(r, `m-${r.name}`), metadata: undefined,
-  configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-});
+const send = (client: Client, r: SpawnRequest) =>
+  client.sendMessage({
+    tenant: '',
+    message: messageOf(r, `m-${r.name}`),
+    metadata: undefined,
+    configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+  });
 const get = (client: Client, id: string) => client.getTask({ tenant: '', id, historyLength: undefined });
-const list = (client: Client, o: { contextId?: string; includeArtifacts?: boolean } = {}) => client.listTasks({
-  tenant: '', contextId: o.contextId ?? '', status: TaskState.TASK_STATE_UNSPECIFIED, pageSize: 50, pageToken: '',
-  historyLength: undefined, statusTimestampAfter: undefined, includeArtifacts: o.includeArtifacts ?? false,
-});
+const list = (client: Client, o: { contextId?: string; includeArtifacts?: boolean } = {}) =>
+  client.listTasks({
+    tenant: '',
+    contextId: o.contextId ?? '',
+    status: TaskState.TASK_STATE_UNSPECIFIED,
+    pageSize: 50,
+    pageToken: '',
+    historyLength: undefined,
+    statusTimestampAfter: undefined,
+    includeArtifacts: o.includeArtifacts ?? false,
+  });
 const stateIs = async (client: Client, id: string, state: TaskState) => (await get(client, id)).status!.state === state;
 /** A spawn, then its session run to its end: the Task as it ended. */
 const ran = async (client: Client, r: SpawnRequest): Promise<Task> => {
-  const started = await send(client, r) as Task;
+  const started = (await send(client, r)) as Task;
   assert.equal(started.status!.state, TaskState.TASK_STATE_WORKING, 'the spawn is answered once the session starts');
   await until(() => stateIs(client, r.name, TaskState.TASK_STATE_COMPLETED), `${r.name} completed`);
   return get(client, r.name);
@@ -149,7 +188,10 @@ test("a Codex Task's context is its thread: empty until Codex prints it, the thr
   await until(async () => (await get(client, 'ae/c-ctx/1')).contextId === THREAD, 'the thread read as the context');
   await until(() => stateIs(client, 'ae/c-ctx/1', TaskState.TASK_STATE_COMPLETED), 'completed');
   assert.equal((await get(client, 'ae/c-ctx/1')).contextId, THREAD, 'and kept once it ended');
-  assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id), ['ae/c-ctx/1']);
+  assert.deepEqual(
+    (await list(client, { contextId: THREAD })).tasks.map((t) => t.id),
+    ['ae/c-ctx/1'],
+  );
   assert.deepEqual((await list(client, { contextId: 'another-thread' })).tasks, []);
 });
 
@@ -165,10 +207,24 @@ test("a Codex session's closing statement is its Task's one Artifact: JSON off `
   assert.deepEqual(closeoutOf(done), { outcome: 'done', summary: 'turn 1' });
   assert.equal(typeof artifact!.metadata?.at, 'number', "stamped with when Codex wrote it, the file's time");
 
-  assert.deepEqual((await list(client)).tasks.map((t) => [t.id, t.artifacts]), [['ae/c-art/1', []]], "A2A's default leaves it out of a listing");
-  assert.deepEqual((await list(client, { includeArtifacts: true })).tasks.map((t) => t.artifacts), [done.artifacts], 'and includeArtifacts puts it in');
+  assert.deepEqual(
+    (await list(client)).tasks.map((t) => [t.id, t.artifacts]),
+    [['ae/c-art/1', []]],
+    "A2A's default leaves it out of a listing",
+  );
+  assert.deepEqual(
+    (await list(client, { includeArtifacts: true })).tasks.map((t) => t.artifacts),
+    [done.artifacts],
+    'and includeArtifacts puts it in',
+  );
 
-  const prose = await ran(client, { name: 'ae/c-art/2', brief: 'b', cwd: workdir({ prose: true }), harness: 'codex', closeoutSchema: SCHEMA });
+  const prose = await ran(client, {
+    name: 'ae/c-art/2',
+    brief: 'b',
+    cwd: workdir({ prose: true }),
+    harness: 'codex',
+    closeoutSchema: SCHEMA,
+  });
   assert.equal(prose.artifacts.length, 1);
   assert.equal(prose.artifacts[0]!.parts[0]!.content!.$case, 'text');
   assert.equal(prose.artifacts[0]!.parts[0]!.mediaType, 'text/plain');
@@ -202,14 +258,20 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
   assert.equal(again.status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel is answered as the first, as A2A answers one');
 
   await ran(client, { name: 'ae/c-stop/2', brief: 'b', cwd: workdir(), harness: 'codex' });
-  await assert.rejects(client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
-    (e: Error) => e.constructor.name === 'TaskNotCancelableError' && e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.');
+  await assert.rejects(
+    client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
+    (e: Error) =>
+      e.constructor.name === 'TaskNotCancelableError' && e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.',
+  );
   assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
 
   // Canceled as soon as it is sent, whether or not its worker has published a pid: it ends CANCELED, and no harness runs on.
   const early = workdir({ sleepMs: 30_000 });
   await send(client, { name: 'ae/c-stop/3', brief: 'b', cwd: early, harness: 'codex' });
-  assert.equal((await client.cancelTask({ tenant: '', id: 'ae/c-stop/3', metadata: undefined })).status!.state, TaskState.TASK_STATE_CANCELED);
+  assert.equal(
+    (await client.cancelTask({ tenant: '', id: 'ae/c-stop/3', metadata: undefined })).status!.state,
+    TaskState.TASK_STATE_CANCELED,
+  );
   await until(() => stateIs(client, 'ae/c-stop/3', TaskState.TASK_STATE_CANCELED), 'a cancel sent at once read CANCELED');
   const started = pidIn(early, 'pid');
   assert.ok(!(started > 0 && alive(started)), 'and no harness is left running');
@@ -222,21 +284,33 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   const journal = Journal.filesOps(root);
   const client = agent(root, (taskId) => Effect.runPromise(journal.read(taskId)));
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
-  const phase = async (want: string) => { await engine.tick(); return (await engine.view(id)).phase === want; };
+  const phase = async (want: string) => {
+    await engine.tick();
+    return (await engine.view(id)).phase === want;
+  };
 
   // Codex has written its answer and not yet exited. The engine ends a signed attempt on its statement (`closedOut`), so the
   // task already waits; the harness still lists the session, and its Task says so until the worker writes `done`.
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ exitOn: 'exit1' } satisfies Fake));
   await until(() => phase('input-required'), 'turn 0 signed and waiting');
-  assert.equal((await get(client, nameFor(id, 1))).status!.state, TaskState.TASK_STATE_WORKING,
-    'while Codex is still exiting, its Task is the harness\'s word: working (open issue 31)');
+  assert.equal(
+    (await get(client, nameFor(id, 1))).status!.state,
+    TaskState.TASK_STATE_WORKING,
+    "while Codex is still exiting, its Task is the harness's word: working (open issue 31)",
+  );
   fs.writeFileSync(path.join(cwd, 'exit1'), '');
-  await until(() => stateIs(client, nameFor(id, 1), TaskState.TASK_STATE_INPUT_REQUIRED), 'the signed attempt of a held task waits on a person, once Codex has exited');
+  await until(
+    () => stateIs(client, nameFor(id, 1), TaskState.TASK_STATE_INPUT_REQUIRED),
+    'the signed attempt of a held task waits on a person, once Codex has exited',
+  );
   const first = await get(client, nameFor(id, 1));
   assert.equal(first.contextId, THREAD);
   assert.deepEqual(closeoutOf(first), { outcome: 'done', summary: 'turn 1' }, 'its closing statement still its Artifact');
-  assert.deepEqual((await list(client)).tasks.map((t) => [t.id, t.status!.state]), [[nameFor(id, 1), TaskState.TASK_STATE_COMPLETED]],
-    "a listing keeps the harness's word, which is what the runtime observes");
+  assert.deepEqual(
+    (await list(client)).tasks.map((t) => [t.id, t.status!.state]),
+    [[nameFor(id, 1), TaskState.TASK_STATE_COMPLETED]],
+    "a listing keeps the harness's word, which is what the runtime observes",
+  );
   assert.equal(alive(pidIn(cwd, 'pid')), false, 'nothing runs while it waits');
 
   // The next turn waits on a gate, so it is caught running.
@@ -245,8 +319,16 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   await until(() => phase('running (working)'), 'the answer started turn 1');
   await until(() => argvOf(cwd).length === 2, 'the fake codex run again');
   const running = await get(client, nameFor(id, 2));
-  assert.equal(running.status!.state, TaskState.TASK_STATE_WORKING, 'a Codex session running is working, never INPUT_REQUIRED: the worker writes no `blocked`');
-  assert.equal((await get(client, nameFor(id, 1))).status!.state, TaskState.TASK_STATE_COMPLETED, 'and the turn it answered is no longer the one waiting');
+  assert.equal(
+    running.status!.state,
+    TaskState.TASK_STATE_WORKING,
+    'a Codex session running is working, never INPUT_REQUIRED: the worker writes no `blocked`',
+  );
+  assert.equal(
+    (await get(client, nameFor(id, 1))).status!.state,
+    TaskState.TASK_STATE_COMPLETED,
+    'and the turn it answered is no longer the one waiting',
+  );
 
   fs.writeFileSync(path.join(cwd, 'go2'), '');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
@@ -255,7 +337,10 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   const second = await get(client, nameFor(id, 2));
   assert.equal(second.contextId, first.contextId, 'one context across both turns');
   assert.deepEqual(closeoutOf(second), { outcome: 'done', summary: 'turn 2' });
-  assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id), [nameFor(id, 1), nameFor(id, 2)]);
+  assert.deepEqual(
+    (await list(client, { contextId: THREAD })).tasks.map((t) => t.id),
+    [nameFor(id, 1), nameFor(id, 2)],
+  );
 
   await engine.close(id);
   await until(() => phase('succeeded'), 'closed and settled');
@@ -270,9 +355,15 @@ test('a held Codex attempt whose statement is on disk before its thread is read 
   const cwd = workdir({ threadOn: 'thread-go', exitOn: 'exit1' });
   const engine = createEngine({ root, harnesses: { codex } });
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
-  const phase = async (want: string) => { await engine.tick(); return (await engine.view(id)).phase === want; };
+  const phase = async (want: string) => {
+    await engine.tick();
+    return (await engine.view(id)).phase === want;
+  };
 
-  await until(async () => { await engine.tick(); return fs.existsSync(path.join(cwd, 'wrote-out')); }, 'the statement written');
+  await until(async () => {
+    await engine.tick();
+    return fs.existsSync(path.join(cwd, 'wrote-out'));
+  }, 'the statement written');
   for (let i = 0; i < 5; i++) await engine.tick();
   assert.notEqual((await engine.view(id)).phase, 'input-required', 'a statement with no session known does not end the attempt');
 
@@ -281,14 +372,17 @@ test('a held Codex attempt whose statement is on disk before its thread is read 
   fs.writeFileSync(path.join(cwd, 'exit1'), '');
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({} satisfies Fake));
   await engine.answer(id, 'the words');
-  await until(async () => { await engine.tick(); return argvOf(cwd).length === 2; }, 'the fake codex run again');
+  await until(async () => {
+    await engine.tick();
+    return argvOf(cwd).length === 2;
+  }, 'the fake codex run again');
   assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
   await engine.close(id);
   await until(() => phase('succeeded'), 'closed and settled');
 });
 
-test("what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it", async () => {
+test('what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it', async () => {
   const root = tmp('store');
   const ops = detachedOps(codex, root);
   const extension = cardOf('codex', ops).capabilities!.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
@@ -297,17 +391,28 @@ test("what `codex exec` cannot take while it runs: its card says no words, and a
   const cwd = workdir({ gate: 'go' });
   const client = agent(root);
   await send(client, { name: 'ae/c-say/1', brief: 'b', cwd, harness: 'codex' });
-  await until(async () => (await get(client, 'ae/c-say/1')).status!.state === TaskState.TASK_STATE_WORKING && pidIn(cwd, 'pid') > 0, 'working');
+  await until(
+    async () => (await get(client, 'ae/c-say/1')).status!.state === TaskState.TASK_STATE_WORKING && pidIn(cwd, 'pid') > 0,
+    'working',
+  );
   await assert.rejects(
     client.sendMessage({
-      tenant: '', message: followUpOf('ae/c-say/1', 'hello', 'm-said'), metadata: undefined,
+      tenant: '',
+      message: followUpOf('ae/c-say/1', 'hello', 'm-said'),
+      metadata: undefined,
       configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
     }),
-    (e: Error) => e instanceof UnsupportedOperationError
-      && e.message === 'the `codex` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session\'s contextId.',
+    (e: Error) =>
+      e instanceof UnsupportedOperationError &&
+      e.message ===
+        "the `codex` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId.",
   );
   const runs = fs.readdirSync(path.join(root, 'runs', 'codex'));
-  assert.equal(runs.some((f) => f.endsWith('.inbox.jsonl')), false, 'no inbox written');
+  assert.equal(
+    runs.some((f) => f.endsWith('.inbox.jsonl')),
+    false,
+    'no inbox written',
+  );
   const run = JSON.parse(fs.readFileSync(path.join(root, 'runs', 'codex', 'ae_c_say_1.json'), 'utf8')) as Record<string, unknown>;
   assert.equal('input' in run, false, 'and the worker holds no way in: its stdin is not open');
   fs.writeFileSync(path.join(cwd, 'go'), '');

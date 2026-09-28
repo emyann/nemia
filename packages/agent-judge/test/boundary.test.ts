@@ -29,15 +29,21 @@ const packageOf = (from: string) => (from.startsWith('@') ? from.split('/').slic
 
 /** The modules `text` imports that it must not, from `names`. */
 export const importsAny = (text: string, names: readonly string[]) =>
-  importsOf(text).map((i) => i.from).filter((from) => names.includes(packageOf(from)));
+  importsOf(text)
+    .map((i) => i.from)
+    .filter((from) => names.includes(packageOf(from)));
 
 const sources = (dir: string): string[] =>
-  !fs.existsSync(dir) ? [] : fs.readdirSync(dir, { withFileTypes: true, recursive: true })
-    .filter((e) => e.isFile() && /\.(ts|tsx|mts|js|mjs)$/.test(e.name) && !e.parentPath.includes('node_modules'))
-    .map((e) => path.join(e.parentPath, e.name));
+  !fs.existsSync(dir)
+    ? []
+    : fs
+        .readdirSync(dir, { withFileTypes: true, recursive: true })
+        .filter((e) => e.isFile() && /\.(ts|tsx|mts|js|mjs)$/.test(e.name) && !e.parentPath.includes('node_modules'))
+        .map((e) => path.join(e.parentPath, e.name));
 
 const workspaces = (): string[] =>
-  ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((d) => path.join(ROOT, top, d)))
+  ['packages', 'apps']
+    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((d) => path.join(ROOT, top, d)))
     .filter((dir) => fs.existsSync(path.join(dir, 'package.json')));
 
 const nameOf = (dir: string) => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).name as string;
@@ -67,19 +73,29 @@ test('nothing in the workspace imports the judge or its SDK, or depends on them'
     }
   }
   assert.ok(workspaces().length >= 4, 'the scan found the workspace');
-  assert.deepEqual(found, [], 'the judge is optional: call it from nothing until the README\'s conditions hold');
+  assert.deepEqual(found, [], "the judge is optional: call it from nothing until the README's conditions hold");
 });
 
 test('the judge imports nothing from the workspace', () => {
-  const names = workspaces().filter((d) => d !== PACKAGE).map(nameOf);
+  const names = workspaces()
+    .filter((d) => d !== PACKAGE)
+    .map(nameOf);
   assert.ok(names.includes('agent-runtime') && names.includes('agent-orchestrator'));
   const pkg = JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8'));
-  assert.deepEqual(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((n) => names.includes(n)), []);
-  const found = ['src', 'bin', 'test'].flatMap((sub) => sources(path.join(PACKAGE, sub)))
-    .flatMap((file) => [
-      ...importsAny(fs.readFileSync(file, 'utf8'), names),
-      ...importsOf(fs.readFileSync(file, 'utf8')).map((i) => i.from).filter((f) => f.startsWith('.') && !path.resolve(path.dirname(file), f).startsWith(PACKAGE + path.sep)),
-    ].map((from) => `${path.relative(PACKAGE, file)}: ${from}`));
+  assert.deepEqual(
+    Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((n) => names.includes(n)),
+    [],
+  );
+  const found = ['src', 'bin', 'test']
+    .flatMap((sub) => sources(path.join(PACKAGE, sub)))
+    .flatMap((file) =>
+      [
+        ...importsAny(fs.readFileSync(file, 'utf8'), names),
+        ...importsOf(fs.readFileSync(file, 'utf8'))
+          .map((i) => i.from)
+          .filter((f) => f.startsWith('.') && !path.resolve(path.dirname(file), f).startsWith(PACKAGE + path.sep)),
+      ].map((from) => `${path.relative(PACKAGE, file)}: ${from}`),
+    );
   assert.deepEqual(found, []);
 });
 
@@ -88,7 +104,8 @@ const EFFECT = ['judge.ts', 'index.ts', 'facade.ts'];
 
 /** Why a plain file's imports would bring Effect in, or [] when they do not. */
 export const effectIn = (text: string): string[] =>
-  importsOf(text).filter((i) => packageOf(i.from) === 'effect' || (!i.typeOnly && EFFECT.some((f) => i.from === `./${f}`) && i.from !== './facade.ts'))
+  importsOf(text)
+    .filter((i) => packageOf(i.from) === 'effect' || (!i.typeOnly && EFFECT.some((f) => i.from === `./${f}`) && i.from !== './facade.ts'))
     .map((i) => i.from);
 
 test('REFUSED: a plain file that imports Effect, or a value from an Effect file, is found; a type is not', () => {
@@ -101,11 +118,20 @@ test('REFUSED: a plain file that imports Effect, or a value from an Effect file,
 test('the plain files import no Effect; the facade exports none of it', () => {
   const src = path.join(PACKAGE, 'src');
   const plain = fs.readdirSync(src).filter((f) => f.endsWith('.ts') && !EFFECT.includes(f));
-  assert.deepEqual(plain.sort(), ['card.ts', 'cli.ts', 'decide.ts', 'key.ts', 'record.ts', 'rival.ts', 'runs.ts', 'score.ts'], 'a new file is sorted into plain or Effect here');
+  assert.deepEqual(
+    plain.sort(),
+    ['card.ts', 'cli.ts', 'decide.ts', 'key.ts', 'record.ts', 'rival.ts', 'runs.ts', 'score.ts'],
+    'a new file is sorted into plain or Effect here',
+  );
   const found = plain.flatMap((f) => effectIn(fs.readFileSync(path.join(src, f), 'utf8')).map((from) => `${f}: ${from}`));
   assert.deepEqual(found, []);
-  const reexports = [...fs.readFileSync(path.join(src, 'facade.ts'), 'utf8').matchAll(/^\s*export\s+(type\s+)?\{[^}]*\}\s+from\s+['"]([^'"]+)['"]/gm)];
-  assert.ok(reexports.length > 3, 'the scan found the facade\'s re-exports');
-  assert.deepEqual(reexports.filter((m) => !m[1] && ['effect', './judge.ts', './index.ts'].includes(m[2]!)).map((m) => m[0].trim()), [],
-    'the facade re-exports types from the Effect files, never values');
+  const reexports = [
+    ...fs.readFileSync(path.join(src, 'facade.ts'), 'utf8').matchAll(/^\s*export\s+(type\s+)?\{[^}]*\}\s+from\s+['"]([^'"]+)['"]/gm),
+  ];
+  assert.ok(reexports.length > 3, "the scan found the facade's re-exports");
+  assert.deepEqual(
+    reexports.filter((m) => !m[1] && ['effect', './judge.ts', './index.ts'].includes(m[2]!)).map((m) => m[0].trim()),
+    [],
+    'the facade re-exports types from the Effect files, never values',
+  );
 });

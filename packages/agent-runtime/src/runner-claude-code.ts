@@ -41,7 +41,17 @@ export const claudeJob: HarnessSpec = {
   name: 'claude',
   command: (r, io) => ({
     cmd: 'claude',
-    args: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--permission-prompts', 'none', ...claudePrintFlags(r, io)],
+    args: [
+      '-p',
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-prompts',
+      'none',
+      ...claudePrintFlags(r, io),
+    ],
   }),
   // A user message, as M6 wrote them; the session is the job's own, so it names none.
   input: {
@@ -72,10 +82,11 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
   // One mode's registry unreadable must not blind the engine to the other's sessions, as for the composite's harnesses: a read
   // that failed is `undefined`, which a full listing reads as nothing and `observeFor` as its expected names unread.
-  const read = (ops: RunnerOps) => ops.observe.pipe(
-    Effect.map((m): Map<string, Sighting> | undefined => m),
-    Effect.catchCause(() => Effect.succeed(undefined)),
-  );
+  const read = (ops: RunnerOps) =>
+    ops.observe.pipe(
+      Effect.map((m): Map<string, Sighting> | undefined => m),
+      Effect.catchCause(() => Effect.succeed(undefined)),
+    );
   const seen = (ops: RunnerOps) => read(ops).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
 
   return {
@@ -96,16 +107,19 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job listing, or
      * the registry once asked. A job's name the registry was asked for and does not list, with the jobs read, is absent.
      */
-    observeFor: (expected) => read(job).pipe(
-      Effect.flatMap((jobs) => !jobs || expected.some((e) => !jobs.has(e.name))
-        ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
-        : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() })),
-      Effect.map(({ jobs, sessions }): Observation => {
-        const seen = new Map([...(jobs ?? []), ...(sessions ?? [])]);
-        const failed = !jobs || !sessions;
-        return { seen, unread: new Set(failed ? expected.map((e) => e.name).filter((name) => !seen.has(name)) : []) };
-      }),
-    ),
+    observeFor: (expected) =>
+      read(job).pipe(
+        Effect.flatMap((jobs) =>
+          !jobs || expected.some((e) => !jobs.has(e.name))
+            ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+            : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() }),
+        ),
+        Effect.map(({ jobs, sessions }): Observation => {
+          const seen = new Map([...(jobs ?? []), ...(sessions ?? [])]);
+          const failed = !jobs || !sessions;
+          return { seen, unread: new Set(failed ? expected.map((e) => e.name).filter((name) => !seen.has(name)) : []) };
+        }),
+      ),
 
     // The job's own run file first — one file, never the jobs' output, which a transcript in flight would re-read on
     // every poll — and then Claude Code's registration.

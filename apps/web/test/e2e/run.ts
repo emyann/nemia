@@ -24,7 +24,23 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { arrivalLine, DRAFT_TRANSCRIPT, INBOX, QUOTA, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedFolder, seedInbox, seedQueue, seedQuota, seedWorkflows } from './seed.ts';
+import {
+  arrivalLine,
+  DRAFT_TRANSCRIPT,
+  INBOX,
+  QUOTA,
+  REGISTRY,
+  SAYING,
+  seed,
+  seedCheckout,
+  seedDiamond,
+  seedFeed,
+  seedFolder,
+  seedInbox,
+  seedQueue,
+  seedQuota,
+  seedWorkflows,
+} from './seed.ts';
 import { loadPages } from './pages.ts';
 import { exitOn, launch, visitAll } from './visit.ts';
 import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
@@ -86,6 +102,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   });
 }
 
+// oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
 const ANSI = /\x1b\[[0-9;]*m/g;
 
 /** Start `node <args>` and resolve with what `listening` captures from its output, once it prints it. */
@@ -137,7 +154,7 @@ async function main(): Promise<void> {
     execFileSync(process.execPath, [vite, 'build'], { cwd: WEB, stdio: 'pipe' });
   } catch (err) {
     const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
-    throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''));
+    throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''), { cause: err });
   }
 
   // A string from here on, and the same store the pages read off world.ts.
@@ -164,37 +181,56 @@ async function main(): Promise<void> {
   // It answers the api's get_usage request too (quota.ts), with the store's answer (QUOTA.file) under the request's id, and waits on its stdin
   // as Claude Code does; with no answer in the store, it ends as a claude that cannot answer would.
   const answer = path.join(store, QUOTA.file);
-  fs.writeFileSync(path.join(bin, 'claude'), [
-    '#!/bin/sh',
-    `if [ "$1" = agents ]; then cat "${path.join(store, REGISTRY)}"; exit 0; fi`,
-    'if [ "$1" != -p ]; then echo \'[]\'; exit 0; fi',
-    'read -r line',
-    `if [ ! -f "${answer}" ]; then echo 'claude: not signed in, the e2e took its answer away' >&2; exit 1; fi`,
-    `id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
-    `sed "s/@ID@/$id/g" "${answer}"`,
-    'cat > /dev/null',
-    '',
-  ].join('\n'), { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    [
+      '#!/bin/sh',
+      `if [ "$1" = agents ]; then cat "${path.join(store, REGISTRY)}"; exit 0; fi`,
+      'if [ "$1" != -p ]; then echo \'[]\'; exit 0; fi',
+      'read -r line',
+      `if [ ! -f "${answer}" ]; then echo 'claude: not signed in, the e2e took its answer away' >&2; exit 1; fi`,
+      `id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
+      `sed "s/@ID@/$id/g" "${answer}"`,
+      'cat > /dev/null',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
 
   // draft's inbox (SAYING): the socket its registration names, listening before the api can be asked to say anything into it.
   // And, as a working session does when it reads the words between calls, the stand-in writes their arrival into draft's transcript.
   const draftTranscript = path.join(store, DRAFT_TRANSCRIPT);
   await listen(path.join(store, INBOX), (line) => {
     const { session_id: sessionId, message } = (line ?? {}) as { session_id?: unknown; message?: { content?: unknown } };
-    if (sessionId === SAYING.sessionId && typeof message?.content === 'string') fs.appendFileSync(draftTranscript, arrivalLine(message.content, new Date().toISOString()));
+    if (sessionId === SAYING.sessionId && typeof message?.content === 'string')
+      fs.appendFileSync(draftTranscript, arrivalLine(message.content, new Date().toISOString()));
   });
   setApiEnv({
-    ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
+    ...process.env,
+    PORT: '0',
+    WF_ROOT: store,
+    HKB_REPO: checkout,
+    CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     // The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written.
     HKB_QUOTA_KEEP_MS: '0',
     // And after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back.
     HKB_QUOTA_BACKOFF_MS: '0',
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });
-  const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API, apiEnv, /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
-  const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
+  const apiPort = await startServer(
+    'the api',
+    [path.join(API, 'src', 'main.ts')],
+    API,
+    apiEnv,
+    /api listening on http:\/\/127\.0\.0\.1:(\d+)/,
+  );
+  const base = await startServer(
+    'vite preview',
+    [vite, 'preview', '--port', '0', '--host', '127.0.0.1'],
+    WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
-    /Local:\s+(http:\/\/[^\s/]+)/);
+    /Local:\s+(http:\/\/[^\s/]+)/,
+  );
   console.log(`e2e: api on :${apiPort}, the built app on ${base}, store ${store}`);
 
   const browser = await launch();

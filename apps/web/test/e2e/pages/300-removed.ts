@@ -36,14 +36,20 @@ export default {
       await expectVisible(run.other.locator(`article > section#step-${ending}`), 'the run page draws the run while it is in the store');
       await expectVisible(step.other.getByRole('heading', { level: 1, name: ending, exact: true }), 'and the step page its step');
       for (const { problems } of [run, step]) {
-        if (problems().length) throw new Refused(`the pages saw nothing wrong while the run was there — they saw:\n    ${problems().join('\n    ')}`);
+        if (problems().length)
+          throw new Refused(`the pages saw nothing wrong while the run was there — they saw:\n    ${problems().join('\n    ')}`);
       }
 
       // As `wf rm` does it: the record gone from the store, and a line on the feed.
       fs.renameSync(record, record + AWAY);
       fed(id, 'removed');
-      const said = new RegExp(`^${SHIPPED.title} is no longer in this store: it was removed, with wf rm, while this page was open\\. Runs lists the runs the store has\\.$`);
-      for (const [{ other }, where] of [[run, 'the run page'], [step, 'the step page']] as const) {
+      const said = new RegExp(
+        `^${SHIPPED.title} is no longer in this store: it was removed, with wf rm, while this page was open\\. Runs lists the runs the store has\\.$`,
+      );
+      for (const [{ other }, where] of [
+        [run, 'the run page'],
+        [step, 'the step page'],
+      ] as const) {
         // Well inside the three tries a failure is given, which would take seven seconds: a run gone is said on the read that finds none.
         await expectVisible(other.locator(`[data-run-gone="${id}"]`, { hasText: said }), `${where} says the run is gone`, 3_000);
         await expectCount(other.locator('article, header[aria-label="The step"]'), 0, `and ${where} draws nothing of what it last read`);
@@ -56,10 +62,16 @@ export default {
 
       // The one refusal each page sees: the read that found no run, as the browser reports it, and nothing else.
       const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
-      for (const [{ problems }, where] of [[run, 'the run page'], [step, 'the step page']] as const) {
+      for (const [{ problems }, where] of [
+        [run, 'the run page'],
+        [step, 'the step page'],
+      ] as const) {
         const seen = problems();
-        const others = seen.filter((p) => p !== refused && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p));
-        if (!seen.includes(refused) || others.length) throw new Refused(`${where} saw the read of a run gone, and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        const others = seen.filter(
+          (p) => p !== refused && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p),
+        );
+        if (!seen.includes(refused) || others.length)
+          throw new Refused(`${where} saw the read of a run gone, and nothing else — it saw:\n    ${seen.join('\n    ')}`);
       }
     } finally {
       // Back before the pages close, and said on the feed as a run's word: the list reads it again, and so does closing them.

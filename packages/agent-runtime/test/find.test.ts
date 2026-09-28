@@ -40,7 +40,9 @@ const fakeClaude = () => {
   const calls = path.join(bin, 'agents-calls');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(calls, '');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -57,7 +59,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now(), pid: ${process.pid} });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -71,22 +75,38 @@ if (args[0] === '--bg') {
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /** The registration Claude Code writes for a running session: by its pid, with when that process started. */
 const register = (session: { name: string; sessionId: string }, pid = process.pid, fields: object = {}) => {
   fs.mkdirSync(sessions, { recursive: true });
-  fs.writeFileSync(path.join(sessions, `${pid}.json`), JSON.stringify({
-    pid, sessionId: session.sessionId, name: session.name, kind: 'bg', procStart: processStart(pid), status: 'busy', ...fields,
-  }));
+  fs.writeFileSync(
+    path.join(sessions, `${pid}.json`),
+    JSON.stringify({
+      pid,
+      sessionId: session.sessionId,
+      name: session.name,
+      kind: 'bg',
+      procStart: processStart(pid),
+      status: 'busy',
+      ...fields,
+    }),
+  );
 };
 
 /** A line the session wrote to its transcript, just now. */
 const wrote = (sessionId: string, text: string) => {
   const file = path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, `${JSON.stringify({ type: 'assistant', uuid: randomUUID(), sessionId, timestamp: new Date().toISOString(), message: { role: 'assistant', content: [{ type: 'text', text }] } })}\n`);
+  fs.appendFileSync(
+    file,
+    `${JSON.stringify({ type: 'assistant', uuid: randomUUID(), sessionId, timestamp: new Date().toISOString(), message: { role: 'assistant', content: [{ type: 'text', text }] } })}\n`,
+  );
 };
 
 const texts = (events: TranscriptEvent[]) => events.map((e) => e.text);
@@ -144,7 +164,11 @@ test('a registration whose process has gone is not found, nor one whose pid anot
       register(row!, process.pid, { procStart: '1' });
       assert.equal(await find(row!.name), undefined, 'a live pid whose process started other than the registration says: not the session');
       register(row!, process.pid, { procStart: undefined });
-      assert.equal(await find(row!.name), undefined, 'a registration that does not say when its process started, where that can be checked: not taken');
+      assert.equal(
+        await find(row!.name),
+        undefined,
+        'a registration that does not say when its process started, where that can be checked: not taken',
+      );
     }
     register(row!);
     assert.deepEqual(await find(row!.name), { sessionId: row!.sessionId }, 'the same registration, of its own live process: found');
@@ -154,7 +178,11 @@ test('a registration whose process has gone is not found, nor one whose pid anot
 test('a name no running session registered is not found — nor an interactive session, a file another user owns, one that names another pid, a symlink, or one with no session id', async () => {
   const session = { name: `ae/t-${randomUUID().slice(0, 8)}/1`, sessionId: randomUUID() };
   assert.equal(await find(session.name), undefined, 'nothing registered under it');
-  assert.equal(await Effect.runPromise(claudeOps({ sessionsDir: path.join(tmp('nowhere'), 'sessions') }).find!(session.name)), undefined, 'no sessions directory at all');
+  assert.equal(
+    await Effect.runPromise(claudeOps({ sessionsDir: path.join(tmp('nowhere'), 'sessions') }).find!(session.name)),
+    undefined,
+    'no sessions directory at all',
+  );
 
   register(session, process.pid, { kind: 'interactive' });
   assert.equal(await find(session.name), undefined, 'an interactive session is never ours');
@@ -178,8 +206,16 @@ test('a name no running session registered is not found — nor an interactive s
   fs.rmSync(file);
   register(session);
   assert.equal(await find(session.name.replace(/\/1$/, '/2')), undefined, "the next attempt's name is not this attempt's");
-  assert.equal(await claudeRegistered(sessions, session.name, { uid: (process.getuid?.() ?? 0) + 1 }), undefined, "a file another user owns is not this user's session");
-  assert.deepEqual(await find(session.name), { sessionId: session.sessionId }, 'the control: a background session, of this user, under its own pid, found');
+  assert.equal(
+    await claudeRegistered(sessions, session.name, { uid: (process.getuid?.() ?? 0) + 1 }),
+    undefined,
+    "a file another user owns is not this user's session",
+  );
+  assert.deepEqual(
+    await find(session.name),
+    { sessionId: session.sessionId },
+    'the control: a background session, of this user, under its own pid, found',
+  );
 });
 
 test("a registration and the registry that disagree: the registry's word is taken — by a view, by say, and by the pass", async () => {
@@ -199,8 +235,10 @@ test("a registration and the registry that disagree: the registry's word is take
     const v = await engine.view(id);
     assert.equal(v.phase, 'running (stopped)', "its state is the registry's");
     assert.equal(v.sessionId, row!.sessionId, 'and so is which session it is');
-    await assert.rejects(engine.say(id, 'hello'), (e: Error & { exitCode?: number }) =>
-      e.exitCode === 2 && /session is `stopped` on its harness, not running/.test(e.message));
+    await assert.rejects(
+      engine.say(id, 'hello'),
+      (e: Error & { exitCode?: number }) => e.exitCode === 2 && /session is `stopped` on its harness, not running/.test(e.message),
+    );
 
     await engine.tick();
     const after = await engine.view(id);
@@ -215,12 +253,33 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
     const sessions = new Map<string, Sighting>();
     const counts = { observe: 0, find: [] as string[] };
     const runner = {
-      async spawn(r: { name: string }) { const s = `s-${sessions.size + 1}`; sessions.set(r.name, { sessionId: s, state: 'working', nativeId: s }); },
-      async observe() { counts.observe++; return new Map(sessions); },
+      async spawn(r: { name: string }) {
+        const s = `s-${sessions.size + 1}`;
+        sessions.set(r.name, { sessionId: s, state: 'working', nativeId: s });
+      },
+      async observe() {
+        counts.observe++;
+        return new Map(sessions);
+      },
       async stop() {},
-      async logs(sessionId: string) { return `logs of ${sessionId}`; },
-      async transcript(sessionId: string) { return { events: [{ id: 'e', at: new Date(0).toISOString(), role: 'assistant' as const, kind: 'text' as const, text: sessionId }], cursor: 'c' }; },
-      ...(withFind ? { async find(name: string) { counts.find.push(name); const s = sessions.get(name); return s && { sessionId: s.sessionId }; } } : {}),
+      async logs(sessionId: string) {
+        return `logs of ${sessionId}`;
+      },
+      async transcript(sessionId: string) {
+        return {
+          events: [{ id: 'e', at: new Date(0).toISOString(), role: 'assistant' as const, kind: 'text' as const, text: sessionId }],
+          cursor: 'c',
+        };
+      },
+      ...(withFind
+        ? {
+            async find(name: string) {
+              counts.find.push(name);
+              const s = sessions.get(name);
+              return s && { sessionId: s.sessionId };
+            },
+          }
+        : {}),
     };
     return { sessions, counts, runner };
   };
@@ -257,10 +316,18 @@ test("a view asks its task's own harness and no other — and a task whose harne
     const sessions = new Map<string, Sighting>();
     const counts = { observe: 0 };
     const runner = {
-      async spawn(r: { name: string }) { const s = `${label}-${sessions.size + 1}`; sessions.set(r.name, { sessionId: s, state: 'working', nativeId: s }); },
-      async observe() { counts.observe++; return new Map(sessions); },
+      async spawn(r: { name: string }) {
+        const s = `${label}-${sessions.size + 1}`;
+        sessions.set(r.name, { sessionId: s, state: 'working', nativeId: s });
+      },
+      async observe() {
+        counts.observe++;
+        return new Map(sessions);
+      },
       async stop() {},
-      async logs(sessionId: string) { return `${label} logs of ${sessionId}`; },
+      async logs(sessionId: string) {
+        return `${label} logs of ${sessionId}`;
+      },
     };
     return { sessions, counts, runner };
   };
@@ -279,7 +346,11 @@ test("a view asks its task's own harness and no other — and a task whose harne
   assert.equal((await engine.view(settled)).phase, 'succeeded', 'a settled task on a harness that cannot find');
   assert.equal(await engine.logs(running), 'b logs of b-1');
   assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");
-  assert.equal(b.counts.observe, before.b + 2, "each read of the task in flight asks b's, once; the settled task's, none (`settled-view.test.ts`)");
+  assert.equal(
+    b.counts.observe,
+    before.b + 2,
+    "each read of the task in flight asks b's, once; the settled task's, none (`settled-view.test.ts`)",
+  );
 
   // The same board, without b. No other harness can name b's sessions, so none is asked: the view is the record's, as the pass reads
   // such a task (`composite`: its names unread, its spawn refused). Before 2026-09-25 it was viewed on the fallback, where a remote

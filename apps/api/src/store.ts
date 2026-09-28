@@ -38,7 +38,9 @@ export async function viewsOf(run: Run, reader: typeof e = e): Promise<Views> {
 /** Every task a run has filed: each step's and its check's, and each earlier try's and its check's — what a run's page reads of every try. */
 const tasksOf = (run: Run): string[] =>
   Object.values(run.steps).flatMap(({ taskId, check, tries }) => [
-    ...(taskId ? [taskId] : []), ...(check ? [check.taskId] : []), ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
+    ...(taskId ? [taskId] : []),
+    ...(check ? [check.taskId] : []),
+    ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
   ]);
 
 /**

@@ -29,10 +29,16 @@ const gates = scratch('wf-check-views-gates-');
 const calls = () => e.io().observed.check?.calls ?? 0;
 
 /** A check filed as the tick files one, through the client; `held` runs until its gate is opened, and every other exits 0 at once. */
-const file = (id: string, held = false) => e.file({
-  id, cwd: scratch('wf-check-views-cwd-'), harness: 'check',
-  brief: checkBrief(held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true', { WF_RUN: 'r', WF_STEP: id }),
-});
+const file = (id: string, held = false) =>
+  e.file({
+    id,
+    cwd: scratch('wf-check-views-cwd-'),
+    harness: 'check',
+    brief: checkBrief(
+      held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
+      { WF_RUN: 'r', WF_STEP: id },
+    ),
+  });
 
 const until = async (ids: string[], done: (phase: string) => boolean) => {
   const deadline = Date.now() + 20_000;
@@ -45,7 +51,7 @@ const until = async (ids: string[], done: (phase: string) => boolean) => {
   }
 };
 
-test('a pass that views a run\'s every check observes the check harness once, and once more for each check in flight — none for a settled one', async () => {
+test("a pass that views a run's every check observes the check harness once, and once more for each check in flight — none for a settled one", async () => {
   const settled = ['c1', 'c2', 'c3', 'c4', 'c5'];
   for (const id of settled) await file(id);
   await until(settled, (p) => p === 'succeeded');

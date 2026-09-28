@@ -38,7 +38,11 @@ type Live = { sessionId: string; state: SessionState; abort: AbortController; to
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
 
-  const pump = (name: string, r: { brief: string; cwd: string; config?: Pick<HarnessArgs, 'model' | 'permissionMode'> }, abort: AbortController) =>
+  const pump = (
+    name: string,
+    r: { brief: string; cwd: string; config?: Pick<HarnessArgs, 'model' | 'permissionMode'> },
+    abort: AbortController,
+  ) =>
     Effect.promise(async () => {
       const q = query({
         prompt: r.brief,
@@ -62,7 +66,9 @@ export const sdkRunner = () => {
           } else if (m.type === 'result') {
             // Measured at the end, from what the SDK reports — and only what it reports: a cost or a
             // token count it leaves out stays out, rather than becoming a 0 that reads as free.
-            const u = m.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } | undefined;
+            const u = m.usage as
+              | { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
+              | undefined;
             set({
               sessionId: m.session_id,
               state: m.is_error ? 'failed' : 'completed',
@@ -70,11 +76,20 @@ export const sdkRunner = () => {
                 turns: m.num_turns,
                 toolCalls: live.get(name)?.toolCalls ?? 0,
                 ...(typeof u?.input_tokens === 'number' && typeof u.output_tokens === 'number'
-                  ? { inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), outputTokens: u.output_tokens }
+                  ? {
+                      inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+                      outputTokens: u.output_tokens,
+                    }
                   : {}),
                 // Its classes only when the SDK gave all three: a class it left out is not measured, not 0.
-                ...(typeof u?.input_tokens === 'number' && typeof u.cache_creation_input_tokens === 'number' && typeof u.cache_read_input_tokens === 'number'
-                  ? { uncachedTokens: u.input_tokens, cacheWriteTokens: u.cache_creation_input_tokens, cacheReadTokens: u.cache_read_input_tokens }
+                ...(typeof u?.input_tokens === 'number' &&
+                typeof u.cache_creation_input_tokens === 'number' &&
+                typeof u.cache_read_input_tokens === 'number'
+                  ? {
+                      uncachedTokens: u.input_tokens,
+                      cacheWriteTokens: u.cache_creation_input_tokens,
+                      cacheReadTokens: u.cache_read_input_tokens,
+                    }
                   : {}),
                 ...(typeof m.total_cost_usd === 'number' ? { costUsd: m.total_cost_usd } : {}),
               },

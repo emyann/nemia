@@ -8,7 +8,8 @@ import { routeLink } from './routeLink';
 /** A link to a route, as React Aria draws one (`routeLink`): what the Agents pages link a node and an agent with. */
 export const RouteLink = routeLink(AriaLink);
 
-const LINK = 'rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-600 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-300';
+const LINK =
+  'rounded-sm underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-600 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-300';
 
 /** Where an agent is read from, as the Workflows page badges a workflow: yours, or this repository's. */
 export function FromBadge({ from }: { from: AgentListing['from'] }) {
@@ -67,7 +68,15 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
  * what it is for, and the tags it carries. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is drawn
  * at all where `none` is left out.
  */
-export function Skills({ skills, none, className }: { skills: readonly AgentSkill[] | null | undefined; none?: React.ReactNode; className?: string }) {
+export function Skills({
+  skills,
+  none,
+  className,
+}: {
+  skills: readonly AgentSkill[] | null | undefined;
+  none?: React.ReactNode;
+  className?: string;
+}) {
   if (!skills?.length) return none ? <p className="text-xs text-neutral-500">{none}</p> : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
@@ -78,7 +87,10 @@ export function Skills({ skills, none, className }: { skills: readonly AgentSkil
           {skill.tags.length > 0 && (
             <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
               {skill.tags.map((tag) => (
-                <span key={tag} className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                <span
+                  key={tag}
+                  className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+                >
                   {tag}
                 </span>
               ))}
@@ -103,9 +115,23 @@ export function AgentLink({ from, name, className }: { from: AgentListing['from'
  * A write of an agent refused: the package's words, and the nodes that still name it when that is why, each linked. `verb` is what did not
  * happen: a try refused is not started.
  */
-export function AgentRefused({ message, users, from, verb = 'Not written' }: { message: string; users: readonly string[]; from: AgentListing['from']; verb?: string }) {
+export function AgentRefused({
+  message,
+  users,
+  from,
+  verb = 'Not written',
+}: {
+  message: string;
+  users: readonly string[];
+  from: AgentListing['from'];
+  verb?: string;
+}) {
   return (
-    <div role="alert" data-agent-refused className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+    <div
+      role="alert"
+      data-agent-refused
+      className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+    >
       <p className="text-sm font-medium text-red-800 dark:text-red-300">{verb}:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
       {users.length > 0 && (
@@ -124,7 +150,11 @@ export function AgentRefused({ message, users, from, verb = 'Not written' }: { m
 /** A write of a skill refused, in the package's words. */
 export function SkillRefused({ message }: { message: string }) {
   return (
-    <div role="alert" data-skill-refused className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+    <div
+      role="alert"
+      data-skill-refused
+      className="space-y-1.5 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+    >
       <p className="text-sm font-medium text-red-800 dark:text-red-300">Not written:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{message}</p>
     </div>
@@ -134,7 +164,12 @@ export function SkillRefused({ message }: { message: string }) {
 /** A link to a skill's page, by its place and name: what an agent's skills and the Agents page's skills link a skill with. */
 export function SkillLink({ from, name, className }: { from: SkillSource; name: string; className?: string }) {
   return (
-    <RouteLink to="/agents/skills/$from/$skill" params={{ from, skill: name }} data-skill-link={name} className={cn('font-mono', LINK, className)}>
+    <RouteLink
+      to="/agents/skills/$from/$skill"
+      params={{ from, skill: name }}
+      data-skill-link={name}
+      className={cn('font-mono', LINK, className)}
+    >
       {name}
     </RouteLink>
   );
@@ -162,10 +197,26 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
  * The skills an agent gives, one row each in its order: its name, linked to its page where it is found, where it is found, what it is for, and what it costs a turn — or why no
  * session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove); read-only, nothing.
  */
-export function GivenSkills({ rows, action, none }: { rows: readonly GivenSkill[]; action?: (row: GivenSkill) => ReactNode; none: ReactNode }) {
-  if (!rows.length) return <p data-given-none className="text-xs text-neutral-500">{none}</p>;
+export function GivenSkills({
+  rows,
+  action,
+  none,
+}: {
+  rows: readonly GivenSkill[];
+  action?: (row: GivenSkill) => ReactNode;
+  none: ReactNode;
+}) {
+  if (!rows.length)
+    return (
+      <p data-given-none className="text-xs text-neutral-500">
+        {none}
+      </p>
+    );
   return (
-    <ul data-given-skills className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+    <ul
+      data-given-skills
+      className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
+    >
       {rows.map((row) => (
         <li key={row.name} data-given-skill={row.name} className="flex items-start gap-3 px-3 py-2">
           <div className="min-w-0 flex-1 space-y-0.5">
@@ -178,8 +229,16 @@ export function GivenSkills({ rows, action, none }: { rows: readonly GivenSkill[
               <SkillSourceBadge from={row.from} />
             </p>
             {row.entry && <p className="text-xs text-neutral-600 dark:text-neutral-400">{row.entry.description}</p>}
-            {row.error !== null && <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">{row.error}</p>}
-            {row.cost && <p data-skill-cost className="text-[11px] text-muted-foreground">{costWords(row.cost)}</p>}
+            {row.error !== null && (
+              <p data-given-error className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+                {row.error}
+              </p>
+            )}
+            {row.cost && (
+              <p data-skill-cost className="text-[11px] text-muted-foreground">
+                {costWords(row.cost)}
+              </p>
+            )}
           </div>
           {action?.(row)}
         </li>

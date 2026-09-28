@@ -45,8 +45,18 @@ import { setup, transition as xTransition } from 'xstate';
 import { endOf, phaseWordOf, type Action, type Ended, type EndReason, type Outcome, type Sighting } from './domain.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
-export const STATES = ['submitted', 'starting', 'working', 'input-required', 'stopping', 'ending', 'completed', 'failed', 'canceled'] as const;
-export type LifecycleState = typeof STATES[number];
+export const STATES = [
+  'submitted',
+  'starting',
+  'working',
+  'input-required',
+  'stopping',
+  'ending',
+  'completed',
+  'failed',
+  'canceled',
+] as const;
+export type LifecycleState = (typeof STATES)[number];
 
 /** What a pass saw of one attempt's session, and what ending it now would lead to. */
 type Seen = {
@@ -111,13 +121,20 @@ type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
     // In the words views have always printed (`phaseWordOf`): a remote Task `submitted` runs as `working` does.
-    case 'SESSION_LIVE': return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
-    case 'SESSION_BLOCKED': return { do: 'nothing', why: 'blocked — needs a person' };
-    case 'UNSEEN_IN_GRACE': return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
-    case 'UNREAD': return { do: 'nothing', why: 'its harness could not be read this pass' };
-    case 'QUEUED': return { do: 'nothing', why: 'queued — waits to be admitted' };
-    case 'AWAITING_INPUT': return { do: 'nothing', why: 'input-required' };
-    default: return { do: 'nothing', why: event.type };
+    case 'SESSION_LIVE':
+      return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
+    case 'SESSION_BLOCKED':
+      return { do: 'nothing', why: 'blocked — needs a person' };
+    case 'UNSEEN_IN_GRACE':
+      return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
+    case 'UNREAD':
+      return { do: 'nothing', why: 'its harness could not be read this pass' };
+    case 'QUEUED':
+      return { do: 'nothing', why: 'queued — waits to be admitted' };
+    case 'AWAITING_INPUT':
+      return { do: 'nothing', why: 'input-required' };
+    default:
+      return { do: 'nothing', why: event.type };
   }
 };
 
@@ -127,15 +144,23 @@ const said = (event: LifecycleEvent): Action => {
  * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
  */
 const harnessEnd = (e: Sessioned): Action => ({
-  do: 'record-end', attempt: e.attempt, sessionId: e.sighting.sessionId, observed: endedOf(e),
-  reason: 'harness', nativeId: e.sighting.nativeId, closeout: e.sighting.closeout?.payload,
+  do: 'record-end',
+  attempt: e.attempt,
+  sessionId: e.sighting.sessionId,
+  observed: endedOf(e),
+  reason: 'harness',
+  nativeId: e.sighting.nativeId,
+  closeout: e.sighting.closeout?.payload,
   // Whether the statement its task asked for came: a fact for the layer above, which judges it.
   ...(e.asked ? { stated: e.sighting.closeout !== undefined } : {}),
 });
 
 const endedOf = (e: Sessioned): Ended => {
   const end = endOf(e.sighting.state);
-  if (!end) throw new Error(`the lifecycle recorded the end of a session its harness says is \`${e.sighting.state}\` on ${e.type}: it has not ended`);
+  if (!end)
+    throw new Error(
+      `the lifecycle recorded the end of a session its harness says is \`${e.sighting.state}\` on ${e.type}: it has not ended`,
+    );
   return end;
 };
 
@@ -144,8 +169,13 @@ const endedOf = (e: Sessioned): Ended => {
  * `stopped`, the deadline `failed`; whatever the harness last showed of it is kept.
  */
 const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sighting): Action => ({
-  do: 'record-end', attempt, sessionId: sighting?.sessionId ?? '(never seen)', observed: reason === 'operator' ? 'stopped' : 'failed',
-  reason, nativeId: sighting?.nativeId, closeout: sighting?.closeout?.payload,
+  do: 'record-end',
+  attempt,
+  sessionId: sighting?.sessionId ?? '(never seen)',
+  observed: reason === 'operator' ? 'stopped' : 'failed',
+  reason,
+  nativeId: sighting?.nativeId,
+  closeout: sighting?.closeout?.payload,
 });
 
 const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
@@ -160,7 +190,10 @@ const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
 const ACTIONS = { nothing: () => {}, start: () => {}, spawn: () => {}, 'record-end': () => {}, stop: () => {}, settle: () => {} };
 
 /** An edge's action, whose params are the `Action` it gives. Typed loosely here; `transition` hands back only `params`. */
-const act = (type: keyof typeof ACTIONS, params: (event: any) => Action) => ({ type, params: ({ event }: { event: LifecycleEvent }) => params(event) });
+const act = (type: keyof typeof ACTIONS, params: (event: any) => Action) => ({
+  type,
+  params: ({ event }: { event: LifecycleEvent }) => params(event),
+});
 
 const nothing = act('nothing', said);
 const harness = [
@@ -168,7 +201,10 @@ const harness = [
   { target: 'ending', actions: act('record-end', harnessEnd) },
 ];
 const deadline = [
-  { guard: 'live', actions: act('stop', (e: Ev<'DEADLINE_PASSED'>) => ({ do: 'stop', sessionId: e.sighting!.sessionId, why: 'deadline' })) },
+  {
+    guard: 'live',
+    actions: act('stop', (e: Ev<'DEADLINE_PASSED'>) => ({ do: 'stop', sessionId: e.sighting!.sessionId, why: 'deadline' })),
+  },
   { target: 'ending', actions: act('record-end', (e: Ev<'DEADLINE_PASSED'>) => cutEnd('deadline', e.attempt, e.sighting)) },
 ];
 /** An attempt in flight, as its harness sees the name — the same in `starting` and `working`. */
@@ -182,7 +218,10 @@ const inFlight = {
   DEADLINE_PASSED: deadline,
 };
 const settle = (outcome: Outcome, note?: (e: any) => string | undefined) =>
-  act('settle', (e) => { const n = note?.(e); return { do: 'settle', outcome, ...(n !== undefined ? { note: n } : {}) }; });
+  act('settle', (e) => {
+    const n = note?.(e);
+    return { do: 'settle', outcome, ...(n !== undefined ? { note: n } : {}) };
+  });
 
 /**
  * The machine's configuration, as data: `withoutEdge` builds a machine from it with one edge taken away, which is how a
@@ -195,13 +234,30 @@ const CONFIG = {
     /** Filed, or answered, and its turn not started: it starts once admitted, or settles on what the record rules out. */
     submitted: {
       on: {
-        READY: { target: 'starting', actions: act('start', (e: Ev<'READY'>) => ({ do: 'start', attempt: e.attempt, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}) })) },
+        READY: {
+          target: 'starting',
+          actions: act('start', (e: Ev<'READY'>) => ({
+            do: 'start',
+            attempt: e.attempt,
+            resumeFrom: e.resumeFrom,
+            ...(e.nudge ? { nudge: e.nudge } : {}),
+          })),
+        },
         QUEUED: { actions: nothing },
         // A session its harness still holds — one that went quiet is not gone — is stopped before it is continued, or two
         // would share one conversation.
-        PREVIOUS_LIVE: { actions: act('stop', (e: Ev<'PREVIOUS_LIVE'>) => ({ do: 'stop', sessionId: e.sessionId, why: 'to continue it' })) },
+        PREVIOUS_LIVE: {
+          actions: act('stop', (e: Ev<'PREVIOUS_LIVE'>) => ({ do: 'stop', sessionId: e.sessionId, why: 'to continue it' })),
+        },
         // A later turn is an answer to a session, and one that never heard the question has nothing to answer.
-        NO_SESSION_TO_CONTINUE: { target: 'failed', actions: settle('failed', (e: Ev<'NO_SESSION_TO_CONTINUE'>) => `turn ${e.turn} has no session to continue: its harness recorded none for the attempt that signed`) },
+        NO_SESSION_TO_CONTINUE: {
+          target: 'failed',
+          actions: settle(
+            'failed',
+            (e: Ev<'NO_SESSION_TO_CONTINUE'>) =>
+              `turn ${e.turn} has no session to continue: its harness recorded none for the attempt that signed`,
+          ),
+        },
       },
     },
     /**
@@ -211,12 +267,25 @@ const CONFIG = {
     starting: {
       on: {
         ...inFlight,
-        UNSPAWNED: { target: 'working', actions: act('spawn', (e: Ev<'UNSPAWNED'>) => ({ do: 'spawn', attempt: e.attempt, name: e.name })) },
+        UNSPAWNED: {
+          target: 'working',
+          actions: act('spawn', (e: Ev<'UNSPAWNED'>) => ({ do: 'spawn', attempt: e.attempt, name: e.name })),
+        },
         // Its harness could not be read, so a session the crash left under the name is not ruled out: spawned by a pass that
         // reads it, never twice. The deadline is read before this, and ends it.
         UNREAD: { actions: nothing },
         // Nothing started: the attempt ends `failed`, `unstartable`, in the harness's words.
-        SPAWN_REFUSED: { target: 'ending', actions: act('record-end', (e: Ev<'SPAWN_REFUSED'>) => ({ do: 'record-end', attempt: e.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: e.error })) },
+        SPAWN_REFUSED: {
+          target: 'ending',
+          actions: act('record-end', (e: Ev<'SPAWN_REFUSED'>) => ({
+            do: 'record-end',
+            attempt: e.attempt,
+            sessionId: '(never started)',
+            observed: 'failed',
+            reason: 'unstartable',
+            error: e.error,
+          })),
+        },
       },
     },
     /** Spawned. Followed while its harness holds it, its end recorded when it lets go or goes quiet. */
@@ -227,7 +296,16 @@ const CONFIG = {
         UNSEEN_IN_GRACE: { actions: nothing },
         // Its harness could not be read: nothing is known, so nothing is done. The deadline is read before this, and ends it.
         UNREAD: { actions: nothing },
-        LOST: { target: 'ending', actions: act('record-end', (e: Ev<'LOST'>) => ({ do: 'record-end', attempt: e.attempt, sessionId: '(never seen)', observed: 'failed', reason: 'lost' })) },
+        LOST: {
+          target: 'ending',
+          actions: act('record-end', (e: Ev<'LOST'>) => ({
+            do: 'record-end',
+            attempt: e.attempt,
+            sessionId: '(never seen)',
+            observed: 'failed',
+            reason: 'lost',
+          })),
+        },
       },
     },
     /** Held open, its turn signed: it waits on a person for as long as they take, before the deadline, which times work. */
@@ -250,10 +328,7 @@ const CONFIG = {
         LOST: { actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
         // Its harness could not be read: the stop waits for a read that says what runs, and once the deadline has passed
         // it is cut as a lost one is, so a person's stop is bounded by a harness that is never read again.
-        UNREAD: [
-          { guard: 'overdue', actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) },
-          { actions: nothing },
-        ],
+        UNREAD: [{ guard: 'overdue', actions: act('record-end', (e: Open) => cutEnd('operator', e.attempt)) }, { actions: nothing }],
         NOTHING_OPEN: { target: 'canceled', actions: settle('stopped', () => 'operator') },
       },
     },
@@ -262,9 +337,18 @@ const CONFIG = {
       on: {
         CLOSED: [
           { guard: 'lastDone', target: 'completed', actions: settle('succeeded', () => 'closed') },
-          { target: 'failed', actions: settle('failed', (e: Ev<'CLOSED'>) => `closed${e.last ? `: attempt ${e.last.n} ended ${e.last.ended}` : ' before any attempt'}`) },
+          {
+            target: 'failed',
+            actions: settle(
+              'failed',
+              (e: Ev<'CLOSED'>) => `closed${e.last ? `: attempt ${e.last.n} ended ${e.last.ended}` : ' before any attempt'}`,
+            ),
+          },
         ],
-        DEADLINE_SPENT: { target: 'failed', actions: settle('failed', (e: Ev<'DEADLINE_SPENT'>) => `deadline exceeded after ${e.seconds}s`) },
+        DEADLINE_SPENT: {
+          target: 'failed',
+          actions: settle('failed', (e: Ev<'DEADLINE_SPENT'>) => `deadline exceeded after ${e.seconds}s`),
+        },
         // One attempt per start: trying again — lost, unstartable or failed — is the layer above's, a new filing.
         ATTEMPT_ENDED: [
           { guard: 'endedDone', target: 'completed', actions: settle('succeeded') },
@@ -297,23 +381,30 @@ const machineOf = (config: Config) =>
 
 export const MACHINE = machineOf(CONFIG as unknown as Config);
 
-const moveOn = (machine: ReturnType<typeof machineOf>): Move => (from, event) => {
-  const snapshot = machine.resolveState({ value: from });
-  if (!snapshot.can(event)) return { refused: { state: from, event: event.type } };
-  const [next, actions] = xTransition(machine, snapshot, event);
-  const params = actions.map((a) => a.params as Action | undefined);
-  // Every edge names one action (`test/lifecycle.test.ts`): anything else is the table's mistake, not the task's.
-  if (params.length !== 1 || !params[0]) throw new Error(`the lifecycle's edge from ${from} on ${event.type} gave ${params.length} actions, not one`);
-  return { to: next.value as LifecycleState, action: params[0] };
-};
+const moveOn =
+  (machine: ReturnType<typeof machineOf>): Move =>
+  (from, event) => {
+    const snapshot = machine.resolveState({ value: from });
+    if (!snapshot.can(event)) return { refused: { state: from, event: event.type } };
+    const [next, actions] = xTransition(machine, snapshot, event);
+    const params = actions.map((a) => a.params as Action | undefined);
+    // Every edge names one action (`test/lifecycle.test.ts`): anything else is the table's mistake, not the task's.
+    if (params.length !== 1 || !params[0])
+      throw new Error(`the lifecycle's edge from ${from} on ${event.type} gave ${params.length} actions, not one`);
+    return { to: next.value as LifecycleState, action: params[0] };
+  };
 
 /** The shipped lifecycle's move: the one state and action an event leads to, or a refusal when the state has no edge for it. */
 export const transition: Move = moveOn(MACHINE);
 
 /** The machine with one state's edges for one event taken away. Never shipped: what a test plants a refusal with. */
 export const machineWithout = (from: LifecycleState, event: EventType) => {
-  const states = Object.fromEntries(Object.entries((CONFIG as unknown as Config).states).map(([name, node]) => [name,
-    name === from && node.on ? { ...node, on: Object.fromEntries(Object.entries(node.on).filter(([type]) => type !== event)) } : node]));
+  const states = Object.fromEntries(
+    Object.entries((CONFIG as unknown as Config).states).map(([name, node]) => [
+      name,
+      name === from && node.on ? { ...node, on: Object.fromEntries(Object.entries(node.on).filter(([type]) => type !== event)) } : node,
+    ]),
+  );
   return machineOf({ ...(CONFIG as unknown as Config), states });
 };
 
@@ -326,16 +417,24 @@ export type Edge = { from: LifecycleState; event: EventType; guard?: string; to:
 /** Every edge of a machine, read off XState's own nodes, so the list is the machine and not a copy of it. */
 export const edgesOf = (machine = MACHINE): Edge[] =>
   Object.entries(machine.root.states).flatMap(([from, node]) =>
-    [...node.transitions.entries()].flatMap(([event, defs]) => defs.map((d) => ({
-      from: from as LifecycleState, event: event as EventType,
-      // A guard named in the table is kept as its name; one given as an object, by its type.
-      ...(d.guard ? { guard: typeof d.guard === 'string' ? d.guard : (d.guard as { type: string }).type } : {}),
-      to: (d.target?.[0]?.key ?? from) as LifecycleState,
-      action: d.actions.map((a) => (a as { type: string }).type).join(' '),
-    }))));
+    [...node.transitions.entries()].flatMap(([event, defs]) =>
+      defs.map((d) => ({
+        from: from as LifecycleState,
+        event: event as EventType,
+        // A guard named in the table is kept as its name; one given as an object, by its type.
+        ...(d.guard ? { guard: typeof d.guard === 'string' ? d.guard : (d.guard as { type: string }).type } : {}),
+        to: (d.target?.[0]?.key ?? from) as LifecycleState,
+        action: d.actions.map((a) => (a as { type: string }).type).join(' '),
+      })),
+    ),
+  );
 
 /** The final states: a task settled, whose record takes no event. */
-export const FINAL: ReadonlySet<LifecycleState> = new Set(Object.entries(MACHINE.root.states).filter(([, n]) => n.type === 'final').map(([k]) => k as LifecycleState));
+export const FINAL: ReadonlySet<LifecycleState> = new Set(
+  Object.entries(MACHINE.root.states)
+    .filter(([, n]) => n.type === 'final')
+    .map(([k]) => k as LifecycleState),
+);
 
 /**
  * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,

@@ -104,9 +104,11 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
     }
     const resolved = path.resolve(path.dirname(from), entry.link);
     const inRepo = inside(mainRoot, resolved);
-    actions.push(inRepo && resolved !== mainModules && !inside(mainModules, resolved)
-      ? { kind: 'link', path: at, target: path.relative(path.dirname(at), path.join(worktree, inRepo)) }
-      : { kind: 'link', path: at, target: from });
+    actions.push(
+      inRepo && resolved !== mainModules && !inside(mainModules, resolved)
+        ? { kind: 'link', path: at, target: path.relative(path.dirname(at), path.join(worktree, inRepo)) }
+        : { kind: 'link', path: at, target: from },
+    );
   };
 
   for (const entry of main.entries) {
@@ -124,7 +126,11 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
     actions.push({ kind: 'dir', path: bins });
     for (const bin of main.bins) {
       const at = path.join(bins, bin.name);
-      actions.push(bin.link === undefined ? { kind: 'tree', path: at, from: path.join(mainModules, '.bin', bin.name) } : { kind: 'link', path: at, target: bin.link });
+      actions.push(
+        bin.link === undefined
+          ? { kind: 'tree', path: at, from: path.join(mainModules, '.bin', bin.name) }
+          : { kind: 'link', path: at, target: bin.link },
+      );
     }
   }
   return actions;
@@ -142,7 +148,7 @@ export const isModuleKey = (key: string): boolean => key.startsWith('node_module
 /** A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile. */
 export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | null => {
   const packages = (lock as { packages?: unknown } | null)?.packages;
-  return packages && typeof packages === 'object' ? packages as Record<string, LockEntry> : null;
+  return packages && typeof packages === 'object' ? (packages as Record<string, LockEntry>) : null;
 };
 
 /**
@@ -186,15 +192,19 @@ export function lockfileParting(wanted: unknown, installed: Readonly<Record<stri
 export function depsLines(deps: Provisioned | undefined): string[] {
   if (deps?.tree === 'own') {
     return [
-      'Its `node_modules` is its own: this branch\'s `package-lock.json` asks for packages the main checkout has not',
+      "Its `node_modules` is its own: this branch's `package-lock.json` asks for packages the main checkout has not",
       'installed, so the run installed them with `npm ci` when it cut this worktree — about a minute before you',
-      'started. `npm install` here changes this tree and nobody else\'s.',
+      "started. `npm install` here changes this tree and nobody else's.",
     ];
   }
   if (deps?.tree === 'failed') {
     return [
-      'The run could not provision this worktree\'s `node_modules`:',
-      '', '```', deps.error, '```', '',
+      "The run could not provision this worktree's `node_modules`:",
+      '',
+      '```',
+      deps.error,
+      '```',
+      '',
       'Run `npm ci` here before anything that needs a dependency.',
     ];
   }
@@ -227,15 +237,19 @@ export function worktreeInclude(text: string): WorktreeInclude {
     if (!line || line.startsWith('#')) continue;
     const rel = path.posix.normalize(line.replaceAll('\\', '/').replace(/^\/+/, '') || '.').replace(/\/+$/, '');
     const segments = rel.split('/');
-    const why =
-      /^[A-Za-z]:[\\/]/.test(line) ? 'is absolute'
-      : rel === '..' || rel.startsWith('../') ? 'is outside the repository'
-      : rel === '.' || rel === '' ? 'is the repository itself'
-      : segments[0] === '.git' ? 'is git\'s own'
-      : null;
+    const why = /^[A-Za-z]:[\\/]/.test(line)
+      ? 'is absolute'
+      : rel === '..' || rel.startsWith('../')
+        ? 'is outside the repository'
+        : rel === '.' || rel === ''
+          ? 'is the repository itself'
+          : segments[0] === '.git'
+            ? "is git's own"
+            : null;
     if (why) out.refused.push({ line, why });
-    else if (segments.includes('node_modules')) { if (!out.provisioned.includes(rel)) out.provisioned.push(rel); }
-    else if (!out.copy.includes(rel)) out.copy.push(rel);
+    else if (segments.includes('node_modules')) {
+      if (!out.provisioned.includes(rel)) out.provisioned.push(rel);
+    } else if (!out.copy.includes(rel)) out.copy.push(rel);
   }
   return out;
 }

@@ -17,7 +17,8 @@ const feedEventOf = (line: FeedLine): 'step' | 'removed' | 'run' =>
  */
 function feedCursorOf(raw: string | undefined): number | { error: string } {
   if (!raw) return 0;
-  const how = 'A feed cursor is the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start.';
+  const how =
+    'A feed cursor is the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start.';
   if (!/^\d+$/.test(raw)) return { error: `\`${raw}\` is not a cursor this feed gave: a feed cursor is a whole number of bytes. ${how}` };
   const refusal = feedCursorRefusal(Number(raw));
   return refusal ? { error: `\`${raw}\` is not a cursor this feed gave: ${refusal}. ${how}` } : Number(raw);
@@ -36,7 +37,9 @@ export const feed = new Hono()
     if (typeof from !== 'number') return c.json({ error: from.error }, 400);
     return streamSSE(c, async (stream) => {
       let end: () => void = () => {};
-      const ended = new Promise<void>((resolve) => { end = resolve; });
+      const ended = new Promise<void>((resolve) => {
+        end = resolve;
+      });
       stream.onAbort(end);
       // Whether the last read failed. A failure is said once, and cleared with `readable` by the first read that works, as the
       // transcript's is — whether or not it finds a line.
@@ -44,7 +47,10 @@ export const feed = new Hono()
       // Whether the stream is ending: said once, however many beats the watch fails on before it is stopped.
       let over = false;
       const unreadable = (err: unknown, retrying: boolean) =>
-        stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error: err instanceof Error ? err.message : String(err), retrying }) });
+        stream.writeSSE({
+          event: 'unreadable',
+          data: JSON.stringify({ error: err instanceof Error ? err.message : String(err), retrying }),
+        });
       let watch: { stop(): void };
       try {
         watch = watchFeed({

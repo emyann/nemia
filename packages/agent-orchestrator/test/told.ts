@@ -13,7 +13,10 @@ export function toldIn(dir: string, step: Workflow): string {
   const found = skillsFor(dir);
   const skills = (step.agent?.skills ?? []).map((name) => {
     const at = found.at.get(name);
-    if (typeof at !== 'string') throw new Error(`${step.name}: its agent gives the skill ${name}, and ${at ? at.message : `no skills folder has it (${found.looked.join(', ')})`}`);
+    if (typeof at !== 'string')
+      throw new Error(
+        `${step.name}: its agent gives the skill ${name}, and ${at ? at.message : `no skills folder has it (${found.looked.join(', ')})`}`,
+      );
     return splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(at, 'SKILL.md'), 'utf8')).body;
   });
   return [step.body, ...skills].join('\n\n');

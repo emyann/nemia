@@ -31,7 +31,7 @@ export const claudeInboxLine = (sessionId: string, text: string): string =>
  */
 export const claudeSayRefuses = (task: { permissionMode?: string }, text: string): string | undefined => {
   if (task.permissionMode === 'bypassPermissions') {
-    return "the task runs in `permissionMode: bypassPermissions`, and Claude Code holds a message sent into such a session for a person to approve — in a background session nobody has attached to, for ever. Nothing said would reach it. Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.";
+    return 'the task runs in `permissionMode: bypassPermissions`, and Claude Code holds a message sent into such a session for a person to approve — in a background session nobody has attached to, for ever. Nothing said would reach it. Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.';
   }
   const length = claudeInboxLine('00000000-0000-0000-0000-000000000000', text).length;
   if (length > CLAUDE_INBOX_LINE_MAX) {
@@ -60,18 +60,28 @@ export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: s
     if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) throw new Error('not a file of yours');
     registration = JSON.parse(await fs.promises.readFile(file, 'utf8'));
   } catch (e) {
-    throw new Error(`the session's registration, ${file}, cannot be read (${e instanceof Error ? e.message : String(e)}): it has exited, or runs somewhere this process cannot see.`);
+    throw new Error(
+      `the session's registration, ${file}, cannot be read (${e instanceof Error ? e.message : String(e)}): it has exited, or runs somewhere this process cannot see.`,
+      { cause: e },
+    );
   }
   if (registration?.sessionId !== sessionId) {
     throw new Error(`pid ${pid} is registered to ${String(registration?.sessionId)} now, not ${sessionId}: the session has exited.`);
   }
   const socket = registration.messagingSocketPath;
   if (typeof socket !== 'string' || !path.isAbsolute(socket)) {
-    throw new Error(`session ${sessionId} has no inbox (its registration names no socket): Claude Code could not set one up for it, and \`/status\` in the session says why.`);
+    throw new Error(
+      `session ${sessionId} has no inbox (its registration names no socket): Claude Code could not set one up for it, and \`/status\` in the session says why.`,
+    );
   }
   let stat: fs.Stats;
-  try { stat = await fs.promises.lstat(socket); } catch (e) {
-    throw new Error(`session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`);
+  try {
+    stat = await fs.promises.lstat(socket);
+  } catch (e) {
+    throw new Error(
+      `session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`,
+      { cause: e },
+    );
   }
   const refused = inboxSocketRefuses(socket, stat, uid);
   if (refused) throw new Error(refused);
@@ -84,7 +94,11 @@ export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: s
  * what `lstat` said and who "this user" is, and pure, so a test can hand it a socket of another user's, which no
  * test can make without root.
  */
-export const inboxSocketRefuses = (socket: string, stat: { isSocket(): boolean; uid: number }, uid: number | undefined): string | undefined => {
+export const inboxSocketRefuses = (
+  socket: string,
+  stat: { isSocket(): boolean; uid: number },
+  uid: number | undefined,
+): string | undefined => {
   if (!stat.isSocket()) return `${socket} is not a socket — a symlink, or something else in its place. Refusing to send.`;
   if (uid !== undefined && stat.uid !== uid) return `${socket} is owned by uid ${stat.uid}, not by you. Refusing to send.`;
   return undefined;
@@ -92,7 +106,12 @@ export const inboxSocketRefuses = (socket: string, stat: { isSocket(): boolean; 
 
 /** Whether a process runs under `pid` that this one may signal. One another user's process holds (EPERM) counts as none. */
 const signalable = (pid: number): boolean => {
-  try { process.kill(pid, 0); return true; } catch { return false; }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 /**
@@ -101,7 +120,11 @@ const signalable = (pid: number): boolean => {
  */
 export const processStart = (pid: number): string | undefined => {
   let stat: string;
-  try { stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); } catch { return undefined; }
+  try {
+    stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+  } catch {
+    return undefined;
+  }
   // The second field is the command's name in parentheses, which may hold spaces and parentheses: count from the last.
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
 };
@@ -128,7 +151,11 @@ export const claudeRegistered = async (
   { uid = process.getuid?.(), startOf = processStart }: { uid?: number; startOf?: (pid: number) => string | undefined } = {},
 ): Promise<{ sessionId: string; pid: number } | undefined> => {
   let files: string[];
-  try { files = await fs.promises.readdir(sessionsDir); } catch { return undefined; }
+  try {
+    files = await fs.promises.readdir(sessionsDir);
+  } catch {
+    return undefined;
+  }
   for (const f of files) {
     const pid = Number(/^([1-9]\d*)\.json$/.exec(f)?.[1]);
     if (!pid) continue;
@@ -138,7 +165,9 @@ export const claudeRegistered = async (
       const stat = await fs.promises.lstat(file);
       if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) continue;
       r = JSON.parse(await readTextAsync(file));
-    } catch { continue; } // gone since the directory was read, or read mid-write: not found this time
+    } catch {
+      continue;
+    } // gone since the directory was read, or read mid-write: not found this time
     if (r?.name !== name || r.kind !== 'bg' || r.pid !== pid || typeof r.sessionId !== 'string' || !r.sessionId) continue;
     if (!signalable(pid)) continue;
     const started = startOf(pid);
@@ -160,22 +189,32 @@ const SAY_TIMEOUT_MS = 5_000;
  * words it did not (found in review). Rejects when the line was not all written: the connection refused or
  * reset, or still being written at the deadline. An inbox drops a line cut short, so then nothing was given.
  */
-export const claudeInboxPost = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) => new Promise<void>((resolve, reject) => {
-  let written = false;
-  let done = false;
-  const finish = (error?: Error) => {
-    if (done) return;
-    done = true;
-    clearTimeout(timer);
-    if (error) reject(error); else resolve();
-  };
-  const c = net.createConnection({ path: socket });
-  const timer = setTimeout(() => {
-    c.destroy();
-    finish(written ? undefined : new Error(`${socket} took only part of the line within ${timeoutMs} ms, and an inbox drops a line cut short`));
-  }, timeoutMs);
-  c.on('connect', () => c.end(line, () => { written = true; }));
-  c.on('data', () => { /* the inbox answers nothing; anything it did say is not ours to read */ });
-  c.on('error', (e) => finish(e));
-  c.on('close', () => finish(written ? undefined : new Error(`${socket} closed the connection before the words were written`)));
-});
+export const claudeInboxPost = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) =>
+  new Promise<void>((resolve, reject) => {
+    let written = false;
+    let done = false;
+    const finish = (error?: Error) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const c = net.createConnection({ path: socket });
+    const timer = setTimeout(() => {
+      c.destroy();
+      finish(
+        written ? undefined : new Error(`${socket} took only part of the line within ${timeoutMs} ms, and an inbox drops a line cut short`),
+      );
+    }, timeoutMs);
+    c.on('connect', () =>
+      c.end(line, () => {
+        written = true;
+      }),
+    );
+    c.on('data', () => {
+      /* the inbox answers nothing; anything it did say is not ours to read */
+    });
+    c.on('error', (e) => finish(e));
+    c.on('close', () => finish(written ? undefined : new Error(`${socket} closed the connection before the words were written`)));
+  });

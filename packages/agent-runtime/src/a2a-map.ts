@@ -76,8 +76,14 @@ const textPart = (text: string): Part => ({ content: { $case: 'text', value: tex
 
 /** A message the agent says about a task: the words a harness gave, carried in `status.message`. */
 const agentSays = (messageId: string, name: string, contextId: string, text: string): Message => ({
-  messageId, contextId, taskId: name, role: Role.ROLE_AGENT,
-  parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
+  messageId,
+  contextId,
+  taskId: name,
+  role: Role.ROLE_AGENT,
+  parts: [textPart(text)],
+  metadata: undefined,
+  extensions: [],
+  referenceTaskIds: [],
 });
 
 /**
@@ -85,12 +91,19 @@ const agentSays = (messageId: string, name: string, contextId: string, text: str
  * `contextId`, empty for a spawn that starts cold; `config` travels whole, unopened.
  */
 export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
-  messageId, contextId: r.resumeFrom ?? '', taskId: r.name, role: Role.ROLE_USER,
+  messageId,
+  contextId: r.resumeFrom ?? '',
+  taskId: r.name,
+  role: Role.ROLE_USER,
   parts: [textPart(r.brief)],
   metadata: clean({
-    cwd: r.cwd, harness: r.harness, config: r.config, closeoutSchema: r.closeoutSchema,
+    cwd: r.cwd,
+    harness: r.harness,
+    config: r.config,
+    closeoutSchema: r.closeoutSchema,
   }),
-  extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
+  extensions: [RUNTIME_EXTENSION],
+  referenceTaskIds: [],
 });
 
 /**
@@ -98,8 +111,14 @@ export const messageOf = (r: SpawnRequest, messageId: string): Message => ({
  * no context, which the Task already has.
  */
 export const followUpOf = (name: string, text: string, messageId: string): Message => ({
-  messageId, contextId: '', taskId: name, role: Role.ROLE_USER,
-  parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
+  messageId,
+  contextId: '',
+  taskId: name,
+  role: Role.ROLE_USER,
+  parts: [textPart(text)],
+  metadata: undefined,
+  extensions: [],
+  referenceTaskIds: [],
 });
 
 /**
@@ -164,8 +183,13 @@ export const spawnOf = (m: Message): SpawnRequest => {
   const md = m.metadata ?? {};
   const brief = m.parts[0]!.content as { $case: 'text'; value: string };
   return {
-    name: m.taskId, brief: brief.value, cwd: md.cwd, harness: md.harness,
-    config: md.config, closeoutSchema: md.closeoutSchema, resumeFrom: m.contextId || undefined,
+    name: m.taskId,
+    brief: brief.value,
+    cwd: md.cwd,
+    harness: md.harness,
+    config: md.config,
+    closeoutSchema: md.closeoutSchema,
+    resumeFrom: m.contextId || undefined,
   };
 };
 
@@ -175,11 +199,16 @@ export const spawnOf = (m: Message): SpawnRequest => {
  * (milliseconds) in its metadata. A resumed session can carry its parent's statement; `at` is how a reader tells.
  */
 export const closeoutArtifact = (payload: unknown, at?: number): Artifact => ({
-  artifactId: 'closeout', name: 'closeout', description: '',
-  parts: [typeof payload === 'string'
-    ? { content: { $case: 'text', value: payload }, metadata: undefined, filename: '', mediaType: 'text/plain' }
-    : { content: { $case: 'data', value: payload }, metadata: undefined, filename: '', mediaType: '' }],
-  metadata: at === undefined ? undefined : { at }, extensions: [],
+  artifactId: 'closeout',
+  name: 'closeout',
+  description: '',
+  parts: [
+    typeof payload === 'string'
+      ? { content: { $case: 'text', value: payload }, metadata: undefined, filename: '', mediaType: 'text/plain' }
+      : { content: { $case: 'data', value: payload }, metadata: undefined, filename: '', mediaType: '' },
+  ],
+  metadata: at === undefined ? undefined : { at },
+  extensions: [],
 });
 
 /** What a closeout Artifact carries, or `undefined` for a Task with none. The payload as it was given, string or not. */
@@ -191,9 +220,12 @@ export const closeoutOf = (t: Task): unknown => {
 type Fill = { message?: Message; history?: Message[]; metadata?: Record<string, unknown>; artifacts?: Artifact[] };
 
 const task = (name: string, contextId: string, state: TaskState, fill: Fill = {}): Task => ({
-  id: name, contextId,
+  id: name,
+  contextId,
   status: { state, message: fill.message, timestamp: undefined },
-  artifacts: fill.artifacts ?? [], history: fill.history ?? [], metadata: fill.metadata,
+  artifacts: fill.artifacts ?? [],
+  history: fill.history ?? [],
+  metadata: fill.metadata,
 });
 
 /**
@@ -222,7 +254,10 @@ export const startedTask = (name: string, asked: Message): Task => task(name, ''
  * this one may yet be adopted in the grace window.
  */
 export const failedSpawnTask = (name: string, asked: Message, words: string, refused: boolean, messageId: string): Task =>
-  task(name, '', refused ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_SUBMITTED, { message: agentSays(messageId, name, '', words), history: [asked] });
+  task(name, '', refused ? TaskState.TASK_STATE_REJECTED : TaskState.TASK_STATE_SUBMITTED, {
+    message: agentSays(messageId, name, '', words),
+    history: [asked],
+  });
 
 /** A session stopped, as A2A answers a cancel, in the context the harness listed it under. */
 export const canceledTask = (name: string, s: Sighting): Task => task(name, s.nativeId ?? '', TaskState.TASK_STATE_CANCELED);
@@ -240,11 +275,18 @@ export const wordsOf = (t: Task): string | undefined => {
  * its Artifact; the reason and the rest of the attempt ride in `metadata.attempt`, and a refusal's words in `status.message`.
  */
 export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiting = false): Task => {
-  const state = a.ended === null ? TaskState.TASK_STATE_SUBMITTED
-    : a.reason === 'unstartable' ? TaskState.TASK_STATE_REJECTED
-    : a.ended === 'done' ? (waiting ? TaskState.TASK_STATE_INPUT_REQUIRED : TaskState.TASK_STATE_COMPLETED)
-    : a.ended === 'stopped' ? TaskState.TASK_STATE_CANCELED
-    : TaskState.TASK_STATE_FAILED;
+  const state =
+    a.ended === null
+      ? TaskState.TASK_STATE_SUBMITTED
+      : a.reason === 'unstartable'
+        ? TaskState.TASK_STATE_REJECTED
+        : a.ended === 'done'
+          ? waiting
+            ? TaskState.TASK_STATE_INPUT_REQUIRED
+            : TaskState.TASK_STATE_COMPLETED
+          : a.ended === 'stopped'
+            ? TaskState.TASK_STATE_CANCELED
+            : TaskState.TASK_STATE_FAILED;
   const contextId = a.nativeId ?? '';
   return task(name, contextId, state, {
     ...(a.error ? { message: agentSays(messageId, name, contextId, a.error) } : {}),
@@ -279,7 +321,8 @@ export const sightingOfTask = (t: Task, now: number): Sighting => {
   const waiting = WAITS.get(state);
   const payload = named === 'completed' ? statementOf(t.artifacts) : undefined;
   return {
-    sessionId: t.id, state: named,
+    sessionId: t.id,
+    state: named,
     ...(t.contextId ? { nativeId: t.contextId } : {}),
     ...(waiting ? { waitingFor: waiting } : {}),
     ...(payload !== undefined ? { closeout: { payload, at: now } } : {}),
@@ -303,16 +346,26 @@ const statementOf = (artifacts: readonly Artifact[]): unknown => {
  * the local harnesses' (`cwd`, `config`), which a remote agent has no use for.
  */
 export const remoteMessageOf = (r: SpawnRequest, messageId: string): Message => ({
-  messageId, contextId: r.resumeFrom ?? '', taskId: '', role: Role.ROLE_USER,
+  messageId,
+  contextId: r.resumeFrom ?? '',
+  taskId: '',
+  role: Role.ROLE_USER,
   parts: [textPart(r.brief)],
   metadata: r.closeoutSchema === undefined ? undefined : { [RUNTIME_EXTENSION]: { closeoutSchema: r.closeoutSchema } },
-  extensions: [], referenceTaskIds: [],
+  extensions: [],
+  referenceTaskIds: [],
 });
 
 /** Words for a remote Task that waits on its caller, as A2A's follow-up: a user message on that Task, in its context. */
 export const remoteFollowUpOf = (taskId: string, contextId: string, text: string, messageId: string): Message => ({
-  messageId, contextId, taskId, role: Role.ROLE_USER,
-  parts: [textPart(text)], metadata: undefined, extensions: [], referenceTaskIds: [],
+  messageId,
+  contextId,
+  taskId,
+  role: Role.ROLE_USER,
+  parts: [textPart(text)],
+  metadata: undefined,
+  extensions: [],
+  referenceTaskIds: [],
 });
 
 /** A part as a line of text: its words, its data as JSON, or what a file part is called. */

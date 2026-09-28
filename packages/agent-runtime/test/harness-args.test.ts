@@ -22,16 +22,32 @@ type Asked = Parameters<NonNullable<RunnerOps['refuses']>>[0];
 
 /** What `ops`, made a `Runner` as every runner is (`Runner.layer`), says of `t`. */
 const refusedBy = (ops: RunnerOps, t: Asked) =>
-  Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(Runner.layer(ops))));
+  Effect.runSync(
+    Effect.gen(function* () {
+      return (yield* Runner).refuses?.(t);
+    }).pipe(Effect.provide(Runner.layer(ops))),
+  );
 
-test('HARNESS_ARGS is the twelve arguments a harness takes — the spend cap among them since stage 4b, Claude Code\'s own flags since card 1a, and remoteControl gone into them', () => {
+test("HARNESS_ARGS is the twelve arguments a harness takes — the spend cap among them since stage 4b, Claude Code's own flags since card 1a, and remoteControl gone into them", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
-    'allowedTools', 'background', 'budgetUsd', 'claude', 'contextTokens', 'disallowedTools', 'effort', 'mcp', 'model', 'permissionMode', 'tools', 'worktree',
+    'allowedTools',
+    'background',
+    'budgetUsd',
+    'claude',
+    'contextTokens',
+    'disallowedTools',
+    'effort',
+    'mcp',
+    'model',
+    'permissionMode',
+    'tools',
+    'worktree',
   ]);
 });
 
 test('remoteControl, a harness argument until 2026-09-25, is refused under config and beside it at any value, naming config.claude — and taken there', () => {
-  const says = "`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: { claude: { remoteControl: true } }`, or leave it out.";
+  const says =
+    "`remoteControl` is Claude Code's own flag, no harness argument of its own since 2026-09-25: file it with Claude Code's flags, as `config: { claude: { remoteControl: true } }`, or leave it out.";
   for (const value of [true, false, undefined]) {
     assert.equal(argsRefusalOf({ ...task, config: { remoteControl: value } } as never), says, `config.remoteControl: ${value}`);
     assert.equal(argsRefusalOf({ ...task, remoteControl: value } as never), says, `remoteControl: ${value} beside config`);
@@ -43,8 +59,17 @@ test('remoteControl, a harness argument until 2026-09-25, is refused under confi
 
 test('a harness argument filed beside config is refused, naming where it goes — each of the twelve', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
-    model: 'opus', permissionMode: 'auto', effort: 'high', tools: ['Read'], allowedTools: ['Edit(**)'], disallowedTools: ['SendMessage'],
-    mcp: {}, contextTokens: 200000, background: true, worktree: true, budgetUsd: 5,
+    model: 'opus',
+    permissionMode: 'auto',
+    effort: 'high',
+    tools: ['Read'],
+    allowedTools: ['Edit(**)'],
+    disallowedTools: ['SendMessage'],
+    mcp: {},
+    contextTokens: 200000,
+    background: true,
+    worktree: true,
+    budgetUsd: 5,
     claude: { appendSystemPromptFile: 'prompt.md' },
   };
   for (const key of HARNESS_ARGS) {
@@ -60,7 +85,10 @@ test('a harness argument filed beside config is refused, naming where it goes �
 test('a config that is not an object of arguments is refused, and says what one is', () => {
   for (const config of [null, 'opus', 7, ['model'], true]) {
     const says = argsRefusalOf({ ...task, config } as never) ?? '';
-    assert.ok(says.startsWith(`\`config: ${JSON.stringify(config)}\` is not a harness's configuration. Give an object of its arguments`), says);
+    assert.ok(
+      says.startsWith(`\`config: ${JSON.stringify(config)}\` is not a harness's configuration. Give an object of its arguments`),
+      says,
+    );
   }
   assert.equal(argsRefusalOf({ ...task, config: {} }), undefined, 'an empty one is the harness defaults');
   assert.equal(argsRefusalOf({ ...task, config: undefined }), undefined, 'and so is none');
@@ -78,7 +106,12 @@ test('a spend cap is dollars above 0, under config: anything else is refused, an
   // The runtime's own check until stage 4b, in its words; it moved beside the argument it checks.
   for (const bad of [0, -1, Number.NaN, Infinity, 'five', '5', null]) {
     const says = argsRefusalOf({ ...task, config: { budgetUsd: bad } } as never) ?? '';
-    assert.ok(says.startsWith(`\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars. Give dollars above 0`), says);
+    assert.ok(
+      says.startsWith(
+        `\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars. Give dollars above 0`,
+      ),
+      says,
+    );
     assert.ok(says.endsWith('or leave it out for no cap.'), says);
   }
   for (const good of [0.01, 5, 250]) assert.equal(argsRefusalOf({ ...task, config: { budgetUsd: good } }), undefined, String(good));
@@ -95,15 +128,24 @@ test("Claude Code's own flags are an object of flags in camelCase, each saying o
   }
   for (const value of [false, null, '', {}, [], ['a', ''], [1], Number.NaN]) {
     const says = argsRefusalOf({ ...task, config: { claude: { pluginDir: value } } } as never) ?? '';
-    assert.ok(says.startsWith(`\`claude.pluginDir: ${JSON.stringify(value)}\` is not a flag's value.`), `${JSON.stringify(value)}: ${says}`);
+    assert.ok(
+      says.startsWith(`\`claude.pluginDir: ${JSON.stringify(value)}\` is not a flag's value.`),
+      `${JSON.stringify(value)}: ${says}`,
+    );
   }
   assert.equal(argsRefusalOf({ ...task, config: { claude: {} } }), undefined, 'none at all is no flag');
-  assert.equal(argsRefusalOf({ ...task, config: { claude: { appendSystemPromptFile: 'p.md', pluginDir: ['a', 'b'], settings: '{}', bare: true, maxTurns: 2 } } }), undefined);
+  assert.equal(
+    argsRefusalOf({
+      ...task,
+      config: { claude: { appendSystemPromptFile: 'p.md', pluginDir: ['a', 'b'], settings: '{}', bare: true, maxTurns: 2 } },
+    }),
+    undefined,
+  );
 });
 
 test('a turn gives its own spend cap and nothing else of the configuration: each refused, at shipped defaults', () => {
   assert.deepEqual([...TURN_ARGS], ['budgetUsd']);
-  assert.equal(turnArgsRefusalOf(undefined), undefined, 'none: the task\'s own');
+  assert.equal(turnArgsRefusalOf(undefined), undefined, "none: the task's own");
   assert.equal(turnArgsRefusalOf({}), undefined);
   assert.equal(turnArgsRefusalOf({ budgetUsd: 0.5 }), undefined);
   for (const bad of [null, 'opus', 7, ['budgetUsd']]) {
@@ -117,13 +159,17 @@ test('a turn gives its own spend cap and nothing else of the configuration: each
   }
   for (const bad of [0, -2, Number.NaN, 'lots']) {
     const says = turnArgsRefusalOf({ budgetUsd: bad }) ?? '';
-    assert.ok(says.startsWith(`\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars.`) && says.endsWith("or leave it out for the task's own."), says);
+    assert.ok(
+      says.startsWith(`\`budgetUsd: ${typeof bad === 'number' ? bad : JSON.stringify(bad)}\` is not an amount of dollars.`) &&
+        says.endsWith("or leave it out for the task's own."),
+      says,
+    );
   }
 });
 
 test("a turn's configuration is laid over the task's own, which it leaves unchanged", () => {
   const own: HarnessArgs = { model: 'opus', budgetUsd: 2 };
-  assert.equal(configForTurn(own, undefined), own, 'no turn of its own: the filing\'s, as it is');
+  assert.equal(configForTurn(own, undefined), own, "no turn of its own: the filing's, as it is");
   assert.equal(configForTurn(undefined, undefined), undefined);
   assert.deepEqual(configForTurn(own, { budgetUsd: 0.5 }), { model: 'opus', budgetUsd: 0.5 });
   assert.deepEqual(configForTurn(undefined, { budgetUsd: 0.5 }), { budgetUsd: 0.5 });
@@ -138,7 +184,13 @@ test('where a key is and whether it is one are said before what its value is', (
 
 test('every Runner refuses the shared checks before its own, and asks its own when they pass', () => {
   const asked: string[] = [];
-  const ops: RunnerOps = { ...testOps(), refuses: (t) => { asked.push(t.config?.model ?? '-'); return t.config?.model === 'huge' ? 'no huge models' : undefined; } };
+  const ops: RunnerOps = {
+    ...testOps(),
+    refuses: (t) => {
+      asked.push(t.config?.model ?? '-');
+      return t.config?.model === 'huge' ? 'no huge models' : undefined;
+    },
+  };
   const refuses = (t: Asked) => refusedBy(ops, t);
 
   assert.match(refuses({ ...task, config: { model: '' } }) ?? '', /^`model` is empty\./);
@@ -150,7 +202,10 @@ test('every Runner refuses the shared checks before its own, and asks its own wh
   // A runner that says nothing of its own still refuses the shared checks: `Runner.layer` asks them for it.
   const bare = { ...testOps() };
   delete bare.refuses;
-  assert.match(refusedBy(bare, { ...task, config: { tools: ['Read,Grep'] } }) ?? '', /^`tools: \["Read,Grep"\]` is not a list of tool names\./);
+  assert.match(
+    refusedBy(bare, { ...task, config: { tools: ['Read,Grep'] } }) ?? '',
+    /^`tools: \["Read,Grep"\]` is not a list of tool names\./,
+  );
 });
 
 test("a composite asks the task's own harness, as a spawn is sent", () => {
@@ -182,7 +237,12 @@ const filedOver = async (runner: Layer.Layer<Runner>, spec: Filing) => {
 
 test('the SDK runner is made a Runner by Runner.layer, so it refuses the shared checks as every runner does', () => {
   // It was built with `Layer.succeed(Runner)(Runner.of(…))`, and so asked nothing: its `refuses` was undefined.
-  const refuses = (t: Asked) => Effect.runSync(Effect.gen(function* () { return (yield* Runner).refuses?.(t); }).pipe(Effect.provide(sdkRunner())));
+  const refuses = (t: Asked) =>
+    Effect.runSync(
+      Effect.gen(function* () {
+        return (yield* Runner).refuses?.(t);
+      }).pipe(Effect.provide(sdkRunner())),
+    );
   for (const [bad, says] of UNUSABLE) assert.match(refuses({ ...task, ...bad } as never) ?? '', says, JSON.stringify(bad));
   assert.equal(refuses({ ...task, config: { model: 'opus' } }), undefined);
 });

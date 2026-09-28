@@ -1,6 +1,15 @@
 /** A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them. */
 import { endWords, type RetryAsk } from 'agent-orchestrator';
-import { answerOf, declaredOutput, type EarlierTry, parseCloseout, roundIn, type Run, type StepRecord, tryNote } from 'agent-orchestrator/run';
+import {
+  answerOf,
+  declaredOutput,
+  type EarlierTry,
+  parseCloseout,
+  roundIn,
+  type Run,
+  type StepRecord,
+  tryNote,
+} from 'agent-orchestrator/run';
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
 import { artifactOf, type StepArtifact } from './artifacts.ts';
 import { wordOf } from './judged.ts';
@@ -97,7 +106,14 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
  * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
  * try that gave none, and for one whose closeout could not be read, which `unreadableIn` answers for.
  */
-export function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views, turn?: number): StepCloseout | null {
+export function closeoutIn(
+  run: Run,
+  name: string,
+  step: Workflow,
+  taskId: string | null,
+  views: Views,
+  turn?: number,
+): StepCloseout | null {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
@@ -159,7 +175,8 @@ export function triesOf(
   // The step's record as it stood on its n-th try: the tries behind that one.
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   // What a person said to the n-th try, asked of the record as it stood then: `answerOf` reads a step's current try.
-  const answerAt = (n: number): string | null => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
+  const answerAt = (n: number): string | null =>
+    answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
   // How the n-th try was reached, as `wf ls` words it for a record on that try — `answered`, when a person answered it.
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
   return [

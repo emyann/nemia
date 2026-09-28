@@ -37,9 +37,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A time measured on a machine is a floor, never a ceiling.** `meter-store.test.ts` spun 30 ms in its fake and wanted the runtime's
   share under 30: a process parked for 21 ms after the spin failed it at 30.8. Assert what a meter moves as an identity — the phases
   add up to no more than the pass — and force the park with a load hook that adds the time after the spin (same run).
-- `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
-  biome, on purpose, until one replaces more code than it adds.
-- Run both before you commit. Green is the floor, not the bar: a change that makes the suite
+- `npm run typecheck` — `tsc --noEmit` per package.
+- `npm run lint` — oxlint (`.oxlintrc.json`: its correctness rules, type-aware, React's and jsx-a11y's, and the suspicious rules that find
+  a bug) and `oxfmt --check` (`.oxfmtrc.json`: width 140, code only, never markdown or JSON). `npm run format` writes the layout; run it
+  before you commit, since a check refuses a file it would move. Every shipped `check:` runs `npm run lint` after the types. A rule turned
+  off, or a line allowed with `oxlint-disable-next-line`, says why beside it. `.git-blame-ignore-revs` lists the commit that formatted the
+  code: `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone (chosen with the owner, rule by rule, on 2026-09-28).
+- Run all three before you commit. Green is the floor, not the bar: a change that makes the suite
   pass by weakening a test is a finding to report, not a fix.
 - **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)
   though three tests pin those folders: the round trip in `agent-orchestrator/test/workflow.test.ts`, the package's `ui`
@@ -95,7 +99,8 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   `240-capabilities.ts` as the last page and `250` as the number two runs would both take, so the page after it failed before a browser
   opened. It reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
-  pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
+  pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => e.message.startsWith('…'))`,
+  since `npm run lint` refuses an anchored literal regex where `startsWith` says it: `unicorn/prefer-string-starts-ends-with`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
 - **A `check:` line tells the run's check from a hand run by `WF_BASE_REF`, never by `WF_STEP`.** The run sets `WF_BASE_REF` on
   every check it executes in a step's worktree of a git run. A ship's `check:` is its implement's line, and the run executes it on the
@@ -103,6 +108,17 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   the line reads what the merge brings and the e2e runs there once. The shipped lines read what was touched and hold the e2e for the
   merged tree on that one variable, and a line keyed that way runs the whole of itself wherever the run's environment is missing (`web-check.test.ts`
   runs each both ways; learned by the run that took the e2e out of the rounds).
+- **A check the run executes inherits the daemon's environment, so a test that reads a `WF_` default passes there and fails by hand.**
+  `wf up` on the owner's machine runs with `WF_MAX_CONCURRENT=50`, and every check a step's run files is its child: `remote-left-out.test.ts`
+  deleted `WF_MAX_RUNS` and left the ceiling to the environment, and at the default of two its second case queued a step never admitted,
+  failing every `npm test` typed by hand since stage 6 part 2 while every run's check passed. A test that depends on a ceiling sets it itself,
+  and is run once with the variable unset and once set low (learned by the run that installed oxlint).
+- **A type-aware lint fix trusts the type, and a guard exists because a caller does not.** `oxlint --fix` for
+  `no-unnecessary-boolean-literal-compare` turned `spec.holdOpen !== true` into `!spec.holdOpen`, and the runtime filed a task with
+  `holdOpen: 'yes'`; its refusal test caught it. A value from a board page, a journal, a driver's report or JSON is typed as it should be and
+  arrives as it is, so a comparison with `true`, a `String()` or a `typeof` there is the guard, whatever the rule says it narrows. Such rules
+  are off in `.oxlintrc.json`, each with its reason; read every line a `--fix` changes in `src` before you keep it, and split words a test must
+  not contain (`${'tmp'}dir`) survive only with their `oxlint-disable-next-line` (learned by the same run).
 - **A check the run files starts at low priority; what a session runs itself does not.** `CHECK.command` in
   `agent-orchestrator/src/check.ts` wraps it in `nice -n 10` (`CHECK_NICENESS`), and `checkScript`'s first line puts its shell in
   the idle IO class where `ionice` exists and is allowed, so a machine without it still runs the check. On 2026-09-24 several runs'

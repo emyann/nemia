@@ -66,8 +66,8 @@ test('engine.ts hands the whole config to every spawn, so a runner is given what
   // The other half of passing it on: were the spawn to drop it, no read would show, and every harness would run bare. A
   // turn's own (an answer's `config`) is laid over it by `configForTurn`, in `harness-args.ts`, never here.
   const code = codeOf(fs.readFileSync('src/engine.ts', 'utf8'));
-  assert.match(code, /runner\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s);
-  assert.match(code, /runner\.release\(session, state\.config\b/);
+  assert.match(code, /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s);
+  assert.match(code, /runner\s*\.release\(\s*session,\s*state\.config\b/);
 });
 
 test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness argument, and a spend is a fact they carry', () => {
@@ -76,7 +76,9 @@ test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness
   // one that names no harness argument (`limit === 'budget'`).
   const BUDGET = /budget/i;
   for (const file of CORE) {
-    const lines = codeOf(fs.readFileSync(file, 'utf8')).split('\n').flatMap((line, i) => (BUDGET.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+    const lines = codeOf(fs.readFileSync(file, 'utf8'))
+      .split('\n')
+      .flatMap((line, i) => (BUDGET.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
     assert.deepEqual(lines, [], `${file} judges a budget`);
   }
   for (const line of ["if (sighting.limit === 'budget') return settle('failed');", 'budgetSpent?: boolean;', "reason: 'budget',"]) {

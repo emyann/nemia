@@ -28,10 +28,18 @@ import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type
 const board = (spawnFails?: Error) => {
   const tasks = new Map<string, Event[]>();
   const journal: PromiseJournal = {
-    async append(taskId, event) { tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); },
-    async read(taskId) { return [...(tasks.get(taskId) ?? [])]; },
-    async list() { return [...tasks.keys()].sort(); },
-    async feed() { return { entries: [], cursor: 0 }; },
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+    },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed() {
+      return { entries: [], cursor: 0 };
+    },
   };
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, unknown]> = [];
@@ -43,12 +51,16 @@ const board = (spawnFails?: Error) => {
       const id = `s-${++n}`;
       sessions.set(r.name, { sessionId: id, state: 'working', busy: true, nativeId: id });
     },
-    async observe() { return new Map(sessions); },
+    async observe() {
+      return new Map(sessions);
+    },
     async stop(sessionId) {
       asked.push(['stop', sessionId]);
       for (const [name, s] of sessions) if (s.sessionId === sessionId) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
-    async logs() { return ''; },
+    async logs() {
+      return '';
+    },
   };
   const engine = createEngine({ journal, harnesses: { fake } });
   /** The journal of `id`, its times masked. */
@@ -57,20 +69,36 @@ const board = (spawnFails?: Error) => {
 };
 
 const filing = {
-  id: 't-words', brief: 'write the words down', cwd: '/repo', harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, closeoutSchema: { type: 'object' },
+  id: 't-words',
+  brief: 'write the words down',
+  cwd: '/repo',
+  harness: 'fake',
+  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] },
+  closeoutSchema: { type: 'object' },
 };
 
 const spawnAsked = {
-  name: 'ae/t-words/1', brief: 'write the words down', cwd: '/repo', harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, closeoutSchema: { type: 'object' },
+  name: 'ae/t-words/1',
+  brief: 'write the words down',
+  cwd: '/repo',
+  harness: 'fake',
+  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] },
+  closeoutSchema: { type: 'object' },
   resumeFrom: undefined,
 };
 
 const filed = {
-  kind: 'filed', at: '<at>', brief: 'write the words down', cwd: '/repo', harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] }, deadlineSeconds: undefined,
-  resumeFrom: undefined, closeoutSchema: { type: 'object' }, holdOpen: undefined, queued: false,
+  kind: 'filed',
+  at: '<at>',
+  brief: 'write the words down',
+  cwd: '/repo',
+  harness: 'fake',
+  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'] },
+  deadlineSeconds: undefined,
+  resumeFrom: undefined,
+  closeoutSchema: { type: 'object' },
+  holdOpen: undefined,
+  queued: false,
 };
 
 test('a session that signs off: spawned, ended with its statement and usage, settled succeeded', async () => {
@@ -79,7 +107,9 @@ test('a session that signs off: spawned, ended with its statement and usage, set
   await b.engine.tick();
   const name = 'ae/t-words/1';
   b.sessions.set(name, {
-    ...b.sessions.get(name)!, state: 'completed', busy: false,
+    ...b.sessions.get(name)!,
+    state: 'completed',
+    busy: false,
     closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: Date.now() + 60_000 },
     usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
   });
@@ -88,14 +118,27 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     filed,
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
-    { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
-      closeout: { outcome: 'done', summary: 'wrote them' }, stated: true, usage: { turns: 3, outputTokens: 120, costUsd: 0.25 }, exitCode: undefined, denials: undefined, limit: undefined },
+    {
+      kind: 'ended',
+      at: '<at>',
+      attempt: 1,
+      sessionId: 's-1',
+      observed: 'done',
+      reason: 'harness',
+      nativeId: 's-1',
+      closeout: { outcome: 'done', summary: 'wrote them' },
+      stated: true,
+      usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
+      exitCode: undefined,
+      denials: undefined,
+      limit: undefined,
+    },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
 });
 
-test('a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above\'s — and an end without the key folds the same', async () => {
+test("a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above's — and an end without the key folds the same", async () => {
   const b = board();
   const id = await b.engine.file(filing);
   await b.engine.tick();
@@ -106,8 +149,21 @@ test('a session that ends with no statement where one was asked: ended as its ha
     filed,
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
-    { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness', nativeId: 's-1',
-      closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined },
+    {
+      kind: 'ended',
+      at: '<at>',
+      attempt: 1,
+      sessionId: 's-1',
+      observed: 'done',
+      reason: 'harness',
+      nativeId: 's-1',
+      closeout: undefined,
+      stated: false,
+      usage: undefined,
+      exitCode: undefined,
+      denials: undefined,
+      limit: undefined,
+    },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged');
@@ -126,8 +182,15 @@ test('a spawn the harness refused: the attempt ends unstartable in its words, an
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'ended', at: '<at>', attempt: 1, sessionId: '(never started)', observed: 'failed', reason: 'unstartable',
-      error: 'fake: no binary called `fake` on PATH' },
+    {
+      kind: 'ended',
+      at: '<at>',
+      attempt: 1,
+      sessionId: '(never started)',
+      observed: 'failed',
+      reason: 'unstartable',
+      error: 'fake: no binary called `fake` on PATH',
+    },
     { kind: 'settled', at: '<at>', outcome: 'failed', note: '1 attempt(s), none succeeded' },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
@@ -160,11 +223,26 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', attempt: 1 },
     { kind: 'stop-requested', at: '<at>' },
-    { kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'stopped', reason: 'operator', nativeId: 's-1',
-      closeout: undefined, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined },
+    {
+      kind: 'ended',
+      at: '<at>',
+      attempt: 1,
+      sessionId: 's-1',
+      observed: 'stopped',
+      reason: 'operator',
+      nativeId: 's-1',
+      closeout: undefined,
+      usage: undefined,
+      exitCode: undefined,
+      denials: undefined,
+      limit: undefined,
+    },
     { kind: 'settled', at: '<at>', outcome: 'stopped', note: 'operator' },
   ]);
-  assert.deepEqual(b.asked, [['spawn', spawnAsked], ['stop', 's-1']]);
+  assert.deepEqual(b.asked, [
+    ['spawn', spawnAsked],
+    ['stop', 's-1'],
+  ]);
 });
 
 test('what the harness denied the session is written on its end, as it said it, and an end written before the key folds the same', async () => {
@@ -177,8 +255,19 @@ test('what the harness denied the session is written on its end, as it said it, 
   await b.engine.tick();
   const ended = (await b.record(id)).find((e) => e.kind === 'ended');
   assert.deepEqual(ended, {
-    kind: 'ended', at: '<at>', attempt: 1, sessionId: 's-1', observed: 'failed', reason: 'harness', nativeId: 's-1',
-    closeout: undefined, stated: false, usage: undefined, exitCode: undefined, denials, limit: undefined,
+    kind: 'ended',
+    at: '<at>',
+    attempt: 1,
+    sessionId: 's-1',
+    observed: 'failed',
+    reason: 'harness',
+    nativeId: 's-1',
+    closeout: undefined,
+    stated: false,
+    usage: undefined,
+    exitCode: undefined,
+    denials,
+    limit: undefined,
   });
   assert.deepEqual((await b.engine.view(id)).state.attempts[0]?.denials, denials);
 
@@ -196,10 +285,13 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   const b = board();
   const id = await b.engine.file({ ...filing, holdOpen: true });
   await b.engine.tick();
-  const sign = (n: number, summary: string) => b.sessions.set(`ae/t-words/${n}`, {
-    ...b.sessions.get(`ae/t-words/${n}`)!, state: 'completed', busy: false,
-    closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
-  });
+  const sign = (n: number, summary: string) =>
+    b.sessions.set(`ae/t-words/${n}`, {
+      ...b.sessions.get(`ae/t-words/${n}`)!,
+      state: 'completed',
+      busy: false,
+      closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
+    });
   sign(1, 'a first draft');
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'input-required');
@@ -209,8 +301,21 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   await b.engine.tick();
   await b.engine.close(id);
   await b.engine.tick();
-  const ended = (n: number, summary: string) => ({ kind: 'ended', at: '<at>', attempt: n, sessionId: `s-${n}`, observed: 'done', reason: 'harness',
-    nativeId: `s-${n}`, closeout: { outcome: 'done', summary }, stated: true, usage: undefined, exitCode: undefined, denials: undefined, limit: undefined });
+  const ended = (n: number, summary: string) => ({
+    kind: 'ended',
+    at: '<at>',
+    attempt: n,
+    sessionId: `s-${n}`,
+    observed: 'done',
+    reason: 'harness',
+    nativeId: `s-${n}`,
+    closeout: { outcome: 'done', summary },
+    stated: true,
+    usage: undefined,
+    exitCode: undefined,
+    denials: undefined,
+    limit: undefined,
+  });
   assert.deepEqual(await b.record(id), [
     { ...filed, holdOpen: true },
     { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
@@ -225,7 +330,16 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   ]);
   assert.deepEqual(b.asked, [
     ['spawn', spawnAsked],
-    ['spawn', { ...spawnAsked, name: 'ae/t-words/2', brief: 'shorter, please', resumeFrom: 's-1', config: { ...spawnAsked.config, budgetUsd: 0.5 } }],
+    [
+      'spawn',
+      {
+        ...spawnAsked,
+        name: 'ae/t-words/2',
+        brief: 'shorter, please',
+        resumeFrom: 's-1',
+        config: { ...spawnAsked.config, budgetUsd: 0.5 },
+      },
+    ],
   ]);
 });
 

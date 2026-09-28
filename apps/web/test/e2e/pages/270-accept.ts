@@ -18,7 +18,8 @@ export default {
     const { id, exhausted: step } = LOOPING;
     const asks = path.join(store!, 'runs', `${id}.asks`);
     const recordFile = path.join(store!, 'runs', `${id}.json`);
-    if (fs.existsSync(asks)) throw new Refused(`the store is as seeded before the page presses anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
+    if (fs.existsSync(asks))
+      throw new Refused(`the store is as seeded before the page presses anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
     const seededRecord = fs.readFileSync(recordFile, 'utf8');
     const decide = page.locator('section[aria-label="Decide"]');
     const row = decide.locator('[data-command="accept"]');
@@ -32,7 +33,10 @@ export default {
 
     // The command to copy, as `wf decide` prints it, and beside it the box and the button: the button waits for a reason, as the CLI waits for
     // `--message`.
-    await expectVisible(row.locator('code', { hasText: `wf accept ${id} ${step} --message "<why>"` }), `the Decide section offers wf accept ${id} ${step} to copy`);
+    await expectVisible(
+      row.locator('code', { hasText: `wf accept ${id} ${step} --message "<why>"` }),
+      `the Decide section offers wf accept ${id} ${step} to copy`,
+    );
     await expectVisible(reason, `a box for why ${step}'s work is good enough as it stands`);
     if (await press.isEnabled()) throw new Refused('Accept as it stands is disabled while there is no reason — it was enabled with none');
     await reason.fill('   ');
@@ -46,20 +50,31 @@ export default {
       r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${step}/accept`;
     try {
       const [response] = await Promise.all([page.waitForResponse(accepted, { timeout: WAIT_MS }), press.click()]);
-      if (response.status() !== 202) throw new Refused(`the api takes the acceptance, through the board's proxy — it answered ${response.status()}: ${await response.text()}`);
+      if (response.status() !== 202)
+        throw new Refused(
+          `the api takes the acceptance, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
+        );
       const took = (await response.json()) as { step?: unknown; try?: unknown; at?: unknown; message?: unknown; file?: unknown };
       const file = path.join(asks, `accept-${step}-3`);
       if (took.step !== step || took.try !== 3 || typeof took.at !== 'string' || took.message !== message || took.file !== file) {
-        throw new Refused(`the api answers with the step, the try accepted, when, the words and the acceptance's file — it answered ${JSON.stringify(took)}`);
+        throw new Refused(
+          `the api answers with the step, the try accepted, when, the words and the acceptance's file — it answered ${JSON.stringify(took)}`,
+        );
       }
       const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
       if (JSON.stringify(written) !== JSON.stringify({ step, try: 3, at: took.at, message }) || fs.readdirSync(asks).length !== 1) {
-        throw new Refused(`the acceptance is written as wf accept writes it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`);
+        throw new Refused(
+          `the acceptance is written as wf accept writes it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
+        );
       }
-      if (fs.readFileSync(recordFile, 'utf8') !== seededRecord) throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
+      if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)
+        throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
 
       // The run moves once it is read again: the loop is over on the person's word, and nobody is waited on for it.
-      await expectVisible(section.locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }), `${step}'s note says it was accepted as it stands, as wf ls says it`);
+      await expectVisible(
+        section.locator('[data-note]', { hasText: `accepted as it stands at ${took.at}, its findings open` }),
+        `${step}'s note says it was accepted as it stands, as wf ls says it`,
+      );
       await expectCount(chip, 0, `${step} no longer reads rounds exhausted`);
       await expectCount(waiting, 0, `the run's page no longer says ${step} is waiting on you`);
       await expectCount(row, 0, 'and the Decide section offers wf accept no more');

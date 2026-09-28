@@ -27,7 +27,11 @@ const { engine, readRun, start, tick } = await import('../src/runner.ts');
 const { freshRestMemo } = await import('../src/tick.ts');
 
 const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd: repo,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 
 const REPO = scratch('wf-agents-calls-repo-');
 git(REPO, 'init', '-q');
@@ -48,7 +52,9 @@ const fakes = () => {
   const ended = path.join(bin, 'ended');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(counter, '');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = () => JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -71,7 +77,9 @@ if (args[0] === 'agents') {
   const wait = () => (fs.existsSync(${JSON.stringify(ended)}) ? process.exit(0) : setTimeout(wait, 50));
   wait();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   process.env.PATH = `${bin}:${process.env.PATH}`;
   return {
     agentsCalls: () => fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean).length,
@@ -116,7 +124,11 @@ test('a pass with claude jobs in flight and no background session asks `claude a
   await atWork(jobRun.id);
   const { calls, done } = await counted();
   assert.equal(calls, 0, 'no `claude agents` for a pass whose claude sessions are all jobs');
-  assert.deepEqual([advanced(done, jobRun.id)?.status, advanced(done, jobRun.id)?.inFlight], ['running', true], 'and the job run is in flight, its step read');
+  assert.deepEqual(
+    [advanced(done, jobRun.id)?.status, advanced(done, jobRun.id)?.inFlight],
+    ['running', true],
+    'and the job run is in flight, its step read',
+  );
   assert.equal(done.cost?.harnesses.claude?.calls, 1, 'claude observed once, its jobs off their run files');
   assert.equal(done.cost?.harnesses.claude?.spawned, 0, 'the meter says the same: no process to observe claude');
 });
@@ -125,8 +137,13 @@ test('a pass with one background session in flight asks `claude agents` once, be
   bgRun = start({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') });
   const bg = await atWork(bgRun.id);
   const { calls, done } = await counted();
-  assert.equal(calls, 1, 'one `claude agents` for the runtime\'s observe, and none for the step advance reads');
-  for (const run of [jobRun, bgRun]) assert.deepEqual([advanced(done, run.id)?.status, advanced(done, run.id)?.inFlight], ['running', true], 'both runs in flight, each step read');
+  assert.equal(calls, 1, "one `claude agents` for the runtime's observe, and none for the step advance reads");
+  for (const run of [jobRun, bgRun])
+    assert.deepEqual(
+      [advanced(done, run.id)?.status, advanced(done, run.id)?.inFlight],
+      ['running', true],
+      'both runs in flight, each step read',
+    );
   assert.equal(done.cost?.harnesses.claude?.spawned, 1);
   assert.equal((await e.view(bg)).phase, 'running (working)');
 });

@@ -9,11 +9,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spentAcceptances, spentApprovals, spentRoundAsks, type Acceptance, type Approval, type Hold, type Pruned, type RoundAsk, type Run } from './run.ts';
+import {
+  spentAcceptances,
+  spentApprovals,
+  spentRoundAsks,
+  type Acceptance,
+  type Approval,
+  type Hold,
+  type Pruned,
+  type RoundAsk,
+  type Run,
+} from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
 import { asNamed, asRan, orderSteps, splitFrontmatter, withFormerNames, type SkillsFound, type Workflow } from './workflow.ts';
 import { loadWorkflows, preloads } from './workflow-store.ts';
-import { noCodingStyle, NO_CODING_STYLE, pluginManifest, pluginOf, PROMPT_FILE, renderedPrompt, rendersAgent, type SkillAgain } from './rendering.ts';
+import {
+  noCodingStyle,
+  NO_CODING_STYLE,
+  pluginManifest,
+  pluginOf,
+  PROMPT_FILE,
+  renderedPrompt,
+  rendersAgent,
+  type SkillAgain,
+} from './rendering.ts';
 import { inputsRoot } from './places.ts';
 import { countRecord, readText, within } from './tally.ts';
 
@@ -55,14 +74,25 @@ export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 /** The prune marker, read: undefined for a run never pruned, and for a marker that no longer reads as one, whose run is taken as pruned all the same. */
 function readPruned(id: string): Pruned | undefined {
   let text: string;
-  try { text = readText(pruneFile(id)); } catch { return undefined; }
+  try {
+    text = readText(pruneFile(id));
+  } catch {
+    return undefined;
+  }
   try {
     const { at, worktrees, artifacts } = JSON.parse(text) as Partial<Pruned>;
     return {
       at: typeof at === 'string' ? at : '',
       worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [],
       // Its files too (`wf prune --artifacts`), when the marker says so: a field that no longer reads says they went, at a time it does not say.
-      ...(artifacts === undefined ? {} : { artifacts: { at: typeof artifacts?.at === 'string' ? artifacts.at : '', bytes: typeof artifacts?.bytes === 'number' ? artifacts.bytes : 0 } }),
+      ...(artifacts === undefined
+        ? {}
+        : {
+            artifacts: {
+              at: typeof artifacts?.at === 'string' ? artifacts.at : '',
+              bytes: typeof artifacts?.bytes === 'number' ? artifacts.bytes : 0,
+            },
+          }),
     };
   } catch {
     return { at: '', worktrees: [] };
@@ -82,10 +112,17 @@ export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
  */
 function readHold(id: string): Hold | undefined {
   let text: string;
-  try { text = readText(holdFile(id)); } catch { return undefined; }
+  try {
+    text = readText(holdFile(id));
+  } catch {
+    return undefined;
+  }
   try {
     const { at, until } = JSON.parse(text) as Partial<Hold>;
-    return { at: typeof at === 'string' ? at : '', until: Array.isArray(until) ? until.filter((u): u is string => typeof u === 'string') : [] };
+    return {
+      at: typeof at === 'string' ? at : '',
+      until: Array.isArray(until) ? until.filter((u): u is string => typeof u === 'string') : [],
+    };
   } catch {
     return { at: '', until: [] };
   }
@@ -146,8 +183,12 @@ const readRecord = (id: string): Run => {
   const { approvals } = readApprovals(id);
   const { acceptances } = readAcceptances(id);
   return {
-    ...run, ...(at ? { cancelledAt: at } : {}), ...(pruned ? { pruned } : {}), ...(hold ? { hold } : {}),
-    ...(approvals.length ? { approvals } : {}), ...(acceptances.length ? { acceptances } : {}),
+    ...run,
+    ...(at ? { cancelledAt: at } : {}),
+    ...(pruned ? { pruned } : {}),
+    ...(hold ? { hold } : {}),
+    ...(approvals.length ? { approvals } : {}),
+    ...(acceptances.length ? { acceptances } : {}),
   };
 };
 
@@ -214,8 +255,14 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
   const notes: string[] = [];
   let names: string[];
   try {
-    names = fs.readdirSync(asksDir(id), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
-  } catch { return { approvals, notes }; }
+    names = fs
+      .readdirSync(asksDir(id), { withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => d.name)
+      .sort();
+  } catch {
+    return { approvals, notes };
+  }
   for (const name of names) {
     const approved = /^approve-(.+)-(\d+)$/.exec(name);
     if (!approved) continue;
@@ -230,7 +277,11 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
 export function approvalIn(file: string, step: string, n: number): Approval | string {
   let held: unknown;
-  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try {
+    held = JSON.parse(readText(file));
+  } catch (err) {
+    return `unreadable (${(err as Error).message})`;
+  }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an approval wf approve wrote';
   const { at, message } = held as Record<string, unknown>;
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
@@ -249,8 +300,14 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
   const notes: string[] = [];
   let names: string[];
   try {
-    names = fs.readdirSync(asksDir(id), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
-  } catch { return { acceptances, notes }; }
+    names = fs
+      .readdirSync(asksDir(id), { withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => d.name)
+      .sort();
+  } catch {
+    return { acceptances, notes };
+  }
   for (const name of names) {
     const took = /^accept-(.+)-(\d+)$/.exec(name);
     if (!took) continue;
@@ -269,7 +326,11 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
   let held: unknown;
-  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try {
+    held = JSON.parse(readText(file));
+  } catch (err) {
+    return `unreadable (${(err as Error).message})`;
+  }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an acceptance wf accept wrote';
   const { at, message } = held as Record<string, unknown>;
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return 'it says no time it was given';
@@ -289,8 +350,14 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
   const notes: string[] = [];
   let names: string[];
   try {
-    names = fs.readdirSync(asksDir(id), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
-  } catch { return { asks, rounds, notes }; }
+    names = fs
+      .readdirSync(asksDir(id), { withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => d.name)
+      .sort();
+  } catch {
+    return { asks, rounds, notes };
+  }
   // An approval opens a gate, read with the run (`readRun`); one that cannot be read is said on the pass, as an ask is. An acceptance
   // ends a loop the same way, and is said the same way.
   notes.push(...readApprovals(id).notes, ...readAcceptances(id).notes);
@@ -315,7 +382,11 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
 /** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
 export function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
   let held: unknown;
-  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try {
+    held = JSON.parse(readText(file));
+  } catch (err) {
+    return `unreadable (${(err as Error).message})`;
+  }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an ask wf round wrote';
   const { at, budget } = held as Record<string, unknown>;
   if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
@@ -332,7 +403,11 @@ const isDollars = (v: unknown): v is number => typeof v === 'number' && Number.i
  */
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   let held: unknown;
-  try { held = JSON.parse(readText(file)); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  try {
+    held = JSON.parse(readText(file));
+  } catch (err) {
+    return `unreadable (${(err as Error).message})`;
+  }
   const { mode, model, message, budget, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
   if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
   if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
@@ -342,8 +417,13 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
   if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
   if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
   return {
-    step, try: n, mode, ...(model ? { model: model as string } : {}), ...(typeof message === 'string' ? { message } : {}),
-    ...(isDollars(budget) ? { budget } : {}), at: typeof at === 'string' ? at : '',
+    step,
+    try: n,
+    mode,
+    ...(model ? { model: model as string } : {}),
+    ...(typeof message === 'string' ? { message } : {}),
+    ...(isDollars(budget) ? { budget } : {}),
+    at: typeof at === 'string' ? at : '',
   };
 }
 
@@ -361,8 +441,14 @@ function readAnswersNow(id: string): RetryAsk[] {
   for (const dir of [asksDir(id), path.join(asksDir(id), 'done')]) {
     let names: string[];
     try {
-      names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
-    } catch { continue; }
+      names = fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((d) => d.isFile())
+        .map((d) => d.name)
+        .sort();
+    } catch {
+      continue;
+    }
     for (const name of names) {
       const tried = /^retry-(.+)-(\d+)$/.exec(name);
       const ask = tried ? askIn(path.join(dir, name), tried[1]!, Number(tried[2])) : undefined;
@@ -410,24 +496,38 @@ function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundA
   for (const file of spent) {
     const done = path.join(asksDir(run.id), 'done', path.basename(file));
     // Not `recursive`: `done/` is made inside the run's asks directory, never the directory itself, which `wf rm` may have removed mid-pass.
-    try { fs.mkdirSync(path.dirname(done)); } catch { /* there already — or gone, with its run */ }
-    try { fs.renameSync(file, done); } catch { /* already moved, by a pass beside this one — or removed, with its run */ }
+    try {
+      fs.mkdirSync(path.dirname(done));
+    } catch {
+      /* there already — or gone, with its run */
+    }
+    try {
+      fs.renameSync(file, done);
+    } catch {
+      /* already moved, by a pass beside this one — or removed, with its run */
+    }
   }
 }
 
 /** Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass. */
-export const listRuns = (): Run[] => within('records', () =>
-  fs.existsSync(runsDir())
-    ? fs.readdirSync(runsDir()).filter((f) => f.endsWith('.json')).flatMap((f) => {
-      const id = path.basename(f, '.json');
-      try {
-        return [readRun(id)];
-      } catch (err) {
-        if (fs.existsSync(runFile(id))) throw err;
-        return [];
-      }
-    }).sort((a, b) => a.id.localeCompare(b.id))
-    : []);
+export const listRuns = (): Run[] =>
+  within('records', () =>
+    fs.existsSync(runsDir())
+      ? fs
+          .readdirSync(runsDir())
+          .filter((f) => f.endsWith('.json'))
+          .flatMap((f) => {
+            const id = path.basename(f, '.json');
+            try {
+              return [readRun(id)];
+            } catch (err) {
+              if (fs.existsSync(runFile(id))) throw err;
+              return [];
+            }
+          })
+          .sort((a, b) => a.id.localeCompare(b.id))
+      : [],
+  );
 
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
@@ -439,29 +539,38 @@ export const listRuns = (): Run[] => within('records', () =>
  *
  * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
  */
-export const restStamps = (): Map<string, string> => within('records', () => {
-  const stamps = new Map<string, string[]>();
-  let names: string[];
-  try { names = fs.readdirSync(runsDir()); } catch { return new Map(); }
-  const stat = (at: string, depth: number): string => {
-    const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
-    if (!s) return 'gone';
-    const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
-    if (!s.isDirectory() || depth > 1) return own;
-    let inside: string[];
-    try { inside = fs.readdirSync(at).sort(); } catch { return `${own}:gone`; }
-    return `${own}[${inside.map((n) => `${n}=${stat(path.join(at, n), depth + 1)}`).join(',')}]`;
-  };
-  for (const name of names.sort()) {
-    const dot = name.indexOf('.');
-    if (dot <= 0) continue;
-    const id = name.slice(0, dot);
-    const parts = stamps.get(id) ?? [];
-    stamps.set(id, parts);
-    parts.push(`${name}=${stat(path.join(runsDir(), name), 0)}`);
-  }
-  return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
-});
+export const restStamps = (): Map<string, string> =>
+  within('records', () => {
+    const stamps = new Map<string, string[]>();
+    let names: string[];
+    try {
+      names = fs.readdirSync(runsDir());
+    } catch {
+      return new Map();
+    }
+    const stat = (at: string, depth: number): string => {
+      const s = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
+      if (!s) return 'gone';
+      const own = `${s.ino}:${s.size}:${s.mtimeNs}`;
+      if (!s.isDirectory() || depth > 1) return own;
+      let inside: string[];
+      try {
+        inside = fs.readdirSync(at).sort();
+      } catch {
+        return `${own}:gone`;
+      }
+      return `${own}[${inside.map((n) => `${n}=${stat(path.join(at, n), depth + 1)}`).join(',')}]`;
+    };
+    for (const name of names.sort()) {
+      const dot = name.indexOf('.');
+      if (dot <= 0) continue;
+      const id = name.slice(0, dot);
+      const parts = stamps.get(id) ?? [];
+      stamps.set(id, parts);
+      parts.push(`${name}=${stat(path.join(runsDir(), name), 0)}`);
+    }
+    return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
+  });
 
 /**
  * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
@@ -552,9 +661,14 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
     fs.mkdirSync(dir, { recursive: true });
     const told = (agent.skills ?? []).map((name) => {
       const from = skills.at.get(name);
-      if (typeof from !== 'string') throw new Error(`${step.name}: the skill ${name} of ${agent.name} is not where the load found it${from ? ` — ${from.message}` : ''}.`);
+      if (typeof from !== 'string')
+        throw new Error(
+          `${step.name}: the skill ${name} of ${agent.name} is not where the load found it${from ? ` — ${from.message}` : ''}.`,
+        );
       fs.cpSync(from, path.join(plugin, 'skills', name), { recursive: true, dereference: true });
-      return preloads(from) ? { name, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body } : { name };
+      return preloads(from)
+        ? { name, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body }
+        : { name };
     });
     if (told.length || agent.systemPrompt === 'no-coding') {
       fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
@@ -597,6 +711,11 @@ export const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { th
  * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
  */
 export const runId = (brief: string): string => {
-  const slug = brief.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28).replace(/-$/, '');
+  const slug = brief
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 28)
+    .replace(/-$/, '');
   return `${slug || 'run'}-${Math.random().toString(36).slice(2, 6)}`;
 };

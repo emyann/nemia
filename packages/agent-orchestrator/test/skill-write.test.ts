@@ -33,16 +33,19 @@ const DRAFT: SkillDraft = {
 /** Every file under `dir`, by its path in it, with what it holds. */
 function snapshot(dir: string): Record<string, string> {
   if (!fs.existsSync(dir)) return {};
-  return Object.fromEntries((fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
-    .filter((e) => e.isFile() || e.isSymbolicLink())
-    .map((e) => {
-      const at = path.join(e.parentPath, e.name);
-      return [path.relative(dir, at), e.isSymbolicLink() ? `-> ${fs.readlinkSync(at)}` : fs.readFileSync(at, 'utf8')];
-    }));
+  return Object.fromEntries(
+    (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+      .filter((e) => e.isFile() || e.isSymbolicLink())
+      .map((e) => {
+        const at = path.join(e.parentPath, e.name);
+        return [path.relative(dir, at), e.isSymbolicLink() ? `-> ${fs.readlinkSync(at)}` : fs.readFileSync(at, 'utf8')];
+      }),
+  );
 }
 
 /** Every hidden file or folder anywhere under `dir`: what a write that failed part-way would leave. */
-const hidden = (dir: string): string[] => (fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).filter((p) => path.basename(p).startsWith('.')) : []);
+const hidden = (dir: string): string[] =>
+  fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).filter((p) => path.basename(p).startsWith('.')) : [];
 
 /** `fn` refused with a `SkillWriteError` of kind `why`, whose message passes `said`, and the library as it was. */
 function refuses(fn: () => unknown, why: string, said: RegExp): void {
@@ -62,25 +65,36 @@ const read = (name: string): string => fs.readFileSync(path.join(LIBRARY, name, 
 
 test('a skill is rendered as HKB ships its own, and read back as it was written, by the card reader and by YAML', () => {
   const text = renderSkill(DRAFT);
-  assert.equal(text, [
-    '---',
-    'name: tidy-notes',
-    'title: "Tidy notes"',
-    'description: "Rewrites a folder of notes: \\"one fact a line\\"."',
-    'tags: ["notes","writing"]',
-    'examples: ["tidy my notes","make these notes one fact a line"]',
-    '---',
-    '# Tidy notes',
-    '',
-    'Read each note, then write it again, one fact a line.',
-    '',
-  ].join('\n'));
+  assert.equal(
+    text,
+    [
+      '---',
+      'name: tidy-notes',
+      'title: "Tidy notes"',
+      'description: "Rewrites a folder of notes: \\"one fact a line\\"."',
+      'tags: ["notes","writing"]',
+      'examples: ["tidy my notes","make these notes one fact a line"]',
+      '---',
+      '# Tidy notes',
+      '',
+      'Read each note, then write it again, one fact a line.',
+      '',
+    ].join('\n'),
+  );
   assert.deepEqual(skillEntryOf('SKILL.md', 'tidy-notes', text), {
-    id: 'tidy-notes', name: 'Tidy notes', description: DRAFT.description, tags: ['notes', 'writing'], examples: DRAFT.examples,
+    id: 'tidy-notes',
+    name: 'Tidy notes',
+    description: DRAFT.description,
+    tags: ['notes', 'writing'],
+    examples: DRAFT.examples,
   });
   const { block } = splitFrontmatter('SKILL.md', text);
   assert.deepEqual(yaml.load(block!), {
-    name: 'tidy-notes', title: 'Tidy notes', description: DRAFT.description, tags: ['notes', 'writing'], examples: DRAFT.examples,
+    name: 'tidy-notes',
+    title: 'Tidy notes',
+    description: DRAFT.description,
+    tags: ['notes', 'writing'],
+    examples: DRAFT.examples,
   });
   assert.deepEqual(skillDraftOf('SKILL.md', 'tidy-notes', text), { ...DRAFT, preload: false });
 });
@@ -88,7 +102,15 @@ test('a skill is rendered as HKB ships its own, and read back as it was written,
 test('a skill given only a description is written with no title, tags or examples, and preload writes its line', () => {
   const text = renderSkill({ name: 'bare', description: 'Does one thing.', body: 'Do it.', preload: true, title: '  ', tags: null });
   assert.equal(text, '---\nname: bare\ndescription: "Does one thing."\npreload: true\n---\nDo it.\n');
-  assert.deepEqual(skillDraftOf('SKILL.md', 'bare', text), { name: 'bare', title: null, description: 'Does one thing.', tags: null, examples: null, preload: true, body: 'Do it.' });
+  assert.deepEqual(skillDraftOf('SKILL.md', 'bare', text), {
+    name: 'bare',
+    title: null,
+    description: 'Does one thing.',
+    tags: null,
+    examples: null,
+    preload: true,
+    body: 'Do it.',
+  });
 });
 
 test('an edit keeps every key the form does not write, line for line, and the preload the file had when the draft says nothing of it', () => {
@@ -128,11 +150,15 @@ test('an edit keeps every key the form does not write, line for line, and the pr
 });
 
 test('a draft the card reader would refuse is refused in its words, and a line break before it can make a line of its own', () => {
-  const refused = (draft: SkillDraft, said: RegExp) => assert.throws(() => renderSkill(draft), (err: unknown) => {
-    assert.ok(err instanceof WorkflowError, String(err));
-    assert.match(err.message, said);
-    return true;
-  });
+  const refused = (draft: SkillDraft, said: RegExp) =>
+    assert.throws(
+      () => renderSkill(draft),
+      (err: unknown) => {
+        assert.ok(err instanceof WorkflowError, String(err));
+        assert.match(err.message, said);
+        return true;
+      },
+    );
   refused({ ...DRAFT, description: '  ' }, /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
   refused({ ...DRAFT, tags: [] }, /`tags` is an empty list, which says as little as none/);
   refused({ ...DRAFT, examples: [' '] }, /`examples` is an empty list/);
@@ -146,19 +172,37 @@ test('withPreload changes that one line, and nothing else of the file', () => {
   const was = '---\nname: x\ndescription: "Does x."\npreload: false\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n';
   const on = withPreload('SKILL.md', was, true);
   assert.equal(on, '---\nname: x\ndescription: "Does x."\nmetadata:\n  a: 1\npreload: true\n---\n\nBody, with its blank line above.\n');
-  assert.equal(withPreload('SKILL.md', on, false), '---\nname: x\ndescription: "Does x."\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n');
-  assert.throws(() => withPreload('SKILL.md', 'no frontmatter', true), (err: Error) => /has no frontmatter, and `preload:` is a line of it/.test(err.message));
+  assert.equal(
+    withPreload('SKILL.md', on, false),
+    '---\nname: x\ndescription: "Does x."\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n',
+  );
+  assert.throws(
+    () => withPreload('SKILL.md', 'no frontmatter', true),
+    (err: Error) => /has no frontmatter, and `preload:` is a line of it/.test(err.message),
+  );
   // A `preload:` the reader finds inside another key's lines is not one a line of its own could change.
-  assert.throws(() => withPreload('SKILL.md', '---\ndescription: d\nmetadata:\n  preload: true\n---\n', false), (err: Error) => /could not be written so it reads false/.test(err.message));
+  assert.throws(
+    () => withPreload('SKILL.md', '---\ndescription: d\nmetadata:\n  preload: true\n---\n', false),
+    (err: Error) => /could not be written so it reads false/.test(err.message),
+  );
 });
 
 test('a skill is made in the library, read by the store, and refused a second time under the same name', () => {
   fresh();
   const made = writeSkill(LIBRARY, DRAFT, { version: null });
-  assert.deepEqual(made, { dir: path.join(LIBRARY, 'tidy-notes'), name: 'tidy-notes', version: skillVersion(path.join(LIBRARY, 'tidy-notes')), written: ['SKILL.md'] });
+  assert.deepEqual(made, {
+    dir: path.join(LIBRARY, 'tidy-notes'),
+    name: 'tidy-notes',
+    version: skillVersion(path.join(LIBRARY, 'tidy-notes')),
+    written: ['SKILL.md'],
+  });
   assert.equal(read('tidy-notes'), renderSkill(DRAFT));
   assert.deepEqual(hidden(LIBRARY), []);
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }), 'exists', /skills\/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it\./);
+  refuses(
+    () => writeSkill(LIBRARY, { ...DRAFT, description: 'Something else.' }, { version: null }),
+    'exists',
+    /skills\/tidy-notes is there already, in .*Give it another name, or open tidy-notes and change it\./,
+  );
 });
 
 test('a name that is not a folder-safe id is refused, and nothing is made', () => {
@@ -181,7 +225,11 @@ test('a frontmatter the card reader refuses is refused, and nothing is made or c
 test('a place that is not a skills folder beside the workflows is refused, and a link is never written through', () => {
   fresh();
   refuses(() => writeSkill(path.join(ROOT, 'workflows', 'elsewhere'), DRAFT, { version: null }), 'refused', /is not a folder of skills/);
-  refuses(() => writeSkill(path.join(scratch('wf-skill-nowhere-'), 'skills'), DRAFT, { version: null }), 'refused', /is not the store's skills\/ .* Write it to one of the two/);
+  refuses(
+    () => writeSkill(path.join(scratch('wf-skill-nowhere-'), 'skills'), DRAFT, { version: null }),
+    'refused',
+    /is not the store's skills\/ .* Write it to one of the two/,
+  );
   const outside = scratch('wf-skill-outside-');
   fs.mkdirSync(LIBRARY, { recursive: true });
   fs.symlinkSync(outside, path.join(LIBRARY, 'linked'));
@@ -195,12 +243,24 @@ test('a change is written at the version it was read at, and refused once the sk
   const changed = writeSkill(LIBRARY, { ...DRAFT, body: 'New body.' }, { version });
   assert.notEqual(changed.version, version);
   assert.match(read('tidy-notes'), /\n---\nNew body\.\n$/);
-  refuses(() => writeSkill(LIBRARY, { ...DRAFT, body: 'Lost.' }, { version }), 'stale', /changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)\. Read it again/);
+  refuses(
+    () => writeSkill(LIBRARY, { ...DRAFT, body: 'Lost.' }, { version }),
+    'stale',
+    /changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)\. Read it again/,
+  );
   // A file added beside SKILL.md moves it too: the version counts the whole folder, as an agent's does.
   fs.writeFileSync(path.join(LIBRARY, 'tidy-notes', 'reference.md'), 'more');
-  refuses(() => writeSkill(LIBRARY, { name: 'tidy-notes', preload: true }, { version: changed.version }), 'stale', /changed since it was read/);
+  refuses(
+    () => writeSkill(LIBRARY, { name: 'tidy-notes', preload: true }, { version: changed.version }),
+    'stale',
+    /changed since it was read/,
+  );
   refuses(() => writeSkill(LIBRARY, { ...DRAFT, name: 'gone' }, { version }), 'missing', /skills\/gone is not in .*: it was removed/);
-  refuses(() => writeSkill(LIBRARY, { name: 'new-one', preload: true }, { version: null }), 'refused', /is a change of `preload:` alone, and there is no skill to change/);
+  refuses(
+    () => writeSkill(LIBRARY, { name: 'new-one', preload: true }, { version: null }),
+    'refused',
+    /is a change of `preload:` alone, and there is no skill to change/,
+  );
 });
 
 test('the switch writes preload alone, and the run reads it', () => {

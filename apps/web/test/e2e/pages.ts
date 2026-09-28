@@ -33,8 +33,15 @@ const nameOf = (file: string): string => PAGE_FILE.exec(file)![2]!;
 /** The pages `dir`'s NAMES says there are: its lines, trimmed, the blank ones left out. */
 export function namesIn(dir = PAGES_DIR): Set<string> {
   const file = path.join(dir, NAMES);
-  if (!fs.existsSync(file)) throw new Error(`${file} is not there, and it says which pages the e2e visits: write it, the name of each page on a line of its own.`);
-  return new Set(fs.readFileSync(file, 'utf8').split('\n').map((line) => line.trim()).filter(Boolean));
+  if (!fs.existsSync(file))
+    throw new Error(`${file} is not there, and it says which pages the e2e visits: write it, the name of each page on a line of its own.`);
+  return new Set(
+    fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
 }
 
 /**
@@ -43,31 +50,43 @@ export function namesIn(dir = PAGES_DIR): Set<string> {
  * when the pages and NAMES differ either way. `list` is how the directory is read, for a test to hand it one that lists its files in an order
  * of its own.
  */
-export function pageFiles(dir = PAGES_DIR, list: (dir: string) => fs.Dirent[] = (d) => fs.readdirSync(d, { withFileTypes: true })): string[] {
+export function pageFiles(
+  dir = PAGES_DIR,
+  list: (dir: string) => fs.Dirent[] = (d) => fs.readdirSync(d, { withFileTypes: true }),
+): string[] {
   const entries = list(dir).filter((entry) => !(entry.name === NAMES && entry.isFile()));
   const strays = entries.filter((entry) => !entry.isFile() || !PAGE_FILE.test(entry.name)).map((entry) => entry.name);
   if (strays.length) {
-    throw new Error(`${dir} holds only pages, each a file NNN-<name>.ts, and ${NAMES}, and the e2e would never visit ${orderOf(strays).join(', ')}. ` +
-      'Name a page for its place and its name (250-<name>.ts); put a helper beside pages.ts (board.ts, canvas.ts), not in pages/.');
+    throw new Error(
+      `${dir} holds only pages, each a file NNN-<name>.ts, and ${NAMES}, and the e2e would never visit ${orderOf(strays).join(', ')}. ` +
+        'Name a page for its place and its name (250-<name>.ts); put a helper beside pages.ts (board.ts, canvas.ts), not in pages/.',
+    );
   }
   const files = orderOf(entries.map((entry) => entry.name));
   const names = namesIn(dir);
   const unlisted = files.filter((file) => !names.has(nameOf(file)));
   if (unlisted.length) {
-    throw new Error(`${unlisted.join(', ')} ${unlisted.length > 1 ? 'are pages' : 'is a page'} ${path.join(dir, NAMES)} does not name: ` +
-      `add a line for each (${unlisted.map(nameOf).join(', ')}), or the e2e cannot tell it went missing.`);
+    throw new Error(
+      `${unlisted.join(', ')} ${unlisted.length > 1 ? 'are pages' : 'is a page'} ${path.join(dir, NAMES)} does not name: ` +
+        `add a line for each (${unlisted.map(nameOf).join(', ')}), or the e2e cannot tell it went missing.`,
+    );
   }
   const pages = new Set(files.map(nameOf));
   const missing = [...names].filter((name) => !pages.has(name)).sort();
   if (missing.length) {
-    throw new Error(`${path.join(dir, NAMES)} names ${missing.join(', ')}, and ${dir} has no page file for ${missing.length > 1 ? 'them' : 'it'}, ` +
-      'so the e2e would not visit it: restore the file (NNN-<name>.ts, from git), or, if the page was deleted on purpose, delete its line from NAMES.');
+    throw new Error(
+      `${path.join(dir, NAMES)} names ${missing.join(', ')}, and ${dir} has no page file for ${missing.length > 1 ? 'them' : 'it'}, ` +
+        'so the e2e would not visit it: restore the file (NNN-<name>.ts, from git), or, if the page was deleted on purpose, delete its line from NAMES.',
+    );
   }
   return files;
 }
 
 const isPageSpec = (spec: unknown): spec is PageSpec =>
-  typeof spec === 'object' && spec !== null && typeof (spec as PageSpec).name === 'string' && typeof (spec as PageSpec).route === 'string' &&
+  typeof spec === 'object' &&
+  spec !== null &&
+  typeof (spec as PageSpec).name === 'string' &&
+  typeof (spec as PageSpec).route === 'string' &&
   typeof (spec as PageSpec).expect === 'function';
 
 /** Every page in `dir`, in the order they are visited, each once. */
@@ -78,9 +97,15 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
     const { default: spec } = (await import(pathToFileURL(path.join(dir, file)).href)) as { default?: unknown };
     if (!isPageSpec(spec)) throw new Error(`${file} default-exports its page: export default { name, route, expect } satisfies PageSpec.`);
     const name = nameOf(file);
-    if (spec.name !== name) throw new Error(`${file} is the ${name} page, which its screenshots are named for, and it says it is ${spec.name}: make the two the same.`);
+    if (spec.name !== name)
+      throw new Error(
+        `${file} is the ${name} page, which its screenshots are named for, and it says it is ${spec.name}: make the two the same.`,
+      );
     const other = from.get(spec.name);
-    if (other) throw new Error(`${other} and ${file} are both the ${spec.name} page, which would be visited twice and photographed over itself: rename one.`);
+    if (other)
+      throw new Error(
+        `${other} and ${file} are both the ${spec.name} page, which would be visited twice and photographed over itself: rename one.`,
+      );
     from.set(spec.name, file);
     pages.push(spec);
   }

@@ -59,18 +59,30 @@ export function readRemoteAgents(file: string): RemoteAgents {
   try {
     json = JSON.parse(text);
   } catch (e) {
-    refuse(file, `is not JSON (${(e as Error).message}). It maps each remote agent's name to its address: \`{ "reviewer": { "url": "https://…" } }\`.`);
+    refuse(
+      file,
+      `is not JSON (${(e as Error).message}). It maps each remote agent's name to its address: \`{ "reviewer": { "url": "https://…" } }\`.`,
+    );
   }
   if (typeof json !== 'object' || json === null || Array.isArray(json)) {
-    refuse(file, `is ${Array.isArray(json) ? 'a list' : `\`${JSON.stringify(json)}\``}, and it is an object that maps each remote agent's name to its address: \`{ "reviewer": { "url": "https://…" } }\`.`);
+    refuse(
+      file,
+      `is ${Array.isArray(json) ? 'a list' : `\`${JSON.stringify(json)}\``}, and it is an object that maps each remote agent's name to its address: \`{ "reviewer": { "url": "https://…" } }\`.`,
+    );
   }
   const agents = new Map<string, RemoteEntry>();
   for (const [name, entry] of Object.entries(json)) {
     if (!REMOTE_NAME.test(name)) {
-      refuse(file, `\`${name}\` is not a name a step can give: a remote agent is named in lowercase words joined by dashes, as \`harness: ${REMOTE_PREFIX}reviewer\` names \`reviewer\`. Rename it.`);
+      refuse(
+        file,
+        `\`${name}\` is not a name a step can give: a remote agent is named in lowercase words joined by dashes, as \`harness: ${REMOTE_PREFIX}reviewer\` names \`reviewer\`. Rename it.`,
+      );
     }
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-      refuse(file, `\`${name}\` is given ${JSON.stringify(entry)}, and an agent is an object: \`{ "url": "https://…" }\`, its base URL, or \`{ "card": { … } }\`, its card.`);
+      refuse(
+        file,
+        `\`${name}\` is given ${JSON.stringify(entry)}, and an agent is an object: \`{ "url": "https://…" }\`, its base URL, or \`{ "card": { … } }\`, its card.`,
+      );
     }
     agents.set(name, entry as RemoteEntry);
   }
@@ -78,7 +90,10 @@ export function readRemoteAgents(file: string): RemoteAgents {
   if (meeting) {
     const [short, long] = meeting;
     const rest = long.slice(short.length + 1);
-    refuse(file, `\`${short}\` and \`${long}\` are both declared, and their secrets' variables can meet: \`${envNameOf(long, 'token')}\` is ${long}'s secret for a scheme its card calls \`token\`, and ${short}'s for one its card calls \`${rest}-token\` — so a card the other party writes could name a scheme that is given ${long}'s secret. Rename one so that neither begins with the other and a dash.`);
+    refuse(
+      file,
+      `\`${short}\` and \`${long}\` are both declared, and their secrets' variables can meet: \`${envNameOf(long, 'token')}\` is ${long}'s secret for a scheme its card calls \`token\`, and ${short}'s for one its card calls \`${rest}-token\` — so a card the other party writes could name a scheme that is given ${long}'s secret. Rename one so that neither begins with the other and a dash.`,
+    );
   }
   return agents;
 }

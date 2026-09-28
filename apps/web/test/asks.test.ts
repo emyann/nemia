@@ -4,10 +4,24 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, gateOffered, needLine, needNodeText, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
+import {
+  answersOf,
+  askedSaid,
+  gateOffered,
+  needLine,
+  needNodeText,
+  needOf,
+  needsOf,
+  needText,
+  offersOf,
+  raiseTo,
+  stepAnchor,
+  type Need,
+} from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail } from '../src/lib/api.ts';
 
-const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
+const LOGIN =
+  'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
 /** What the harness says such a session waits for, in the package's words, as the api gives them (`StepNeeds.waitingFor`). */
 const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-held/1' };
 
@@ -15,7 +29,20 @@ type Step = RunDetail['steps'][number];
 
 /** A step as a run's detail gives it, cut to what these read. */
 const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
-  ({ name, status, note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, lastLine: null, asked: null, check: null, ...over }) as Step;
+  ({
+    name,
+    status,
+    note: null,
+    needs: null,
+    blockedByHarness: false,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+    lastLine: null,
+    asked: null,
+    check: null,
+    ...over,
+  }) as Step;
 
 /** A run of these steps, waiting on `waitingOnYou`. */
 const run = (steps: Step[], waitingOnYou: string[], cancelledAt: string | null = null) => ({ steps, waitingOnYou, cancelledAt });
@@ -47,7 +74,11 @@ test("a step's need is its question while it waits on you, or that the harness b
     `held is blocked by the harness: ${WAIT.words} · ${LOGIN}`,
     'silent is blocked by the harness',
   ]);
-  assert.deepEqual(needs.map(needText), ['asks: Which database?', `blocked by the harness: ${WAIT.words} · ${LOGIN}`, 'blocked by the harness']);
+  assert.deepEqual(needs.map(needText), [
+    'asks: Which database?',
+    `blocked by the harness: ${WAIT.words} · ${LOGIN}`,
+    'blocked by the harness',
+  ]);
   for (const line of [...needs.map(needLine), ...needs.map(needText)]) assert.doesNotMatch(line, /answer it in Claude Code/);
 
   // A step's node has one narrow line: it says the wait alone, and every other need as it reads anywhere else.
@@ -73,19 +104,39 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
   assert.deepEqual(needsOf(run(steps, ['plan'], '2026-09-16T22:00:00.000Z')), [], 'nothing on a run called off');
   // An ending step at its gate is the run's to-decide line, which names it and the command: not asked for twice, as `wf ls` prints it.
   const ship = step('ship', 'awaiting approval', { approve: 'approve ship' });
-  const ending = { ...run([step('implement', 'unverified · done'), ship], ['ship']), toDecide: { kind: 'approve', step: 'ship', says: 'Merge it.', said: 'Merge it. — wf approve r ship', command: 'wf approve r ship' } as const };
+  const ending = {
+    ...run([step('implement', 'unverified · done'), ship], ['ship']),
+    toDecide: {
+      kind: 'approve',
+      step: 'ship',
+      says: 'Merge it.',
+      said: 'Merge it. — wf approve r ship',
+      command: 'wf approve r ship',
+    } as const,
+  };
   assert.deepEqual(needsOf(ending), [], 'the to-decide line says it');
   // Another step's own gate, mid-workflow, is still asked for beside it.
   const both = { ...ending, steps: [...ending.steps, plan], waitingOnYou: ['ship', 'plan'] };
   assert.deepEqual(needsOf(both), [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
   // And a branch nobody merged names no step, so nothing is left out.
-  const ahead = { ...run(steps, ['plan']), toDecide: { kind: 'git', branches: ['wf/r/implement'], said: 'wf/r/implement is ahead of main, and nothing has merged it — wf decide r', command: 'wf decide r' } as const };
+  const ahead = {
+    ...run(steps, ['plan']),
+    toDecide: {
+      kind: 'git',
+      branches: ['wf/r/implement'],
+      said: 'wf/r/implement is ahead of main, and nothing has merged it — wf decide r',
+      command: 'wf decide r',
+    } as const,
+  };
   assert.deepEqual(needsOf(ahead), [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
   // A gate's step is answered where its closeout is, not among the answers.
   assert.deepEqual(offersOf(run(steps, ['plan', 'theme'])), [{ step: 'theme', kind: 'try-again', recheck: true, unfinished: false }]);
   // Sent back: its try asked, which the Decide section says, as for any try asked.
   const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
-  const sent = step('plan', 'awaiting approval', { note, asked: { try: 2, mode: 'nudge', model: null, message: 'Store it first.', stopFirst: false } });
+  const sent = step('plan', 'awaiting approval', {
+    note,
+    asked: { try: 2, mode: 'nudge', model: null, message: 'Store it first.', stopFirst: false },
+  });
   assert.deepEqual(answersOf(run([sent], [])), [{ step: 'plan', kind: 'asked', try: 2, note }]);
   assert.equal(stepAnchor('plan'), 'step-plan');
 });
@@ -95,11 +146,14 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
     step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
     step('quiet', 'succeeded · BLOCKED'),
     step('theme', 'failed ✗ check (exit 1)', { check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null } }),
-    step('lint', 'failed ✗ check (unfinished)', { check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } }),
+    step('lint', 'failed ✗ check (unfinished)', {
+      check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null },
+    }),
     step('docs', 'unsigned'),
     step('notes', 'denied', { denied: { words: 'denied: Write(/tmp/w/notes.md)', calls: ['Write(/tmp/w/notes.md)'] } }),
     step('plan', 'succeeded · BLOCKED', {
-      needs: 'Which plan?', note: 'try 2 asked (--fresh, with your answer) — the next tick files it',
+      needs: 'Which plan?',
+      note: 'try 2 asked (--fresh, with your answer) — the next tick files it',
       asked: { try: 2, mode: 'fresh', model: null, message: 'The small one.' },
     }),
     // Out of rounds: `wf round`, among the commands, and no try.
@@ -125,7 +179,7 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
   assert.deepEqual(kinds(needsOf(run(steps, waiting))), ['asks'], 'the banner names the step that asks');
 });
 
-test('a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner\'s', () => {
+test("a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner's", () => {
   const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
   const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
   // It asked nothing, so the package's `waitingOnYou` does not name it; the package takes a try of it all the same.
@@ -139,9 +193,18 @@ test('a session the harness blocked is offered Continue, whether or not the api 
   assert.deepEqual(answersOf(run([held], [])), [], 'no Decide section for it until its try is asked');
 
   const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
-  const asked = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN, note, asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true } });
+  const asked = step('held', 'needs-human', {
+    blockedByHarness: true,
+    lastLine: LOGIN,
+    note,
+    asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true },
+  });
   assert.deepEqual(offersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }]);
-  assert.deepEqual(answersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }], 'the Decide section is drawn for it, as for any try asked');
+  assert.deepEqual(
+    answersOf(run([asked], [])),
+    [{ step: 'held', kind: 'asked', try: 2, note }],
+    'the Decide section is drawn for it, as for any try asked',
+  );
   // The need stays for as long as the harness keeps the session blocked: no tick has stopped it yet.
   assert.deepEqual(needsOf(run([asked], [])), [{ step: 'held', kind: 'harness', waitingFor: null, lastLine: LOGIN }]);
 });
@@ -159,47 +222,86 @@ test('a try the api has just taken, as the board says it until the run is read a
 });
 
 test("a step the api carries a raise for is offered it — with its try, or its loop's round — whatever its word, with its question where it signed off blocked, and whether its check did not finish", () => {
-  const byTry = { by: 'retry' as const, above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'] as RetryMode[], own: 'failed (check)' };
+  const byTry = {
+    by: 'retry' as const,
+    above: 4.25,
+    said: '$4.25',
+    modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+    own: 'failed (check)',
+  };
   const byRound = { by: 'round' as const, above: 2.1, said: '$2.10', modes: [] as RetryMode[], own: null };
   const ended = { by: 'retry' as const, above: 3.02, said: '$3.02', modes: ['nudge', 'fresh'] as RetryMode[], own: 'budget exhausted' };
   const blocked = { by: 'retry' as const, above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'] as RetryMode[], own: 'blocked' };
   const unfinished = { ...byTry, above: 3.5, said: '$3.50' };
   const steps = [
-    step('tokens', 'over budget $4.25 of $3', { raise: byTry, check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null } }),
+    step('tokens', 'over budget $4.25 of $3', {
+      raise: byTry,
+      check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null },
+    }),
     step('review', 'over budget — implement $2.10 of $2', { raise: byRound }),
     step('lint', 'budget exhausted $3.02 of $3', { raise: ended }),
     // Signed off blocked past its budget: its word is `over budget`, and its question is still the closeout's.
     step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Warm colours, or cool ones?' }),
     // Its check did not finish past its budget: a check's word, and a session of it refused without the raise all the same.
-    step('types', 'failed ✗ check (unfinished)', { raise: unfinished, check: { command: 'npm run typecheck', taskId: 't-t', verdict: 'unfinished', refused: null } }),
+    step('types', 'failed ✗ check (unfinished)', {
+      raise: unfinished,
+      check: { command: 'npm run typecheck', taskId: 't-t', verdict: 'unfinished', refused: null },
+    }),
   ];
   assert.deepEqual(offersOf(run(steps, ['tokens', 'review', 'lint', 'palette', 'types'])), [
     { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', needs: null, unfinished: false, ...byTry },
     { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', needs: null, unfinished: false, ...byRound },
     { step: 'lint', kind: 'raise', status: 'budget exhausted $3.02 of $3', needs: null, unfinished: false, ...ended },
-    { step: 'palette', kind: 'raise', status: 'over budget $1.50 of $1', needs: 'Warm colours, or cool ones?', unfinished: false, ...blocked },
+    {
+      step: 'palette',
+      kind: 'raise',
+      status: 'over budget $1.50 of $1',
+      needs: 'Warm colours, or cool ones?',
+      unfinished: false,
+      ...blocked,
+    },
     { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', needs: null, unfinished: true, ...unfinished },
   ]);
-  assert.deepEqual(answersOf(run(steps, ['tokens'])).map((o) => o.kind), ['raise'], 'a raise is an answer the Decide section offers');
+  assert.deepEqual(
+    answersOf(run(steps, ['tokens'])).map((o) => o.kind),
+    ['raise'],
+    'a raise is an answer the Decide section offers',
+  );
   // The first whole dollar above what the package says the cap has to pass: never the amount itself, which it refuses.
   assert.deepEqual([raiseTo(4.25), raiseTo(3), raiseTo(2.1), raiseTo(0.004)], [5, 4, 3, 1]);
 });
 
 test('REFUSED: no raise for a step past its budget the package takes none of, nor one not waiting on you, nor one whose raise is asked, nor on a run called off — and none for a check that did not finish within its budget', () => {
-  const byTry = { by: 'retry' as const, above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'] as RetryMode[], own: 'failed (check)' };
+  const byTry = {
+    by: 'retry' as const,
+    above: 4.25,
+    said: '$4.25',
+    modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+    own: 'failed (check)',
+  };
   // The loop's target: it goes again with its looping step's round, whose row that is.
   assert.deepEqual(offersOf(run([step('implement', 'over budget $2.10 of $2', { raise: null })], ['implement'])), []);
   assert.deepEqual(offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], [])), []);
   const note = 'try 3 asked (--nudge, --budget 5) — the next tick files it';
-  const asked = step('tokens', 'over budget $4.25 of $3', { raise: byTry, note, asked: { try: 3, mode: 'nudge', model: null, message: null, stopFirst: false } });
+  const asked = step('tokens', 'over budget $4.25 of $3', {
+    raise: byTry,
+    note,
+    asked: { try: 3, mode: 'nudge', model: null, message: null, stopFirst: false },
+  });
   assert.deepEqual(offersOf(run([asked], [])), [{ step: 'tokens', kind: 'asked', try: 3, note }]);
-  assert.deepEqual(offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], ['tokens'], '2026-09-15T07:00:00.000Z')), []);
+  assert.deepEqual(
+    offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], ['tokens'], '2026-09-15T07:00:00.000Z')),
+    [],
+  );
   // A check that did not finish within its budget: the api carries no raise, and the board offers a try again, its recheck first.
-  const lint = step('lint', 'failed ✗ check (unfinished)', { raise: null, check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } });
+  const lint = step('lint', 'failed ✗ check (unfinished)', {
+    raise: null,
+    check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null },
+  });
   assert.deepEqual(offersOf(run([lint], ['lint'])), [{ step: 'lint', kind: 'try-again', recheck: true, unfinished: true }]);
 });
 
-test('REFUSED: a step\'s section offers its gate only for the words `wf ls` asks with — not for a step with none, not for a detail that carries no `approve` at all, and not on a run called off', () => {
+test("REFUSED: a step's section offers its gate only for the words `wf ls` asks with — not for a step with none, not for a detail that carries no `approve` at all, and not on a run called off", () => {
   assert.equal(gateOffered({ approve: 'approve plan' }, false), true);
   assert.equal(gateOffered({ approve: null }, false), false, 'approved, sent back, or never gated');
   // An api started before it carried `approve`: nothing there is no approval to ask for, and its approve route would answer 404.

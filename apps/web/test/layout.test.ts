@@ -51,11 +51,14 @@ test('every edge points right, however the steps fan out and in', bounded, () =>
 });
 
 test('a step goes right of the deepest step it waits on, not the nearest', bounded, () => {
-  assert.deepEqual(layers([
-    { name: 'plan', after: [] },
-    { name: 'build', after: ['plan'] },
-    { name: 'ship', after: ['plan', 'build'] },
-  ]), [['plan'], ['build'], ['ship']]);
+  assert.deepEqual(
+    layers([
+      { name: 'plan', after: [] },
+      { name: 'build', after: ['plan'] },
+      { name: 'ship', after: ['plan', 'build'] },
+    ]),
+    [['plan'], ['build'], ['ship']],
+  );
 });
 
 test('within a column, steps follow their parents, so a fan-out does not cross', bounded, () => {
@@ -65,43 +68,62 @@ test('within a column, steps follow their parents, so a fan-out does not cross',
     { name: 'after-bottom', after: ['bottom'] },
     { name: 'after-top', after: ['top'] },
   ];
-  assert.deepEqual(layers(steps), [['top', 'bottom'], ['after-top', 'after-bottom']]);
+  assert.deepEqual(layers(steps), [
+    ['top', 'bottom'],
+    ['after-top', 'after-bottom'],
+  ]);
   const at = layout(steps);
   assert.ok(at.get('after-top')!.y < at.get('after-bottom')!.y, JSON.stringify(Object.fromEntries(at)));
 });
 
 test('a cycle is refused, naming the steps in it, and the layering does not loop', bounded, () => {
   assert.throws(
-    () => layers([{ name: 'a', after: ['b'] }, { name: 'b', after: ['a'] }]),
+    () =>
+      layers([
+        { name: 'a', after: ['b'] },
+        { name: 'b', after: ['a'] },
+      ]),
     /cycle among a, b\b/,
   );
   // Behind a step that is fine, and dragging a step that waits on it: everything it cannot place.
   assert.throws(
-    () => layout([
-      { name: 'start', after: [] },
-      { name: 'a', after: ['start', 'b'] },
-      { name: 'b', after: ['a'] },
-      { name: 'after-b', after: ['b'] },
-    ]),
+    () =>
+      layout([
+        { name: 'start', after: [] },
+        { name: 'a', after: ['start', 'b'] },
+        { name: 'b', after: ['a'] },
+        { name: 'after-b', after: ['b'] },
+      ]),
     /cycle among a, b, after-b\b/,
   );
   assert.throws(() => layers([{ name: 'self', after: ['self'] }]), /cycle among self\b/);
 });
 
 test('an `after` naming a step the run does not have is drawn as nothing', bounded, () => {
-  assert.deepEqual(layers([{ name: 'review', after: ['gone', 'gone'] }, { name: 'other', after: [] }]), [['review', 'other']]);
+  assert.deepEqual(
+    layers([
+      { name: 'review', after: ['gone', 'gone'] },
+      { name: 'other', after: [] },
+    ]),
+    [['review', 'other']],
+  );
   assert.deepEqual(layers([]), []);
 });
 
 test("a layout's extent is a column's width per column and a row's height per row of its tallest column", bounded, () => {
   assert.deepEqual(extentOf(new Map()), { width: 0, height: 0 });
   assert.deepEqual(extentOf(layout([{ name: 'alone', after: [] }])), { width: COLUMN_WIDTH, height: ROW_HEIGHT });
-  assert.deepEqual(extentOf(layout([
-    { name: 'plan', after: [] },
-    { name: 'api', after: ['plan'] },
-    { name: 'web', after: ['plan'] },
-    { name: 'merge', after: ['api', 'web'] },
-  ])), { width: 3 * COLUMN_WIDTH, height: 2 * ROW_HEIGHT });
+  assert.deepEqual(
+    extentOf(
+      layout([
+        { name: 'plan', after: [] },
+        { name: 'api', after: ['plan'] },
+        { name: 'web', after: ['plan'] },
+        { name: 'merge', after: ['api', 'web'] },
+      ]),
+    ),
+    { width: 3 * COLUMN_WIDTH, height: 2 * ROW_HEIGHT },
+  );
 });
 
 test("the layering reads a graph's `after` edges and leaves its `loop` edges out, so an edge back opens no column", bounded, () => {
@@ -117,10 +139,20 @@ test("the layering reads a graph's `after` edges and leaves its `loop` edges out
     { name: 'review', after: ['test'] },
   ]);
   assert.deepEqual(layers(stepsOf(names, edges)), [['implement'], ['test'], ['review']]);
-  assert.deepEqual(layout(stepsOf(names, edges)), layout(stepsOf(names, edges.filter((e) => e.kind === 'after'))));
+  assert.deepEqual(
+    layout(stepsOf(names, edges)),
+    layout(
+      stepsOf(
+        names,
+        edges.filter((e) => e.kind === 'after'),
+      ),
+    ),
+  );
   // What leaving it out is for: read as an `after`, the edge back is a cycle, which the layering refuses.
   const asAfter = names.map((name) => ({ name, after: edges.filter((e) => e.to === name).map((e) => e.from) }));
   assert.throws(() => layers(asAfter), /cycle among implement, test, review\b/);
   // A loop edge and nothing else orders nothing: both steps in the first column.
-  assert.deepEqual(layers(stepsOf(['implement', 'review'], [{ from: 'review', to: 'implement', kind: 'loop' }])), [['implement', 'review']]);
+  assert.deepEqual(layers(stepsOf(['implement', 'review'], [{ from: 'review', to: 'implement', kind: 'loop' }])), [
+    ['implement', 'review'],
+  ]);
 });

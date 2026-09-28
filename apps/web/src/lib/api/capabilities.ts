@@ -66,11 +66,28 @@ export type StepReach = {
   step: string;
   harness: string;
   claudeCode: boolean;
-  fence: { tools: string[] | null; disallowedTools: string[]; allowedTools: string[]; permissionMode: string | null; sandbox: string | null; effort: string | null; mcp: null };
-  tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
+  fence: {
+    tools: string[] | null;
+    disallowedTools: string[];
+    allowedTools: string[];
+    permissionMode: string | null;
+    sandbox: string | null;
+    effort: string | null;
+    mcp: null;
+  };
+  tools: {
+    from: 'declared' | 'measured';
+    names: string[];
+    inferred: string[];
+    removed: Array<{ name: string; rule: string; source: string; of: string | null }>;
+  } | null;
   skills: { names: string[]; why: string | null } | null;
   /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */
-  mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; asks: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
+  mcp: Array<{
+    server: string;
+    tools: Array<{ name: string; denied: Rule | null; asks: Rule | null; allowed: boolean }> | null;
+    why: string | null;
+  }> | null;
   denied: Rule[];
   /** The settings' ask rules: what asks whatever an allow says, and in dontAsk, or on a job, is denied. None off Claude Code. */
   asked: Rule[];

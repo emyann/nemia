@@ -9,7 +9,6 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { scratch } from './scratch.ts';
@@ -31,20 +30,34 @@ const emptyFeed = () => {
   /** One pass, as the tick hands the feed what it judged: every run in the store, by id. */
   return (runs: Record<string, FeedWords>) => recordFeed(new Map(Object.entries(runs)), { memo });
 };
-const planAt = (word: string, note?: string): FeedWords =>
-  ({ run: { word: 'running' }, steps: [{ name: 'plan', word, ...(note ? { note } : {}) }] });
+const planAt = (word: string, note?: string): FeedWords => ({
+  run: { word: 'running' },
+  steps: [{ name: 'plan', word, ...(note ? { note } : {}) }],
+});
 const end = () => readFeed(0).cursor;
 
 type Block = { event?: string; data?: string; id?: string };
 /** Server-sent events as a reader gets them: the fields of each block. */
 const blocks = (text: string): Block[] =>
-  text.split('\n\n').filter((block) => block.trim()).map((block) => Object.fromEntries(block.split('\n').map((line) => {
-    const colon = line.indexOf(': ');
-    return [line.slice(0, colon), line.slice(colon + 2)];
-  })));
+  text
+    .split('\n\n')
+    .filter((block) => block.trim())
+    .map((block) =>
+      Object.fromEntries(
+        block.split('\n').map((line) => {
+          const colon = line.indexOf(': ');
+          return [line.slice(0, colon), line.slice(colon + 2)];
+        }),
+      ),
+    );
 
 /** Read a stream until `until` holds for what it has sent, or it ends; under a bound of seconds, never a length of time. */
-async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: { value: string }, until: (said: Block[]) => boolean, ms = 5_000): Promise<Block[]> {
+async function readUntil(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  text: { value: string },
+  until: (said: Block[]) => boolean,
+  ms = 5_000,
+): Promise<Block[]> {
   const decoder = new TextDecoder();
   const bound = Date.now() + ms;
   for (;;) {
@@ -55,7 +68,9 @@ async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: 
     let timer: NodeJS.Timeout | undefined;
     const { done, value } = await Promise.race([
       reader.read(),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`the stream sent nothing more in ${ms} ms, after: ${complete}`)), left); }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`the stream sent nothing more in ${ms} ms, after: ${complete}`)), left);
+      }),
     ]).finally(() => clearTimeout(timer));
     if (done) return blocks(text.value);
     text.value += decoder.decode(value, { stream: true });
@@ -93,9 +108,15 @@ test("a transition the tick writes to the feed arrives on the stream as it is wr
 
     const [gate] = pass({ 'r-1': planAt('awaiting approval', 'approve it: wf approve r-1 plan') });
     let said = await readUntil(reader, text, (s) => s.length >= 1);
-    assert.deepEqual(said, [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }], 'the gate, and nothing that was there before the cursor');
+    assert.deepEqual(
+      said,
+      [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
+      'the gate, and nothing that was there before the cursor',
+    );
 
-    const [done] = pass({ 'r-1': { run: { word: 'done' }, steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: wf approve r-1 plan' }] } });
+    const [done] = pass({
+      'r-1': { run: { word: 'done' }, steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: wf approve r-1 plan' }] },
+    });
     said = await readUntil(reader, text, (s) => s.length >= 2);
     assert.deepEqual(said[1], { event: 'run', data: JSON.stringify(done), id: String(end()) });
 
@@ -119,7 +140,10 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
   const first = await open();
   const all = await readUntil(first.reader, first.text, (s) => s.length >= 3);
   await first.reader.cancel();
-  assert.deepEqual(all.map((b) => [b.event, b.data]), lines.map((l) => [l.step ? 'step' : 'run', JSON.stringify(l)]));
+  assert.deepEqual(
+    all.map((b) => [b.event, b.data]),
+    lines.map((l) => [l.step ? 'step' : 'run', JSON.stringify(l)]),
+  );
   assert.equal(all[2]!.id, String(end()));
   // Each id is where a read takes up after that line, and no other.
   for (const [i, b] of all.entries()) assert.deepEqual(readFeed(Number(b.id)).lines, lines.slice(i + 1));
@@ -129,13 +153,21 @@ test('a stream opened with no cursor reads the feed from the start; one reconnec
   pass({ 'r-1': planAt('failed') });
   const more = await readUntil(again.reader, again.text, (s) => s.length >= 3);
   await again.reader.cancel();
-  assert.deepEqual(resumed.map((b) => b.id), all.slice(1).map((b) => b.id), 'the header wins over the address: the second and third, not the first');
+  assert.deepEqual(
+    resumed.map((b) => b.id),
+    all.slice(1).map((b) => b.id),
+    'the header wins over the address: the second and third, not the first',
+  );
   assert.equal(JSON.parse(more[2]!.data!).word, 'failed', 'and then what is written next');
 
   const fromSecond = await open(`?after=${all[1]!.id}`);
   const third = await readUntil(fromSecond.reader, fromSecond.text, (s) => s.length >= 2);
   await fromSecond.reader.cancel();
-  assert.deepEqual(third.map((b) => b.id), [all[2]!.id, more[2]!.id], 'from the second event on');
+  assert.deepEqual(
+    third.map((b) => b.id),
+    [all[2]!.id, more[2]!.id],
+    'from the second event on',
+  );
 
   const empty = await open('?after=');
   const whole = await readUntil(empty.reader, empty.text, (s) => s.length >= 4);
@@ -148,9 +180,17 @@ test('REFUSED: a cursor the feed never gave is a 400 that names it and says what
   pass({ 'r-1': planAt('running') });
   const size = end();
   const cases: [string, Record<string, string>, RegExp][] = [
-    [`?after=${size - 2}`, {}, new RegExp(`^\`${size - 2}\` is not a cursor this feed gave: cursor ${size - 2} falls inside a line of the feed`)],
+    [
+      `?after=${size - 2}`,
+      {},
+      new RegExp(`^\`${size - 2}\` is not a cursor this feed gave: cursor ${size - 2} falls inside a line of the feed`),
+    ],
     ['', { 'Last-Event-ID': String(size - 2) }, /falls inside a line of the feed, not after one/],
-    [`?after=${size + 10}`, {}, new RegExp(`^\`${size + 10}\` is not a cursor this feed gave: cursor ${size + 10} is past the end of the feed \\(${size} bytes`)],
+    [
+      `?after=${size + 10}`,
+      {},
+      new RegExp(`^\`${size + 10}\` is not a cursor this feed gave: cursor ${size + 10} is past the end of the feed \\(${size} bytes`),
+    ],
     ['?after=abc', {}, /^`abc` is not a cursor this feed gave: a feed cursor is a whole number of bytes\./],
     ['?after=-1', {}, /^`-1` is not a cursor this feed gave: a feed cursor is a whole number of bytes\./],
     ['', { 'Last-Event-ID': 'page-2' }, /^`page-2` is not a cursor this feed gave/],
@@ -162,7 +202,11 @@ test('REFUSED: a cursor the feed never gave is a 400 that names it and says what
     assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
     const { error } = await res.json();
     assert.match(error, pattern, where);
-    assert.match(error, /the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start\.$/, where);
+    assert.match(
+      error,
+      /the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start\.$/,
+      where,
+    );
   }
   // A cursor the feed did give is taken.
   const taken = await open(`?after=${size}`);
@@ -213,7 +257,11 @@ test('a read that fails for a beat is said once, `retrying`, and cleared by the 
     }
     // Nothing written: the next read that works clears it all the same.
     const cleared = await readUntil(reader, text, (s) => s.length >= 2);
-    assert.deepEqual(cleared.map((b) => b.event), ['unreadable', 'readable'], 'said once, then cleared — with no line between');
+    assert.deepEqual(
+      cleared.map((b) => b.event),
+      ['unreadable', 'readable'],
+      'said once, then cleared — with no line between',
+    );
 
     const [line] = pass({ 'r-1': planAt('succeeded') });
     const more = await readUntil(reader, text, (s) => s.length >= 3);
@@ -228,15 +276,24 @@ test('a stream whose reader goes leaves no watcher behind: each open stream hold
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
   // Nothing else in this process watches: the streams of the tests before this one are gone with their readers.
-  await until(() => watchers() === 0, () => `${watchers()} watchers left behind by the tests before this one`);
+  await until(
+    () => watchers() === 0,
+    () => `${watchers()} watchers left behind by the tests before this one`,
+  );
   const streams = await Promise.all([open(), open(), open()]);
   // One event each: each stream's watch has started.
   for (const s of streams) await readUntil(s.reader, s.text, (said) => said.length >= 1);
   assert.equal(watchers(), 3, 'one watcher a stream');
   await streams[0]!.reader.cancel();
-  await until(() => watchers() === 2, () => `${watchers()} watchers, with one of three readers gone`);
+  await until(
+    () => watchers() === 2,
+    () => `${watchers()} watchers, with one of three readers gone`,
+  );
   for (const s of streams.slice(1)) await s.reader.cancel();
-  await until(() => watchers() === 0, () => `${watchers()} watchers left behind by three streams whose readers went`);
+  await until(
+    () => watchers() === 0,
+    () => `${watchers()} watchers left behind by three streams whose readers went`,
+  );
 });
 
 test('a client that closes its socket stops the watch too — the path `main.ts` serves, where nothing is being written when it goes', async () => {
@@ -245,7 +302,10 @@ test('a client that closes its socket stops the watch too — the path `main.ts`
   const server = createAdaptorServer({ fetch: app.fetch });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
-    await until(() => watchers() === 0, () => `${watchers()} watchers left behind by the tests before this one`);
+    await until(
+      () => watchers() === 0,
+      () => `${watchers()} watchers left behind by the tests before this one`,
+    );
     const { port } = server.address() as AddressInfo;
     const abort = new AbortController();
     const res = await fetch(`http://127.0.0.1:${port}${STREAM}`, { signal: abort.signal });
@@ -253,7 +313,10 @@ test('a client that closes its socket stops the watch too — the path `main.ts`
     await readUntil(res.body!.getReader(), { value: '' }, (said) => said.length >= 2);
     assert.equal(watchers(), 1);
     abort.abort();
-    await until(() => watchers() === 0, () => `the watch outlived its client's socket: ${watchers()} left`);
+    await until(
+      () => watchers() === 0,
+      () => `the watch outlived its client's socket: ${watchers()} left`,
+    );
   } finally {
     server.closeAllConnections?.();
     await new Promise((resolve) => server.close(resolve));

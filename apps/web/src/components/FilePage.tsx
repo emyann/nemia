@@ -18,21 +18,35 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
         <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900">
             <tr>
-              <th scope="col" className="px-3 py-1.5 font-medium">key</th>
-              <th scope="col" className="px-3 py-1.5 font-medium">value</th>
-              <th scope="col" className="px-3 py-1.5 font-medium">what it means</th>
+              <th scope="col" className="px-3 py-1.5 font-medium">
+                key
+              </th>
+              <th scope="col" className="px-3 py-1.5 font-medium">
+                value
+              </th>
+              <th scope="col" className="px-3 py-1.5 font-medium">
+                what it means
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map(({ key, value, meaning }) => (
-              <tr key={key} data-key={key} data-set={value !== null} className="border-t border-neutral-200 align-top dark:border-neutral-800">
+              <tr
+                key={key}
+                data-key={key}
+                data-set={value !== null}
+                className="border-t border-neutral-200 align-top dark:border-neutral-800"
+              >
                 <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-neutral-500')}>
                   {key}
                 </th>
                 <td data-value className="w-56 px-3 py-1.5 font-mono text-xs break-all">
                   {value ?? <span className="font-sans text-neutral-400 dark:text-neutral-500">not set</span>}
                 </td>
-                <td data-meaning className={cn('px-3 py-1.5 text-xs', value === null ? 'text-neutral-500' : 'text-neutral-700 dark:text-neutral-300')}>
+                <td
+                  data-meaning
+                  className={cn('px-3 py-1.5 text-xs', value === null ? 'text-neutral-500' : 'text-neutral-700 dark:text-neutral-300')}
+                >
                   <Markdown>{meaning}</Markdown>
                 </td>
               </tr>
@@ -70,7 +84,10 @@ export function AsWritten({ file, source, children }: { file: string; source: st
         </button>
       </div>
       {shown ? (
-        <pre data-source className="overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words dark:border-neutral-800 dark:bg-neutral-900">
+        <pre
+          data-source
+          className="overflow-x-auto rounded border border-neutral-200 bg-neutral-50 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words dark:border-neutral-800 dark:bg-neutral-900"
+        >
           {source}
         </pre>
       ) : (

@@ -29,11 +29,16 @@ function NewSkillPage() {
       <header className="space-y-1">
         <h1 className="text-base font-semibold">New skill</h1>
         <p className="text-sm text-neutral-500">
-          Written to <code className="font-mono text-xs">~/.agent-workflows/workflows/skills/&lt;name&gt;/SKILL.md</code>, your library. An agent
-          of yours gives it by its name, from its page's skills.
+          Written to <code className="font-mono text-xs">~/.agent-workflows/workflows/skills/&lt;name&gt;/SKILL.md</code>, your library. An
+          agent of yours gives it by its name, from its page's skills.
         </p>
       </header>
-      <SkillForm detail={null} saving={create.isPending} refusal={create.error && <SkillRefused message={create.error.message} />} onSave={(draft) => create.mutate(draft)} />
+      <SkillForm
+        detail={null}
+        saving={create.isPending}
+        refusal={create.error && <SkillRefused message={create.error.message} />}
+        onSave={(draft) => create.mutate(draft)}
+      />
     </article>
   );
 }

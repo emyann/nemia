@@ -75,7 +75,10 @@ export default {
       await section.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the second press lifts, and the page says no hold');
       lifted('the run page');
-      await expectVisible(page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
+      await expectVisible(
+        page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }),
+        `and offers ${gated}'s Approve again`,
+      );
       await expectCount(page.locator('[role="alert"][data-lift-refused]'), 0, 'with no refusal said');
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `lift-lifted-${theme}.png`), fullPage: true });

@@ -148,8 +148,20 @@ export const STALE_MS = 30_000;
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
-const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-const sizeOf = (p: string) => { try { return fs.statSync(p).size; } catch { return 0; } };
+const isDirectory = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+const sizeOf = (p: string) => {
+  try {
+    return fs.statSync(p).size;
+  } catch {
+    return 0;
+  }
+};
 
 /**
  * What the worker writes about one session, and the whole of what a detached harness knows of it.
@@ -192,8 +204,14 @@ export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now
 
 type RunFile = {
   /** The worker's own words (`bin/ae-worker.ts`), kept on disk as they are: `detachedStateOf` translates them. */
-  name?: string; state: WorkerState; pid: number; heartbeatAt: string; startedAt?: string;
-  nativeId?: string; logFile: string; exitCode?: number;
+  name?: string;
+  state: WorkerState;
+  pid: number;
+  heartbeatAt: string;
+  startedAt?: string;
+  nativeId?: string;
+  logFile: string;
+  exitCode?: number;
   /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
   resumeFrom?: string;
   /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
@@ -222,13 +240,17 @@ const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(r
  * is its name, so that is the id found. A file whose name is not this one — `safe` folds two names into one path — is
  * not this run, and a file that cannot be read yet is not found, as `observe` skips it.
  */
-export const detachedFind = (spec: HarnessSpec, root: string) => (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
-  Effect.sync(() => {
-    try {
-      const run = JSON.parse(readText(runFileOf(spec, root, name))) as RunFile;
-      return run.name === name ? { sessionId: name } : undefined;
-    } catch { return undefined; }
-  });
+export const detachedFind =
+  (spec: HarnessSpec, root: string) =>
+  (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
+    Effect.sync(() => {
+      try {
+        const run = JSON.parse(readText(runFileOf(spec, root, name))) as RunFile;
+        return run.name === name ? { sessionId: name } : undefined;
+      } catch {
+        return undefined;
+      }
+    });
 
 export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
@@ -252,11 +274,12 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       try {
         const run = JSON.parse(readText(path.join(dir, f))) as RunFile;
         if (run.name) out.push({ name: run.name, run });
-      } catch { /* a half-written file: the next pass will read it */ }
+      } catch {
+        /* a half-written file: the next pass will read it */
+      }
     }
     return out;
   };
-
 
   const find = (sessionId: string) => readAll().find(({ name }) => name === sessionId);
 
@@ -271,9 +294,18 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     const f = closeoutFile(name);
     let text: string;
     let at: number;
-    try { text = readText(f); at = fs.statSync(f).mtimeMs; } catch { return undefined; }
+    try {
+      text = readText(f);
+      at = fs.statSync(f).mtimeMs;
+    } catch {
+      return undefined;
+    }
     let payload: unknown = text;
-    try { payload = JSON.parse(text); } catch { /* carried as text */ }
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      /* carried as text */
+    }
     return { payload, at };
   };
 
@@ -287,11 +319,19 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     if (!spec.readOutput) return undefined;
     let size: number;
     let mtimeMs: number;
-    try { ({ size, mtimeMs } = fs.statSync(logFile(name))); } catch { return undefined; }
+    try {
+      ({ size, mtimeMs } = fs.statSync(logFile(name)));
+    } catch {
+      return undefined;
+    }
     let known = outputs.get(name);
     if (!known || known.size !== size || known.mtimeMs !== mtimeMs) {
       let text: string;
-      try { text = readText(logFile(name)); } catch { return undefined; }
+      try {
+        text = readText(logFile(name));
+      } catch {
+        return undefined;
+      }
       known = { size, mtimeMs, read: spec.readOutput(text) };
       outputs.set(name, known);
     }
@@ -313,9 +353,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const usageOf = (all: Array<{ name: string; run: RunFile }>, run: RunFile, usage: Usage | undefined): Usage | undefined => {
     if (!usage || !spec.resumeCostCarried || !run.resumeFrom) return usage;
     const at = (r: RunFile) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN);
-    const parent = all
-      .filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run))
-      .sort((a, b) => at(b.run) - at(a.run))[0];
+    const parent = all.filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run)).sort((a, b) => at(b.run) - at(a.run))[0];
     const carried = parent && outputOf(parent.name)?.read.usage;
     const { costUsd, apiMs, ...own } = usage;
     const less = (mine: number | undefined, theirs: number | undefined) =>
@@ -326,15 +364,18 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return Object.keys(left).length ? left : undefined;
   };
 
-  const transcriptOf = (reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
-    (sessionId, after) => Effect.tryPromise({
-      try: async () => {
-        const hit = find(sessionId);
-        const nativeId = hit ? hit.run.nativeId : sessionId;
-        return readTranscript(nativeId ? reader.file(nativeId) : undefined, after, reader.events);
-      },
-      catch: (cause) => new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
-    });
+  const transcriptOf =
+    (reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
+    (sessionId, after) =>
+      Effect.tryPromise({
+        try: async () => {
+          const hit = find(sessionId);
+          const nativeId = hit ? hit.run.nativeId : sessionId;
+          return readTranscript(nativeId ? reader.file(nativeId) : undefined, after, reader.events);
+        },
+        catch: (cause) =>
+          new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+      });
 
   /**
    * Words for a running session, appended to its inbox as the line its harness reads, for its worker to write on. Its own
@@ -343,24 +384,38 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
    * appended, where no worker would write the words on: no run under the name; a run its worker started with no input (one
    * started before jobs took words); a run whose harness has printed its closing line; and one that is not working.
    */
-  const sayTo = (input: NonNullable<HarnessSpec['input']>): NonNullable<RunnerOps['say']> => (session, text) =>
-    Effect.try({
-      try: () => {
-        const { name } = session;
-        let run: RunFile | undefined;
-        try { run = JSON.parse(fs.readFileSync(runFile(name), 'utf8')) as RunFile; } catch { /* none, or mid-write: refused below */ }
-        if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
-        if (!run.input) throw new Error(`\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
-        if (run.inputClosed) throw new Error(`\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`);
-        const state = leased(run, Date.now());
-        if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
-        const line = input.line(text);
-        // A line with a newline in it would reach the harness as two, or as half a message.
-        if (/[\r\n]/.test(line)) throw new Error(`the words make a line with a line break in it, which the harness would read as two. Nothing was said.`);
-        fs.appendFileSync(inboxFile(name), `${line}\n`);
-      },
-      catch: (cause) => new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
-    });
+  const sayTo =
+    (input: NonNullable<HarnessSpec['input']>): NonNullable<RunnerOps['say']> =>
+    (session, text) =>
+      Effect.try({
+        try: () => {
+          const { name } = session;
+          let run: RunFile | undefined;
+          try {
+            run = JSON.parse(fs.readFileSync(runFile(name), 'utf8')) as RunFile;
+          } catch {
+            /* none, or mid-write: refused below */
+          }
+          if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
+          if (!run.input)
+            throw new Error(
+              `\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
+            );
+          if (run.inputClosed)
+            throw new Error(
+              `\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
+            );
+          const state = leased(run, Date.now());
+          if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
+          const line = input.line(text);
+          // A line with a newline in it would reach the harness as two, or as half a message.
+          if (/[\r\n]/.test(line))
+            throw new Error(`the words make a line with a line break in it, which the harness would read as two. Nothing was said.`);
+          fs.appendFileSync(inboxFile(name), `${line}\n`);
+        },
+        catch: (cause) =>
+          new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+      });
 
   return {
     spawn: (asked) =>
@@ -376,7 +431,11 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
           // A re-spawn of the same attempt must not find the previous one's answer waiting for it.
-          try { fs.rmSync(closeoutFile(r.name)); } catch { /* nothing to clear */ }
+          try {
+            fs.rmSync(closeoutFile(r.name));
+          } catch {
+            /* nothing to clear */
+          }
           // Nor in its output, which a spec that reads one would take the previous answer from.
           fs.rmSync(logFile(r.name), { force: true });
           // Nor a stop asked of it, which its worker would read as asked of this one and start nothing.
@@ -395,10 +454,18 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // The inbox is never written or cleared here: it is the person's, and a run spawned again under the name starts
           // past what was said to the one before it.
           const input: RunInput | undefined = spec.input && {
-            first: spec.input.line(r.brief), inbox: inboxFile(r.name), from: sizeOf(inboxFile(r.name)), closesOn: spec.input.closesOn,
+            first: spec.input.line(r.brief),
+            inbox: inboxFile(r.name),
+            from: sizeOf(inboxFile(r.name)),
+            closesOn: spec.input.closesOn,
           };
           const plan = {
-            name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name), stopFile: stopFile(r.name),
+            name: r.name,
+            cmd,
+            args,
+            cwd: r.cwd,
+            logFile: logFile(r.name),
+            stopFile: stopFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
             ...(spec.resumeCostCarried && r.resumeFrom ? { resumeFrom: r.resumeFrom } : {}),
             ...(input ? { input } : {}),
@@ -409,7 +476,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 
           // Detached, stdio ignored, unref'd: the worker outlives this process by design.
           const child = spawn(process.execPath, [WORKER, runFile(r.name)], {
-            detached: true, stdio: 'ignore', cwd: r.cwd,
+            detached: true,
+            stdio: 'ignore',
+            cwd: r.cwd,
           });
           // Heard, so a launch that fails after `spawn` returns never takes the engine down with it;
           // the run file it leaves says working with no pid, and the lease calls that dead.
@@ -436,7 +505,10 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         const usage = usageOf(all, run, output?.read.usage);
         const printed = output?.read.closeout && { payload: output.read.closeout.payload, at: output.at };
         m.set(name, {
-          sessionId: name, state: detachedStateOf(run, now), nativeId: run.nativeId, closeout: statementOf(name) ?? printed,
+          sessionId: name,
+          state: detachedStateOf(run, now),
+          nativeId: run.nativeId,
+          closeout: statementOf(name) ?? printed,
           // The process's own exit code, once it has one. The worker writes -1 when there is none —
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
@@ -465,7 +537,11 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             // SIGTERM the worker, which kills the harness's process group and writes `stopped`.
             // Not our business to write that state: the worker is the one that saw it happen. It hears
             // SIGTERM from the moment its pid is on disk, so a stop that lands any time after is heard.
-            try { process.kill(now.run.pid, 'SIGTERM'); } catch { /* already gone */ }
+            try {
+              process.kill(now.run.pid, 'SIGTERM');
+            } catch {
+              /* already gone */
+            }
           }
         },
         catch: (cause) => new RunnerError({ verb: 'stop', message: String(cause) }),

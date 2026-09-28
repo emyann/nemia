@@ -17,10 +17,17 @@ export const transcriptFile = (sessionId: string): string | undefined => {
   const known = transcripts.get(sessionId);
   if (known && fs.existsSync(known)) return known;
   let dirs: string[];
-  try { dirs = fs.readdirSync(PROJECTS); } catch { return undefined; }
+  try {
+    dirs = fs.readdirSync(PROJECTS);
+  } catch {
+    return undefined;
+  }
   for (const d of dirs) {
     const f = path.join(PROJECTS, d, `${sessionId}.jsonl`);
-    if (fs.existsSync(f)) { transcripts.set(sessionId, f); return f; }
+    if (fs.existsSync(f)) {
+      transcripts.set(sessionId, f);
+      return f;
+    }
   }
   return undefined;
 };
@@ -44,7 +51,11 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
     // Most lines are not it, and the tool's own definition mentions the name too.
     if (!line.includes('StructuredOutput')) continue;
     let entry: { type?: string; timestamp?: string; message?: { content?: unknown } };
-    try { entry = JSON.parse(line); } catch { continue; }
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
     const content = entry.message?.content;
     if (entry.type !== 'assistant' || !Array.isArray(content)) continue;
     for (const block of content as Array<{ type?: string; id?: unknown; name?: string; input?: unknown }>) {
@@ -74,13 +85,20 @@ const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
     const line = lines[i]!;
     if (!line.trim() || !line.includes('"type"')) continue;
     let entry: { type?: string; message?: { content?: unknown } };
-    try { entry = JSON.parse(line); } catch { continue; } // a line still being written, or one that is not JSON
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    } // a line still being written, or one that is not JSON
     if (entry?.type !== 'user' && entry?.type !== 'assistant') continue;
     const content = entry.message?.content;
-    return Array.isArray(content) && content.some((b) => {
-      const block = b as { type?: unknown; tool_use_id?: unknown } | null;
-      return block?.type === 'tool_result' && block.tool_use_id === id;
-    });
+    return (
+      Array.isArray(content) &&
+      content.some((b) => {
+        const block = b as { type?: unknown; tool_use_id?: unknown } | null;
+        return block?.type === 'tool_result' && block.tool_use_id === id;
+      })
+    );
   }
   return false;
 };
@@ -90,12 +108,16 @@ export const claudeTranscriptFile = (sessionId: string): string | undefined => t
 
 /** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
 const resultText = (content: unknown): string =>
-  typeof content === 'string' ? content
-    : Array.isArray(content) ? content.map((b) => {
-        const block = b as { type?: unknown; text?: unknown } | null;
-        return block?.type === 'text' && typeof block.text === 'string' ? block.text : `[${String(block?.type)}]`;
-      }).join('\n')
-    : '';
+  typeof content === 'string'
+    ? content
+    : Array.isArray(content)
+      ? content
+          .map((b) => {
+            const block = b as { type?: unknown; text?: unknown } | null;
+            return block?.type === 'text' && typeof block.text === 'string' ? block.text : `[${String(block?.type)}]`;
+          })
+          .join('\n')
+      : '';
 
 /**
  * One line of a Claude Code transcript as events. A `user` or `assistant` line gives one per content
@@ -128,47 +150,97 @@ const resultText = (content: unknown): string =>
  */
 export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
   const line = entry as {
-    type?: unknown; uuid?: unknown; timestamp?: unknown; subtype?: unknown; content?: unknown;
-    isMeta?: unknown; isSidechain?: unknown; message?: { content?: unknown } | null;
+    type?: unknown;
+    uuid?: unknown;
+    timestamp?: unknown;
+    subtype?: unknown;
+    content?: unknown;
+    isMeta?: unknown;
+    isSidechain?: unknown;
+    message?: { content?: unknown } | null;
     attachment?: { type?: unknown; prompt?: unknown; commandMode?: unknown; origin?: { kind?: unknown } | null } | null;
   } | null;
   const at = isoTime(line?.timestamp);
   if (!line || !at || line.isSidechain === true) return [];
   const id = typeof line.uuid === 'string' && line.uuid ? line.uuid : `@${offset}`;
   if (line.type === 'system') {
-    return [{ id, at, role: 'system', kind: 'system', text: typeof line.content === 'string' ? line.content : String(line.subtype ?? 'system') }];
+    return [
+      {
+        id,
+        at,
+        role: 'system',
+        kind: 'system',
+        text: typeof line.content === 'string' ? line.content : typeof line.subtype === 'string' ? line.subtype : 'system',
+      },
+    ];
   }
   if (line.type === 'attachment') {
     const a = line.attachment;
     if (a?.type !== 'queued_command' || typeof a.prompt !== 'string') return [];
     const from = a.origin?.kind;
     if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
-    return a.commandMode === 'prompt' && (from === 'human' || from === undefined) ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }] : [];
+    return a.commandMode === 'prompt' && (from === 'human' || from === undefined)
+      ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
+      : [];
   }
   if (line.type !== 'user' && line.type !== 'assistant') return [];
   const role = line.isMeta === true ? 'system' : line.type;
-  const said = (i: number, text: string): TranscriptEvent => ({ id: `${id}:${i}`, at, role, kind: role === 'system' ? 'system' : 'text', text });
+  const said = (i: number, text: string): TranscriptEvent => ({
+    id: `${id}:${i}`,
+    at,
+    role,
+    kind: role === 'system' ? 'system' : 'text',
+    text,
+  });
   const content = line.message?.content;
   if (typeof content === 'string') return [said(0, content)];
   if (!Array.isArray(content)) return [];
   return content.flatMap((b: unknown, i): TranscriptEvent[] => {
     const block = b as {
-      type?: unknown; text?: unknown; thinking?: unknown; id?: unknown; name?: unknown; input?: unknown;
-      tool_use_id?: unknown; content?: unknown; is_error?: unknown;
+      type?: unknown;
+      text?: unknown;
+      thinking?: unknown;
+      id?: unknown;
+      name?: unknown;
+      input?: unknown;
+      tool_use_id?: unknown;
+      content?: unknown;
+      is_error?: unknown;
     } | null;
     switch (block?.type) {
       case 'text':
         return [said(i, typeof block.text === 'string' ? block.text : '')];
       case 'thinking':
       case 'redacted_thinking':
-        return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(typeof block.thinking === 'string' && block.thinking ? { text: block.thinking } : {}) }];
+        return [
+          {
+            id: `${id}:${i}`,
+            at,
+            role,
+            kind: 'thinking',
+            ...(typeof block.thinking === 'string' && block.thinking ? { text: block.thinking } : {}),
+          },
+        ];
       case 'tool_use':
-        return [{ id: typeof block.id === 'string' ? block.id : `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } }];
+        return [
+          {
+            id: typeof block.id === 'string' ? block.id : `${id}:${i}`,
+            at,
+            role,
+            kind: 'tool_use',
+            tool: { name: String(block.name), input: block.input },
+          },
+        ];
       case 'tool_result':
-        return [{
-          id: typeof block.tool_use_id === 'string' ? block.tool_use_id : `${id}:${i}`, at, role, kind: 'tool_result',
-          result: { text: resultText(block.content), isError: block.is_error === true },
-        }];
+        return [
+          {
+            id: typeof block.tool_use_id === 'string' ? block.tool_use_id : `${id}:${i}`,
+            at,
+            role,
+            kind: 'tool_result',
+            result: { text: resultText(block.content), isError: block.is_error === true },
+          },
+        ];
       default:
         return [said(i, `[${String(block?.type)}]`)];
     }
@@ -180,7 +252,11 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
  * in `modelUsage` together, input as a response's are counted (`transcriptUsage`): uncached, cache writes and cache reads.
  */
 type CostState = {
-  costUsd?: number; apiMs?: number; toolMs?: number; startTime?: number; unpriced: boolean;
+  costUsd?: number;
+  apiMs?: number;
+  toolMs?: number;
+  startTime?: number;
+  unpriced: boolean;
 } & Tokens;
 
 /** An attempt's tokens: its input in three classes and in their sum, and its output. */
@@ -207,12 +283,20 @@ const tokensOf = (modelUsage: unknown): Tokens => {
 
 const costStateOf = (line: string): CostState | undefined => {
   let e: Record<string, unknown> | null;
-  try { e = JSON.parse(line); } catch { return undefined; }
+  try {
+    e = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
   if (e?.type !== 'cost-state') return undefined;
   const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? (e[key] as number) : undefined);
   return {
-    costUsd: n('totalCostUSD'), apiMs: n('totalAPIDuration'), toolMs: n('totalToolDuration'), ...tokensOf(e.modelUsage),
-    startTime: n('startTime'), unpriced: e.hasUnknownModelCost === true,
+    costUsd: n('totalCostUSD'),
+    apiMs: n('totalAPIDuration'),
+    toolMs: n('totalToolDuration'),
+    ...tokensOf(e.modelUsage),
+    startTime: n('startTime'),
+    unpriced: e.hasUnknownModelCost === true,
   };
 };
 
@@ -254,7 +338,13 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
   const unpriced = after.unpriced || base?.unpriced === true;
   const [costUsd, apiMs, toolMs] = [own('costUsd'), own('apiMs'), own('toolMs')];
   const counts = tokens
-    ? { inputTokens: own('inputTokens'), uncachedTokens: own('uncachedTokens'), cacheWriteTokens: own('cacheWriteTokens'), cacheReadTokens: own('cacheReadTokens'), outputTokens: own('outputTokens') }
+    ? {
+        inputTokens: own('inputTokens'),
+        uncachedTokens: own('uncachedTokens'),
+        cacheWriteTokens: own('cacheWriteTokens'),
+        cacheReadTokens: own('cacheReadTokens'),
+        outputTokens: own('outputTokens'),
+      }
     : undefined;
   return {
     ...(counts && Object.values(counts).every((c) => c !== undefined) ? counts : {}),
@@ -310,13 +400,18 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     if (line.includes('"cost-state"')) {
       const state = costStateOf(line);
       if (state) {
-        if (begun) after = state; else before = state;
+        if (begun) after = state;
+        else before = state;
         continue;
       }
     }
     if (line.includes('"agent-name"')) {
       let entry: { type?: unknown; agentName?: unknown } | null = null;
-      try { entry = JSON.parse(line); } catch { /* not a line */ }
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        /* not a line */
+      }
       if (entry?.type === 'agent-name' && typeof entry.agentName === 'string') {
         if (begun && name !== undefined && entry.agentName !== name) break;
         name = entry.agentName;
@@ -324,7 +419,11 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
       }
     }
     if (!begun && line.includes('"timestamp"')) {
-      try { begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since; } catch { /* not a line */ }
+      try {
+        begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since;
+      } catch {
+        /* not a line */
+      }
     }
     // A resumed transcript carries its parent's last boundary, before this attempt began: that summary is not this attempt's.
     if (begun && line.includes('"compact_boundary"')) {
@@ -335,18 +434,32 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
           const pre = entry.compactMetadata?.preTokens;
           if (typeof pre === 'number' && Number.isFinite(pre)) summarised = Math.max(summarised, pre);
         }
-      } catch { /* not a line */ }
+      } catch {
+        /* not a line */
+      }
     }
     if (!line.includes('"assistant"')) continue;
     let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
-    try { entry = JSON.parse(line); } catch { continue; }
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
     const message = entry.message;
     if (entry.type !== 'assistant' || !message?.id || !(Date.parse(entry.timestamp ?? '') >= since)) continue;
     const u = message.usage;
     const n = (key: string) => (typeof u?.[key] === 'number' ? (u[key] as number) : 0);
-    responses.set(message.id, typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'
-      ? { uncached: n('input_tokens'), write: n('cache_creation_input_tokens'), read: n('cache_read_input_tokens'), output: n('output_tokens') }
-      : null);
+    responses.set(
+      message.id,
+      typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'
+        ? {
+            uncached: n('input_tokens'),
+            write: n('cache_creation_input_tokens'),
+            read: n('cache_read_input_tokens'),
+            output: n('output_tokens'),
+          }
+        : null,
+    );
     if (Array.isArray(message.content)) {
       for (const block of message.content as Array<{ type?: string; id?: string }>) {
         if (block?.type === 'tool_use' && block.id) toolCalls.add(block.id);
@@ -366,7 +479,9 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     ...(all && !compacted
       ? {
           inputTokens: total('uncached') + total('write') + total('read'),
-          uncachedTokens: total('uncached'), cacheWriteTokens: total('write'), cacheReadTokens: total('read'),
+          uncachedTokens: total('uncached'),
+          cacheWriteTokens: total('write'),
+          cacheReadTokens: total('read'),
           outputTokens: total('output'),
         }
       : {}),
@@ -384,11 +499,15 @@ export const renderTranscript = (messages: readonly unknown[]): string =>
       const msg = m as { type?: string; message?: { content?: unknown } };
       const content = msg.message?.content;
       const text = Array.isArray(content)
-        ? content.map((b) => {
-            const block = b as { type?: string; text?: string; name?: string };
-            return block.type === 'text' ? block.text : block.type === 'tool_use' ? `[${block.name}]` : `[${block.type}]`;
-          }).join(' ')
-        : typeof content === 'string' ? content : '';
-      return `${(msg.type ?? '?').padEnd(9)} ${String(text).replace(/\s+/g, ' ').slice(0, 160)}`;
+        ? content
+            .map((b) => {
+              const block = b as { type?: string; text?: string; name?: string };
+              return block.type === 'text' ? block.text : block.type === 'tool_use' ? `[${block.name}]` : `[${block.type}]`;
+            })
+            .join(' ')
+        : typeof content === 'string'
+          ? content
+          : '';
+      return `${(msg.type ?? '?').padEnd(9)} ${text.replace(/\s+/g, ' ').slice(0, 160)}`;
     })
     .join('\n');

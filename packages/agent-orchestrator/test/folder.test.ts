@@ -24,10 +24,16 @@ const FAN = path.join(ROOT, 'workflows', 'fan');
 fs.mkdirSync(FAN, { recursive: true });
 fs.writeFileSync(path.join(FAN, 'a.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side a\n');
 fs.writeFileSync(path.join(FAN, 'b.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\n---\nwrite side b\n');
-fs.writeFileSync(path.join(FAN, 'c.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: a, b\n---\nput the two together\n');
+fs.writeFileSync(
+  path.join(FAN, 'c.md'),
+  '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: a, b\n---\nput the two together\n',
+);
 // And a fourth that continues the third's session, which is the shipped `note` chain's shape and the only one anybody runs today: it
 // works in `c`'s folder and is given nothing of its own, so its brief's `given/inputs` is true only because `c`'s copy is in there.
-fs.writeFileSync(path.join(FAN, 'd.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n');
+fs.writeFileSync(
+  path.join(FAN, 'd.md'),
+  '---\nworkspace: folder\npermissionMode: dontAsk\nallow: Edit(**)\nafter: c\n---\nread it once more\n',
+);
 // Two files a person hands the run with `wf start --input`.
 const GIVEN_FILES = path.join(ROOT, 'given-files');
 fs.mkdirSync(GIVEN_FILES, { recursive: true });
@@ -42,13 +48,18 @@ fs.writeFileSync(path.join(GIT_TEAM, 'implement.md'), '---\n---\nmake the change
 // A `git` that refuses and says so, first on PATH: anything that reaches for git during a folder run is written down.
 const BIN = path.join(ROOT, 'bin');
 fs.mkdirSync(BIN);
-fs.writeFileSync(path.join(BIN, 'git'), `#!/bin/sh\necho "$*" >> ${JSON.stringify(GIT_ASKED)}\necho "fatal: not a git repository" >&2\nexit 128\n`, { mode: 0o755 });
+fs.writeFileSync(
+  path.join(BIN, 'git'),
+  `#!/bin/sh\necho "$*" >> ${JSON.stringify(GIT_ASKED)}\necho "fatal: not a git repository" >&2\nexit 128\n`,
+  { mode: 0o755 },
+);
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT_ASKED, 'utf8').trim().split('\n') : []);
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, retry, start, startQueued } = await import('../src/runner.ts');
+const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, retry, start, startQueued } =
+  await import('../src/runner.ts');
 const { forgetLine, sentBack, stepTaskId } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
@@ -56,8 +67,14 @@ const { main } = await import('../src/cli.ts');
 const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
   const lines: string[] = [];
   const log = console.log;
-  console.log = (...args: unknown[]) => { lines.push(args.join(' ')); };
-  try { await main(argv, e as Parameters<typeof main>[1]); } finally { console.log = log; }
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(' '));
+  };
+  try {
+    await main(argv, e as Parameters<typeof main>[1]);
+  } finally {
+    console.log = log;
+  }
   return lines.join('\n').split('\n');
 };
 type Engine = Parameters<typeof advance>[0];
@@ -72,24 +89,54 @@ const board = () => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
-        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        id,
+        phase: t?.phase ?? 'pending',
+        sessionId: t ? 's' : null,
         state: {
-          brief: t?.spec.brief ?? '', settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null, startedAt: '2026-09-19T10:00:00Z', spawnedAt: null, endedAt: null, reason: null }],
+          brief: t?.spec.brief ?? '',
+          settled,
+          stopRequested: false,
+          said: [],
+          attempts:
+            !t || t.phase === 'pending'
+              ? []
+              : [
+                  {
+                    n: 1,
+                    ended: null,
+                    nativeId: `native-${id}`,
+                    closeout: t.closeout,
+                    exitCode: null,
+                    usage: null,
+                    startedAt: '2026-09-19T10:00:00Z',
+                    spawnedAt: null,
+                    endedAt: null,
+                    reason: null,
+                  },
+                ],
         },
       };
     },
-    file: async (spec: { id: string; brief: string; cwd: string }) => { tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    file: async (spec: { id: string; brief: string; cwd: string }) => {
+      tasks.set(spec.id, { spec, phase: 'pending' });
+      return spec.id;
+    },
     stop: async () => {},
     logs: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
   } as unknown as Engine;
-  const settle = (id: string, phase: string, closeout?: unknown) => { tasks.set(id, { ...tasks.get(id)!, phase, closeout }); };
+  const settle = (id: string, phase: string, closeout?: unknown) => {
+    tasks.set(id, { ...tasks.get(id)!, phase, closeout });
+  };
   return { e, tasks, settle };
 };
 
 const refusal = (fn: () => unknown): { message: string; exitCode: unknown } => {
-  try { fn(); } catch (err) { return { message: (err as Error).message, exitCode: (err as { exitCode?: unknown }).exitCode }; }
+  try {
+    fn();
+  } catch (err) {
+    return { message: (err as Error).message, exitCode: (err as { exitCode?: unknown }).exitCode };
+  }
   assert.fail('it was not refused');
 };
 
@@ -98,7 +145,8 @@ test('a folder team starts from a directory that is no repository, and its recor
   const record = readRun(run.id);
   assert.deepEqual(record.place, { kind: 'folder' });
   assert.equal(record.workspace, path.join(ROOT, 'runs', run.id, 'work'));
-  for (const key of ['repo', 'baseRef', 'branch', 'isolate'] as const) assert.equal(key in record, false, `${key} is not on a folder run's record`);
+  for (const key of ['repo', 'baseRef', 'branch', 'isolate'] as const)
+    assert.equal(key in record, false, `${key} is not on a folder run's record`);
   assert.deepEqual(record.steps, { write: { taskId: null }, review: { taskId: null } });
   assert.deepEqual(gitAsked(), []);
 });
@@ -160,11 +208,20 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.deepEqual(decided.decision.kind === 'awaiting' && [decided.decision.branches, decided.decision.direct], [[], false]);
   assert.deepEqual([decided.standings, decided.toDecide], [[], undefined]);
   const listed = await list(e, readRun(run.id));
-  assert.deepEqual(listed.steps.map((s) => s.branch), [null, null], 'no branch to list');
+  assert.deepEqual(
+    listed.steps.map((s) => s.branch),
+    [null, null],
+    'no branch to list',
+  );
 
   // wf decide says where the work is and the one command there is, and no git command.
   const screen = await printed(['decide', run.id], e);
-  assert.ok(screen.includes(`  worked in folders, with no git repository: ${path.join(ROOT, 'runs', run.id, 'work')}, a folder per step; nothing to merge`), screen.join('\n'));
+  assert.ok(
+    screen.includes(
+      `  worked in folders, with no git repository: ${path.join(ROOT, 'runs', run.id, 'work')}, a folder per step; nothing to merge`,
+    ),
+    screen.join('\n'),
+  );
   assert.equal(screen.at(-1), `  done with it   wf rm ${run.id}  — forgets the run with its folders and files`);
   assert.equal(screen.filter((l) => /\bgit (-C|merge|branch|diff)/.test(l)).length, 0, screen.join('\n'));
 
@@ -173,7 +230,10 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
-  assert.match(forgetLine(forgot), new RegExp(`^${run.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`));
+  assert.match(
+    forgetLine(forgot),
+    new RegExp(`^${run.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`),
+  );
   assert.deepEqual(gitAsked(), [], 'and nothing asked git');
 });
 
@@ -208,9 +268,15 @@ test('wf start from a directory that is no repository: a folder team starts, and
     const out = await printed(['start', 'a note on tides', '--workflows', TEAM]);
     const id = out[0]!.split(' ')[0]!;
     assert.equal(readRun(id).place?.kind, 'folder');
-    assert.ok(out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`), out.join('\n'));
-    await assert.rejects(main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.']),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``));
+    assert.ok(
+      out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`),
+      out.join('\n'),
+    );
+    await assert.rejects(
+      main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.']),
+      (err: Error & { exitCode?: number }) =>
+        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``),
+    );
   } finally {
     process.chdir(cwd);
   }
@@ -223,14 +289,20 @@ test('REFUSED: a card filed for a folder team with a repository — the card nam
   try {
     // The board filed a `repo:` on every card it filed, and a folder team never reads one: refused where the card is written, in the
     // words `wf start --repo` is refused in. A card for a git team, and a card for a folder team with no repository, are filed as before.
-    assert.throws(() => addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO }),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2
-        && err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``)
-        && /File the card without a repository, or name a workflow whose steps work on one\.$/.test(err.message));
+    assert.throws(
+      () => addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO }),
+      (err: Error & { exitCode?: number }) =>
+        err.exitCode === 2 &&
+        err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``) &&
+        err.message.endsWith('File the card without a repository, or name a workflow whose steps work on one.'),
+    );
     const inbox = path.join(ROOT, 'inbox');
     assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], 'refused before the card is written');
     assert.ok(addToInbox({ text: 'a note on tides', workflow: TEAM }).card.name, 'a folder team with no repository is filed');
-    assert.ok(addToInbox({ text: 'a change to make', workflow: GIT_TEAM, repo: NOT_A_REPO }).card.repo, 'a team that works on a repository keeps its repository');
+    assert.ok(
+      addToInbox({ text: 'a change to make', workflow: GIT_TEAM, repo: NOT_A_REPO }).card.repo,
+      'a team that works on a repository keeps its repository',
+    );
   } finally {
     process.chdir(cwd);
   }
@@ -246,13 +318,22 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     const file = path.join(ROOT, 'inbox', 'a-note-on-tides-old.md');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `---\nworkflow: ${TEAM}\nrepo: ${NOT_A_REPO}\n---\na note on tides\n`);
-    await assert.rejects(main(['start', file, '--repo', '.']),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``));
+    await assert.rejects(
+      main(['start', file, '--repo', '.']),
+      (err: Error & { exitCode?: number }) =>
+        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``),
+    );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
     const out = await printed(['start', file]);
     const run = readRun(out[0]!.split(' ')[0]!);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', 'a-note-on-tides-old', false]);
-    assert.ok(out.some((line) => line === `the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository`), out.join('\n'));
+    assert.ok(
+      out.some(
+        (line) =>
+          line === `the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository`,
+      ),
+      out.join('\n'),
+    );
     assert.ok(!fs.existsSync(file), 'started, the card leaves the inbox');
   } finally {
     process.chdir(cwd);
@@ -279,9 +360,11 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
     const run = readRun(started.run);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', named, false], 'the run looked at no repository');
     assert.equal(started.ignoredRepo, NOT_A_REPO, "the tick's start carries the card's repo, which the run looked at none of");
-    assert.equal(queueLine(started),
+    assert.equal(
+      queueLine(started),
       `started ${named} as ${started.run} (the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository)`,
-      'and the line a daemon prints says it, in the sentence wf start prints');
+      'and the line a daemon prints says it, in the sentence wf start prints',
+    );
 
     // The other way round, so the line is not one every start carries: a card of the same folder team that names no repository.
     const plain = card('a-note-queued-plain', '');
@@ -295,7 +378,7 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
   assert.deepEqual(gitAsked(), []);
 });
 
-test('the shipped note team is a folder team: it starts with no repository, and review continues write\'s folder, handed its title and gist', async () => {
+test("the shipped note team is a folder team: it starts with no repository, and review continues write's folder, handed its title and gist", async () => {
   const shipped = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'note');
   const run = start({ brief: 'a note on how tides work', repo: NOT_A_REPO, workflowDir: shipped });
   assert.deepEqual(readRun(run.id).place, { kind: 'folder' });
@@ -337,9 +420,13 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['a', 'b']);
   for (const name of ['a', 'b']) {
     const folder = path.join(work, name);
-    assert.deepEqual(fs.readdirSync(path.join(folder, 'given', 'inputs')).sort(), ['brief notes.md', 'mock.png'], `${name} was given the run's inputs`);
+    assert.deepEqual(
+      fs.readdirSync(path.join(folder, 'given', 'inputs')).sort(),
+      ['brief notes.md', 'mock.png'],
+      `${name} was given the run's inputs`,
+    );
     assert.equal(fs.readFileSync(path.join(folder, 'given', 'inputs', 'mock.png'), 'utf8'), 'PNG');
-    assert.equal(fs.existsSync(path.join(folder, 'given', 'from')), false, 'a root waits on nobody, so it is given nobody\'s folder');
+    assert.equal(fs.existsSync(path.join(folder, 'given', 'from')), false, "a root waits on nobody, so it is given nobody's folder");
   }
   // What each side leaves, and two things the copy must not carry into the step after them: a link out of the folder, and the folder's
   // own `given/`, which is its parents' work and not its own — copied on, a chain would square it at every fan-in.
@@ -353,9 +440,21 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.equal(tasks.get(`${run.id}-c`)!.spec.cwd, c, 'a fan-in gets a folder of its own');
   assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'a', 'side-a.md'), 'utf8'), '# a\n');
   assert.equal(fs.readFileSync(path.join(c, 'given', 'from', 'b', 'side-b.md'), 'utf8'), '# b\n');
-  assert.deepEqual(fs.readdirSync(path.join(c, 'given', 'inputs')).sort(), ['brief notes.md', 'mock.png'], 'and the run\'s inputs, as its parents were');
-  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'out')), false, 'a symlink is not copied: a link in the folder is the fence undone by a file');
-  assert.equal(fs.existsSync(path.join(c, 'given', 'from', 'b', 'given')), false, 'nor a parent\'s own given/: what this step waits on is what that step made');
+  assert.deepEqual(
+    fs.readdirSync(path.join(c, 'given', 'inputs')).sort(),
+    ['brief notes.md', 'mock.png'],
+    "and the run's inputs, as its parents were",
+  );
+  assert.equal(
+    fs.existsSync(path.join(c, 'given', 'from', 'b', 'out')),
+    false,
+    'a symlink is not copied: a link in the folder is the fence undone by a file',
+  );
+  assert.equal(
+    fs.existsSync(path.join(c, 'given', 'from', 'b', 'given')),
+    false,
+    "nor a parent's own given/: what this step waits on is what that step made",
+  );
 
   // The step that continues c's session works in c's folder, and is given nothing of its own: its brief says the run's files are
   // `given/inputs` *in this folder*, which is true because c's copy is sitting in the folder it inherits. That is the shape the
@@ -386,7 +485,7 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.deepEqual(gitAsked(), []);
 });
 
-test('REFUSED: a card with a repository queued onto a folder team — `--workflow` writes that key, so it is judged as the card\'s own writer is', async () => {
+test("REFUSED: a card with a repository queued onto a folder team — `--workflow` writes that key, so it is judged as the card's own writer is", async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
@@ -399,9 +498,16 @@ test('REFUSED: a card with a repository queued onto a folder team — `--workflo
     fs.writeFileSync(file, text);
     const refused = refusal(() => queueInInbox('a-card-with-a-repo', { workflow: TEAM }));
     assert.equal(refused.exitCode, 2);
-    assert.ok(refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``), refused.message);
+    assert.ok(
+      refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`workspace: folder\``),
+      refused.message,
+    );
     assert.match(refused.message, /File the card without a repository, or name a workflow whose steps work on one\.$/);
-    assert.equal(fs.readFileSync(file, 'utf8'), text, 'refused before anything is written: the card is unqueued, and its workflow is its own');
+    assert.equal(
+      fs.readFileSync(file, 'utf8'),
+      text,
+      'refused before anything is written: the card is unqueued, and its workflow is its own',
+    );
     // Taken OFF the queue with `--workflow` writes the key just the same (`queuedText`), so it is refused just the same. The card has to
     // be queued for that write to happen — an unqueued card taken off the queue is left alone, whatever was passed — so it is queued
     // first, on the team it names, which works on a repository.
@@ -429,7 +535,6 @@ test('REFUSED: a card with a repository queued onto a folder team — `--workflo
   }
   assert.deepEqual(gitAsked(), []);
 });
-
 
 test("a fan-in filed a second time is given its parent's folder as it stands then, not laid over the copy it had", async () => {
   // `folderPlace.make` runs every time a step is filed, and a step is filed more than once: a person's objection at a gate unfiles the
@@ -459,8 +564,11 @@ test("a fan-in filed a second time is given its parent's folder as it stands the
   const again = await advance(e, readRun(run.id));
   assert.deepEqual(again.filed, ['c'], again.notes.join('\n'));
   assert.equal(tasks.get(`${run.id}-c-try2`)!.spec.cwd, path.join(work, 'c'), 'the folder it had, since a send-back keeps it');
-  assert.deepEqual(fs.readdirSync(givenA).sort(), ['keep.md', 'said.md'],
-    "a's folder as it stands now — the copy is replaced, not merged over, or the step reads work that is not there any more");
+  assert.deepEqual(
+    fs.readdirSync(givenA).sort(),
+    ['keep.md', 'said.md'],
+    "a's folder as it stands now — the copy is replaced, not merged over, or the step reads work that is not there any more",
+  );
 
   await forget(e, run.id);
   assert.deepEqual(gitAsked(), []);
@@ -496,7 +604,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   // Somebody's directory outside the run, shaped as the copy is — `from/a/` inside it — so a followed link would empty it.
   const outside = path.join(ROOT, 'outside-the-run');
   fs.mkdirSync(path.join(outside, 'from', 'a'), { recursive: true });
-  fs.writeFileSync(path.join(outside, 'from', 'a', 'theirs.md'), 'not the run\'s to touch\n');
+  fs.writeFileSync(path.join(outside, 'from', 'a', 'theirs.md'), "not the run's to touch\n");
   fs.rmSync(path.join(work, 'c', 'given'), { recursive: true });
   fs.symlinkSync(outside, path.join(work, 'c', 'given'));
 
@@ -509,11 +617,17 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
     const pass = await advance(e, readRun(run.id));
     filed = pass.filed;
     said = pass.notes.join('\n');
-  } catch (err) { said = (err as Error).message; }
+  } catch (err) {
+    said = (err as Error).message;
+  }
   assert.deepEqual(filed, [], 'c is not filed through a link');
   assert.match(said, /given is a link, and `given\/` in a step's folder is the run's own/);
   assert.match(said, /Remove or rename it/);
-  assert.equal(fs.readFileSync(path.join(outside, 'from', 'a', 'theirs.md'), 'utf8'), 'not the run\'s to touch\n', 'what the link points at is as it was');
+  assert.equal(
+    fs.readFileSync(path.join(outside, 'from', 'a', 'theirs.md'), 'utf8'),
+    "not the run's to touch\n",
+    'what the link points at is as it was',
+  );
   assert.deepEqual(fs.readdirSync(path.join(outside, 'from', 'a')), ['theirs.md'], 'and nothing of the run was written there');
   await forget(e, run.id);
 });

@@ -26,16 +26,22 @@ test('with a key it is ready, and asks nothing to say so', async () => {
   assert.equal(await main(['status'], { env: ENV, out: (l) => lines.push(l) }), 0);
   assert.deepEqual(lines, ['ready']);
   assert.equal(reached.length, 0);
-  await assert.rejects(main(['status', 'now'], { env: ENV, out: () => {} }), (e: Error) => /^judge status takes nothing/.test(e.message));
+  await assert.rejects(main(['status', 'now'], { env: ENV, out: () => {} }), (e: Error) =>
+    e.message.startsWith('judge status takes nothing'),
+  );
 });
 
 test('the facade refuses a key passed in, an unknown option, no record, an alias and a bad mode', () => {
   const record = tmp('facade');
-  refused(() => judge({ model: 'jev-1.13.0', record, apiKey: 'x' } as never), /^judge: unknown option `apiKey`\. The key is read from TYPESAFE_API_KEY/);
+  refused(
+    () => judge({ model: 'jev-1.13.0', record, apiKey: 'x' } as never),
+    /^judge: unknown option `apiKey`\. The key is read from TYPESAFE_API_KEY/,
+  );
   refused(() => judge({ model: 'jev-1.13.0', record, timeout: 1 } as never), /^judge: unknown option `timeout`\. It takes model, record/);
   refused(() => judge({ model: 'jev-1.13.0' } as never), /^judge: `record` names the directory/);
   refused(() => judge({ model: 'jev-1.13.0', record: '' }), /^judge: `record` names the directory/);
-  for (const model of ['jev', 'jev-latest', 'jev-1', 'JEV-1.13.0', '']) refused(() => judge({ model, record }), /^judge: the model must be pinned/);
+  for (const model of ['jev', 'jev-latest', 'jev-1', 'JEV-1.13.0', ''])
+    refused(() => judge({ model, record }), /^judge: the model must be pinned/);
   refused(() => judge({ model: 'jev-1.13.0', record, mode: 'live' as never }), /^judge: `mode` is recorded or replay, not "live"/);
 });
 

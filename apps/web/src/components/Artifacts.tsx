@@ -3,10 +3,13 @@ import { when } from './Facts';
 
 /** Bytes as a person reads them, as `wf decide` prints a file's size and `wf prune` a worktree's (`sizeOf`). */
 export const bytesWord = (bytes: number): string =>
-  bytes < 1024 ? `${bytes} B`
-  : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB`
-  : bytes < 1024 ** 3 ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
-  : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  bytes < 1024
+    ? `${bytes} B`
+    : bytes < 1024 ** 2
+      ? `${(bytes / 1024).toFixed(1)} KB`
+      : bytes < 1024 ** 3
+        ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
+        : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
 /**
  * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;
@@ -16,7 +19,15 @@ export const bytesWord = (bytes: number): string =>
  * `size` puts every file's size beside its name, and says so when there are none: for a list of what a folder holds rather than of
  * what a step named, where the size is part of what a person came to see.
  */
-export function Artifacts({ artifacts, size = false, none = 'none named' }: { artifacts: readonly StepArtifact[]; size?: boolean; none?: string }) {
+export function Artifacts({
+  artifacts,
+  size = false,
+  none = 'none named',
+}: {
+  artifacts: readonly StepArtifact[];
+  size?: boolean;
+  none?: string;
+}) {
   if (!artifacts.length) return <p className="text-xs text-neutral-500">{none}</p>;
   return (
     <ul className="mt-1 space-y-2 text-xs">

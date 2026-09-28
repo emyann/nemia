@@ -27,7 +27,10 @@ type SkillAdded = import('../src/skills.ts').SkillAdded;
 
 // What HKB ships: the checkout these tests run in, which is the api's own (HOME_REPO). Read, never written.
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
-const shipped = fs.readdirSync(SHIPPED).filter((name) => fs.existsSync(path.join(SHIPPED, name, 'SKILL.md'))).sort();
+const shipped = fs
+  .readdirSync(SHIPPED)
+  .filter((name) => fs.existsSync(path.join(SHIPPED, name, 'SKILL.md')))
+  .sort();
 const [inLibrary, inRepo, toCopy] = shipped as [string, string, string];
 const LIBRARY = path.join(root, 'workflows', 'skills');
 const THEIRS = path.join(repo, '.claude', 'skills');
@@ -39,17 +42,20 @@ function skill(dir: string, name: string, text: string): void {
 
 // The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names
 // puts your library first: only the lookup does.
-skill(THEIRS, 'shared', '---\ndescription: The repository\'s.\n---\nTheirs.\n');
+skill(THEIRS, 'shared', "---\ndescription: The repository's.\n---\nTheirs.\n");
 skill(THEIRS, 'review', '---\nname: code-review\ndescription: Reviews a change.\n---\nReview it.\n');
 skill(THEIRS, 'scratch', '# Scratch\n\nNo frontmatter.\n');
-skill(THEIRS, inRepo, '---\ndescription: The repository\'s own of a shipped name.\n---\nTheirs.\n');
-skill(path.join(repo, 'workflows', 'skills'), 'beside', '---\ndescription: Beside the repository\'s agents.\n---\nNot for yours.\n');
+skill(THEIRS, inRepo, "---\ndescription: The repository's own of a shipped name.\n---\nTheirs.\n");
+skill(path.join(repo, 'workflows', 'skills'), 'beside', "---\ndescription: Beside the repository's agents.\n---\nNot for yours.\n");
 skill(LIBRARY, 'shared', '---\ndescription: Mine.\n---\nMine.\n');
 skill(LIBRARY, 'mine', '---\ndescription: "Writes a decision."\ntags: ["decision"]\n---\n# Mine\n\nWrite it down.\n');
 skill(LIBRARY, 'always', '---\ndescription: Asks when it reads two ways.\npreload: true\n---\nAsk before you guess, every time.\n');
 fs.cpSync(path.join(SHIPPED, inLibrary), path.join(LIBRARY, inLibrary), { recursive: true });
 fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
-fs.writeFileSync(path.join(root, 'workflows', 'agents', 'scribe.md'), '---\ndescription: Writes notes.\nskills: mine, shared, review\ntools: Read, Skill\n---\nWrite.\n');
+fs.writeFileSync(
+  path.join(root, 'workflows', 'agents', 'scribe.md'),
+  '---\ndescription: Writes notes.\nskills: mine, shared, review\ntools: Read, Skill\n---\nWrite.\n',
+);
 fs.writeFileSync(path.join(root, 'workflows', 'agents', 'clerk.md'), '---\ndescription: Files notes.\nskills: mine\n---\nFile.\n');
 fs.writeFileSync(path.join(root, 'workflows', 'agents', 'broken.md'), '---\nskills: shared\ncheck: npm test\n---\nNope.\n');
 
@@ -58,8 +64,13 @@ const send = (url: string, body: unknown, headers: Record<string, string> = json
   app.request(url, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** Every file of the library, by its path in it, with what it holds. */
-const snapshot = (): Record<string, string> => Object.fromEntries((fs.readdirSync(LIBRARY, { recursive: true }) as string[]).sort()
-  .filter((f) => fs.statSync(path.join(LIBRARY, f)).isFile()).map((f) => [f, fs.readFileSync(path.join(LIBRARY, f), 'utf8')]));
+const snapshot = (): Record<string, string> =>
+  Object.fromEntries(
+    (fs.readdirSync(LIBRARY, { recursive: true }) as string[])
+      .sort()
+      .filter((f) => fs.statSync(path.join(LIBRARY, f)).isFile())
+      .map((f) => [f, fs.readFileSync(path.join(LIBRARY, f), 'utf8')]),
+  );
 
 async function refused(res: Promise<Response>, status: number, pattern: RegExp): Promise<void> {
   const before = snapshot();
@@ -68,7 +79,11 @@ async function refused(res: Promise<Response>, status: number, pattern: RegExp):
   assert.equal(answer.status, status, body.error);
   assert.match(body.error, pattern);
   assert.deepEqual(snapshot(), before, 'a refused copy leaves the library as it was');
-  assert.deepEqual(fs.readdirSync(LIBRARY).filter((n) => n.startsWith('.')), [], 'with no half-copied folder in it');
+  assert.deepEqual(
+    fs.readdirSync(LIBRARY).filter((n) => n.startsWith('.')),
+    [],
+    'with no half-copied folder in it',
+  );
 }
 
 async function listed(): Promise<SkillPlace[]> {
@@ -77,17 +92,38 @@ async function listed(): Promise<SkillPlace[]> {
   return (await res.json()) as SkillPlace[];
 }
 
-const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined => places.find((p) => p.from === from)?.skills.find((s) => s.name === name);
+const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined =>
+  places.find((p) => p.from === from)?.skills.find((s) => s.name === name);
 
-test('the skills are listed by place — yours, the repository\'s, then what HKB ships — each name where an agent of yours finds it', async () => {
+test("the skills are listed by place — yours, the repository's, then what HKB ships — each name where an agent of yours finds it", async () => {
   const places = await listed();
-  assert.deepEqual(places.map((p) => [p.from, p.dir]), [['yours', LIBRARY], ['repo', THEIRS], ['shipped', SHIPPED]]);
-  assert.deepEqual(places[0]!.skills.map((s) => s.name), ['always', inLibrary, 'mine', 'shared'].sort());
-  assert.deepEqual(places[1]!.skills.map((s) => s.name), [inRepo, 'review', 'scratch'].sort(), 'the name in both is in yours alone');
-  assert.deepEqual(places[2]!.skills.map((s) => s.name), shipped);
+  assert.deepEqual(
+    places.map((p) => [p.from, p.dir]),
+    [
+      ['yours', LIBRARY],
+      ['repo', THEIRS],
+      ['shipped', SHIPPED],
+    ],
+  );
+  assert.deepEqual(
+    places[0]!.skills.map((s) => s.name),
+    ['always', inLibrary, 'mine', 'shared'].sort(),
+  );
+  assert.deepEqual(
+    places[1]!.skills.map((s) => s.name),
+    [inRepo, 'review', 'scratch'].sort(),
+    'the name in both is in yours alone',
+  );
+  assert.deepEqual(
+    places[2]!.skills.map((s) => s.name),
+    shipped,
+  );
   assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
   assert.equal(rowOf(places, 'yours', 'shared')!.dir, path.join(LIBRARY, 'shared'));
-  assert.ok(!places.some((p) => p.skills.some((s) => s.name === 'beside')), "the repository's workflows/skills is no place an agent of yours looks");
+  assert.ok(
+    !places.some((p) => p.skills.some((s) => s.name === 'beside')),
+    "the repository's workflows/skills is no place an agent of yours looks",
+  );
 });
 
 test('a skill is listed with its card entry, whether it is loaded every turn, what it costs a turn, and the agents of yours that give it', async () => {
@@ -130,7 +166,10 @@ test('a shipped skill says where an agent of yours already finds its name: in yo
   assert.equal(rowOf(places, 'shipped', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'shipped', toCopy)!.found, null);
   assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every shipped skill reads');
-  assert.ok(places[2]!.skills.every((s) => s.usedBy.length === 0), 'no agent of yours is given a skill from where HKB ships it');
+  assert.ok(
+    places[2]!.skills.every((s) => s.usedBy.length === 0),
+    'no agent of yours is given a skill from where HKB ships it',
+  );
 });
 
 test('a shipped skill is copied into your library, byte for byte, and listed there at once', async () => {
@@ -141,16 +180,28 @@ test('a shipped skill is copied into your library, byte for byte, and listed the
   assert.equal(body.skill.dir, path.join(LIBRARY, toCopy));
   assert.ok(body.written.includes('SKILL.md'));
   for (const file of body.written) {
-    assert.equal(fs.readFileSync(path.join(LIBRARY, toCopy, file), 'utf8'), fs.readFileSync(path.join(SHIPPED, toCopy, file), 'utf8'), file);
+    assert.equal(
+      fs.readFileSync(path.join(LIBRARY, toCopy, file), 'utf8'),
+      fs.readFileSync(path.join(SHIPPED, toCopy, file), 'utf8'),
+      file,
+    );
   }
   const places = await listed();
   assert.ok(rowOf(places, 'yours', toCopy), 'in your library');
   assert.equal(rowOf(places, 'shipped', toCopy)!.found, 'yours', 'and the shipped row says so');
-  await refused(send('/api/skills/yours', { copy: toCopy }), 409, new RegExp(`^skills/${toCopy} is there already, in .*, and a copy would write over it\\.`));
+  await refused(
+    send('/api/skills/yours', { copy: toCopy }),
+    409,
+    new RegExp(`^skills/${toCopy} is there already, in .*, and a copy would write over it\\.`),
+  );
 });
 
-test('REFUSED at shipped defaults: a skill HKB does not ship, a name that is not a skill\'s, and a body that names none', async () => {
-  await refused(send('/api/skills/yours', { copy: 'no-such-skill' }), 404, /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/);
+test("REFUSED at shipped defaults: a skill HKB does not ship, a name that is not a skill's, and a body that names none", async () => {
+  await refused(
+    send('/api/skills/yours', { copy: 'no-such-skill' }),
+    404,
+    /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
+  );
   await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the skill HKB ships to copy, a string/);
@@ -161,15 +212,31 @@ test('REFUSED at shipped defaults: a skill HKB does not ship, a name that is not
 test("REFUSED at shipped defaults: a copy into the repository's skills, or anywhere but yours, and nothing is written into the checkout", async () => {
   const theirs = fs.readdirSync(THEIRS).sort();
   await refused(send('/api/skills/repo', { copy: toCopy }), 403, /^POST \/api\/skills\/repo refuses to write the repository's skills/);
-  await refused(send('/api/skills/elsewhere', { copy: toCopy }), 400, /the board writes a skill into your library, at \/api\/skills\/yours/);
+  await refused(
+    send('/api/skills/elsewhere', { copy: toCopy }),
+    400,
+    /the board writes a skill into your library, at \/api\/skills\/yours/,
+  );
   assert.deepEqual(fs.readdirSync(THEIRS).sort(), theirs);
 });
 
 test('REFUSED at shipped defaults: a copy is guarded as every write of the board is — another site, another host, another content type', async () => {
   const other = shipped.find((name) => ![inLibrary, inRepo, toCopy].includes(name))!;
-  await refused(send('/api/skills/yours', { copy: other }, { ...json, 'sec-fetch-site': 'cross-site' }), 403, /^POST \/api\/skills\/yours refuses a request made by a page on another site/);
-  await refused(send('/api/skills/yours', { copy: other }, { ...json, host: 'evil.example' }), 403, /refuses a request addressed to evil\.example/);
-  await refused(send('/api/skills/yours', { copy: other }, { 'content-type': 'text/plain' }), 415, /takes its body as `content-type: application\/json`/);
+  await refused(
+    send('/api/skills/yours', { copy: other }, { ...json, 'sec-fetch-site': 'cross-site' }),
+    403,
+    /^POST \/api\/skills\/yours refuses a request made by a page on another site/,
+  );
+  await refused(
+    send('/api/skills/yours', { copy: other }, { ...json, host: 'evil.example' }),
+    403,
+    /refuses a request addressed to evil\.example/,
+  );
+  await refused(
+    send('/api/skills/yours', { copy: other }, { 'content-type': 'text/plain' }),
+    415,
+    /takes its body as `content-type: application\/json`/,
+  );
   assert.equal(fs.existsSync(path.join(LIBRARY, other)), false);
 });
 
@@ -178,11 +245,14 @@ test('an agent is listed with each skill it gives, where it is found and what it
   try {
     const res = await app.request('/api/agents/yours/scribe');
     const scribe = (await res.json()) as import('../src/agents.ts').AgentListing;
-    assert.deepEqual(scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]), [
-      ['mine', 'yours', 'Writes a decision.'],
-      ['shared', 'yours', 'Mine.'],
-      ['review', 'repo', 'Reviews a change.'],
-    ]);
+    assert.deepEqual(
+      scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]),
+      [
+        ['mine', 'yours', 'Writes a decision.'],
+        ['shared', 'yours', 'Mine.'],
+        ['review', 'repo', 'Reviews a change.'],
+      ],
+    );
     const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('../src/agents.ts').AgentListing;
     assert.equal(lost.given[0]!.preload, true);
     assert.equal(lost.given[0]!.cost!.perTurn, lost.given[0]!.cost!.listed + lost.given[0]!.cost!.body);
@@ -206,18 +276,41 @@ async function detail(from: string, name: string): Promise<SkillDetail> {
   return body as SkillDetail;
 }
 
-const agentVersionOf = async (name: string): Promise<string> => ((await (await app.request(`/api/agents/yours/${name}`)).json()) as { version: string }).version;
+const agentVersionOf = async (name: string): Promise<string> =>
+  ((await (await app.request(`/api/agents/yours/${name}`)).json()) as { version: string }).version;
 
-const NOTES = { name: 'tidy-notes', title: 'Tidy notes', description: 'Rewrites notes one fact a line.', tags: ['notes'], examples: ['tidy my notes'], body: '# Tidy\n\nOne fact a line.' };
+const NOTES = {
+  name: 'tidy-notes',
+  title: 'Tidy notes',
+  description: 'Rewrites notes one fact a line.',
+  tags: ['notes'],
+  examples: ['tidy my notes'],
+  body: '# Tidy\n\nOne fact a line.',
+};
 
 test("a skill's page says what it says, what it costs a turn, the agents of either place that give this very folder, and how to move it", async () => {
   fs.mkdirSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'theirs.md'), '---\ndescription: The repository\'s.\nskills: mine, shared\n---\nWork.\n');
+  fs.writeFileSync(
+    path.join(repo, 'workflows', 'agents', 'theirs.md'),
+    "---\ndescription: The repository's.\nskills: mine, shared\n---\nWork.\n",
+  );
   try {
     const mine = await detail('yours', 'mine');
-    assert.deepEqual(mine.draft, { name: 'mine', title: null, description: 'Writes a decision.', tags: ['decision'], examples: null, preload: false, body: '# Mine\n\nWrite it down.' });
+    assert.deepEqual(mine.draft, {
+      name: 'mine',
+      title: null,
+      description: 'Writes a decision.',
+      tags: ['decision'],
+      examples: null,
+      preload: false,
+      body: '# Mine\n\nWrite it down.',
+    });
     assert.match(mine.version, /^[0-9a-f]{16}$/);
-    assert.deepEqual(mine.users, [{ from: 'repo', name: 'theirs' }, { from: 'yours', name: 'clerk' }, { from: 'yours', name: 'scribe' }]);
+    assert.deepEqual(mine.users, [
+      { from: 'repo', name: 'theirs' },
+      { from: 'yours', name: 'clerk' },
+      { from: 'yours', name: 'scribe' },
+    ]);
     assert.deepEqual(mine.skill.cost, skillTurnCost('mine', fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8')));
     assert.equal(mine.copyHint, `mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'mine')}' '${THEIRS}/'`);
     // `shared` is in both places: the repository's agent finds its own first, and an agent of yours finds yours.
@@ -245,16 +338,27 @@ test('a skill written on the board is made in your library, read back as its pag
   assert.deepEqual(made.written, ['SKILL.md']);
   assert.deepEqual(made.draft, { ...NOTES, preload: false });
   assert.equal(made.skill.dir, path.join(LIBRARY, 'tidy-notes'));
-  assert.deepEqual(made.skill.entry, { id: 'tidy-notes', name: 'Tidy notes', description: NOTES.description, tags: ['notes'], examples: ['tidy my notes'] });
-  assert.equal(fs.readFileSync(path.join(LIBRARY, 'tidy-notes', 'SKILL.md'), 'utf8'),
-    '---\nname: tidy-notes\ntitle: "Tidy notes"\ndescription: "Rewrites notes one fact a line."\ntags: ["notes"]\nexamples: ["tidy my notes"]\n---\n# Tidy\n\nOne fact a line.\n');
+  assert.deepEqual(made.skill.entry, {
+    id: 'tidy-notes',
+    name: 'Tidy notes',
+    description: NOTES.description,
+    tags: ['notes'],
+    examples: ['tidy my notes'],
+  });
+  assert.equal(
+    fs.readFileSync(path.join(LIBRARY, 'tidy-notes', 'SKILL.md'), 'utf8'),
+    '---\nname: tidy-notes\ntitle: "Tidy notes"\ndescription: "Rewrites notes one fact a line."\ntags: ["notes"]\nexamples: ["tidy my notes"]\n---\n# Tidy\n\nOne fact a line.\n',
+  );
   assert.ok(rowOf(await listed(), 'yours', 'tidy-notes'));
 });
 
 test('a change of a skill moves the version of every agent that gives it, and the preload switch alone does too', async () => {
   const before = { scribe: await agentVersionOf('scribe'), clerk: await agentVersionOf('clerk') };
   const { version } = await detail('yours', 'mine');
-  const res = await put('/api/skills/yours/mine', { version, skill: { name: 'mine', description: 'Writes a decision down.', tags: ['decision'], body: 'Write it down, dated.' } });
+  const res = await put('/api/skills/yours/mine', {
+    version,
+    skill: { name: 'mine', description: 'Writes a decision down.', tags: ['decision'], body: 'Write it down, dated.' },
+  });
   const changed = (await res.json()) as SkillSaved;
   assert.equal(res.status, 200, JSON.stringify(changed));
   assert.equal(changed.draft!.description, 'Writes a decision down.');
@@ -270,16 +374,31 @@ test('a change of a skill moves the version of every agent that gives it, and th
   assert.notEqual(await agentVersionOf('clerk'), after.clerk);
   const off = await put('/api/skills/yours/mine', { version: switched.version, preload: false });
   assert.equal(off.status, 200);
-  assert.equal(fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'), '---\nname: mine\ndescription: "Writes a decision down."\ntags: ["decision"]\n---\nWrite it down, dated.\n');
+  assert.equal(
+    fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'),
+    '---\nname: mine\ndescription: "Writes a decision down."\ntags: ["decision"]\n---\nWrite it down, dated.\n',
+  );
 });
 
 test('REFUSED at shipped defaults: a name that is not a folder-safe id, a clash with a skill of your library, a frontmatter the card reader refuses', async () => {
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: '../agents' } }), 422, /^`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'Tidy Notes' } }), 422, /^`Tidy Notes` is not a skill's name/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }), 409, /^skills\/mine is there already, in .*, and a new skill would write over it\. Give it another name/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }), 422, /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/);
+  await refused(
+    send('/api/skills/yours', { skill: { ...NOTES, name: 'mine' } }),
+    409,
+    /^skills\/mine is there already, in .*, and a new skill would write over it\. Give it another name/,
+  );
+  await refused(
+    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: '' } }),
+    422,
+    /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/,
+  );
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: [] } }), 422, /`tags` is an empty list/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: 'one\npreload: true' } }), 422, /`description` holds a line break/);
+  await refused(
+    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', description: 'one\npreload: true' } }),
+    422,
+    /`description` holds a line break/,
+  );
   assert.equal(fs.existsSync(path.join(LIBRARY, 'fresh')), false);
 });
 
@@ -289,34 +408,61 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
   await refused(put('/api/skills/yours/always', { version, preload: false }), 409, /^skills\/always changed since it was read \(version /);
   await refused(put('/api/skills/yours/gone', { version, preload: false }), 404, /^skills\/gone is not in .*: it was removed/);
   const now = (await detail('yours', 'always')).version;
-  await refused(put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }), 400, /the skill is named always, and this request's is "renamed"/);
-  await refused(put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'always', examples: [] } }), 422, /`examples` is an empty list/);
-  await refused(put('/api/skills/yours/always', { version: now }), 400, /takes one of `skill` .* and `preload` .* and this request sent neither/);
+  await refused(
+    put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'renamed' } }),
+    400,
+    /the skill is named always, and this request's is "renamed"/,
+  );
+  await refused(
+    put('/api/skills/yours/always', { version: now, skill: { ...NOTES, name: 'always', examples: [] } }),
+    422,
+    /`examples` is an empty list/,
+  );
+  await refused(
+    put('/api/skills/yours/always', { version: now }),
+    400,
+    /takes one of `skill` .* and `preload` .* and this request sent neither/,
+  );
   await refused(put('/api/skills/yours/always', { version: now, preload: true, skill: NOTES }), 400, /this request sent both/);
   await refused(put('/api/skills/yours/always', { preload: true }), 400, /takes the `version` the skill was read at/);
   await refused(put('/api/skills/yours/always', { version: now, preload: 'yes' }), 400, /`preload` is true or false/);
-  await refused(send('/api/skills/yours', { copy: toCopy, skill: NOTES }), 400, /takes one of `copy` .* and `skill` .* and this request sent both/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: 'notes' } }), 400, /`tags` is a list of lines of text, or null/);
+  await refused(
+    send('/api/skills/yours', { copy: toCopy, skill: NOTES }),
+    400,
+    /takes one of `copy` .* and `skill` .* and this request sent both/,
+  );
+  await refused(
+    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', tags: 'notes' } }),
+    400,
+    /`tags` is a list of lines of text, or null/,
+  );
   await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh', color: 'red' } }), 400, /`color` is no key of a skill's/);
 });
 
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet", async () => {
   const { copyCommand } = await import('../src/skills.ts');
   // A checkout with a `.claude/` and no `skills/` in it yet, under a folder whose name has a space and a quote.
-  const checkout = path.join(scratch("hkb-api-skills-copy-"), "Jo's work", 'repo');
+  const checkout = path.join(scratch('hkb-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');
   const run = () => execFileSync('sh', ['-c', copyCommand(path.join(LIBRARY, 'mine'), into)], { stdio: ['ignore', 'pipe', 'pipe'] });
   run();
   assert.deepEqual(fs.readdirSync(into), ['mine'], 'the folder is copied under its name, not spilled into skills/');
-  assert.equal(fs.readFileSync(path.join(into, 'mine', 'SKILL.md'), 'utf8'), fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'));
+  assert.equal(
+    fs.readFileSync(path.join(into, 'mine', 'SKILL.md'), 'utf8'),
+    fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'),
+  );
   run();
   assert.deepEqual(fs.readdirSync(path.join(into, 'mine')), ['SKILL.md'], 'copied again, it lands on the same folder, not inside it');
 });
 
 test("REFUSED at shipped defaults: a write of the repository's skills, and a skill write guarded as every write of the board is", async () => {
   const theirs = snapshotOf(THEIRS);
-  await refused(send('/api/skills/repo', { skill: NOTES }), 403, /^POST \/api\/skills\/repo refuses to write the repository's skills .* `mkdir -p '.*' && cp -r '.*\/<name>' '/);
+  await refused(
+    send('/api/skills/repo', { skill: NOTES }),
+    403,
+    /^POST \/api\/skills\/repo refuses to write the repository's skills .* `mkdir -p '.*' && cp -r '.*\/<name>' '/,
+  );
   const hint = `\`mkdir -p '${THEIRS}' && cp -r '${path.join(LIBRARY, 'review')}' '${THEIRS}/'\``;
   const res = await put('/api/skills/repo/review', { version: 'x', preload: true });
   assert.equal(res.status, 403);
@@ -325,12 +471,28 @@ test("REFUSED at shipped defaults: a write of the repository's skills, and a ski
   await refused(put('/api/skills/shipped/review', { version: 'x', preload: true }), 400, /the board changes a skill of your library/);
   assert.deepEqual(snapshotOf(THEIRS), theirs, 'nothing is written into the checkout');
   const { version } = await detail('yours', 'mine');
-  await refused(put('/api/skills/yours/mine', { version, preload: true }, { ...json, 'sec-fetch-site': 'cross-site' }), 403, /^PUT \/api\/skills\/yours\/mine refuses a request made by a page on another site/);
-  await refused(send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh' } }, { ...json, host: 'evil.example' }), 403, /refuses a request addressed to evil\.example/);
-  await refused(put('/api/skills/yours/mine', { version, preload: true }, { 'content-type': 'text/plain' }), 415, /takes its body as `content-type: application\/json`/);
+  await refused(
+    put('/api/skills/yours/mine', { version, preload: true }, { ...json, 'sec-fetch-site': 'cross-site' }),
+    403,
+    /^PUT \/api\/skills\/yours\/mine refuses a request made by a page on another site/,
+  );
+  await refused(
+    send('/api/skills/yours', { skill: { ...NOTES, name: 'fresh' } }, { ...json, host: 'evil.example' }),
+    403,
+    /refuses a request addressed to evil\.example/,
+  );
+  await refused(
+    put('/api/skills/yours/mine', { version, preload: true }, { 'content-type': 'text/plain' }),
+    415,
+    /takes its body as `content-type: application\/json`/,
+  );
 });
 
 function snapshotOf(dir: string): Record<string, string> {
-  return Object.fromEntries((fs.readdirSync(dir, { recursive: true }) as string[]).sort()
-    .filter((f) => fs.statSync(path.join(dir, f)).isFile()).map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]));
+  return Object.fromEntries(
+    (fs.readdirSync(dir, { recursive: true }) as string[])
+      .sort()
+      .filter((f) => fs.statSync(path.join(dir, f)).isFile())
+      .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]),
+  );
 }

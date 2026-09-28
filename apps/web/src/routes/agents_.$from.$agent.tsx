@@ -48,10 +48,14 @@ function AgentPage() {
     mutationFn: (draft: AgentDraft) => saveAgent(agent.name, agent.version, draft),
     onSuccess: (saved) =>
       settleSave({
-        rename: saved.agent.name !== agent.name ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } }) : undefined,
+        rename:
+          saved.agent.name !== agent.name
+            ? () => navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } })
+            : undefined,
         invalidate: () => invalidateAgents(queryClient),
         // The form a copy kept stays until the agent reads at the save's version: let go before, it was drawn from the file before the save.
-        release: () => setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('yours', saved.agent.name).queryKey)?.version)),
+        release: () =>
+          setKept((was) => keptAfterSave(was, queryClient.getQueryData(agentQuery('yours', saved.agent.name).queryKey)?.version)),
       }),
   });
   const remove = useMutation({
@@ -110,22 +114,29 @@ function AgentPage() {
         <UsedBy listing={agent} />
         {!mine && (
           <p data-read-only className="text-xs text-neutral-500">
-            The repository's agents are read here, not written: they change with the repository, in a commit. To start one of yours from this one,{' '}
-            {code(`cp ${agent.file} ~/.agent-workflows/workflows/agents/`)}.
+            The repository's agents are read here, not written: they change with the repository, in a commit. To start one of yours from
+            this one, {code(`cp ${agent.file} ~/.agent-workflows/workflows/agents/`)}.
           </p>
         )}
       </header>
 
       {agent.error !== null && (
-        <div data-agent-error className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as an agent, so no run can start a node that names it:</p>
+        <div
+          data-agent-error
+          className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+        >
+          <p className="text-sm font-medium text-red-800 dark:text-red-300">
+            Does not read as an agent, so no run can start a node that names it:
+          </p>
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{agent.error}</p>
         </div>
       )}
 
       {mine ? (
         <>
-          <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">{agent.file}</p>
+          <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">
+            {agent.file}
+          </p>
           {form}
         </>
       ) : (

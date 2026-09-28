@@ -44,8 +44,17 @@ import { transition, type LifecycleEvent, type LifecycleState, type Move, type R
  *
  * `busy` used to be in here and did not belong: it is a value of a DIFFERENT field. See `Sighting.busy`.
  */
-export const SESSION_STATES = ['submitted', 'working', 'input-required', 'auth-required', 'completed', 'failed', 'canceled', 'rejected'] as const;
-export type SessionState = typeof SESSION_STATES[number];
+export const SESSION_STATES = [
+  'submitted',
+  'working',
+  'input-required',
+  'auth-required',
+  'completed',
+  'failed',
+  'canceled',
+  'rejected',
+] as const;
+export type SessionState = (typeof SESSION_STATES)[number];
 /** Whether a word is one of A2A's names for a session's state. */
 export const isSessionState = (word: unknown): word is SessionState => (SESSION_STATES as readonly unknown[]).includes(word);
 
@@ -72,11 +81,15 @@ export const atWorkState = (s: SessionState | undefined): boolean => s !== undef
 
 const ENDS: Record<SessionState, Ended | undefined> = {
   // At work and let go of — quiet, or closed out — is an end the harness vouches for, as a quiet session has always been.
-  submitted: 'done', working: 'done', completed: 'done',
-  failed: 'failed', rejected: 'failed',
+  submitted: 'done',
+  working: 'done',
+  completed: 'done',
+  failed: 'failed',
+  rejected: 'failed',
   canceled: 'stopped',
   // Waiting on a person has not ended: no edge records its end off such a sighting (`harnessEnd`).
-  'input-required': undefined, 'auth-required': undefined,
+  'input-required': undefined,
+  'auth-required': undefined,
 };
 
 /** The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person. */
@@ -88,9 +101,14 @@ export const endOf = (state: SessionState): Ended | undefined => ENDS[state];
  */
 export type PhaseWord = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
 const PHASE_WORDS: Record<SessionState, PhaseWord> = {
-  submitted: 'working', working: 'working',
-  'input-required': 'blocked', 'auth-required': 'blocked',
-  completed: 'done', failed: 'failed', rejected: 'failed', canceled: 'stopped',
+  submitted: 'working',
+  working: 'working',
+  'input-required': 'blocked',
+  'auth-required': 'blocked',
+  completed: 'done',
+  failed: 'failed',
+  rejected: 'failed',
+  canceled: 'stopped',
 };
 export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state];
 
@@ -101,7 +119,13 @@ export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state
  */
 export const formerStateOf = (word: unknown): SessionState | undefined =>
   typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;
-const FORMER = { working: 'working', blocked: 'input-required', done: 'completed', failed: 'failed', stopped: 'canceled' } as const satisfies Record<PhaseWord, SessionState>;
+const FORMER = {
+  working: 'working',
+  blocked: 'input-required',
+  done: 'completed',
+  failed: 'failed',
+  stopped: 'canceled',
+} as const satisfies Record<PhaseWord, SessionState>;
 
 export type Outcome = 'succeeded' | 'failed' | 'stopped';
 
@@ -295,7 +319,10 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
 export type Event =
   /** The desired state, stated once. */
   | {
-      kind: 'filed'; at: string; brief: string; cwd: string;
+      kind: 'filed';
+      at: string;
+      brief: string;
+      cwd: string;
       /** Which harness runs it: the adapter's name. */
       harness?: string;
       deadlineSeconds?: number;
@@ -363,7 +390,22 @@ export type Event =
    * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
    * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Ended; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; usage?: Usage; exitCode?: number; denials?: Denial[]; limit?: string; error?: string }
+  | {
+      kind: 'ended';
+      at: string;
+      attempt: number;
+      sessionId: string;
+      observed: Ended;
+      reason: EndReason;
+      nativeId?: string;
+      closeout?: unknown;
+      stated?: boolean;
+      usage?: Usage;
+      exitCode?: number;
+      denials?: Denial[];
+      limit?: string;
+      error?: string;
+    }
   /**
    * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
    * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
@@ -488,33 +530,72 @@ export type State = {
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
-    taskId, brief: '', cwd: '',
-    attempts: [], said: [], inputs: [], closed: false, stopRequested: false, settled: null,
+    taskId,
+    brief: '',
+    cwd: '',
+    attempts: [],
+    said: [],
+    inputs: [],
+    closed: false,
+    stopRequested: false,
+    settled: null,
   };
   for (const e of events) {
     switch (e.kind) {
       case 'filed':
         s.filedAt = e.at;
-        s.brief = e.brief; s.cwd = e.cwd;
+        s.brief = e.brief;
+        s.cwd = e.cwd;
         s.harness = e.harness;
         s.deadlineSeconds = e.deadlineSeconds;
         s.resumeFrom = e.resumeFrom;
-        s.config = e.config; s.closeoutSchema = e.closeoutSchema;
+        s.config = e.config;
+        s.closeoutSchema = e.closeoutSchema;
         if (e.holdOpen) s.holdOpen = true;
         if (e.queued !== undefined) s.queued = e.queued;
         break;
-      case 'admitted': s.admitted = s.inputs.length; break;
+      case 'admitted':
+        s.admitted = s.inputs.length;
+        break;
       case 'starting':
-        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null, ...(s.inputs.length ? { turn: s.inputs.length } : {}) });
+        s.attempts.push({
+          n: e.attempt,
+          startedAt: e.at,
+          spawnedAt: null,
+          ended: null,
+          endedAt: null,
+          reason: null,
+          nativeId: null,
+          resumeFrom: e.resumeFrom,
+          ...(e.nudge ? { nudge: e.nudge } : {}),
+          usage: null,
+          exitCode: null,
+          ...(s.inputs.length ? { turn: s.inputs.length } : {}),
+        });
         break;
       case 'spawned': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.spawnedAt = e.at; a.error = e.error; }
+        if (a) {
+          a.spawnedAt = e.at;
+          a.error = e.error;
+        }
         break;
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; if (e.stated !== undefined) a.stated = e.stated; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; if (e.denials?.length) a.denials = e.denials; if (e.limit) a.limit = e.limit; a.error = e.error ?? a.error; }
+        if (a) {
+          a.ended = e.observed;
+          a.endedAt = e.at;
+          a.reason = e.reason;
+          a.nativeId = e.nativeId ?? a.nativeId;
+          a.closeout = e.closeout;
+          if (e.stated !== undefined) a.stated = e.stated;
+          a.usage = e.usage ?? null;
+          a.exitCode = e.exitCode ?? null;
+          if (e.denials?.length) a.denials = e.denials;
+          if (e.limit) a.limit = e.limit;
+          a.error = e.error ?? a.error;
+        }
         break;
       }
       case 'measured': {
@@ -522,10 +603,18 @@ export function fold(taskId: string, events: readonly Event[]): State {
         if (a) a.usage = { ...a.usage, ...e.usage };
         break;
       }
-      case 'stop-requested': s.stopRequested = true; break;
-      case 'said': s.said.push({ at: e.at, attempt: e.attempt, text: e.text }); break;
-      case 'input': s.inputs.push({ at: e.at, text: e.text, ...(e.config ? { config: e.config } : {}) }); break;
-      case 'closed': s.closed = true; break;
+      case 'stop-requested':
+        s.stopRequested = true;
+        break;
+      case 'said':
+        s.said.push({ at: e.at, attempt: e.attempt, text: e.text });
+        break;
+      case 'input':
+        s.inputs.push({ at: e.at, text: e.text, ...(e.config ? { config: e.config } : {}) });
+        break;
+      case 'closed':
+        s.closed = true;
+        break;
       case 'settled': {
         s.settled = e.outcome;
         const open = s.attempts.at(-1);
@@ -552,8 +641,9 @@ export function turnOf(state: State, n = state.inputs.length) {
   const before = state.attempts.filter((a) => (a.turn ?? 0) < n);
   const given = n === 0 ? [] : state.inputs.slice(before.at(-1)?.turn ?? 0, n);
   return {
-    n, attempts,
-    continues: n === 0 ? state.resumeFrom : before.at(-1)?.nativeId ?? undefined,
+    n,
+    attempts,
+    continues: n === 0 ? state.resumeFrom : (before.at(-1)?.nativeId ?? undefined),
     words: given.length ? given.map((i) => i.text).join('\n\n') : undefined,
     config: [...given].reverse().find((i) => i.config)?.config,
   };
@@ -600,7 +690,17 @@ export type Action =
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
   /** The harness says this attempt is over — or, `unstartable`, refused to start it, in its words (`error`). Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Ended; reason: EndReason; nativeId?: string; closeout?: unknown; stated?: boolean; error?: string }
+  | {
+      do: 'record-end';
+      attempt: number;
+      sessionId: string;
+      observed: Ended;
+      reason: EndReason;
+      nativeId?: string;
+      closeout?: unknown;
+      stated?: boolean;
+      error?: string;
+    }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -640,7 +740,9 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   const from = lifecycleOf(state);
   const event = observe(state, observed, now);
   const moved = move(from, event);
-  return 'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on ${event.type}`, refused: moved.refused } : moved.action;
+  return 'refused' in moved
+    ? { do: 'nothing', why: `refused: no edge from ${from} on ${event.type}`, refused: moved.refused }
+    : moved.action;
 }
 
 /**
@@ -688,14 +790,17 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
     // 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end. A person's
     // stop outranks the deadline.
     const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
-    if (overdue && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
+    if (overdue && !state.stopRequested && !endedOwn)
+      return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
     // Note the order: the SIGHTING is read before our own `spawnedAt`. A crash between the spawn call and its journal
     // entry leaves a session running under a name we can still find, so it is adopted rather than started a second
     // time. That is the whole reason the name is ours.
     if (sighting) {
       const ending = endOf(sighting.state);
       const seen = {
-        attempt: last.n, sighting, asked: state.closeoutSchema !== undefined,
+        attempt: last.n,
+        sighting,
+        asked: state.closeoutSchema !== undefined,
         holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
       };
       // Quiet and working: its runner holds it has stopped, and that is its end. Whether it gave the statement its task
@@ -713,7 +818,9 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
     if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
     // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
     // race measured in seconds) or the session is gone. A grace window tells the two apart.
-    return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs ? { type: 'UNSEEN_IN_GRACE', attempt: last.n } : { type: 'LOST', attempt: last.n };
+    return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
+      ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
+      : { type: 'LOST', attempt: last.n };
   }
 
   // ---- nothing in flight.
@@ -745,7 +852,9 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
 export function spawnRefused(state: State, attempt: number, error: string, move: Move = transition): Action {
   const from = lifecycleOf(state);
   const moved = move(from, { type: 'SPAWN_REFUSED', attempt, error });
-  return 'refused' in moved ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused } : moved.action;
+  return 'refused' in moved
+    ? { do: 'nothing', why: `refused: no edge from ${from} on SPAWN_REFUSED`, refused: moved.refused }
+    : moved.action;
 }
 
 /** Is this task waiting on a person? The one thing a fleet operator must be told about. */

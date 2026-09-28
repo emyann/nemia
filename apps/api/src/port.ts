@@ -20,7 +20,9 @@ export function portOf(value: string | undefined): number {
   if (!text) return DEFAULT_PORT;
   if (/^\d{1,5}$/.test(text) && Number(text) <= 65535) return Number(text);
   throw Object.assign(
-    new Error(`PORT=${value} is not a port. Give a whole number from 0 to 65535 — 0 for any free port — or unset PORT for ${DEFAULT_PORT}.`),
+    new Error(
+      `PORT=${value} is not a port. Give a whole number from 0 to 65535 — 0 for any free port — or unset PORT for ${DEFAULT_PORT}.`,
+    ),
     { exitCode: 2 },
   );
 }

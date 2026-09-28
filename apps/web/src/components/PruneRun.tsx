@@ -54,7 +54,11 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
     );
   }
   if (decidable && (!data || isPlaceholderData)) {
-    return <p data-prune-reading className="text-xs text-neutral-600 dark:text-neutral-400">Reading whether it was merged…</p>;
+    return (
+      <p data-prune-reading className="text-xs text-neutral-600 dark:text-neutral-400">
+        Reading whether it was merged…
+      </p>
+    );
   }
   const offer = pruneOffer(run, decidable && data ? awaitingOf(data) : null);
   return offer ? <PruneForm id={run.id} offer={offer} onClose={onClose} /> : null;
@@ -98,11 +102,22 @@ function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onCl
           What to give back. Its record and its branches are kept: no branch is ever deleted.
         </Text>
         {offer.choices.map((c) => (
-          <Radio key={c.key} value={c.key} isDisabled={c.unavailable !== null} data-prune-choice={c.key} className={cn(RADIO, 'data-disabled:opacity-60')}>
+          <Radio
+            key={c.key}
+            value={c.key}
+            isDisabled={c.unavailable !== null}
+            data-prune-choice={c.key}
+            className={cn(RADIO, 'data-disabled:opacity-60')}
+          >
             <span aria-hidden className={DOT} />
             <span className="space-y-0.5">
               <span className="block text-xs font-medium">{c.label}</span>
-              <span className={cn('block text-[11px] leading-snug', c.how.unmerged ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground')}>
+              <span
+                className={cn(
+                  'block text-[11px] leading-snug',
+                  c.how.unmerged ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground',
+                )}
+              >
                 {c.says}
               </span>
               {c.unavailable && <span className="block text-[11px] leading-snug text-amber-700 dark:text-amber-400">{c.unavailable}</span>}

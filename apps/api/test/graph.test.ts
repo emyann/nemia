@@ -11,13 +11,21 @@ const workflow = (files: Record<string, string>, schemas: Record<string, string>
   return steps;
 };
 
-const again = JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false });
+const again = JSON.stringify({
+  type: 'object',
+  properties: { again: { type: 'boolean' } },
+  required: ['again'],
+  additionalProperties: false,
+});
 
 test('a two-step loop: the card leads to the target only, an `after` edge forward and a `loop` edge back', () => {
-  const steps = workflow({
-    implement: 'Implement it.\n',
-    review: '---\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it.\n',
-  }, { 'review.json': again });
+  const steps = workflow(
+    {
+      implement: 'Implement it.\n',
+      review: '---\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it.\n',
+    },
+    { 'review.json': again },
+  );
   assert.deepEqual(graphOf(steps), {
     roots: ['implement'],
     edges: [
@@ -27,10 +35,13 @@ test('a two-step loop: the card leads to the target only, an `after` edge forwar
     ],
   });
 
-  const capped = workflow({
-    implement: 'Implement it.\n',
-    review: '---\nafter: implement\nloop: implement\nrounds: 5\noutput: review.json\n---\nReview it.\n',
-  }, { 'review.json': again });
+  const capped = workflow(
+    {
+      implement: 'Implement it.\n',
+      review: '---\nafter: implement\nloop: implement\nrounds: 5\noutput: review.json\n---\nReview it.\n',
+    },
+    { 'review.json': again },
+  );
   assert.deepEqual(graphOf(capped).edges.at(-1), { from: 'review', to: 'implement', kind: 'loop', rounds: 5 });
 });
 
@@ -62,20 +73,25 @@ test('a workflow with no loop has no `loop` edge, and every step that waits on n
   });
   const graph = graphOf(steps);
   assert.deepEqual(graph.roots, ['implement', 'tokens']);
-  assert.deepEqual(graph.edges.map((e) => `${e.from} ${e.kind} ${e.to}`), [
-    'review after respond',
-    'implement after respond',
-    'implement after review',
-  ]);
-  assert.equal(graph.edges.some((e) => e.kind === 'loop'), false);
+  assert.deepEqual(
+    graph.edges.map((e) => `${e.from} ${e.kind} ${e.to}`),
+    ['review after respond', 'implement after respond', 'implement after review'],
+  );
+  assert.equal(
+    graph.edges.some((e) => e.kind === 'loop'),
+    false,
+  );
 });
 
 test('an edge naming a step not in the graph is not drawn, and does not make its step unreachable', () => {
   // Only a record edited by hand has one: `validate` refuses a workflow that names a step it does not have.
-  assert.deepEqual(graphOf([
-    { name: 'review', after: ['gone', 'gone'], loop: 'gone', rounds: 2 },
-    { name: 'self', after: ['self'] },
-  ]), { roots: ['review', 'self'], edges: [] });
+  assert.deepEqual(
+    graphOf([
+      { name: 'review', after: ['gone', 'gone'], loop: 'gone', rounds: 2 },
+      { name: 'self', after: ['self'] },
+    ]),
+    { roots: ['review', 'self'], edges: [] },
+  );
   assert.deepEqual(graphOf([]), { roots: [], edges: [] });
 });
 

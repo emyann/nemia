@@ -14,12 +14,24 @@ const counting = () => {
   const engine = {
     async view(id: string) {
       asked.set(id, (asked.get(id) ?? 0) + 1);
-      if (id === 'bad' && failOnce) { failOnce = false; throw new Error('no journal'); }
+      if (id === 'bad' && failOnce) {
+        failOnce = false;
+        throw new Error('no journal');
+      }
       return { id, phase: 'done' } as unknown as TaskView;
     },
-    async list() { return []; },
-    async io() { return {}; },
-    async answer() {}, async stop() {}, async tick() { return {}; }, async rename() {},
+    async list() {
+      return [];
+    },
+    async io() {
+      return {};
+    },
+    async answer() {},
+    async stop() {},
+    async tick() {
+      return {};
+    },
+    async rename() {},
   };
   return { e: viewedOnce(engine as unknown as Engine), asked };
 };

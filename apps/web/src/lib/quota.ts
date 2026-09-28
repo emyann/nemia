@@ -54,12 +54,14 @@ export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: Wi
 /** What the hover says of a reading: where it came from, how often it is asked again, and the rule the header shows it by. */
 export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
   const every = q.keepMs > 0 ? `asked again at most every ${keepWord(q.keepMs)} while a board is open` : 'asked again on every read';
-  const how = q.state === 'unanswered' && q.againAt
-    ? `asked again at ${clockWord(new Date(q.againAt), now, timeZone)} at the soonest, and less often each time the usage service gives nothing`
-    : every;
-  const from = q.state === 'fresh' && q.askedAt
-    ? `Asked of Claude Code (get_usage${q.subscription ? `, ${q.subscription} plan` : ''}) at ${clockWord(new Date(q.askedAt), now, timeZone)}; ${how}.`
-    : `Asked of Claude Code (get_usage); ${how}.`;
+  const how =
+    q.state === 'unanswered' && q.againAt
+      ? `asked again at ${clockWord(new Date(q.againAt), now, timeZone)} at the soonest, and less often each time the usage service gives nothing`
+      : every;
+  const from =
+    q.state === 'fresh' && q.askedAt
+      ? `Asked of Claude Code (get_usage${q.subscription ? `, ${q.subscription} plan` : ''}) at ${clockWord(new Date(q.askedAt), now, timeZone)}; ${how}.`
+      : `Asked of Claude Code (get_usage); ${how}.`;
   const rule = `A window ${q.markAt}% used or more is marked.`;
   const last = lastWords(q, now, timeZone) ? ' The dimmed numbers are the last reading, not now.' : '';
   return `${from} ${rule}${last}`;

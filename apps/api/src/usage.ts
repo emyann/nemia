@@ -12,7 +12,12 @@ export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
  * time it counted waiting on the model and running tools — each null where nobody measured it.
  */
 export type StepUsed = {
-  usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null;
+  usage: Usage | null;
+  used: string;
+  cost: string;
+  costUsd: number | null;
+  apiMs: number | null;
+  toolMs: number | null;
   /**
    * What the sessions read, by price, as `wf decide` says it beside the cost (`readWords`): `read 21.4M · wrote 412k · peak 167k`, the peak
    * against the step's `context:` cap, and a resumed session that rebuilt its cache. Null where the runner measured none of it.
@@ -38,9 +43,15 @@ export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
 export function usedOf(usage: Usage | undefined, cap?: number, read: Usage | undefined = usage): StepUsed {
   const [used = ''] = usedLines(usage);
   return {
-    usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: usage?.costUsd !== undefined ? dollars(usage.costUsd) : 'not measured',
-    costUsd: usage?.costUsd ?? null, apiMs: usage?.apiMs ?? null, toolMs: usage?.toolMs ?? null,
-    read: readWords(read, cap) || null, peak: peakMark(read, cap), rebuilt: read?.rebuiltCaches ?? 0,
+    usage: usage ?? null,
+    used: used.replace(/^used\s+/, ''),
+    cost: usage?.costUsd !== undefined ? dollars(usage.costUsd) : 'not measured',
+    costUsd: usage?.costUsd ?? null,
+    apiMs: usage?.apiMs ?? null,
+    toolMs: usage?.toolMs ?? null,
+    read: readWords(read, cap) || null,
+    peak: peakMark(read, cap),
+    rebuilt: read?.rebuiltCaches ?? 0,
   };
 }
 

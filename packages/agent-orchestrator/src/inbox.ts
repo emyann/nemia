@@ -53,14 +53,17 @@ export type InboxCard = {
 export const INBOX_KEYS = ['workflow', 'repo', 'queued', 'gate'] as const;
 
 /** An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is stable. */
-const isInstant = (value: string): boolean => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
+const isInstant = (value: string): boolean =>
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
 /** What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: what the board shows beside a card's value. */
 export const INBOX_KEY_MEANINGS: Readonly<Record<(typeof INBOX_KEYS)[number], string>> = {
-  workflow: "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
+  workflow:
+    "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
   repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
-  queued: 'the time `wf inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
-  gate: "a step of its workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, in the run it starts: none when unset",
+  queued:
+    'the time `wf inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
+  gate: 'a step of its workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, in the run it starts: none when unset',
 };
 
 function refuse(why: string): never {
@@ -78,22 +81,34 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
   const { repo, workflow, queued, gate } = block === null ? {} : inboxKeys(file, block);
   const name = file.slice(0, -'.md'.length);
   if (repo !== undefined && !path.isAbsolute(repo)) {
-    refuse(`${file}: \`repo: ${repo}\` is not an absolute path. \`repo:\` is the repository the idea is about, from the root — \`repo: /home/me/code/app\` — since a relative one would name a different repository from wherever the card is started.`);
+    refuse(
+      `${file}: \`repo: ${repo}\` is not an absolute path. \`repo:\` is the repository the idea is about, from the root — \`repo: /home/me/code/app\` — since a relative one would name a different repository from wherever the card is started.`,
+    );
   }
   if (repo !== undefined && !isDirectory(repo)) {
-    refuse(`${file}: \`repo: ${repo}\` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.`);
+    refuse(
+      `${file}: \`repo: ${repo}\` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.`,
+    );
   }
   if (queued !== undefined && !isInstant(queued)) {
-    refuse(`${file}: \`queued: ${queued}\` is not a time. \`queued:\` is when the card was queued to start on its own, as wf inbox queue writes it — \`queued: 2026-09-16T10:00:00.000Z\` — which orders the queue. Delete the line, and queue the card with wf inbox queue ${name}.`);
+    refuse(
+      `${file}: \`queued: ${queued}\` is not a time. \`queued:\` is when the card was queued to start on its own, as wf inbox queue writes it — \`queued: 2026-09-16T10:00:00.000Z\` — which orders the queue. Delete the line, and queue the card with wf inbox queue ${name}.`,
+    );
   }
   if (queued !== undefined && workflow === undefined) {
-    refuse(`${file}: \`queued:\` with no \`workflow:\` — a card that starts on its own has nothing to say what runs it. Write \`workflow:\`, or delete the \`queued:\` line and queue the card with its workflow: wf inbox queue ${name} --workflow <w> writes both.`);
+    refuse(
+      `${file}: \`queued:\` with no \`workflow:\` — a card that starts on its own has nothing to say what runs it. Write \`workflow:\`, or delete the \`queued:\` line and queue the card with its workflow: wf inbox queue ${name} --workflow <w> writes both.`,
+    );
   }
   if (gate !== undefined && gate.includes(',')) {
-    refuse(`${file}: \`gate: ${gate}\` names more than one step. A card gates one step of its workflow — \`gate: plan\` — and its start gates any other: wf start <inbox>/${file} --gate <step>.`);
+    refuse(
+      `${file}: \`gate: ${gate}\` names more than one step. A card gates one step of its workflow — \`gate: plan\` — and its start gates any other: wf start <inbox>/${file} --gate <step>.`,
+    );
   }
   if (gate === 'true') {
-    refuse(`${file}: \`gate: true\` is how a step's own file gates it, and a card names the step its run waits at — \`gate: plan\` — since a card is not a step. Name the step, or delete the line.`);
+    refuse(
+      `${file}: \`gate: true\` is how a step's own file gates it, and a card names the step its run waits at — \`gate: plan\` — since a card is not a step. Name the step, or delete the line.`,
+    );
   }
   return {
     name,
@@ -112,11 +127,13 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
  * gives the wait, since `file` is where the idea is now, and no card's path.
  */
 function inboxKeys(file: string, block: string, filing = false): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
-  return frontmatterKeys(file, block, INBOX_KEYS, (key) => (key === 'after'
-    ? filing
-      ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>.md --after <runId>.`
-      : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
-    : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, and the step its run waits at for a person; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`));
+  return frontmatterKeys(file, block, INBOX_KEYS, (key) =>
+    key === 'after'
+      ? filing
+        ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>.md --after <runId>.`
+        : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
+      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, and the step its run waits at for a person; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+  );
 }
 
 /**
@@ -132,11 +149,13 @@ export function workflowAt(given: string, dir: string): string {
  * dot, a hidden file `wf inbox` never lists. Whether a card of that name is there is the folder's to say (`noCardLine`).
  */
 export function inboxNameRefusal(name: string): string | undefined {
-  if (!name.trim()) return 'A card is named by its file in the inbox, minus .md, as wf inbox lists it, and this name is empty. Give the name: wf inbox lists them.';
+  if (!name.trim())
+    return 'A card is named by its file in the inbox, minus .md, as wf inbox lists it, and this name is empty. Give the name: wf inbox lists them.';
   if (/[\\/\0]/.test(name) || name === '.' || name === '..') {
     return `\`${name}\` is not a card's name: a name stays in the inbox, with no slash and not . or .., since it names a file there. Give the name wf inbox lists — cache-the-views-k2q9, say.`;
   }
-  if (name.startsWith('.')) return `\`${name}\` is not a card's name: a name that starts with a dot is a hidden file, and wf inbox lists none. Give the name wf inbox lists — cache-the-views-k2q9, say.`;
+  if (name.startsWith('.'))
+    return `\`${name}\` is not a card's name: a name that starts with a dot is a hidden file, and wf inbox lists none. Give the name wf inbox lists — cache-the-views-k2q9, say.`;
   return undefined;
 }
 
@@ -145,7 +164,10 @@ export function inboxNameRefusal(name: string): string | undefined {
  * one of them.
  */
 export function noCardLine(name: string, cards: readonly string[]): string {
-  const bare = name.endsWith('.md') && cards.includes(name.slice(0, -'.md'.length)) ? ` A card is named without its .md: \`${name.slice(0, -'.md'.length)}\`.` : '';
+  const bare =
+    name.endsWith('.md') && cards.includes(name.slice(0, -'.md'.length))
+      ? ` A card is named without its .md: \`${name.slice(0, -'.md'.length)}\`.`
+      : '';
   return `no card ${name} in the inbox.${bare} ${cards.length ? `Its cards are: ${[...cards].sort().join(', ')}.` : 'The inbox is empty.'}`;
 }
 
@@ -192,7 +214,12 @@ export type QueueTry = { at: string; text: string; repo: string; why: string; re
  * not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and, when the
  * tick's last try of its start is of the card as it stands (`tries`, by name), that try.
  */
-export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run, 'id' | 'from'>[], isDirectory: (at: string) => boolean, tries: ReadonlyMap<string, QueueTry> = new Map()): InboxListing[] {
+export function inboxListing(
+  files: readonly PlanFile[],
+  runs: readonly Pick<Run, 'id' | 'from'>[],
+  isDirectory: (at: string) => boolean,
+  tries: ReadonlyMap<string, QueueTry> = new Map(),
+): InboxListing[] {
   const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
     const t = tries.get(name);
     return t && t.text === text ? { tried: { at: t.at, repo: t.repo, why: t.why, refused: t.refused } } : {};
@@ -203,7 +230,12 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
     .map(({ file, text }): InboxListing => {
       if (!file.endsWith('.md')) {
         return {
-          name: file, file, title: null, workflow: null, repo: null, startedAs: [],
+          name: file,
+          file,
+          title: null,
+          workflow: null,
+          repo: null,
+          startedAs: [],
           error: `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
         };
       }
@@ -212,7 +244,14 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
       try {
         const card = parseInboxCard(file, text, isDirectory);
         return {
-          name, file, title: card.body.split('\n')[0]!, workflow: card.workflow ?? null, repo: card.repo ?? null, ...(card.gate !== undefined ? { gate: card.gate } : {}), startedAs, error: null,
+          name,
+          file,
+          title: card.body.split('\n')[0]!,
+          workflow: card.workflow ?? null,
+          repo: card.repo ?? null,
+          ...(card.gate !== undefined ? { gate: card.gate } : {}),
+          startedAs,
+          error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
       } catch (err) {
@@ -220,15 +259,27 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
         // refuses it by name, as it refuses a workflow gone — never a card that leaves the queue with nothing said.
         // Its workflow and repository as it writes them, too: the repository its start is tried on, which keys the try.
         let lenient: InboxCard | undefined;
-        try { lenient = parseInboxCard(file, text, () => true); } catch { /* not a card for another reason: not in the queue */ }
+        try {
+          lenient = parseInboxCard(file, text, () => true);
+        } catch {
+          /* not a card for another reason: not in the queue */
+        }
         const queued = lenient?.queued;
         return {
-          name, file, title: null, workflow: queued !== undefined ? lenient!.workflow ?? null : null, repo: queued !== undefined ? lenient!.repo ?? null : null, startedAs, error: (err as Error).message,
+          name,
+          file,
+          title: null,
+          workflow: queued !== undefined ? (lenient!.workflow ?? null) : null,
+          repo: queued !== undefined ? (lenient!.repo ?? null) : null,
+          startedAs,
+          error: (err as Error).message,
           ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
         };
       }
     });
-  queueOrder(listed).forEach((l, i) => { l.queued!.place = i + 1; });
+  queueOrder(listed).forEach((l, i) => {
+    l.queued!.place = i + 1;
+  });
   return listed;
 }
 
@@ -237,7 +288,9 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
  * it is never started again. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
  */
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
-  listing.filter((l) => l.queued && !l.startedAs.length).sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
+  listing
+    .filter((l) => l.queued && !l.startedAs.length)
+    .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
 /**
  * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused as it
@@ -304,9 +357,11 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
     const t = l.tried;
     const on = t && l.error === null && !l.repo ? ` on ${t.repo}` : '';
     const why = t && t.why !== l.error ? `: ${t.why}` : '';
-    const tried = !t ? ''
-      : t.refused ? ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${on ? ', or run wf up in the repository it is about' : ''}, and the tick tries it again`
-      : ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
+    const tried = !t
+      ? ''
+      : t.refused
+        ? ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${on ? ', or run wf up in the repository it is about' : ''}, and the tick tries it again`
+        : ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}`;
     return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${queued}${tried}${started}`;
   });
@@ -323,25 +378,49 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
  * `../workflows/dev` would name a workflow of the store's rather than the one beside the file. Without `dir`, it is written as it is.
  */
-export function ideaCard(from: string, text: string, given: { workflow?: string; repo?: string }, isDirectory: (at: string) => boolean, dir?: string): { text: string; body: string } {
+export function ideaCard(
+  from: string,
+  text: string,
+  given: { workflow?: string; repo?: string },
+  isDirectory: (at: string) => boolean,
+  dir?: string,
+): { text: string; body: string } {
   if (!text.trim()) {
-    refuse(`wf inbox add takes the idea, and ${from} has nothing in it. Give it as text — wf inbox add "<idea>" — or as a file: wf inbox add ./idea.md. Nothing was filed.`);
+    refuse(
+      `wf inbox add takes the idea, and ${from} has nothing in it. Give it as text — wf inbox add "<idea>" — or as a file: wf inbox add ./idea.md. Nothing was filed.`,
+    );
   }
   for (const [flag, value] of Object.entries(given)) {
-    if (value !== undefined && /[\r\n]/.test(value)) refuse(`${from}: the ${flag} given, ${JSON.stringify(value)}, is more than one line, and a card's ${flag}: is one. Give the one line it names.`);
+    if (value !== undefined && /[\r\n]/.test(value))
+      refuse(
+        `${from}: the ${flag} given, ${JSON.stringify(value)}, is more than one line, and a card's ${flag}: is one. Give the one line it names.`,
+      );
   }
   let keys: { workflow?: string; repo?: string; queued?: string; gate?: string } = {};
-  let body = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
+  let body = text
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .trim();
   let split: { block: string | null; body: string } | undefined;
-  try { split = splitFrontmatter(from, text); } catch { /* a rule that never closes: the text is the body */ }
-  const lines = (split?.block ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  const isCardLine = (line: string) => line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
+  try {
+    split = splitFrontmatter(from, text);
+  } catch {
+    /* a rule that never closes: the text is the body */
+  }
+  const lines = (split?.block ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
+  const isCardLine = (line: string) =>
+    line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
   if (split && lines.length && lines.every(isCardLine)) {
     // Its keys, to be written over; whether what they say holds is asked of the card written, below.
     const read = inboxKeys(from, split.block!, true);
     // A card is queued once it is in the inbox, under its own name: a time carried in from elsewhere would jump the queue.
     if (read.queued !== undefined) {
-      refuse(`${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card wf inbox add names: wf inbox queue <name>.`);
+      refuse(
+        `${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card wf inbox add names: wf inbox queue <name>.`,
+      );
     }
     keys = read;
     body = split.body;
@@ -350,7 +429,9 @@ export function ideaCard(from: string, text: string, given: { workflow?: string;
   const workflow = given.workflow ?? keys.workflow;
   const repo = given.repo ?? keys.repo;
   const frontmatter = [
-    ...(workflow !== undefined ? [`workflow: ${workflow}`] : []), ...(repo !== undefined ? [`repo: ${repo}`] : []), ...(keys.gate !== undefined ? [`gate: ${keys.gate}`] : []),
+    ...(workflow !== undefined ? [`workflow: ${workflow}`] : []),
+    ...(repo !== undefined ? [`repo: ${repo}`] : []),
+    ...(keys.gate !== undefined ? [`gate: ${keys.gate}`] : []),
   ];
   // A body that opens with a rule of its own is kept from being read as the card's frontmatter by a frontmatter before it.
   if (!frontmatter.length && body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
@@ -379,7 +460,13 @@ export function queuedText(card: InboxCard, at: string | null, isDirectory: (at:
  * names (`startedAs`), which is not started again (`startedRefusal`); a card already queued, with its place, and how to take it back; and a card
  * with no `workflow:` and none given — nothing would say what starts it, and `--workflow <w>` writes both.
  */
-export function queueRefusal(card: InboxCard, where: string, startedAs: readonly string[], place: number | null, workflow?: string): string | undefined {
+export function queueRefusal(
+  card: InboxCard,
+  where: string,
+  startedAs: readonly string[],
+  place: number | null,
+  workflow?: string,
+): string | undefined {
   if (startedAs.length) return startedRefusal(card, where, startedAs);
   if (card.queued !== undefined) {
     return `${card.file}: already queued, at ${card.queued}${place ? `, ${place} in the queue's order` : ''}: the tick starts it when its turn comes and a run slot is free. To queue it again, take it back first: wf inbox queue ${card.name} --off.`;
@@ -411,10 +498,12 @@ export function inboxNameOf(at: string, dir: string): string | null {
  */
 export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, repo: string, workflows: readonly string[]): string {
   const dir = path.join(repo, 'workflows');
-  return `${card.file}: no workflow — the card names none, and none was given, so nothing says what runs it. `
-    + (workflows.length
+  return (
+    `${card.file}: no workflow — the card names none, and none was given, so nothing says what runs it. ` +
+    (workflows.length
       ? `The repository's workflows are: ${workflows.join(', ')}, in ${dir}. Name one: wf start ${where} --workflows ${workflows[0]}, or write \`workflow: ${workflows[0]}\` in the card.`
-      : `${dir} has no workflows. Give a workflow folder: wf start ${where} --workflows <dir>, or write \`workflow:\` in the card.`);
+      : `${dir} has no workflows. Give a workflow folder: wf start ${where} --workflows <dir>, or write \`workflow:\` in the card.`)
+  );
 }
 
 /**
@@ -422,5 +511,5 @@ export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, 
  * Started again, the idea would run twice.
  */
 export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
-  return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? 'that run\'s record says' : 'their records say'} so — and is still in the inbox because its removal failed. Drop it with wf inbox rm ${card.name}; to run the idea again, park it again under a name of its own first: wf inbox add ${where}.`;
+  return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and is still in the inbox because its removal failed. Drop it with wf inbox rm ${card.name}; to run the idea again, park it again under a name of its own first: wf inbox add ${where}.`;
 }

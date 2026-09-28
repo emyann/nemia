@@ -57,11 +57,17 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
     view = await e.view(taskId);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
-    throw new Unread(502, `Could not read task ${taskId} of step '${step}': ${why}. \`wf ls\` reads the same record from the command line.`);
+    throw new Unread(
+      502,
+      `Could not read task ${taskId} of step '${step}': ${why}. \`wf ls\` reads the same record from the command line.`,
+    );
   }
   const phase = phaseOfView(view);
   if (phase === 'unknown') {
-    throw new Unread(404, `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`wf ls\` shows the step unknown.`);
+    throw new Unread(
+      404,
+      `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`wf ls\` shows the step unknown.`,
+    );
   }
   try {
     const { events, cursor } = await e.transcript(taskId, after);
@@ -72,14 +78,29 @@ async function readTranscript(id: string, step: string, taskId: string, after: s
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     if ((err as { exitCode?: unknown }).exitCode !== 2) {
-      throw new Unread(502, `Could not read the conversation of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads its output from the command line.`);
+      throw new Unread(
+        502,
+        `Could not read the conversation of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads its output from the command line.`,
+      );
     }
     // Refused. The engine refuses a cursor none of its reads gave, and a harness that keeps no conversation it can read — and
     // asked again from the start, only the second. The words of the refusal are the engine's to change; this is not.
-    if (after !== undefined && (await e.transcript(taskId).then(() => true, () => false))) {
-      throw new Unread(400, `\`${after}\` is not a cursor a read of this conversation gave. Pass the \`cursor\` the last read returned as \`after\` — on the stream, the id of the last event, which an EventSource sends back as Last-Event-ID — or none to read from the start.`);
+    if (
+      after !== undefined &&
+      (await e.transcript(taskId).then(
+        () => true,
+        () => false,
+      ))
+    ) {
+      throw new Unread(
+        400,
+        `\`${after}\` is not a cursor a read of this conversation gave. Pass the \`cursor\` the last read returned as \`after\` — on the stream, the id of the last event, which an EventSource sends back as Last-Event-ID — or none to read from the start.`,
+      );
     }
-    throw new Unread(404, `Step '${step}' of run '${id}' has no conversation to read: ${why} GET /api/runs/${id}/steps/${step}/log gives what its session printed.`);
+    throw new Unread(
+      404,
+      `Step '${step}' of run '${id}' has no conversation to read: ${why} GET /api/runs/${id}/steps/${step}/log gives what its session printed.`,
+    );
   }
 }
 
@@ -114,9 +135,12 @@ export const steps = new Hono()
       return c.json(tailOf(await e.logs(taskId), LOG_LINES));
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
-      return c.json({
-        error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
-      }, 502);
+      return c.json(
+        {
+          error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
+        },
+        502,
+      );
     }
   })
   // One file of a step's files directory, by name and never by path (artifacts.ts), as its closeout's `artifacts` link it. Read on
@@ -133,15 +157,21 @@ export const steps = new Hono()
     // Gone, not missing: `wf prune --artifacts` removed the run's files, and its record, closeouts and branches are what is left.
     const pruned = found.run.pruned?.artifacts;
     if (!file && pruned) {
-      return c.json({
-        error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
-        pruned: pruned.at,
-      }, 410);
+      return c.json(
+        {
+          error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
+          pruned: pruned.at,
+        },
+        410,
+      );
     }
     if (!file) {
-      return c.json({
-        error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
-      }, 404);
+      return c.json(
+        {
+          error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
+        },
+        404,
+      );
     }
     return c.body(new Uint8Array(file.body), 200, served(file.type));
   })
@@ -157,15 +187,21 @@ export const steps = new Hono()
     if (refused) return c.json({ error: refused }, 400);
     const dir = workFolderOf(found.run, step);
     if (!dir) {
-      return c.json({
-        error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
-      }, 404);
+      return c.json(
+        {
+          error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
+        },
+        404,
+      );
     }
     const file = readFolderFile(dir, name);
     if (!file) {
-      return c.json({
-        error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
-      }, 404);
+      return c.json(
+        {
+          error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
+        },
+        404,
+      );
     }
     return c.body(new Uint8Array(file.body), 200, served(file.type));
   })
@@ -195,7 +231,12 @@ export const steps = new Hono()
     if ('error' in found) return c.json({ error: found.error }, 404);
     const { taskId } = found;
     if (!taskId) {
-      return c.json({ error: `Step '${step}' of run '${id}' is not filed yet, so it has no session to follow. GET /api/runs/${id} gives its task once a tick files it.` }, 404);
+      return c.json(
+        {
+          error: `Step '${step}' of run '${id}' is not filed yet, so it has no session to follow. GET /api/runs/${id} gives its task once a tick files it.`,
+        },
+        404,
+      );
     }
     // An EventSource that reconnects sends the id of the last event it was sent; a first connection can say where to start.
     const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;

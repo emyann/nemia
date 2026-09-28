@@ -101,7 +101,10 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   }, [namesKey]);
 
   const runHeld = run.holding != null;
-  const states = useMemo(() => new Map(run.steps.map((s) => [s.name, stepState(s.status, runCancelled, runHeld)])), [run, runCancelled, runHeld]);
+  const states = useMemo(
+    () => new Map(run.steps.map((s) => [s.name, stepState(s.status, runCancelled, runHeld)])),
+    [run, runCancelled, runHeld],
+  );
 
   const nodes = useMemo(() => {
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
@@ -122,7 +125,12 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
       const picked = changes.find((c) => c.type === 'select' && c.selected);
       if (picked?.type === 'select') onSelect(picked.id);
       if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
-      setPlaced((current) => applyNodeChanges(changes.filter((c) => c.type !== 'select' && c.type !== 'remove'), current));
+      setPlaced((current) =>
+        applyNodeChanges(
+          changes.filter((c) => c.type !== 'select' && c.type !== 'remove'),
+          current,
+        ),
+      );
     },
     [onSelect],
   );

@@ -11,8 +11,7 @@ export const Route = createFileRoute('/runs/')({
   component: Runs,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
-      Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running
-      (<code>npm run dev</code>)?
+      Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
     </p>
   ),
 });
@@ -23,8 +22,11 @@ function Runs() {
   if (!runs.length) {
     return (
       <p className="text-sm text-neutral-500">
-        No runs yet. Start one from <Link to="/workflows" className="underline underline-offset-2">Workflows</Link>, or with{' '}
-        <code>npx wf start</code>.
+        No runs yet. Start one from{' '}
+        <Link to="/workflows" className="underline underline-offset-2">
+          Workflows
+        </Link>
+        , or with <code>npx wf start</code>.
       </p>
     );
   }
@@ -44,7 +46,9 @@ function Runs() {
   return (
     <article className="space-y-8">
       {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} />}
-      {deciding.length > 0 && <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} />}
+      {deciding.length > 0 && (
+        <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} />
+      )}
       {finished.length > 0 && <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} />}
     </article>
   );
@@ -60,7 +64,10 @@ function RunGroup({ group, title, about, runs }: { group: string; title: string;
   return (
     <section aria-label={title} data-group={group} className="space-y-1">
       <h2 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
-        {title} <span data-count className="text-xs font-normal text-neutral-500">{runs.length}</span>
+        {title}{' '}
+        <span data-count className="text-xs font-normal text-neutral-500">
+          {runs.length}
+        </span>
         <span className="text-xs font-normal text-neutral-500">
           {about}, newest first
           {waiting > 0 && <span className="text-amber-600"> · {waiting} waiting on you</span>}
@@ -81,7 +88,10 @@ function RunRow({ run }: { run: RunSummary }) {
 
   return (
     // The run's link, and beside it when it was created and the workflow's link: side by side, since a link inside a link is not HTML.
-    <li data-in-flight={inFlight(run)} className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900">
+    <li
+      data-in-flight={inFlight(run)}
+      className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+    >
       <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">

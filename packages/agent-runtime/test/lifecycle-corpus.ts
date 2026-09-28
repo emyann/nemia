@@ -14,8 +14,12 @@ export const S = 1_000;
 export const filed = (extra: object = {}): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra }) as Event;
 export const starting = (n: number, ms = 0, extra: object = {}): Event => ({ kind: 'starting', at: at(ms), attempt: n, ...extra });
 export const spawned = (n: number, ms = S): Event => ({ kind: 'spawned', at: at(ms), attempt: n });
-export const ended = (n: number, observed: Ended, reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' | 'unsigned' = 'harness', nativeId?: string): Event =>
-  ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
+export const ended = (
+  n: number,
+  observed: Ended,
+  reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' | 'unsigned' = 'harness',
+  nativeId?: string,
+): Event => ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
 export const signed = (n: number) => ended(n, 'done', 'harness', `native-${n}`);
 
 /** Journal shapes, by name: what a task's record can say. */
@@ -41,10 +45,30 @@ export const JOURNALS: Record<string, Event[]> = {
   'held open, signed': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1)],
   'held open, failed': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'failed')],
   'held open, answered': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'input', at: at(3 * S), text: 'go on' }],
-  'held open, answered, no session recorded': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'done'), { kind: 'input', at: at(3 * S), text: 'go on' }],
-  'held open, second turn in flight': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'input', at: at(3 * S), text: 'go on' }, starting(2, 4 * S, { resumeFrom: 'native-1' }), spawned(2, 5 * S)],
+  'held open, answered, no session recorded': [
+    filed({ holdOpen: true }),
+    starting(1),
+    spawned(1),
+    ended(1, 'done'),
+    { kind: 'input', at: at(3 * S), text: 'go on' },
+  ],
+  'held open, second turn in flight': [
+    filed({ holdOpen: true }),
+    starting(1),
+    spawned(1),
+    signed(1),
+    { kind: 'input', at: at(3 * S), text: 'go on' },
+    starting(2, 4 * S, { resumeFrom: 'native-1' }),
+    spawned(2, 5 * S),
+  ],
   'held open, closed after signing': [filed({ holdOpen: true }), starting(1), spawned(1), signed(1), { kind: 'closed', at: at(3 * S) }],
-  'held open, closed after failing': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'failed'), { kind: 'closed', at: at(3 * S) }],
+  'held open, closed after failing': [
+    filed({ holdOpen: true }),
+    starting(1),
+    spawned(1),
+    ended(1, 'failed'),
+    { kind: 'closed', at: at(3 * S) },
+  ],
   'held open, closed before any attempt': [filed({ holdOpen: true }), { kind: 'closed', at: at(0) }],
   'held open, closed in flight': [filed({ holdOpen: true }), starting(1), spawned(1), { kind: 'closed', at: at(2 * S) }],
   'stop asked, nothing started': [filed(), { kind: 'stop-requested', at: at(0) }],
@@ -61,18 +85,34 @@ export const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as co
 /** The corpus's name for a pass that could not read the last attempt's harness. */
 const UNREAD = 'unread';
 
-export type Case = { name: string; events: Event[]; observed: Map<string, Sighting>; now: { at: Date; graceMs: number; unread?: ReadonlySet<string> } };
+export type Case = {
+  name: string;
+  events: Event[];
+  observed: Map<string, Sighting>;
+  now: { at: Date; graceMs: number; unread?: ReadonlySet<string> };
+};
 
 /**
  * Every journal shape, under every deadline, sighting and time: `sightings` keyed by the name a case takes. With `unread`, one
  * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`, 2026-09-25). Asked
  * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded.
  */
-export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>, options: { unread?: boolean } = {}): Case[] => Object.entries(JOURNALS).flatMap(([j, base]) =>
-  Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) => [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) => Object.entries(TIMES).map(([t, ms]) => {
-    const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
-    const last = fold(TASK, events).attempts.at(-1);
-    const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);
-    const unread = s === UNREAD && last ? { unread: new Set([nameFor(TASK, last.n)]) } : {};
-    return { name: `${j} · ${d} · ${s} · ${t}`, events, observed, now: { at: new Date(T0.getTime() + ms), graceMs: 30_000, ...unread } };
-  }))));
+export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>, options: { unread?: boolean } = {}): Case[] =>
+  Object.entries(JOURNALS).flatMap(([j, base]) =>
+    Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) =>
+      [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) =>
+        Object.entries(TIMES).map(([t, ms]) => {
+          const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
+          const last = fold(TASK, events).attempts.at(-1);
+          const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);
+          const unread = s === UNREAD && last ? { unread: new Set([nameFor(TASK, last.n)]) } : {};
+          return {
+            name: `${j} · ${d} · ${s} · ${t}`,
+            events,
+            observed,
+            now: { at: new Date(T0.getTime() + ms), graceMs: 30_000, ...unread },
+          };
+        }),
+      ),
+    ),
+  );

@@ -43,9 +43,11 @@ const server = http.createServer((req, res) => {
   if (req.url === '/api/answered') return void res.writeHead(200, { 'content-type': 'application/json' }).end('[]');
   if (req.url !== `/${how}`) return void res.writeHead(204).end();
   // Painted for both themes, so the theme check passes and the break is what is left to fail.
-  res.writeHead(200, { 'content-type': 'text/html' }).end(
-    `<style>body{background:white}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style><p>${TEXT}</p><button>${PRESS}</button><script>${BREAKS[how]}</script>`,
-  );
+  res
+    .writeHead(200, { 'content-type': 'text/html' })
+    .end(
+      `<style>body{background:white}@media (prefers-color-scheme: dark){body{background:#111;color:#eee}}</style><p>${TEXT}</p><button>${PRESS}</button><script>${BREAKS[how]}</script>`,
+    );
 });
 
 server.listen(0, '127.0.0.1', () => {
@@ -60,7 +62,8 @@ server.listen(0, '127.0.0.1', () => {
       await expectVisible(p.getByText(TEXT), 'the page says what it is');
       if (store) {
         fs.rmSync(store, { recursive: true, force: true });
-        if (how === 'store-removed') await expectVisible(p.getByText('Give the board a look'), 'the page draws a run the store has', PRESS_MS);
+        if (how === 'store-removed')
+          await expectVisible(p.getByText('Give the board a look'), 'the page draws a run the store has', PRESS_MS);
         return;
       }
       await p.getByRole('button', { name: PRESS }).click({ timeout: PRESS_MS });

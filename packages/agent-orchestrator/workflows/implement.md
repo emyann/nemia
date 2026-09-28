@@ -1,6 +1,6 @@
 ---
 harness: claude
-check: npm test && npm run typecheck
+check: npm test && npm run typecheck && npm run lint
 # Denied by name what no step needs and an unattended session otherwise has: messaging other sessions, scheduling cron
 # jobs, firing remote triggers (measured, docs/plan-hold-the-bar.md §4b, "what a worker gets"). `--disallowedTools`.
 disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger

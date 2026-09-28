@@ -11,8 +11,37 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { AgentWriteError, agentUsers, agentVersion, cardSkills, HOME, listRuns, loadAgents, removeAgent, skillsFor, start, writeAgent, type AgentSchema } from 'agent-orchestrator';
-import { AGENT_KEYS, AGENT_OWN_KEYS, AGENTS_FOLDER, agentCard, agentNameRefusal, FORMER_KEYS, formerSandbox, frontmatterKey, isCardFile, splitFrontmatter, type AgentCardShape, type AgentDraft, type AgentSkill, type RoleKey, type SkillsFound } from 'agent-orchestrator/workflow';
+import {
+  AgentWriteError,
+  agentUsers,
+  agentVersion,
+  cardSkills,
+  HOME,
+  listRuns,
+  loadAgents,
+  removeAgent,
+  skillsFor,
+  start,
+  writeAgent,
+  type AgentSchema,
+} from 'agent-orchestrator';
+import {
+  AGENT_KEYS,
+  AGENT_OWN_KEYS,
+  AGENTS_FOLDER,
+  agentCard,
+  agentNameRefusal,
+  FORMER_KEYS,
+  formerSandbox,
+  frontmatterKey,
+  isCardFile,
+  splitFrontmatter,
+  type AgentCardShape,
+  type AgentDraft,
+  type AgentSkill,
+  type RoleKey,
+  type SkillsFound,
+} from 'agent-orchestrator/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { judgedNow } from './runs.ts';
@@ -78,7 +107,8 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
  * `.claude/skills/`, then the store's. What its version digests and its card is read from.
  */
-const skillsOfPlace = (dir: string, repo: string, home: string = HOME): SkillsFound => skillsFor(path.join(path.dirname(dir), '_'), placesOf(repo, home));
+const skillsOfPlace = (dir: string, repo: string, home: string = HOME): SkillsFound =>
+  skillsFor(path.join(path.dirname(dir), '_'), placesOf(repo, home));
 
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
 const agentPlaces = (repo: string, home: string = HOME): Array<{ from: WorkflowSource; dir: string }> =>
@@ -86,7 +116,9 @@ const agentPlaces = (repo: string, home: string = HOME): Array<{ from: WorkflowS
 
 /** Every agent of each place, by name, each read now from disk. */
 export function listAgents(repo: string, home: string = HOME): AgentListing[] {
-  return agentPlaces(repo, home).flatMap(({ from, dir }) => [...loadAgents(dir).keys()].sort().map((name) => listedAgent(from, dir, name, repo, home)!));
+  return agentPlaces(repo, home).flatMap(({ from, dir }) =>
+    [...loadAgents(dir).keys()].sort().map((name) => listedAgent(from, dir, name, repo, home)!),
+  );
 }
 
 /** One agent as the listing has it, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. */
@@ -107,29 +139,50 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
   const agent = loadAgents(dir).get(name);
   // A link is refused by the package's reader, and read here it would be whatever it points at, outside the folder: only the refusal.
   const linked = (at: string) => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
-  if (linked(file)) return { ...empty(from, dir, file, name, version, usedBy), error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.` };
+  if (linked(file))
+    return {
+      ...empty(from, dir, file, name, version, usedBy),
+      error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.`,
+    };
   let source: string;
-  try { source = fs.readFileSync(file, 'utf8'); } catch (err) { return { ...empty(from, dir, file, name, version, usedBy), error: messageOf(err) }; }
+  try {
+    source = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return { ...empty(from, dir, file, name, version, usedBy), error: messageOf(err) };
+  }
   const sidecarOf = (named: string | undefined): AgentSchema | null => {
     if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
-    try { return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') }; } catch { return null; }
+    try {
+      return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') };
+    } catch {
+      return null;
+    }
   };
   if (agent === undefined || agent instanceof Error) {
     // Not read: its lines as written, so what is wrong can be put right in the form — a key under its former name too, as the parser reads it,
     // which the form's save then writes under the name it has now.
     const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
-    const keys = Object.fromEntries(ROLE_KEYS.flatMap((key) => {
-      const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
-      return value === undefined ? [] : [[key, value]];
-    })) as Partial<Record<RoleKey, string>>;
+    const keys = Object.fromEntries(
+      ROLE_KEYS.flatMap((key) => {
+        const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
+        return value === undefined ? [] : [[key, value]];
+      }),
+    ) as Partial<Record<RoleKey, string>>;
     // A codex agent's sandbox, written as `permissionMode:` before 2026-09-23, is its `sandbox` — as the parser reads it (`formerSandbox`).
-    const former = keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined ? formerSandbox(keys.permissionMode) : undefined;
+    const former =
+      keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined
+        ? formerSandbox(keys.permissionMode)
+        : undefined;
     if (former !== undefined) {
       delete keys.permissionMode;
       keys.sandbox = former;
     }
     let body = '';
-    try { body = splitFrontmatter(file, source).body; } catch { body = source; }
+    try {
+      body = splitFrontmatter(file, source).body;
+    } catch {
+      body = source;
+    }
     return {
       ...empty(from, dir, file, name, version, usedBy),
       description: frontmatterKey(source, 'description') ?? null,
@@ -144,11 +197,30 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
   }
   let card: AgentSkill[] | null = null;
   let cardError: string | null = null;
-  try { card = cardSkills(agent, found); } catch (err) { cardError = messageOf(err); }
+  try {
+    card = cardSkills(agent, found);
+  } catch (err) {
+    cardError = messageOf(err);
+  }
   return {
-    name, from, dir, file, description: agent.description ?? null, keys: agent.keys, body: agent.body, schema: sidecarOf(agent.keys.output),
-    card, cardError, skills: agent.skills?.join(', ') ?? null, given: givenSkills(agent.skills ?? [], found, repo, home), systemPrompt: agent.systemPrompt ?? null,
-    source, version, usedBy, error: null, untried: null,
+    name,
+    from,
+    dir,
+    file,
+    description: agent.description ?? null,
+    keys: agent.keys,
+    body: agent.body,
+    schema: sidecarOf(agent.keys.output),
+    card,
+    cardError,
+    skills: agent.skills?.join(', ') ?? null,
+    given: givenSkills(agent.skills ?? [], found, repo, home),
+    systemPrompt: agent.systemPrompt ?? null,
+    source,
+    version,
+    usedBy,
+    error: null,
+    untried: null,
   };
 }
 
@@ -161,8 +233,26 @@ function skillsLineOf(source: string): string | null {
   return line === undefined || isCardFile(line) ? null : line;
 }
 
-const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing =>
-  ({ name, from, dir, file, description: null, keys: {}, body: '', schema: null, card: null, cardError: null, skills: null, given: [], systemPrompt: null, source: '', version, usedBy, error: null, untried: null });
+const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing => ({
+  name,
+  from,
+  dir,
+  file,
+  description: null,
+  keys: {},
+  body: '',
+  schema: null,
+  card: null,
+  cardError: null,
+  skills: null,
+  given: [],
+  systemPrompt: null,
+  source: '',
+  version,
+  usedBy,
+  error: null,
+  untried: null,
+});
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
@@ -176,7 +266,8 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 /** A refused write: the package's words, and the steps that still name the agent when that is why. */
 export type AgentRefused = { error: string; users: string[] };
 
-const DRAFT = '"description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+const DRAFT =
+  '"description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -219,7 +310,10 @@ function yoursOnly(route: string, from: string, name: string | null, repo: strin
       error: `${route} refuses to write the repository's agents (${theirs}): the board writes only yours, in ${yours}, and the api writes nothing into a checkout. Make the agent in yours${copy} then copy the file into ${theirs} by hand, where git shows it as a change to commit.`,
     };
   }
-  return { status: 400, error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\`, and the board writes yours, at /api/agents/yours/…. This request named ${JSON.stringify(from)}.` };
+  return {
+    status: 400,
+    error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\`, and the board writes yours, at /api/agents/yours/…. This request named ${JSON.stringify(from)}.`,
+  };
 }
 
 /** The request's JSON body, or why it has none. */
@@ -232,28 +326,50 @@ async function jsonOf(req: { json: () => Promise<unknown> }, route: string, shap
 }
 
 /** A draft from a body, its shape checked: a key's value is judged by the package, which says what is wrong with it in its words. */
-function draftOf(body: Record<string, unknown>, name: unknown, route: string, shape: string): { draft: AgentDraft; schema: AgentSchema | null } | Refusal {
+function draftOf(
+  body: Record<string, unknown>,
+  name: unknown,
+  route: string,
+  shape: string,
+): { draft: AgentDraft; schema: AgentSchema | null } | Refusal {
   const wrong = (what: string) => ({ status: 400 as const, error: `${route}: ${what}. Send ${shape}.` });
   if (typeof name !== 'string') return wrong(`\`name\` is the agent's name, a string, and this request's was ${JSON.stringify(name)}`);
   // A page drawn before agents card 2 sends the card file it edited — `card` and `cardText`, or `skillsText` from before 2026-09-25. Taken as
   // nothing, the edit would be lost unsaid; the card is generated from the agent's skills now, so it is refused, saying so. An own null too.
   const retired = ['card', 'cardText', 'skillsText'].filter((key) => Object.hasOwn(body, key));
-  if (retired.length) return wrong(`${retired.map((key) => `\`${key}\``).join(' and ')} named the card file beside the agent, which is retired: since agents card 2 its card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page open since before then sends it: reload it, and save again`);
+  if (retired.length)
+    return wrong(
+      `${retired.map((key) => `\`${key}\``).join(' and ')} named the card file beside the agent, which is retired: since agents card 2 its card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page open since before then sends it: reload it, and save again`,
+    );
   if (body.description != null && typeof body.description !== 'string') return wrong('`description` is a line of text, or null');
-  if (body.skills != null && typeof body.skills !== 'string') return wrong('`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null');
-  if (body.systemPrompt != null && typeof body.systemPrompt !== 'string') return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
+  if (body.skills != null && typeof body.skills !== 'string')
+    return wrong(
+      '`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null',
+    );
+  if (body.systemPrompt != null && typeof body.systemPrompt !== 'string')
+    return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
   if (body.keys !== undefined && !isObject(body.keys)) return wrong('`keys` is an object of the role keys the agent sets');
   const keys = (body.keys ?? {}) as Record<string, unknown>;
   const bad = Object.entries(keys).find(([, value]) => value !== null && typeof value !== 'string');
   if (bad) return wrong(`\`keys.${bad[0]}\` is written as a string, as its line in the file is — ${JSON.stringify(bad[1])} is not one`);
-  if (body.body !== undefined && typeof body.body !== 'string') return wrong('`body` is the agent\'s instructions, a string');
+  if (body.body !== undefined && typeof body.body !== 'string') return wrong("`body` is the agent's instructions, a string");
   const schema = body.schema ?? null;
-  if (schema !== null && (!isObject(schema) || typeof schema.file !== 'string' || typeof schema.text !== 'string')) return wrong('`schema` is the result schema its `output:` names, `{ "file", "text" }`, or null');
+  if (schema !== null && (!isObject(schema) || typeof schema.file !== 'string' || typeof schema.text !== 'string'))
+    return wrong('`schema` is the result schema its `output:` names, `{ "file", "text" }`, or null');
   const description = typeof body.description === 'string' && body.description.trim() ? body.description.trim() : null;
   const line = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value.trim() : null);
-  const trimmed = Object.fromEntries(Object.entries(keys).map(([key, value]) => [key, typeof value === 'string' && value.trim() ? value.trim() : null]));
+  const trimmed = Object.fromEntries(
+    Object.entries(keys).map(([key, value]) => [key, typeof value === 'string' && value.trim() ? value.trim() : null]),
+  );
   return {
-    draft: { name, description, skills: line(body.skills), systemPrompt: line(body.systemPrompt), keys: trimmed as AgentDraft['keys'], body: (body.body as string | undefined) ?? '' },
+    draft: {
+      name,
+      description,
+      skills: line(body.skills),
+      systemPrompt: line(body.systemPrompt),
+      keys: trimmed as AgentDraft['keys'],
+      body: (body.body as string | undefined) ?? '',
+    },
     schema: schema as AgentSchema | null,
   };
 }
@@ -262,7 +378,8 @@ function draftOf(body: Record<string, unknown>, name: unknown, route: string, sh
 function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 } | null {
   if (!(err instanceof AgentWriteError)) {
     // renderAgent's and the parser's refusals are WorkflowErrors: a key, a value, a line break.
-    if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2) return { body: { error: err.message, users: [] }, status: 422 };
+    if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2)
+      return { body: { error: err.message, users: [] }, status: 422 };
     return null;
   }
   const status = err.why === 'missing' ? 404 : err.why === 'refused' ? 422 : 409;
@@ -271,7 +388,11 @@ function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 
 
 /** The name in a path, refused in the package's words before anything is read, or the agents folder of `from`. */
 function placeOf(from: string, name: string | null, route: string): { dir: string } | Refusal {
-  if (from !== 'repo' && from !== 'yours') return { status: 400, error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\` — /api/agents/yours/${name ?? '<name>'}, say. This request's was '${from}'.` };
+  if (from !== 'repo' && from !== 'yours')
+    return {
+      status: 400,
+      error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\` — /api/agents/yours/${name ?? '<name>'}, say. This request's was '${from}'.`,
+    };
   if (name !== null) {
     const refused = agentNameRefusal(name);
     if (refused) return { status: 400, error: refused };
@@ -295,7 +416,13 @@ export const agents = new Hono()
     if ('status' in place) return c.json({ error: place.error }, place.status);
     try {
       const agent = listedAgent(from as WorkflowSource, place.dir, name, repoOf());
-      if (!agent) return c.json({ error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.` }, 404);
+      if (!agent)
+        return c.json(
+          {
+            error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
+          },
+          404,
+        );
       return c.json(agent);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
@@ -314,11 +441,21 @@ export const agents = new Hono()
     if ('status' in place) return c.json({ error: place.error }, place.status);
     try {
       const agent = loadAgents(place.dir).get(name);
-      if (agent === undefined) return c.json({ error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.` }, 404);
+      if (agent === undefined)
+        return c.json(
+          {
+            error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
+          },
+          404,
+        );
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
       const found = skillsOfPlace(place.dir, repoOf());
       const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
-      return c.json({ card, servedOverA2A: false, why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.` } satisfies AgentCardAnswer);
+      return c.json({
+        card,
+        servedOverA2A: false,
+        why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`,
+      } satisfies AgentCardAnswer);
     } catch (err) {
       if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2) return c.json({ error: err.message }, 422);
       return c.json({ error: messageOf(err) }, 500);
@@ -328,7 +465,12 @@ export const agents = new Hono()
   .post('/api/agents/:from', async (c) => {
     const { from } = c.req.param();
     const route = `POST /api/agents/${from}`;
-    const refused = refusedBeforeReading(agentGuard(route, POST_SHAPE), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      agentGuard(route, POST_SHAPE),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     const where = yoursOnly(route, from, null, repoOf());
     if (where) return c.json({ error: where.error }, where.status);
@@ -346,7 +488,12 @@ export const agents = new Hono()
   .put('/api/agents/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `PUT /api/agents/${from}/${name}`;
-    const refused = refusedBeforeReading(agentGuard(route, PUT_SHAPE), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      agentGuard(route, PUT_SHAPE),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     const where = yoursOnly(route, from, name, repoOf());
     if (where) return c.json({ error: where.error }, where.status);
@@ -357,7 +504,12 @@ export const agents = new Hono()
     if (!isObject(read.body)) return c.json({ error: `${route} takes a JSON object: ${PUT_SHAPE}.` }, 400);
     const { version } = read.body;
     if (typeof version !== 'string' || !version) {
-      return c.json({ error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(version)}.` }, 400);
+      return c.json(
+        {
+          error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(version)}.`,
+        },
+        400,
+      );
     }
     const to = read.body.name ?? name;
     if (typeof to === 'string' && to !== name) {
@@ -378,7 +530,12 @@ export const agents = new Hono()
   .post('/api/agents/:from/:name/try', async (c) => {
     const { from, name } = c.req.param();
     const route = `POST /api/agents/${from}/${name}/try`;
-    const refused = refusedBeforeReading(tryGuard(route), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      tryGuard(route),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     const repo = repoOf();
     if (from === 'repo') {
@@ -395,23 +552,54 @@ export const agents = new Hono()
     const read = await jsonOf(c.req, route, TRY_SHAPE);
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const brief = isObject(read.body) ? read.body.brief : undefined;
-    if (typeof brief !== 'string') return c.json({ error: `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(brief)}.` }, 400);
-    if (!brief.trim()) return c.json({ error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.` }, 422);
+    if (typeof brief !== 'string')
+      return c.json(
+        {
+          error: `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(brief)}.`,
+        },
+        400,
+      );
+    if (!brief.trim())
+      return c.json(
+        {
+          error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
+        },
+        422,
+      );
     try {
       const agent = listedAgent('yours', place.dir, name, repo);
-      if (!agent) return c.json({ error: `Yours has no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.` }, 404);
+      if (!agent)
+        return c.json(
+          {
+            error: `Yours has no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
+          },
+          404,
+        );
       if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
       // Its name, its harness and `remote:`, refused before anything is written: the loader would refuse the try's own step, on a file the api wrote.
       if (agent.untried) return c.json({ error: agent.untried.why }, 422);
       // A try looks at no repository, so a skill the agent finds only in the repository's .claude/skills is not found by its start.
       const theirs = agent.given.filter((skill) => skill.from === 'repo');
       if (theirs.length) {
-        const copies = theirs.map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills())}\``).join(', ');
-        return c.json({ error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.` }, 422);
+        const copies = theirs
+          .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills())}\``)
+          .join(', ');
+        return c.json(
+          {
+            error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
+          },
+          422,
+        );
       }
       const tries = listRuns().filter((run) => tryOf(run)?.agent === name);
       const moving = (await judgedNow(tries)).find((run) => run.moving);
-      if (moving) return c.json({ error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.` }, 409);
+      if (moving)
+        return c.json(
+          {
+            error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
+          },
+          409,
+        );
       const workflowDir = writeTryFolder(name, agent.version);
       const run = start({ brief: brief.trim(), repo: '', workflowDir });
       return c.json({ id: run.id } satisfies AgentTried, 201);
@@ -425,7 +613,12 @@ export const agents = new Hono()
   .delete('/api/agents/:from/:name', async (c) => {
     const { from, name } = c.req.param();
     const route = `DELETE /api/agents/${from}/${name}`;
-    const refused = refusedBeforeReading(agentGuard(route, DELETE_SHAPE), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(
+      agentGuard(route, DELETE_SHAPE),
+      c.req.header('host'),
+      c.req.header('sec-fetch-site'),
+      c.req.header('content-type'),
+    );
     if (refused) return c.json({ error: refused.error }, refused.status);
     const where = yoursOnly(route, from, name, repoOf());
     if (where) return c.json({ error: where.error }, where.status);
@@ -435,7 +628,12 @@ export const agents = new Hono()
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const version = isObject(read.body) ? read.body.version : undefined;
     if (typeof version !== 'string' || !version) {
-      return c.json({ error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(version)}.` }, 400);
+      return c.json(
+        {
+          error: `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(version)}.`,
+        },
+        400,
+      );
     }
     try {
       // The repository the board serves is read too, for a step its workflows are given this agent by; another is not known here.
@@ -448,10 +646,18 @@ export const agents = new Hono()
   });
 
 /** `writeAgent`, answered: the agent as it now reads, or the package's refusal with its status. */
-function saved(dir: string, draft: AgentDraft, how: Parameters<typeof writeAgent>[2], ok: 200 | 201): { body: AgentSaved | AgentRefused | { error: string }; status: 200 | 201 | 404 | 409 | 422 | 500 } {
+function saved(
+  dir: string,
+  draft: AgentDraft,
+  how: Parameters<typeof writeAgent>[2],
+  ok: 200 | 201,
+): { body: AgentSaved | AgentRefused | { error: string }; status: 200 | 201 | 404 | 409 | 422 | 500 } {
   try {
     const done = writeAgent(dir, draft, how);
-    return { body: { agent: listedAgent('yours', done.dir, done.agent.name, repoOf())!, written: done.written, removed: done.removed }, status: ok };
+    return {
+      body: { agent: listedAgent('yours', done.dir, done.agent.name, repoOf())!, written: done.written, removed: done.removed },
+      status: ok,
+    };
   } catch (err) {
     return refusalOf(err) ?? { body: { error: messageOf(err) }, status: 500 };
   }

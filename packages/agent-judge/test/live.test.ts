@@ -10,14 +10,22 @@ import path from 'node:path';
 import { decide, judge, noul, score, type FailureKind } from '../src/facade.ts';
 
 const state = { card: 'Sort the inbox by date.' };
-const questions = { web: noul('Does `card` touch the web app?', { true: 'yes', false: 'no' }), size: score('How large is `card`?', ['small', 'large']) };
+const questions = {
+  web: noul('Does `card` touch the web app?', { true: 'yes', false: 'no' }),
+  size: score('How large is `card`?', ['small', 'large']),
+};
 
-const ask = async (replies: Parameters<typeof stub>, options: { env?: Record<string, string>; attemptMs?: number; deadlineMs?: number; retries?: number } = {}) => {
+const ask = async (
+  replies: Parameters<typeof stub>,
+  options: { env?: Record<string, string>; attemptMs?: number; deadlineMs?: number; retries?: number } = {},
+) => {
   const record = tmp('live');
   const s = stub(...replies);
   const j = judge({ model: 'jev-1.13.0', record, env: ENV, fetch: s.fetch, retries: 0, ...options });
   const asked = await j.ask(state, questions);
-  const text = files(record).map((f) => fs.readFileSync(path.join(record, f), 'utf8')).join('');
+  const text = files(record)
+    .map((f) => fs.readFileSync(path.join(record, f), 'utf8'))
+    .join('');
   return { asked, calls: s.calls, record, text };
 };
 
@@ -30,13 +38,14 @@ const failedAs = (asked: Awaited<ReturnType<typeof ask>>['asked'], kind: Failure
   }
 };
 
-test('one request carries every question, the caller\'s state and the pinned model, and nothing else', async () => {
+test("one request carries every question, the caller's state and the pinned model, and nothing else", async () => {
   const { asked, calls } = await ask([answering({ web: 0.93, size: 0.4 })]);
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.url, 'https://api.typesafe.ai/v1/systemone');
   assert.equal(calls[0]!.headers.authorization, `Bearer ${KEY}`);
   assert.deepEqual(calls[0]!.body, {
-    model: 'jev-1.13.0', state,
+    model: 'jev-1.13.0',
+    state,
     questions: {
       web: { type: 'noul', instructions: 'Does `card` touch the web app?', criteria: { true: 'yes', false: 'no' } },
       size: { type: 'score', instructions: 'How large is `card`?', criteria: ['small', 'large'] },
@@ -54,7 +63,9 @@ test('TYPESAFE_BASE_URL and TYPESAFE_LOG_LEVEL in the environment move nothing: 
   const log = console.debug;
   console.debug = console.info = (...xs: unknown[]) => void logged.push(xs);
   try {
-    const { calls } = await ask([answering({})], { env: { ...ENV, TYPESAFE_BASE_URL: 'https://elsewhere.example', TYPESAFE_LOG_LEVEL: 'debug' } });
+    const { calls } = await ask([answering({})], {
+      env: { ...ENV, TYPESAFE_BASE_URL: 'https://elsewhere.example', TYPESAFE_LOG_LEVEL: 'debug' },
+    });
     assert.equal(calls[0]!.url, 'https://api.typesafe.ai/v1/systemone');
   } finally {
     console.debug = log;
@@ -86,7 +97,16 @@ test('no key, then a key: the same questions are sent and answered, with no reas
   assert.equal(on.answers.size.status === 'answered' && on.answers.size.answer.score, 0.4);
 });
 
-for (const [status, kind] of [[400, 'refused'], [401, 'refused'], [403, 'refused'], [422, 'refused'], [429, 'rate-limited'], [529, 'rate-limited'], [500, 'unreachable'], [503, 'unreachable']] as const) {
+for (const [status, kind] of [
+  [400, 'refused'],
+  [401, 'refused'],
+  [403, 'refused'],
+  [422, 'refused'],
+  [429, 'rate-limited'],
+  [529, 'rate-limited'],
+  [500, 'unreachable'],
+  [503, 'unreachable'],
+] as const) {
   test(`a ${status} is ${kind}, recorded, and not asked again`, async () => {
     const { asked, calls, record, text } = await ask([{ status, body: { detail: `status ${status}` } }]);
     assert.equal(calls.length, 1);
@@ -133,7 +153,13 @@ test('a key the service echoes back is in no message and no record', async () =>
 });
 
 test('an answer that is not one is kept raw, read as malformed, and paid for once', async () => {
-  const bad = { body: { model: 'jev-1.13.0', answers: { web: { type: 'noul', noul: 1.7 }, size: { type: 'noul', noul: 0.5 } }, usage: { input_tokens: 9, output_tokens: 0 } } };
+  const bad = {
+    body: {
+      model: 'jev-1.13.0',
+      answers: { web: { type: 'noul', noul: 1.7 }, size: { type: 'noul', noul: 0.5 } },
+      usage: { input_tokens: 9, output_tokens: 0 },
+    },
+  };
   const { asked, record, text } = await ask([bad]);
   failedAs(asked, 'malformed');
   assert.match(text, /"raw":\{"type":"noul","noul":1\.7\}/);

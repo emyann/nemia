@@ -9,7 +9,18 @@ import { denialText, type Engine, type TaskView } from './runtime-client.ts';
 import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import type { Consumed } from './radius.ts';
 import type { Workflow } from './workflow.ts';
-import { decision, gated, resultSteps, taskSpend, type CloseoutAsked, type ParentRun, type Run, type Said, type SpendOf, type TaskPhase } from './run.ts';
+import {
+  decision,
+  gated,
+  resultSteps,
+  taskSpend,
+  type CloseoutAsked,
+  type ParentRun,
+  type Run,
+  type Said,
+  type SpendOf,
+  type TaskPhase,
+} from './run.ts';
 import { parseCloseout, type Closeout } from './closeout.ts';
 import { signedAndHeld, taskUsage } from './timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './store.ts';
@@ -53,13 +64,16 @@ const currentTurn = (state: TaskView['state']): TaskView['state']['attempts'] =>
  * Whether a task held open waits for a person's word now — `input-required`: its turn signed, nobody closed it, and nothing runs. What the
  * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
  */
-export const waitsForWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'input-required';
+export const waitsForWord =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): boolean =>
+    views.get(taskId)?.phase === 'input-required';
 
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
  * What tells a turn a pass started and died before writing down (`adoptTries`) from one the record already holds.
  */
-export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? view.state.inputs?.length ?? 0 : 0);
+export const answersIn = (view: TaskView | undefined): number => (view?.state.holdOpen ? (view.state.inputs?.length ?? 0) : 0);
 
 /**
  * The engine a pass's `advance` reads, whose `view` of a task the runtime's pass reported is that report's (`TickReport.views`): a view
@@ -77,7 +91,11 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
   return new Proxy(e, {
     get(target, key, receiver) {
       const value = Reflect.get(target, key, receiver) as unknown;
-      if (key === 'view') return (taskId: string) => { const v = reported.get(taskId); return v ? Promise.resolve(v) : target.view(taskId); };
+      if (key === 'view')
+        return (taskId: string) => {
+          const v = reported.get(taskId);
+          return v ? Promise.resolve(v) : target.view(taskId);
+        };
       if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key))) return value;
       return (...args: unknown[]) => {
         const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
@@ -104,12 +122,20 @@ export function viewedOnce(e: Engine): Engine {
         return (taskId: string) => {
           let v = read.get(taskId);
           // A view that failed is not kept: the next read asks the engine again, as it would have.
-          if (!v) read.set(taskId, v = target.view(taskId).catch((err: unknown) => { read.delete(taskId); throw err; }));
+          if (!v)
+            read.set(
+              taskId,
+              (v = target.view(taskId).catch((err: unknown) => {
+                read.delete(taskId);
+                throw err;
+              })),
+            );
           return v;
         };
       }
       // A pass moves every task, so a `tick` or a `start` is read as a verb this does not know: it drops every view.
-      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key) && key !== 'tick' && key !== 'start')) return value;
+      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key) && key !== 'tick' && key !== 'start'))
+        return value;
       return (...args: unknown[]) => {
         const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
         if (named) for (const taskId of named(args)) read.delete(taskId);
@@ -125,8 +151,12 @@ const ENGINE_READS = new Set(['tick', 'list', 'logs', 'transcript', 'feed', 'wat
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names none the report could carry. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
-  file: () => [], admit: ([ids]) => (Array.isArray(ids) ? ids : []),
-  answer: ([id]) => [id], stop: ([id]) => [id], close: ([id]) => [id], say: ([id]) => [id],
+  file: () => [],
+  admit: ([ids]) => (Array.isArray(ids) ? ids : []),
+  answer: ([id]) => [id],
+  stop: ([id]) => [id],
+  close: ([id]) => [id],
+  say: ([id]) => [id],
 };
 
 /**
@@ -143,7 +173,11 @@ const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unkno
  * them only while a cap is in force, because a step answered without limit — the supervisor, which is answered for as long as a person
  * keeps answering — would otherwise add one journal read per answer to every pass of every four seconds, for ever, buying nothing.
  */
-export async function taskPhases(e: Engine, run: Run, { earlierTries = true }: { earlierTries?: boolean } = {}): Promise<{
+export async function taskPhases(
+  e: Engine,
+  run: Run,
+  { earlierTries = true }: { earlierTries?: boolean } = {},
+): Promise<{
   views: Map<string, TaskView>;
   phaseOf: (taskId: string) => TaskPhase;
 }> {
@@ -167,8 +201,10 @@ export async function taskPhases(e: Engine, run: Run, { earlierTries = true }: {
  * missing statement: a `done` with no closeout from before 2026-09-19 would otherwise read unsigned, and be nudged, long after.
  */
 const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][number] | undefined): boolean =>
-  state.closeoutSchema !== undefined && a !== undefined && a.closeout === undefined
-  && (a.reason === 'unsigned' || (a.ended === 'done' && a.stated === false));
+  state.closeoutSchema !== undefined &&
+  a !== undefined &&
+  a.closeout === undefined &&
+  (a.reason === 'unsigned' || (a.ended === 'done' && a.stated === false));
 
 /**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
@@ -176,11 +212,13 @@ const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][
  * without one — `unsigned` — from a task that was never asked, and from one that failed. Exported, log-free, for a consumer that
  * words a step as `wf ls` does.
  */
-export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): CloseoutAsked => {
-  const state = views.get(taskId)?.state;
-  if (!state?.closeoutSchema) return false;
-  return unsignedEnd(state, currentTurn(state).at(-1)) ? 'unsigned' : true;
-};
+export const closeoutAsked =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): CloseoutAsked => {
+    const state = views.get(taskId)?.state;
+    if (!state?.closeoutSchema) return false;
+    return unsignedEnd(state, currentTurn(state).at(-1)) ? 'unsigned' : true;
+  };
 
 /**
  * How an attempt ended, in the words a person has read for it since 2026-09-19: an attempt its harness cut at its spend cap is `failed`,
@@ -189,16 +227,25 @@ export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: 
  * and any other is as the runtime recorded it. The one writer of those words for a surface that shows an attempt's end, so the board says
  * what it said when the runtime judged it: never read an attempt's raw `reason` for `unsigned` or `budget`.
  */
-export const endWords = (state: TaskView['state'], a: TaskView['state']['attempts'][number]): { ended: string | null; reason: string | null } =>
-  a.limit === 'budget' ? { ended: 'failed', reason: 'budget' }
-  : unsignedEnd(state, a) ? { ended: 'failed', reason: 'unsigned' } : { ended: a.ended, reason: a.reason };
+export const endWords = (
+  state: TaskView['state'],
+  a: TaskView['state']['attempts'][number],
+): { ended: string | null; reason: string | null } =>
+  a.limit === 'budget'
+    ? { ended: 'failed', reason: 'budget' }
+    : unsignedEnd(state, a)
+      ? { ended: 'failed', reason: 'unsigned' }
+      : { ended: a.ended, reason: a.reason };
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
  * tells a step waiting on a person with nothing signed, as on a login refresh the harness lost, from one still working (`retryable`).
  * Exported, log-free, for a consumer that asks `retry` for such a step as `wf retry` does.
  */
-export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'needs-human';
+export const harnessBlocked =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): boolean =>
+    views.get(taskId)?.phase === 'needs-human';
 
 /**
  * What the harness says a task's blocked session waits for, in its own words (`TaskView.waitingFor`), off views already read — `permission
@@ -208,7 +255,10 @@ export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId:
  * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
  * run.ts, which is the only place this repository turns the harness's word into a sentence.
  */
-export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string | undefined => views.get(taskId)?.waitingFor;
+export const waitingOf =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): string | undefined =>
+    views.get(taskId)?.waitingFor;
 
 /**
  * What a task's sessions were denied, off views already read: every call the harness refused on an attempt that ended, as a permission rule
@@ -223,19 +273,23 @@ export const waitingOf = (views: ReadonlyMap<string, TaskView>) => (taskId: stri
  *
  * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in run.ts.
  */
-export const deniedOf = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string[] => {
-  const state = views.get(taskId)?.state;
-  return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
-};
+export const deniedOf =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): string[] => {
+    const state = views.get(taskId)?.state;
+    return [...new Set((state ? currentTurn(state) : []).flatMap((a) => (a.denials ?? []).map(denialText)))];
+  };
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
  * print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free, for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
  */
-export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (taskId) => {
-  const spent = taskSpend(views.get(taskId));
-  return spent && { ...spent, denied: deniedOf(views)(taskId) };
-};
+export const spendReader =
+  (views: ReadonlyMap<string, TaskView>): SpendOf =>
+  (taskId) => {
+    const spent = taskSpend(views.get(taskId));
+    return spent && { ...spent, denied: deniedOf(views)(taskId) };
+  };
 
 /**
  * What each step's current check exited with, off the engine's record: the code its process gave, or
@@ -246,13 +300,15 @@ export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (t
  *
  * Exported for a consumer that words a check as `wf ls` does, without a `logs` call per refused check.
  */
-export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string): Verdict | undefined => {
-  const taskId = run.steps[step]?.check?.taskId;
-  if (!taskId) return undefined;
-  // A check the operator or its deadline cut short did not finish, whatever code its process died with.
-  const last = views.get(taskId)?.state.attempts.at(-1);
-  return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
-};
+export const exitVerdicts =
+  (views: ReadonlyMap<string, TaskView>, run: Run) =>
+  (step: string): Verdict | undefined => {
+    const taskId = run.steps[step]?.check?.taskId;
+    if (!taskId) return undefined;
+    // A check the operator or its deadline cut short did not finish, whatever code its process died with.
+    const last = views.get(taskId)?.state.attempts.at(-1);
+    return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
+  };
 
 /**
  * The harness's own id for the session a try after the task continues — what `--resume` takes: its last session's, or, where the harness
@@ -266,7 +322,10 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
  * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `wf ls`
  * prints beside a step, and what the feed words it from (`feedPhase`).
  */
-export const engineWord = (views: ReadonlyMap<string, TaskView>) => (taskId: string): string => wordOfView(views.get(taskId));
+export const engineWord =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): string =>
+    wordOfView(views.get(taskId));
 
 /**
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
@@ -280,10 +339,12 @@ export const wordOfView = (v: TaskView | undefined): string =>
  * How many times a person said something to each step's current try while it ran (`wf say`): the engine's `said` on the try's task, off
  * views already read. Exported, log-free, for a consumer that words a step as `wf ls` does.
  */
-export const saidCount = (views: ReadonlyMap<string, TaskView>, run: Run) => (stepName: string): number => {
-  const taskId = run.steps[stepName]?.taskId;
-  return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
-};
+export const saidCount =
+  (views: ReadonlyMap<string, TaskView>, run: Run) =>
+  (stepName: string): number => {
+    const taskId = run.steps[stepName]?.taskId;
+    return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
+  };
 
 /** What was said to a task's sessions while they ran (`wf say`), off its view: none for a task with no view, or one from before `said`. */
 export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
@@ -329,8 +390,12 @@ function tailOf(file: string, bytes = 64_000): string {
       const buf = Buffer.alloc(Math.min(size, bytes));
       fs.readSync(fd, buf, 0, buf.length, size - buf.length);
       return buf.toString('utf8');
-    } finally { fs.closeSync(fd); }
-  } catch { return ''; }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -356,10 +421,12 @@ export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepN
 }
 
 /** Only the well-formed ones, for the pure functions that just want the outcome. */
-export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) => (stepName: string): Closeout | undefined => {
-  const c = closeoutOf(views, run, stepName);
-  return c && !('error' in c) ? c : undefined;
-};
+export const closeoutReader =
+  (views: ReadonlyMap<string, TaskView>, run: Run) =>
+  (stepName: string): Closeout | undefined => {
+    const c = closeoutOf(views, run, stepName);
+    return c && !('error' in c) ? c : undefined;
+  };
 
 /**
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
@@ -384,12 +451,30 @@ export async function parentOf(e: Engine, id: string, git: BranchReader = oneByO
   const { record } = known;
   if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
   let steps: Workflow[];
-  try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
-  const branches = resultSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  try {
+    steps = stepsOf(record);
+  } catch {
+    return { ...known, shipped: false };
+  }
+  const branches = resultSteps(steps)
+    .map((s) => record.steps[s.name]?.branch)
+    .filter((b): b is string => Boolean(b));
   if (!branches.length || !branches.every(shippedOf(record, git))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
-  const said = decision(steps, record, phaseOf, shippedOf(record, git), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
+  const said = decision(
+    steps,
+    record,
+    phaseOf,
+    shippedOf(record, git),
+    closeoutReader(views, record),
+    closeoutAsked(views),
+    exitVerdicts(views, record),
+    asks,
+    rounds,
+    () => false,
+    spendReader(views),
+  );
   return { ...known, shipped: said.kind === 'shipped' };
 }
 
@@ -427,7 +512,11 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
  * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
  * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. A feed that cannot be read rejects, as the engine's does.
  */
-export async function readFilings(e: Engine, after = 0, into = new Map<string, string>()): Promise<{ filed: Map<string, string>; cursor: number }> {
+export async function readFilings(
+  e: Engine,
+  after = 0,
+  into = new Map<string, string>(),
+): Promise<{ filed: Map<string, string>; cursor: number }> {
   const { entries, cursor } = await e.feed(after);
   for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
   return { filed: into, cursor };

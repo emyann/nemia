@@ -9,7 +9,13 @@ import { agoWord, clockWord, lastWords, quotaTitle, windowWords } from '../src/l
 
 const NOW = new Date('2026-09-19T10:00:00.000Z');
 const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
-  key: 'five_hour', label: '5-hour', usedPercentage: 38.4, resetsAt: '2026-09-19T12:30:00.000Z', reset: false, marked: false, ...over,
+  key: 'five_hour',
+  label: '5-hour',
+  usedPercentage: 38.4,
+  resetsAt: '2026-09-19T12:30:00.000Z',
+  reset: false,
+  marked: false,
+  ...over,
 });
 
 test("a reset is said in the person's own time zone: the time on the same day, the weekday before it on another", () => {
@@ -33,7 +39,13 @@ test('the age of a reading', () => {
 });
 
 test('a window: its percentage rounded, when it resets, marked past the mark — and, reset since the reading, said so and not marked', () => {
-  assert.deepEqual(windowWords(win(), NOW, 'UTC'), { key: 'five_hour', label: '5-hour', used: '38%', resets: 'resets 12:30', marked: false });
+  assert.deepEqual(windowWords(win(), NOW, 'UTC'), {
+    key: 'five_hour',
+    label: '5-hour',
+    used: '38%',
+    resets: 'resets 12:30',
+    marked: false,
+  });
   assert.equal(windowWords(win({ usedPercentage: 86, marked: true }), NOW, 'UTC').marked, true);
   const reset = windowWords(win({ usedPercentage: 91, marked: true, reset: true, resetsAt: '2026-09-19T09:00:00Z' }), NOW, 'UTC');
   assert.equal(reset.resets, 'reset 09:00, not read since');
@@ -44,35 +56,65 @@ test('a window: its percentage rounded, when it resets, marked past the mark —
 test('the hover says where the reading came from, when it is asked again, and by what rule it is shown', () => {
   const windows = [win(), win({ key: 'seven_day', label: 'week', usedPercentage: 71 })];
   const fresh: Quota = {
-    state: 'fresh', askedAt: '2026-09-19T09:58:00Z', ageMs: 120_000, againAt: '2026-09-19T10:01:00Z', subscription: 'max', windows, last: null, keepMs: 180_000,
-    markAt: 80, said: null,
+    state: 'fresh',
+    askedAt: '2026-09-19T09:58:00Z',
+    ageMs: 120_000,
+    againAt: '2026-09-19T10:01:00Z',
+    subscription: 'max',
+    windows,
+    last: null,
+    keepMs: 180_000,
+    markAt: 80,
+    said: null,
   };
   assert.equal(
     quotaTitle(fresh, NOW, 'UTC'),
     'Asked of Claude Code (get_usage, max plan) at 09:58; asked again at most every 3 min while a board is open. A window 80% used or more is marked.',
   );
   const failed: Quota = {
-    ...fresh, state: 'timeout', askedAt: '2026-09-19T09:59:00Z', subscription: null, windows: [], said: 'late',
+    ...fresh,
+    state: 'timeout',
+    askedAt: '2026-09-19T09:59:00Z',
+    subscription: null,
+    windows: [],
+    said: 'late',
     last: { askedAt: '2026-09-19T09:40:00Z', windows },
   };
   assert.equal(
     quotaTitle(failed, NOW, 'UTC'),
     'Asked of Claude Code (get_usage); asked again at most every 3 min while a board is open. A window 80% used or more is marked. The dimmed numbers are the last reading, not now.',
   );
-  assert.match(quotaTitle({ ...failed, keepMs: 0, last: null }, NOW, 'UTC'), /^Asked of Claude Code \(get_usage\); asked again on every read\. A window 80% used or more is marked\.$/);
+  assert.match(
+    quotaTitle({ ...failed, keepMs: 0, last: null }, NOW, 'UTC'),
+    /^Asked of Claude Code \(get_usage\); asked again on every read\. A window 80% used or more is marked\.$/,
+  );
   assert.match(quotaTitle({ ...fresh, keepMs: 90_000 }, NOW, 'UTC'), /at most every 90 s /);
 });
 
 test('the last good reading beside a state with none: its windows, and as of when — in the header itself, never beside a fresh one', () => {
   const windows = [win(), win({ key: 'seven_day', label: 'week', usedPercentage: 86, marked: true, resetsAt: '2026-09-22T11:00:00Z' })];
   const unanswered: Quota = {
-    state: 'unanswered', askedAt: '2026-09-19T09:59:00Z', ageMs: 60_000, againAt: '2026-09-19T10:19:00Z', subscription: 'max', windows: [],
-    last: { askedAt: '2026-09-19T09:35:00Z', windows }, keepMs: 600_000, markAt: 80, said: 'nothing this time',
+    state: 'unanswered',
+    askedAt: '2026-09-19T09:59:00Z',
+    ageMs: 60_000,
+    againAt: '2026-09-19T10:19:00Z',
+    subscription: 'max',
+    windows: [],
+    last: { askedAt: '2026-09-19T09:35:00Z', windows },
+    keepMs: 600_000,
+    markAt: 80,
+    said: 'nothing this time',
   };
   const last = lastWords(unanswered, NOW, 'UTC');
   assert.equal(last?.asOf, 'as of 09:35, 25 min ago');
-  assert.deepEqual(last?.windows.map((w) => [w.label, w.used, w.resets, w.marked]), [['5-hour', '38%', 'resets 12:30', false], ['week', '86%', 'resets Tue 11:00', true]]);
-  assert.equal(lastWords({ ...unanswered, last: null }, NOW, 'UTC'), null, 'none past the api\'s bound');
+  assert.deepEqual(
+    last?.windows.map((w) => [w.label, w.used, w.resets, w.marked]),
+    [
+      ['5-hour', '38%', 'resets 12:30', false],
+      ['week', '86%', 'resets Tue 11:00', true],
+    ],
+  );
+  assert.equal(lastWords({ ...unanswered, last: null }, NOW, 'UTC'), null, "none past the api's bound");
   assert.equal(lastWords({ ...unanswered, state: 'fresh', windows }, NOW, 'UTC'), null);
   assert.equal(
     quotaTitle(unanswered, NOW, 'UTC'),

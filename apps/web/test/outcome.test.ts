@@ -16,7 +16,10 @@ const filesSchema = { type: 'array', items: { type: 'object', properties: { path
 const strings = { type: 'array', items: { type: 'string' } };
 
 test('an array of objects with a file and a line is findings — whatever else each says, and a null line among them', () => {
-  const findings = [{ file: 'src/a.ts', line: 12, what: 'It breaks.' }, { file: 'test/a.test.ts', line: null, what: 'No test.' }];
+  const findings = [
+    { file: 'src/a.ts', line: 12, what: 'It breaks.' },
+    { file: 'test/a.test.ts', line: null, what: 'No test.' },
+  ];
   assert.equal(outputKind(findingsSchema, findings, none), 'findings');
   assert.equal(outputKind(undefined, [{ file: 'a', line: 1, finding: 'x' }], none), 'findings', 'with no schema, off the value alone');
   // A finding whose text is not flat is still one: the place is what makes it a finding.
@@ -24,12 +27,25 @@ test('an array of objects with a file and a line is findings — whatever else e
 });
 
 test("an array of objects with a finding and an answer is replies — the loop target's", () => {
-  const replies = [{ finding: 'src/a.ts:12', answer: 'fixed', why: 'It does not.' }, { finding: 'b', answer: "won't fix", why: 'On purpose.' }];
+  const replies = [
+    { finding: 'src/a.ts:12', answer: 'fixed', why: 'It does not.' },
+    { finding: 'b', answer: "won't fix", why: 'On purpose.' },
+  ];
   assert.equal(outputKind(undefined, replies, none), 'replies');
 });
 
 test("an array of flat objects that are neither is a table — a plan's files", () => {
-  assert.equal(outputKind(filesSchema, [{ path: 'a.ts', change: 'New.' }, { path: 'b.ts', change: 'Gone.' }], none), 'table');
+  assert.equal(
+    outputKind(
+      filesSchema,
+      [
+        { path: 'a.ts', change: 'New.' },
+        { path: 'b.ts', change: 'Gone.' },
+      ],
+      none,
+    ),
+    'table',
+  );
 });
 
 test('a boolean is yes or no', () => {
@@ -53,11 +69,16 @@ test("a string that is the path of one of the try's image artifacts is the image
   assert.equal(outputKind({ type: 'string' }, shot, none), 'text');
   assert.equal(outputKind({ type: 'string' }, 'other.png', images), 'text');
   // `imagePaths` is what tells it: an image the api serves, not a text file nor a bare path.
-  assert.deepEqual([...imagePaths([
-    { path: shot, name: 'runs-light.png', url: '/x', kind: 'image', size: 1 },
-    { path: '/wf/notes.md', name: 'notes.md', url: '/y', kind: 'text', size: 1 },
-    { path: 'on-the-branch.png' },
-  ])], [shot]);
+  assert.deepEqual(
+    [
+      ...imagePaths([
+        { path: shot, name: 'runs-light.png', url: '/x', kind: 'image', size: 1 },
+        { path: '/wf/notes.md', name: 'notes.md', url: '/y', kind: 'text', size: 1 },
+        { path: 'on-the-branch.png' },
+      ]),
+    ],
+    [shot],
+  );
 });
 
 test('a string of more than one line, or longer than MARKDOWN_AT, is markdown; a short one text, and so is a number', () => {
@@ -69,7 +90,17 @@ test('a string of more than one line, or longer than MARKDOWN_AT, is markdown; a
 
 test('an unknown shape is json: an object, an array of arrays, a mixed array, records that are neither findings nor flat, null', () => {
   assert.equal(outputKind({ type: 'object' }, { a: 1 }, none), 'json');
-  assert.equal(outputKind(undefined, [[1, 2], [3, 4]], none), 'json');
+  assert.equal(
+    outputKind(
+      undefined,
+      [
+        [1, 2],
+        [3, 4],
+      ],
+      none,
+    ),
+    'json',
+  );
   assert.equal(outputKind(undefined, ['a', { b: 1 }], none), 'json');
   assert.equal(outputKind(undefined, [1, 2], none), 'json');
   assert.equal(outputKind(undefined, [{ name: 'a', tags: ['x'] }], none), 'json');
@@ -91,12 +122,34 @@ test("the kind is the value's and its schema's, never its field's name: it is no
   assert.equal(outputKind(undefined, { findings: [] }, none), 'json');
 });
 
-const ended = (reason: string, how = 'failed'): StepAttempts => ({ count: 1, latest: { startedAt: 'a', ended: how, endedAt: 'b', reason } });
-const said = (outcome: 'done' | 'blocked') => ({ outcome, summary: '', needs: null, artifacts: [], output: {}, missing: [], replies: null, schema: {}, raw: {} }) satisfies StepCloseout;
+const ended = (reason: string, how = 'failed'): StepAttempts => ({
+  count: 1,
+  latest: { startedAt: 'a', ended: how, endedAt: 'b', reason },
+});
+const said = (outcome: 'done' | 'blocked') =>
+  ({
+    outcome,
+    summary: '',
+    needs: null,
+    artifacts: [],
+    output: {},
+    missing: [],
+    replies: null,
+    schema: {},
+    raw: {},
+  }) satisfies StepCloseout;
 
 test("a try's outcome is the agent's when it gave a statement — and says when the machine cut it after", () => {
-  assert.deepEqual(outcomeOf({ closeout: said('blocked'), unreadable: null, attempts: ended('harness', 'done') }, '-'), { by: 'agent', outcome: 'blocked', cut: null });
-  assert.deepEqual(outcomeOf({ closeout: said('done'), unreadable: null, attempts: ended('deadline') }, '-'), { by: 'agent', outcome: 'done', cut: 'then it ran past its deadline and was stopped' });
+  assert.deepEqual(outcomeOf({ closeout: said('blocked'), unreadable: null, attempts: ended('harness', 'done') }, '-'), {
+    by: 'agent',
+    outcome: 'blocked',
+    cut: null,
+  });
+  assert.deepEqual(outcomeOf({ closeout: said('done'), unreadable: null, attempts: ended('deadline') }, '-'), {
+    by: 'agent',
+    outcome: 'done',
+    cut: 'then it ran past its deadline and was stopped',
+  });
 });
 
 test("with no statement, the machine's reason says why — each reason the engine records, and a harness that ended it failed or stopped", () => {
@@ -106,21 +159,36 @@ test("with no statement, the machine's reason says why — each reason the engin
     assert.equal(outcomeWord(o), reason);
   }
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: ended('harness', 'stopped') }, '-'), {
-    by: 'machine', reason: 'stopped', words: 'Its harness ended the session stopped, and it said nothing of how it went.',
+    by: 'machine',
+    reason: 'stopped',
+    words: 'Its harness ended the session stopped, and it said nothing of how it went.',
   });
 });
 
 test("a statement that could not be read is the agent's, unreadable, and says why — ahead of any reason the machine gives", () => {
   const unreadable = { error: 'not an object', raw: ['done'] };
   const o = outcomeOf({ closeout: null, unreadable, attempts: ended('harness', 'done') }, 'No closeout yet.');
-  assert.deepEqual(o, { by: 'unreadable', words: 'It gave a closing statement that could not be read (not an object). Here it is as it came.' });
+  assert.deepEqual(o, {
+    by: 'unreadable',
+    words: 'It gave a closing statement that could not be read (not an object). Here it is as it came.',
+  });
   assert.equal(outcomeWord(o), 'unreadable');
-  assert.equal(outcomeOf({ closeout: null, unreadable, attempts: ended('budget') }, '-').by, 'unreadable', 'what it said comes first, as a statement does');
+  assert.equal(
+    outcomeOf({ closeout: null, unreadable, attempts: ended('budget') }, '-').by,
+    'unreadable',
+    'what it said comes first, as a statement does',
+  );
 });
 
 test("with no statement and no reason — running, not filed, a harness's done — the inspector's words", () => {
   const nobody = { by: 'nobody', words: 'No closeout yet.' };
-  assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: { count: 1, latest: { startedAt: 'a', ended: null, endedAt: null, reason: null } } }, 'No closeout yet.'), nobody);
+  assert.deepEqual(
+    outcomeOf(
+      { closeout: null, unreadable: null, attempts: { count: 1, latest: { startedAt: 'a', ended: null, endedAt: null, reason: null } } },
+      'No closeout yet.',
+    ),
+    nobody,
+  );
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: { count: 0, latest: null } }, 'No closeout yet.'), nobody);
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: ended('harness', 'done') }, 'No closeout yet.'), nobody);
   assert.equal(outcomeWord(nobody as never), 'no closeout');

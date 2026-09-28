@@ -13,8 +13,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 test("the root's test script lets every package finish when one fails, so a failure is reported where it is", () => {
-  const root = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+  const root = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
   const words = root.scripts.test!.split(/\s+/);
   assert.deepEqual(words.slice(0, 3), ['turbo', 'run', 'test'], root.scripts.test);
-  assert.ok(words.includes('--continue') || words.includes('--continue=always'), `turbo stops every package at the first failure without --continue: ${root.scripts.test}`);
+  assert.ok(
+    words.includes('--continue') || words.includes('--continue=always'),
+    `turbo stops every package at the first failure without --continue: ${root.scripts.test}`,
+  );
 });

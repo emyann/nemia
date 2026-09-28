@@ -37,22 +37,28 @@ const refusals = (config: unknown, repo: string): string[] => {
   if (command !== 'node') out.push(`runs ${JSON.stringify(command)}, not node: npx downloads at every spawn`);
   if (!Array.isArray(args) || !args.every((a) => typeof a === 'string')) return [...out, 'gives no list of string arguments'];
   const [script, ...flags] = args as string[];
-  if (!script || path.isAbsolute(script)) out.push(`names its script ${JSON.stringify(script)}, not by a path relative to the repository: an absolute one is one checkout`);
-  else if (!fs.statSync(path.join(repo, script), { throwIfNoEntry: false })?.isFile()) out.push(`names its script ${script}, which is not on disk under ${repo}`);
+  if (!script || path.isAbsolute(script))
+    out.push(`names its script ${JSON.stringify(script)}, not by a path relative to the repository: an absolute one is one checkout`);
+  else if (!fs.statSync(path.join(repo, script), { throwIfNoEntry: false })?.isFile())
+    out.push(`names its script ${script}, which is not on disk under ${repo}`);
   const value = (flag: string) => (flags.includes(flag) ? flags[flags.indexOf(flag) + 1] : undefined);
   if (!flags.includes('--headless')) out.push('is not --headless: a step has no display');
   if (value('--browser') !== 'chromium') out.push(`asks for --browser ${value('--browser')}, not chromium from ~/.cache/ms-playwright`);
   if (!flags.includes('--isolated')) out.push('is not --isolated: the profile is kept on disk and shared by every step');
   if (flags.includes('--user-data-dir')) out.push('names a --user-data-dir: a profile shared by every step');
   const dir = value('--output-dir');
-  if (!dir || !path.isAbsolute(dir)) out.push(`writes its files to ${dir ?? '.playwright-mcp'}, relative to the workspace, where the run commits them`);
+  if (!dir || !path.isAbsolute(dir))
+    out.push(`writes its files to ${dir ?? '.playwright-mcp'}, relative to the workspace, where the run commits them`);
   else if (!path.relative(repo, dir).startsWith('..')) out.push(`writes its files to ${dir}, inside the repository`);
   return out;
 };
 
 /** Where `command` is found on PATH, as the harness finds it. */
 const onPath = (command: string) =>
-  (process.env.PATH ?? '').split(path.delimiter).map((dir) => path.join(dir, command)).find((f) => fs.statSync(f, { throwIfNoEntry: false })?.isFile());
+  (process.env.PATH ?? '')
+    .split(path.delimiter)
+    .map((dir) => path.join(dir, command))
+    .find((f) => fs.statSync(f, { throwIfNoEntry: false })?.isFile());
 
 test('the root .mcp.json parses and names exactly one server, playwright, run from disk as headless, isolated chromium', () => {
   const config = shipped();
@@ -67,17 +73,84 @@ test('the root .mcp.json parses and names exactly one server, playwright, run fr
 
 test('each way out of that shape is refused', () => {
   const cases: Array<[string, (s: { command: string; args: string[] }, c: { mcpServers: Record<string, unknown> }) => void, RegExp]> = [
-    ['npx', (s) => { s.command = 'npx'; s.args = ['@playwright/mcp@latest', ...s.args.slice(1)]; }, /not node: npx downloads/],
-    ['an absolute script', (s) => { s.args[0] = path.join(REPO, s.args[0]!); }, /an absolute one is one checkout/],
-    ['a script not on disk', (s) => { s.args[0] = 'node_modules/@playwright/nope/cli.js'; }, /not on disk/],
-    ['headed', (s) => { s.args = s.args.filter((a) => a !== '--headless'); }, /not --headless/],
-    ["the operator's Chrome", (s) => { s.args[s.args.indexOf('--browser') + 1] = 'chrome'; }, /--browser chrome, not chromium/],
-    ['a profile on disk', (s) => { s.args = s.args.filter((a) => a !== '--isolated'); }, /not --isolated/],
-    ['a shared profile', (s) => { s.args.push('--user-data-dir', '/tmp/profile'); }, /--user-data-dir/],
-    ['the default output dir', (s) => { s.args.splice(s.args.indexOf('--output-dir'), 2); }, /\.playwright-mcp, relative to the workspace/],
-    ['a relative output dir', (s) => { s.args[s.args.indexOf('--output-dir') + 1] = 'shots'; }, /shots, relative to the workspace/],
-    ['an output dir in the repository', (s) => { s.args[s.args.indexOf('--output-dir') + 1] = path.join(REPO, 'shots'); }, /inside the repository/],
-    ['a second server', (_s, c) => { c.mcpServers.other = { command: 'x' }; }, /not exactly one server/],
+    [
+      'npx',
+      (s) => {
+        s.command = 'npx';
+        s.args = ['@playwright/mcp@latest', ...s.args.slice(1)];
+      },
+      /not node: npx downloads/,
+    ],
+    [
+      'an absolute script',
+      (s) => {
+        s.args[0] = path.join(REPO, s.args[0]!);
+      },
+      /an absolute one is one checkout/,
+    ],
+    [
+      'a script not on disk',
+      (s) => {
+        s.args[0] = 'node_modules/@playwright/nope/cli.js';
+      },
+      /not on disk/,
+    ],
+    [
+      'headed',
+      (s) => {
+        s.args = s.args.filter((a) => a !== '--headless');
+      },
+      /not --headless/,
+    ],
+    [
+      "the operator's Chrome",
+      (s) => {
+        s.args[s.args.indexOf('--browser') + 1] = 'chrome';
+      },
+      /--browser chrome, not chromium/,
+    ],
+    [
+      'a profile on disk',
+      (s) => {
+        s.args = s.args.filter((a) => a !== '--isolated');
+      },
+      /not --isolated/,
+    ],
+    [
+      'a shared profile',
+      (s) => {
+        s.args.push('--user-data-dir', '/tmp/profile');
+      },
+      /--user-data-dir/,
+    ],
+    [
+      'the default output dir',
+      (s) => {
+        s.args.splice(s.args.indexOf('--output-dir'), 2);
+      },
+      /\.playwright-mcp, relative to the workspace/,
+    ],
+    [
+      'a relative output dir',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = 'shots';
+      },
+      /shots, relative to the workspace/,
+    ],
+    [
+      'an output dir in the repository',
+      (s) => {
+        s.args[s.args.indexOf('--output-dir') + 1] = path.join(REPO, 'shots');
+      },
+      /inside the repository/,
+    ],
+    [
+      'a second server',
+      (_s, c) => {
+        c.mcpServers.other = { command: 'x' };
+      },
+      /not exactly one server/,
+    ],
   ];
   for (const [label, change, why] of cases) {
     const config = structuredClone(shipped());
@@ -94,7 +167,11 @@ test('an interactive session in the checkout is given the same server, and it is
   const pinned = read('package.json').devDependencies['@playwright/mcp'];
   assert.ok(exact(pinned), `@playwright/mcp is pinned exactly, not ${pinned}`);
   const script = shipped().mcpServers.playwright!.args[0]!;
-  assert.equal(read(path.join(path.dirname(script), 'package.json')).version, pinned, 'the script on disk is the pinned version; run `npm install`');
+  assert.equal(
+    read(path.join(path.dirname(script), 'package.json')).version,
+    pinned,
+    'the script on disk is the pinned version; run `npm install`',
+  );
 });
 
 test('the ui implement step is told it has the browser', () => {
@@ -110,23 +187,38 @@ test('the server starts as configured, from the repository root, and offers brow
   const { command, args } = shipped().mcpServers.playwright!;
   const child = spawn(command, args, { cwd: REPO, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
-  child.stderr.on('data', (d) => { stderr += d; });
+  child.stderr.on('data', (d) => {
+    stderr += d;
+  });
   const send = (m: object) => child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', ...m })}\n`);
   try {
     const tools = await new Promise<string[]>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`no tools/list answer within 30 s. It printed:\n${stderr}`)), 30_000);
-      child.on('exit', (code) => { clearTimeout(timer); reject(new Error(`exited ${code} before listing its tools:\n${stderr}`)); });
+      child.on('exit', (code) => {
+        clearTimeout(timer);
+        reject(new Error(`exited ${code} before listing its tools:\n${stderr}`));
+      });
       let buf = '';
       child.stdout.on('data', (d) => {
         buf += d;
         for (let at = buf.indexOf('\n'); at !== -1; at = buf.indexOf('\n')) {
           const msg = JSON.parse(buf.slice(0, at)) as { id?: number; result?: { tools?: Array<{ name: string }> } };
           buf = buf.slice(at + 1);
-          if (msg.id === 1) { send({ method: 'notifications/initialized' }); send({ id: 2, method: 'tools/list' }); }
-          if (msg.id === 2) { clearTimeout(timer); resolve((msg.result?.tools ?? []).map((t) => t.name)); }
+          if (msg.id === 1) {
+            send({ method: 'notifications/initialized' });
+            send({ id: 2, method: 'tools/list' });
+          }
+          if (msg.id === 2) {
+            clearTimeout(timer);
+            resolve((msg.result?.tools ?? []).map((t) => t.name));
+          }
         }
       });
-      send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'mcp-config.test', version: '1' } } });
+      send({
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'mcp-config.test', version: '1' } },
+      });
     });
     assert.ok(tools.includes('browser_navigate'), tools.join(' '));
   } finally {
@@ -156,33 +248,51 @@ const CLOSEOUT = {
   additionalProperties: false,
 };
 
-test("a --bg task filed in this repository has Playwright's browser_navigate and none of the operator's servers", {
-  skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
-  timeout: 12 * 60_000,
-}, async () => {
-  // Shipped defaults: the engine's built-in harnesses, `claude` first, asked for a background session. No `mcp` on the task, so the
-  // only servers it can have are the ones the checkout's .mcp.json names.
-  const engine: Engine = createEngine({ root: scratch('wf-live-mcp-') });
-  const id = await engine.file({ brief: BRIEF, cwd: REPO, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } });
-  let view: TaskView | undefined;
-  try {
-    const until = Date.now() + 10 * 60_000;
-    while (Date.now() < until) {
-      await engine.tick();
-      view = await engine.view(id);
-      if (view.state.settled) break;
-      await new Promise((r) => setTimeout(r, 5_000));
+test(
+  "a --bg task filed in this repository has Playwright's browser_navigate and none of the operator's servers",
+  {
+    skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
+    timeout: 12 * 60_000,
+  },
+  async () => {
+    // Shipped defaults: the engine's built-in harnesses, `claude` first, asked for a background session. No `mcp` on the task, so the
+    // only servers it can have are the ones the checkout's .mcp.json names.
+    const engine: Engine = createEngine({ root: scratch('wf-live-mcp-') });
+    const id = await engine.file({
+      brief: BRIEF,
+      cwd: REPO,
+      closeoutSchema: CLOSEOUT,
+      deadlineSeconds: 480,
+      config: { effort: 'low', background: true },
+    });
+    let view: TaskView | undefined;
+    try {
+      const until = Date.now() + 10 * 60_000;
+      while (Date.now() < until) {
+        await engine.tick();
+        view = await engine.view(id);
+        if (view.state.settled) break;
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
+      assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
+      const said = view.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
+      assert.deepEqual(said?.mcpServers, ['playwright'], `the repository's server and only that; it said ${JSON.stringify(said)}`);
+      assert.ok(said?.mcpTools?.includes('mcp__playwright__browser_navigate'), `the browser's tools; it said ${JSON.stringify(said)}`);
+      assert.deepEqual(
+        said?.mcpTools?.filter((t) => !t.startsWith('mcp__playwright__')),
+        [],
+        "no tool from any of the operator's servers",
+      );
+    } finally {
+      // Settled sessions stay in the harness's registry (engine open issue 3); leave nothing running behind.
+      const short = view?.sessionId?.split('-')[0];
+      for (const verb of short ? ['stop', 'rm'] : []) {
+        try {
+          execFileSync('claude', [verb, short!], { stdio: 'ignore', timeout: 30_000 });
+        } catch {
+          /* best effort */
+        }
+      }
     }
-    assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
-    const said = view.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
-    assert.deepEqual(said?.mcpServers, ['playwright'], `the repository's server and only that; it said ${JSON.stringify(said)}`);
-    assert.ok(said?.mcpTools?.includes('mcp__playwright__browser_navigate'), `the browser's tools; it said ${JSON.stringify(said)}`);
-    assert.deepEqual(said?.mcpTools?.filter((t) => !t.startsWith('mcp__playwright__')), [], "no tool from any of the operator's servers");
-  } finally {
-    // Settled sessions stay in the harness's registry (engine open issue 3); leave nothing running behind.
-    const short = view?.sessionId?.split('-')[0];
-    for (const verb of short ? ['stop', 'rm'] : []) {
-      try { execFileSync('claude', [verb, short!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* best effort */ }
-    }
-  }
-});
+  },
+);

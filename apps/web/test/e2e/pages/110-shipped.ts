@@ -9,13 +9,17 @@ export default {
   route: `/runs/${SHIPPED.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const { id, ending } = SHIPPED;
+    const { ending } = SHIPPED;
     const section = page.locator(`article > section#step-${ending}`);
 
     // Nothing to decide, and nobody waited on: its ending answered for its own branch.
     await expectCount(page.locator('section[aria-label="To decide"]'), 0, 'a run whose ending merged it has nothing to decide');
     await expectCount(page.locator('section[aria-label="Waiting on you"]'), 0, 'and waits on nobody');
-    await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the Decide section says nothing: the branch is already on the base');
+    await expectCount(
+      page.locator('section[aria-label="Decide"]'),
+      0,
+      'and the Decide section says nothing: the branch is already on the base',
+    );
 
     // The ending step: what it did, and its gate approved. Its approval filed it — nothing follows it to be handed anything.
     await expectVisible(section.getByText(SHIPPED.merged), `${ending} says what it did (${SHIPPED.merged})`);
@@ -32,7 +36,10 @@ export default {
 
     // And pruned since, its files with it: the run's facts say when, what it freed and what it kept, and its steps are still read as they ended.
     const said = /— removed 1 worktree, 1\.50 GB freed, and its files, 48\.0 MB freed; its branches and record are kept$/;
-    await expectVisible(page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }), 'the run says it was pruned: when, what it removed and freed, and what it kept');
+    await expectVisible(
+      page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }),
+      'the run says it was pruned: when, what it removed and freed, and what it kept',
+    );
     await expectVisible(section.getByText(SHIPPED.merged), 'and a pruned run still reads its steps as they ended');
     // A file a step named in its files directory is said gone, by the prune — not drawn as a path, as if it had never been made.
     const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: SHIPPED.shot });

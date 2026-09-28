@@ -13,7 +13,8 @@ import { checkoutMcpConfig, claudeMcpArgs } from './runner-mcp.ts';
  * format goes first, where the brief's `-p` has already taken its value and the variadic lists after it cannot take one.
  */
 export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, output: string[]): string[] => [
-  '-p', r.brief,
+  '-p',
+  r.brief,
   ...output,
   ...claudePrintFlags(r, io),
 ];
@@ -35,14 +36,16 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
   // The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
   ...claudeFlagsOf(r.config?.claude),
-  '--permission-mode', r.config?.permissionMode ?? 'auto',
+  '--permission-mode',
+  r.config?.permissionMode ?? 'auto',
   // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
   // The checkout's settings and never the operator's: a job reads `.claude/settings.json` and `settings.local.json` of
   // its cwd, and nothing of `~/.claude/` — the user's mode, allow rules, plugins, skills, hooks, model and effort — so
   // it does the same on any machine, and an agent's own skills do not share the listing's budget with a person's (F9,
   // F24; the owner's decision of 2026-09-25). `--settings`, `--plugin-dir` and `--mcp-config` still reach it. One value.
-  '--setting-sources', 'project,local',
+  '--setting-sources',
+  'project,local',
   ...(r.config?.model ? ['--model', r.config?.model] : []),
   ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
   // The context window, as for `claude --bg`: `claude -p` compacts past it and still gives its `structured_output` (2.1.278).
@@ -76,7 +79,8 @@ export const claudeDetached: HarnessSpec = {
   // The same transcript `claude --bg` writes, read the same way — but only once the session has exited:
   // its id is in the one object `--output-format json` prints, and that is printed last.
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
-  noChannel: "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
+  noChannel:
+    "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude`, whose jobs take words on their stdin, to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,

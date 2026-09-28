@@ -17,9 +17,12 @@ async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: s
   await page.locator('[data-sidebar="content"] [data-sidebar="menu-button"]', { hasText: place }).focus();
   await page.keyboard.press('Enter');
   await page.waitForURL((url) => url.pathname === route, { timeout: WAIT_MS });
-  const [kept, after] = await page.evaluate(() => [(window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded === true, history.length] as const);
+  const [kept, after] = await page.evaluate(
+    () => [(window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded === true, history.length] as const,
+  );
   if (!kept) throw new Refused(`Enter on ${place} in the menu goes to ${route} in the page — the whole page was loaded again`);
-  if (after !== before + 1) throw new Refused(`Enter on ${place} in the menu adds one entry to the history, as a click does — it went from ${before} to ${after}`);
+  if (after !== before + 1)
+    throw new Refused(`Enter on ${place} in the menu adds one entry to the history, as a click does — it went from ${before} to ${after}`);
 }
 
 export default {
@@ -34,11 +37,18 @@ export default {
     const flying = page.locator('section[data-group="in-flight"]');
     const deciding = page.locator('section[data-group="to-decide"]');
     const finished = page.locator('section[data-group="finished"]');
-    await expectCount(flying.locator('li[data-in-flight="true"]'), 4, 'the four runs in flight, as the Factory counts them, are under In flight');
+    await expectCount(
+      flying.locator('li[data-in-flight="true"]'),
+      4,
+      'the four runs in flight, as the Factory counts them, are under In flight',
+    );
     await expectCount(flying.locator('li[data-in-flight="false"]'), 0, 'and no finished run is');
     await expectCount(finished.locator('li[data-in-flight="false"]'), 10, 'the ten finished runs nobody has to decide are under Finished');
     await expectCount(finished.locator('li[data-in-flight="true"]'), 0, 'and no run in flight is');
-    await expectVisible(flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }), 'In flight is headed with its count and its order');
+    await expectVisible(
+      flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }),
+      'In flight is headed with its count and its order',
+    );
     await expectVisible(
       finished.getByRole('heading', { name: /^Finished 10 nothing of these moves any more, newest first · 5 waiting on you$/ }),
       'Finished is headed with its count, its order, and how many of them wait on you, as the Factory counts them',
@@ -48,14 +58,18 @@ export default {
     // Between the two, the runs nobody has decided: a group of its own, newest first, with its count and how many wait on you.
     await expectCount(deciding.locator('li[data-in-flight="false"]'), 2, 'the two runs nobody has decided are under To decide');
     await expectVisible(
-      deciding.getByRole('heading', { name: /^To decide 2 each is at its result, and nobody has decided it, newest first · 1 waiting on you$/ }),
+      deciding.getByRole('heading', {
+        name: /^To decide 2 each is at its result, and nobody has decided it, newest first · 1 waiting on you$/,
+      }),
       'To decide is headed with its count, its order, and the one of them a step waits on you for',
     );
     await expectBeneath(deciding, flying, 'the runs to decide are listed beneath the runs in flight');
     await expectBeneath(finished, deciding, 'and the finished beneath those');
     // Each row says what there is to decide, in `wf ls`'s words: the ending's gate with the command that approves it, and the branch nobody took.
     await expectVisible(
-      deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-to-decide="approve"]`, { hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}` }),
+      deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-to-decide="approve"]`, {
+        hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}`,
+      }),
       `the row of a run at its ending's gate says what it would do and the command that approves it`,
     );
     await expectCount(
@@ -67,7 +81,11 @@ export default {
       deciding.locator(`li a[href="/runs/${UNMERGED.id}"] [data-to-decide="git"]`, { hasText: `to decide: ${UNMERGED.said}` }),
       'the row of a finished run whose branch nobody merged says so, and names wf decide',
     );
-    await expectCount(finished.locator(`li a[href="/runs/${SHIPPED.id}"]`), 1, `the run whose ending merged it is among the finished (${SHIPPED.id})`);
+    await expectCount(
+      finished.locator(`li a[href="/runs/${SHIPPED.id}"]`),
+      1,
+      `the run whose ending merged it is among the finished (${SHIPPED.id})`,
+    );
     await expectCount(finished.locator('[data-to-decide]'), 0, 'and no finished row has anything to decide');
     // Beside where a row says `cancelled`, the row of a run pruned says so, and what went and what stayed on hover.
     await expectVisible(
@@ -75,26 +93,41 @@ export default {
       `the row of the run pruned with its files says pruned (${SHIPPED.id})`,
     );
     await expectCount(page.locator('[data-pruned]'), 1, 'on that row alone: no other run was pruned');
-    const listed = await rows.evaluateAll((lis) => lis.map((li) => ({
-      id: li.querySelector('a[href^="/runs/"]')?.getAttribute('href')?.slice('/runs/'.length) ?? '',
-      inFlight: li.getAttribute('data-in-flight') === 'true',
-      group: li.closest('section[data-group]')?.getAttribute('data-group') ?? '',
-      at: li.querySelector('time')?.getAttribute('datetime') ?? '',
-    })));
+    const listed = await rows.evaluateAll((lis) =>
+      lis.map((li) => ({
+        id: li.querySelector('a[href^="/runs/"]')?.getAttribute('href')?.slice('/runs/'.length) ?? '',
+        inFlight: li.getAttribute('data-in-flight') === 'true',
+        group: li.closest('section[data-group]')?.getAttribute('data-group') ?? '',
+        at: li.querySelector('time')?.getAttribute('datetime') ?? '',
+      })),
+    );
     // The three groups in their order, and each newest first: in flight, then what nobody has decided, then the rest.
     const GROUPS = ['in-flight', 'to-decide', 'finished'];
-    const ordered = [...listed].sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+    const ordered = [...listed].sort(
+      (a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id),
+    );
     if (listed.some((r, i) => r.id !== ordered[i]!.id) || listed.some((r) => r.inFlight !== (r.group === 'in-flight'))) {
-      const said = (rs: typeof listed) => rs.map((r) => `${r.id} (${r.group}, ${r.inFlight ? 'in flight' : 'not'}, ${r.at})`).join('\n    ');
-      throw new Refused(`the runs list has the runs in flight first, then those to decide, then the rest, each newest first — it lists:\n    ${said(listed)}\n  and not:\n    ${said(ordered)}`);
+      const said = (rs: typeof listed) =>
+        rs.map((r) => `${r.id} (${r.group}, ${r.inFlight ? 'in flight' : 'not'}, ${r.at})`).join('\n    ');
+      throw new Refused(
+        `the runs list has the runs in flight first, then those to decide, then the rest, each newest first — it lists:\n    ${said(listed)}\n  and not:\n    ${said(ordered)}`,
+      );
     }
     const row = page.locator(`li a[href="/runs/${FAKE.id}"]`);
     await expectVisible(row, `the runs list has a row for ${FAKE.id}`);
-    await expectVisible(row.getByText(`waiting on you: ${FAKE.waitingOnYou.join(', ')}`), `the row says ${FAKE.waitingOnYou.join(' and ')} are waiting on you`);
-    await expectVisible(row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the row shows ${FAKE.refused}'s refused check as a red chip`);
+    await expectVisible(
+      row.getByText(`waiting on you: ${FAKE.waitingOnYou.join(', ')}`),
+      `the row says ${FAKE.waitingOnYou.join(' and ')} are waiting on you`,
+    );
+    await expectVisible(
+      row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }),
+      `the row shows ${FAKE.refused}'s refused check as a red chip`,
+    );
     // Beside the run's link, not inside it: a link inside a link is not HTML.
     await expectVisible(
-      page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
+      page
+        .locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) })
+        .locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
       `the row names the workflow the run was started from (${FAKE.workflow}), linked to the Workflows page`,
     );
     await expectCount(row.locator('a'), 0, "the run's link has no link inside it");
@@ -105,25 +138,47 @@ export default {
     // A run waiting on a run called off waits on you, as the Factory counts it: the row says so, in wf ls's words.
     const orphanRow = page.locator(`li a[href="/runs/${DIAMOND.orphan.id}"]`);
     await expectVisible(
-      orphanRow.locator('[data-waiting-on-you]', { hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${DIAMOND.orphan.id}` }),
+      orphanRow.locator('[data-waiting-on-you]', {
+        hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${DIAMOND.orphan.id}`,
+      }),
       `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, and what is yours to resolve`,
     );
-    await expectCount(page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-waiting-on-you]`), 0, `${DIAMOND.bottom.id}, waiting on a run that may still ship, does not wait on you`);
+    await expectCount(
+      page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-waiting-on-you]`),
+      0,
+      `${DIAMOND.bottom.id}, waiting on a run that may still ship, does not wait on you`,
+    );
     // What a run cost, beside when it started, once a session of it was priced; a step over its budget, an amber chip with the amounts.
     const costly = page.locator('li', { has: page.locator(`a[href="/runs/${COSTLY.id}"]`) });
-    await expectVisible(costly.locator('[data-cost]', { hasText: COSTLY.cost }), `the row of a run whose sessions were priced says what it cost (${COSTLY.cost})`);
+    await expectVisible(
+      costly.locator('[data-cost]', { hasText: COSTLY.cost }),
+      `the row of a run whose sessions were priced says what it cost (${COSTLY.cost})`,
+    );
     await expectVisible(
       costly.locator('[data-state="over-budget"]', { hasText: COSTLY.over.status }),
       `the row shows ${COSTLY.over.step} over its budget as an amber chip, with the amounts (${COSTLY.over.status})`,
     );
     await expectVisible(costly.getByText(`waiting on you: ${COSTLY.steps.join(', ')}`), 'and says every step past its budget waits on you');
-    await expectCount(page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator('[data-cost]'), 0, "the fake run's row says no cost: none of its sessions was priced");
+    await expectCount(
+      page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator('[data-cost]'),
+      0,
+      "the fake run's row says no cost: none of its sessions was priced",
+    );
     // A run at its gate: what is asked of you, as wf ls says it, and counted among the runs waiting on you above.
     const gatedRow = page.locator(`li a[href="/runs/${GATED.id}"]`);
-    await expectVisible(gatedRow.locator('[data-waiting-on-you]', { hasText: new RegExp(`^waiting on you: approve ${GATED.gated}$`) }), `the row of a run at its gate says waiting on you: approve ${GATED.gated}`);
-    await expectVisible(gatedRow.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), 'and shows its step as awaiting approval, an amber chip');
+    await expectVisible(
+      gatedRow.locator('[data-waiting-on-you]', { hasText: new RegExp(`^waiting on you: approve ${GATED.gated}$`) }),
+      `the row of a run at its gate says waiting on you: approve ${GATED.gated}`,
+    );
+    await expectVisible(
+      gatedRow.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }),
+      'and shows its step as awaiting approval, an amber chip',
+    );
     const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
-    await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
+    await expectVisible(
+      loop.getByText(`waiting on you: ${LOOPING.exhausted}`),
+      `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`,
+    );
     await expectVisible(
       loop.locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
       `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
@@ -131,7 +186,10 @@ export default {
 
     // From the keyboard, to the Inbox and back: each place reached in the page, and the runs list drawn again for its photograph.
     await enterOnPlace(page, 'Inbox', '/inbox');
-    await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'reached with Enter, the Inbox is lit in the menu');
+    await expectVisible(
+      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }),
+      'reached with Enter, the Inbox is lit in the menu',
+    );
     await enterOnPlace(page, 'Runs', '/runs');
     await expectCount(rows, 16, 'back on Runs with Enter, the list has its sixteen rows again');
   },

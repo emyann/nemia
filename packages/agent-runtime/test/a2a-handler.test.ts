@@ -11,8 +11,12 @@ import { Effect } from 'effect';
 import { Role, TaskState, type Message, type SendMessageRequest } from '@a2a-js/sdk';
 import { ServerCallContext } from '@a2a-js/sdk/server';
 import {
-  ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, RequestMalformedError, TaskNotCancelableError,
-  TaskNotFoundError, UnsupportedOperationError,
+  ExtendedAgentCardNotConfiguredError,
+  PushNotificationNotSupportedError,
+  RequestMalformedError,
+  TaskNotCancelableError,
+  TaskNotFoundError,
+  UnsupportedOperationError,
 } from '@a2a-js/sdk/errors';
 import { HarnessFailed, HarnessHandler, OPEN_LISTINGS, type TranscriptRequest } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from '../src/a2a-map.ts';
@@ -26,71 +30,101 @@ const ctx = new ServerCallContext();
  * driver may have — `find`, `release`, `say`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every driver has;
  * `noFind` takes `find` alone away.
  */
-const harness = (o: {
-  spawnFails?: unknown; stopFails?: string; observeFails?: string; sayFails?: string; findFails?: unknown; transcriptFails?: unknown;
-  bare?: boolean; noFind?: boolean;
-} = {}) => {
+const harness = (
+  o: {
+    spawnFails?: unknown;
+    stopFails?: string;
+    observeFails?: string;
+    sayFails?: string;
+    findFails?: unknown;
+    transcriptFails?: unknown;
+    bare?: boolean;
+    noFind?: boolean;
+  } = {},
+) => {
   const sessions = new Map<string, Sighting>();
   const unread = new Set<string>();
   const asked: Array<[string, unknown]> = [];
   const journal = new Map<string, Event[]>();
   let n = 0;
   const ops: RunnerOps = {
-    spawn: (r: SpawnRequest) => Effect.suspend(() => {
-      asked.push(['spawn', r]);
-      if (o.spawnFails instanceof RunnerError) return Effect.fail(o.spawnFails);
-      if (o.spawnFails) return Effect.die(o.spawnFails);
-      sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
-      return Effect.void;
-    }),
+    spawn: (r: SpawnRequest) =>
+      Effect.suspend(() => {
+        asked.push(['spawn', r]);
+        if (o.spawnFails instanceof RunnerError) return Effect.fail(o.spawnFails);
+        if (o.spawnFails) return Effect.die(o.spawnFails);
+        sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
+        return Effect.void;
+      }),
     observe: Effect.suspend(() => {
       asked.push(['observe', undefined]);
-      return o.observeFails ? Effect.fail(new RunnerError({ verb: 'observe', message: o.observeFails })) : Effect.succeed(new Map(sessions));
+      return o.observeFails
+        ? Effect.fail(new RunnerError({ verb: 'observe', message: o.observeFails }))
+        : Effect.succeed(new Map(sessions));
     }),
-    stop: (id) => Effect.suspend(() => {
-      asked.push(['stop', id]);
-      if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
-      return Effect.void;
-    }),
-    logs: (id) => Effect.suspend(() => {
-      asked.push(['logs', id]);
-      return Effect.succeed(`logs of ${id}`);
-    }),
-    ...(o.bare || o.noFind ? {} : {
-      find: (name: string) => Effect.suspend(() => {
-        asked.push(['find', name]);
-        if (o.findFails) return Effect.die(o.findFails);
-        const s = sessions.get(name);
-        return Effect.succeed(s ? { sessionId: s.sessionId } : undefined);
+    stop: (id) =>
+      Effect.suspend(() => {
+        asked.push(['stop', id]);
+        if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
+        for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
+        return Effect.void;
       }),
-    }),
-    ...(o.bare ? {} : {
-      release: (session: Sighting, task: { worktree?: string | boolean }) => Effect.suspend(() => {
-        asked.push(['release', [session, task]]);
-        return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
+    logs: (id) =>
+      Effect.suspend(() => {
+        asked.push(['logs', id]);
+        return Effect.succeed(`logs of ${id}`);
       }),
-      say: (session: { name: string; sessionId: string }, text: string) => Effect.suspend(() => {
-        asked.push(['say', [session, text]]);
-        return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
-      }),
-      // Told what is expected, it lists those alone: what a driver that reads less when told looks like.
-      observeFor: (expected: readonly ExpectedSession[]) => Effect.suspend(() => {
-        asked.push(['observeFor', expected]);
-        // A name it was told to leave unread (`unread`), as a driver whose registry could not be read leaves one.
-        const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
-        return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
-      }),
-      transcript: (sessionId: string, after?: string) => Effect.suspend(() => {
-        asked.push(['transcript', [sessionId, after]]);
-        if (o.transcriptFails instanceof RunnerError) return Effect.fail(o.transcriptFails);
-        if (o.transcriptFails) return Effect.die(o.transcriptFails);
-        return Effect.succeed({
-          events: [{ id: 'e-1', at: '2026-09-23T10:00:00.000Z', role: 'assistant' as const, kind: 'text' as const, text: `said in ${sessionId}` }],
-          cursor: `${sessionId}@${after ?? 0}+1`,
-        });
-      }),
-    }),
+    ...(o.bare || o.noFind
+      ? {}
+      : {
+          find: (name: string) =>
+            Effect.suspend(() => {
+              asked.push(['find', name]);
+              if (o.findFails) return Effect.die(o.findFails);
+              const s = sessions.get(name);
+              return Effect.succeed(s ? { sessionId: s.sessionId } : undefined);
+            }),
+        }),
+    ...(o.bare
+      ? {}
+      : {
+          release: (session: Sighting, task: { worktree?: string | boolean }) =>
+            Effect.suspend(() => {
+              asked.push(['release', [session, task]]);
+              return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
+            }),
+          say: (session: { name: string; sessionId: string }, text: string) =>
+            Effect.suspend(() => {
+              asked.push(['say', [session, text]]);
+              return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
+            }),
+          // Told what is expected, it lists those alone: what a driver that reads less when told looks like.
+          observeFor: (expected: readonly ExpectedSession[]) =>
+            Effect.suspend(() => {
+              asked.push(['observeFor', expected]);
+              // A name it was told to leave unread (`unread`), as a driver whose registry could not be read leaves one.
+              const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
+              return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
+            }),
+          transcript: (sessionId: string, after?: string) =>
+            Effect.suspend(() => {
+              asked.push(['transcript', [sessionId, after]]);
+              if (o.transcriptFails instanceof RunnerError) return Effect.fail(o.transcriptFails);
+              if (o.transcriptFails) return Effect.die(o.transcriptFails);
+              return Effect.succeed({
+                events: [
+                  {
+                    id: 'e-1',
+                    at: '2026-09-23T10:00:00.000Z',
+                    role: 'assistant' as const,
+                    kind: 'text' as const,
+                    text: `said in ${sessionId}`,
+                  },
+                ],
+                cursor: `${sessionId}@${after ?? 0}+1`,
+              });
+            }),
+        }),
   };
   const handler = new HarnessHandler('fake', ops, async (id) => journal.get(id) ?? []);
   /** What the harness was asked, reads left out. */
@@ -98,21 +132,38 @@ const harness = (o: {
   return { handler, sessions, unread, asked, acted, journal };
 };
 
-const spawn = (name = 'ae/t-1/1', change: Partial<Message> = {}, configuration: SendMessageRequest['configuration'] = {
-  acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true,
-}): SendMessageRequest => ({
-  tenant: '', message: { ...messageOf({ name, brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' } }, 'm-1'), ...change },
-  configuration, metadata: undefined,
+const spawn = (
+  name = 'ae/t-1/1',
+  change: Partial<Message> = {},
+  configuration: SendMessageRequest['configuration'] = {
+    acceptedOutputModes: [],
+    taskPushNotificationConfig: undefined,
+    returnImmediately: true,
+  },
+): SendMessageRequest => ({
+  tenant: '',
+  message: { ...messageOf({ name, brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' } }, 'm-1'), ...change },
+  configuration,
+  metadata: undefined,
 });
 
 /** Words said to a session, as a client sends them: a follow-up on its Task, returnImmediately. */
 const said = (name = 'ae/t-1/1', text = 'look at the tests again', change: Partial<Message> = {}): SendMessageRequest => ({
-  tenant: '', message: { ...followUpOf(name, text, 'm-2'), ...change },
-  configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true }, metadata: undefined,
+  tenant: '',
+  message: { ...followUpOf(name, text, 'm-2'), ...change },
+  configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+  metadata: undefined,
 });
 
-const listing = (change: { pageSize?: number; pageToken?: string; contextId?: string; status?: TaskState; statusTimestampAfter?: string } = {}) => ({
-  tenant: '', contextId: '', status: TaskState.TASK_STATE_UNSPECIFIED, pageToken: '', statusTimestampAfter: undefined, ...change,
+const listing = (
+  change: { pageSize?: number; pageToken?: string; contextId?: string; status?: TaskState; statusTimestampAfter?: string } = {},
+) => ({
+  tenant: '',
+  contextId: '',
+  status: TaskState.TASK_STATE_UNSPECIFIED,
+  pageToken: '',
+  statusTimestampAfter: undefined,
+  ...change,
 });
 
 /** Refused with `kind`, in exactly `words`. */
@@ -125,122 +176,378 @@ const refusedWith = (kind: new (...a: never[]) => Error, words: string) => (e: E
 type H = ReturnType<typeof harness>;
 type Setup = Parameters<typeof harness>[0];
 const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean, Setup?]> = [
-  ['a spawn not sent returnImmediately', (h) => h.handler.sendMessage(spawn('ae/t-1/1', {}, { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: false }), ctx),
-    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.')],
-  ['a spawn with no configuration', (h) => h.handler.sendMessage({ ...spawn(), configuration: undefined }, ctx),
-    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.')],
-  ['a spawn with no message', (h) => h.handler.sendMessage({ ...spawn(), message: undefined }, ctx),
-    refusedWith(RequestMalformedError, 'the request has no message: a spawn is one user message.')],
-  ['a spawn that names no task', (h) => h.handler.sendMessage(spawn('ae/t-1/1', { taskId: '' }), ctx),
-    refusedWith(RequestMalformedError, 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.')],
-  ['a spawn under a name that is not a session name', (h) => h.handler.sendMessage(spawn('ae/t-1/0', { contextId: '' }), ctx),
-    refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ['a spawn said by the agent', (h) => h.handler.sendMessage(spawn('ae/t-1/1', { role: Role.ROLE_AGENT }), ctx),
-    refusedWith(RequestMalformedError, 'a spawn is a message from the user: its role is ROLE_USER.')],
-  ['a spawn with no text part', (h) => h.handler.sendMessage(spawn('ae/t-1/1', {
-    parts: [{ content: { $case: 'data', value: { brief: 'do it' } }, metadata: undefined, filename: '', mediaType: '' }],
-  }), ctx), refusedWith(RequestMalformedError, 'the brief is one text part, and this message has one part that is not text.')],
-  ['a spawn with two parts', (h) => h.handler.sendMessage(spawn('ae/t-1/1', {
-    parts: [0, 1].map(() => ({ content: { $case: 'text' as const, value: 'do it' }, metadata: undefined, filename: '', mediaType: '' })),
-  }), ctx), refusedWith(RequestMalformedError, 'the brief is one text part, and this message has 2 parts.')],
-  ['a spawn with no cwd', (h) => h.handler.sendMessage(spawn('ae/t-1/1', { metadata: { harness: 'fake' } }), ctx),
-    refusedWith(RequestMalformedError, "the message's metadata has no `cwd`: say where the session works.")],
-  ['a page of none', (h) => h.handler.listTasks(listing({ pageSize: 0 }), ctx),
-    refusedWith(RequestMalformedError, '`pageSize: 0` is not a page: give a whole number from 1 to 100, or none for 50.')],
-  ['a page of 101', (h) => h.handler.listTasks(listing({ pageSize: 101 }), ctx),
-    refusedWith(RequestMalformedError, '`pageSize: 101` is not a page: give a whole number from 1 to 100, or none for 50.')],
-  ['a page of 1.5', (h) => h.handler.listTasks(listing({ pageSize: 1.5 }), ctx),
-    refusedWith(RequestMalformedError, '`pageSize: 1.5` is not a page: give a whole number from 1 to 100, or none for 50.')],
-  ['a page of a listing never made', (h) => h.handler.listTasks(listing({ pageToken: '1:1' }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: 1:1` is not a page of a listing still open: list again from the first page.')],
-  ['a page token that is no token', (h) => h.handler.listTasks(listing({ pageToken: 'next' }), ctx),
-    refusedWith(RequestMalformedError, '`pageToken: next` is not a page of a listing still open: list again from the first page.')],
-  ['a listing since a time', (h) => h.handler.listTasks(listing({ statusTimestampAfter: '2026-09-23T00:00:00Z' }), ctx),
-    refusedWith(UnsupportedOperationError, 'this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.')],
-  ['a session nobody knows', (h) => h.handler.getTask({ tenant: '', id: 'ae/t-9/1' }, ctx),
-    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1`: the `fake` harness lists none, and no attempt was journalled under it.')],
-  ['a session under no session name', (h) => h.handler.getTask({ tenant: '', id: 'fake-1' }, ctx),
-    refusedWith(TaskNotFoundError, 'no session `fake-1`: the `fake` harness lists none, and no attempt was journalled under it.')],
-  ['a stop of a session nobody lists', (h) => h.handler.cancelTask({ tenant: '', id: 'ae/t-9/1', metadata: undefined }, ctx),
-    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to stop: it lists none.')],
-  ['a stop of a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' }); return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx); },
-    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (done): there is nothing to stop.')],
-  ['a stop of a session that failed', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' }); return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx); },
-    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (failed): there is nothing to stop.')],
-  ['a stream', (h) => h.handler.sendMessageStream(spawn(), ctx).next(),
-    refusedWith(UnsupportedOperationError, 'this agent does not stream: send the message with returnImmediately and poll getTask.')],
-  ['a resubscription', (h) => h.handler.resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next(),
-    refusedWith(UnsupportedOperationError, 'this agent does not stream: poll getTask.')],
-  ['a push config set', (h) => h.handler.createTaskPushNotificationConfig({ tenant: '', id: 'p', taskId: 'ae/t-1/1', url: 'http://x', token: '', authentication: undefined }, ctx),
-    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.')],
-  ['a push config read', (h) => h.handler.getTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', id: 'p' }, ctx),
-    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.')],
-  ['a push config listing', (h) => h.handler.listTaskPushNotificationConfigs({ tenant: '', taskId: 'ae/t-1/1', pageSize: 1, pageToken: '' }, ctx),
-    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.')],
-  ['a push config deleted', (h) => h.handler.deleteTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', id: 'p' }, ctx),
-    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.')],
-  ['an extended card', (h) => h.handler.getAuthenticatedExtendedAgentCard({ tenant: '' }, ctx),
-    refusedWith(ExtendedAgentCardNotConfiguredError, 'the `fake` harness has no extended card: its card is the whole of it.')],
-  ['a message with no mark and no task: a new task, which only a spawn starts', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { taskId: '' }), ctx),
-    refusedWith(RequestMalformedError, 'a message with no taskId asks for a new task, and a session is started only by a spawn, marked `urn:agent-runtime:session:v1`: to speak to a running session, send its name, `ae/<task>/<n>`, as the taskId.')],
-  ['a spawn with its mark taken off: words to a session it names', (h) => h.handler.sendMessage(spawn('ae/t-1/1', { extensions: [] }), ctx),
-    refusedWith(TaskNotFoundError, 'no session `ae/t-1/1` for the `fake` harness to hear anything: it lists none.')],
-  ['words to a name that is not a session name', (h) => h.handler.sendMessage(said('fake-1'), ctx),
-    refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ["words in a context that is not their session's", (h) => {
-    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', nativeId: 'conv-a' });
-    return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 'conv-b' }), ctx);
-  }, refusedWith(RequestMalformedError, "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.")],
-  ["words in a context, to a session none is known for yet", (h) => {
-    h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
-    return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 't-1' }), ctx);
-  }, refusedWith(RequestMalformedError, "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.")],
-  ['words said by the agent', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { role: Role.ROLE_AGENT }), ctx),
-    refusedWith(RequestMalformedError, 'words said to a session are a message from the user: its role is ROLE_USER.')],
-  ['words that are not text', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', {
-    parts: [{ content: { $case: 'data', value: { text: 'hi' } }, metadata: undefined, filename: '', mediaType: '' }],
-  }), ctx), refusedWith(RequestMalformedError, 'words said to a session are one text part, and this message has one part that is not text.')],
-  ['words in two parts', (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', {
-    parts: [0, 1].map(() => ({ content: { $case: 'text' as const, value: 'hi' }, metadata: undefined, filename: '', mediaType: '' })),
-  }), ctx), refusedWith(RequestMalformedError, 'words said to a session are one text part, and this message has 2 parts.')],
-  ['empty words', (h) => h.handler.sendMessage(said('ae/t-1/1', '  \n'), ctx),
-    refusedWith(RequestMalformedError, 'the words are empty: give the words the session should hear.')],
-  ['words not sent returnImmediately', (h) => h.handler.sendMessage({ ...said(), configuration: undefined }, ctx),
-    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.')],
-  ['words to a harness with no channel into a session', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sendMessage(said(), ctx); },
-    refusedWith(UnsupportedOperationError, "the `fake` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId."), { bare: true }],
-  ['words to a session nobody lists', (h) => h.handler.sendMessage(said('ae/t-9/1'), ctx),
-    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.')],
-  ['words to a session that is done', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' }); return h.handler.sendMessage(said(), ctx); },
-    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (done): it takes no more words.')],
-  ['words to a session that failed', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' }); return h.handler.sendMessage(said(), ctx); },
-    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (failed): it takes no more words.')],
-  ['words to a session that was stopped', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'canceled' }); return h.handler.sendMessage(said(), ctx); },
-    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (stopped): it takes no more words.')],
-  ['a find on a harness that cannot find', (h) => h.handler.findSession({ name: 'ae/t-1/1' }, ctx),
-    refusedWith(UnsupportedOperationError, 'the `fake` harness cannot find a session by name: list its sessions (listTasks).'), { bare: true }],
-  ['a find of a name that is not a session name', (h) => h.handler.findSession({ name: 'ae/t-1/0' }, ctx),
-    refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ['the logs of no session', (h) => h.handler.sessionLogs({ sessionId: '' }, ctx),
-    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`.')],
-  ['a release on a harness with nothing to let go of', (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'completed' }, task: {} }, ctx),
-    refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'), { bare: true }],
-  ['a release of no session', (h) => h.handler.releaseSession({ session: undefined as unknown as Sighting, task: {} }, ctx),
-    refusedWith(RequestMalformedError, 'the request names no session: send the session as the last listing saw it.')],
-  ['a transcript on a harness that keeps none', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx); },
-    refusedWith(UnsupportedOperationError, "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs)."), { bare: true }],
-  ['a transcript for a name that is not a session name', (h) => { h.sessions.set('fake-1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'fake-1' }, ctx); },
-    refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ['a transcript for no name at all', (h) => h.handler.sessionTranscript({ name: undefined as unknown as string }, ctx),
-    refusedWith(RequestMalformedError, '`undefined` is not a session name: a session is named `ae/<task>/<n>`, n from 1.')],
-  ['a transcript by an empty id', (h) => h.handler.sessionTranscript({ sessionId: '' }, ctx),
-    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
-  ['a transcript by an id that is no string', (h) => h.handler.sessionTranscript({ sessionId: 7 as unknown as string }, ctx),
-    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.')],
-  ['a transcript that names its session twice', (h) => { h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' }); return h.handler.sessionTranscript({ name: 'ae/t-1/1', sessionId: 's-1' } as unknown as TranscriptRequest, ctx); },
-    refusedWith(RequestMalformedError, 'the request names the session twice, by `name` and by `sessionId`: send one.')],
-  ['a transcript by id on a harness that keeps none', (h) => h.handler.sessionTranscript({ sessionId: 's-1' }, ctx),
-    refusedWith(UnsupportedOperationError, "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs)."), { bare: true }],
+  [
+    'a spawn not sent returnImmediately',
+    (h) =>
+      h.handler.sendMessage(
+        spawn('ae/t-1/1', {}, { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: false }),
+        ctx,
+      ),
+    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.'),
+  ],
+  [
+    'a spawn with no configuration',
+    (h) => h.handler.sendMessage({ ...spawn(), configuration: undefined }, ctx),
+    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.'),
+  ],
+  [
+    'a spawn with no message',
+    (h) => h.handler.sendMessage({ ...spawn(), message: undefined }, ctx),
+    refusedWith(RequestMalformedError, 'the request has no message: a spawn is one user message.'),
+  ],
+  [
+    'a spawn that names no task',
+    (h) => h.handler.sendMessage(spawn('ae/t-1/1', { taskId: '' }), ctx),
+    refusedWith(RequestMalformedError, 'the message names no task: send the session name, `ae/<task>/<n>`, as its taskId.'),
+  ],
+  [
+    'a spawn under a name that is not a session name',
+    (h) => h.handler.sendMessage(spawn('ae/t-1/0', { contextId: '' }), ctx),
+    refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'a spawn said by the agent',
+    (h) => h.handler.sendMessage(spawn('ae/t-1/1', { role: Role.ROLE_AGENT }), ctx),
+    refusedWith(RequestMalformedError, 'a spawn is a message from the user: its role is ROLE_USER.'),
+  ],
+  [
+    'a spawn with no text part',
+    (h) =>
+      h.handler.sendMessage(
+        spawn('ae/t-1/1', {
+          parts: [{ content: { $case: 'data', value: { brief: 'do it' } }, metadata: undefined, filename: '', mediaType: '' }],
+        }),
+        ctx,
+      ),
+    refusedWith(RequestMalformedError, 'the brief is one text part, and this message has one part that is not text.'),
+  ],
+  [
+    'a spawn with two parts',
+    (h) =>
+      h.handler.sendMessage(
+        spawn('ae/t-1/1', {
+          parts: [0, 1].map(() => ({
+            content: { $case: 'text' as const, value: 'do it' },
+            metadata: undefined,
+            filename: '',
+            mediaType: '',
+          })),
+        }),
+        ctx,
+      ),
+    refusedWith(RequestMalformedError, 'the brief is one text part, and this message has 2 parts.'),
+  ],
+  [
+    'a spawn with no cwd',
+    (h) => h.handler.sendMessage(spawn('ae/t-1/1', { metadata: { harness: 'fake' } }), ctx),
+    refusedWith(RequestMalformedError, "the message's metadata has no `cwd`: say where the session works."),
+  ],
+  [
+    'a page of none',
+    (h) => h.handler.listTasks(listing({ pageSize: 0 }), ctx),
+    refusedWith(RequestMalformedError, '`pageSize: 0` is not a page: give a whole number from 1 to 100, or none for 50.'),
+  ],
+  [
+    'a page of 101',
+    (h) => h.handler.listTasks(listing({ pageSize: 101 }), ctx),
+    refusedWith(RequestMalformedError, '`pageSize: 101` is not a page: give a whole number from 1 to 100, or none for 50.'),
+  ],
+  [
+    'a page of 1.5',
+    (h) => h.handler.listTasks(listing({ pageSize: 1.5 }), ctx),
+    refusedWith(RequestMalformedError, '`pageSize: 1.5` is not a page: give a whole number from 1 to 100, or none for 50.'),
+  ],
+  [
+    'a page of a listing never made',
+    (h) => h.handler.listTasks(listing({ pageToken: '1:1' }), ctx),
+    refusedWith(RequestMalformedError, '`pageToken: 1:1` is not a page of a listing still open: list again from the first page.'),
+  ],
+  [
+    'a page token that is no token',
+    (h) => h.handler.listTasks(listing({ pageToken: 'next' }), ctx),
+    refusedWith(RequestMalformedError, '`pageToken: next` is not a page of a listing still open: list again from the first page.'),
+  ],
+  [
+    'a listing since a time',
+    (h) => h.handler.listTasks(listing({ statusTimestampAfter: '2026-09-23T00:00:00Z' }), ctx),
+    refusedWith(
+      UnsupportedOperationError,
+      'this agent cannot filter by `statusTimestampAfter`: a session carries no time of its state. List without it.',
+    ),
+  ],
+  [
+    'a session nobody knows',
+    (h) => h.handler.getTask({ tenant: '', id: 'ae/t-9/1' }, ctx),
+    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1`: the `fake` harness lists none, and no attempt was journalled under it.'),
+  ],
+  [
+    'a session under no session name',
+    (h) => h.handler.getTask({ tenant: '', id: 'fake-1' }, ctx),
+    refusedWith(TaskNotFoundError, 'no session `fake-1`: the `fake` harness lists none, and no attempt was journalled under it.'),
+  ],
+  [
+    'a stop of a session nobody lists',
+    (h) => h.handler.cancelTask({ tenant: '', id: 'ae/t-9/1', metadata: undefined }, ctx),
+    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to stop: it lists none.'),
+  ],
+  [
+    'a stop of a session that is done',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
+      return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx);
+    },
+    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (done): there is nothing to stop.'),
+  ],
+  [
+    'a stop of a session that failed',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' });
+      return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx);
+    },
+    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (failed): there is nothing to stop.'),
+  ],
+  [
+    'a stream',
+    (h) => h.handler.sendMessageStream(spawn(), ctx).next(),
+    refusedWith(UnsupportedOperationError, 'this agent does not stream: send the message with returnImmediately and poll getTask.'),
+  ],
+  [
+    'a resubscription',
+    (h) => h.handler.resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next(),
+    refusedWith(UnsupportedOperationError, 'this agent does not stream: poll getTask.'),
+  ],
+  [
+    'a push config set',
+    (h) =>
+      h.handler.createTaskPushNotificationConfig(
+        { tenant: '', id: 'p', taskId: 'ae/t-1/1', url: 'http://x', token: '', authentication: undefined },
+        ctx,
+      ),
+    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.'),
+  ],
+  [
+    'a push config read',
+    (h) => h.handler.getTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', id: 'p' }, ctx),
+    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.'),
+  ],
+  [
+    'a push config listing',
+    (h) => h.handler.listTaskPushNotificationConfigs({ tenant: '', taskId: 'ae/t-1/1', pageSize: 1, pageToken: '' }, ctx),
+    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.'),
+  ],
+  [
+    'a push config deleted',
+    (h) => h.handler.deleteTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', id: 'p' }, ctx),
+    refusedWith(PushNotificationNotSupportedError, 'the `fake` harness sends no notifications: poll getTask.'),
+  ],
+  [
+    'an extended card',
+    (h) => h.handler.getAuthenticatedExtendedAgentCard({ tenant: '' }, ctx),
+    refusedWith(ExtendedAgentCardNotConfiguredError, 'the `fake` harness has no extended card: its card is the whole of it.'),
+  ],
+  [
+    'a message with no mark and no task: a new task, which only a spawn starts',
+    (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { taskId: '' }), ctx),
+    refusedWith(
+      RequestMalformedError,
+      'a message with no taskId asks for a new task, and a session is started only by a spawn, marked `urn:agent-runtime:session:v1`: to speak to a running session, send its name, `ae/<task>/<n>`, as the taskId.',
+    ),
+  ],
+  [
+    'a spawn with its mark taken off: words to a session it names',
+    (h) => h.handler.sendMessage(spawn('ae/t-1/1', { extensions: [] }), ctx),
+    refusedWith(TaskNotFoundError, 'no session `ae/t-1/1` for the `fake` harness to hear anything: it lists none.'),
+  ],
+  [
+    'words to a name that is not a session name',
+    (h) => h.handler.sendMessage(said('fake-1'), ctx),
+    refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    "words in a context that is not their session's",
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', nativeId: 'conv-a' });
+      return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 'conv-b' }), ctx);
+    },
+    refusedWith(
+      RequestMalformedError,
+      "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.",
+    ),
+  ],
+  [
+    'words in a context, to a session none is known for yet',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+      return h.handler.sendMessage(said('ae/t-1/1', 'hi', { contextId: 't-1' }), ctx);
+    },
+    refusedWith(
+      RequestMalformedError,
+      "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.",
+    ),
+  ],
+  [
+    'words said by the agent',
+    (h) => h.handler.sendMessage(said('ae/t-1/1', 'hi', { role: Role.ROLE_AGENT }), ctx),
+    refusedWith(RequestMalformedError, 'words said to a session are a message from the user: its role is ROLE_USER.'),
+  ],
+  [
+    'words that are not text',
+    (h) =>
+      h.handler.sendMessage(
+        said('ae/t-1/1', 'hi', {
+          parts: [{ content: { $case: 'data', value: { text: 'hi' } }, metadata: undefined, filename: '', mediaType: '' }],
+        }),
+        ctx,
+      ),
+    refusedWith(RequestMalformedError, 'words said to a session are one text part, and this message has one part that is not text.'),
+  ],
+  [
+    'words in two parts',
+    (h) =>
+      h.handler.sendMessage(
+        said('ae/t-1/1', 'hi', {
+          parts: [0, 1].map(() => ({ content: { $case: 'text' as const, value: 'hi' }, metadata: undefined, filename: '', mediaType: '' })),
+        }),
+        ctx,
+      ),
+    refusedWith(RequestMalformedError, 'words said to a session are one text part, and this message has 2 parts.'),
+  ],
+  [
+    'empty words',
+    (h) => h.handler.sendMessage(said('ae/t-1/1', '  \n'), ctx),
+    refusedWith(RequestMalformedError, 'the words are empty: give the words the session should hear.'),
+  ],
+  [
+    'words not sent returnImmediately',
+    (h) => h.handler.sendMessage({ ...said(), configuration: undefined }, ctx),
+    refusedWith(UnsupportedOperationError, 'this agent answers once the session starts: send returnImmediately and poll getTask.'),
+  ],
+  [
+    'words to a harness with no channel into a session',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+      return h.handler.sendMessage(said(), ctx);
+    },
+    refusedWith(
+      UnsupportedOperationError,
+      "the `fake` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId.",
+    ),
+    { bare: true },
+  ],
+  [
+    'words to a session nobody lists',
+    (h) => h.handler.sendMessage(said('ae/t-9/1'), ctx),
+    refusedWith(TaskNotFoundError, 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.'),
+  ],
+  [
+    'words to a session that is done',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
+      return h.handler.sendMessage(said(), ctx);
+    },
+    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (done): it takes no more words.'),
+  ],
+  [
+    'words to a session that failed',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'failed' });
+      return h.handler.sendMessage(said(), ctx);
+    },
+    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (failed): it takes no more words.'),
+  ],
+  [
+    'words to a session that was stopped',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'canceled' });
+      return h.handler.sendMessage(said(), ctx);
+    },
+    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (stopped): it takes no more words.'),
+  ],
+  [
+    'a find on a harness that cannot find',
+    (h) => h.handler.findSession({ name: 'ae/t-1/1' }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness cannot find a session by name: list its sessions (listTasks).'),
+    { bare: true },
+  ],
+  [
+    'a find of a name that is not a session name',
+    (h) => h.handler.findSession({ name: 'ae/t-1/0' }, ctx),
+    refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'the logs of no session',
+    (h) => h.handler.sessionLogs({ sessionId: '' }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`.'),
+  ],
+  [
+    'a release on a harness with nothing to let go of',
+    (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'completed' }, task: {} }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'),
+    { bare: true },
+  ],
+  [
+    'a release of no session',
+    (h) => h.handler.releaseSession({ session: undefined as unknown as Sighting, task: {} }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send the session as the last listing saw it.'),
+  ],
+  [
+    'a transcript on a harness that keeps none',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+      return h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx);
+    },
+    refusedWith(
+      UnsupportedOperationError,
+      "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).",
+    ),
+    { bare: true },
+  ],
+  [
+    'a transcript for a name that is not a session name',
+    (h) => {
+      h.sessions.set('fake-1', { sessionId: 's-1', state: 'working' });
+      return h.handler.sessionTranscript({ name: 'fake-1' }, ctx);
+    },
+    refusedWith(RequestMalformedError, '`fake-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'a transcript for no name at all',
+    (h) => h.handler.sessionTranscript({ name: undefined as unknown as string }, ctx),
+    refusedWith(RequestMalformedError, '`undefined` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'a transcript by an empty id',
+    (h) => h.handler.sessionTranscript({ sessionId: '' }, ctx),
+    refusedWith(
+      RequestMalformedError,
+      'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+    ),
+  ],
+  [
+    'a transcript by an id that is no string',
+    (h) => h.handler.sessionTranscript({ sessionId: 7 as unknown as string }, ctx),
+    refusedWith(
+      RequestMalformedError,
+      'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+    ),
+  ],
+  [
+    'a transcript that names its session twice',
+    (h) => {
+      h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
+      return h.handler.sessionTranscript({ name: 'ae/t-1/1', sessionId: 's-1' } as unknown as TranscriptRequest, ctx);
+    },
+    refusedWith(RequestMalformedError, 'the request names the session twice, by `name` and by `sessionId`: send one.'),
+  ],
+  [
+    'a transcript by id on a harness that keeps none',
+    (h) => h.handler.sessionTranscript({ sessionId: 's-1' }, ctx),
+    refusedWith(
+      UnsupportedOperationError,
+      "the `fake` harness keeps no conversation to read: its session's logs are what it printed (sessionLogs).",
+    ),
+    { bare: true },
+  ],
 ];
 
 for (const [what, ask, says, setup] of REFUSALS) {
@@ -261,17 +568,25 @@ test('listings overlap: each is paged from the listing its token names, whatever
   const second = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
   assert.equal(second.nextPageToken, '2:2');
   const rest = await h.handler.listTasks(listing({ pageSize: 2, pageToken: first.nextPageToken }), ctx);
-  assert.deepEqual(rest.tasks.map((t) => t.id), ['ae/t-3/1'], 'the first listing, as it was when it was made');
+  assert.deepEqual(
+    rest.tasks.map((t) => t.id),
+    ['ae/t-3/1'],
+    'the first listing, as it was when it was made',
+  );
   assert.equal(rest.nextPageToken, '');
   const theirs = await h.handler.listTasks(listing({ pageSize: 2, pageToken: second.nextPageToken }), ctx);
-  assert.deepEqual(theirs.tasks.map((t) => t.id), ['ae/t-3/1', 'ae/t-4/1']);
+  assert.deepEqual(
+    theirs.tasks.map((t) => t.id),
+    ['ae/t-3/1', 'ae/t-4/1'],
+  );
   assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 2, 'one observe a listing');
 });
 
 test('REFUSED: a page of a listing whose last page was served, of one dropped, of other filters, or past its end', async () => {
   const h = harness();
   for (let i = 1; i <= 3; i++) h.sessions.set(`ae/t-${i}/1`, { sessionId: `s-${i}`, state: 'working' });
-  const refused = (token: string) => refusedWith(RequestMalformedError, `\`pageToken: ${token}\` is not a page of a listing still open: list again from the first page.`);
+  const refused = (token: string) =>
+    refusedWith(RequestMalformedError, `\`pageToken: ${token}\` is not a page of a listing still open: list again from the first page.`);
 
   // Served to its end: its pages are gone with it.
   const done = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
@@ -286,8 +601,13 @@ test('REFUSED: a page of a listing whose last page was served, of one dropped, o
   assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens.at(-1) }), ctx)).tasks.length, 1);
 
   const open = await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: open.nextPageToken, contextId: 't-2' }), ctx),
-    refusedWith(RequestMalformedError, 'a page is asked for with other filters than its listing: ask every page with the filters of the first.'));
+  await assert.rejects(
+    h.handler.listTasks(listing({ pageSize: 1, pageToken: open.nextPageToken, contextId: 't-2' }), ctx),
+    refusedWith(
+      RequestMalformedError,
+      'a page is asked for with other filters than its listing: ask every page with the filters of the first.',
+    ),
+  );
   const past = open.nextPageToken.replace(/:[0-9]+$/, ':4');
   await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: past }), ctx), refused(past));
 });
@@ -296,10 +616,20 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
   const h = harness();
   const asked = spawn('ae/t-1/1');
   const t = await h.handler.sendMessage(asked, ctx);
-  assert.deepEqual(h.acted(), [['spawn', {
-    name: 'ae/t-1/1', brief: 'do it', cwd: '/repo', harness: 'fake', config: { model: 'opus' },
-    closeoutSchema: undefined, resumeFrom: undefined,
-  }]]);
+  assert.deepEqual(h.acted(), [
+    [
+      'spawn',
+      {
+        name: 'ae/t-1/1',
+        brief: 'do it',
+        cwd: '/repo',
+        harness: 'fake',
+        config: { model: 'opus' },
+        closeoutSchema: undefined,
+        resumeFrom: undefined,
+      },
+    ],
+  ]);
   assert.ok('status' in t);
   assert.equal(t.id, 'ae/t-1/1');
   assert.equal(t.contextId, '', 'no context until the harness lists the session with an id');
@@ -308,7 +638,9 @@ test('a spawn the harness takes: the request reaches it whole, and the Task is w
 });
 
 test('a spawn the harness refused is REJECTED in its words; one that failed otherwise is SUBMITTED in its words', async () => {
-  const refused = harness({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true }) });
+  const refused = harness({
+    spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true }),
+  });
   const r = await refused.handler.sendMessage(spawn(), ctx);
   assert.ok('status' in r);
   assert.equal(r.status!.state, TaskState.TASK_STATE_REJECTED);
@@ -333,7 +665,12 @@ test('listing 250 sessions: sorted by name, in pages, every sighting whole, and 
   for (let i = 250; i >= 1; i--) {
     const name = `ae/t-${String(i).padStart(3, '0')}/${i % 2 ? 1 : 2}`;
     names.push(name);
-    h.sessions.set(name, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'input-required' : 'working', nativeId: `n-${i}`, usage: { turns: i } });
+    h.sessions.set(name, {
+      sessionId: `s-${i}`,
+      state: i % 5 === 0 ? 'input-required' : 'working',
+      nativeId: `n-${i}`,
+      usage: { turns: i },
+    });
   }
   const seen: string[] = [];
   const sizes: number[] = [];
@@ -353,7 +690,10 @@ test('listing 250 sessions: sorted by name, in pages, every sighting whole, and 
   assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 1, 'one observe for the whole listing');
 
   const one = await h.handler.listTasks(listing({ contextId: 'n-7' }), ctx);
-  assert.deepEqual(one.tasks.map((t) => t.id), ['ae/t-007/1']);
+  assert.deepEqual(
+    one.tasks.map((t) => t.id),
+    ['ae/t-007/1'],
+  );
   const blocked = await h.handler.listTasks(listing({ status: TaskState.TASK_STATE_INPUT_REQUIRED }), ctx);
   assert.equal(blocked.totalSize, 50);
   assert.equal(blocked.tasks.length, 50, 'no pageSize is a page of 50');
@@ -415,8 +755,17 @@ test("a listing by context is every attempt that continued the conversation, wha
   h.sessions.set('ae/t-1/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-b' });
   h.sessions.set('ae/t-1/3', { sessionId: 'job-4', state: 'working' });
   const a = await h.handler.listTasks(listing({ contextId: 'conv-a' }), ctx);
-  assert.deepEqual(a.tasks.map((t) => [t.id, t.contextId]), [['ae/t-1/2', 'conv-a'], ['ae/t-2/1', 'conv-a']]);
-  assert.deepEqual((await h.handler.listTasks(listing({ contextId: 'conv-b' }), ctx)).tasks.map((t) => t.id), ['ae/t-1/1']);
+  assert.deepEqual(
+    a.tasks.map((t) => [t.id, t.contextId]),
+    [
+      ['ae/t-1/2', 'conv-a'],
+      ['ae/t-2/1', 'conv-a'],
+    ],
+  );
+  assert.deepEqual(
+    (await h.handler.listTasks(listing({ contextId: 'conv-b' }), ctx)).tasks.map((t) => t.id),
+    ['ae/t-1/1'],
+  );
   assert.deepEqual((await h.handler.listTasks(listing({ contextId: 't-1' }), ctx)).tasks, [], "the runtime's task is no context");
 });
 
@@ -426,16 +775,26 @@ test('a listing carries what each session closed with only when it asks for arti
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed', nativeId: 'conv-a', closeout });
   h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'working' });
   const bare = await h.handler.listTasks(listing(), ctx);
-  assert.deepEqual(bare.tasks.map((t) => t.artifacts), [[], []], "A2A's default: no artifacts");
+  assert.deepEqual(
+    bare.tasks.map((t) => t.artifacts),
+    [[], []],
+    "A2A's default: no artifacts",
+  );
   assert.deepEqual(sightingOf(bare.tasks[0]!)?.closeout, closeout, 'the sighting, which the engine reads, is whole either way');
   const full = await h.handler.listTasks({ ...listing(), includeArtifacts: true }, ctx);
-  assert.deepEqual(full.tasks.map((t) => t.artifacts.map((a) => a.artifactId)), [['closeout'], []]);
+  assert.deepEqual(
+    full.tasks.map((t) => t.artifacts.map((a) => a.artifactId)),
+    [['closeout'], []],
+  );
   assert.deepEqual(closeoutOf(full.tasks[0]!), { outcome: 'done' });
   // Paged: each page asks for itself.
   const first = await h.handler.listTasks({ ...listing({ pageSize: 1 }), includeArtifacts: true }, ctx);
   assert.equal(first.tasks[0]!.artifacts.length, 1);
   const rest = await h.handler.listTasks({ ...listing({ pageSize: 1, pageToken: first.nextPageToken }) }, ctx);
-  assert.deepEqual(rest.tasks.map((t) => t.id), ['ae/t-2/1']);
+  assert.deepEqual(
+    rest.tasks.map((t) => t.id),
+    ['ae/t-2/1'],
+  );
   assert.equal(closeoutOf(await h.handler.getTask({ tenant: '', id: 'ae/t-1/1' }, ctx)) !== undefined, true);
 });
 
@@ -444,7 +803,16 @@ const held = (after: Event[] = []): Event[] => [
   { kind: 'filed', at: '2026-09-23T10:00:00.000Z', brief: 'b', cwd: '/r', holdOpen: true },
   { kind: 'starting', at: '2026-09-23T10:00:00.000Z', attempt: 1 },
   { kind: 'spawned', at: '2026-09-23T10:00:01.000Z', attempt: 1 },
-  { kind: 'ended', at: '2026-09-23T10:05:00.000Z', attempt: 1, sessionId: 'job-1', observed: 'done', reason: 'harness', nativeId: 'conv-h', closeout: { outcome: 'done' } },
+  {
+    kind: 'ended',
+    at: '2026-09-23T10:05:00.000Z',
+    attempt: 1,
+    sessionId: 'job-1',
+    observed: 'done',
+    reason: 'harness',
+    nativeId: 'conv-h',
+    closeout: { outcome: 'done' },
+  },
   ...after,
 ];
 
@@ -452,19 +820,33 @@ test('a signed session its task holds open is INPUT_REQUIRED on a read, listed b
   const listed = harness();
   listed.journal.set('t-h', held());
   // A Claude Code job is never let go: its harness lists it done while its task waits.
-  const job: Sighting = { sessionId: 'job-1', state: 'completed', nativeId: 'conv-h', closeout: { payload: { outcome: 'done' }, at: 1790000000000 } };
+  const job: Sighting = {
+    sessionId: 'job-1',
+    state: 'completed',
+    nativeId: 'conv-h',
+    closeout: { payload: { outcome: 'done' }, at: 1790000000000 },
+  };
   listed.sessions.set('ae/t-h/1', job);
   const read = await listed.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
-  assert.deepEqual([read.status!.state, read.contextId, closeoutOf(read)], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }]);
-  assert.equal(sightingOf(read), undefined, 'a Task whose state is not its sighting\'s carries none to read');
+  assert.deepEqual(
+    [read.status!.state, read.contextId, closeoutOf(read)],
+    [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }],
+  );
+  assert.equal(sightingOf(read), undefined, "a Task whose state is not its sighting's carries none to read");
   const inList = (await listed.handler.listTasks(listing(), ctx)).tasks;
-  assert.deepEqual(inList.map((t) => t.status!.state), [TaskState.TASK_STATE_COMPLETED]);
+  assert.deepEqual(
+    inList.map((t) => t.status!.state),
+    [TaskState.TASK_STATE_COMPLETED],
+  );
   assert.deepEqual(sightingOf(inList[0]!), job, 'observe reads the harness, unchanged');
 
   const gone = harness();
   gone.journal.set('t-h', held());
   const off = await gone.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx);
-  assert.deepEqual([off.status!.state, off.contextId, closeoutOf(off)], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }]);
+  assert.deepEqual(
+    [off.status!.state, off.contextId, closeoutOf(off)],
+    [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h', { outcome: 'done' }],
+  );
   assert.deepEqual(listed.acted().concat(gone.acted()), [], 'a read, and nothing asked of the harness');
 });
 
@@ -480,22 +862,33 @@ test('REFUSED: a held task answered or closed waits on nobody, and a task not he
       const h = harness();
       h.journal.set('t-h', events);
       if (listedDone) h.sessions.set('ae/t-h/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-h' });
-      assert.equal((await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status!.state, TaskState.TASK_STATE_COMPLETED,
-        `${what}, ${listedDone ? 'listed done' : 'let go'}`);
+      assert.equal(
+        (await h.handler.getTask({ tenant: '', id: 'ae/t-h/1' }, ctx)).status!.state,
+        TaskState.TASK_STATE_COMPLETED,
+        `${what}, ${listedDone ? 'listed done' : 'let go'}`,
+      );
     }
   }
   // The answer's turn signed, and waits again: its attempt is the one waiting; the first turn's is done.
   const h = harness();
-  h.journal.set('t-h', held([
-    { kind: 'input', at, text: 'go on' },
-    { kind: 'starting', at, attempt: 2, resumeFrom: 'conv-h' },
-    { kind: 'spawned', at, attempt: 2 },
-    { kind: 'ended', at, attempt: 2, sessionId: 'job-2', observed: 'done', reason: 'harness', nativeId: 'conv-h' },
-  ]));
+  h.journal.set(
+    't-h',
+    held([
+      { kind: 'input', at, text: 'go on' },
+      { kind: 'starting', at, attempt: 2, resumeFrom: 'conv-h' },
+      { kind: 'spawned', at, attempt: 2 },
+      { kind: 'ended', at, attempt: 2, sessionId: 'job-2', observed: 'done', reason: 'harness', nativeId: 'conv-h' },
+    ]),
+  );
   const states = await Promise.all(['ae/t-h/1', 'ae/t-h/2'].map((id) => h.handler.getTask({ tenant: '', id }, ctx)));
-  assert.deepEqual(states.map((t) => [t.status!.state, t.contextId]), [
-    [TaskState.TASK_STATE_COMPLETED, 'conv-h'], [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h'],
-  ], 'two turns of one conversation, one context');
+  assert.deepEqual(
+    states.map((t) => [t.status!.state, t.contextId]),
+    [
+      [TaskState.TASK_STATE_COMPLETED, 'conv-h'],
+      [TaskState.TASK_STATE_INPUT_REQUIRED, 'conv-h'],
+    ],
+    'two turns of one conversation, one context',
+  );
 });
 
 test('a stop: a live session is stopped and CANCELED, one already stopped is CANCELED again, and the harness asked once', async () => {
@@ -507,14 +900,19 @@ test('a stop: a live session is stopped and CANCELED, one already stopped is CAN
   assert.equal((await cancel('ae/t-2/1')).status!.state, TaskState.TASK_STATE_CANCELED);
   assert.equal(h.sessions.get('ae/t-1/1')!.state, 'canceled');
   assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel answers as the first');
-  assert.deepEqual(h.acted(), [['stop', 's-1'], ['stop', 's-2']]);
+  assert.deepEqual(h.acted(), [
+    ['stop', 's-1'],
+    ['stop', 's-2'],
+  ]);
 });
 
 test("a stop the harness failed throws the harness's words, unchanged", async () => {
   const h = harness({ stopFails: 'fake stop s-1: no such session (exit 1)' });
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
-  await assert.rejects(h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx),
-    refusedWith(HarnessFailed, 'fake stop s-1: no such session (exit 1)'));
+  await assert.rejects(
+    h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx),
+    refusedWith(HarnessFailed, 'fake stop s-1: no such session (exit 1)'),
+  );
 });
 
 test("the harness's card: its name, no streaming, no notifications, text in and out, and the runtime's extension", async () => {
@@ -522,15 +920,25 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
   assert.equal(card.name, 'fake');
   const { extensions, ...rest } = card.capabilities!;
   assert.deepEqual(rest, { streaming: false, pushNotifications: false, extendedAgentCard: false });
-  assert.deepEqual(extensions.map((e) => [e.uri, e.required, e.params]), [
-    [RUNTIME_EXTENSION, false, { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript', 'observeSessions'], say: true }],
-  ]);
+  assert.deepEqual(
+    extensions.map((e) => [e.uri, e.required, e.params]),
+    [
+      [
+        RUNTIME_EXTENSION,
+        false,
+        { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript', 'observeSessions'], say: true },
+      ],
+    ],
+  );
   assert.deepEqual([card.defaultInputModes, card.defaultOutputModes], [['text/plain'], ['text/plain']]);
 });
 
-test("REFUSED on the card: a verb the driver lacks is not offered, and logs, which every driver has, always is", async () => {
+test('REFUSED on the card: a verb the driver lacks is not offered, and logs, which every driver has, always is', async () => {
   const card = await harness({ bare: true }).handler.getAgentCard();
-  assert.deepEqual(card.capabilities!.extensions.map((e) => e.params), [{ methods: ['sessionLogs'], say: false }]);
+  assert.deepEqual(
+    card.capabilities!.extensions.map((e) => e.params),
+    [{ methods: ['sessionLogs'], say: false }],
+  );
 });
 
 test('observeSessions hands the driver what is expected, and answers what it listed as Tasks', async () => {
@@ -539,7 +947,10 @@ test('observeSessions hands the driver what is expected, and answers what it lis
   h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed' });
   const expected = [{ name: 'ae/t-1/1', harness: 'fake' }];
   const { tasks, unread } = await h.handler.observeSessions({ expected }, ctx);
-  assert.deepEqual(tasks.map((t) => [t.id, t.status!.state]), [['ae/t-1/1', TaskState.TASK_STATE_WORKING]]);
+  assert.deepEqual(
+    tasks.map((t) => [t.id, t.status!.state]),
+    [['ae/t-1/1', TaskState.TASK_STATE_WORKING]],
+  );
   assert.deepEqual(unread, []);
   assert.deepEqual(h.acted(), [['observeFor', expected]]);
 });
@@ -548,16 +959,24 @@ test('observeSessions answers the names the driver could not read, beside the Ta
   const h = harness();
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
   h.unread.add('ae/t-2/1');
-  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }, { name: 'ae/t-2/1', harness: 'fake' }];
+  const expected = [
+    { name: 'ae/t-1/1', harness: 'fake' },
+    { name: 'ae/t-2/1', harness: 'fake' },
+  ];
   const answered = await h.handler.observeSessions({ expected }, ctx);
-  assert.deepEqual(answered.tasks.map((t) => t.id), ['ae/t-1/1']);
+  assert.deepEqual(
+    answered.tasks.map((t) => t.id),
+    ['ae/t-1/1'],
+  );
   assert.deepEqual(answered.unread, ['ae/t-2/1']);
 });
 
 test('REFUSED: observeSessions on a driver without the verb, and with a list that names no session', async () => {
   const bare = harness({ bare: true });
-  await assert.rejects(bare.handler.observeSessions({ expected: [] }, ctx),
-    refusedWith(UnsupportedOperationError, 'the `fake` harness lists its sessions in full, told nothing: list them (listTasks).'));
+  await assert.rejects(
+    bare.handler.observeSessions({ expected: [] }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness lists its sessions in full, told nothing: list them (listTasks).'),
+  );
   const h = harness();
   const malformed = '`expected` is not a list of sessions: send `[{ name }]`, each name `ae/<task>/<n>`, n from 1.';
   for (const expected of [undefined, 'ae/t-1/1', [{ name: 'ae/t-1/0' }], [{ name: 7 }], [null]]) {
@@ -582,7 +1001,7 @@ test('words to a running session reach the harness with the id it lists, and the
   ]);
 });
 
-test("words the harness could not deliver throw its words, unchanged", async () => {
+test('words the harness could not deliver throw its words, unchanged', async () => {
   const h = harness({ sayFails: 'fake message s-1: inbox closed (exit 3)' });
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
   await assert.rejects(h.handler.sendMessage(said(), ctx), refusedWith(HarnessFailed, 'fake message s-1: inbox closed (exit 3)'));
@@ -595,21 +1014,32 @@ test('the extension answers as the driver does: a session found or none, its log
   assert.equal(await h.handler.findSession({ name: 'ae/t-1/2' }, ctx), null);
   assert.deepEqual(await h.handler.sessionLogs({ sessionId: 's-1' }, ctx), { logs: 'logs of s-1' });
   const done: Sighting = { sessionId: 's-1', state: 'completed' };
-  assert.deepEqual(await h.handler.releaseSession({ session: done, task: { worktree: true } }, ctx), { usage: { turns: 3, costUsd: 0.25 } });
+  assert.deepEqual(await h.handler.releaseSession({ session: done, task: { worktree: true } }, ctx), {
+    usage: { turns: 3, costUsd: 0.25 },
+  });
   assert.deepEqual(await h.handler.releaseSession({ session: { sessionId: 's-2', state: 'canceled' }, task: {} }, ctx), { usage: null });
-  assert.deepEqual(h.asked, [
-    ['find', 'ae/t-1/1'], ['find', 'ae/t-1/2'], ['logs', 's-1'],
-    ['release', [done, { worktree: true }]], ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
-  ], 'each asked once, and no listing made for any');
+  assert.deepEqual(
+    h.asked,
+    [
+      ['find', 'ae/t-1/1'],
+      ['find', 'ae/t-1/2'],
+      ['logs', 's-1'],
+      ['release', [done, { worktree: true }]],
+      ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
+    ],
+    'each asked once, and no listing made for any',
+  );
 });
 
 const at = '2026-09-23T10:00:00.000Z';
 const filed: Event = { kind: 'filed', at, brief: 'b', cwd: '/r' };
 
-test("a transcript is read by the id the journal ended its attempt with, and no registry is asked, whatever it lists now", async () => {
+test('a transcript is read by the id the journal ended its attempt with, and no registry is asked, whatever it lists now', async () => {
   const h = harness();
   h.journal.set('t-1', [
-    filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
+    filed,
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
     { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'done', reason: 'harness', nativeId: 's-old' },
   ]);
   // The harness lists another session under the name now: the record's id is read, not the listing's.
@@ -631,13 +1061,19 @@ test('a transcript of an attempt in flight: found by name when the harness can f
   finds.journal.set('t-1', flight);
   finds.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
   assert.equal((await finds.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
-  assert.deepEqual(finds.asked, [['find', 'ae/t-1/1'], ['transcript', ['s-1', undefined]]]);
+  assert.deepEqual(finds.asked, [
+    ['find', 'ae/t-1/1'],
+    ['transcript', ['s-1', undefined]],
+  ]);
 
   const lists = harness({ noFind: true });
   lists.journal.set('t-1', flight);
   lists.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'input-required' });
   assert.equal((await lists.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
-  assert.deepEqual(lists.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
+  assert.deepEqual(lists.asked, [
+    ['observe', undefined],
+    ['transcript', ['s-1', undefined]],
+  ]);
 });
 
 test('a transcript whose session its harness cannot name this time is none, and the harness is not asked to read one', async () => {
@@ -646,14 +1082,20 @@ test('a transcript whose session its harness cannot name this time is none, and 
   const early = harness();
   early.journal.set('t-1', flight);
   assert.equal(await early.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
-  assert.deepEqual(early.asked, [['find', 'ae/t-1/1'], ['observe', undefined]]);
+  assert.deepEqual(early.asked, [
+    ['find', 'ae/t-1/1'],
+    ['observe', undefined],
+  ]);
 
   // A find that fails is nothing found; a listing that fails is nothing listed. Neither is the caller's error.
   const broken = harness({ findFails: new TypeError('the registry file is torn'), observeFails: 'fake ls: exit 3' });
   broken.journal.set('t-1', flight);
   broken.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
   assert.equal(await broken.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
-  assert.deepEqual(broken.asked, [['find', 'ae/t-1/1'], ['observe', undefined]]);
+  assert.deepEqual(broken.asked, [
+    ['find', 'ae/t-1/1'],
+    ['observe', undefined],
+  ]);
 
   // A find that fails, and a listing that names it: read.
   const listed = harness({ findFails: new RunnerError({ verb: 'find', message: 'fake: no registration file' }) });
@@ -665,16 +1107,26 @@ test('a transcript whose session its harness cannot name this time is none, and 
 test('a transcript of an ended attempt with no id on the record, or of a name no attempt is journalled under yet, is observed', async () => {
   const h = harness();
   // Ended before `ended` carried an id: no find, which reads only what is in flight — the listing.
-  h.journal.set('t-1', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness' }]);
+  h.journal.set('t-1', [
+    filed,
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness' },
+  ]);
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
   assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
-  assert.deepEqual(h.asked, [['observe', undefined], ['transcript', ['s-1', undefined]]]);
+  assert.deepEqual(h.asked, [
+    ['observe', undefined],
+    ['transcript', ['s-1', undefined]],
+  ]);
 
   // A session is listed before its spawn is written: a name with no attempt on the record is asked of the harness.
   h.sessions.set('ae/t-9/1', { sessionId: 's-9', state: 'working' });
   assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-9/1' }, ctx))?.cursor, 's-9@0+1');
-  assert.deepEqual(h.asked.slice(2), [['find', 'ae/t-9/1'], ['transcript', ['s-9', undefined]]]);
+  assert.deepEqual(h.asked.slice(2), [
+    ['find', 'ae/t-9/1'],
+    ['transcript', ['s-9', undefined]],
+  ]);
 });
 
 test('a transcript by id is read as asked: no journal, no find, no listing, whatever the harness lists', async () => {
@@ -688,8 +1140,10 @@ test('a transcript by id is read as asked: no journal, no find, no listing, what
 test("a transcript the harness could not read throws its words, unchanged; a driver's defect is let through as it is", async () => {
   const words = harness({ transcriptFails: new RunnerError({ verb: 'transcript', message: 'fake: transcript s-1 unreadable (EACCES)' }) });
   words.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
-  await assert.rejects(words.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
-    refusedWith(HarnessFailed, 'fake: transcript s-1 unreadable (EACCES)'));
+  await assert.rejects(
+    words.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
+    refusedWith(HarnessFailed, 'fake: transcript s-1 unreadable (EACCES)'),
+  );
   const boom = new TypeError('the reader fell over');
   const defect = harness({ transcriptFails: boom });
   defect.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });

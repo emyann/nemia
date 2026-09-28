@@ -33,9 +33,14 @@ export function missingArtifacts(run: Run, stepName: string, closeout: Closeout 
   const missing: MissingArtifact[] = [];
   for (const file of closeout.artifacts) {
     const place = artifactPlace(file, dir);
-    const why = place === 'outside' || place === 'escapes' ? place
-      : place === 'files' ? (isFileIn(file, dir) ? undefined : 'missing')
-      : workspaceArtifact(run, stepName, file, dir);
+    const why =
+      place === 'outside' || place === 'escapes'
+        ? place
+        : place === 'files'
+          ? isFileIn(file, dir)
+            ? undefined
+            : 'missing'
+          : workspaceArtifact(run, stepName, file, dir);
     if (why) missing.push({ path: file, why });
   }
   return missing;
@@ -66,13 +71,18 @@ function workspaceArtifact(run: Run, stepName: string, file: string, dir: string
  * What is at a path from a workspace's root, every link on the way followed: a file, and where it really is; a directory; something else;
  * nothing — or `outside`, when a link leads out of the workspace, which is not looked at further.
  */
-function inWorkspace(workspace: string, rel: string): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
+function inWorkspace(
+  workspace: string,
+  rel: string,
+): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
   let root: string;
   let real: string;
   try {
     root = fs.realpathSync(workspace);
     real = fs.realpathSync(path.join(workspace, rel));
-  } catch { return { kind: 'absent' }; }
+  } catch {
+    return { kind: 'absent' };
+  }
   if (real !== root && !inside(root, real)) return { kind: 'outside' };
   const at = fs.statSync(real, { throwIfNoEntry: false });
   return at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' };
@@ -110,7 +120,9 @@ export function collectArtifacts(run: Run, stepName: string, closeout: Closeout 
       fs.copyFileSync(at.real, to);
       fs.utimesSync(to, from.atime, from.mtime);
       copied.push(rel);
-    } catch { /* not collected, and `wf decide` says so */ }
+    } catch {
+      /* not collected, and `wf decide` says so */
+    }
   }
   return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
 }
@@ -122,7 +134,13 @@ export function collectArtifacts(run: Run, stepName: string, closeout: Closeout 
  */
 function copyBlocked(dir: string, rel: string): boolean {
   let at = dir;
-  for (const part of ['.', ...path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')]) {
+  for (const part of [
+    '.',
+    ...path
+      .dirname(rel)
+      .split(path.sep)
+      .filter((p) => p && p !== '.'),
+  ]) {
     at = path.join(at, part);
     const st = lstatOf(at);
     // Nothing there yet: made as a plain directory, and nothing below it can be in the way.
@@ -138,7 +156,9 @@ function isFileIn(file: string, dir: string): boolean {
   try {
     const real = fs.realpathSync(file);
     return artifactPlace(real, fs.realpathSync(dir)) === 'files' && fs.statSync(real).isFile();
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -150,7 +170,11 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
   const found: ArtifactFile[] = [];
   const walk = (dir: string): void => {
     let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       const at = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(at);
@@ -177,12 +201,21 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
  * on a later pass, so a pass that dies halfway leaves the whole list and the next one removes the rest. Nothing to remove writes nothing.
  */
 export function dropLandedPictures(
-  run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined, said: { commit: string; checkTaskId?: string },
+  run: Pick<Run, 'id'>,
+  stepName: string,
+  closeout: Closeout | undefined,
+  said: { commit: string; checkTaskId?: string },
 ): { removed: string[]; bytes: number } {
   const dir = artifactsDir(run, stepName);
-  const named = new Set((closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))));
+  const named = new Set(
+    (closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))),
+  );
   let entries: fs.Dirent[];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return { removed: [], bytes: 0 }; }
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return { removed: [], bytes: 0 };
+  }
   const pictures = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.png') && !named.has(path.join(dir, entry.name)))
     .map((entry) => ({ name: entry.name, bytes: lstatOf(path.join(dir, entry.name))?.size ?? 0 }))
@@ -198,19 +231,28 @@ export function dropLandedPictures(
       fs.rmSync(path.join(dir, picture.name));
       removed.push(picture.name);
       freed += picture.bytes;
-    } catch { /* still there: the next pass that lands tries again */ }
+    } catch {
+      /* still there: the next pass that lands tries again */
+    }
   }
   return { removed, bytes: freed };
 }
 
 /** The words of `e2e-pictures.txt`: why the pictures went, what they were, and where what the check said still is. */
-function landedPicturesNote(stepName: string, pictures: readonly { name: string; bytes: number }[], bytes: number, said: { commit: string; checkTaskId?: string }): string {
+function landedPicturesNote(
+  stepName: string,
+  pictures: readonly { name: string; bytes: number }[],
+  bytes: number,
+  said: { commit: string; checkTaskId?: string },
+): string {
   return [
     `${stepName}'s check passed on the merge, and the run committed it as ${said.commit.slice(0, 12)}.`,
     `So the run removed the ${pictures.length} ${pictures.length === 1 ? 'picture' : 'pictures'} the check's e2e took of the merged tree (${sizeOf(bytes)}): after a pass nobody reads them.`,
-    'A check that does not pass keeps every picture it took, the failed page\'s among them.',
-    'The pictures of the branch that a reviewer read are the implement step\'s, in its own files directory, and are kept.',
-    ...(said.checkTaskId ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ${checkStderr(said.checkTaskId)}`] : []),
+    "A check that does not pass keeps every picture it took, the failed page's among them.",
+    "The pictures of the branch that a reviewer read are the implement step's, in its own files directory, and are kept.",
+    ...(said.checkTaskId
+      ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ${checkStderr(said.checkTaskId)}`]
+      : []),
     '',
     'Removed:',
     ...pictures.map((p) => `  ${p.name}  ${sizeOf(p.bytes)}`),

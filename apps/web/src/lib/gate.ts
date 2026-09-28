@@ -42,7 +42,10 @@ export function gateOfSummary(
  * nobody called off. `ends` off the workflow the run froze (`workspace: main`); `back` as the package names it, off the graph's `after`
  * edges for an ending that has no task yet.
  */
-export function gateOfStep(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>, step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>): GateAsk | null {
+export function gateOfStep(
+  run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'branch' | 'graph'>,
+  step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
+): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
   const ends = step.spec?.workspace === 'main';
   const back = step.taskId ? [step.name] : run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from);
@@ -70,15 +73,16 @@ export function gateCardLine(gate: GateAsk): string {
  * of its own: its section (`hash`), where what it would act on is drawn beside its gate.
  */
 export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>
-  (gate.ends
+  gate.ends
     ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) }
-    : { words: gate.step === 'plan' ? 'Read the plan' : 'Read what it handed on', step: gate.step });
+    : { words: gate.step === 'plan' ? 'Read the plan' : 'Read what it handed on', step: gate.step };
 
 /**
  * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve plan's hand-off`. Both name the step as
  * `wf ls` does (`approve plan`), and the inspector says the rest.
  */
-export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string => (gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`);
+export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
+  gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`;
 
 /**
  * The inspector's opening: which step waits, what approving does and what sending back does, each a sentence off the record.
@@ -88,7 +92,11 @@ export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string => (g
  * wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the person's words, and the gate holds
  * again once that try signs off.
  */
-export function gateBrief(gate: GateAsk, says: string | null, next: readonly string[]): { waits: string; approving: string; sendingBack: string } {
+export function gateBrief(
+  gate: GateAsk,
+  says: string | null,
+  next: readonly string[],
+): { waits: string; approving: string; sendingBack: string } {
   const waits = gate.ends
     ? `${gate.step} waits at its gate: it has not run, and it runs only on your approval.`
     : `${gate.step} has signed off and waits at its gate: nothing after it is filed until you approve what it handed on.`;
@@ -104,16 +112,23 @@ export function gateBrief(gate: GateAsk, says: string | null, next: readonly str
 }
 
 /** The first line of a step's prose, which is what a gate's folder says the step does: `toDecide.says`, off the detail. */
-export const firstLine = (body: string | null): string | null => body?.split('\n').map((line) => line.trim()).find(Boolean) ?? null;
+export const firstLine = (body: string | null): string | null =>
+  body
+    ?.split('\n')
+    .map((line) => line.trim())
+    .find(Boolean) ?? null;
 
 /**
  * What the card says once a person's word is taken, until the run is read again and moves: `approved — the next pass files ship`, or
  * `sent back to review — try 2 asked (--nudge, with your answer) — the next tick files it`.
  */
-export const takenLine = (taken: { approved: true } | { asked: StepAsked | { try: number; stopFirst: boolean }; to: string }, gate: GateAsk): string =>
-  ('approved' in taken
+export const takenLine = (
+  taken: { approved: true } | { asked: StepAsked | { try: number; stopFirst: boolean }; to: string },
+  gate: GateAsk,
+): string =>
+  'approved' in taken
     ? `approved — the next pass files ${gate.ends ? gate.step : `what waits on ${gate.step}`}`
-    : `sent back to ${taken.to} — ${askedSaid(taken.asked)}`);
+    : `sent back to ${taken.to} — ${askedSaid(taken.asked)}`;
 
 /** One fact under a gate, as the inspector lists it: a label, the words, and where to read more (a step's section on the run's page). */
 export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; step?: string };
@@ -138,7 +153,9 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
     const findings = Array.isArray(output.findings) ? output.findings.length : null;
     // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the loop is over on their word. Say that,
     // with their words, where "asks another round" would send whoever approves the ending looking for a round nobody will file.
-    const accepted = looping.accepted ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}` : null;
+    const accepted = looping.accepted
+      ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}`
+      : null;
     const said = !closeout
       ? `${looping.name} has not signed off`
       : output.again === false
@@ -161,7 +178,11 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
     if (decision.touched.length) facts.push({ label: 'touched', said: touchedSummary(decision.touched) });
     for (const standing of decision.standings) {
       if (!standing.merge) continue;
-      facts.push({ label: 'merges', said: standing.merge.said, state: 'clean' in standing.merge ? (standing.merge.clean ? 'good' : 'bad') : undefined });
+      facts.push({
+        label: 'merges',
+        said: standing.merge.said,
+        state: 'clean' in standing.merge ? (standing.merge.clean ? 'good' : 'bad') : undefined,
+      });
     }
   }
   return facts;
@@ -183,6 +204,8 @@ export const decideLine = (branches: readonly string[]): string =>
 
 /** A step's need, for the inspector, in full: what it asks, or what the harness waits for, where to answer it, and what its session said last. */
 export const needWords = (need: Need): string =>
-  (need.kind === 'asks' ? `${need.step} asks: ${need.needs}` : need.kind === 'harness'
-    ? `${need.step} is blocked by the harness${need.waitingFor ? `; ${need.waitingFor.words} — ${need.waitingFor.advice}` : ''}${need.lastLine ? `; its session said last: ${need.lastLine}` : ''}`
-    : need.said);
+  need.kind === 'asks'
+    ? `${need.step} asks: ${need.needs}`
+    : need.kind === 'harness'
+      ? `${need.step} is blocked by the harness${need.waitingFor ? `; ${need.waitingFor.words} — ${need.waitingFor.advice}` : ''}${need.lastLine ? `; its session said last: ${need.lastLine}` : ''}`
+      : need.said;

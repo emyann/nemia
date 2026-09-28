@@ -76,11 +76,17 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
               data-more={pill.kind === 'more' ? pill.names.join(' ') : undefined}
               data-state={pill.state ?? (pill.done ? 'done' : 'mixed')}
               data-live={pill.live || undefined}
-              title={pill.kind === 'step' ? stepTitle(byName.get(pill.names[0]!), pill.names[0]!, cancelled, held) : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled, held)).join('\n')}
+              title={
+                pill.kind === 'step'
+                  ? stepTitle(byName.get(pill.names[0]!), pill.names[0]!, cancelled, held)
+                  : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled, held)).join('\n')
+              }
               style={at(pill)}
               className={[
                 'absolute flex items-center justify-center rounded-full px-1.5 font-mono text-[10px] leading-none',
-                pill.state ? stateClass[pill.state] : 'border border-dashed border-neutral-400 bg-background text-muted-foreground dark:border-neutral-600',
+                pill.state
+                  ? stateClass[pill.state]
+                  : 'border border-dashed border-neutral-400 bg-background text-muted-foreground dark:border-neutral-600',
                 pill.live ? 'ring-2 ring-sky-500/60 ring-offset-1 ring-offset-background dark:ring-sky-400/60' : '',
               ].join(' ')}
             >
@@ -107,7 +113,13 @@ const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boole
  * status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a tile
  * opens its inspector beside the floor (`onStep`).
  */
-export function StepTiles({ run, detail, flow, selected, onStep }: {
+export function StepTiles({
+  run,
+  detail,
+  flow,
+  selected,
+  onStep,
+}: {
   run: RunSummary;
   detail: RunDetail | null;
   flow: Flow;
@@ -135,7 +147,9 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
           const onYou = run.waitingOnYou.includes(name);
           const need = needOf(step, onYou, cancelled);
           const read = details.get(name);
-          const attempt = read ? attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no attempt yet') : null;
+          const attempt = read
+            ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no attempt yet'))
+            : null;
           const cost = read ? costText(read) : null;
           const gated = onYou && isGate(state, cancelled);
           return (
@@ -155,7 +169,9 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
                   : state === 'working'
                     ? 'border border-sky-500 ring-2 ring-sky-500/25 dark:border-sky-400 dark:ring-sky-400/20'
                     : 'border',
-                selected === name ? 'outline-2 outline-offset-2 outline-foreground' : 'data-[focus-visible]:outline-2 data-[focus-visible]:outline-offset-2 data-[focus-visible]:outline-ring',
+                selected === name
+                  ? 'outline-2 outline-offset-2 outline-foreground'
+                  : 'data-[focus-visible]:outline-2 data-[focus-visible]:outline-offset-2 data-[focus-visible]:outline-ring',
               ].join(' ')}
             >
               <span className="truncate text-xs font-semibold" title={name}>
@@ -167,7 +183,10 @@ export function StepTiles({ run, detail, flow, selected, onStep }: {
               <span className="flex min-w-0 gap-1 font-mono text-[10px] text-muted-foreground">
                 <span className="truncate">{attempt ?? '…'}</span>
                 {cost && read && (
-                  <span data-cost={pastBudget(read) ? 'over' : 'within'} className={`truncate ${pastBudget(read) ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>
+                  <span
+                    data-cost={pastBudget(read) ? 'over' : 'within'}
+                    className={`truncate ${pastBudget(read) ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}
+                  >
                     · {cost}
                   </span>
                 )}

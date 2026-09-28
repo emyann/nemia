@@ -33,8 +33,9 @@ const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
   // Text a step wrote is shown as text. An HTML or a script file among it is an agent's text too: as `text/plain`, a tab
   // shows it rather than running it on the board's origin.
   ...Object.fromEntries(
-    ['.txt', '.md', '.log', '.csv', '.tsv', '.yaml', '.yml', '.xml', '.html', '.diff', '.patch', '.ts', '.tsx', '.js', '.css', '.sh']
-      .map((ext) => [ext, { type: 'text/plain; charset=utf-8', kind: 'text' as const }]),
+    ['.txt', '.md', '.log', '.csv', '.tsv', '.yaml', '.yml', '.xml', '.html', '.diff', '.patch', '.ts', '.tsx', '.js', '.css', '.sh'].map(
+      (ext) => [ext, { type: 'text/plain; charset=utf-8', kind: 'text' as const }],
+    ),
   ),
 };
 
@@ -111,13 +112,15 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { 
     const code = (e as NodeJS.ErrnoException).code;
     return { files: [], error: code === 'ENOENT' ? null : `Its folder could not be read (${code ?? (e as Error).message}).` };
   }
-  const files = names.filter((name) => !(name === GIVEN && isDirectory(path.join(dir, name)))).map((name) => {
-    const here = path.join(dir, name);
-    const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
-    if (!stat) return { path: here };
-    const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/files/${encodeURIComponent(name)}`;
-    return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
-  });
+  const files = names
+    .filter((name) => !(name === GIVEN && isDirectory(path.join(dir, name))))
+    .map((name) => {
+      const here = path.join(dir, name);
+      const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
+      if (!stat) return { path: here };
+      const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/files/${encodeURIComponent(name)}`;
+      return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
+    });
   return { files, error: null };
 }
 

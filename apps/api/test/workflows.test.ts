@@ -33,13 +33,21 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-const again = JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false });
+const again = JSON.stringify({
+  type: 'object',
+  properties: { again: { type: 'boolean' } },
+  required: ['again'],
+  additionalProperties: false,
+});
 
 /** implement ⇄ review, described by its README. */
 const good = path.join(repo, 'workflows', 'good');
 write(path.join(good, 'README.md'), '# good\n\nImplement it, then review it,\ntwo rounds at most.\n\nMore about it.\n');
 write(path.join(good, 'implement.md'), '---\nharness: claude\nmodel: opus\ncheck: npm test\n---\nImplement it.\n');
-write(path.join(good, 'review.md'), '---\nharness: claude\nafter: implement\ntools: Read, Grep\npermissionMode: dontAsk\noutput: review.json\nloop: implement\nrounds: 2\n---\nReview it.\n');
+write(
+  path.join(good, 'review.md'),
+  '---\nharness: claude\nafter: implement\ntools: Read, Grep\npermissionMode: dontAsk\noutput: review.json\nloop: implement\nrounds: 2\n---\nReview it.\n',
+);
 write(path.join(good, 'review.json'), again);
 
 /** A reviewer whose `after` is misspelt, which the loader refuses by name. */
@@ -63,8 +71,33 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, sandbox: null, tools: null, disallowedTools: [], allowedTools: [], denials: null, background: null, remote: null,
-  deadlineSeconds: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
+  harness: null,
+  model: null,
+  effort: null,
+  context: null,
+  after: [],
+  resume: null,
+  input: [],
+  workspace: null,
+  slot: null,
+  agent: null,
+  permissionMode: null,
+  sandbox: null,
+  tools: null,
+  disallowedTools: [],
+  allowedTools: [],
+  denials: null,
+  background: null,
+  remote: null,
+  deadlineSeconds: null,
+  budget: null,
+  check: null,
+  retries: null,
+  gate: null,
+  output: null,
+  loop: null,
+  rounds: null,
+  ...fields,
 });
 
 /** What the loader refuses `dir` with. */
@@ -78,13 +111,18 @@ const loaderRefusal = (dir: string): string => {
 };
 
 const post = (body: unknown) =>
-  app.request('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app.request('/api/runs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 
 /** The files in the store's runs directory: a record per run, and anything else anyone wrote there. */
 const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')).sort() : []);
 
 /** The tasks filed with the engine: a journal each. */
-const filedTasks = (): string[] => (fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : []);
+const filedTasks = (): string[] =>
+  fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : [];
 
 test("GET /api/workflows lists each folder, the repository's then yours: its description, its steps' specs and bodies, its graph and the schemas beside its steps — and a folder the loader refuses, with the refusal and no steps", async () => {
   const res = await app.request('/api/workflows');
@@ -96,16 +134,49 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
   // Each at the version its files are at: what a save from the board carries.
   for (const w of listing) assert.equal(w.version, versionOf(w.dir), w.name);
   assert.deepEqual(listing, [
-    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], folderTeam: false, version: versionOf(broken), error: refused },
     {
-      name: 'good', from: 'repo', dir: good, description: 'Implement it, then review it, two rounds at most.',
+      name: 'broken',
+      from: 'repo',
+      dir: broken,
+      description: 'A reviewer with a misspelt key.',
+      steps: [],
+      graph: { roots: [], edges: [] },
+      schemas: [],
+      folderTeam: false,
+      version: versionOf(broken),
+      error: refused,
+    },
+    {
+      name: 'good',
+      from: 'repo',
+      dir: good,
+      description: 'Implement it, then review it, two rounds at most.',
       // The README is not among the steps.
       steps: [
         { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }), body: 'Implement it.', own: null },
-        { name: 'review', spec: spec({ harness: 'claude', after: ['implement'], tools: ['Read', 'Grep'], permissionMode: 'dontAsk', output: 'review.json', loop: 'implement', rounds: 2 }), body: 'Review it.', own: null },
+        {
+          name: 'review',
+          spec: spec({
+            harness: 'claude',
+            after: ['implement'],
+            tools: ['Read', 'Grep'],
+            permissionMode: 'dontAsk',
+            output: 'review.json',
+            loop: 'implement',
+            rounds: 2,
+          }),
+          body: 'Review it.',
+          own: null,
+        },
       ],
       // `graphOf` the steps, as a run of it is drawn.
-      graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }] },
+      graph: {
+        roots: ['implement'],
+        edges: [
+          { from: 'implement', to: 'review', kind: 'after' },
+          { from: 'review', to: 'implement', kind: 'loop', rounds: 2 },
+        ],
+      },
       schemas: ['review.json'],
       // Neither works in folders: a folder team is every step saying `workspace: folder` (folder-run.test.ts lists one).
       folderTeam: false,
@@ -113,7 +184,10 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       error: null,
     },
     {
-      name: 'mine', from: 'yours', dir: mine, description: null,
+      name: 'mine',
+      from: 'yours',
+      dir: mine,
+      description: null,
       steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.', own: null }],
       graph: { roots: ['plan'], edges: [] },
       schemas: [],
@@ -131,7 +205,11 @@ const stepPage = (from: string, name: string, step: string) => app.request(`/api
 const rows = (set: Record<string, string>) => STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
 
 /** A folder as it is: each file's name and text, to show a read wrote nothing. */
-const filesOf = (dir: string): Array<[string, string]> => fs.readdirSync(dir).sort().map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
+const filesOf = (dir: string): Array<[string, string]> =>
+  fs
+    .readdirSync(dir)
+    .sort()
+    .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
 test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means", async () => {
   const before = [filesOf(good), filesOf(mine)];
@@ -139,18 +217,45 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   const res = await stepPage('repo', 'good', 'review');
   assert.equal(res.status, 200, await res.clone().text());
   const review: WorkflowStepPage = await res.json();
-  assert.deepEqual({ ...review, keys: undefined }, {
-    workflow: 'good', from: 'repo', dir: good, step: 'review', body: 'Review it.',
-    source: fs.readFileSync(path.join(good, 'review.md'), 'utf8'), keys: undefined,
-    // This step names no agent, so there is nothing it says it can do; a step whose agent has skills is further down, in this test.
-    agentSkills: null,
-  });
-  assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', sandbox: null, tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
-  assert.deepEqual(review.keys.map((k) => k.key), [...STEP_KEYS], "in the package's order, set or not");
+  assert.deepEqual(
+    { ...review, keys: undefined },
+    {
+      workflow: 'good',
+      from: 'repo',
+      dir: good,
+      step: 'review',
+      body: 'Review it.',
+      source: fs.readFileSync(path.join(good, 'review.md'), 'utf8'),
+      keys: undefined,
+      // This step names no agent, so there is nothing it says it can do; a step whose agent has skills is further down, in this test.
+      agentSkills: null,
+    },
+  );
+  assert.deepEqual(
+    review.keys,
+    rows({
+      after: 'implement',
+      harness: 'claude',
+      permissionMode: 'dontAsk',
+      sandbox: null,
+      tools: 'Read, Grep',
+      output: 'review.json',
+      loop: 'implement',
+      rounds: '2',
+    }),
+  );
+  assert.deepEqual(
+    review.keys.map((k) => k.key),
+    [...STEP_KEYS],
+    "in the package's order, set or not",
+  );
 
   // Yours, and a step that sets counts: each in digits.
   const plan: WorkflowStepPage = await (await stepPage('yours', 'mine', 'plan')).json();
-  assert.deepEqual([plan.from, plan.dir, plan.body, plan.source], ['yours', mine, 'Write PLAN.md.', '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n']);
+  assert.deepEqual(
+    [plan.from, plan.dir, plan.body, plan.source],
+    ['yours', mine, 'Write PLAN.md.', '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n'],
+  );
   assert.deepEqual(plan.keys, rows({ harness: 'codex', check: 'test -f PLAN.md', retries: '1' }));
 
   // A step that sets nothing: every key, none set.
@@ -167,12 +272,22 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
 
   // A step that names an agent: what that agent says it can do, its card generated from the skills it gives, is on the step's page beside its keys.
   const said = [{ id: 'take-notes', name: 'Take notes', description: 'Writes down what was decided.', tags: ['notes', 'writing'] }];
-  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.md'), '---\ndescription: Writes things down.\nskills: take-notes\ntools: Read, Skill\nharness: claude\n---\nWrite it down.\n');
-  write(path.join(root, 'workflows', 'skills', 'take-notes', 'SKILL.md'), '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n');
+  write(
+    path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.md'),
+    '---\ndescription: Writes things down.\nskills: take-notes\ntools: Read, Skill\nharness: claude\n---\nWrite it down.\n',
+  );
+  write(
+    path.join(root, 'workflows', 'skills', 'take-notes', 'SKILL.md'),
+    '---\nname: take-notes\ntitle: Take notes\ndescription: Writes down what was decided.\ntags: ["notes", "writing"]\n---\nWrite it.\n',
+  );
   write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
   const attached: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
   assert.deepEqual(attached.agentSkills, said);
-  assert.deepEqual(attached.keys.find((k) => k.key === 'harness'), { key: 'harness', value: 'claude', meaning: STEP_KEY_MEANINGS.harness }, "the agent's keys are the step's too");
+  assert.deepEqual(
+    attached.keys.find((k) => k.key === 'harness'),
+    { key: 'harness', value: 'claude', meaning: STEP_KEY_MEANINGS.harness },
+    "the agent's keys are the step's too",
+  );
   // The same step with the line taken off: the agent is not named, so the page says nothing it can do.
   write(path.join(mine, 'notes.md'), 'Take notes.\n');
   assert.equal(((await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills, null);
@@ -198,7 +313,13 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
   const { error } = await unknown.json();
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   // Found among the folders a source has, never joined onto a path; and yours is not the repository's.
-  for (const [where, name] of [['repo', '..%2Fworkflows%2Fgood'], ['repo', 'mine'], ['yours', 'good'], ['repo', '.draft'], ['yours', '.git']]) {
+  for (const [where, name] of [
+    ['repo', '..%2Fworkflows%2Fgood'],
+    ['repo', 'mine'],
+    ['yours', 'good'],
+    ['repo', '.draft'],
+    ['yours', '.git'],
+  ]) {
     assert.equal((await stepPage(where!, name!, 'implement')).status, 404, `${where} ${name}`);
   }
 
@@ -226,11 +347,31 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
   assert.deepEqual(runFiles(), [`${id}.json`], 'the record, and nothing beside it');
   const run = readRun(id);
   assert.deepEqual(
-    { repo: run.repo, workspace: run.workspace, workflowDir: run.workflowDir, brief: run.brief, isolate: run.isolate, branch: run.branch, steps: run.steps },
-    { repo, workspace: repo, workflowDir: good, brief: 'Add a cache\n\nKeep it small.', isolate: true, branch: 'main', steps: { implement: { taskId: null }, review: { taskId: null } } },
+    {
+      repo: run.repo,
+      workspace: run.workspace,
+      workflowDir: run.workflowDir,
+      brief: run.brief,
+      isolate: run.isolate,
+      branch: run.branch,
+      steps: run.steps,
+    },
+    {
+      repo,
+      workspace: repo,
+      workflowDir: good,
+      brief: 'Add a cache\n\nKeep it small.',
+      isolate: true,
+      branch: 'main',
+      steps: { implement: { taskId: null }, review: { taskId: null } },
+    },
   );
   assert.equal(run.baseRef, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim());
-  assert.deepEqual(run.workflow?.map((s) => s.name), ['implement', 'review'], 'the workflow frozen on the record');
+  assert.deepEqual(
+    run.workflow?.map((s) => s.name),
+    ['implement', 'review'],
+    'the workflow frozen on the record',
+  );
 
   // Nothing filed: no task in the engine's store, and no worktree cut. `wf tick` files the first step.
   assert.deepEqual(filedTasks(), []);
@@ -239,7 +380,10 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
   // The board lists it, with the folder it was started from.
   const listed = (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
   assert.equal(listed.workflowDir, good);
-  assert.deepEqual(listed.steps.map((s: { status: string }) => s.status), ['waiting', 'waiting']);
+  assert.deepEqual(
+    listed.steps.map((s: { status: string }) => s.status),
+    ['waiting', 'waiting'],
+  );
 });
 
 test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body of the wrong shape (400) — and nothing is written', async () => {
@@ -252,7 +396,8 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   assert.ok(error.includes('The workflows there are: broken (repo), good (repo), mine (yours).'), error);
   // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included,
   // nor `agents/`, whose files read as steps.
-  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
+  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents'])
+    assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
 
   for (const brief of [undefined, '', '  \n', 42]) {
     const res = await post({ workflow: 'good', brief });
@@ -272,17 +417,31 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
 
 /** A start of the repository's `good`, sent with exactly `headers`. */
 const sentWith = (headers: Record<string, string>) =>
-  app.request('/api/runs', { method: 'POST', headers, body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }) });
+  app.request('/api/runs', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }),
+  });
 
 test('REFUSED at shipped defaults: a start another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — and nothing is written', async () => {
   const before = runFiles();
 
   // What `fetch(url, { method: 'POST', body })` sends from any page, which the browser does not ask the api about first; a form's; and a near miss.
-  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'application/jsonp']) {
+  for (const type of [
+    'text/plain;charset=UTF-8',
+    'application/x-www-form-urlencoded',
+    'multipart/form-data; boundary=x',
+    'application/jsonp',
+  ]) {
     const res = await sentWith({ 'content-type': type });
     assert.equal(res.status, 415, type);
     const { error } = await res.json();
-    assert.ok(error.startsWith(`POST /api/runs takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``), error);
+    assert.ok(
+      error.startsWith(
+        `POST /api/runs takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
+      ),
+      error,
+    );
   }
 
   // The browser's word on who made the request, which no page can set: anything but the board's own origin. Another port on localhost is `same-site`.
@@ -290,7 +449,10 @@ test('REFUSED at shipped defaults: a start another site could make — a body no
     const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
     const { error } = await res.json();
-    assert.ok(error.startsWith('POST /api/runs refuses a request made by a page on another site') && error.includes(`(Sec-Fetch-Site: ${site})`), error);
+    assert.ok(
+      error.startsWith('POST /api/runs refuses a request made by a page on another site') && error.includes(`(Sec-Fetch-Site: ${site})`),
+      error,
+    );
   }
 
   // A site whose name was pointed at 127.0.0.1 is its own origin to the browser, so same-origin; only its Host says where it thinks it is.
@@ -361,7 +523,11 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
 
 test("this repository's workflows read as workflows: dev and dev-build are implement ⇄ review → ship with the package's reviewer on Claude, and ui is the package's, copied, ending in the same ship", () => {
   const listed = listWorkflows(HOME_REPO, scratch('hkb-api-no-yours-'));
-  for (const name of ['dev', 'dev-build', 'ui']) assert.ok(listed.some((w) => w.name === name), `workflows/${name} is listed`);
+  for (const name of ['dev', 'dev-build', 'ui'])
+    assert.ok(
+      listed.some((w) => w.name === name),
+      `workflows/${name} is listed`,
+    );
   // Every workflow the repository carries reads, with a description: a folder `wf start` would refuse fails here.
   for (const w of listed) {
     assert.equal(w.error, null, `workflows/${w.name}`);
@@ -373,46 +539,135 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   // dev's check: the suite and the types, then the build when, and only when, git says the work touched the web app, and the e2e only
   // where the run set no WF_BASE_REF — the merged tree, in ship's check (packages/agent-orchestrator/test/web-check.test.ts runs
   // it against real git). dev-build's builds whatever was touched, and leaves the e2e to the merged tree the same way.
-  const atMerge = "if [ -n \"${WF_BASE_REF:-}\" ]; then echo \"wf check: no e2e in a round's check; it runs once, on the merged tree, where no WF_BASE_REF is set\"; else npm run e2e; fi";
-  const devCheck = "npm test && npm run typecheck && { if [ -n \"${WF_BASE_REF:-}\" ]; then range=\"$WF_BASE_REF...HEAD\"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only \"$range\" --) || { echo \"wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess\" >&2; false; }; } && if printf '%s\\n' \"$touched\" | grep -Eq '^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)'; then npm run build && " + atMerge + "; else echo \"wf check: nothing under apps/web/ or apps/api/, nor the root's package.json, package-lock.json or turbo.json, was touched: no build, no e2e\"; fi";
+  const atMerge =
+    'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
+  const devCheck =
+    'npm test && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf \'%s\\n\' "$touched" | grep -Eq \'^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)\'; then npm run build && ' +
+    atMerge +
+    '; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root\'s package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi';
   // The run's ending, gated: it stages the merge in the repository's own checkout and signs off its message, and the run executes
   // implement's check on the merge and commits it on exit 0 — so ship's check is implement's, and its output the message. ui ends in it too.
-  const ship = (check: string) => ({ name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, permissionMode: 'auto', after: ['review'], workspace: 'main', gate: true, check, output: 'shipper.schema.json', disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) });
-  for (const [name, check] of [['dev', devCheck], ['dev-build', `npm test && npm run typecheck && npm run build && ${atMerge}`]] as const) {
+  const ship = (check: string) => ({
+    name: 'ship',
+    spec: spec({
+      agent: 'shipper',
+      harness: 'claude',
+      model: 'opus',
+      effort: 'medium',
+      context: 200_000,
+      permissionMode: 'auto',
+      after: ['review'],
+      workspace: 'main',
+      gate: true,
+      check,
+      output: 'shipper.schema.json',
+      disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'],
+    }),
+  });
+  for (const [name, check] of [
+    ['dev', devCheck],
+    ['dev-build', `npm test && npm run typecheck && npm run lint && npm run build && ${atMerge}`],
+  ] as const) {
     const w = listed.find((x) => x.name === name)!;
     // Each step with its body as the loader read it, which the builder puts back.
-    assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);
-    assert.deepEqual(w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })), [
-      // Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role that builds.
-      { name: 'implement', spec: spec({ agent: 'implementer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, permissionMode: 'auto', check, disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
-      {
-        name: 'review',
-        spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
-      },
-      ship(check),
-    ], name);
+    assert.deepEqual(
+      w.steps.map((s) => s.body),
+      loadWorkflows(w.dir).map((s) => s.body),
+      name,
+    );
+    assert.deepEqual(
+      w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })),
+      [
+        // Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role that builds.
+        {
+          name: 'implement',
+          spec: spec({
+            agent: 'implementer',
+            harness: 'claude',
+            model: 'opus',
+            effort: 'high',
+            context: 200_000,
+            permissionMode: 'auto',
+            check,
+            disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'],
+          }),
+        },
+        {
+          name: 'review',
+          spec: spec({
+            agent: 'reviewer',
+            harness: 'claude',
+            model: 'opus',
+            effort: 'high',
+            context: 200_000,
+            after: ['implement'],
+            tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'],
+            disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'],
+            permissionMode: 'dontAsk',
+            budget: 20,
+            output: 'review.schema.json',
+            loop: 'implement',
+            rounds: 3,
+          }),
+        },
+        ship(check),
+      ],
+      name,
+    );
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     // The package's review is a codex step, which takes no skills, and keeps the reviewer's procedure in its body. Since agents card 1b the
     // reviewer's is in its skills (`workflows/skills/`): every sentence of the package's is told to this review, by its body or a skill.
-    const told = [review.body, ...(review.agent?.skills ?? []).map((skill) => fs.readFileSync(path.join(HOME_REPO, 'workflows', 'skills', skill, 'SKILL.md'), 'utf8'))]
-      .join('\n\n').replace(/\s+/g, ' ');
+    const told = [
+      review.body,
+      ...(review.agent?.skills ?? []).map((skill) =>
+        fs.readFileSync(path.join(HOME_REPO, 'workflows', 'skills', skill, 'SKILL.md'), 'utf8'),
+      ),
+    ]
+      .join('\n\n')
+      .replace(/\s+/g, ' ');
     const sentences = reviewer.body.replace(/\s+/g, ' ').split(/(?<=\.) /);
     assert.ok(sentences.length >= 6, 'the package review, sentence by sentence');
     for (const sentence of sentences) assert.ok(told.includes(sentence), `${name}/review is told the package's review: ${sentence}`);
-    for (const said of [/`npm test` and `npm run typecheck`/, /`npx turbo run test --filter=<package>`/, /`cd packages\/<package> && node --test /, /`git diff`, `git log`, `git show`, `git status`/, /Do not run `npm run build` or `npm run e2e`: they write\s+into the workspace\./]) {
+    for (const said of [
+      /`npm test` and `npm run typecheck`/,
+      /`npx turbo run test --filter=<package>`/,
+      /`cd packages\/<package> && node --test /,
+      /`git diff`, `git log`, `git show`, `git status`/,
+      /Do not run `npm run build` or `npm run e2e`: they write\s+into the workspace\./,
+    ]) {
       assert.match(review.body, said, `${name}/review.md says which commands it may run`);
     }
     assert.deepEqual(review.output?.schema, reviewer.output?.schema, `${name}/review.schema.json is the package's, \`again\` and all`);
   }
 
-  const files = (dir: string) => fs.readdirSync(dir).filter((f) => !isReadme(f)).sort();
+  const files = (dir: string) =>
+    fs
+      .readdirSync(dir)
+      .filter((f) => !isReadme(f))
+      .sort();
   const ui = path.join(HOME_REPO, 'workflows', 'ui');
   const listedUi = listed.find((x) => x.name === 'ui')!;
-  assert.deepEqual(listedUi.steps.map((s) => s.name), ['implement', 'review', 'ship']);
-  assert.deepEqual(listedUi.steps.map((s) => s.body), loadWorkflows(ui).map((s) => s.body), 'ui');
-  assert.deepEqual((({ name, spec: keys }) => ({ name, spec: keys }))(listedUi.steps.find((s) => s.name === 'ship')!), ship(`npm test && npm run typecheck && npm run build && ${atMerge}`), "ui's ship is dev-build's");
+  assert.deepEqual(
+    listedUi.steps.map((s) => s.name),
+    ['implement', 'review', 'ship'],
+  );
+  assert.deepEqual(
+    listedUi.steps.map((s) => s.body),
+    loadWorkflows(ui).map((s) => s.body),
+    'ui',
+  );
+  assert.deepEqual(
+    (({ name, spec: keys }) => ({ name, spec: keys }))(listedUi.steps.find((s) => s.name === 'ship')!),
+    ship(`npm test && npm run typecheck && npm run lint && npm run build && ${atMerge}`),
+    "ui's ship is dev-build's",
+  );
   assert.deepEqual(files(ui), files(path.join(shipped, 'ui')));
-  for (const f of files(ui)) assert.equal(fs.readFileSync(path.join(ui, f), 'utf8'), fs.readFileSync(path.join(shipped, 'ui', f), 'utf8'), `workflows/ui/${f} is the package's`);
+  for (const f of files(ui))
+    assert.equal(
+      fs.readFileSync(path.join(ui, f), 'utf8'),
+      fs.readFileSync(path.join(shipped, 'ui', f), 'utf8'),
+      `workflows/ui/${f} is the package's`,
+    );
 });
 
 // ─── a run that waits on a run ──────────────────────────────────────────────
@@ -421,10 +676,22 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
 function parentRun(id: string, cancelledAt?: string): void {
   if (fs.existsSync(path.join(root, 'runs', `${id}.json`))) return;
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, workspace: repo, baseRef: head, branch: 'main', isolate: true, brief: `Run ${id}`, workflowDir: good, workflow: loadWorkflows(good),
-    steps: { implement: { taskId: null }, review: { taskId: null } }, createdAt: '2026-09-14T00:00:00.000Z',
-  }));
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo,
+      workspace: repo,
+      baseRef: head,
+      branch: 'main',
+      isolate: true,
+      brief: `Run ${id}`,
+      workflowDir: good,
+      workflow: loadWorkflows(good),
+      steps: { implement: { taskId: null }, review: { taskId: null } },
+      createdAt: '2026-09-14T00:00:00.000Z',
+    }),
+  );
   if (cancelledAt) write(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
 }
 
@@ -463,7 +730,10 @@ test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 40
     const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
     assert.equal(res.status, 400, JSON.stringify(after));
     const { error } = await res.json();
-    assert.ok(error.startsWith('`after` is the runs this one waits on, by id, as `wf start --after <runId>` takes each: a list of run ids'), error);
+    assert.ok(
+      error.startsWith('`after` is the runs this one waits on, by id, as `wf start --after <runId>` takes each: a list of run ids'),
+      error,
+    );
     assert.ok(error.includes(`This request's was ${JSON.stringify(after)}.`), error);
   }
   // Shaped before the folder is read: a workflow nobody has is not what it is told first.
@@ -482,12 +752,18 @@ test("REFUSED at shipped defaults: a run `wf start --after` will not wait on is 
     assert.equal(error, afterRefusal(after, { repo, branch: 'main' }, parentRecord), JSON.stringify(after));
     return error;
   };
-  assert.equal(await refusedBy(['no-such-run']), '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.');
+  assert.equal(
+    await refusedBy(['no-such-run']),
+    '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.',
+  );
   assert.equal(
     await refusedBy(['p-running', 'p-cancelled']),
     '--after p-cancelled: p-cancelled was cancelled at 2026-09-14T00:30:00.000Z, and a cancelled run never ships, so this run would wait for ever. Start it without --after p-cancelled.',
   );
-  assert.equal(await refusedBy(['p-running', 'p-running']), '--after p-running is given twice, and a run waits on another once. Give each run one --after.');
+  assert.equal(
+    await refusedBy(['p-running', 'p-running']),
+    '--after p-running is given twice, and a run waits on another once. Give each run one --after.',
+  );
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);
 });

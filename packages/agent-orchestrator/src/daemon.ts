@@ -76,7 +76,8 @@ export function everyOf(arg: string | undefined): { every: number } | { refusal:
   const every = Number(arg);
   if (arg.trim() !== '' && Number.isInteger(every) && every >= 1 && every <= MAX_EVERY_MS) return { every };
   return {
-    refusal: `wf up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
+    refusal:
+      `wf up takes its pass interval in whole milliseconds, from 1 to ${MAX_EVERY_MS}, and ${JSON.stringify(arg)} is not one: ` +
       `wf up [ms], ${DEFAULT_EVERY_MS} when none is given. The interval is written into ${DAEMON_FILE}, and a holder whose interval does not ` +
       `read there holds nothing: a second wf up would take the store from it while it ticks.`,
   };
@@ -92,7 +93,9 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
     const parsed: unknown = JSON.parse(text);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
     v = parsed as Record<string, unknown>;
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
   const { pid, startedAt, cwd, every, passedAt, beatAt, procStart, stoppedAt } = v;
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return undefined;
   if (!isTime(startedAt) || typeof cwd !== 'string') return undefined;
@@ -102,8 +105,14 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
   if (procStart !== undefined && (typeof procStart !== 'number' || !Number.isInteger(procStart) || procStart < 0)) return undefined;
   if (stoppedAt !== undefined && !isTime(stoppedAt)) return undefined;
   return {
-    pid, startedAt, cwd, every, passedAt: passedAt ?? null,
-    ...(beatAt !== undefined ? { beatAt } : {}), ...(procStart !== undefined ? { procStart } : {}), ...(stoppedAt !== undefined ? { stoppedAt } : {}),
+    pid,
+    startedAt,
+    cwd,
+    every,
+    passedAt: passedAt ?? null,
+    ...(beatAt !== undefined ? { beatAt } : {}),
+    ...(procStart !== undefined ? { procStart } : {}),
+    ...(stoppedAt !== undefined ? { stoppedAt } : {}),
   };
 }
 
@@ -113,7 +122,13 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
  * `staleAfterMs` of its interval (`stalled`); or one ticking. `last` is when it last showed life — the latest of its start, its last pass and
  * its beat — `quiet` how long ago that was, and `identity` what the process table said of its pid.
  */
-export type Standing = { kind: 'stopped' | 'gone' | 'stalled' | 'ticking'; file: DaemonFile; last: number; quiet: number; identity: Identity };
+export type Standing = {
+  kind: 'stopped' | 'gone' | 'stalled' | 'ticking';
+  file: DaemonFile;
+  last: number;
+  quiet: number;
+  identity: Identity;
+};
 export type DaemonStanding = { kind: 'none' } | { kind: 'unreadable'; text: string } | Standing;
 
 /**
@@ -121,14 +136,23 @@ export type DaemonStanding = { kind: 'none' } | { kind: 'unreadable'; text: stri
  * pid. A stop said is read before the process, so a reused pid does not hold a store its daemon gave up; a process gone or another before
  * staleness, so a crash frees the store at once.
  */
-export function daemonStanding(text: string | undefined, { now, identify }: { now: number; identify: (file: DaemonFile) => Identity }): DaemonStanding {
+export function daemonStanding(
+  text: string | undefined,
+  { now, identify }: { now: number; identify: (file: DaemonFile) => Identity },
+): DaemonStanding {
   if (text === undefined) return { kind: 'none' };
   const file = parseDaemonFile(text);
   if (!file) return { kind: 'unreadable', text };
   const last = Math.max(...[file.startedAt, file.passedAt, file.beatAt].filter((t): t is string => !!t).map(Date.parse));
   const quiet = now - last;
   const identity = identify(file);
-  const kind = file.stoppedAt ? 'stopped' : identity === 'gone' || identity === 'other' ? 'gone' : quiet > staleAfterMs(file.every) ? 'stalled' : 'ticking';
+  const kind = file.stoppedAt
+    ? 'stopped'
+    : identity === 'gone' || identity === 'other'
+      ? 'gone'
+      : quiet > staleAfterMs(file.every)
+        ? 'stalled'
+        : 'ticking';
   return { kind, file, last, quiet, identity };
 }
 
@@ -145,7 +169,9 @@ export function lastPassWords(file: DaemonFile, now: number): string {
   const ago = (t: string) => `${durationWord(now - Date.parse(t))} ago (${t})`;
   const passed = file.passedAt ? `last pass ${ago(file.passedAt)}` : `no pass completed yet, started ${ago(file.startedAt)}`;
   const since = Date.parse(file.passedAt ?? file.startedAt);
-  return file.beatAt && Date.parse(file.beatAt) - since > 2 * file.every ? `${passed}, a pass under way since — alive ${ago(file.beatAt)}` : passed;
+  return file.beatAt && Date.parse(file.beatAt) - since > 2 * file.every
+    ? `${passed}, a pass under way since — alive ${ago(file.beatAt)}`
+    : passed;
 }
 
 /**
@@ -168,22 +194,27 @@ export function holdRefusal(standing: Standing, verb: 'up' | 'tick', store: stri
   const stale = durationWord(staleAfterMs(holder.every));
   return verb === 'up'
     ? `wf up: ${store} is held by ${who}. One store takes one wf up: a second would be a second writer of every file the tick writes. ` +
-      `Leave it ticking, or stop it with ${stopWords(standing)}; a holder silent for ${stale} is taken over by the next wf up.`
+        `Leave it ticking, or stop it with ${stopWords(standing)}; a holder silent for ${stale} is taken over by the next wf up.`
     : `wf tick: ${store} is held by ${who}, which runs this same pass within its interval: a pass by hand beside it would be a second writer. ` +
-      `Wait for its next pass — wf ls says when it was — or stop it with ${stopWords(standing)}, and tick by hand then.`;
+        `Wait for its next pass — wf ls says when it was — or stop it with ${stopWords(standing)}, and tick by hand then.`;
 }
 
 /** Why a holder is gone: its process ended, or its pid is another process's now — never a pid to kill. */
 const goneWords = ({ identity }: Standing): string =>
-  identity === 'other' ? `whose process is gone — that pid is another process's now, started after the wf up that wrote ${DAEMON_FILE}` : 'whose process is gone';
+  identity === 'other'
+    ? `whose process is gone — that pid is another process's now, started after the wf up that wrote ${DAEMON_FILE}`
+    : 'whose process is gone';
 
 /** What `wf up` says of the holder it took the store from, when that was not a clean stop — or undefined when there is nothing to say. */
 export function takeoverLine(replaced: DaemonStanding, store: string, now: number): string | undefined {
   if (replaced.kind === 'unreadable') return `took ${store} over from a ${DAEMON_FILE} that did not read as a holder`;
-  if (replaced.kind === 'gone') return `took ${store} over from pid ${replaced.file.pid}, ${goneWords(replaced)} — its ${lastPassWords(replaced.file, now)}`;
+  if (replaced.kind === 'gone')
+    return `took ${store} over from pid ${replaced.file.pid}, ${goneWords(replaced)} — its ${lastPassWords(replaced.file, now)}`;
   if (replaced.kind === 'stalled') {
-    return `took ${store} over from pid ${replaced.file.pid}, alive but silent for ${durationWord(replaced.quiet)}, over the ${durationWord(staleAfterMs(replaced.file.every))} that is stale at every ${replaced.file.every}ms — ` +
-      `it stops at its next pass, on reading the store is no longer its; to stop it now, ${stopWords(replaced)}`;
+    return (
+      `took ${store} over from pid ${replaced.file.pid}, alive but silent for ${durationWord(replaced.quiet)}, over the ${durationWord(staleAfterMs(replaced.file.every))} that is stale at every ${replaced.file.every}ms — ` +
+      `it stops at its next pass, on reading the store is no longer its; to stop it now, ${stopWords(replaced)}`
+    );
   }
   return undefined;
 }
@@ -201,12 +232,17 @@ const unconfirmed = ({ file, identity }: Standing): string =>
 /** `wf ls`'s last line: whether a daemon is ticking the store, and when its last pass was. */
 export function daemonLine(standing: DaemonStanding, now: number): string {
   switch (standing.kind) {
-    case 'none': return 'wf up: none has held this store — nothing ticks it; start one with wf up';
-    case 'unreadable': return `wf up: none known — ${DAEMON_FILE} does not read as a holder, so nothing is known to tick this store; wf up takes it over`;
-    case 'ticking': return `wf up: ticking, pid ${standing.file.pid}, every ${standing.file.every}ms — ${lastPassWords(standing.file, now)}${unconfirmed(standing)}`;
+    case 'none':
+      return 'wf up: none has held this store — nothing ticks it; start one with wf up';
+    case 'unreadable':
+      return `wf up: none known — ${DAEMON_FILE} does not read as a holder, so nothing is known to tick this store; wf up takes it over`;
+    case 'ticking':
+      return `wf up: ticking, pid ${standing.file.pid}, every ${standing.file.every}ms — ${lastPassWords(standing.file, now)}${unconfirmed(standing)}`;
     case 'stalled':
-      return `wf up: stalled, pid ${standing.file.pid}, every ${standing.file.every}ms — alive, but silent for ${durationWord(standing.quiet)}: ${lastPassWords(standing.file, now)}; ` +
-        `the next wf up takes the store over, and ${standing.identity === 'same' ? `kill ${standing.file.pid} stops it` : `stopping it now is by ${stopWords(standing)}`}`;
+      return (
+        `wf up: stalled, pid ${standing.file.pid}, every ${standing.file.every}ms — alive, but silent for ${durationWord(standing.quiet)}: ${lastPassWords(standing.file, now)}; ` +
+        `the next wf up takes the store over, and ${standing.identity === 'same' ? `kill ${standing.file.pid} stops it` : `stopping it now is by ${stopWords(standing)}`}`
+      );
     case 'gone':
       return standing.identity === 'other'
         ? `wf up: none ticking — the wf up of pid ${standing.file.pid} is gone, that pid another process's now; its ${lastPassWords(standing.file, now)}; start one with wf up`

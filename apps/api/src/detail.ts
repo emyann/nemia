@@ -1,12 +1,67 @@
 /** One run in full, for a person reading it (`GET /api/runs/:id`): the spec, and per step what it was told and how it went. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactsDir, budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, HOME, phaseOfView, remoteAgents, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
-import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-orchestrator/run';
+import {
+  artifactsDir,
+  budgetWord,
+  closeoutAsked,
+  closeoutReader,
+  consumption,
+  dollars,
+  exitVerdicts,
+  fromNote,
+  HARNESSES,
+  HOME,
+  phaseOfView,
+  remoteAgents,
+  type Retry,
+  type RetryMode,
+  runStartedAt,
+  type Said,
+  type Spend,
+  type SpendOf,
+  stepSpend,
+  type Timeline,
+  timeline,
+  type TimelineTotal,
+  type TimelineTry,
+} from 'agent-orchestrator';
+import {
+  acceptanceOf,
+  addSpend,
+  approvalOf,
+  budgetOf,
+  composeBrief,
+  gatesOf,
+  hasGate,
+  isGitRun,
+  loopOver,
+  overBudget,
+  ownStatus,
+  type PlaceKind,
+  placeOf,
+  retryable,
+  type Run,
+  type StepRecord,
+  type StepStatus,
+} from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { holdsIn, judge, needsOf, type RunHolding, type RunStatus, type RunToDecide, type RunWaiting, type Spent, spentOf, standingsOf, type StepNeeds, waitsIn } from './judged.ts';
+import {
+  holdsIn,
+  judge,
+  needsOf,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  spentOf,
+  standingsOf,
+  type StepNeeds,
+  waitsIn,
+} from './judged.ts';
 import { checksOf, type StepCheck } from './logs.ts';
 import { bare, e, filedTimes, judgedSteps, stepNames, type TaskView, type Views, viewsFor, workflowsOf, workFolderOf } from './store.ts';
 import { attemptsIn, closeoutIn, type StepAttempts, type StepCloseout, type StepTry, triesOf, unreadableIn } from './tries.ts';
@@ -289,7 +344,9 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
   const shown = run.workflow ? 'shown as the run froze it' : 'shown from the run record without spec or prose';
   const said = [
     ...(removed.length ? [`it no longer has ${removed.join(', ')}, ${shown}`] : []),
-    ...(added.length ? [`it has ${added.join(', ')}, which the run did not start with${run.workflow ? ' and will never file, so it is not shown' : ''}`] : []),
+    ...(added.length
+      ? [`it has ${added.join(', ')}, which the run did not start with${run.workflow ? ' and will never file, so it is not shown' : ''}`]
+      : []),
   ];
   return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
 }
@@ -299,13 +356,25 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
  * views the request already read, with no observation of its own. `steps` are the workflow the run is judged by: a step it does not have has
  * no `budget:`.
  */
-function costOf(run: Run, name: string, steps: readonly Workflow[], views: Views, spendOf: SpendOf): { spent: Spent | null; budget: StepBudget | null; raise: StepRaise | null } {
+function costOf(
+  run: Run,
+  name: string,
+  steps: readonly Workflow[],
+  views: Views,
+  spendOf: SpendOf,
+): { spent: Spent | null; budget: StepBudget | null; raise: StepRaise | null } {
   const step = steps.find((s) => s.name === name);
   const spent = spentOf(stepSpend(run, name, spendOf));
   const cap = step ? budgetOf(step, run.steps[name]) : undefined;
-  const budget = step && cap !== undefined
-    ? { usd: cap, said: budgetWord(cap), of: spent && `${spent.said} of ${budgetWord(cap)}`, over: Boolean(overBudget(step, run, spendOf)) }
-    : null;
+  const budget =
+    step && cap !== undefined
+      ? {
+          usd: cap,
+          said: budgetWord(cap),
+          of: spent && `${spent.said} of ${budgetWord(cap)}`,
+          over: Boolean(overBudget(step, run, spendOf)),
+        }
+      : null;
   // None on a held run, as on one pruned: the raise is asked with a try or a round, which the verb refuses while the hold stands (`heldRefusal`).
   return { spent, budget, raise: step && !run.cancelledAt && !run.pruned && !run.hold ? raiseOf(run, step, steps, views, spendOf) : null };
 }
@@ -321,7 +390,13 @@ function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Vi
   const asked = closeoutAsked(views);
   const { status, modes, raise } = retryable(step, run, phase, reader, asked, steps, () => false, spendOf, exitVerdicts(views, run));
   if (raise && modes.length) {
-    return { by: 'retry', above: raise.above, said: dollars(raise.above), modes, own: ownStatus(step, run, phase, reader, asked, steps, spendOf) };
+    return {
+      by: 'retry',
+      above: raise.above,
+      said: dollars(raise.above),
+      modes,
+      own: ownStatus(step, run, phase, reader, asked, steps, spendOf),
+    };
   }
   const over = step.loop && (status === 'over budget' || status === 'exhausted') ? loopOver(steps, step, run, spendOf) : [];
   if (!over.length) return null;
@@ -337,7 +412,11 @@ function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Vi
 function roundSpend(clock: Timeline, steps: readonly Workflow[], total: TimelineTotal, spendOf: SpendOf): Spend {
   const looping = steps.find((s) => s.name === total.loop);
   const names = looping ? loopSpan(steps, looping) : [];
-  return addSpend(names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.round === total.round && t.session ? [spendOf(t.session.taskId)] : []))));
+  return addSpend(
+    names.flatMap((name) =>
+      (clock.steps[name] ?? []).flatMap((t) => (t.round === total.round && t.session ? [spendOf(t.session.taskId)] : [])),
+    ),
+  );
 }
 
 /**
@@ -402,7 +481,9 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
   if (!got) return null;
   // What the session said, not what it was told: a brief, a `wf say` and every tool result come back as `user` events
   // (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
-  const last = got.events.filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim()).at(-1);
+  const last = got.events
+    .filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim())
+    .at(-1);
   const line = last?.text?.trim() ?? from?.line ?? null;
   lastSaid.set(key, { cursor: got.cursor, line });
   return line;
@@ -455,7 +536,9 @@ export async function detail(run: Run): Promise<RunDetail> {
   // The record is read first, as the list reads it. One more observation for each refused check's output (`checksOf`) and each blocked
   // session's last line (`lastLineOf`), which only a run's own detail reads.
   const { views, reader: seen } = await viewsFor([run]);
-  const judged = judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) => standingsOf(run, steps, status));
+  const judged = judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
+    standingsOf(run, steps, status),
+  );
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
@@ -479,11 +562,13 @@ export async function detail(run: Run): Promise<RunDetail> {
     createdAt: run.createdAt,
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
-    pruned: run.pruned ? {
-      at: run.pruned.at,
-      worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
-      artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
-    } : null,
+    pruned: run.pruned
+      ? {
+          at: run.pruned.at,
+          worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
+          artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
+        }
+      : null,
     onDisk: onDiskOf(run),
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
@@ -493,7 +578,12 @@ export async function detail(run: Run): Promise<RunDetail> {
     status: judged.status,
     moving: judged.moving,
     cost: judged.cost,
-    read: readOf(totalOf(steps, names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))))),
+    read: readOf(
+      totalOf(
+        steps,
+        names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))),
+      ),
+    ),
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
     toDecide: judged.toDecide,
@@ -501,45 +591,47 @@ export async function detail(run: Run): Promise<RunDetail> {
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     // The steps `judge` words: the judged workflow, then a root for each one the page shows beside it.
     graph: runGraph(steps, names),
-    steps: await Promise.all(names.map(async (name) => {
-      const step = source?.find((s) => s.name === name);
-      const taskId = run.steps[name]?.taskId ?? null;
-      // The `context:` its sessions ran under, as the run judges the step: where its peak reached it.
-      const cap = steps.find((s) => s.name === name)?.context;
-      const needs = needsOf(run, name, views, judged);
-      const current = {
-        status: judged.words.get(name)!,
-        check: checks.get(name) ?? null,
-        closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
-        unreadable: unreadableIn(taskId, views),
-        attempts: attemptsIn(taskId, views),
-      };
-      return {
-        name,
-        spec: step ? specOf(step) : null,
-        filed: filedOf(run.steps[name], views),
-        body: step?.body ?? null,
-        told: toldOf(run, name, source, views),
-        taskId,
-        workspace: run.steps[name]?.workspace ?? null,
-        ...filesOf(run, name),
-        branch: run.steps[name]?.branch ?? null,
-        note: judged.notes.get(name) ?? null,
-        ...needs,
-        lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
-        // Judged by the workflow the run is: a step it does not have is gated only where the run was started with its gate.
-        gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
-        accepted: acceptedOf(run, name),
-        said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
-        asked: askedOf(judged.asked.get(name)),
-        ...current,
-        used: taskId ? usedOf(used[name], cap) : null,
-        // Off the same views, which hold every try's task: no observation.
-        ...costOf(run, name, steps, views, judged.spendOf),
-        tries: triesOf(run, name, steps, views, current, judged.answers),
-        timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, cap) : null })),
-      };
-    })),
+    steps: await Promise.all(
+      names.map(async (name) => {
+        const step = source?.find((s) => s.name === name);
+        const taskId = run.steps[name]?.taskId ?? null;
+        // The `context:` its sessions ran under, as the run judges the step: where its peak reached it.
+        const cap = steps.find((s) => s.name === name)?.context;
+        const needs = needsOf(run, name, views, judged);
+        const current = {
+          status: judged.words.get(name)!,
+          check: checks.get(name) ?? null,
+          closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
+          unreadable: unreadableIn(taskId, views),
+          attempts: attemptsIn(taskId, views),
+        };
+        return {
+          name,
+          spec: step ? specOf(step) : null,
+          filed: filedOf(run.steps[name], views),
+          body: step?.body ?? null,
+          told: toldOf(run, name, source, views),
+          taskId,
+          workspace: run.steps[name]?.workspace ?? null,
+          ...filesOf(run, name),
+          branch: run.steps[name]?.branch ?? null,
+          note: judged.notes.get(name) ?? null,
+          ...needs,
+          lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
+          // Judged by the workflow the run is: a step it does not have is gated only where the run was started with its gate.
+          gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
+          accepted: acceptedOf(run, name),
+          said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
+          asked: askedOf(judged.asked.get(name)),
+          ...current,
+          used: taskId ? usedOf(used[name], cap) : null,
+          // Off the same views, which hold every try's task: no observation.
+          ...costOf(run, name, steps, views, judged.spendOf),
+          tries: triesOf(run, name, steps, views, current, judged.answers),
+          timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, cap) : null })),
+        };
+      }),
+    ),
     timeline: {
       rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
       run: { ...clock.run, cost: judged.cost },
@@ -624,7 +716,12 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   if (typeof harness !== 'object' || !('command' in harness)) return null;
   const modeOf = (tools: string[] | undefined): string | undefined => {
     try {
-      const { args } = harness.command({ name: `${state.taskId}/mode`, brief: '', cwd: state.cwd || '/', config: { permissionMode, tools } });
+      const { args } = harness.command({
+        name: `${state.taskId}/mode`,
+        brief: '',
+        cwd: state.cwd || '/',
+        config: { permissionMode, tools },
+      });
       const at = args.findIndex((arg) => MODE_FLAGS.includes(arg));
       return at < 0 ? undefined : args[at + 1];
     } catch {

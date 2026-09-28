@@ -12,7 +12,17 @@ export type StateFlowEdge = Edge<StateEdgeData, 'state'>;
  * loop's edge back curves beneath the row from under its looping step (`loopPath`), dashed, with the round it is on beside
  * it, and moves as a running edge does while its round is due. Its arrow is the `markerEnd` `stepEdges` gives it, in its colour.
  */
-export function StateEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, data }: EdgeProps<StateFlowEdge>) {
+export function StateEdge({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  markerEnd,
+  label,
+  data,
+}: EdgeProps<StateFlowEdge>) {
   const { state, loop } = data ?? { state: 'to-come', loop: false };
   const { path, labelX, labelY } = loop
     ? loopPath({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })

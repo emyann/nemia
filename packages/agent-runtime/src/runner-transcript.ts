@@ -46,11 +46,15 @@ export const readTranscript = async (
   eventsOf: (entry: unknown, offset: number) => TranscriptEvent[],
 ): Promise<Transcript> => {
   if (after !== undefined && !isTranscriptCursor(after)) {
-    throw new Error(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
+    throw new Error(
+      `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
+    );
   }
   if (!file) return noTranscript();
   let handle: fs.promises.FileHandle;
-  try { handle = await fs.promises.open(file, 'r'); } catch (e) {
+  try {
+    handle = await fs.promises.open(file, 'r');
+  } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return noTranscript();
     throw e;
   }
@@ -76,7 +80,11 @@ export const readTranscript = async (
     let read = 0;
     for (let end = chunk.indexOf(0x0a); end !== -1; end = chunk.indexOf(0x0a, read)) {
       let entry: unknown;
-      try { entry = JSON.parse(chunk.toString('utf8', read, end)); } catch { entry = undefined; }
+      try {
+        entry = JSON.parse(chunk.toString('utf8', read, end));
+      } catch {
+        entry = undefined;
+      }
       if (entry !== undefined) events.push(...eventsOf(entry, from + read));
       read = end + 1;
     }

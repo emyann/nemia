@@ -8,18 +8,39 @@ export default {
   route: '/capabilities',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }), 'the sidebar lights Capabilities on its page');
+    await expectVisible(
+      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }),
+      'the sidebar lights Capabilities on its page',
+    );
     const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
     const section = (title: string) => page.locator(`section[aria-label="${title}"]`);
-    for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length], ['Asks', asked.length]] as const) {
-      await expectVisible(section(title).locator('h2 [data-count]', { hasText: new RegExp(`^${count}$`) }), `the ${title} section counts ${count}`);
+    for (const [title, count] of [
+      ['Skills', 2],
+      ['Agents', 1],
+      ['MCP servers', 2],
+      ['Denied', denied.length],
+      ['Asks', asked.length],
+    ] as const) {
+      await expectVisible(
+        section(title).locator('h2 [data-count]', { hasText: new RegExp(`^${count}$`) }),
+        `the ${title} section counts ${count}`,
+      );
     }
 
     const skills = section('Skills');
-    await expectVisible(skills.getByText(skill.name, { exact: true }), `the skill in .claude/skills/${skill.dir} by the name its frontmatter gives (${skill.name})`);
+    await expectVisible(
+      skills.getByText(skill.name, { exact: true }),
+      `the skill in .claude/skills/${skill.dir} by the name its frontmatter gives (${skill.name})`,
+    );
     await expectVisible(skills.getByText(skill.description, { exact: true }), `${skill.name} with its description`);
-    await expectVisible(skills.getByText(`.claude/skills/${skill.dir}/SKILL.md`, { exact: true }), `${skill.name} with where it was read from`);
-    await expectVisible(skills.getByText(bareSkill, { exact: true }), `a SKILL.md without frontmatter, listed by its directory (${bareSkill})`);
+    await expectVisible(
+      skills.getByText(`.claude/skills/${skill.dir}/SKILL.md`, { exact: true }),
+      `${skill.name} with where it was read from`,
+    );
+    await expectVisible(
+      skills.getByText(bareSkill, { exact: true }),
+      `a SKILL.md without frontmatter, listed by its directory (${bareSkill})`,
+    );
     const agents = section('Agents');
     await expectVisible(agents.getByText(agent.description, { exact: true }), `the agent ${agent.name} with its description`);
     await expectVisible(agents.getByText(`.claude/agents/${agent.file}`, { exact: true }), `${agent.name} with where it was read from`);
@@ -27,11 +48,17 @@ export default {
     const listing = page.locator(`li[aria-label="MCP server ${server.name}"]`);
     await expectVisible(listing.getByText('enabled', { exact: true }), `${server.name} reads as enabled by the settings`);
     for (const tool of server.tools) {
-      await expectVisible(listing.locator('li').getByText(tool, { exact: true }), `${server.name} lists ${tool}, as the server itself answered tools/list`);
+      await expectVisible(
+        listing.locator('li').getByText(tool, { exact: true }),
+        `${server.name} lists ${tool}, as the server itself answered tools/list`,
+      );
     }
     await expectVisible(listing.getByText(server.said, { exact: true }), 'a tool with the first line of its description');
     await expectCount(listing.getByText(server.secondLine), 0, 'and only its first line');
-    await expectVisible(listing.locator(`li[data-denied="${server.denied}"]`, { hasText: 'denied' }), `the tool ${server.denied} refuses is marked denied`);
+    await expectVisible(
+      listing.locator(`li[data-denied="${server.denied}"]`, { hasText: 'denied' }),
+      `the tool ${server.denied} refuses is marked denied`,
+    );
     await expectVisible(listing.getByText('.mcp.json', { exact: true }).first(), `${server.name} with where it was read from`);
     await expectVisible(
       page.locator(`li[aria-label="MCP server ${missing.name}"]`).getByText(`there is no command \`${missing.command}\``),
@@ -40,7 +67,10 @@ export default {
 
     const rules = section('Denied');
     for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
-    await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+    await expectVisible(
+      rules.getByText(`refuses ${server.name} · wipe`),
+      `the denied list says which listed tool ${server.denied} refuses`,
+    );
     // The settings' ask rules, listed for the repository as its deny rules are — whether or not a step reads them.
     const asks = section('Asks');
     for (const rule of asked) await expectVisible(asks.getByText(rule, { exact: true }), `the ask list has ${rule}`);
@@ -49,7 +79,10 @@ export default {
     // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
     const { good, yours } = WORKFLOWS;
     const steps = section('What each step gets');
-    await expectVisible(steps.locator('h2 [data-count]', { hasText: /^3$/ }), "a row for each step of each workflow that reads: dev's two, and yours");
+    await expectVisible(
+      steps.locator('h2 [data-count]', { hasText: /^3$/ }),
+      "a row for each step of each workflow that reads: dev's two, and yours",
+    );
     const review = steps.locator(`li[data-step="${good.name}/review"]`);
     const declared = good.tools.split(', ');
     for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
@@ -57,50 +90,114 @@ export default {
     await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
     // The fence as the file declares it, its allowedTools: and all: in dontAsk what a rule allows is what the step may do, and the page said only what it denies.
     await expectVisible(review.locator('dt', { hasText: /^allowed tools$/ }), "review's fence says what it allows, beside what it denies");
-    await expectVisible(review.locator('dt', { hasText: /^allowed tools$/ }).locator('xpath=following-sibling::dd[1]').getByText('nothing', { exact: true }), 'nothing, where the step names no rule');
+    await expectVisible(
+      review
+        .locator('dt', { hasText: /^allowed tools$/ })
+        .locator('xpath=following-sibling::dd[1]')
+        .getByText('nothing', { exact: true }),
+      'nothing, where the step names no rule',
+    );
     for (const command of CHECKOUT.allowed.map((rule) => rule.slice('Bash('.length, -1))) {
-      await expectVisible(review.locator(`[data-bash="${command}"]`), `review, in dontAsk, shows the Bash command the settings allow (${command})`);
+      await expectVisible(
+        review.locator(`[data-bash="${command}"]`),
+        `review, in dontAsk, shows the Bash command the settings allow (${command})`,
+      );
     }
     // Claude Code's read-only commands ask for no rule, in dontAsk too: the page says so, and claims no denial of them.
     await expectVisible(
-      review.getByText("In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:"),
+      review.getByText(
+        "In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:",
+      ),
       'review, in dontAsk, says a command that asks is denied — not every command no rule allows',
     );
-    await expectCount(page.getByText(/a command no rule allows is denied/), 0, 'and nowhere that a command no rule allows is denied, which the read-only commands are not');
-    await expectVisible(review.locator('[data-read-only="ls"]:not([data-documented]):not([data-denied])'), 'review runs ls without a rule, as measured');
-    await expectVisible(review.locator('[data-read-only="wc"][data-documented]:not([data-denied])'), 'and wc, as the docs name it, marked not measured');
-    await expectVisible(review.locator('[data-read-only="find"][data-denied="Bash(find:*)"]'), 'and not find, which the settings deny (Bash(find:*))');
+    await expectCount(
+      page.getByText(/a command no rule allows is denied/),
+      0,
+      'and nowhere that a command no rule allows is denied, which the read-only commands are not',
+    );
+    await expectVisible(
+      review.locator('[data-read-only="ls"]:not([data-documented]):not([data-denied])'),
+      'review runs ls without a rule, as measured',
+    );
+    await expectVisible(
+      review.locator('[data-read-only="wc"][data-documented]:not([data-denied])'),
+      'and wc, as the docs name it, marked not measured',
+    );
+    await expectVisible(
+      review.locator('[data-read-only="find"][data-denied="Bash(find:*)"]'),
+      'and not find, which the settings deny (Bash(find:*))',
+    );
     const [ask] = CHECKOUT.asked;
-    await expectVisible(review.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`), `nor cat, which the settings make ask (${ask}), and dontAsk denies`);
+    await expectVisible(
+      review.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`),
+      `nor cat, which the settings make ask (${ask}), and dontAsk denies`,
+    );
     await expectVisible(
       review.locator('[data-read-only-taken]', { hasText: `cat asks, by ${ask} (.claude/settings.json), which dontAsk denies` }),
       'review says why cat is struck, beside the commands',
     );
     await expectVisible(review.locator(`[data-ask-rule="${ask}"]`), `review lists the ask rule that holds for it (${ask})`);
     await expectVisible(
-      review.locator('[data-read-only-measured="2026-09-15"]', { hasText: /were measured on 2026-09-15 with 2\.1\.272 \(.+\): that day, under that day's settings/ }),
+      review.locator('[data-read-only-measured="2026-09-15"]', {
+        hasText: /were measured on 2026-09-15 with 2\.1\.272 \(.+\): that day, under that day's settings/,
+      }),
       'with the day and version the read-only commands were measured on, as a measurement of that day',
     );
-    await expectVisible(review.locator('[data-mcp-tool="echo"][data-not-allowed]'), "review's server tool no rule allows is marked: dontAsk denies it without a prompt");
-    await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
+    await expectVisible(
+      review.locator('[data-mcp-tool="echo"][data-not-allowed]'),
+      "review's server tool no rule allows is marked: dontAsk denies it without a prompt",
+    );
+    await expectVisible(
+      review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`),
+      `review's server tool the settings deny is marked denied (${server.denied})`,
+    );
     const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
-    await expectVisible(implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }), "implement has the harness's own set, with the date and version it was measured on");
-    await expectVisible(implement.locator('[data-tool="WebFetch"]:not([data-inferred])'), 'a tool the measurement named is shown as measured (WebFetch)');
-    for (const tool of ['Edit', 'Bash']) await expectVisible(implement.locator(`[data-tool="${tool}"][data-inferred]`), `a tool no unfenced measurement named is marked inferred (${tool})`);
-    await expectVisible(implement.locator(`[data-removed="${good.disallowedTools}"]`), `implement's disallowedTools: takes ${good.disallowedTools} from it`);
+    await expectVisible(
+      implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }),
+      "implement has the harness's own set, with the date and version it was measured on",
+    );
+    await expectVisible(
+      implement.locator('[data-tool="WebFetch"]:not([data-inferred])'),
+      'a tool the measurement named is shown as measured (WebFetch)',
+    );
+    for (const tool of ['Edit', 'Bash'])
+      await expectVisible(
+        implement.locator(`[data-tool="${tool}"][data-inferred]`),
+        `a tool no unfenced measurement named is marked inferred (${tool})`,
+      );
+    await expectVisible(
+      implement.locator(`[data-removed="${good.disallowedTools}"]`),
+      `implement's disallowedTools: takes ${good.disallowedTools} from it`,
+    );
     await expectCount(implement.locator(`[data-tool="${good.disallowedTools}"]`), 0, `and ${good.disallowedTools} is not among its tools`);
-    await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
-    await expectVisible(implement.locator('[data-read-only="grep"]:not([data-documented])'), 'implement, in no mode, runs the read-only commands without a rule too (grep)');
+    await expectVisible(
+      implement.locator(`[data-skill="${skill.name}"]`),
+      `implement, with Skill, can load the repository's skill (${skill.name})`,
+    );
+    await expectVisible(
+      implement.locator('[data-read-only="grep"]:not([data-documented])'),
+      'implement, in no mode, runs the read-only commands without a rule too (grep)',
+    );
     // Implement is a job, which asks nobody in any mode: what an ask rule makes ask is denied there too, and the page said it would ask.
-    await expectVisible(implement.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`), `and cat, which the settings make ask (${ask}), is denied on a job`);
+    await expectVisible(
+      implement.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`),
+      `and cat, which the settings make ask (${ask}), is denied on a job`,
+    );
     await expectVisible(
       implement.locator('[data-read-only-taken]', { hasText: `cat asks, by ${ask} (.claude/settings.json), which a job denies` }),
       'implement says why cat is struck: it is a job',
     );
     const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
-    await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
-    await expectVisible(codexed.locator('dt', { hasText: /^sandbox$/ }), 'its fence under Codex\'s name, sandbox');
+    await expectVisible(
+      codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }),
+      `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`,
+    );
+    await expectVisible(codexed.locator('dt', { hasText: /^sandbox$/ }), "its fence under Codex's name, sandbox");
     await expectCount(codexed.locator('dt', { hasText: /^permission mode$/ }), 0, 'and no permission mode, which codex has not');
-    await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only], [data-ask-rule]'), 0, 'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read');
+    await expectCount(
+      codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only], [data-ask-rule]'),
+      0,
+      'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read',
+    );
   },
 } satisfies PageSpec;

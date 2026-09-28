@@ -126,11 +126,17 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where a journal written
    * before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
    */
-  static layer = (ops: JournalOps) => Layer.succeed(Journal)(Journal.of({
-    ...ops,
-    read: (taskId) => ops.read(taskId).pipe(Effect.map((events) => events.map(upgrade))),
-    feed: (after) => ops.feed(after).pipe(Effect.map(({ entries, cursor }) => ({ entries: entries.map((e) => ({ ...e, event: upgrade(e.event) })), cursor }))),
-  }));
+  static layer = (ops: JournalOps) =>
+    Layer.succeed(Journal)(
+      Journal.of({
+        ...ops,
+        read: (taskId) => ops.read(taskId).pipe(Effect.map((events) => events.map(upgrade))),
+        feed: (after) =>
+          ops
+            .feed(after)
+            .pipe(Effect.map(({ entries, cursor }) => ({ entries: entries.map((e) => ({ ...e, event: upgrade(e.event) })), cursor }))),
+      }),
+    );
 
   /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));
@@ -159,12 +165,22 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         Effect.try({
           try: () => {
             if (!fs.existsSync(file(taskId))) return [];
-            return readText(file(taskId)).split('\n').filter(Boolean).map((l) => JSON.parse(l) as Event);
+            return readText(file(taskId))
+              .split('\n')
+              .filter(Boolean)
+              .map((l) => JSON.parse(l) as Event);
           },
           catch: fail(taskId),
         }),
       list: Effect.try({
-        try: () => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl')).map((f) => f.slice(0, -6)).sort() : []),
+        try: () =>
+          fs.existsSync(dir)
+            ? fs
+                .readdirSync(dir)
+                .filter((f) => f.endsWith('.jsonl'))
+                .map((f) => f.slice(0, -6))
+                .sort()
+            : [],
         catch: fail('*'),
       }),
 
@@ -186,7 +202,11 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             const text = buf.toString('utf8');
             const end = text.lastIndexOf('\n');
             if (end < 0) return { entries: [], cursor: after };
-            const entries = text.slice(0, end).split('\n').filter(Boolean).map((l) => JSON.parse(l) as FeedEntry);
+            const entries = text
+              .slice(0, end)
+              .split('\n')
+              .filter(Boolean)
+              .map((l) => JSON.parse(l) as FeedEntry);
             return { entries, cursor: after + Buffer.byteLength(text.slice(0, end + 1)) };
           },
           catch: fail('*'),
@@ -197,7 +217,9 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
       subscribe: (onChange) => {
         try {
           fs.mkdirSync(root, { recursive: true });
-          const watcher = fs.watch(root, (_e, name) => { if (!name || name === 'feed.jsonl') onChange(); });
+          const watcher = fs.watch(root, (_e, name) => {
+            if (!name || name === 'feed.jsonl') onChange();
+          });
           return () => watcher.close();
         } catch {
           return () => {};
@@ -211,10 +233,11 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
     const store = new Map<string, Event[]>();
     const feed: FeedEntry[] = [];
     return Journal.layer({
-      append: (taskId, event) => Effect.sync(() => {
-        store.set(taskId, [...(store.get(taskId) ?? []), event]);
-        feed.push({ taskId, event });
-      }),
+      append: (taskId, event) =>
+        Effect.sync(() => {
+          store.set(taskId, [...(store.get(taskId) ?? []), event]);
+          feed.push({ taskId, event });
+        }),
       read: (taskId) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
       list: Effect.sync(() => [...store.keys()].sort()),
       // In memory the cursor is an index rather than a byte offset — same contract either way.

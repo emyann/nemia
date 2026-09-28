@@ -19,7 +19,17 @@ import { pinnedModel, refuse, Refusal, type State } from './key.ts';
 
 export { choice, noul, score } from '@typesafe-ai/sdk';
 export type { ChoiceQuestion, NoulQuestion, Question, Questions, ScoreQuestion, Usage } from '@typesafe-ai/sdk';
-export { decide, why, FAILURE_KINDS, type Answered, type Failed, type FailureKind, type Judgment, type Thresholds, type Verdict } from './decide.ts';
+export {
+  decide,
+  why,
+  FAILURE_KINDS,
+  type Answered,
+  type Failed,
+  type FailureKind,
+  type Judgment,
+  type Thresholds,
+  type Verdict,
+} from './decide.ts';
 export type { Asked, Answers, AskOptions } from './judge.ts';
 export type { State } from './key.ts';
 
@@ -52,16 +62,19 @@ export type Judgement = {
 export const judge = (options: JudgeOptions): Judgement => {
   const unknown = Object.keys(options ?? {}).filter((k) => !OPTIONS.includes(k));
   if (unknown.length > 0) {
-    refuse(`judge: unknown option ${unknown.map((k) => `\`${k}\``).join(', ')}. ` +
-      (unknown.includes('apiKey') ? 'The key is read from TYPESAFE_API_KEY in the environment, and never passed.' : `It takes ${OPTIONS.join(', ')}.`));
+    refuse(
+      `judge: unknown option ${unknown.map((k) => `\`${k}\``).join(', ')}. ` +
+        (unknown.includes('apiKey')
+          ? 'The key is read from TYPESAFE_API_KEY in the environment, and never passed.'
+          : `It takes ${OPTIONS.join(', ')}.`),
+    );
   }
   const model = pinnedModel(options.model);
-  if (typeof options.record !== 'string' || options.record === '') refuse('judge: `record` names the directory its facts are kept in; there is no default.');
+  if (typeof options.record !== 'string' || options.record === '')
+    refuse('judge: `record` names the directory its facts are kept in; there is no default.');
   const { record, mode = 'recorded' } = options;
   if (mode !== 'recorded' && mode !== 'replay') refuse(`judge: \`mode\` is recorded or replay, not ${JSON.stringify(mode)}.`);
-  const layer = mode === 'replay'
-    ? replay({ model, record })
-    : recorded({ model, record }).pipe(Layer.provide(Asker.live(options)));
+  const layer = mode === 'replay' ? replay({ model, record }) : recorded({ model, record }).pipe(Layer.provide(Asker.live(options)));
   return {
     model,
     ask: async (state, questions, opts) => {

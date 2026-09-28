@@ -112,7 +112,9 @@ export type Pruned = { id: string; pruned: true; lines: string[]; left: number }
 export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
   const route = `/api/runs/${encodeURIComponent(id)}/prune`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { pruned?: unknown; lines?: unknown; left?: unknown; error?: unknown } | undefined;
+  const body = (await res.json().catch(() => undefined)) as
+    | { pruned?: unknown; lines?: unknown; left?: unknown; error?: unknown }
+    | undefined;
   if (res.ok && body?.pruned === true) {
     const lines = Array.isArray(body.lines) ? body.lines.filter((line): line is string => typeof line === 'string') : [];
     return { id, pruned: true, lines, left: Array.isArray(body.left) ? body.left.length : 0 };

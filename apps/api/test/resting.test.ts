@@ -25,7 +25,11 @@ const { e, findRun } = await import('../src/store.ts');
 const { restingRead } = await import('../src/resting.ts');
 
 const git = (repo: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
+  execFileSync(
+    'git',
+    ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+    { cwd: repo, encoding: 'utf8' },
+  );
 
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -52,24 +56,49 @@ const at = '2026-09-25T09:00:00.000Z';
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 const journal = (taskId: string) => path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
 /** A line on the engine's feed, as every append to a journal writes one: what takes a run out of the memo. */
-const fed = (taskId: string, kind: string) => fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event: { kind, at } })}\n`);
+const fed = (taskId: string, kind: string) =>
+  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event: { kind, at } })}\n`);
 
-const started = (taskId: string) => [
+const started = () => [
   { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
   { kind: 'starting', at, attempt: 1 },
   { kind: 'spawned', at, attempt: 1 },
 ];
-const signedOff = (taskId: string) => write(journal(taskId), jsonl([
-  ...started(taskId),
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] } },
-  { kind: 'settled', at, outcome: 'succeeded' },
-]));
-const running = (taskId: string) => write(journal(taskId), jsonl(started(taskId)));
-const blocked = (taskId: string) => write(journal(taskId), jsonl([
-  ...started(taskId),
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'blocked', summary: 'Could not.', needs: 'a key', artifacts: [] } },
-  { kind: 'settled', at, outcome: 'failed' },
-]));
+const signedOff = (taskId: string) =>
+  write(
+    journal(taskId),
+    jsonl([
+      ...started(),
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${taskId}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]),
+  );
+const running = (taskId: string) => write(journal(taskId), jsonl(started()));
+const blocked = (taskId: string) =>
+  write(
+    journal(taskId),
+    jsonl([
+      ...started(),
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: `ae/${taskId}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'blocked', summary: 'Could not.', needs: 'a key', artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'failed' },
+    ]),
+  );
 
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
@@ -80,11 +109,26 @@ function aFinishedRun(id: string, brief = 'Decide it') {
   writeRun(id, brief);
 }
 function writeRun(id: string, brief: string) {
-  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, baseRef: base, workspace: repo, branch: 'main', isolate: true, brief, createdAt: at,
-    workflowDir: path.join(root, 'no-such-workflow'), workflow: PLAIN,
-    steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` } },
-  }, null, 2));
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify(
+      {
+        id,
+        repo,
+        baseRef: base,
+        workspace: repo,
+        branch: 'main',
+        isolate: true,
+        brief,
+        createdAt: at,
+        workflowDir: path.join(root, 'no-such-workflow'),
+        workflow: PLAIN,
+        steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` } },
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 type Listed = { id: string; status: string; brief: string; moving: boolean; toDecide: { kind: string } | null; waitingOnYou: string[] };
@@ -98,7 +142,11 @@ const listed = async (id: string) => (await list()).find((r) => r.id === id);
 /** With the memo's check off: what the memo alone answers. */
 async function unverified<T>(f: () => Promise<T>): Promise<T> {
   process.env.WF_VERIFY_REST = '0';
-  try { return await f(); } finally { process.env.WF_VERIFY_REST = '1'; }
+  try {
+    return await f();
+  } finally {
+    process.env.WF_VERIFY_REST = '1';
+  }
 }
 
 aFinishedRun('r-rest');
@@ -106,7 +154,7 @@ running('r-moving-implement');
 branchOff('wf/r-moving/implement');
 writeRun('r-moving', 'Still going');
 
-test('a finished run is kept and a moving one is not, and a poll then reads the moving run\'s journal alone', async () => {
+test("a finished run is kept and a moving one is not, and a poll then reads the moving run's journal alone", async () => {
   await list();
   const first = await list();
   assert.equal(first.find((r) => r.id === 'r-rest')?.status, 'succeeded');
@@ -118,7 +166,7 @@ test('a finished run is kept and a moving one is not, and a poll then reads the 
   const hits = resting.hits;
   const again = await unverified(list);
   assert.deepEqual(again, first, 'the same answer from memory');
-  assert.equal(e.io().reads - reads, 1, 'the moving run\'s one journal, and not the finished run\'s');
+  assert.equal(e.io().reads - reads, 1, "the moving run's one journal, and not the finished run's");
   assert.equal(resting.hits - hits, 1);
 });
 
@@ -142,7 +190,7 @@ test('a file a person writes beside the run is judged afresh: a retry asked of a
   assert.deepEqual(after, await listed('r-ask'), 'and the answer is the fresh one');
 });
 
-test('a line on the engine\'s feed for a task of the run is judged afresh: its journal changed', async () => {
+test("a line on the engine's feed for a task of the run is judged afresh: its journal changed", async () => {
   aFinishedRun('r-fed');
   await list();
   assert.ok(resting.runs.has('r-fed'));
@@ -151,7 +199,7 @@ test('a line on the engine\'s feed for a task of the run is judged afresh: its j
   assert.equal((await unverified(() => listed('r-fed')))?.status, 'failed');
 });
 
-test('a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick\'s does', async () => {
+test("a journal changed with no line on the feed is not seen: the feed is what the memo watches, as the tick's does", async () => {
   aFinishedRun('r-unfed');
   await list();
   const was = resting.runs.get('r-unfed');
@@ -164,7 +212,7 @@ test('a journal changed with no line on the feed is not seen: the feed is what t
   assert.equal((await listed('r-unfed'))?.status, 'failed');
 });
 
-test('a branch tip that moves is judged afresh: the base branch taking the run\'s work', async () => {
+test("a branch tip that moves is judged afresh: the base branch taking the run's work", async () => {
   aFinishedRun('r-merged');
   await list();
   assert.ok(resting.runs.has('r-merged'));
@@ -182,13 +230,31 @@ test('a run removed from the store leaves the memo', async () => {
   assert.ok(!resting.runs.has('r-gone'));
 });
 
-test('runs waiting on the same run read its journals once between them, off the request\'s one list', async () => {
+test("runs waiting on the same run read its journals once between them, off the request's one list", async () => {
   aFinishedRun('r-parent');
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', 'wf/r-parent/implement');
-  const child = (id: string) => write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, baseRef: base, workspace: repo, branch: 'main', isolate: true, brief: 'After the parent', createdAt: at,
-    workflowDir: path.join(root, 'no-such-workflow'), workflow: PLAIN, after: ['r-parent'], steps: { implement: { taskId: null } },
-  }, null, 2));
+  const child = (id: string) =>
+    write(
+      path.join(root, 'runs', `${id}.json`),
+      JSON.stringify(
+        {
+          id,
+          repo,
+          baseRef: base,
+          workspace: repo,
+          branch: 'main',
+          isolate: true,
+          brief: 'After the parent',
+          createdAt: at,
+          workflowDir: path.join(root, 'no-such-workflow'),
+          workflow: PLAIN,
+          after: ['r-parent'],
+          steps: { implement: { taskId: null } },
+        },
+        null,
+        2,
+      ),
+    );
   child('r-child-1');
   await list();
   const cost = async () => {
@@ -199,7 +265,11 @@ test('runs waiting on the same run read its journals once between them, off the 
   const one = await cost();
   child('r-child-2');
   await list();
-  assert.equal(await cost(), one, 'a second run waiting on the parent reads no journal more: the parent\'s tasks are among the request\'s views');
+  assert.equal(
+    await cost(),
+    one,
+    "a second run waiting on the parent reads no journal more: the parent's tasks are among the request's views",
+  );
 });
 
 test('two requests at once: one that read the feed before the other read on past a line of its run keeps nothing', async () => {

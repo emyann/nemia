@@ -14,19 +14,127 @@ import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
 import { folderPlace } from './places.ts';
-import { admissionOrder, holdsOpen, holdsOpenOn, resultSteps, slotFree, takesNoSlot, endingAsked, type CheckoutHold, type MainClaim, heldCheckouts, triedFrom, heldRuns, isGitRun, runAdmitted, runCapOf, slotNeed, slotWord, hasStarted, runReady, tipBranches, tipsSeen, holdsOf, waitsOf, type RunSlot, type Wait } from './run.ts';
-import { sizeOf, feedPhase, feedWords, filedDenies, landedWords, landingDue, landingOpen, landsOnCheck, type FeedWords, type GitRun, type Landed } from './run.ts';
-import { askingTry, assess, budgetOf, budgetUsdFor, ownStatus, stepSpend, type SpendOf, capOf, checkTaskId, composeBrief, remoteBrief, handOffDue, inFlight, listing, retriesDue, roundFiled, roundsDue, sentBack, type EndingStopped, stepStatus, stepTaskId, type Assessment, type ParentCloseout, type ParentStep, type RoundAsk, type Run, type CloseoutAsked, type TaskPhase } from './run.ts';
+import {
+  admissionOrder,
+  holdsOpen,
+  holdsOpenOn,
+  resultSteps,
+  slotFree,
+  takesNoSlot,
+  endingAsked,
+  type CheckoutHold,
+  type MainClaim,
+  heldCheckouts,
+  triedFrom,
+  heldRuns,
+  isGitRun,
+  runAdmitted,
+  runCapOf,
+  slotNeed,
+  slotWord,
+  hasStarted,
+  runReady,
+  tipBranches,
+  tipsSeen,
+  holdsOf,
+  waitsOf,
+  type RunSlot,
+  type Wait,
+} from './run.ts';
+import {
+  sizeOf,
+  feedPhase,
+  feedWords,
+  filedDenies,
+  landedWords,
+  landingDue,
+  landingOpen,
+  landsOnCheck,
+  type FeedWords,
+  type GitRun,
+  type Landed,
+} from './run.ts';
+import {
+  askingTry,
+  assess,
+  budgetOf,
+  budgetUsdFor,
+  ownStatus,
+  stepSpend,
+  type SpendOf,
+  capOf,
+  checkTaskId,
+  composeBrief,
+  remoteBrief,
+  handOffDue,
+  inFlight,
+  listing,
+  retriesDue,
+  roundFiled,
+  roundsDue,
+  sentBack,
+  type EndingStopped,
+  stepStatus,
+  stepTaskId,
+  type Assessment,
+  type ParentCloseout,
+  type ParentStep,
+  type RoundAsk,
+  type Run,
+  type CloseoutAsked,
+  type TaskPhase,
+} from './run.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
-import { agentFilesDir, artifactsDir, cancelFile, skillsAgain, isDirectory, checkStderr, consumeAsks, holdFile, inputsDir, listRuns, pruneFile, removeHold, readAnswers, readAsks, readRun, restStamps, rewriteRun, runFile, runsDir, stepsOf } from './store.ts';
+import {
+  agentFilesDir,
+  artifactsDir,
+  cancelFile,
+  skillsAgain,
+  isDirectory,
+  checkStderr,
+  consumeAsks,
+  holdFile,
+  inputsDir,
+  listRuns,
+  pruneFile,
+  removeHold,
+  readAnswers,
+  readAsks,
+  readRun,
+  restStamps,
+  rewriteRun,
+  runFile,
+  runsDir,
+  stepsOf,
+} from './store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
 import { feedFile, recordFeed } from './feed-store.ts';
 import { abortMerge, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
-import { answersIn, closeoutAsked, closeoutOf, closeoutReader, engineWord, exitVerdicts, harnessBlocked, parentOf, parentsOf, phaseOfView, refusalOf, reportedEngine, saidCount, saidIn, sessionIn, spendReader, taskPhases, waitingOf, waitsForWord } from './views.ts';
+import {
+  answersIn,
+  closeoutAsked,
+  closeoutOf,
+  closeoutReader,
+  engineWord,
+  exitVerdicts,
+  harnessBlocked,
+  parentOf,
+  parentsOf,
+  phaseOfView,
+  refusalOf,
+  reportedEngine,
+  saidCount,
+  saidIn,
+  sessionIn,
+  spendReader,
+  taskPhases,
+  waitingOf,
+  waitsForWord,
+} from './views.ts';
 import { placesOf, startQueued } from './start.ts';
 import { skillsFor } from './workflow-store.ts';
 import { renderedFlags, rendersAgent, unrendered } from './rendering.ts';
@@ -66,7 +174,7 @@ export async function adoptChecks(
     if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    if (!view.state.brief) continue; // not filed: due, and this pass's to file
     views.set(taskId, view);
     run.steps[step.name] = { ...run.steps[step.name]!, check: { taskId } };
     adopted.push(step.name);
@@ -107,7 +215,7 @@ export async function adoptTries(
     }
     const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    if (!view.state.brief) continue; // not filed: due, and this pass's to file
     views.set(taskId, view);
     const record = run.steps[r.step]!;
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
@@ -140,7 +248,7 @@ export async function adoptRounds(
   for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks, spendOf)) {
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
     const view = await e.view(taskId);
-    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    if (!view.state.brief) continue; // not filed: due, and this pass's to file
     views.set(taskId, view);
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
     adopted.push(r.step);
@@ -172,8 +280,8 @@ export async function unrecordedSteps(
   const found: Array<{ name: string; taskId: string }> = [];
   for (const name of ready) {
     const taskId = stepTaskId(run, name, tryOf(run, name));
-    const view = views.get(taskId) ?? await e.view(taskId);
-    if (!view.state.brief) continue;   // not filed
+    const view = views.get(taskId) ?? (await e.view(taskId));
+    if (!view.state.brief) continue; // not filed
     views.set(taskId, view);
     found.push({ name, taskId });
   }
@@ -191,8 +299,17 @@ export async function unrecordedSteps(
  * filed something. `held` is the slot the cap held its roots at, on a pass that held them.
  */
 export type Advanced = {
-  run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[];
-  inFlight: boolean; held?: RunSlot;
+  run: Run;
+  filed: string[];
+  checked: string[];
+  tried: string[];
+  looped: string[];
+  status: Assessment['status'];
+  blocked: string[];
+  notes: string[];
+  waiting: Wait[];
+  inFlight: boolean;
+  held?: RunSlot;
   /** What the pass judged of the run and of each step, in the words the feed keeps (`feedWords`): what `tick` writes where they changed. */
   feed: FeedWords;
 };
@@ -245,7 +362,11 @@ export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow
  */
 async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promise<MainClaim | undefined> {
   let steps: Workflow[];
-  try { steps = stepsOf(run); } catch { return undefined; }   // a record whose workflow no longer reads files nothing
+  try {
+    steps = stepsOf(run);
+  } catch {
+    return undefined;
+  } // a record whose workflow no longer reads files nothing
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || !isGitRun(run)) return undefined;
   const repo = path.resolve(run.repo);
@@ -266,7 +387,18 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   const at = endingAsked(run, ending, asks);
   if (at === undefined) return undefined;
   const { views, phaseOf } = await taskPhases(e, run);
-  const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+  const a = assess(
+    steps,
+    run,
+    phaseOf,
+    closeoutReader(views, run),
+    closeoutAsked(views),
+    exitVerdicts(views, run),
+    asks,
+    rounds,
+    harnessBlocked(views),
+    spendReader(views),
+  );
   const parent = await parentsOf(e, run);
   const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);
   return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
@@ -293,7 +425,11 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`), which is all of git a pass asks of a
  * run at rest.
  */
-async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
+async function advanceRun(
+  e: Engine,
+  run: Run,
+  slot?: RunSlot,
+): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
   const steps = stepsOf(run);
 
   // Every try's session, or only the current ones: what the earlier ones cost is read by nothing here unless a cap is in force
@@ -351,19 +487,21 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
   let markedHandedOff = false;
   // Only where there is somewhere to hand one off from (`handOffOwed`).
-  const collected = within('act', () => handOffOwed(steps, run, phaseOf).flatMap((name) => {
-    if (!fs.existsSync(runFile(run.id))) return [];
-    const record = run.steps[name]!;
-    let handed: ReturnType<typeof handOff>;
-    if (isGitRun(run)) handed = handOff(record.workspace!, name);
-    else folderPlace(runsDir()).handOff(run, name);
-    // Once for the try, unless git refused the commit — a hook, a signature — which the next pass tries again.
-    if (!(handed && 'error' in handed)) {
-      run.steps[name] = { ...record, handedOff: record.taskId! };
-      markedHandedOff = true;
-    }
-    return collectArtifacts(run, name, signedOff(name));
-  }));
+  const collected = within('act', () =>
+    handOffOwed(steps, run, phaseOf).flatMap((name) => {
+      if (!fs.existsSync(runFile(run.id))) return [];
+      const record = run.steps[name]!;
+      let handed: ReturnType<typeof handOff>;
+      if (isGitRun(run)) handed = handOff(record.workspace!, name);
+      else folderPlace(runsDir()).handOff(run, name);
+      // Once for the try, unless git refused the commit — a hook, a signature — which the next pass tries again.
+      if (!(handed && 'error' in handed)) {
+        run.steps[name] = { ...record, handedOff: record.taskId! };
+        markedHandedOff = true;
+      }
+      return collectArtifacts(run, name, signedOff(name));
+    }),
+  );
 
   // The merge an ending that lands on its check staged in the repository's checkout is committed on its check's word, or aborted — before
   // anything reads where the ending stands, so the pass that lands it reads it landed, and a try of it is never filed over a merge still
@@ -386,7 +524,9 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
     for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
     if (shipped && removeHold(run.id, run.hold.at)) {
       const { until } = run.hold;
-      liftNotes.push(`the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`);
+      liftNotes.push(
+        `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
+      );
       delete run.hold;
     }
   }
@@ -426,10 +566,31 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   // What the pass judged, as `wf ls` words it, for the feed (`recordFeed`) — worded here, off what this pass read before it filed anything: a
   // step filed below has no view on this pass, and would read `unknown`. So a step's filing reaches the feed a pass late, as the engine's
   // `pending`. Off the same reads as the judgement, and nothing read again: the feed only reports what the pass decided on.
-  const feed = feedWords(listing(
-    steps, run, (taskId) => feedPhase(engineWord(views)(taskId)), (name) => closeoutOf(views, run, name), asked, verdictOf, asks, roundAsks,
-    readAnswers(run.id), waiting, saidCount(views, run), spendOf, held, [], checkout, waitingOf(views), undefined, holdsOf(run, parent),
-  ), run, assessed, (name) => closeoutOf(views, run, name));
+  const feed = feedWords(
+    listing(
+      steps,
+      run,
+      (taskId) => feedPhase(engineWord(views)(taskId)),
+      (name) => closeoutOf(views, run, name),
+      asked,
+      verdictOf,
+      asks,
+      roundAsks,
+      readAnswers(run.id),
+      waiting,
+      saidCount(views, run),
+      spendOf,
+      held,
+      [],
+      checkout,
+      waitingOf(views),
+      undefined,
+      holdsOf(run, parent),
+    ),
+    run,
+    assessed,
+    (name) => closeoutOf(views, run, name),
+  );
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
   // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
@@ -444,13 +605,19 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   // `wf prune` removed, or inherits one — and the marker is written before the first removal, so a pass that read the run a moment
   // before stops here too. And a held run: a person who holds it while this pass is at work holds what the pass would file next.
   let calledOff = false;
-  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)) || fs.existsSync(pruneFile(run.id))
-    || fs.existsSync(holdFile(run.id)));
+  const mayFile = (): boolean =>
+    !(calledOff ||=
+      !fs.existsSync(runFile(run.id)) ||
+      fs.existsSync(cancelFile(run.id)) ||
+      fs.existsSync(pruneFile(run.id)) ||
+      fs.existsSync(holdFile(run.id)));
   const endingSaid = (ending: Workflow): EndingStopped => {
     const said = signedOff(ending.name);
     return {
-      step: ending.name, status: ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf),
-      ...(said?.summary ? { summary: said.summary } : {}), ...(said?.needs ? { needs: said.needs } : {}),
+      step: ending.name,
+      status: ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf),
+      ...(said?.summary ? { summary: said.summary } : {}),
+      ...(said?.needs ? { needs: said.needs } : {}),
       onto: isGitRun(run) ? run.branch : 'the base branch',
     };
   };
@@ -465,7 +632,9 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       if (!views.get(record.taskId!)?.state.stopRequested) {
         await e.stop(record.taskId!);
         const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
-        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`);
+        notes.push(
+          `${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`,
+        );
       }
       continue;
     }
@@ -483,8 +652,12 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
     // A person's nudge of a step whose task is held open and waits for their word — it signed off blocked, or waits at its gate — is an
     // answer to that task (`answers`): its next turn, in the session that signed, under the same id. Any other try of a task that waits —
     // `--fresh`, `--model` — closes it first, and is filed as its own task, as every try was before tasks were held open.
-    const answers = awaitsWord(record.taskId) && r.by === 'ask' && r.mode === 'nudge' && Boolean(sessionIn(views, record.taskId!))
-      && holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf);
+    const answers =
+      awaitsWord(record.taskId) &&
+      r.by === 'ask' &&
+      r.mode === 'nudge' &&
+      Boolean(sessionIn(views, record.taskId!)) &&
+      holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf);
     if (!answers && awaitsWord(record.taskId)) {
       const refused = await closeWaiting(r.step, record.taskId!);
       if (refused) {
@@ -510,23 +683,48 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
       const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
       const reads = (name: string): Closeout | undefined =>
-        (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
+        asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name);
       const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
       const told = toldOf(run, step);
-      const brief = remote ? remoteBrief(step, run, steps, reads, { try: r.try, by: r.by, mode: r.mode, resumed: false, status: tried, ...(r.message !== undefined ? { message: r.message } : {}) })
-        : composeBrief(told.step, run, steps, reads, files, undefined, {
-          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}),
-          ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
-          // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
-          ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-          // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
-          // A gated step that signed off was sent back from its gate.
-          status: tried, ...(refusal ? { refusal } : {}),
-          // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allowedTools:` denies again.
-          ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
-          // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
-          ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
-        }, undefined, undefined, inputsDir(run));
+      const brief = remote
+        ? remoteBrief(step, run, steps, reads, {
+            try: r.try,
+            by: r.by,
+            mode: r.mode,
+            resumed: false,
+            status: tried,
+            ...(r.message !== undefined ? { message: r.message } : {}),
+          })
+        : composeBrief(
+            told.step,
+            run,
+            steps,
+            reads,
+            files,
+            undefined,
+            {
+              try: r.try,
+              by: r.by,
+              mode: r.mode,
+              ...(r.model ? { model: r.model } : {}),
+              ...(r.message !== undefined ? { message: r.message } : {}),
+              ...(r.budget !== undefined ? { budget: r.budget } : {}),
+              resumed: Boolean(resumeFrom),
+              // What was said to the session a nudge continues: it may never have read it (agent-runtime open issue 16).
+              ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
+              // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
+              // A gated step that signed off was sent back from its gate.
+              status: tried,
+              ...(refusal ? { refusal } : {}),
+              // A try of a step its `denials: fail` stopped: the calls it was denied, which the same `allowedTools:` denies again.
+              ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
+              // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
+              ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
+            },
+            undefined,
+            undefined,
+            inputsDir(run),
+          );
       // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
       // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it. A turn's cap is its own, as a task's is (agent-runtime's `answer`).
       const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf));
@@ -538,41 +736,42 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
           notes.push(`${r.step}: ${refused}`);
           continue;
         }
-      } else await e.file({
-        id: taskId,
-        brief,
-        cwd: record.workspace ?? run.workspace,
-        harness: step.harness,
-        ...localFields(step, () => ({
-          // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
-          config: {
-            // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
-            // after a `--model` try continues that session as it cached it.
-            model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
-            effort: step.effort,
-            // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
-            contextTokens: sessionContext(step, steps),
-            permissionMode: modeOf(step),
-            // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
-            tools: step.tools,
-            disallowedTools: filedDenies(step, run),
-            allowedTools: step.allowedTools,
-            // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
-            background: step.background,
-            // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
-            budgetUsd,
-            // The agent `wf start` rendered for it: a try is told what the step is.
-            claude: told.claude,
-          },
-          resumeFrom,
-          // Held open when it signs, as the step's first try is (`holdsOpenOn`).
-          ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-          // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
-          // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
-          closeoutSchema: closeoutSchemaOf(step, steps),
-        })),
-        deadlineSeconds: step.deadlineSeconds,
-      });
+      } else
+        await e.file({
+          id: taskId,
+          brief,
+          cwd: record.workspace ?? run.workspace,
+          harness: step.harness,
+          ...localFields(step, () => ({
+            // How the harness is to run the session: its arguments, which the engine carries to the runner unread (`HarnessArgs`).
+            config: {
+              // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
+              // after a `--model` try continues that session as it cached it.
+              model: r.mode === 'fresh' ? (r.model ?? step.model) : sessionModel(step, record),
+              effort: step.effort,
+              // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
+              contextTokens: sessionContext(step, steps),
+              permissionMode: modeOf(step),
+              // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
+              tools: step.tools,
+              disallowedTools: filedDenies(step, run),
+              allowedTools: step.allowedTools,
+              // Run as the step is: a try is a session of the step (`background`), bridged as the step asked (`toldOf`).
+              background: step.background,
+              // What is left of the cap, for a harness that keeps one as its own flag: the runtime keeps no budget (stage 4b).
+              budgetUsd,
+              // The agent `wf start` rendered for it: a try is told what the step is.
+              claude: told.claude,
+            },
+            resumeFrom,
+            // Held open when it signs, as the step's first try is (`holdsOpenOn`).
+            ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
+            // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
+            // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
+            closeoutSchema: closeoutSchemaOf(step, steps),
+          })),
+          deadlineSeconds: step.deadlineSeconds,
+        });
     }
     tried.push(r.step);
     notes.push(said);
@@ -602,7 +801,9 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       }
     }
     looped.push(r.step);
-    notes.push(`${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`);
+    notes.push(
+      `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
+    );
     // A round an earlier pass filed and never wrote down was adopted above. Looked up once more all the same, as a try is.
     if (!(await e.view(taskId)).state.brief) {
       const files = artifactsDir(run, r.target);
@@ -612,10 +813,25 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       await e.file({
         id: taskId,
         // Read off the closeout that asked for the round, before the record moves it behind.
-        brief: composeBrief(told.step, run, steps, signedOff, files, undefined, undefined, {
-          loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
-          ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-        }, undefined, inputsDir(run)),
+        brief: composeBrief(
+          told.step,
+          run,
+          steps,
+          signedOff,
+          files,
+          undefined,
+          undefined,
+          {
+            loop: r.step,
+            round: r.round,
+            rounds: capOf(looping),
+            by: r.by,
+            resumed: Boolean(resumeFrom),
+            ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
+          },
+          undefined,
+          inputsDir(run),
+        ),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
         // A loop's target is never a remote agent (`validateLoops`); guarded all the same, as every filing is.
@@ -631,7 +847,11 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
             disallowedTools: filedDenies(target, run),
             allowedTools: target.allowedTools,
             background: target.background,
-            budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
+            budgetUsd: budgetUsdFor(
+              target,
+              r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
+              stepSpend(run, r.target, spendOf),
+            ),
             claude: told.claude,
           },
           resumeFrom,
@@ -669,7 +889,11 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
         brief: checkBrief(step.check!, {
           // No base to diff against in the repository's checkout: an ending's check judges the merge staged there, against HEAD, which a
           // check reads from MERGE_HEAD itself, and the run's base is by then an older commit of the branch it merges onto.
-          WF_RUN: run.id, WF_STEP: name, ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}), WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+          WF_RUN: run.id,
+          WF_STEP: name,
+          ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+          WF_WORKSPACE: workspace,
+          WF_STDERR: checkStderr(taskId),
           WF_ARTIFACTS: files,
         }),
         cwd: workspace,
@@ -691,7 +915,8 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   // A run that waited on runs starts from its base branch as it stands now, with their work on it — not as it stood at `wf start`,
   // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
   // from it. A run with no `after` keeps the base `wf start` recorded, as before.
-  if (ready.length && starting && run.after?.length && isGitRun(run)) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+  if (ready.length && starting && run.after?.length && isGitRun(run))
+    run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
   // What those runs concluded, for the roots' briefs (`## From run <id>`): read on the same pass, and never again.
   const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
 
@@ -721,7 +946,18 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
       // A remote agent's names nothing of this machine (`remoteBrief`).
       brief: isRemoteHarness(step.harness)
         ? remoteBrief(step, run, steps, signedOff, undefined, step.after.length ? undefined : parents)
-        : composeBrief(told.step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
+        : composeBrief(
+            told.step,
+            run,
+            steps,
+            signedOff,
+            files,
+            place.deps,
+            undefined,
+            undefined,
+            step.after.length ? undefined : parents,
+            inputsDir(run),
+          ),
       cwd: place.workspace,
       harness: step.harness,
       deadlineSeconds: step.deadlineSeconds,
@@ -780,14 +1016,34 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
-  const wrote = Boolean(filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff || landing.landed);
+  const wrote = Boolean(
+    filed.length ||
+    checked.length ||
+    tried.length ||
+    looped.length ||
+    adopted.length ||
+    adoptedTries.length ||
+    adoptedRounds.length ||
+    tips ||
+    heldFirst ||
+    markedHandedOff ||
+    landing.landed,
+  );
   if (wrote) rewriteRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
 
   const advanced: Advanced = {
-    run, filed, checked, tried, looped, status, blocked, notes, waiting,
+    run,
+    filed,
+    checked,
+    tried,
+    looped,
+    status,
+    blocked,
+    notes,
+    waiting,
     // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
     inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
@@ -796,7 +1052,13 @@ async function advanceRun(e: Engine, run: Run, slot?: RunSlot): Promise<{ advanc
   // Whether the next pass, its inputs unchanged, would read the same and do nothing: what `tick` may answer from its memo (`rest.ts`).
   const ending = steps.find((s) => s.workspace === 'main');
   const facts: RestFacts = {
-    run, status, due: assessed, notes, waiting, inFlight: advanced.inFlight, held: Boolean(held),
+    run,
+    status,
+    due: assessed,
+    notes,
+    waiting,
+    inFlight: advanced.inFlight,
+    held: Boolean(held),
     settled: [...views.values()].every((v) => Boolean(v.state.settled)),
     acted: wrote || closed.size > 0,
     handOffDue: handOffOwed(steps, run, phaseOf),
@@ -837,25 +1099,43 @@ export function resultTips(run: GitRun): Record<string, string> {
  * committed only if its check passed on it, and aborted otherwise.
  */
 function landEnding(
-  run: Run, steps: readonly Workflow[], phaseOf: (taskId: string) => TaskPhase, signedOff: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => CloseoutAsked, spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
+  run: Run,
+  steps: readonly Workflow[],
+  phaseOf: (taskId: string) => TaskPhase,
+  signedOff: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => CloseoutAsked,
+  spendOf: SpendOf,
+  verdictOf: (step: string) => Verdict | undefined,
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
   if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !fs.existsSync(runFile(run.id))) return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
-  const due = landingDue(ending, run, own, phaseOf, typeof said === 'string' ? said : undefined, verdictOf(ending.name),
-    mergeInProgress(run.repo), () => mergeState(run.repo, resultTips(run)));
+  const due = landingDue(
+    ending,
+    run,
+    own,
+    phaseOf,
+    typeof said === 'string' ? said : undefined,
+    verdictOf(ending.name),
+    mergeInProgress(run.repo),
+    () => mergeState(run.repo, resultTips(run)),
+  );
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
   const write = (landed: Landed, note: string) => {
     // Once it has landed, the pictures its check took of the merged tree are read by nobody (`dropLandedPictures`): removed before the
     // record says it landed, so a pass that dies between the two lands again on the next and removes what is left.
-    const dropped = 'commit' in landed ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId }) : undefined;
+    const dropped =
+      'commit' in landed
+        ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
+        : undefined;
     run.steps[name] = { ...record, landed };
     const freed = dropped?.removed.length
-      ? [`${name}: removed the ${dropped.removed.length} ${dropped.removed.length === 1 ? 'picture' : 'pictures'} its check took of the merged tree (${sizeOf(dropped.bytes)}); ${LANDED_PICTURES} says what they were`]
+      ? [
+          `${name}: removed the ${dropped.removed.length} ${dropped.removed.length === 1 ? 'picture' : 'pictures'} its check took of the merged tree (${sizeOf(dropped.bytes)}); ${LANDED_PICTURES} says what they were`,
+        ]
       : [];
     return { notes: [`${name}: ${note}`, ...freed], landed: true };
   };
@@ -865,11 +1145,19 @@ function landEnding(
     if ('commit' in made) return write(made, `its check passed on the merge, and ${landedWords(run, made)}`);
     const why = `git refused the commit of its merge: ${made.error}`;
     const refused = abortMerge(run.repo);
-    if (refused) return { notes: [`${name}: ${why}; and the run could not abort the merge either (${refused.error}): the next tick tries again`], landed: false };
+    if (refused)
+      return {
+        notes: [`${name}: ${why}; and the run could not abort the merge either (${refused.error}): the next tick tries again`],
+        landed: false,
+      };
     return write({ aborted: why }, `${why}, so the run aborted the merge; nothing landed on ${run.branch}`);
   }
   const refused = abortMerge(run.repo);
-  if (refused) return { notes: [`${name}: ${due.why}, and the run could not abort its merge (${refused.error}): the next tick tries again`], landed: false };
+  if (refused)
+    return {
+      notes: [`${name}: ${due.why}, and the run could not abort its merge (${refused.error}): the next tick tries again`],
+      landed: false,
+    };
   return write({ aborted: due.why }, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
 }
 
@@ -925,7 +1213,8 @@ async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: nu
  * runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left out, not
  * emptied; and a try of a remote step is a new Task, never a turn of the last one.
  */
-const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> => (isRemoteHarness(step.harness) ? {} : fields());
+const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
+  isRemoteHarness(step.harness) ? {} : fields();
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
@@ -937,9 +1226,10 @@ const localFields = <T extends object>(step: Workflow, fields: () => T): T | Rec
  */
 function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
-  const told = rendersAgent(step) && !isDirectory(dir)
-    ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
-    : step;
+  const told =
+    rendersAgent(step) && !isDirectory(dir)
+      ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
+      : step;
   const rendered = renderedFlags(told, dir);
   return { step: told, claude: told.remote ? { remoteControl: true, ...rendered } : rendered };
 }
@@ -985,7 +1275,8 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
         continue;
       }
       const c = closeoutOf(new Map([[taskId, view]]), record, step.name);
-      if (!c) said.push({ name: step.name, unreadable: `the engine holds no closeout for its task ${taskId}, which is ${phaseOfView(view)}` });
+      if (!c)
+        said.push({ name: step.name, unreadable: `the engine holds no closeout for its task ${taskId}, which is ${phaseOfView(view)}` });
       else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
       else said.push({ step, said: c });
     }
@@ -996,7 +1287,8 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
 
 /** One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything (`startQueued`). */
 export type Pass = {
-  runs: Advanced[]; queue?: QueueStarted;
+  runs: Advanced[];
+  queue?: QueueStarted;
   /** Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed to decide. */
   feedError?: string;
   /**
@@ -1051,9 +1343,18 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and throws
  * where the two differ — the tests' (`WF_VERIFY_REST=1`), never the daemon's, since it spends all that the memo saves.
  */
-export async function tick(e: Engine, { repo = process.cwd(), memo = restMemo(e), verifyRest = process.env.WF_VERIFY_REST === '1' }: {
-  repo?: string; memo?: RestMemo; verifyRest?: boolean;
-} = {}): Promise<Pass> {
+export async function tick(
+  e: Engine,
+  {
+    repo = process.cwd(),
+    memo = restMemo(e),
+    verifyRest = process.env.WF_VERIFY_REST === '1',
+  }: {
+    repo?: string;
+    memo?: RestMemo;
+    verifyRest?: boolean;
+  } = {},
+): Promise<Pass> {
   const io0 = ioOf(e);
   const { value, ms, tallies } = await metered(() => pass(meteredEngine(e), repo, memo, verifyRest));
   if (!tallies) return value;
@@ -1107,7 +1408,12 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
   }
   // An engine's report from before the runtime reported refusals — a test's fake — carries none.
   const refused = report.refused ?? [];
-  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}), ...(feedError ? { feedError } : {}), ...(refused.length ? { refused } : {}) };
+  return {
+    runs: runs.map((run) => done.get(run.id)!),
+    ...(queue ? { queue } : {}),
+    ...(feedError ? { feedError } : {}),
+    ...(refused.length ? { refused } : {}),
+  };
 }
 
 // ─── runs at rest ───────────────────────────────────────────────────────────
@@ -1133,7 +1439,7 @@ export const freshRestMemo = (): RestMemo => ({ runs: new Map() });
 const memos = new WeakMap<Engine, RestMemo>();
 const restMemo = (e: Engine): RestMemo => {
   let memo = memos.get(e);
-  if (!memo) memos.set(e, memo = freshRestMemo());
+  if (!memo) memos.set(e, (memo = freshRestMemo()));
   return memo;
 };
 
@@ -1158,7 +1464,12 @@ async function restingPass(e: Engine, memo: RestMemo, verify: boolean): Promise<
     } else {
       const { entries, cursor } = await e.feed(memo.cursor);
       if (cursor < memo.cursor) memo.runs.clear();
-      else for (const id of evictedBy(entries.map((f) => f.taskId), new Set(memo.runs.keys()))) memo.runs.delete(id);
+      else
+        for (const id of evictedBy(
+          entries.map((f) => f.taskId),
+          new Set(memo.runs.keys()),
+        ))
+          memo.runs.delete(id);
       memo.cursor = cursor;
     }
   } catch {
@@ -1168,7 +1479,9 @@ async function restingPass(e: Engine, memo: RestMemo, verify: boolean): Promise<
   }
   const heads = new Map<string, Record<string, string>>();
   return {
-    memo, verify, stamps: restStamps(),
+    memo,
+    verify,
+    stamps: restStamps(),
     heads: (repo) => {
       const at = path.resolve(repo);
       if (!heads.has(at)) heads.set(at, headsOf(at));
@@ -1196,14 +1509,25 @@ async function advanceResting(e: Engine, run: Run, resting: RestingPass | undefi
   const stamp = stamps.get(run.id);
   const record = JSON.stringify(run);
   const kept = memo.runs.get(run.id);
-  if (kept && stamp !== undefined && kept.stamp === stamp && kept.record === record
-    && (!kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined)) {
+  if (
+    kept &&
+    stamp !== undefined &&
+    kept.stamp === stamp &&
+    kept.record === record &&
+    (!kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined)
+  ) {
     countRested();
     if (verify) {
-      const { advanced: { run: _, ...judged }, blockers, rest } = await advanceRun(e, run, slot);
+      const {
+        advanced: { run: _, ...judged },
+        blockers,
+        rest,
+      } = await advanceRun(e, run, slot);
       if (!rest || !isDeepStrictEqual(judged, kept.advanced) || JSON.stringify(run) !== record) {
-        throw new Error(`the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: `
-          + `an input of the run changed that the memo does not watch (rest.ts) — memo ${JSON.stringify(kept.advanced)}, pass ${JSON.stringify(judged)}`);
+        throw new Error(
+          `the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: ` +
+            `an input of the run changed that the memo does not watch (rest.ts) — memo ${JSON.stringify(kept.advanced)}, pass ${JSON.stringify(judged)}`,
+        );
       }
     }
     return { ...kept.advanced, run };
@@ -1221,7 +1545,11 @@ async function advanceResting(e: Engine, run: Run, resting: RestingPass | undefi
 function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Workflow[] }> {
   for (const run of runs) {
     let steps: Workflow[];
-    try { steps = stepsOf(run); } catch { continue; }
+    try {
+      steps = stepsOf(run);
+    } catch {
+      continue;
+    }
     yield { run, steps };
   }
 }
@@ -1230,8 +1558,18 @@ function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Work
 
 /** The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a task is `act`. */
 const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
-  tick: 'runtime', view: 'journals', list: 'journals', feed: 'journals', logs: 'journals', transcript: 'journals',
-  file: 'act', admit: 'act', stop: 'act', close: 'act', answer: 'act', say: 'act',
+  tick: 'runtime',
+  view: 'journals',
+  list: 'journals',
+  feed: 'journals',
+  logs: 'journals',
+  transcript: 'journals',
+  file: 'act',
+  admit: 'act',
+  stop: 'act',
+  close: 'act',
+  answer: 'act',
+  say: 'act',
 };
 
 type EngineIo = ReturnType<Engine['io']>;
@@ -1241,12 +1579,27 @@ const ioOf = (e: Engine): EngineIo | undefined => (typeof e.io === 'function' ? 
 
 /** Each harness's observes between two of the runtime's totals. */
 const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefined): Record<string, HarnessCost> =>
-  Object.fromEntries(Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
-    const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
-    // `unread` only when some observe could not read: a runtime from before it has none, and a pass that read everything says nothing of it.
-    const unread = (o.unread ?? 0) - (b.unread ?? 0);
-    return o.calls > b.calls ? [[name, { calls: o.calls - b.calls, ms: o.ms - b.ms, listed: o.listed - b.listed, spawned: o.spawned - b.spawned, ...(unread > 0 ? { unread } : {}) }]] : [];
-  }));
+  Object.fromEntries(
+    Object.entries(after?.observed ?? {}).flatMap(([name, o]): Array<[string, HarnessCost]> => {
+      const b = before?.observed[name] ?? { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
+      // `unread` only when some observe could not read: a runtime from before it has none, and a pass that read everything says nothing of it.
+      const unread = (o.unread ?? 0) - (b.unread ?? 0);
+      return o.calls > b.calls
+        ? [
+            [
+              name,
+              {
+                calls: o.calls - b.calls,
+                ms: o.ms - b.ms,
+                listed: o.listed - b.listed,
+                spawned: o.spawned - b.spawned,
+                ...(unread > 0 ? { unread } : {}),
+              },
+            ],
+          ]
+        : [];
+    }),
+  );
 
 /**
  * One call to the engine, counted in its phase — and what the runtime reported of it added there: the bytes it read and the processes it
@@ -1263,25 +1616,38 @@ async function engineCall<T>(e: Engine, verb: string, phase: Phase, call: () => 
       if (!before || !after) return;
       const seen = Object.values(observedBetween(before, after));
       const ms = verb === 'tick' ? Math.max(0, ...seen.map((o) => o.ms)) : seen.reduce((n, o) => n + o.ms, 0);
-      addRuntime(phase, { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
-        { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) });
+      addRuntime(
+        phase,
+        { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
+        { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) },
+      );
     });
   }
 }
 
 /** The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is. */
-const meteredEngine = (e: Engine): Engine => new Proxy(e, {
-  get(target, key, receiver) {
-    const value = Reflect.get(target, key, receiver) as unknown;
-    const phase = typeof key === 'string' ? ENGINE_PHASES[key] : undefined;
-    if (!phase || typeof value !== 'function') return value;
-    return (...args: unknown[]) => engineCall(target, key as string, phase, () => (value as (...a: unknown[]) => Promise<unknown>).apply(target, args));
-  },
-});
+const meteredEngine = (e: Engine): Engine =>
+  new Proxy(e, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver) as unknown;
+      const phase = typeof key === 'string' ? ENGINE_PHASES[key] : undefined;
+      if (!phase || typeof value !== 'function') return value;
+      return (...args: unknown[]) =>
+        engineCall(target, key as string, phase, () => (value as (...a: unknown[]) => Promise<unknown>).apply(target, args));
+    },
+  });
 
 /** A pass's cost from its counts and the runtime's totals before and after it. */
 const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: EngineIo | undefined): PassCost =>
-  passCost({ at: new Date().toISOString(), ms, phases: t.kinds, harnesses: observedBetween(before, after), records: t.records, rested: t.rested, overheadMs: t.overheadMs });
+  passCost({
+    at: new Date().toISOString(),
+    ms,
+    phases: t.kinds,
+    harnesses: observedBetween(before, after),
+    records: t.records,
+    rested: t.rested,
+    overheadMs: t.overheadMs,
+  });
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
@@ -1297,10 +1663,25 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {
     let steps: Workflow[];
-    try { steps = stepsOf(run); } catch { continue; }
+    try {
+      steps = stepsOf(run);
+    } catch {
+      continue;
+    }
     const { views, phaseOf } = await taskPhases(e, run);
     const { asks, rounds } = readAsks(run.id);
-    const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+    const a = assess(
+      steps,
+      run,
+      phaseOf,
+      closeoutReader(views, run),
+      closeoutAsked(views),
+      exitVerdicts(views, run),
+      asks,
+      rounds,
+      harnessBlocked(views),
+      spendReader(views),
+    );
     const parent = await parentsOf(e, run);
     needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps) });
   }

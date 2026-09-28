@@ -14,7 +14,7 @@
  * stopping, collecting a step's artifacts, and writing the run's record, the feed and the ceilings.
  */
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'] as const;
-export type Phase = typeof PHASES[number];
+export type Phase = (typeof PHASES)[number];
 
 /** One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. */
 export type PhaseCost = { ms: number; calls: number; bytes: number; reads: number; spawned: number };
@@ -52,7 +52,10 @@ export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>): PassCost => ({
 
 /** The phases that took longest, longest first, at most `n`, leaving out any that took no time. */
 export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3): Array<{ phase: Phase; ms: number }> =>
-  PHASES.map((phase) => ({ phase, ms: phases[phase].ms })).filter((p) => p.ms > 0).sort((a, b) => b.ms - a.ms).slice(0, n);
+  PHASES.map((phase) => ({ phase, ms: phases[phase].ms }))
+    .filter((p) => p.ms > 0)
+    .sort((a, b) => b.ms - a.ms)
+    .slice(0, n);
 
 /** How often `wf up` says what its passes cost: once a minute, however often it ticks. */
 export const STATS_EVERY_MS = 60_000;
@@ -61,11 +64,29 @@ export const STATS_EVERY_MS = 60_000;
  * The passes since the last line `wf up` said of them: numbers only, summed, and started afresh after each line (`summaryDue`). All that is
  * carried between passes.
  */
-export type Interval = { from: number; passes: number; ms: number; slowestMs: number; phases: Record<Phase, number>; bytes: number; spawned: number; overheadMs: number };
+export type Interval = {
+  from: number;
+  passes: number;
+  ms: number;
+  slowestMs: number;
+  phases: Record<Phase, number>;
+  bytes: number;
+  spawned: number;
+  overheadMs: number;
+};
 
 /** The interval with one more pass in it — a new one, from `now`, when there was none. */
 export const addPass = (interval: Interval | undefined, cost: PassCost, now: number): Interval => {
-  const i = interval ?? { from: now, passes: 0, ms: 0, slowestMs: 0, phases: Object.fromEntries(PHASES.map((p) => [p, 0])) as Record<Phase, number>, bytes: 0, spawned: 0, overheadMs: 0 };
+  const i = interval ?? {
+    from: now,
+    passes: 0,
+    ms: 0,
+    slowestMs: 0,
+    phases: Object.fromEntries(PHASES.map((p) => [p, 0])) as Record<Phase, number>,
+    bytes: 0,
+    spawned: 0,
+    overheadMs: 0,
+  };
   return {
     from: i.from,
     passes: i.passes + 1,
@@ -96,23 +117,35 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
  */
 export const summaryLine = (i: Interval, now: number): string => {
   const heavy = heaviest(Object.fromEntries(PHASES.map((p) => [p, { ms: i.phases[p] }])) as Record<Phase, { ms: number }>);
-  return `cost: ${plural(i.passes, 'pass', 'passes')} in ${Math.round((now - i.from) / 1000)}s, ${msWord(i.ms / Math.max(i.passes, 1))} ms a pass (slowest ${msWord(i.slowestMs)}) — ` +
+  return (
+    `cost: ${plural(i.passes, 'pass', 'passes')} in ${Math.round((now - i.from) / 1000)}s, ${msWord(i.ms / Math.max(i.passes, 1))} ms a pass (slowest ${msWord(i.slowestMs)}) — ` +
     `${heavy.length ? heavy.map((h) => `${h.phase} ${msWord(h.ms)}`).join(', ') : 'nothing took time'} ms in all — ` +
-    `${bytesWord(i.bytes)} read, ${plural(i.spawned, 'process', 'processes')} started; measuring ${msWord(i.overheadMs)} ms`;
+    `${bytesWord(i.bytes)} read, ${plural(i.spawned, 'process', 'processes')} started; measuring ${msWord(i.overheadMs)} ms`
+  );
 };
 
 /** The last pass, phase by phase and harness by harness, for `wf up --stats` and `wf tick --stats`. */
 export const breakdownLines = (c: PassCost): string[] => {
-  const rows = PHASES.map((p) => [p, msWord(c.phases[p].ms), String(c.phases[p].calls), bytesWord(c.phases[p].bytes), String(c.phases[p].spawned)]);
+  const rows = PHASES.map((p) => [
+    p,
+    msWord(c.phases[p].ms),
+    String(c.phases[p].calls),
+    bytesWord(c.phases[p].bytes),
+    String(c.phases[p].spawned),
+  ]);
   const head = ['phase', 'ms', 'calls', 'read', 'processes'];
   const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k]!.length)));
   const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]!) : cell.padStart(widths[k]!))).join('  ')}`;
-  const harnesses = Object.entries(c.harnesses).sort(([a], [b]) => a.localeCompare(b)).map(([name, h]) =>
-    `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started` +
-      `${h.unread ? `, ${h.unread} could not read it` : ''}`);
+  const harnesses = Object.entries(c.harnesses)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([name, h]) =>
+        `  ${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started` +
+        (h.unread ? `, ${h.unread} could not read it` : ''),
+    );
   return [
     `the last pass, at ${c.at}: ${msWord(c.ms)} ms, ${plural(c.records, 'run record')} read, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started` +
-      `${c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''}`,
+      (c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''),
     line(head),
     ...rows.map(line),
     ...(harnesses.length ? ['observed, by harness (at once, so their times overlap):', ...harnesses] : ['no harness was observed']),
@@ -123,14 +156,23 @@ export const breakdownLines = (c: PassCost): string[] => {
 /** A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one. */
 export const parsePassCost = (text: string): PassCost | undefined => {
   let c: unknown;
-  try { c = JSON.parse(text); } catch { return undefined; }
+  try {
+    c = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
   if (!c || typeof c !== 'object') return undefined;
   const r = c as Record<string, unknown>;
   const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const phases = r.phases as Record<string, Record<string, unknown>> | undefined;
   if (typeof r.at !== 'string' || !num(r.ms) || !num(r.records) || !num(r.bytes) || !num(r.spawned) || !num(r.overheadMs)) return undefined;
   if (r.rested !== undefined && !num(r.rested)) return undefined;
-  if (!phases || typeof phases !== 'object' || !PHASES.every((p) => phases[p] && ['ms', 'calls', 'bytes', 'reads', 'spawned'].every((k) => num(phases[p]![k])))) return undefined;
+  if (
+    !phases ||
+    typeof phases !== 'object' ||
+    !PHASES.every((p) => phases[p] && ['ms', 'calls', 'bytes', 'reads', 'spawned'].every((k) => num(phases[p]![k])))
+  )
+    return undefined;
   if (!r.harnesses || typeof r.harnesses !== 'object' || Array.isArray(r.harnesses)) return undefined;
   return c as PassCost;
 };

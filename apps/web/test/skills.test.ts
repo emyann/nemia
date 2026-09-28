@@ -1,7 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GivenSkill, SkillDetail, SkillPlace, SkillRow } from '../src/lib/api.ts';
-import { costWords, draftOfForm, drawnSkill, EMPTY_SKILL_FORM, givenRows, offerOf, PLACE_LABELS, preloadWords, reachWords, skillEdited, skillFormOf } from '../src/lib/skills.ts';
+import {
+  costWords,
+  draftOfForm,
+  drawnSkill,
+  EMPTY_SKILL_FORM,
+  givenRows,
+  offerOf,
+  PLACE_LABELS,
+  preloadWords,
+  reachWords,
+  skillEdited,
+  skillFormOf,
+} from '../src/lib/skills.ts';
 
 const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
   name: 'write-a-note',
@@ -27,21 +39,40 @@ test('the places are named as the picker groups them', () => {
 });
 
 test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {
-  assert.equal(costWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }), 'named — about 12 tokens a turn, and about 1,500 more in a turn that loads it');
+  assert.equal(
+    costWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }),
+    'named — about 12 tokens a turn, and about 1,500 more in a turn that loads it',
+  );
   assert.equal(costWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), 'loaded every turn — about 1,512 tokens (cached)');
 });
 
-test("a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read", () => {
+test('a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read', () => {
   const read: GivenSkill[] = [{ name: 'old', from: 'repo', entry: null, error: 'as read', preload: false, cost: null }];
   const shipped = row({ name: 'ship-it', from: 'shipped' });
   const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [shipped]));
-  assert.deepEqual(rows.map((r) => [r.name, r.from]), [['write-a-note', 'yours'], ['old', 'repo'], ['ship-it', null]], 'a shipped skill is not found by an agent of yours');
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.from]),
+    [
+      ['write-a-note', 'yours'],
+      ['old', 'repo'],
+      ['ship-it', null],
+    ],
+    'a shipped skill is not found by an agent of yours',
+  );
   assert.equal(rows[1]!.error, 'as read');
   assert.match(rows[2]!.error!, /^Neither your library nor this repository has `ship-it`/);
   // The list read again after a copy: the agent as read said it was missing, and the list now has it in your library.
-  const copied = givenRows(['gone'], [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }], places([row({ name: 'gone' })]));
+  const copied = givenRows(
+    ['gone'],
+    [{ name: 'gone', from: null, entry: null, error: 'No skills folder has `gone`', preload: false, cost: null }],
+    places([row({ name: 'gone' })]),
+  );
   assert.deepEqual([copied[0]!.from, copied[0]!.error], ['yours', null], 'what the list says now wins over what the agent was read with');
-  assert.deepEqual(givenRows(['typed'], [], undefined).map((r) => [r.from, r.error]), [[null, null]], 'before the list is read a new name is not called missing');
+  assert.deepEqual(
+    givenRows(['typed'], [], undefined).map((r) => [r.from, r.error]),
+    [[null, null]],
+    'before the list is read a new name is not called missing',
+  );
 });
 
 test('the picker offers Add for a skill of yours or the repository, and copy-and-add for a shipped one found nowhere', () => {
@@ -52,7 +83,10 @@ test('the picker offers Add for a skill of yours or the repository, and copy-and
 });
 
 test("REFUSED: no offer for a skill that does not read, and no copy of a shipped name an agent of yours already finds — it would write over yours or hide the repository's", () => {
-  assert.deepEqual(offerOf(row({ entry: null, error: 'SKILL.md has no frontmatter' }), []), { kind: 'refused', why: 'SKILL.md has no frontmatter' });
+  assert.deepEqual(offerOf(row({ entry: null, error: 'SKILL.md has no frontmatter' }), []), {
+    kind: 'refused',
+    why: 'SKILL.md has no frontmatter',
+  });
   assert.deepEqual(offerOf(row({ from: 'shipped', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
   assert.deepEqual(offerOf(row({ from: 'shipped', found: 'yours' }), []), { kind: 'found', where: 'yours' });
   assert.deepEqual(offerOf(row({ from: 'shipped', found: 'repo' }), []), { kind: 'found', where: 'repo' });
@@ -61,7 +95,15 @@ test("REFUSED: no offer for a skill that does not read, and no copy of a shipped
 const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
   skill: row(),
   version: 'v1',
-  draft: { name: 'write-a-note', title: 'Write a note', description: 'Writes the notes of a change.', tags: ['note', 'docs'], examples: null, preload: false, body: 'Write it.\n' },
+  draft: {
+    name: 'write-a-note',
+    title: 'Write a note',
+    description: 'Writes the notes of a change.',
+    tags: ['note', 'docs'],
+    examples: null,
+    preload: false,
+    body: 'Write it.\n',
+  },
   body: 'Write it.\n',
   users: [],
   copyHint: null,
@@ -69,13 +111,38 @@ const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
 });
 
 test("a skill's form is filled from its draft as written, and a skill that does not read keeps its name and instructions", () => {
-  assert.deepEqual(skillFormOf(detail()), { name: 'write-a-note', title: 'Write a note', description: 'Writes the notes of a change.', tags: 'note\ndocs', examples: '', body: 'Write it.\n' });
-  assert.deepEqual(skillFormOf(detail({ draft: null, body: 'Mend me.\n' })), { ...EMPTY_SKILL_FORM, name: 'write-a-note', body: 'Mend me.\n' });
+  assert.deepEqual(skillFormOf(detail()), {
+    name: 'write-a-note',
+    title: 'Write a note',
+    description: 'Writes the notes of a change.',
+    tags: 'note\ndocs',
+    examples: '',
+    body: 'Write it.\n',
+  });
+  assert.deepEqual(skillFormOf(detail({ draft: null, body: 'Mend me.\n' })), {
+    ...EMPTY_SKILL_FORM,
+    name: 'write-a-note',
+    body: 'Mend me.\n',
+  });
 });
 
 test('the form sends a blank title, tags or examples as none, one tag a line, and leaves the switch to the switch', () => {
-  const draft = draftOfForm({ name: ' a-skill ', title: '  ', description: ' Does a thing. ', tags: 'one\n\n  two  \n', examples: '\n', body: 'Do it.\n' });
-  assert.deepEqual(draft, { name: 'a-skill', title: null, description: 'Does a thing.', tags: ['one', 'two'], examples: null, body: 'Do it.\n' });
+  const draft = draftOfForm({
+    name: ' a-skill ',
+    title: '  ',
+    description: ' Does a thing. ',
+    tags: 'one\n\n  two  \n',
+    examples: '\n',
+    body: 'Do it.\n',
+  });
+  assert.deepEqual(draft, {
+    name: 'a-skill',
+    title: null,
+    description: 'Does a thing.',
+    tags: ['one', 'two'],
+    examples: null,
+    body: 'Do it.\n',
+  });
   assert.equal('preload' in draft, false);
 });
 
@@ -86,15 +153,24 @@ test('a form is edited when what it would write differs, not when only its blank
   assert.equal(skillEdited({ ...was, body: 'Write it well.\n' }, was), true);
 });
 
-test("the switch says what the other position would carry: on, the body every turn at four characters a token, cached", () => {
-  assert.equal(preloadWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }), 'On, its instructions are loaded every turn too — about 1,500 tokens more a turn, cached.');
-  assert.equal(preloadWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }), 'Off, a session is told only its name and what it does, and loads it when it needs it.');
+test('the switch says what the other position would carry: on, the body every turn at four characters a token, cached', () => {
+  assert.equal(
+    preloadWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }),
+    'On, its instructions are loaded every turn too — about 1,500 tokens more a turn, cached.',
+  );
+  assert.equal(
+    preloadWords({ preload: true, listed: 12, body: 1500, perTurn: 1512 }),
+    'Off, a session is told only its name and what it does, and loads it when it needs it.',
+  );
 });
 
 test('a change is said to reach every agent that gives the skill, by name, or none', () => {
   assert.equal(reachWords([]), 'No agent gives it yet: a change reaches none.');
   assert.equal(
-    reachWords([{ from: 'yours', name: 'coder' }, { from: 'repo', name: 'reviewer' }]),
+    reachWords([
+      { from: 'yours', name: 'coder' },
+      { from: 'repo', name: 'reviewer' },
+    ]),
     'A change, this switch included, changes every agent that gives it, from its next run: coder, reviewer (this repository).',
   );
 });

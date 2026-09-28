@@ -33,25 +33,27 @@ const filed = (taskId: string) => ({ kind: 'filed', at, brief: filedBrief(taskId
 const queuedTask = (taskId: string) => journal(taskId, [filed(taskId)]);
 
 /** A task the engine ran once and settled, which signed off with `closeout`. */
-const settledTask = (taskId: string, closeout: object) => journal(taskId, [
-  filed(taskId),
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-  { kind: 'settled', at, outcome: 'succeeded' },
-]);
+const settledTask = (taskId: string, closeout: object) =>
+  journal(taskId, [
+    filed(taskId),
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]);
 
 const later = '2026-09-12T00:40:00.000Z';
 
 /** A task on its second attempt, still running: the engine lost sight of the first. */
-const retryingTask = (taskId: string) => journal(taskId, [
-  { ...filed(taskId), maxAttempts: 2 },
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'failed', reason: 'lost' },
-  { kind: 'starting', at: later, attempt: 2 },
-  { kind: 'spawned', at: later, attempt: 2 },
-]);
+const retryingTask = (taskId: string) =>
+  journal(taskId, [
+    { ...filed(taskId), maxAttempts: 2 },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'failed', reason: 'lost' },
+    { kind: 'starting', at: later, attempt: 2 },
+    { kind: 'spawned', at: later, attempt: 2 },
+  ]);
 
 /**
  * A session of a detached harness — `codex`, or the run's `check` — as its worker leaves it on disk: a
@@ -66,7 +68,8 @@ const detachedSession = (harness: string, taskId: string, attempt: number, outpu
   if (typeof output === 'string') fs.writeFileSync(`${base}.log`, output);
   else fs.mkdirSync(`${base}.log`);
 };
-const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) => detachedSession('codex', taskId, attempt, output);
+const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) =>
+  detachedSession('codex', taskId, attempt, output);
 
 const workflowFolder = (files: Record<string, string>) => {
   const dir = scratch('hkb-api-workflow-');
@@ -86,20 +89,58 @@ const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Wh
  * `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. `raw` is the
  * statement as the engine recorded it.
  */
-const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: [{ path: 'NOTES.md' }], output: {}, missing: [], replies: null, schema: {}, raw: blocked };
+const blockedCloseout = {
+  outcome: 'blocked',
+  summary: 'Half of it is done.',
+  needs: 'Which database?',
+  artifacts: [{ path: 'NOTES.md' }],
+  output: {},
+  missing: [],
+  replies: null,
+  schema: {},
+  raw: blocked,
+};
 
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
-const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null; unreadable?: null }) => [{
-  try: 1, round: 1, then: null, current: true, note: null,
-  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout, unreadable: null, answer: null,
-}];
+const firstTry = (step: {
+  taskId: string | null;
+  status: string;
+  attempts: object;
+  check: object | null;
+  closeout: object | null;
+  unreadable?: null;
+}) => [
+  {
+    try: 1,
+    round: 1,
+    then: null,
+    current: true,
+    note: null,
+    taskId: step.taskId,
+    status: step.status,
+    attempts: step.attempts,
+    check: step.check,
+    closeout: step.closeout,
+    unreadable: null,
+    answer: null,
+  },
+];
 
 /** The engine's record of a task `filed` journals: a codex task with nothing else said — which Codex runs in `workspace-write`. */
-const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, remote: null, tools: null, deadlineSeconds: null };
+const filedBare = {
+  model: null,
+  askedModel: null,
+  effort: null,
+  contextTokens: null,
+  permissionMode: null,
+  runsIn: { mode: 'workspace-write', by: 'default' },
+  remote: null,
+  tools: null,
+  deadlineSeconds: null,
+};
 
 /** A run as GET /api/runs lists it. */
-const listed = async (id: string) =>
-  (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+const listed = async (id: string) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
 
 test('health answers', async () => {
   const res = await app.request('/api/health');
@@ -114,46 +155,91 @@ test('an empty store lists no runs', async () => {
 
 test('runs are read from the workflow store and summarized, with what each step is doing', async () => {
   writeRun({
-    id: 'r-1', repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true,
-    brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
+    id: 'r-1',
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Do the thing',
+    workflowDir: '/code/app/workflows',
+    createdAt: '2026-09-12T00:00:00.000Z',
     steps: { implement: { taskId: 't-1', branch: 'wf/r-1/implement' }, review: { taskId: null } },
   });
   fs.writeFileSync(path.join(root, 'runs', 'r-1.cancelled'), '2026-09-12T01:00:00.000Z');
 
   const res = await app.request('/api/runs');
-  assert.deepEqual(await res.json(), [{
-    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Do the thing', workflowDir: '/code/app/workflows', try: null, createdAt: '2026-09-12T00:00:00.000Z',
-    // Started, and none of its filings on the feed (there is none here): when it was created.
-    startedAt: '2026-09-12T00:00:00.000Z',
-    cancelledAt: '2026-09-12T01:00:00.000Z',
-    // Nobody pruned it: no mark beside its status.
-    pruned: null,
-    // Started without `--after`: it waits on no run.
-    after: [],
-    waiting: null,
-    heldUntil: [],
-    holding: null,
-    status: 'cancelled',
-    moving: false,
-    // Nothing of it was measured: no cost, which is not $0.
-    cost: null,
-    steps: [
-      // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
-      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null },
-      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null, needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null },
-    ],
-    // No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page.
-    graph: { roots: ['implement', 'review'], edges: [] },
-    waitingOnYou: [],
-    onYou: [],
-    // Called off: nothing to decide about a result nobody is waiting for.
-    toDecide: null,
-  }]);
+  assert.deepEqual(await res.json(), [
+    {
+      id: 'r-1',
+      repo: '/code/app',
+      place: 'git',
+      work: null,
+      brief: 'Do the thing',
+      workflowDir: '/code/app/workflows',
+      try: null,
+      createdAt: '2026-09-12T00:00:00.000Z',
+      // Started, and none of its filings on the feed (there is none here): when it was created.
+      startedAt: '2026-09-12T00:00:00.000Z',
+      cancelledAt: '2026-09-12T01:00:00.000Z',
+      // Nobody pruned it: no mark beside its status.
+      pruned: null,
+      // Started without `--after`: it waits on no run.
+      after: [],
+      waiting: null,
+      heldUntil: [],
+      holding: null,
+      status: 'cancelled',
+      moving: false,
+      // Nothing of it was measured: no cost, which is not $0.
+      cost: null,
+      steps: [
+        // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
+        {
+          name: 'implement',
+          taskId: 't-1',
+          branch: 'wf/r-1/implement',
+          status: 'unknown',
+          note: null,
+          needs: null,
+          blockedByHarness: false,
+          waitingFor: null,
+          approve: null,
+          denied: null,
+        },
+        {
+          name: 'review',
+          taskId: null,
+          branch: null,
+          status: 'waiting',
+          note: null,
+          needs: null,
+          blockedByHarness: false,
+          waitingFor: null,
+          approve: null,
+          denied: null,
+        },
+      ],
+      // No workflow frozen and no folder to read: nothing says what waits on what, so every step is a root, as on the run's page.
+      graph: { roots: ['implement', 'review'], edges: [] },
+      waitingOnYou: [],
+      onYou: [],
+      // Called off: nothing to decide about a result nobody is waiting for.
+      toDecide: null,
+    },
+  ]);
 });
 
 const r2 = {
-  id: 'r-2', repo: '/code/app', workspace: '/code/app/.wt/r-2', baseRef: 'def456', branch: 'main', isolate: true,
-  brief: 'Add a cache\n\nKeep it small.', workflowDir, createdAt: '2026-09-12T02:00:00.000Z',
+  id: 'r-2',
+  repo: '/code/app',
+  workspace: '/code/app/.wt/r-2',
+  baseRef: 'def456',
+  branch: 'main',
+  isolate: true,
+  brief: 'Add a cache\n\nKeep it small.',
+  workflowDir,
+  createdAt: '2026-09-12T02:00:00.000Z',
   steps: {
     implement: { taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement' },
     review: { taskId: null },
@@ -164,19 +250,57 @@ const r2 = {
  * The timeline of a step whose one task settled as `settledTask` journals it — filed, spawned and ended all at `at` — in a store that keeps
  * no feed, so its filing, and the queue, is not known: never 0. What its session used is nobody's count.
  */
-const settledTimeline = (taskId: string) => [{
-  try: 1, round: 1, sessionOf: null, check: null,
-  session: { taskId, at: 'ended', filedAt: null, spawnedAt: at, endedAt: at, attempts: 1, queuedMs: null, ranMs: 0, queued: 'not known', ran: '0s' },
-  used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
-}];
+const settledTimeline = (taskId: string) => [
+  {
+    try: 1,
+    round: 1,
+    sessionOf: null,
+    check: null,
+    session: {
+      taskId,
+      at: 'ended',
+      filedAt: null,
+      spawnedAt: at,
+      endedAt: at,
+      attempts: 1,
+      queuedMs: null,
+      ranMs: 0,
+      queued: 'not known',
+      ran: '0s',
+    },
+    used: {
+      usage: null,
+      used: 'not measured',
+      cost: 'not measured',
+      costUsd: null,
+      apiMs: null,
+      toolMs: null,
+      read: null,
+      peak: null,
+      rebuilt: 0,
+    },
+  },
+];
 
 /** The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can know. */
 const oneTaskTotals = () => ({
   rounds: [],
-  run: { loop: null, round: null, tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known', cost: null },
+  run: {
+    loop: null,
+    round: null,
+    tasks: 1,
+    inFlight: 0,
+    queuedMs: 0,
+    ranMs: 0,
+    wallMs: null,
+    queued: 'not known',
+    ran: '0s',
+    wall: 'not known',
+    cost: null,
+  },
 });
 
-test('a run in full: the brief, each step\'s spec and prose, what it was told, and how it went', async () => {
+test("a run in full: the brief, each step's spec and prose, what it was told, and how it went", async () => {
   settledTask('t-2', blocked);
   writeRun(r2);
 
@@ -184,64 +308,169 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   assert.equal(res.status, 200);
   const run = await res.json();
   const [implement, review] = run.steps;
-  assert.deepEqual({ ...run, steps: undefined }, {
-    id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', place: 'git', work: null, workflowDir, try: null, baseRef: 'def456',
-    branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', startedAt: '2026-09-12T02:00:00.000Z', cancelledAt: null, pruned: null, onDisk: { worktrees: false, files: false }, after: [], waiting: null, heldUntil: [], holding: null,
-    // implement signed off blocked, so review can never be filed: the run is over, and failed.
-    status: 'failed', moving: false, cost: null, read: null, waitingOnYou: ['implement'], onYou: ['implement'],
-    // Failed at implement: not a run at its result, so there is nothing about the result to decide.
-    toDecide: null,
-    // Gated at no step: no gate to wait at.
-    gates: [], warning: null,
-    graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
-    steps: undefined,
-    timeline: oneTaskTotals(),
-  });
+  assert.deepEqual(
+    { ...run, steps: undefined },
+    {
+      id: 'r-2',
+      brief: 'Add a cache\n\nKeep it small.',
+      repo: '/code/app',
+      place: 'git',
+      work: null,
+      workflowDir,
+      try: null,
+      baseRef: 'def456',
+      branch: 'main',
+      isolate: true,
+      createdAt: '2026-09-12T02:00:00.000Z',
+      startedAt: '2026-09-12T02:00:00.000Z',
+      cancelledAt: null,
+      pruned: null,
+      onDisk: { worktrees: false, files: false },
+      after: [],
+      waiting: null,
+      heldUntil: [],
+      holding: null,
+      // implement signed off blocked, so review can never be filed: the run is over, and failed.
+      status: 'failed',
+      moving: false,
+      cost: null,
+      read: null,
+      waitingOnYou: ['implement'],
+      onYou: ['implement'],
+      // Failed at implement: not a run at its result, so there is nothing about the result to decide.
+      toDecide: null,
+      // Gated at no step: no gate to wait at.
+      gates: [],
+      warning: null,
+      graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
+      steps: undefined,
+      timeline: oneTaskTotals(),
+    },
+  );
 
   const implementTry = {
-    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
+    taskId: 't-2',
+    status: 'succeeded · BLOCKED',
+    check: null,
+    closeout: blockedCloseout,
+    unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
   assert.deepEqual(implement, {
     name: 'implement',
-    spec: { harness: 'codex', model: 'gpt-5', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: 600, loop: null, rounds: null },
+    spec: {
+      harness: 'codex',
+      model: 'gpt-5',
+      effort: null,
+      context: null,
+      after: [],
+      workspace: null,
+      resume: null,
+      permissionMode: null,
+      sandbox: null,
+      tools: null,
+      deadlineSeconds: 600,
+      loop: null,
+      rounds: null,
+    },
     // The engine's record, not the folder's words: this journal was written with none of them.
     filed: filedBare,
     body: 'Implement the thing.',
     // What the engine was filed with, not the brief recomposed from today's folder and record.
     told: filedBrief('t-2'),
-    workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
+    workspace: '/code/app/.wt/r-2/implement',
+    branch: 'wf/r-2/implement',
     // A git run's step works on a branch: it lists no files, whatever its worktree holds.
-    files: [], filesError: null,
+    files: [],
+    filesError: null,
     note: null,
     // Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet.
-    needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+    needs: 'Which database?',
+    blockedByHarness: false,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+    gate: null,
+    accepted: null,
+    lastLine: null,
+    said: [],
+    asked: null,
     ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
-    used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
-    spent: null, budget: null, raise: null,
+    used: {
+      usage: null,
+      used: 'not measured',
+      cost: 'not measured',
+      costUsd: null,
+      apiMs: null,
+      toolMs: null,
+      read: null,
+      peak: null,
+      rebuilt: 0,
+    },
+    spent: null,
+    budget: null,
+    raise: null,
     tries: firstTry(implementTry),
     timeline: settledTimeline('t-2'),
   });
 
-  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, unreadable: null, attempts: { count: 0, latest: null } };
-  assert.deepEqual({ ...review, told: undefined }, {
-    name: 'review',
-    spec: { harness: null, model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
-    // Not filed: the engine has filed it with nothing yet.
-    filed: null,
-    body: 'Review what implement did.',
-    told: undefined,
-    workspace: null, branch: null, files: [], filesError: null,
-    note: null,
-    needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
-    ...reviewTry,
-    // Not filed: it consumed nothing, and has no try on the clock.
-    used: null,
-    spent: null, budget: null, raise: null,
-    tries: firstTry(reviewTry),
-    timeline: [],
-  });
+  const reviewTry = {
+    taskId: null,
+    status: 'waiting',
+    check: null,
+    closeout: null,
+    unreadable: null,
+    attempts: { count: 0, latest: null },
+  };
+  assert.deepEqual(
+    { ...review, told: undefined },
+    {
+      name: 'review',
+      spec: {
+        harness: null,
+        model: null,
+        effort: null,
+        context: null,
+        after: ['implement'],
+        workspace: null,
+        resume: null,
+        permissionMode: null,
+        sandbox: null,
+        tools: null,
+        deadlineSeconds: null,
+        loop: null,
+        rounds: null,
+      },
+      // Not filed: the engine has filed it with nothing yet.
+      filed: null,
+      body: 'Review what implement did.',
+      told: undefined,
+      workspace: null,
+      branch: null,
+      files: [],
+      filesError: null,
+      note: null,
+      needs: null,
+      blockedByHarness: false,
+      waitingFor: null,
+      approve: null,
+      denied: null,
+      gate: null,
+      accepted: null,
+      lastLine: null,
+      said: [],
+      asked: null,
+      ...reviewTry,
+      // Not filed: it consumed nothing, and has no try on the clock.
+      used: null,
+      spent: null,
+      budget: null,
+      raise: null,
+      tries: firstTry(reviewTry),
+      timeline: [],
+    },
+  );
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
   assert.match(review.told, /already been worked in by: implement/);
@@ -250,7 +479,10 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
 
 test('a step that signed off blocked is waiting on you in the list too', async () => {
   const run = await listed('r-2');
-  assert.deepEqual(run.steps.map((s: { status: string }) => s.status), ['succeeded · BLOCKED', 'waiting']);
+  assert.deepEqual(
+    run.steps.map((s: { status: string }) => s.status),
+    ['succeeded · BLOCKED', 'waiting'],
+  );
   assert.deepEqual(run.waitingOnYou, ['implement']);
 });
 
@@ -277,7 +509,11 @@ test('the api words a step as list does — `unknown` for a task the engine has 
   for (const id of ['r-2', 'r-4', 'r-5']) {
     const words = await list(e, readRun(id));
     const run = await listed(id);
-    assert.deepEqual(run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })), words.steps, id);
+    assert.deepEqual(
+      run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })),
+      words.steps,
+      id,
+    );
     assert.deepEqual(run.waitingOnYou, words.waitingOnYou, id);
   }
 });
@@ -297,25 +533,89 @@ test('a run whose workflow folder is gone still answers, from its record', async
   assert.deepEqual((await listed('r-3')).graph, run.graph);
   assert.deepEqual(run.waitingOnYou, ['implement']);
   const implementTry = {
-    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
+    taskId: 't-2',
+    status: 'succeeded · BLOCKED',
+    check: null,
+    closeout: blockedCloseout,
+    unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
-  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, unreadable: null, attempts: { count: 0, latest: null } };
+  const reviewTry = {
+    taskId: null,
+    status: 'waiting',
+    check: null,
+    closeout: null,
+    unreadable: null,
+    attempts: { count: 0, latest: null },
+  };
   assert.deepEqual(run.steps, [
     {
-      name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
-      workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement', files: [], filesError: null,
-      note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+      name: 'implement',
+      spec: null,
+      filed: filedBare,
+      body: null,
+      told: filedBrief('t-2'),
+      workspace: '/code/app/.wt/r-2/implement',
+      branch: 'wf/r-2/implement',
+      files: [],
+      filesError: null,
+      note: null,
+      needs: 'Which database?',
+      blockedByHarness: false,
+      waitingFor: null,
+      approve: null,
+      denied: null,
+      gate: null,
+      accepted: null,
+      lastLine: null,
+      said: [],
+      asked: null,
       ...implementTry,
-      used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
-      spent: null, budget: null, raise: null,
+      used: {
+        usage: null,
+        used: 'not measured',
+        cost: 'not measured',
+        costUsd: null,
+        apiMs: null,
+        toolMs: null,
+        read: null,
+        peak: null,
+        rebuilt: 0,
+      },
+      spent: null,
+      budget: null,
+      raise: null,
       tries: firstTry(implementTry),
       timeline: settledTimeline('t-2'),
     },
     {
-      name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, files: [], filesError: null, note: null,
-      needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
-      ...reviewTry, used: null, spent: null, budget: null, raise: null, tries: firstTry(reviewTry), timeline: [],
+      name: 'review',
+      spec: null,
+      filed: null,
+      body: null,
+      told: null,
+      workspace: null,
+      branch: null,
+      files: [],
+      filesError: null,
+      note: null,
+      needs: null,
+      blockedByHarness: false,
+      waitingFor: null,
+      approve: null,
+      denied: null,
+      gate: null,
+      accepted: null,
+      lastLine: null,
+      said: [],
+      asked: null,
+      ...reviewTry,
+      used: null,
+      spent: null,
+      budget: null,
+      raise: null,
+      tries: firstTry(reviewTry),
+      timeline: [],
     },
   ]);
 
@@ -340,7 +640,9 @@ test('a folder changed since the run started keeps the steps that ran, and names
   });
   settledTask('t-6', blocked);
   writeRun({
-    ...r2, id: 'r-6', workflowDir: changed,
+    ...r2,
+    id: 'r-6',
+    workflowDir: changed,
     steps: { original: { taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original' }, review: { taskId: null } },
   });
   // Renamed after the run started: the folder still reads as a workflow, only not this run's.
@@ -351,30 +653,74 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.match(run.warning, /no longer has original/);
   assert.match(run.warning, /has replacement, which the run did not start with/);
   assert.deepEqual(run.waitingOnYou, ['original']);
-  assert.deepEqual(run.steps.map((s: { name: string }) => s.name), ['original', 'review', 'replacement']);
+  assert.deepEqual(
+    run.steps.map((s: { name: string }) => s.name),
+    ['original', 'review', 'replacement'],
+  );
 
   const [original, review, replacement] = run.steps;
   const originalTry = {
-    taskId: 't-6', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
+    taskId: 't-6',
+    status: 'succeeded · BLOCKED',
+    check: null,
+    closeout: blockedCloseout,
+    unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
   assert.deepEqual(original, {
-    name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
-    workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original', files: [], filesError: null,
-    note: null, needs: 'Which database?', blockedByHarness: false, waitingFor: null, approve: null, denied: null, gate: null, accepted: null, lastLine: null, said: [], asked: null,
+    name: 'original',
+    spec: null,
+    filed: filedBare,
+    body: null,
+    told: filedBrief('t-6'),
+    workspace: '/code/app/.wt/r-6/original',
+    branch: 'wf/r-6/original',
+    files: [],
+    filesError: null,
+    note: null,
+    needs: 'Which database?',
+    blockedByHarness: false,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+    gate: null,
+    accepted: null,
+    lastLine: null,
+    said: [],
+    asked: null,
     ...originalTry,
-    used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
-    spent: null, budget: null, raise: null,
+    used: {
+      usage: null,
+      used: 'not measured',
+      cost: 'not measured',
+      costUsd: null,
+      apiMs: null,
+      toolMs: null,
+      read: null,
+      peak: null,
+      rebuilt: 0,
+    },
+    spent: null,
+    budget: null,
+    raise: null,
     tries: firstTry(originalTry),
     timeline: settledTimeline('t-6'),
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
-  assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);
+  assert.deepEqual(
+    [replacement.body, replacement.taskId, replacement.status, replacement.closeout],
+    ['Do the original thing.', null, 'waiting', null],
+  );
 
   const summary = await listed('r-6');
-  assert.deepEqual(summary.steps.map((s: { name: string; status: string }) => [s.name, s.status]), [
-    ['original', 'succeeded · BLOCKED'], ['review', 'waiting'], ['replacement', 'waiting'],
-  ]);
+  assert.deepEqual(
+    summary.steps.map((s: { name: string; status: string }) => [s.name, s.status]),
+    [
+      ['original', 'succeeded · BLOCKED'],
+      ['review', 'waiting'],
+      ['replacement', 'waiting'],
+    ],
+  );
   assert.deepEqual(summary.waitingOnYou, ['original']);
 });
 
@@ -382,19 +728,58 @@ test('a folder changed since the run started keeps the steps that ran, and names
 const frozenLoop = [
   { name: 'implement', after: [], body: 'Implement it, as frozen.', harness: 'claude', model: 'opus' },
   {
-    name: 'review', after: ['implement'], body: 'Review it, as frozen.', harness: 'codex', loop: 'implement', rounds: 2,
-    output: { file: 'review.json', schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false } },
+    name: 'review',
+    after: ['implement'],
+    body: 'Review it, as frozen.',
+    harness: 'codex',
+    loop: 'implement',
+    rounds: 2,
+    output: {
+      file: 'review.json',
+      schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false },
+    },
   },
 ];
 
 const frozenSpecs = {
-  implement: { harness: 'claude', model: 'opus', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: null, rounds: null },
-  review: { harness: 'codex', model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: null, deadlineSeconds: null, loop: 'implement', rounds: 2 },
+  implement: {
+    harness: 'claude',
+    model: 'opus',
+    effort: null,
+    context: null,
+    after: [],
+    workspace: null,
+    resume: null,
+    permissionMode: null,
+    sandbox: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
+  },
+  review: {
+    harness: 'codex',
+    model: null,
+    effort: null,
+    context: null,
+    after: ['implement'],
+    workspace: null,
+    resume: null,
+    permissionMode: null,
+    sandbox: null,
+    tools: null,
+    deadlineSeconds: null,
+    loop: 'implement',
+    rounds: 2,
+  },
 };
 
 const frozenGraph = {
   roots: ['implement'],
-  edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }],
+  edges: [
+    { from: 'implement', to: 'review', kind: 'after' },
+    { from: 'review', to: 'implement', kind: 'loop', rounds: 2 },
+  ],
 };
 
 test('a run that froze its workflow draws from it when its folder does not read: spec, prose, what a step would be told, and the graph', async () => {
@@ -404,7 +789,13 @@ test('a run that froze its workflow draws from it when its folder does not read:
     'implement.md': '---\nharness: claude\nsomeNewerKey: yes\n---\nImplement it.\n',
     'review.md': '---\nafter: implement\nloop: implement\n---\nReview it.\n',
   });
-  writeRun({ ...r2, id: 'r-40', workflowDir: newer, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-40',
+    workflowDir: newer,
+    workflow: frozenLoop,
+    steps: { implement: { taskId: null }, review: { taskId: null } },
+  });
 
   const run = await (await app.request('/api/runs/r-40')).json();
   assert.match(run.warning, /no longer reads as a workflow/);
@@ -412,10 +803,13 @@ test('a run that froze its workflow draws from it when its folder does not read:
   // Not the pre-freeze record's warning, which would say the page has no spec to show.
   assert.doesNotMatch(run.warning, /without their spec or prose/);
   assert.match(run.warning, /the workflow the run froze/);
-  assert.deepEqual(run.steps.map((s: { name: string; spec: unknown; body: string }) => [s.name, s.spec, s.body]), [
-    ['implement', frozenSpecs.implement, 'Implement it, as frozen.'],
-    ['review', frozenSpecs.review, 'Review it, as frozen.'],
-  ]);
+  assert.deepEqual(
+    run.steps.map((s: { name: string; spec: unknown; body: string }) => [s.name, s.spec, s.body]),
+    [
+      ['implement', frozenSpecs.implement, 'Implement it, as frozen.'],
+      ['review', frozenSpecs.review, 'Review it, as frozen.'],
+    ],
+  );
   assert.deepEqual(run.graph, frozenGraph);
   // The list draws the card's flow off the same graph, with no read of the run.
   assert.deepEqual((await listed('r-40')).graph, frozenGraph);
@@ -423,23 +817,41 @@ test('a run that froze its workflow draws from it when its folder does not read:
   assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), run.steps[0].told);
 
   // And with no folder at all: the same page.
-  writeRun({ ...r2, id: 'r-41', workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-41',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: frozenLoop,
+    steps: { implement: { taskId: null }, review: { taskId: null } },
+  });
   const gone = await (await app.request('/api/runs/r-41')).json();
   assert.match(gone.warning, /is gone\. Nothing here is read from it/);
-  assert.deepEqual(gone.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
+  assert.deepEqual(
+    gone.steps.map((s: { spec: unknown }) => s.spec),
+    [frozenSpecs.implement, frozenSpecs.review],
+  );
   assert.deepEqual(gone.graph, frozenGraph);
   assert.deepEqual((await listed('r-41')).graph, frozenGraph);
 });
 
 test('a run frozen before stage 4a part 2 with a step of `maxAttempts: 2` still reads, and its spec no longer carries the key', async () => {
   const frozen = frozenLoop.map((s) => (s.name === 'review' ? { ...s, maxAttempts: 2 } : s));
-  writeRun({ ...r2, id: 'r-44', workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: frozen, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-44',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: frozen,
+    steps: { implement: { taskId: null }, review: { taskId: null } },
+  });
   const response = await app.request('/api/runs/r-44');
   assert.equal(response.status, 200);
   const run = await response.json();
-  assert.deepEqual(run.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
+  assert.deepEqual(
+    run.steps.map((s: { spec: unknown }) => s.spec),
+    [frozenSpecs.implement, frozenSpecs.review],
+  );
   assert.equal('maxAttempts' in run.steps[1].spec, false);
-  assert.ok((await listed('r-44')), 'and it lists');
+  assert.ok(await listed('r-44'), 'and it lists');
 });
 
 test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
@@ -448,12 +860,24 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
     'implement.md': '---\nharness: codex\n---\nImplement it, edited.\n',
     'review.md': '---\nharness: claude\n---\nReview it, edited.\n',
   });
-  writeRun({ ...r2, id: 'r-42', workflowDir: edited, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-42',
+    workflowDir: edited,
+    workflow: frozenLoop,
+    steps: { implement: { taskId: null }, review: { taskId: null } },
+  });
 
   const run = await (await app.request('/api/runs/r-42')).json();
   assert.equal(run.warning, null);
-  assert.deepEqual(run.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
-  assert.deepEqual(run.steps.map((s: { body: string }) => s.body), ['Implement it, as frozen.', 'Review it, as frozen.']);
+  assert.deepEqual(
+    run.steps.map((s: { spec: unknown }) => s.spec),
+    [frozenSpecs.implement, frozenSpecs.review],
+  );
+  assert.deepEqual(
+    run.steps.map((s: { body: string }) => s.body),
+    ['Implement it, as frozen.', 'Review it, as frozen.'],
+  );
   assert.deepEqual(run.graph, frozenGraph);
   // And so is its card: not the edited folder's graph, which has no edge at all.
   assert.deepEqual((await listed('r-42')).graph, frozenGraph);
@@ -467,17 +891,35 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
     'review.md': '---\nafter: implement\n---\nReview it.\n',
     'docs.md': 'Write it down.\n',
   });
-  writeRun({ ...r2, id: 'r-43', workflowDir: grown, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-43',
+    workflowDir: grown,
+    workflow: frozenLoop,
+    steps: { implement: { taskId: null }, review: { taskId: null } },
+  });
 
   const run = await (await app.request('/api/runs/r-43')).json();
-  assert.match(run.warning, /has changed since this run started: it has docs, which the run did not start with and will never file, so it is not shown\./);
-  assert.deepEqual(run.steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  assert.match(
+    run.warning,
+    /has changed since this run started: it has docs, which the run did not start with and will never file, so it is not shown\./,
+  );
+  assert.deepEqual(
+    run.steps.map((s: { name: string }) => s.name),
+    ['implement', 'review'],
+  );
   // Not a root beside implement: the graph is the one the run froze.
   assert.deepEqual(run.graph, frozenGraph);
   assert.deepEqual((await listed('r-43')).graph, frozenGraph);
-  assert.deepEqual((await listed('r-43')).steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  assert.deepEqual(
+    (await listed('r-43')).steps.map((s: { name: string }) => s.name),
+    ['implement', 'review'],
+  );
   // The steps `wf ls` lists, and no other.
-  assert.deepEqual((await list(engine(), readRun('r-43'))).steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  assert.deepEqual(
+    (await list(engine(), readRun('r-43'))).steps.map((s: { name: string }) => s.name),
+    ['implement', 'review'],
+  );
   assert.equal((await app.request('/api/runs/r-43/steps/docs/log')).status, 404);
 });
 
@@ -503,11 +945,14 @@ test('each step says how many attempts it has had, when the latest began, and ho
   writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
 
   const run = await (await app.request('/api/runs/r-7')).json();
-  assert.deepEqual(run.steps.map((s: { attempts: unknown }) => s.attempts), [
-    // The second attempt is still going, so it has not ended; the one the engine lost is counted.
-    { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null } },
-    { count: 0, latest: null },
-  ]);
+  assert.deepEqual(
+    run.steps.map((s: { attempts: unknown }) => s.attempts),
+    [
+      // The second attempt is still going, so it has not ended; the one the engine lost is counted.
+      { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null } },
+      { count: 0, latest: null },
+    ],
+  );
 
   // An attempt that ran half an hour: its end is its `ended` event's, not its start's, so the board can say how long it took.
   journal('t-8', [
@@ -525,13 +970,14 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   // A session that ended with no statement where its task asked for one: since stage 4a the runtime says so as a fact,
   // `stated: false`, and settles it as its harness ended it — the api says what it said before, off the orchestrator's reading.
-  const quiet = (taskId: string, end: object, settled: string) => journal(taskId, [
-    { ...filed(taskId), closeoutSchema: { type: 'object' } },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at: later, attempt: 1, sessionId: `ae/${taskId}/1`, ...end },
-    { kind: 'settled', at: later, outcome: settled },
-  ]);
+  const quiet = (taskId: string, end: object, settled: string) =>
+    journal(taskId, [
+      { ...filed(taskId), closeoutSchema: { type: 'object' } },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      { kind: 'ended', at: later, attempt: 1, sessionId: `ae/${taskId}/1`, ...end },
+      { kind: 'settled', at: later, outcome: settled },
+    ]);
   const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
   quiet('t-8u', { observed: 'done', reason: 'harness', stated: false }, 'succeeded');
   writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
@@ -561,7 +1007,18 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   // The list is kept as it was, with the note `wf ls` prints beside a step — none, for a step on its first try — and what a person
   // has to know to act on it.
-  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied']);
+  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), [
+    'name',
+    'taskId',
+    'branch',
+    'status',
+    'note',
+    'needs',
+    'blockedByHarness',
+    'waitingFor',
+    'approve',
+    'denied',
+  ]);
   assert.equal((await listed('r-7')).steps[0].note, null);
 });
 
@@ -572,7 +1029,7 @@ const logOf = async (url: string) => {
   return { status: res.status, body: await res.json() };
 };
 
-test('a step\'s log is the end of its session\'s output: the last 200 lines, and whether there were more', async () => {
+test("a step's log is the end of its session's output: the last 200 lines, and whether there were more", async () => {
   settledTask('t-8', blocked);
   codexSession('t-8', 1, numbered(250).join('\n') + '\n');
   writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
@@ -591,7 +1048,7 @@ test('a step\'s log is the end of its session\'s output: the last 200 lines, and
   });
 });
 
-test('a step with no task has no log yet, and one filed but not started has the engine\'s word for it', async () => {
+test("a step with no task has no log yet, and one filed but not started has the engine's word for it", async () => {
   assert.deepEqual(await logOf('/api/runs/r-8/steps/review/log'), { status: 200, body: { lines: [], truncated: false } });
   // A step the folder gained after the run started has no task either.
   assert.deepEqual(await logOf('/api/runs/r-6/steps/replacement/log'), { status: 200, body: { lines: [], truncated: false } });
@@ -614,7 +1071,11 @@ test('a log for a run or a step that does not exist is refused with a 404 that s
   assert.match(noStep.body.error, /GET \/api\/runs\/r-8 lists the steps/);
 
   // Names every object answers to are not steps, and a run id is not a path out of the store.
-  for (const url of ['/api/runs/r-8/steps/constructor/log', '/api/runs/r-8/steps/__proto__/log', '/api/runs/..%2Fescape/steps/implement/log']) {
+  for (const url of [
+    '/api/runs/r-8/steps/constructor/log',
+    '/api/runs/r-8/steps/__proto__/log',
+    '/api/runs/..%2Fescape/steps/implement/log',
+  ]) {
     assert.equal((await app.request(url)).status, 404, url);
   }
 });
@@ -635,29 +1096,36 @@ test('output the engine cannot read is a 502 that says how to read it from the c
 const done = { outcome: 'done', summary: 'It is done.', needs: null, artifacts: [] };
 
 /** A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one. */
-const checkTask = (taskId: string, how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number }) => journal(taskId, [
-  { ...filed(taskId), harness: 'check' },
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-  ...('settled' in how
-    ? [
-        {
-          kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: how.settled === 'succeeded' ? 'done' : how.settled, reason: 'harness',
-          ...(how.exitCode === undefined ? {} : { exitCode: how.exitCode }),
-        },
-        { kind: 'settled', at, outcome: how.settled },
-      ]
-    : []),
-]);
+const checkTask = (taskId: string, how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number }) =>
+  journal(taskId, [
+    { ...filed(taskId), harness: 'check' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    ...('settled' in how
+      ? [
+          {
+            kind: 'ended',
+            at,
+            attempt: 1,
+            sessionId: `ae/${taskId}/1`,
+            observed: how.settled === 'succeeded' ? 'done' : how.settled,
+            reason: 'harness',
+            ...(how.exitCode === undefined ? {} : { exitCode: how.exitCode }),
+          },
+          { kind: 'settled', at, outcome: how.settled },
+        ]
+      : []),
+  ]);
 
 /** A task asked for a closeout, whose session ended without giving one. */
-const silentTask = (taskId: string) => journal(taskId, [
-  { ...filed(taskId), closeoutSchema: { type: 'object' } },
-  { kind: 'starting', at, attempt: 1 },
-  { kind: 'spawned', at, attempt: 1 },
-  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness' },
-  { kind: 'settled', at, outcome: 'succeeded' },
-]);
+const silentTask = (taskId: string) =>
+  journal(taskId, [
+    { ...filed(taskId), closeoutSchema: { type: 'object' } },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness' },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]);
 
 /** A test runner's stdout as the check's log keeps it: the command's output, then the exit code the run printed. */
 const refusedOutput = 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n';
@@ -691,10 +1159,16 @@ function seedChecks() {
   silentTask('t-20-notes');
   retryingTask('t-20-plan');
   writeRun({
-    ...r2, id: 'r-20', workflow: r20Steps,
+    ...r2,
+    id: 'r-20',
+    workflow: r20Steps,
     // The folder as somebody left it after `wf start`: the same steps, and every `check:` taken out. The
     // run is judged by the workflow it froze, so these change nothing.
-    workflowDir: workflowFolder(Object.fromEntries(r20Steps.map((s) => [`${s.name}.md`, `${s.after.length ? `---\nafter: ${s.after.join(', ')}\n---\n` : ''}${s.body}\n`]))),
+    workflowDir: workflowFolder(
+      Object.fromEntries(
+        r20Steps.map((s) => [`${s.name}.md`, `${s.after.length ? `---\nafter: ${s.after.join(', ')}\n---\n` : ''}${s.body}\n`]),
+      ),
+    ),
     steps: {
       build: { taskId: 't-20-build', check: { taskId: 'r-20-build-check' } },
       test: { taskId: 't-20-test', check: { taskId: 'r-20-test-check' } },
@@ -712,8 +1186,13 @@ function seedChecks() {
   checkTask('r-21-build-check', { settled: 'succeeded', exitCode: 0 });
   settledTask('t-21-docs', done);
   writeRun({
-    ...r2, id: 'r-21', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
-    workflow: [{ name: 'build', after: [], body: 'Build it.', check: 'npm run build' }, { name: 'docs', after: ['build'], body: 'Write it down.' }],
+    ...r2,
+    id: 'r-21',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [
+      { name: 'build', after: [], body: 'Build it.', check: 'npm run build' },
+      { name: 'docs', after: ['build'], body: 'Write it down.' },
+    ],
     steps: { build: { taskId: 't-21-build', check: { taskId: 'r-21-build-check' } }, docs: { taskId: 't-21-docs' } },
   });
 }
@@ -734,8 +1213,14 @@ test("each step says what the run established, in `wf ls`'s words, on both endpo
   ];
   const detail = await (await app.request('/api/runs/r-20')).json();
   const summary = await listed('r-20');
-  assert.deepEqual(detail.steps.map((s: Said) => [s.name, s.status]), words);
-  assert.deepEqual(summary.steps.map((s: Said) => [s.name, s.status]), words);
+  assert.deepEqual(
+    detail.steps.map((s: Said) => [s.name, s.status]),
+    words,
+  );
+  assert.deepEqual(
+    summary.steps.map((s: Said) => [s.name, s.status]),
+    words,
+  );
   // The refusals and the step that never signed; not a check still running, nor a step done on its own word.
   assert.deepEqual(detail.waitingOnYou, ['test', 'e2e', 'notes']);
   assert.deepEqual(summary.waitingOnYou, ['test', 'e2e', 'notes']);
@@ -747,8 +1232,15 @@ test("the api's words, and who it says is waited on, are `list`'s — a refused 
   for (const id of ['r-20', 'r-21']) {
     const words = await list(e, readRun(id));
     const detail = await (await app.request(`/api/runs/${id}`)).json();
-    for (const [where, run] of [['list', await listed(id)], ['detail', detail]]) {
-      assert.deepEqual(run.steps.map(({ name, status, branch }: Said) => ({ name, status, branch })), words.steps, `${id}, ${where}`);
+    for (const [where, run] of [
+      ['list', await listed(id)],
+      ['detail', detail],
+    ]) {
+      assert.deepEqual(
+        run.steps.map(({ name, status, branch }: Said) => ({ name, status, branch })),
+        words.steps,
+        `${id}, ${where}`,
+      );
       assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}`);
     }
   }
@@ -781,22 +1273,44 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
   checkTask('r-24-a-check', { settled: 'failed', exitCode: 1 });
   journal('t-24-b', [filed('t-24-b'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   writeRun({
-    ...r2, id: 'r-24', workflowDir: gone,
-    workflow: [{ name: 'a', after: [], body: 'A.', check: 'npm test' }, { name: 'b', after: [], body: 'B.' }, { name: 'c', after: ['a', 'b'], body: 'C.' }],
+    ...r2,
+    id: 'r-24',
+    workflowDir: gone,
+    workflow: [
+      { name: 'a', after: [], body: 'A.', check: 'npm test' },
+      { name: 'b', after: [], body: 'B.' },
+      { name: 'c', after: ['a', 'b'], body: 'C.' },
+    ],
     steps: { a: { taskId: 't-24-a', check: { taskId: 'r-24-a-check' } }, b: { taskId: 't-24-b' }, c: { taskId: null } },
   });
-  assert.deepEqual((await listed('r-24')).steps.map((s: Said) => [s.name, s.status]), [['a', 'failed ✗ check (exit 1)'], ['b', 'starting'], ['c', 'waiting']]);
+  assert.deepEqual(
+    (await listed('r-24')).steps.map((s: Said) => [s.name, s.status]),
+    [
+      ['a', 'failed ✗ check (exit 1)'],
+      ['b', 'starting'],
+      ['c', 'waiting'],
+    ],
+  );
 
   // One branch failed, nothing is running, and a step waiting only on the other branch is still to be filed.
   journal('t-25-a', [
-    filed('t-25-a'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
+    filed('t-25-a'),
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
     { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-25-a/1', observed: 'failed', reason: 'harness' },
     { kind: 'settled', at, outcome: 'failed' },
   ]);
   settledTask('t-25-b', done);
   writeRun({
-    ...r2, id: 'r-25', workflowDir: gone,
-    workflow: [{ name: 'a', after: [], body: 'A.' }, { name: 'b', after: [], body: 'B.' }, { name: 'c', after: ['b'], body: 'C.' }, { name: 'd', after: ['a'], body: 'D.' }],
+    ...r2,
+    id: 'r-25',
+    workflowDir: gone,
+    workflow: [
+      { name: 'a', after: [], body: 'A.' },
+      { name: 'b', after: [], body: 'B.' },
+      { name: 'c', after: ['b'], body: 'C.' },
+      { name: 'd', after: ['a'], body: 'D.' },
+    ],
     steps: { a: { taskId: 't-25-a' }, b: { taskId: 't-25-b' }, c: { taskId: null }, d: { taskId: null } },
   });
 
@@ -832,16 +1346,31 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
 
 test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {
   const gone = path.join(NOWHERE, 'no-such-workflow');
-  const retried = [{ name: 'a', after: [], body: 'A.', check: 'npm test', retries: 1 }, { name: 'b', after: ['a'], body: 'B.' }];
+  const retried = [
+    { name: 'a', after: [], body: 'A.', check: 'npm test', retries: 1 },
+    { name: 'b', after: ['a'], body: 'B.' },
+  ];
   // Refused: the check ran to its end and exited 1, and `retries: 1` leaves a try for the next tick to file.
   settledTask('t-27-a', done);
   checkTask('r-27-a-check', { settled: 'failed', exitCode: 1 });
   detachedSession('check', 'r-27-a-check', 1, refusedOutput, 1);
-  writeRun({ ...r2, id: 'r-27', workflowDir: gone, workflow: retried, steps: { a: { taskId: 't-27-a', check: { taskId: 'r-27-a-check' } }, b: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-27',
+    workflowDir: gone,
+    workflow: retried,
+    steps: { a: { taskId: 't-27-a', check: { taskId: 'r-27-a-check' } }, b: { taskId: null } },
+  });
   // F's review: stopped at its deadline, which the engine settles `failed` with no exit code. No try is spent on it.
   settledTask('t-28-a', done);
   checkTask('r-28-a-check', { settled: 'failed' });
-  writeRun({ ...r2, id: 'r-28', workflowDir: gone, workflow: retried, steps: { a: { taskId: 't-28-a', check: { taskId: 'r-28-a-check' } }, b: { taskId: null } } });
+  writeRun({
+    ...r2,
+    id: 'r-28',
+    workflowDir: gone,
+    workflow: retried,
+    steps: { a: { taskId: 't-28-a', check: { taskId: 'r-28-a-check' } }, b: { taskId: null } },
+  });
 
   const e = engine();
   const cases: Array<[id: string, status: string, moving: boolean, waitingOnYou: string[], word: string, why: string]> = [
@@ -850,8 +1379,15 @@ test('a check that refused with `retries:` left reads as the tick has it — run
   ];
   for (const [id, status, moving, waitingOnYou, word, why] of cases) {
     assert.deepEqual((await list(e, readRun(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
-    for (const [where, run] of [['list', await listed(id)], ['detail', await (await app.request(`/api/runs/${id}`)).json()]] as const) {
-      assert.deepEqual([run.status, run.moving, run.waitingOnYou, run.steps[0].status], [status, moving, waitingOnYou, word], `${id}, ${where}: ${why}`);
+    for (const [where, run] of [
+      ['list', await listed(id)],
+      ['detail', await (await app.request(`/api/runs/${id}`)).json()],
+    ] as const) {
+      assert.deepEqual(
+        [run.status, run.moving, run.waitingOnYou, run.steps[0].status],
+        [status, moving, waitingOnYou, word],
+        `${id}, ${where}: ${why}`,
+      );
     }
   }
 });
@@ -865,8 +1401,15 @@ test('a check that refused with `retries:` left reads as the tick has it — run
 const looped = [
   { name: 'implement', after: [], body: 'Implement it.' },
   {
-    name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: DEFAULT_ROUNDS,
-    output: { file: 'review.json', schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false } },
+    name: 'review',
+    after: ['implement'],
+    body: 'Review it.',
+    loop: 'implement',
+    rounds: DEFAULT_ROUNDS,
+    output: {
+      file: 'review.json',
+      schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false },
+    },
   },
 ];
 
@@ -901,16 +1444,30 @@ type Row = Said & { note: string | null };
 /** A step row as `list` has it: a note only where it prints one. */
 const asListed = ({ name, status, branch, note }: Row) => ({ name, status, branch, ...(note === null ? {} : { note }) });
 
-type Judgement = [id: string, status: string, moving: boolean, waitingOnYou: string[], rows: Array<[name: string, status: string, note: string | null]>, why: string];
+type Judgement = [
+  id: string,
+  status: string,
+  moving: boolean,
+  waitingOnYou: string[],
+  rows: Array<[name: string, status: string, note: string | null]>,
+  why: string,
+];
 
 /** Each run on both endpoints: where it stands, whether it moves, who it waits on, each step's word and note — and those are `wf ls`'s. */
 async function expectJudged(cases: readonly Judgement[]) {
   const e = engine();
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
     const words = await list(e, readRun(id));
-    for (const [where, run] of [['list', await listed(id)], ['detail', await (await app.request(`/api/runs/${id}`)).json()]] as const) {
+    for (const [where, run] of [
+      ['list', await listed(id)],
+      ['detail', await (await app.request(`/api/runs/${id}`)).json()],
+    ] as const) {
       assert.deepEqual([run.status, run.moving, run.waitingOnYou], [status, moving, waitingOnYou], `${id}, ${where}: ${why}`);
-      assert.deepEqual(run.steps.map((s: Row) => [s.name, s.status, s.note]), rows, `${id}, ${where}: ${why}`);
+      assert.deepEqual(
+        run.steps.map((s: Row) => [s.name, s.status, s.note]),
+        rows,
+        `${id}, ${where}: ${why}`,
+      );
       assert.deepEqual(run.steps.map(asListed), words.steps, `${id}, ${where}: wf ls's words and notes`);
       assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}: who wf ls says is waited on`);
     }
@@ -925,14 +1482,28 @@ test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not 
   askFor('r-31', 'round-review-4', { step: 'review', round: 4 });
 
   await expectJudged([
-    ['r-30', 'failed', false, ['review'], [
-      ['implement', 'unverified · done', 'round 3 of 3'],
-      ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: wf round r-30 review'],
-    ], 'at its cap, and it asked again: a person decides, and no tick files a thing'],
-    ['r-31', 'running', true, [], [
-      ['implement', 'unverified · done', 'round 3 of 3'],
-      ['review', 'rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
-    ], 'a person asked for round 4: the next tick files it, and nobody is waited on'],
+    [
+      'r-30',
+      'failed',
+      false,
+      ['review'],
+      [
+        ['implement', 'unverified · done', 'round 3 of 3'],
+        ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: wf round r-30 review'],
+      ],
+      'at its cap, and it asked again: a person decides, and no tick files a thing',
+    ],
+    [
+      'r-31',
+      'running',
+      true,
+      [],
+      [
+        ['implement', 'unverified · done', 'round 3 of 3'],
+        ['review', 'rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
+      ],
+      'a person asked for round 4: the next tick files it, and nobody is waited on',
+    ],
   ]);
 });
 
@@ -942,21 +1513,40 @@ test('a round the loop asked for, and a try a person asked for, read as the tick
   // Signed off blocked, and a person asked for another try with `wf retry r-33 implement`.
   settledTask('t-33-implement', blocked);
   writeRun({
-    ...r2, id: 'r-33', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
-    workflow: [{ name: 'implement', after: [], body: 'Implement it.' }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    ...r2,
+    id: 'r-33',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.' },
+      { name: 'review', after: ['implement'], body: 'Review it.' },
+    ],
     steps: { implement: { taskId: 't-33-implement' }, review: { taskId: null } },
   });
   askFor('r-33', 'retry-implement-2', { mode: 'nudge' });
 
   await expectJudged([
-    ['r-32', 'running', true, [], [
-      ['implement', 'unverified · done', null],
-      ['review', 'unverified · done', `round 2 of ${DEFAULT_ROUNDS} due — review asked again, and the next tick files implement`],
-    ], 'review asked again with rounds left: a round due moves the run as a try due does'],
-    ['r-33', 'running', true, [], [
-      ['implement', 'succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
-      ['review', 'waiting', null],
-    ], 'a person asked for another try: the next tick files it, and nobody is waited on'],
+    [
+      'r-32',
+      'running',
+      true,
+      [],
+      [
+        ['implement', 'unverified · done', null],
+        ['review', 'unverified · done', `round 2 of ${DEFAULT_ROUNDS} due — review asked again, and the next tick files implement`],
+      ],
+      'review asked again with rounds left: a round due moves the run as a try due does',
+    ],
+    [
+      'r-33',
+      'running',
+      true,
+      [],
+      [
+        ['implement', 'succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+        ['review', 'waiting', null],
+      ],
+      'a person asked for another try: the next tick files it, and nobody is waited on',
+    ],
   ]);
 });
 
@@ -983,18 +1573,25 @@ test("a step with a `check:` carries its command, and once its check refused, th
     command: 'npm run e2e',
     taskId: 'r-20-e2e-check',
     verdict: 'unfinished',
-    refused: { exit: 'unfinished', stdout: { lines: ['(no output yet)'], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: null },
+    refused: {
+      exit: 'unfinished',
+      stdout: { lines: ['(no output yet)'], truncated: false },
+      stderr: { lines: [], truncated: false },
+      unreadable: null,
+    },
   });
   // No `check:` in the workflow the run froze.
   for (const name of ['docs', 'notes', 'plan', 'ship']) assert.equal(checkOf(name), null, name);
 });
 
-test("a refused check whose output cannot be read still answers, and says how to read it from the command line", async () => {
+test('a refused check whose output cannot be read still answers, and says how to read it from the command line', async () => {
   settledTask('t-22-test', done);
   checkTask('r-22-test-check', { settled: 'failed', exitCode: 2 });
   detachedSession('check', 'r-22-test-check', 1, { unreadable: true }, 2);
   writeRun({
-    ...r2, id: 'r-22', workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    ...r2,
+    id: 'r-22',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
     workflow: [{ name: 'test', after: [], body: 'Test it.', check: 'npm test' }],
     steps: { test: { taskId: 't-22-test', check: { taskId: 'r-22-test-check' } } },
   });
@@ -1003,9 +1600,15 @@ test("a refused check whose output cannot be read still answers, and says how to
   assert.equal(res.status, 200);
   const [test] = (await res.json()).steps;
   assert.equal(test.status, 'failed ✗ check (exit 2)');
-  assert.deepEqual({ ...test.check.refused, unreadable: undefined }, {
-    exit: 'exit 2', stdout: { lines: [], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: undefined,
-  });
+  assert.deepEqual(
+    { ...test.check.refused, unreadable: undefined },
+    {
+      exit: 'exit 2',
+      stdout: { lines: [], truncated: false },
+      stderr: { lines: [], truncated: false },
+      unreadable: undefined,
+    },
+  );
   assert.match(test.check.refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
   assert.match(test.check.refused.unreadable, /`wf decide r-22`/);
 });
@@ -1032,7 +1635,10 @@ test('the list of runs observes the engine at most once, however many runs and s
   const runs: Array<{ steps: Array<{ taskId: string | null; status: string }> }> = await res.json();
   // A view per filed step would have observed once for each of these, and reading a refused check's log once more for each of those.
   assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
-  assert.ok(runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'), 'a refused check, worded with its exit code, is on the list');
+  assert.ok(
+    runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'),
+    'a refused check, worded with its exit code, is on the list',
+  );
   // Queued, settled and refused, none of them in flight: no harness is looked at (`list(taskIds)`). Once for any number of background
   // sessions in flight is `asks.test.ts`'s, with three the harness blocked.
   assert.equal(observations(), 0);
@@ -1061,9 +1667,16 @@ const gone = path.join(NOWHERE, 'no-such-workflow');
 test('a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation', async (t) => {
   // implement's check refused its first try, and `retries: 1` filed a second, which passed; review asked for another round, and
   // the loop filed implement's third try, which answered the findings and passed; review then asked for no more.
-  const findings = [{ file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' }, { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' }];
+  const findings = [
+    { file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' },
+    { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' },
+  ];
   const replies = [
-    { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now, and a test waits it out.' },
+    {
+      finding: 'src/cache.ts:12 — the cache never expires',
+      answer: 'fixed',
+      why: 'Entries expire after the TTL now, and a test waits it out.',
+    },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'It is counted once per layer, on purpose.' },
   ];
   const said = {
@@ -1084,17 +1697,30 @@ test('a step on its third try, in the second round of its loop, carries every tr
   checkTask('r-50-implement-try3-check', { settled: 'succeeded', exitCode: 0 });
   settledTask('r-50-review-try2', said.review2);
   const reviewOutput = {
-    type: 'object', properties: { again: { type: 'boolean' }, findings: { type: 'array' } }, required: ['again', 'findings'], additionalProperties: false,
+    type: 'object',
+    properties: { again: { type: 'boolean' }, findings: { type: 'array' } },
+    required: ['again', 'findings'],
+    additionalProperties: false,
   };
   writeRun({
-    ...r2, id: 'r-50', workflowDir: gone,
+    ...r2,
+    id: 'r-50',
+    workflowDir: gone,
     workflow: [
       { name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 },
-      { name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: DEFAULT_ROUNDS, output: { file: 'review.json', schema: reviewOutput } },
+      {
+        name: 'review',
+        after: ['implement'],
+        body: 'Review it.',
+        loop: 'implement',
+        rounds: DEFAULT_ROUNDS,
+        output: { file: 'review.json', schema: reviewOutput },
+      },
     ],
     steps: {
       implement: {
-        taskId: 'r-50-implement-try3', check: { taskId: 'r-50-implement-try3-check' },
+        taskId: 'r-50-implement-try3',
+        check: { taskId: 'r-50-implement-try3-check' },
         tries: [
           { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, then: 'retries' },
           { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, then: 'round' },
@@ -1113,28 +1739,69 @@ test('a step on its third try, in the second round of its loop, carries every tr
 
   const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
   // Each closeout with what was recorded, untouched, as `raw`: `replies` is read into the api's shape, and the statement is not.
-  const closeout = (raw: { summary: string }, more: object = {}) => ({ outcome: 'done', summary: raw.summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, schema: {}, raw, ...more });
+  const closeout = (raw: { summary: string }, more: object = {}) => ({
+    outcome: 'done',
+    summary: raw.summary,
+    needs: null,
+    artifacts: [],
+    output: {},
+    missing: [],
+    replies: null,
+    schema: {},
+    raw,
+    ...more,
+  });
   const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: 'passed', refused: null });
   const [implement, review] = run.steps;
   assert.deepEqual([implement.status, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
   assert.deepEqual(implement.tries, [
     {
-      try: 1, round: 1, then: 'retries', current: false, taskId: 'r-50-implement', note: null, status: 'succeeded', attempts: once,
+      try: 1,
+      round: 1,
+      then: 'retries',
+      current: false,
+      taskId: 'r-50-implement',
+      note: null,
+      status: 'succeeded',
+      attempts: once,
       // Its check refused: the verdict, and its stderr, which is a file. Its output is not read for a try that is over.
       check: {
-        command: 'npm test', taskId: 'r-50-implement-check', verdict: 'exit 1',
+        command: 'npm test',
+        taskId: 'r-50-implement-check',
+        verdict: 'exit 1',
         refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
       },
-      closeout: closeout(said.implement), unreadable: null,
+      closeout: closeout(said.implement),
+      unreadable: null,
       answer: null,
     },
     {
-      try: 2, round: 1, then: 'round', current: false, taskId: 'r-50-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: once,
-      check: passed('r-50-implement-try2-check'), closeout: closeout(said.implement2), unreadable: null, answer: null,
+      try: 2,
+      round: 1,
+      then: 'round',
+      current: false,
+      taskId: 'r-50-implement-try2',
+      note: 'try 2, by retries: 1',
+      status: 'succeeded',
+      attempts: once,
+      check: passed('r-50-implement-try2-check'),
+      closeout: closeout(said.implement2),
+      unreadable: null,
+      answer: null,
     },
     {
-      try: 3, round: 2, then: null, current: true, taskId: 'r-50-implement-try3', note: 'round 2 of 3', status: 'verified ✓', attempts: once,
-      check: passed('r-50-implement-try3-check'), closeout: closeout(said.implement3, { replies }), unreadable: null, answer: null,
+      try: 3,
+      round: 2,
+      then: null,
+      current: true,
+      taskId: 'r-50-implement-try3',
+      note: 'round 2 of 3',
+      status: 'verified ✓',
+      attempts: once,
+      check: passed('r-50-implement-try3-check'),
+      closeout: closeout(said.implement3, { replies }),
+      unreadable: null,
+      answer: null,
     },
   ]);
   // The current try is where it was: the step's own check and closeout are its.
@@ -1142,14 +1809,32 @@ test('a step on its third try, in the second round of its loop, carries every tr
 
   assert.deepEqual(review.tries, [
     {
-      try: 1, round: 1, then: 'round', current: false, taskId: 'r-50-review', note: null, status: 'succeeded', attempts: once, check: null,
+      try: 1,
+      round: 1,
+      then: 'round',
+      current: false,
+      taskId: 'r-50-review',
+      note: null,
+      status: 'succeeded',
+      attempts: once,
+      check: null,
       // What it declared, in its schema's order: the findings implement was handed, and each field's schema off the frozen workflow.
-      closeout: closeout(said.review, { output: { again: true, findings }, schema: reviewOutput.properties }), unreadable: null,
+      closeout: closeout(said.review, { output: { again: true, findings }, schema: reviewOutput.properties }),
+      unreadable: null,
       answer: null,
     },
     {
-      try: 2, round: 2, then: null, current: true, taskId: 'r-50-review-try2', note: 'round 2 of 3', status: review.status, attempts: once, check: null,
-      closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }), unreadable: null,
+      try: 2,
+      round: 2,
+      then: null,
+      current: true,
+      taskId: 'r-50-review-try2',
+      note: 'round 2 of 3',
+      status: review.status,
+      attempts: once,
+      check: null,
+      closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }),
+      unreadable: null,
       answer: null,
     },
   ]);
@@ -1163,19 +1848,32 @@ test("a closeout carries each declared field's schema off the workflow the run f
       approach: { type: 'string', description: 'The change in a paragraph.' },
       files: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, change: { type: 'string' } } } },
     },
-    required: ['approach', 'files'], additionalProperties: false,
+    required: ['approach', 'files'],
+    additionalProperties: false,
   };
   // An outcome that is neither word, an artifact that is not a path, a field nobody declared: read forgivingly, and kept as said.
-  const said = { outcome: 'finished', summary: 'A plan.', needs: null, artifacts: ['PLAN.md', 7], approach: 'Cache it.', aside: { mood: 'fine' } };
+  const said = {
+    outcome: 'finished',
+    summary: 'A plan.',
+    needs: null,
+    artifacts: ['PLAN.md', 7],
+    approach: 'Cache it.',
+    aside: { mood: 'fine' },
+  };
   settledTask('r-51-plan', said);
   writeRun({
-    ...r2, id: 'r-51', workflowDir: gone,
+    ...r2,
+    id: 'r-51',
+    workflowDir: gone,
     workflow: [{ name: 'plan', after: [], body: 'Plan it.', output: { file: 'plan.json', schema } }],
     steps: { plan: { taskId: 'r-51-plan' } },
   });
   const run = await (await app.request('/api/runs/r-51')).json();
   const { closeout } = run.steps[0];
-  assert.deepEqual([closeout.outcome, closeout.artifacts, closeout.output, closeout.missing], ['done', [{ path: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']]);
+  assert.deepEqual(
+    [closeout.outcome, closeout.artifacts, closeout.output, closeout.missing],
+    ['done', [{ path: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']],
+  );
   // The folder is gone: the schema is the record's, a field's own, `files` among them though it was not given.
   assert.deepEqual(closeout.schema, schema.properties);
   assert.deepEqual(closeout.raw, said);
@@ -1184,13 +1882,22 @@ test("a closeout carries each declared field's schema off the workflow the run f
 test('a statement that could not be read reaches the board as it came, with why — and a readable one has nothing unreadable', async () => {
   // Cut off mid-string, and an array: neither is a closeout; each is what the agent said, and the board shows it whole.
   const cut = '{"outcome": "done", "summary": "Cut off';
-  for (const [id, said] of [['r-52-cut', cut], ['r-52-list', ['done']]] as const) {
+  for (const [id, said] of [
+    ['r-52-cut', cut],
+    ['r-52-list', ['done']],
+  ] as const) {
     settledTask(id, said as unknown as object);
   }
   settledTask('r-52-fine', { outcome: 'done', summary: 'Fine.' });
   writeRun({
-    ...r2, id: 'r-52', workflowDir: gone,
-    workflow: [{ name: 'cut', after: [], body: 'Say it.' }, { name: 'list', after: [], body: 'Say it.' }, { name: 'fine', after: [], body: 'Say it.' }],
+    ...r2,
+    id: 'r-52',
+    workflowDir: gone,
+    workflow: [
+      { name: 'cut', after: [], body: 'Say it.' },
+      { name: 'list', after: [], body: 'Say it.' },
+      { name: 'fine', after: [], body: 'Say it.' },
+    ],
     steps: { cut: { taskId: 'r-52-cut' }, list: { taskId: 'r-52-list' }, fine: { taskId: 'r-52-fine' } },
   });
   const [c, l, f] = (await (await app.request('/api/runs/r-52')).json()).steps;
@@ -1204,23 +1911,54 @@ test('a statement that could not be read reaches the board as it came, with why 
   assert.equal(f.closeout.summary, 'Fine.');
 });
 
-test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {
+test("a step says what it runs with: the workflow's effort, context window and tools, and what the engine filed its try with where the workflow says nothing", async () => {
   // Filed as the tick files a step — with its effort, window and tools — and, as a step that sets neither, with no deadline.
-  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] } });
+  await engine().file({
+    id: 'r-51-implement',
+    brief: 'Implement it.',
+    cwd: '/code/app',
+    harness: 'claude',
+    config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] },
+  });
   writeRun({
-    ...r2, id: 'r-51', workflowDir: gone,
-    workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', context: 200_000, tools: ['Read', 'Grep'] }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    ...r2,
+    id: 'r-51',
+    workflowDir: gone,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', context: 200_000, tools: ['Read', 'Grep'] },
+      { name: 'review', after: ['implement'], body: 'Review it.' },
+    ],
     steps: { implement: { taskId: 'r-51-implement' }, review: { taskId: null } },
   });
 
   const [implement, review] = (await (await app.request('/api/runs/r-51')).json()).steps;
   assert.deepEqual(implement.spec, {
-    harness: 'claude', model: null, effort: 'high', context: 200_000, after: [], workspace: null, resume: null, permissionMode: null, sandbox: null, tools: ['Read', 'Grep'], deadlineSeconds: null, loop: null, rounds: null,
+    harness: 'claude',
+    model: null,
+    effort: 'high',
+    context: 200_000,
+    after: [],
+    workspace: null,
+    resume: null,
+    permissionMode: null,
+    sandbox: null,
+    tools: ['Read', 'Grep'],
+    deadlineSeconds: null,
+    loop: null,
+    rounds: null,
   });
   // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
   // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
   assert.deepEqual(implement.filed, {
-    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, remote: null, tools: ['Read', 'Grep'], deadlineSeconds: null,
+    model: null,
+    askedModel: null,
+    effort: 'high',
+    contextTokens: 200_000,
+    permissionMode: null,
+    runsIn: { mode: 'auto', by: 'default' },
+    remote: null,
+    tools: ['Read', 'Grep'],
+    deadlineSeconds: null,
   });
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);
@@ -1245,7 +1983,13 @@ test('a step says the mode its session runs in, as its harness decides it — a 
     // The step's keys are the workflow's; the engine is filed with the harness's arguments under `config`, as the tick files them.
     const { harness, ...config } = spec;
     await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness, config });
-    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    writeRun({
+      ...r2,
+      id,
+      workflowDir: gone,
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }],
+      steps: { implement: { taskId: `${id}-implement` } },
+    });
     const [implement] = (await (await app.request(`/api/runs/${id}`)).json()).steps;
     assert.deepEqual(implement.filed.runsIn, runsIn, id);
   }
@@ -1257,10 +2001,25 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   // and `claude-detached` share (`claudePrintFlags`) and the detached spec's `command` prints.
   // Seeded here, not borrowed from the test before, whose first wrong mode would stop it before it seeds the second.
   const said = new Map<string, string>();
-  for (const [id, permissionMode] of [['r-59-claude', undefined], ['r-59-claude-mode', 'dontAsk']] as const) {
+  for (const [id, permissionMode] of [
+    ['r-59-claude', undefined],
+    ['r-59-claude-mode', 'dontAsk'],
+  ] as const) {
     const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
-    await engine().file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness: 'claude', ...(permissionMode ? { config: { permissionMode } } : {}) });
-    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    await engine().file({
+      id: `${id}-implement`,
+      brief: 'Implement it.',
+      cwd: '/code/app',
+      harness: 'claude',
+      ...(permissionMode ? { config: { permissionMode } } : {}),
+    });
+    writeRun({
+      ...r2,
+      id,
+      workflowDir: gone,
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }],
+      steps: { implement: { taskId: `${id}-implement` } },
+    });
     const res = await app.request(`/api/runs/${id}`);
     assert.equal(res.status, 200, id);
     said.set(id, (await res.json()).steps[0].filed.runsIn.mode);
@@ -1278,7 +2037,9 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
     process.env.PATH = before;
   });
   const spawnedWith = async (permissionMode: string | undefined) => {
-    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) }));
+    await Effect.runPromise(
+      claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) }),
+    );
     const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
     return args[args.indexOf('--permission-mode') + 1];
   };
@@ -1287,7 +2048,12 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
 
   const { claudeDetached } = await import('agent-runtime/effect');
   const jobWith = (permissionMode: string | undefined) => {
-    const { args } = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { config: { permissionMode } } : {}) });
+    const { args } = claudeDetached.command({
+      name: 'ae/t/1',
+      brief: 'the prompt',
+      cwd: bin,
+      ...(permissionMode ? { config: { permissionMode } } : {}),
+    });
     return args[args.indexOf('--permission-mode') + 1];
   };
   assert.equal(said.get('r-59-claude'), jobWith(undefined), 'a job filed with no mode');
@@ -1295,7 +2061,13 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
 });
 
 test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
-  await engine().file({ id: 'r-55-implement-try2', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', config: { model: 'sonnet' } });
+  await engine().file({
+    id: 'r-55-implement-try2',
+    brief: 'Implement it.',
+    cwd: '/code/app',
+    harness: 'claude',
+    config: { model: 'sonnet' },
+  });
   const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
   const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
     ['r-55', [asked], 'sonnet'],
@@ -1306,7 +2078,10 @@ test("a model a person's `wf retry --model` asked for is on the try it was asked
   ];
   for (const [id, tries, askedModel] of cases) {
     writeRun({
-      ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
+      ...r2,
+      id,
+      workflowDir: gone,
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
       steps: { implement: { taskId: 'r-55-implement-try2', tries } },
     });
     const { filed } = (await (await app.request(`/api/runs/${id}`)).json()).steps[0];
@@ -1318,17 +2093,23 @@ test("a model a person's `wf retry --model` asked for is on the try it was asked
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 /** An SVG that carries a script: an agent's markup, which would run on the board's origin opened as a page of its own. */
-const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>parent.pwned = true</script><rect width="10" height="10"/></svg>\n';
+const SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>parent.pwned = true</script><rect width="10" height="10"/></svg>\n';
 
 /** r-52's `shoot`, which named its files: some in its files directory, and some not, or not by a name the api serves. */
 function seedFiles() {
   const dir = path.join(root, 'runs', 'r-52', 'artifacts', 'shoot');
   const files: Record<string, string | Buffer> = {
-    'shot.png': PNG, 'notes.txt': 'It rendered.\n', 'trace.zip': 'PK', 'sub/deep.png': PNG,
+    'shot.png': PNG,
+    'notes.txt': 'It rendered.\n',
+    'trace.zip': 'PK',
+    'sub/deep.png': PNG,
     // Markup that would run on the board's origin opened as a page: served sandboxed, and the HTML as text. The page is not named.
-    'diagram.svg': SVG, 'page.html': '<script>parent.pwned = true</script>\n',
+    'diagram.svg': SVG,
+    'page.html': '<script>parent.pwned = true</script>\n',
     // Each a file the directory has, which a refusal alone keeps from being served.
-    '..shot.png': PNG, 'a\\b.png': PNG,
+    '..shot.png': PNG,
+    'a\\b.png': PNG,
     // Beside the directory, where `..` leads.
     '../outside.png': PNG,
   };
@@ -1339,27 +2120,54 @@ function seedFiles() {
   // Seeded by each test that reads it: the link is made afresh.
   fs.rmSync(path.join(dir, 'link.png'), { force: true });
   fs.symlinkSync(path.join(dir, '..', 'outside.png'), path.join(dir, 'link.png'));
-  const named = ['shot.png', 'notes.txt', 'trace.zip', 'diagram.svg', '../outside.png', 'sub/deep.png', 'link.png', '..shot.png', 'gone.png'].map((name) => path.join(dir, name));
+  const named = [
+    'shot.png',
+    'notes.txt',
+    'trace.zip',
+    'diagram.svg',
+    '../outside.png',
+    'sub/deep.png',
+    'link.png',
+    '..shot.png',
+    'gone.png',
+  ].map((name) => path.join(dir, name));
   // `path.join` resolves `..`: named as a step would spell it.
   named[4] = `${dir}/../outside.png`;
   settledTask('t-52-shoot', { ...done, artifacts: [...named, 'RESPONSE.md', '/etc/hosts'] });
-  writeRun({ ...r2, id: 'r-52', workflowDir: gone, workflow: [{ name: 'shoot', after: [], body: 'Shoot it.' }], steps: { shoot: { taskId: 't-52-shoot' } } });
+  writeRun({
+    ...r2,
+    id: 'r-52',
+    workflowDir: gone,
+    workflow: [{ name: 'shoot', after: [], body: 'Shoot it.' }],
+    steps: { shoot: { taskId: 't-52-shoot' } },
+  });
   return { dir, named };
 }
 
 test("a closeout's files in the step's files directory carry where the api serves them, their kind and size — any other path is the path alone", async () => {
   const { dir, named } = seedFiles();
   const [shoot] = (await (await app.request('/api/runs/r-52')).json()).steps;
-  const served = (name: string, kind: string, size: number) => ({ path: path.join(dir, name), name, url: `/api/runs/r-52/steps/shoot/artifacts/${encodeURIComponent(name)}`, kind, size });
+  const served = (name: string, kind: string, size: number) => ({
+    path: path.join(dir, name),
+    name,
+    url: `/api/runs/r-52/steps/shoot/artifacts/${encodeURIComponent(name)}`,
+    kind,
+    size,
+  });
   assert.deepEqual(shoot.closeout.artifacts, [
     served('shot.png', 'image', PNG.length),
     served('notes.txt', 'text', 13),
     served('trace.zip', 'other', 2),
     served('diagram.svg', 'image', Buffer.byteLength(SVG)),
     // Outside the directory, however it is spelled; under it, which no name reaches; a link out of it; a name the route refuses; a file it does not have.
-    { path: named[4] }, { path: named[5] }, { path: named[6] }, { path: named[7] }, { path: named[8] },
+    { path: named[4] },
+    { path: named[5] },
+    { path: named[6] },
+    { path: named[7] },
+    { path: named[8] },
     // A path on the branch, and an absolute path anywhere else, which is not looked at.
-    { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
+    { path: 'RESPONSE.md' },
+    { path: '/etc/hosts' },
   ]);
   assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
 });
@@ -1376,7 +2184,10 @@ test("a step's file is served by name, with its type and no caching — and a na
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), PNG);
 
   const text = await app.request(`${base}/notes.txt`);
-  assert.deepEqual([text.status, text.headers.get('content-type'), text.headers.get('cache-control'), await text.text()], [200, 'text/plain; charset=utf-8', 'no-store', 'It rendered.\n']);
+  assert.deepEqual(
+    [text.status, text.headers.get('content-type'), text.headers.get('cache-control'), await text.text()],
+    [200, 'text/plain; charset=utf-8', 'no-store', 'It rendered.\n'],
+  );
   assert.equal((await app.request(`${base}/trace.zip`)).headers.get('content-type'), 'application/octet-stream');
 
   // Markup an agent wrote runs no script on the board's origin, opened in a tab: an SVG is served as an image under a policy that
@@ -1427,7 +2238,8 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
       // Beside the directory is not in it: the path alone, as before.
       { path: named[4] },
       ...[5, 6, 7, 8].map((i) => ({ path: named[i], pruned: said, prunedAt: files.at })),
-      { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
+      { path: 'RESPONSE.md' },
+      { path: '/etc/hosts' },
     ]);
     assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
 
@@ -1436,7 +2248,10 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
       const gone = await app.request(`${base}/${name}`);
       assert.equal(gone.status, 410, name);
       const body = await gone.json();
-      assert.equal(body.error, `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`wf decide r-52\` reads them.`);
+      assert.equal(
+        body.error,
+        `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`wf decide r-52\` reads them.`,
+      );
       assert.equal(body.pruned, files.at);
     }
     // A name that is a path is refused as before; the prune answers only for a name the route would serve.
@@ -1461,32 +2276,64 @@ test("the detail carries where each step's time went — per try and per check, 
   const { readFilings, timeline } = await import('agent-orchestrator');
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
   /** A task as the engine journals one: filed, a slot taken and spawned, and — given an end — ended and settled. */
-  const ran = (taskId: string, harness: string, filedAt: string, spawnedAt: string, ended?: { at: string; outcome: 'succeeded' | 'failed'; more?: object }) => journal(taskId, [
-    { kind: 'filed', at: filedAt, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1, harness },
-    { kind: 'starting', at: spawnedAt, attempt: 1 },
-    { kind: 'spawned', at: spawnedAt, attempt: 1 },
-    ...(ended
-      ? [
-          { kind: 'ended', at: ended.at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: ended.outcome === 'succeeded' ? 'done' : 'failed', reason: 'harness', ...ended.more },
-          { kind: 'settled', at: ended.at, outcome: ended.outcome },
-        ]
-      : []),
-  ]);
+  const ran = (
+    taskId: string,
+    harness: string,
+    filedAt: string,
+    spawnedAt: string,
+    ended?: { at: string; outcome: 'succeeded' | 'failed'; more?: object },
+  ) =>
+    journal(taskId, [
+      { kind: 'filed', at: filedAt, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1, harness },
+      { kind: 'starting', at: spawnedAt, attempt: 1 },
+      { kind: 'spawned', at: spawnedAt, attempt: 1 },
+      ...(ended
+        ? [
+            {
+              kind: 'ended',
+              at: ended.at,
+              attempt: 1,
+              sessionId: `ae/${taskId}/1`,
+              observed: ended.outcome === 'succeeded' ? 'done' : 'failed',
+              reason: 'harness',
+              ...ended.more,
+            },
+            { kind: 'settled', at: ended.at, outcome: ended.outcome },
+          ]
+        : []),
+    ]);
   const feed = path.join(root, 'engine', 'feed.jsonl');
-  const fileOnFeed = (taskId: string, at: string) => fs.appendFileSync(feed, `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`);
+  const fileOnFeed = (taskId: string, at: string) =>
+    fs.appendFileSync(feed, `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`);
 
   // implement's check refused try 1, and try 2's check is still running. The feed has each filing; a task's view has none.
-  ran('r-60-implement', 'codex', T(0), T(0, 12), { at: T(19, 54), outcome: 'succeeded', more: { closeout: done, usage: { turns: 54, toolCalls: 146 } } });
+  ran('r-60-implement', 'codex', T(0), T(0, 12), {
+    at: T(19, 54),
+    outcome: 'succeeded',
+    more: { closeout: done, usage: { turns: 54, toolCalls: 146 } },
+  });
   ran('r-60-implement-check', 'check', T(19, 56), T(19, 57), { at: T(20, 55), outcome: 'failed', more: { exitCode: 1 } });
   ran('r-60-implement-try2', 'codex', T(21), T(21, 3), { at: T(26, 38), outcome: 'succeeded', more: { closeout: done } });
   ran('r-60-implement-try2-check', 'check', T(26, 40), T(26, 41));
-  for (const [taskId, at] of [['r-60-implement', T(0)], ['r-60-implement-check', T(19, 56)], ['r-60-implement-try2', T(21)], ['r-60-implement-try2-check', T(26, 40)]] as const) fileOnFeed(taskId, at);
+  for (const [taskId, at] of [
+    ['r-60-implement', T(0)],
+    ['r-60-implement-check', T(19, 56)],
+    ['r-60-implement-try2', T(21)],
+    ['r-60-implement-try2-check', T(26, 40)],
+  ] as const)
+    fileOnFeed(taskId, at);
   const record = {
-    ...r2, id: 'r-60', workflowDir: gone,
-    workflow: [{ name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    ...r2,
+    id: 'r-60',
+    workflowDir: gone,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 },
+      { name: 'review', after: ['implement'], body: 'Review it.' },
+    ],
     steps: {
       implement: {
-        taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' },
+        taskId: 'r-60-implement-try2',
+        check: { taskId: 'r-60-implement-try2-check' },
         tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, then: 'retries' }],
       },
       review: { taskId: null },
@@ -1498,16 +2345,57 @@ test("the detail carries where each step's time went — per try and per check, 
   const run = await (await app.request('/api/runs/r-60')).json();
   assert.equal(observations(), 0, 'the feed is a read of the store: the detail observes no harness for it, and none for tasks all settled');
   const [implement, review] = run.steps;
-  const words = (s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null) =>
-    s && { at: s.at, filedAt: s.filedAt, spawnedAt: s.spawnedAt, endedAt: s.endedAt, queued: s.queued, ran: s.ran };
-  assert.deepEqual(implement.timeline.map((x: { try: number; round: number; sessionOf: number | null }) => [x.try, x.round, x.sessionOf]), [[1, 1, null], [2, 1, null]]);
-  assert.deepEqual(words(implement.timeline[0].session), { at: 'ended', filedAt: T(0), spawnedAt: T(0, 12), endedAt: T(19, 54), queued: '12s', ran: '19m42s' });
-  assert.deepEqual(words(implement.timeline[0].check), { at: 'ended', filedAt: T(19, 56), spawnedAt: T(19, 57), endedAt: T(20, 55), queued: '1s', ran: '58s' });
-  assert.deepEqual(words(implement.timeline[1].check), { at: 'running', filedAt: T(26, 40), spawnedAt: T(26, 41), endedAt: null, queued: '1s', ran: 'still running, no end yet' });
+  const words = (
+    s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null,
+  ) => s && { at: s.at, filedAt: s.filedAt, spawnedAt: s.spawnedAt, endedAt: s.endedAt, queued: s.queued, ran: s.ran };
+  assert.deepEqual(
+    implement.timeline.map((x: { try: number; round: number; sessionOf: number | null }) => [x.try, x.round, x.sessionOf]),
+    [
+      [1, 1, null],
+      [2, 1, null],
+    ],
+  );
+  assert.deepEqual(words(implement.timeline[0].session), {
+    at: 'ended',
+    filedAt: T(0),
+    spawnedAt: T(0, 12),
+    endedAt: T(19, 54),
+    queued: '12s',
+    ran: '19m42s',
+  });
+  assert.deepEqual(words(implement.timeline[0].check), {
+    at: 'ended',
+    filedAt: T(19, 56),
+    spawnedAt: T(19, 57),
+    endedAt: T(20, 55),
+    queued: '1s',
+    ran: '58s',
+  });
+  assert.deepEqual(words(implement.timeline[1].check), {
+    at: 'running',
+    filedAt: T(26, 40),
+    spawnedAt: T(26, 41),
+    endedAt: null,
+    queued: '1s',
+    ran: 'still running, no end yet',
+  });
   // What each session used, in `wf decide`'s words, as the step's `used` is.
-  assert.deepEqual(implement.timeline[0].used, { usage: { turns: 54, toolCalls: 146 }, used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 });
+  assert.deepEqual(implement.timeline[0].used, {
+    usage: { turns: 54, toolCalls: 146 },
+    used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured',
+    cost: 'not measured',
+    costUsd: null,
+    apiMs: null,
+    toolMs: null,
+    read: null,
+    peak: null,
+    rebuilt: 0,
+  });
   assert.deepEqual(review.timeline, [], 'a step not filed has no try on the clock');
-  assert.deepEqual([run.timeline.run.tasks, run.timeline.run.inFlight, run.timeline.run.queued, run.timeline.run.ran, run.timeline.run.wall], [4, 1, '17s', '26m15s, 1 still running', 'still going']);
+  assert.deepEqual(
+    [run.timeline.run.tasks, run.timeline.run.inFlight, run.timeline.run.queued, run.timeline.run.ran, run.timeline.run.wall],
+    [4, 1, '17s', '26m15s, 1 still running', 'still going'],
+  );
 
   // Held to the package: its `timeline` over the engine's own views and the feed's filings, word for word.
   const e = engine();
@@ -1516,7 +2404,10 @@ test("the detail carries where each step's time went — per try and per check, 
   const theirs = timeline(readRun('r-60'), views, filed);
   // The totals carry what their sessions cost beside it, which the package's `timeline` does not: nobody priced these.
   const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null), total);
-  assert.deepEqual({ rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) }, JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })));
+  assert.deepEqual(
+    { rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) },
+    JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })),
+  );
   // Each try as the package has it, less `used`, which the api words as `wf decide` does (asserted above).
   const lessUsed = (tries: ReadonlyArray<{ used?: unknown }>) => JSON.parse(JSON.stringify(tries.map(({ used: _, ...x }) => x)));
   assert.deepEqual(lessUsed(implement.timeline), lessUsed(theirs.steps.implement!));
@@ -1524,9 +2415,28 @@ test("the detail carries where each step's time went — per try and per check, 
   // A try filed since is read on from where the last read of the feed stopped: its filing is known on the next poll, and not `not known`.
   ran('r-60-implement-try3', 'codex', T(40), T(40, 7));
   fileOnFeed('r-60-implement-try3', T(40));
-  writeRun({ ...record, steps: { ...record.steps, implement: { taskId: 'r-60-implement-try3', tries: [...record.steps.implement.tries, { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' }] } } });
+  writeRun({
+    ...record,
+    steps: {
+      ...record.steps,
+      implement: {
+        taskId: 'r-60-implement-try3',
+        tries: [
+          ...record.steps.implement.tries,
+          { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' },
+        ],
+      },
+    },
+  });
   const again = await (await app.request('/api/runs/r-60')).json();
-  assert.deepEqual(words(again.steps[0].timeline[2].session), { at: 'running', filedAt: T(40), spawnedAt: T(40, 7), endedAt: null, queued: '7s', ran: 'still running, no end yet' });
+  assert.deepEqual(words(again.steps[0].timeline[2].session), {
+    at: 'running',
+    filedAt: T(40),
+    spawnedAt: T(40, 7),
+    endedAt: null,
+    queued: '7s',
+    ran: 'still running, no end yet',
+  });
 });
 
 test("a step whose attempts were denied calls says which, on the list and on the run's page, beside a status that is unchanged", async () => {
@@ -1535,18 +2445,49 @@ test("a step whose attempts were denied calls says which, on the list and on the
     { ...filed('t-denied'), maxAttempts: 2 },
     { kind: 'starting', at, attempt: 1 },
     { kind: 'spawned', at, attempt: 1 },
-    { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-denied/1', observed: 'failed', reason: 'lost', denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }] },
+    {
+      kind: 'ended',
+      at,
+      attempt: 1,
+      sessionId: 'ae/t-denied/1',
+      observed: 'failed',
+      reason: 'lost',
+      denials: [
+        { tool: 'Skill', what: 'look' },
+        { tool: 'Bash', what: 'pytest' },
+      ],
+    },
     { kind: 'starting', at, attempt: 2 },
     { kind: 'spawned', at, attempt: 2 },
-    { kind: 'ended', at, attempt: 2, sessionId: 'ae/t-denied/2', observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Edit', what: '/tmp/a\nb' }] },
+    {
+      kind: 'ended',
+      at,
+      attempt: 2,
+      sessionId: 'ae/t-denied/2',
+      observed: 'done',
+      reason: 'harness',
+      closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null },
+      denials: [
+        { tool: 'Skill', what: 'look' },
+        { tool: 'Edit', what: '/tmp/a\nb' },
+      ],
+    },
     { kind: 'settled', at, outcome: 'succeeded' },
   ]);
   settledTask('t-clean', { outcome: 'done', summary: 'did it', artifacts: [], needs: null });
-  writeRun({ ...r2, id: 'r-denied', steps: { implement: { taskId: 't-denied', branch: 'wf/r-denied/implement' }, review: { taskId: 't-clean' } } });
+  writeRun({
+    ...r2,
+    id: 'r-denied',
+    steps: { implement: { taskId: 't-denied', branch: 'wf/r-denied/implement' }, review: { taskId: 't-clean' } },
+  });
   const denied = { words: 'denied: Skill(look), Bash(pytest), Edit(/tmp/a b)', calls: ['Skill(look)', 'Bash(pytest)', 'Edit(/tmp/a\nb)'] };
 
   const [implement, review] = (await listed('r-denied')).steps;
-  assert.deepEqual([implement.status, implement.denied], ['unverified · done', denied], 'each call once, and the status the chip reads as it was');
+  assert.deepEqual(
+    [implement.status, implement.denied],
+    ['unverified · done', denied],
+    'each call once, and the status the chip reads as it was',
+  );
   assert.equal(implement.note, null, 'nor in the note: the board says it once, from its own field');
   assert.equal(review.denied, null, 'a step denied nothing: null, not an empty list');
   const page = (await (await app.request('/api/runs/r-denied')).json()).steps;

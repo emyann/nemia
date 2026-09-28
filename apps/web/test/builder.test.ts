@@ -2,24 +2,65 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
-  addStep, connect, contextText, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
-  setKey, setSchema, takes, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
+  addStep,
+  connect,
+  contextText,
+  DEFAULT_ROUNDS,
+  disconnect,
+  draftGraph,
+  draftOf,
+  listedWith,
+  listOf,
+  nameRefusal,
+  numberOf,
+  orderOf,
+  placesOf,
+  removeStep,
+  schemasOf,
+  setBody,
+  setKey,
+  setSchema,
+  takes,
+  tokensOf,
+  toPut,
+  UNSET,
+  unsaved,
+  unsavedSteps,
+  type DraftStep,
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
-const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({ ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [], ...fields });
-const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({ name, spec: spec(fields), body, own: null });
+const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
+  ...UNSET,
+  after: [],
+  input: [],
+  disallowedTools: [],
+  allowedTools: [],
+  ...fields,
+});
+const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({
+  name,
+  spec: spec(fields),
+  body,
+  own: null,
+});
 
 /** implement ⇄ review, as the listing has a folder of yours. */
 const folder: Pick<WorkflowListing, 'steps'> = {
-  steps: [listed('implement', { check: 'npm test' }), listed('review', { after: ['implement'], output: 'review.schema.json', loop: 'implement', rounds: 3 })],
+  steps: [
+    listed('implement', { check: 'npm test' }),
+    listed('review', { after: ['implement'], output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+  ],
 };
 
 const specOf = (steps: readonly DraftStep[], name: string) => steps.find((s) => s.name === name)!.spec;
 
 test('a folder as a draft is as it is listed, unsaved nowhere, and puts back as it was listed', () => {
   const draft = draftOf(folder);
-  assert.deepEqual(draft.map((s) => s.schema), [null, null]);
+  assert.deepEqual(
+    draft.map((s) => s.schema),
+    [null, null],
+  );
   assert.equal(unsaved(draft, folder), false);
   assert.deepEqual(unsavedSteps(draft, folder), []);
   assert.deepEqual(toPut(draft), folder.steps);
@@ -79,13 +120,19 @@ test('a step added has a name and a body and sets nothing; a name there is none 
   assert.deepEqual(addStep(draft, '', 'Nothing.'), draft);
 });
 
-test("a step removed takes every key of another step that names it, and the draft is unsaved though no step left changed", () => {
+test('a step removed takes every key of another step that names it, and the draft is unsaved though no step left changed', () => {
   const draft = setKey(setKey(addStep(draftOf(folder), 'ship', 'Ship it.'), 'ship', 'after', ['review']), 'ship', 'input', ['review']);
   const gone = removeStep(draft, 'review');
-  assert.deepEqual(gone.map((s) => s.name), ['implement', 'ship']);
+  assert.deepEqual(
+    gone.map((s) => s.name),
+    ['implement', 'ship'],
+  );
   assert.deepEqual([specOf(gone, 'ship').after, specOf(gone, 'ship').input], [[], []]);
   const loopGone = removeStep(draftOf(folder), 'implement');
-  assert.deepEqual([specOf(loopGone, 'review').after, specOf(loopGone, 'review').loop, specOf(loopGone, 'review').rounds], [[], null, null]);
+  assert.deepEqual(
+    [specOf(loopGone, 'review').after, specOf(loopGone, 'review').loop, specOf(loopGone, 'review').rounds],
+    [[], null, null],
+  );
   assert.deepEqual(unsavedSteps(removeStep(draftOf(folder), 'review'), folder), []);
   assert.equal(unsaved(removeStep(draftOf(folder), 'review'), folder), true);
 });
@@ -102,14 +149,18 @@ test('a key set is set as given, a loop brings its rounds and takes them away, a
   assert.equal(unsaved(setKey(setKey(draft, 'implement', 'model', 'opus'), 'implement', 'model', null), folder), false);
 });
 
-test("a schema pasted names its file in `output:`, is a change until saved, and taken back leaves `output:` as it is", () => {
+test('a schema pasted names its file in `output:`, is a change until saved, and taken back leaves `output:` as it is', () => {
   const draft = draftOf(folder);
   const pasted = setSchema(draft, 'implement', { file: 'implement.schema.json', text: '{}' });
   assert.equal(specOf(pasted, 'implement').output, 'implement.schema.json');
   assert.deepEqual(unsavedSteps(pasted, folder), ['implement']);
   assert.equal(toPut(pasted)[0]!.spec.output, 'implement.schema.json');
   assert.equal('schema' in toPut(pasted)[0]!, false, 'a step put carries no paste: the save carries the schemas beside the steps');
-  assert.deepEqual(schemasOf(pasted), [{ file: 'implement.schema.json', text: '{}' }], 'and here they are, to be judged with the steps and written with them');
+  assert.deepEqual(
+    schemasOf(pasted),
+    [{ file: 'implement.schema.json', text: '{}' }],
+    'and here they are, to be judged with the steps and written with them',
+  );
   assert.deepEqual(schemasOf(draft), [], 'none pasted, none carried');
   const back = setSchema(pasted, 'implement', null);
   assert.equal(specOf(back, 'implement').output, 'implement.schema.json');
@@ -125,7 +176,14 @@ test('the steps are placed left to right by after; steps that wait on each other
   assert.equal(placed.cycle, true);
   assert.deepEqual(Object.fromEntries(placed.at), { implement: { x: 0, y: 0 }, review: { x: COLUMN_WIDTH, y: 0 } });
   assert.deepEqual(orderOf(round), ['implement', 'review'], 'and ordered as given');
-  assert.deepEqual(orderOf(addStep(disconnect(draftOf(folder), 'implement->review'), 'plan', 'Plan it.').map((s) => (s.name === 'implement' ? { ...s, spec: { ...s.spec, after: ['plan'] } } : s))), ['review', 'plan', 'implement']);
+  assert.deepEqual(
+    orderOf(
+      addStep(disconnect(draftOf(folder), 'implement->review'), 'plan', 'Plan it.').map((s) =>
+        s.name === 'implement' ? { ...s, spec: { ...s.spec, after: ['plan'] } } : s,
+      ),
+    ),
+    ['review', 'plan', 'implement'],
+  );
 });
 
 test('what is typed into a list or a number field, as the listing has it', () => {
@@ -136,25 +194,55 @@ test('what is typed into a list or a number field, as the listing has it', () =>
   assert.equal(numberOf('2.50'), 2.5);
   assert.equal(numberOf('-1'), -1, 'the package refuses it on save, in its words');
   // A context window, as a person writes it and as the package reads it — `200k`, `150000`, `1M` — and back in the package's one form.
-  for (const [typed, tokens] of [['200k', 200_000], [' 150000 ', 150_000], ['100K', 100_000], ['1M', 1_000_000], ['50k', 50_000]] as const) assert.equal(tokensOf(typed), tokens, typed);
+  for (const [typed, tokens] of [
+    ['200k', 200_000],
+    [' 150000 ', 150_000],
+    ['100K', 100_000],
+    ['1M', 1_000_000],
+    ['50k', 50_000],
+  ] as const)
+    assert.equal(tokensOf(typed), tokens, typed);
   for (const typed of ['', 'lots', '200 k', '1.5M', '200,000', '0', '-1']) assert.equal(tokensOf(typed), null, typed);
   assert.deepEqual([contextText(150_000), contextText(1_000_000), contextText(123_456)], ['150k', '1000k', '123456']);
 });
 
 test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {
-  const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({ name, from, dir: `/${from}/${name}`, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], version: '0', error: null });
+  const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({
+    name,
+    from,
+    dir: `/${from}/${name}`,
+    description: null,
+    steps: [],
+    graph: { roots: [], edges: [] },
+    schemas: [],
+    version: '0',
+    error: null,
+  });
   const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'yours')];
-  assert.deepEqual(listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`), ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine']);
-  assert.deepEqual(listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description), [null, null, 'Mine.']);
-  assert.deepEqual(listedWith(undefined, w('built', 'yours')).map((x) => x.name), ['built']);
+  assert.deepEqual(
+    listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`),
+    ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine'],
+  );
+  assert.deepEqual(
+    listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description),
+    [null, null, 'Mine.'],
+  );
+  assert.deepEqual(
+    listedWith(undefined, w('built', 'yours')).map((x) => x.name),
+    ['built'],
+  );
 });
 
 /** `build`, whose agent `coder` gives it its harness, model and effort, with a check and a note of its own — as the listing has it. */
 const attached: Pick<WorkflowListing, 'steps'> = {
-  steps: [{
-    name: 'build', spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
-    body: 'You write code.\n\nMind the cache.', own: { keys: ['check'], body: 'Mind the cache.' },
-  }],
+  steps: [
+    {
+      name: 'build',
+      spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
+      body: 'You write code.\n\nMind the cache.',
+      own: { keys: ['check'], body: 'Mind the cache.' },
+    },
+  ],
 };
 
 test("a step with an agent: a key changed is its own, one unset is its agent's again, and its body is its own note — each a change, put back with what it sets itself", () => {
@@ -170,60 +258,99 @@ test("a step with an agent: a key changed is its own, one unset is its agent's a
   assert.deepEqual(back[0]!.own!.keys, []);
 
   const noted = setBody(draft, 'build', 'Mind the index.');
-  assert.deepEqual([noted[0]!.body, noted[0]!.own!.body], ['You write code.\n\nMind the cache.', 'Mind the index.'], 'the note, not the agent\'s words');
+  assert.deepEqual(
+    [noted[0]!.body, noted[0]!.own!.body],
+    ['You write code.\n\nMind the cache.', 'Mind the index.'],
+    "the note, not the agent's words",
+  );
   assert.deepEqual(unsavedSteps(noted, attached), ['build']);
 
   const pasted = setSchema(draft, 'build', { file: 'build.schema.json', text: '{}' });
   assert.ok(pasted[0]!.own!.keys.includes('output'), 'a schema pasted is its own output');
 });
 
-test("an agent attached to a step makes what it has its own; taken away, the step keeps what its agent gave it, words and all", () => {
+test('an agent attached to a step makes what it has its own; taken away, the step keeps what its agent gave it, words and all', () => {
   const plain = draftOf({ steps: [listed('build', { model: 'sonnet', check: 'npm test' }, 'Build it.')] });
   const given = setKey(plain, 'build', 'agent', 'coder');
   assert.deepEqual([given[0]!.spec.agent, given[0]!.own], ['coder', { keys: ['model', 'check'], body: 'Build it.' }]);
 
   const taken = setKey(draftOf(attached), 'build', 'agent', null);
-  assert.deepEqual([taken[0]!.spec.agent, taken[0]!.own, taken[0]!.body, taken[0]!.spec.model], [null, null, 'You write code.\n\nMind the cache.', 'opus']);
+  assert.deepEqual(
+    [taken[0]!.spec.agent, taken[0]!.own, taken[0]!.body, taken[0]!.spec.model],
+    [null, null, 'You write code.\n\nMind the cache.', 'opus'],
+  );
 });
 
 /** What the api says each agent gives a step: `coder` as `attached` has it, and `reviewer`, which sets a model and nothing else. */
 const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
-  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
+  roleKeys: [
+    'harness',
+    'model',
+    'effort',
+    'context',
+    'permissionMode',
+    'sandbox',
+    'tools',
+    'disallowedTools',
+    'allowedTools',
+    'remote',
+    'output',
+  ],
   agents: { coder: { harness: 'claude', model: 'opus', effort: 'high' }, reviewer: { model: 'sonnet' } },
 };
 
-test("a step moved to another agent shows what that agent gives it, and nothing the last one gave; its own keys stay its own", () => {
+test('a step moved to another agent shows what that agent gives it, and nothing the last one gave; its own keys stay its own', () => {
   const moved = setKey(draftOf(attached), 'build', 'agent', 'reviewer', agents);
-  assert.deepEqual([moved[0]!.spec.model, moved[0]!.spec.effort, moved[0]!.spec.harness], ['sonnet', null, null], "reviewer's model, not coder's opus and high");
+  assert.deepEqual(
+    [moved[0]!.spec.model, moved[0]!.spec.effort, moved[0]!.spec.harness],
+    ['sonnet', null, null],
+    "reviewer's model, not coder's opus and high",
+  );
   assert.deepEqual([moved[0]!.spec.check, moved[0]!.own], ['npm test', { keys: ['check'], body: 'Mind the cache.' }]);
 
   const plain = draftOf({ steps: [listed('build', { model: 'sonnet' }, 'Build it.')] });
   const given = setKey(plain, 'build', 'agent', 'coder', agents);
-  assert.deepEqual([given[0]!.spec.model, given[0]!.spec.effort, given[0]!.spec.harness], ['sonnet', 'high', 'claude'], 'its own model, the rest the agent\'s');
+  assert.deepEqual(
+    [given[0]!.spec.model, given[0]!.spec.effort, given[0]!.spec.harness],
+    ['sonnet', 'high', 'claude'],
+    "its own model, the rest the agent's",
+  );
 
   const unset = setKey(setKey(draftOf(attached), 'build', 'effort', 'low', agents), 'build', 'effort', null, agents);
   assert.deepEqual([unset[0]!.spec.effort, unset[0]!.own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
 });
 
 test("a step's form has its harness's fence alone: a permission mode on Claude Code, a sandbox on codex", () => {
-  const harness = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'claude-detached'], byHarness: null } as const;
+  const harness = {
+    key: 'harness',
+    meaning: '',
+    kind: 'choice',
+    choices: ['claude', 'codex', 'claude-detached'],
+    byHarness: null,
+  } as const;
   const permissionMode = { byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] } };
   const sandbox = { byHarness: { codex: ['read-only'] } };
   const form = { keys: [harness] } as unknown as Pick<KeyForm, 'keys'>;
   assert.deepEqual([takes(form, sandbox, 'codex'), takes(form, permissionMode, 'codex')], [true, false]);
   assert.deepEqual([takes(form, sandbox, 'claude'), takes(form, permissionMode, 'claude')], [false, true]);
-  assert.equal(takes(form, { byHarness: null }, 'codex'), true, 'a key that is not a harness word is every harness\'s');
+  assert.equal(takes(form, { byHarness: null }, 'codex'), true, "a key that is not a harness word is every harness's");
   assert.equal(takes(form, sandbox, 'nowhere'), true, 'a harness the form does not know is judged on save');
   assert.equal(UNSET.sandbox, null);
 });
 
 test('a step on a remote A2A agent has none of the keys the package refuses there, whether or not the form lists the agent', () => {
   const harness = { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'a2a:reviewer'], byHarness: null } as const;
-  const form = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode', 'tools', 'check'] } } as unknown as Pick<KeyForm, 'keys' | 'remote'>;
+  const form = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode', 'tools', 'check'] } } as unknown as Pick<
+    KeyForm,
+    'keys' | 'remote'
+  >;
   const model = { key: 'model', byHarness: { claude: ['opus'], codex: ['gpt-5.5'] } } as const;
   const tools = { key: 'tools', byHarness: null } as const;
   const deadline = { key: 'deadlineSeconds', byHarness: null } as const;
-  assert.deepEqual([takes(form, model, 'a2a:reviewer'), takes(form, tools, 'a2a:reviewer'), takes(form, deadline, 'a2a:reviewer')], [false, false, true]);
+  assert.deepEqual(
+    [takes(form, model, 'a2a:reviewer'), takes(form, tools, 'a2a:reviewer'), takes(form, deadline, 'a2a:reviewer')],
+    [false, false, true],
+  );
   assert.equal(takes(form, tools, 'a2a:gone'), false, 'a name the store no longer declares is still remote');
   assert.deepEqual([takes(form, model, 'claude'), takes(form, tools, 'claude')], [true, true], 'a harness of ours keeps them');
   // An api from before remote agents sends no `remote`: nothing is hidden for it.

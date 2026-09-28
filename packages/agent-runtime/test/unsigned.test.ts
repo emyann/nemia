@@ -42,7 +42,9 @@ const fakeClaude = () => {
   const spawns = path.join(bin, 'spawns.jsonl');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(spawns, '');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -62,7 +64,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId, state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
   return {
     bin,
@@ -70,14 +74,23 @@ if (args[0] === '--bg') {
     set: (name: string, change: Partial<Row>) =>
       fs.writeFileSync(registry, JSON.stringify(rows().map((r) => (r.name === name ? { ...r, ...change } : r)))),
     /** The arguments of every `claude --bg`, in order. */
-    spawns: () => fs.readFileSync(spawns, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]),
+    spawns: () =>
+      fs
+        .readFileSync(spawns, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l) as string[]),
   };
 };
 
 const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
-  try { return await f(); } finally { process.env.PATH = prev; }
+  try {
+    return await f();
+  } finally {
+    process.env.PATH = prev;
+  }
 };
 
 /** Lines appended to the session's transcript, then its mtime put back `ago` milliseconds. Each line carries its own time. */
@@ -91,15 +104,17 @@ const wrote = (sessionId: string, ago: number, ...entries: object[]) => {
 };
 const prompt = (content: string) => ({ type: 'user', message: { role: 'user', content } });
 const says = (id: string, text: string) => ({ type: 'assistant', message: { id, role: 'assistant', content: [{ type: 'text', text }] } });
-const closes = (id: string, payload: object) =>
-  ({ type: 'assistant', message: { id, role: 'assistant', content: [{ type: 'tool_use', id: `tu_${id}`, name: 'StructuredOutput', input: payload }] } });
+const closes = (id: string, payload: object) => ({
+  type: 'assistant',
+  message: { id, role: 'assistant', content: [{ type: 'tool_use', id: `tu_${id}`, name: 'StructuredOutput', input: payload }] },
+});
 
 const settledNote = async (engine: ReturnType<typeof createEngine>, id: string) => {
   const entry = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled');
   return entry?.event.kind === 'settled' ? entry.event.note : undefined;
 };
 
-test('a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above\'s', async () => {
+test("a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
@@ -114,8 +129,11 @@ test('a task that asked for a closeout, whose session goes quiet without one, en
 
     const v = await engine.view(id);
     const [first] = v.state.attempts;
-    assert.deepEqual([first?.ended, first?.reason, first?.stated, first?.closeout], ['done', 'harness', false, undefined],
-      'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned');
+    assert.deepEqual(
+      [first?.ended, first?.reason, first?.stated, first?.closeout],
+      ['done', 'harness', false, undefined],
+      'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned',
+    );
     assert.deepEqual(claude.rows(), [], 'its session let go');
 
     await engine.tick();
@@ -138,7 +156,10 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
     await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(v.state.attempts.map((a) => [a.ended, a.reason]), [['done', 'harness']]);
+    assert.deepEqual(
+      v.state.attempts.map((a) => [a.ended, a.reason]),
+      [['done', 'harness']],
+    );
     assert.equal(claude.spawns().length, 1, 'nothing continued');
   });
 });
@@ -164,9 +185,12 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     await engine.tick();
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
     const anHourAgo = new Date(Date.now() - 60 * MINUTES).toISOString();
-    wrote(other.sessionId, 10 * MINUTES,
+    wrote(
+      other.sessionId,
+      10 * MINUTES,
       { ...prompt('the parent prompt'), timestamp: anHourAgo },
-      { ...closes('msg_0', { outcome: 'done', by: 'parent' }), timestamp: anHourAgo });
+      { ...closes('msg_0', { outcome: 'done', by: 'parent' }), timestamp: anHourAgo },
+    );
     claude.set(other.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     const w = await engine.view(inherited);
@@ -191,12 +215,18 @@ test("THE HARNESS'S `done` without a statement is said to have stated nothing to
     await engine.tick();
 
     const v = await engine.view(asked);
-    assert.deepEqual(v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]), [['done', 'harness', undefined, false]],
-      'it never said it had finished, and the record says so');
+    assert.deepEqual(
+      v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
+      [['done', 'harness', undefined, false]],
+      'it never said it had finished, and the record says so',
+    );
 
     const w = await engine.view(nothing);
     assert.equal(w.state.settled, 'succeeded', "the harness's word is the only end a task that asked for nothing has");
-    assert.deepEqual(w.state.attempts.map((a) => [a.ended, a.reason]), [['done', 'harness']]);
+    assert.deepEqual(
+      w.state.attempts.map((a) => [a.ended, a.reason]),
+      [['done', 'harness']],
+    );
     assert.equal('stated' in w.state.attempts[0]!, false);
   });
 });

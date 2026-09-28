@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import { NAV } from '../src/components/nav.ts';
 
 test('the menu starts with the Inbox, and the rest follow in their order', () => {
-  assert.deepEqual(NAV.map((item) => item.label), ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities']);
-  assert.deepEqual(NAV.map((item) => item.to), ['/inbox', '/', '/runs', '/workflows', '/agents', '/capabilities']);
+  assert.deepEqual(
+    NAV.map((item) => item.label),
+    ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities'],
+  );
+  assert.deepEqual(
+    NAV.map((item) => item.to),
+    ['/inbox', '/', '/runs', '/workflows', '/agents', '/capabilities'],
+  );
 });
 
 test("each page lights one place in the menu — a run and its steps lighting Runs, a card's page the Inbox, a step's page Workflows, an agent's page Agents — and a page the menu has no place for lights none", () => {

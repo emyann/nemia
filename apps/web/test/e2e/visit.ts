@@ -29,14 +29,19 @@ const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.r
  * being visited failed on an answer box it never drew, blamed on the branch under check.
  */
 export const storeGone = (store: string): string =>
-  `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again`
-  + '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
+  `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again` +
+  '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
 
 class PageFailure extends Error {
   constructor(where: string, cause: unknown, screenshot: string, lost?: string) {
-    const why = cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
+    const why =
+      cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
     // With the store gone, that is the failure, and what the page could not find follows from it.
-    super(lost ? `${where}: ${lost}\n  what the page then failed on: ${why}\n  what it looked like: ${screenshot}` : `${where}: ${why}\n  what it looked like: ${screenshot}`);
+    super(
+      lost
+        ? `${where}: ${lost}\n  what the page then failed on: ${why}\n  what it looked like: ${screenshot}`
+        : `${where}: ${why}\n  what it looked like: ${screenshot}`,
+    );
   }
 }
 
@@ -75,7 +80,8 @@ export async function visitAll(browser: Browser, base: string, pages: readonly P
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
     for (const theme of THEMES) {
-      for (const name of [`${spec.name}-${theme}.png`, `${spec.name}-${theme}-failed.png`]) fs.rmSync(path.join(out, name), { force: true });
+      for (const name of [`${spec.name}-${theme}.png`, `${spec.name}-${theme}-failed.png`])
+        fs.rmSync(path.join(out, name), { force: true });
     }
   }
   const shots: string[] = [];
@@ -100,7 +106,10 @@ export async function launch(): Promise<Browser> {
   try {
     return await chromium.launch();
   } catch (err) {
-    throw new Error(`Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`);
+    throw new Error(
+      `Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`,
+      { cause: err },
+    );
   }
 }
 
@@ -108,7 +117,8 @@ export async function launch(): Promise<Browser> {
 const HEADLINE_WIDTH = 300;
 
 /** What Playwright's call log says of itself while it tries again: none of it says why it tries again. */
-const RETRYING = /^(?:\d+ × )?(?:retrying \w+ action|waiting \d+ms|waiting for element to be |element is visible, enabled and stable$|scrolling into view|done scrolling|attempting \w+ action)/;
+const RETRYING =
+  /^(?:\d+ × )?(?:retrying \w+ action|waiting \d+ms|waiting for element to be |element is visible, enabled and stable$|scrolling into view|done scrolling|attempting \w+ action)/;
 
 /**
  * A failure in a few lines: its first; for an error Playwright threw, the element it waited for and the last thing its call log says
@@ -117,12 +127,16 @@ const RETRYING = /^(?:\d+ × )?(?:retrying \w+ action|waiting \d+ms|waiting for 
  */
 export function headlineOf(message: string): string[] {
   // Playwright dims its call log in colour, whether or not a terminal reads it.
+  // oxlint-disable-next-line no-control-regex -- a terminal colour code starts with ESC, which is what this strips
   const lines = message.replace(/\x1b\[[0-9;]*m/g, '').split('\n');
   const clip = (line: string) => (line.length > HEADLINE_WIDTH ? `${line.slice(0, HEADLINE_WIDTH - 1)}…` : line);
   const said = [lines[0]!];
   const from = lines.findIndex((line) => line.trim() === 'Call log:');
   if (from >= 0) {
-    const log = lines.slice(from + 1).map((line) => line.trim().replace(/^- /, '')).filter((line) => line && !line.startsWith('what it looked like:'));
+    const log = lines
+      .slice(from + 1)
+      .map((line) => line.trim().replace(/^- /, ''))
+      .filter((line) => line && !line.startsWith('what it looked like:'));
     const waited = log.find((line) => /^waiting for (?!element )/.test(line));
     const last = [...log].reverse().find((line) => line !== waited && !RETRYING.test(line));
     for (const line of [waited, last]) if (line) said.push(line);

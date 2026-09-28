@@ -16,7 +16,9 @@ const unique = (xs: string[]) => [...new Set(xs)];
 
 /** Variables the README names that the source never reads and no test sets to show it is ignored. */
 const unreadEnv = (readme: string, src: string, tests: string) =>
-  unique(readme.match(/\b(?:TYPESAFE|WF)_[A-Z_]+\b/g) ?? []).filter((v) => !src.includes(`env.${v}`) && !src.includes(`'${v}'`) && !tests.includes(v));
+  unique(readme.match(/\b(?:TYPESAFE|WF)_[A-Z_]+\b/g) ?? []).filter(
+    (v) => !src.includes(`env.${v}`) && !src.includes(`'${v}'`) && !tests.includes(v),
+  );
 
 /** Package paths the README names, in backticks, that do not exist. */
 const missingFiles = (readme: string, exists: (p: string) => boolean) =>
@@ -62,7 +64,10 @@ test('each check refuses a README that says what the code does not', () => {
   ].join('\n');
   assert.deepEqual(unreadEnv(planted, 'const r = env.WF_ROOT;', ''), ['TYPESAFE_TIMEOUT']);
   assert.deepEqual(unreadEnv('`TYPESAFE_BASE_URL` is ignored', '', "env: { TYPESAFE_BASE_URL: 'x' }"), [], 'a test shows it ignored');
-  assert.deepEqual(missingFiles(planted, (p) => p === 'src/key.ts' || p === 'src/judge.ts'), ['src/nowhere.ts']);
+  assert.deepEqual(
+    missingFiles(planted, (p) => p === 'src/key.ts' || p === 'src/judge.ts'),
+    ['src/nowhere.ts'],
+  );
   assert.deepEqual(unknownVerbs(planted, "case 'card':"), ['frobnicate']);
   assert.deepEqual(counts(planted), ['61 tests', '300 lines']);
   assert.deepEqual(undocumented(planted, ['src/key.ts', 'src/record.ts']), ['src/record.ts']);
@@ -71,14 +76,26 @@ test('each check refuses a README that says what the code does not', () => {
 
 test('the README names no variable the code does not read', () => {
   const src = filesIn('src', 'bin').map(read).join('\n');
-  const tests = filesIn('test').filter((f) => f !== 'test/readme.test.ts').map(read).join('\n');
+  const tests = filesIn('test')
+    .filter((f) => f !== 'test/readme.test.ts')
+    .map(read)
+    .join('\n');
   assert.deepEqual(unreadEnv(read('README.md'), src, tests), []);
 });
 
 test('the README names no file that does not exist, and every source and test file is in it', () => {
   const readme = read('README.md');
-  assert.deepEqual(missingFiles(readme, (p) => fs.existsSync(path.join(pkg, p))), []);
-  assert.deepEqual(undocumented(readme, filesIn('src', 'bin', 'test').filter((f) => f.endsWith('.ts'))), []);
+  assert.deepEqual(
+    missingFiles(readme, (p) => fs.existsSync(path.join(pkg, p))),
+    [],
+  );
+  assert.deepEqual(
+    undocumented(
+      readme,
+      filesIn('src', 'bin', 'test').filter((f) => f.endsWith('.ts')),
+    ),
+    [],
+  );
 });
 
 test('the README uses no verb the command does not have, and keeps no count by hand', () => {
@@ -95,7 +112,11 @@ test("the README lists the rival's planning words as the code has them, and clai
   const readme = read('README.md');
   // First, a README that says what the code does not: the sentence this test was written against.
   assert.match('plan, design, decide, and their forms', /and their forms/);
-  assert.doesNotMatch(readme, /and their forms/, 'the list is fixed: `deciding` and `option` are not in it, and the README must not say they are');
+  assert.doesNotMatch(
+    readme,
+    /and their forms/,
+    'the list is fixed: `deciding` and `option` are not in it, and the README must not say they are',
+  );
   const missing = PLANNING_WORDS.filter((w) => !readme.includes(`\`${w}\``));
   assert.deepEqual(missing, [], 'each word of PLANNING_WORDS is named in the README, in backticks');
 });

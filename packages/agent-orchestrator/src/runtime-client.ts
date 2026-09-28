@@ -13,7 +13,16 @@
  * the engine should need to learn three functions, not a library.
  */
 import path from 'node:path';
-import { claudeDetached, codex, createEngine, remoteConfigRefusal, type Credentials, type Engine, type MissingCredential, type RemoteAgent } from 'agent-runtime';
+import {
+  claudeDetached,
+  codex,
+  createEngine,
+  remoteConfigRefusal,
+  type Credentials,
+  type Engine,
+  type MissingCredential,
+  type RemoteAgent,
+} from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './a2a-agents.ts';
 import { CHECK } from './check.ts';
 import { HOME } from './store.ts';
@@ -66,7 +75,8 @@ export const engine = (): Engine => {
 };
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
-const LEFT_OUT = 'It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held, and one not yet started is refused its start.';
+const LEFT_OUT =
+  'It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held, and one not yet started is refused its start.';
 
 /**
  * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in

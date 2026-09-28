@@ -23,7 +23,9 @@ after(() => setStore(undefined));
  */
 function wfFeed(store: string): { said: string[]; cursor: number } {
   const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'feed', '0'], {
-    env: { ...process.env, WF_ROOT: store }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, WF_ROOT: store },
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
   const lines = out.trimEnd().split('\n');
   const last = /^cursor: (\d+)$/.exec(lines.at(-1) ?? '');
@@ -42,13 +44,14 @@ test('fed appends a line the package reads back, with a step and without', () =>
   fed('r-1', 'awaiting approval');
   const { said, cursor } = wfFeed(dir);
   assert.equal(cursor, fs.statSync(file).size, 'every line is whole');
-  assert.deepEqual(said, [
-    'r-0  —  running',
-    'r-1  implement  blocked',
-    'r-1  —  awaiting approval',
-  ]);
-  const lines = fs.readFileSync(file, 'utf8').trimEnd().split('\n').map((l) => JSON.parse(l) as Line);
+  assert.deepEqual(said, ['r-0  —  running', 'r-1  implement  blocked', 'r-1  —  awaiting approval']);
+  const lines = fs
+    .readFileSync(file, 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map((l) => JSON.parse(l) as Line);
   assert.equal(lines[0].at, before.at, 'what was there is kept');
-  for (const { at } of lines.slice(1)) assert.ok(Date.parse(at) >= from - 1000 && at === new Date(Date.parse(at)).toISOString(), `written now, as an ISO time: ${at}`);
+  for (const { at } of lines.slice(1))
+    assert.ok(Date.parse(at) >= from - 1000 && at === new Date(Date.parse(at)).toISOString(), `written now, as an ISO time: ${at}`);
   assert.ok(!('step' in lines[2]), "a run's line carries no step key at all");
 });

@@ -17,29 +17,35 @@ const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => ty
  * use: on 2.1.270 a `url` with no `type` loads no server and says nothing.
  */
 export const mcpRefuses = (mcp: unknown): string | undefined => {
-  const shape = 'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...} }, as in a `.mcp.json`.';
+  const shape =
+    'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...} }, as in a `.mcp.json`.';
   if (!isMap(mcp)) return `\`mcp: ${JSON.stringify(mcp)}\` is not a map of MCP servers by name. ${shape}`;
   for (const [name, server] of Object.entries(mcp)) {
     const at = `\`mcp.${name}\``;
     if (!/^[\w-]+$/.test(name)) return `\`mcp: ${JSON.stringify(name)}\` is not a server name. Use letters, digits, - and _.`;
     if (!isMap(server)) return `${at} is not a server. ${shape}`;
     const local = 'command' in server;
-    if (local === ('url' in server)) return `${at} has ${local ? 'both `command` and `url`' : 'neither `command` nor `url`'}. ${shape}`;
+    if (local === 'url' in server) return `${at} has ${local ? 'both `command` and `url`' : 'neither `command` nor `url`'}. ${shape}`;
     const stray = Object.keys(server).find((k) => !(local ? ['type', 'command', 'args', 'env'] : ['type', 'url', 'headers']).includes(k));
     if (stray) return `${at} has \`${stray}\`, which a server with a \`${local ? 'command' : 'url'}\` does not take. ${shape}`;
     if (local) {
-      if (typeof server.command !== 'string' || !server.command) return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
-      if (server.type !== undefined && server.type !== 'stdio') return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
+      if (typeof server.command !== 'string' || !server.command)
+        return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
+      if (server.type !== undefined && server.type !== 'stdio')
+        return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
       if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
         return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
       }
-      if (server.env !== undefined && !isStringMap(server.env)) return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
+      if (server.env !== undefined && !isStringMap(server.env))
+        return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
     } else {
-      if (typeof server.url !== 'string' || !server.url) return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
+      if (typeof server.url !== 'string' || !server.url)
+        return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
       if (server.type !== 'http' && server.type !== 'sse') {
         return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
       }
-      if (server.headers !== undefined && !isStringMap(server.headers)) return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
+      if (server.headers !== undefined && !isStringMap(server.headers))
+        return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
     }
   }
   return undefined;
@@ -57,9 +63,16 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
   try {
     if (!fs.statSync(file).isFile()) return undefined;
     text = fs.readFileSync(file, 'utf8');
-  } catch { return undefined; }
-  try { JSON.parse(text); } catch (e) {
-    throw new Error(`${file} is not valid JSON (${(e as Error).message}), and Claude Code starts no session with it named. Fix the file, or remove it from the checkout.`);
+  } catch {
+    return undefined;
+  }
+  try {
+    JSON.parse(text);
+  } catch (e) {
+    throw new Error(
+      `${file} is not valid JSON (${(e as Error).message}), and Claude Code starts no session with it named. Fix the file, or remove it from the checkout.`,
+      { cause: e },
+    );
   }
   return file;
 };
@@ -70,7 +83,10 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
  * `headers` value may be a secret.
  */
 export const writeMcpConfig = (file: string, mcp: HarnessArgs['mcp']): string | undefined => {
-  if (!mcp || !Object.keys(mcp).length) { fs.rmSync(file, { force: true }); return undefined; }
+  if (!mcp || !Object.keys(mcp).length) {
+    fs.rmSync(file, { force: true });
+    return undefined;
+  }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });
   // Absolute for the same reason as the checkout's: a root given relative is relative to the engine.
@@ -119,6 +135,21 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
  * every dot, quotes or none ("invalid transport in `mcp_servers."a`", 0.154.0).
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
-  tomlTable(Object.entries(mcp).map(([name, s]) => [name, 'command' in s
-    ? tomlTable([['command', tomlString(s.command)], ['args', s.args && `[${s.args.map((a) => tomlString(a)).join(',')}]`], ['env', tomlStrings(s.env)]])
-    : tomlTable([['url', tomlString(s.url)], ['http_headers', tomlStrings(s.headers)]])] as const));
+  tomlTable(
+    Object.entries(mcp).map(
+      ([name, s]) =>
+        [
+          name,
+          'command' in s
+            ? tomlTable([
+                ['command', tomlString(s.command)],
+                ['args', s.args && `[${s.args.map((a) => tomlString(a)).join(',')}]`],
+                ['env', tomlStrings(s.env)],
+              ])
+            : tomlTable([
+                ['url', tomlString(s.url)],
+                ['http_headers', tomlStrings(s.headers)],
+              ]),
+        ] as const,
+    ),
+  );

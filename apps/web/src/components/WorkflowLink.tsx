@@ -11,7 +11,10 @@ export function WorkflowLink({ dir }: { dir: string }) {
       data-workflow={name}
       className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
     >
-      workflow <span className="font-mono text-neutral-700 underline decoration-neutral-300 underline-offset-2 dark:text-neutral-300 dark:decoration-neutral-600">{name}</span>
+      workflow{' '}
+      <span className="font-mono text-neutral-700 underline decoration-neutral-300 underline-offset-2 dark:text-neutral-300 dark:decoration-neutral-600">
+        {name}
+      </span>
     </Link>
   );
 }

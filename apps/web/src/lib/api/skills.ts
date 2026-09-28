@@ -34,7 +34,14 @@ export type SkillRow = {
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
 /** Mirrors `GivenSkill`: a skill an agent gives, where a start finds it and what it costs — or why none is found (`from: null`). */
-export type GivenSkill = { name: string; from: SkillSource | null; entry: AgentSkill | null; error: string | null; preload: boolean; cost: SkillCost | null };
+export type GivenSkill = {
+  name: string;
+  from: SkillSource | null;
+  entry: AgentSkill | null;
+  error: string | null;
+  preload: boolean;
+  cost: SkillCost | null;
+};
 
 /** Mirrors `SkillAdded`: the copied skill as it now reads in your library, and its files. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
@@ -56,10 +63,17 @@ export class SkillRefusal extends Error {
 
 /** Copy the skill HKB ships under `name` into your library, a write of its own: an agent of yours can then be given it. */
 export async function copySkill(name: string): Promise<SkillAdded> {
-  const res = await fetch('/api/skills/yours', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ copy: name }) });
+  const res = await fetch('/api/skills/yours', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ copy: name }),
+  });
   const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
   if (res.ok && answer) return answer as SkillAdded;
-  throw new SkillRefusal(typeof answer?.error === 'string' ? answer.error : `POST /api/skills/yours answered ${res.status} ${res.statusText}`, res.status);
+  throw new SkillRefusal(
+    typeof answer?.error === 'string' ? answer.error : `POST /api/skills/yours answered ${res.status} ${res.statusText}`,
+    res.status,
+  );
 }
 
 /**
@@ -83,7 +97,14 @@ export type SkillUser = { from: 'yours' | 'repo'; name: string };
  * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read,
  * `body` its instructions all the same), the agents of either place that give this very folder, and the `cp -r` that moves it to the other place.
  */
-export type SkillDetail = { skill: SkillRow; version: string; draft: SkillDraft | null; body: string; users: SkillUser[]; copyHint: string | null };
+export type SkillDetail = {
+  skill: SkillRow;
+  version: string;
+  draft: SkillDraft | null;
+  body: string;
+  users: SkillUser[];
+  copyHint: string | null;
+};
 
 /** Mirrors `SkillSaved`: a skill written, as its page now reads it. */
 export type SkillSaved = SkillDetail & { written: string[] };
@@ -99,7 +120,10 @@ async function written(method: 'POST' | 'PUT', url: string, body: unknown): Prom
   const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
   if (res.ok && answer) return answer as SkillSaved;
-  throw new SkillRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${url} answered ${res.status} ${res.statusText}`, res.status);
+  throw new SkillRefusal(
+    typeof answer?.error === 'string' ? answer.error : `${method} ${url} answered ${res.status} ${res.statusText}`,
+    res.status,
+  );
 }
 
 /** A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader refuses. */

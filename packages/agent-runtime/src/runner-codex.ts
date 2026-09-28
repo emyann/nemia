@@ -24,8 +24,14 @@ export const trustedProjects = (toml: string): Set<string> => {
   for (const raw of toml.split('\n')) {
     const line = raw.trim();
     const table = /^\[projects\."((?:[^"\\]|\\.)*)"\]$/.exec(line);
-    if (table) { current = table[1]; continue; }
-    if (line.startsWith('[')) { current = undefined; continue; }
+    if (table) {
+      current = table[1];
+      continue;
+    }
+    if (line.startsWith('[')) {
+      current = undefined;
+      continue;
+    }
     if (current !== undefined && /^trust_level\s*=\s*"trusted"$/.test(line)) trusted.add(current);
   }
   return trusted;
@@ -35,9 +41,15 @@ export const trustedProjects = (toml: string): Set<string> => {
 const repositoryOf = (cwd: string): string | undefined => {
   try {
     countSpawn();
-    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
     return path.dirname(path.resolve(cwd, common));
-  } catch { return undefined; }
+  } catch {
+    return undefined;
+  }
 };
 
 /**
@@ -88,10 +100,12 @@ export const codex: HarnessSpec = {
       'exec',
       '--json',
       '--skip-git-repo-check',
-      '-C', r.cwd,
+      '-C',
+      r.cwd,
       // The sandbox the task named, as itself. `read-only` used to fall through to `workspace-write`,
       // so a task that asked for a reviewer that cannot write got one that could.
-      '-s', sandboxOf(r),
+      '-s',
+      sandboxOf(r),
       ...(r.config?.model ? ['-m', r.config?.model] : []),
       // Codex's worktree flag takes NO value, so it is safe immediately before the prompt —
       // unlike Claude's. The spec is where that difference lives, so the engine never learns
@@ -152,7 +166,8 @@ export const codex: HarnessSpec = {
   // The conversation, from Codex's own rollout of the thread rather than the stream: the rollout dates
   // every record, and `exec --json` dates none.
   transcript: { file: codexRolloutFile, events: codexRolloutEvents },
-  noChannel: "`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.",
+  noChannel:
+    '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.',
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**
@@ -175,11 +190,17 @@ export const codex: HarnessSpec = {
   prepare: (r) => {
     const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
     let toml: string;
-    try { toml = fs.readFileSync(config, 'utf8'); } catch { return {}; }
+    try {
+      toml = fs.readFileSync(config, 'utf8');
+    } catch {
+      return {};
+    }
     const operators = codexMcpServerNames(toml);
     const taken = Object.keys(r.config?.mcp ?? {}).filter((name) => operators.has(name));
     if (taken.length) {
-      throw new Error(`${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`);
+      throw new Error(
+        `${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`,
+      );
     }
     const repo = repositoryOf(r.cwd);
     if (!repo) return {};

@@ -18,13 +18,18 @@ delete process.env.WF_MAX_RUNS;
 const repo = scratch('hkb-api-queue-repo-');
 process.env.HKB_REPO = repo;
 const git = (...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
+  execFileSync(
+    'git',
+    ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+    { cwd: repo, encoding: 'utf8' },
+  );
 git('init', '-q', '-b', 'main');
 git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
 const { app } = await import('../src/app.ts');
-const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } = await import('agent-orchestrator');
+const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } =
+  await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 type Ceilings = import('../src/ceilings.ts').Ceilings;
 
@@ -73,7 +78,13 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   queueInInbox(first.name);
   queueInInbox(second.name);
   // The tick's own file for a start it refused, of the card as it stands.
-  const tried = { at: '2026-09-16T10:00:00.000Z', text: cardText(second.name), repo, why: `no workflow gone in ${repo}/workflows.`, refused: true };
+  const tried = {
+    at: '2026-09-16T10:00:00.000Z',
+    text: cardText(second.name),
+    repo,
+    why: `no workflow gone in ${repo}/workflows.`,
+    refused: true,
+  };
   fs.mkdirSync(path.join(root, 'queue'), { recursive: true });
   fs.writeFileSync(path.join(root, 'queue', `${second.name}.json`), JSON.stringify(tried));
 
@@ -103,17 +114,42 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   assert.equal(queued.status, 200, await queued.clone().text());
   const answer = await queued.json();
   assert.match(answer.queued, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-  assert.deepEqual(answer, { name: first.name, file: path.join(inbox, `${first.name}.md`), was: 'queued', queued: answer.queued, place: 1, of: 1 });
-  assert.equal(cardText(first.name), `---\nworkflow: dev\nqueued: ${answer.queued}\n---\nCache the views between passes\n`, 'written as wf inbox queue writes it');
+  assert.deepEqual(answer, {
+    name: first.name,
+    file: path.join(inbox, `${first.name}.md`),
+    was: 'queued',
+    queued: answer.queued,
+    place: 1,
+    of: 1,
+  });
+  assert.equal(
+    cardText(first.name),
+    `---\nworkflow: dev\nqueued: ${answer.queued}\n---\nCache the views between passes\n`,
+    'written as wf inbox queue writes it',
+  );
 
   // A body of `{}` is no body.
   const behind = await (await queue(second.name, JSON_TYPE, '{}')).json();
   assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2]);
-  assert.deepEqual((await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(), [[first.name, 1], [second.name, 2]].sort());
+  const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
+  assert.deepEqual(
+    (await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(byName),
+    [
+      [first.name, 1],
+      [second.name, 2],
+    ].sort(byName),
+  );
 
   const off = await unqueue(first.name);
   assert.equal(off.status, 200, await off.clone().text());
-  assert.deepEqual(await off.json(), { name: first.name, file: path.join(inbox, `${first.name}.md`), was: 'taken back', queued: null, place: null, of: null });
+  assert.deepEqual(await off.json(), {
+    name: first.name,
+    file: path.join(inbox, `${first.name}.md`),
+    was: 'taken back',
+    queued: null,
+    place: null,
+    of: null,
+  });
   assert.equal(cardText(first.name), '---\nworkflow: dev\n---\nCache the views between passes\n');
   assert.equal((await listed()).find((e) => e.name === second.name)!.queued!.place, 1, 'the card behind it moves up');
 
@@ -152,7 +188,7 @@ test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it wa
   assert.deepEqual(await filedAt(), before, 'a refusal, and a card taken off a queue it was not in, leave it as it was');
 });
 
-test("DELETE /api/inbox/:name/queue takes back a queued card whose repository is gone, as `--off` does without the check — and the listing keeps its place until then", async () => {
+test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is gone, as `--off` does without the check — and the listing keeps its place until then', async () => {
   clear();
   const about = scratch('hkb-api-queue-gone-');
   const { card } = addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about });
@@ -175,7 +211,10 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   queueInInbox(queued.name);
   const started = addToInbox({ text: 'Started, its removal failed', workflow: 'dev' }).card;
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), JSON.stringify({ id: 'started-run-k2q9', from: { inbox: started.name } }));
+  fs.writeFileSync(
+    path.join(root, 'runs', 'started-run-k2q9.json'),
+    JSON.stringify({ id: 'started-run-k2q9', from: { inbox: started.name } }),
+  );
   fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');
   const before = inboxAsIs();
 
@@ -206,7 +245,12 @@ test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 4
   clear();
   const { card } = addToInbox({ text: 'No workflow named' });
   const before = inboxAsIs();
-  for (const [sent, name] of [['.hidden', '.hidden'], ['..%2Fruns%2Fr-1', '../runs/r-1'], ['a%2Fb', 'a/b'], ['a%5Cb', 'a\\b']] as const) {
+  for (const [sent, name] of [
+    ['.hidden', '.hidden'],
+    ['..%2Fruns%2Fr-1', '../runs/r-1'],
+    ['a%2Fb', 'a/b'],
+    ['a%5Cb', 'a\\b'],
+  ] as const) {
     for (const send of [queue, unqueue]) {
       const res = await send(sent);
       assert.equal(res.status, 400, sent);
@@ -246,7 +290,11 @@ test('REFUSED at shipped defaults: a queue or its taking back another site could
     for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
       const res = await send({ 'content-type': type });
       assert.equal(res.status, 415, `${route} ${type}`);
-      assert.ok((await res.json()).error.startsWith(`${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``));
+      assert.ok(
+        (await res.json()).error.startsWith(
+          `${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
+        ),
+      );
     }
     const none = await send({});
     assert.equal(none.status, 415, `${route} with no content-type`);
@@ -265,7 +313,12 @@ test('REFUSED at shipped defaults: a queue or its taking back another site could
   assert.deepEqual(inboxAsIs(), before);
 
   // As the board sends each, through vite's proxy: taken.
-  const board = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+  const board = {
+    'content-type': 'application/json',
+    'sec-fetch-site': 'same-origin',
+    origin: 'http://localhost:5173',
+    host: '127.0.0.1:8787',
+  };
   assert.equal((await queue(card.name, board)).status, 200);
   assert.equal((await unqueue(other.name, board)).status, 200);
   assert.match(cardText(card.name), /\nqueued: /);
@@ -279,18 +332,32 @@ const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}
 /** A task filed and waiting for a session: in flight. */
 const pending = (taskId: string) => {
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), `${JSON.stringify({ kind: 'filed', at: at(0), brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' })}\n`);
+  fs.writeFileSync(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    `${JSON.stringify({ kind: 'filed', at: at(0), brief: 'Implement it.', cwd: repo, maxAttempts: 1, harness: 'codex' })}\n`,
+  );
 };
 
 /** A run of one step, frozen on the record as `wf start` freezes it. */
 function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}): void {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true, brief: `Run ${id}`, createdAt: at(minute),
-    workflowDir: path.join(root, 'no-such-workflow'), workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
-    steps: { implement: fields.taskId ? { taskId: fields.taskId, workspace: repo, branch: `wf/${id}/implement` } : { taskId: null } },
-    ...(fields.after ? { after: fields.after } : {}),
-  }));
+  fs.writeFileSync(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo,
+      workspace: repo,
+      baseRef: base,
+      branch: 'main',
+      isolate: true,
+      brief: `Run ${id}`,
+      createdAt: at(minute),
+      workflowDir: path.join(root, 'no-such-workflow'),
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
+      steps: { implement: fields.taskId ? { taskId: fields.taskId, workspace: repo, branch: `wf/${id}/implement` } : { taskId: null } },
+      ...(fields.after ? { after: fields.after } : {}),
+    }),
+  );
   if (fields.cancelled) fs.writeFileSync(path.join(root, 'runs', `${id}.cancelled`), at(minute + 1));
 }
 
@@ -348,7 +415,10 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
   // A cap of 2: the oldest wanting a slot is admitted and counted, and the next held at 2 of 2.
   tickWrote({ sessions: 2, runs: 2 });
   const two = await ceilings();
-  assert.deepEqual([two.cap, two.inFlight, two.held], [2, ['a-flying'], [{ run: 'c-wants', inFlight: 2, cap: 2, word: 'waiting for a run slot (2 of 2 in flight)' }]]);
+  assert.deepEqual(
+    [two.cap, two.inFlight, two.held],
+    [2, ['a-flying'], [{ run: 'c-wants', inFlight: 2, cap: 2, word: 'waiting for a run slot (2 of 2 in flight)' }]],
+  );
   assert.deepEqual(two.held, await packageHeld());
 
   // A cap of 3: nothing held.
@@ -367,7 +437,9 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
 test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last pass and not the api's environment — a pass with no cap is `no cap` beside WF_MAX_RUNS=1 — and reads the api's own only before any pass, refusing one that is not a count by name", async (t) => {
   clear();
   seedRuns();
-  t.after(() => { delete process.env.WF_MAX_RUNS; });
+  t.after(() => {
+    delete process.env.WF_MAX_RUNS;
+  });
 
   process.env.WF_MAX_RUNS = '1';
   tickWrote({ sessions: 2, runs: 0 });
@@ -383,7 +455,10 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
   process.env.WF_MAX_RUNS = 'two';
   const res = await app.request('/api/ceilings');
   assert.equal(res.status, 500);
-  assert.equal((await res.json()).error, 'WF_MAX_RUNS=two is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.');
+  assert.equal(
+    (await res.json()).error,
+    'WF_MAX_RUNS=two is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.',
+  );
   // Once a pass has written its ceilings, the api's environment is not read at all.
   tickWrote({ sessions: 2, runs: 2 });
   assert.equal((await ceilings()).cap, 2);
@@ -391,8 +466,18 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
 
 /** What a pass cost, as the tick writes it (`recordPassCost`): each phase, the harnesses observed, and the totals. */
 const PASS = {
-  at: '2026-09-25T10:00:00.000Z', ms: 212, records: 12, bytes: 812_000, spawned: 1, overheadMs: 0.4,
-  phases: Object.fromEntries(['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p, k) => [p, { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 }])),
+  at: '2026-09-25T10:00:00.000Z',
+  ms: 212,
+  records: 12,
+  bytes: 812_000,
+  spawned: 1,
+  overheadMs: 0.4,
+  phases: Object.fromEntries(
+    ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p, k) => [
+      p,
+      { ms: k * 10, calls: 1, bytes: p === 'journals' ? 812_000 : 0, reads: 1, spawned: p === 'observe' ? 1 : 0 },
+    ]),
+  ),
   harnesses: { claude: { calls: 1, ms: 30, listed: 3, spawned: 1 } },
 };
 

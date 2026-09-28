@@ -35,19 +35,29 @@ const CLICK = [
 ].join('\n');
 
 /** How Playwright words it: its call log dimmed, a colour code at each end of every line. */
-const dimmed = (message: string) => message.split('\n').map((line, i) => (i > 1 && line !== PICTURE ? `${String.fromCharCode(27)}[2m${line}${String.fromCharCode(27)}[22m` : line)).join('\n');
+const dimmed = (message: string) =>
+  message
+    .split('\n')
+    .map((line, i) => (i > 1 && line !== PICTURE ? `${String.fromCharCode(27)}[2m${line}${String.fromCharCode(27)}[22m` : line))
+    .join('\n');
 
-test("a click Playwright gave up on is said in four lines: the page, the theme and the timeout; the element it waited for; what was in the way; and the picture — none of its retrying", () => {
-  for (const message of [CLICK, dimmed(CLICK)]) assert.deepEqual(headlineOf(message), [
-    'the factory-gate page (/) in the light theme: could not be checked: locator.click: Timeout 30000ms exceeded.',
-    'waiting for locator(\'.react-flow__node[data-id="ship-it-e2e3"]\').locator(\'[data-answer="Approve"]\')',
-    '<span class="text-xs"> · resets 23:16</span> from <div class="flex flex-wrap">…</div> subtree intercepts pointer events',
-    'what it looked like: /tmp/out/factory-gate-light-failed.png',
-  ]);
+test('a click Playwright gave up on is said in four lines: the page, the theme and the timeout; the element it waited for; what was in the way; and the picture — none of its retrying', () => {
+  for (const message of [CLICK, dimmed(CLICK)])
+    assert.deepEqual(headlineOf(message), [
+      'the factory-gate page (/) in the light theme: could not be checked: locator.click: Timeout 30000ms exceeded.',
+      'waiting for locator(\'.react-flow__node[data-id="ship-it-e2e3"]\').locator(\'[data-answer="Approve"]\')',
+      '<span class="text-xs"> · resets 23:16</span> from <div class="flex flex-wrap">…</div> subtree intercepts pointer events',
+      'what it looked like: /tmp/out/factory-gate-light-failed.png',
+    ]);
 });
 
 test("an assertion's refusal, with no call log, is its first line and the picture — the list under it stays above, said once", () => {
-  const refused = ['the runs page (/runs) in the dark theme: no console error and no failed request — 2 seen:', '    console error: a', '    request failed: GET /api/x', PICTURE].join('\n');
+  const refused = [
+    'the runs page (/runs) in the dark theme: no console error and no failed request — 2 seen:',
+    '    console error: a',
+    '    request failed: GET /api/x',
+    PICTURE,
+  ].join('\n');
   assert.deepEqual(headlineOf(refused), [
     'the runs page (/runs) in the dark theme: no console error and no failed request — 2 seen:',
     'what it looked like: /tmp/out/factory-gate-light-failed.png',
@@ -57,6 +67,9 @@ test("an assertion's refusal, with no call log, is its first line and the pictur
 test('a failure before any page — the build, a server — is its first line; and no line of the headline runs past 300 characters', () => {
   assert.deepEqual(headlineOf('the web app did not build:\nsrc/x.ts: error'), ['the web app did not build:']);
   const long = headlineOf(`${'x'.repeat(1_000)}\nCall log:\n  - waiting for locator('${'y'.repeat(1_000)}')`);
-  assert.deepEqual(long.map((line) => line.length), [300, 300]);
+  assert.deepEqual(
+    long.map((line) => line.length),
+    [300, 300],
+  );
   assert.ok(long.every((line) => line.endsWith('…')));
 });

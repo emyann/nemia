@@ -35,13 +35,21 @@ const checkOf = (folder: string): string => {
 const DEV = checkOf('workflows/dev');
 
 /** Every shipped folder that has an e2e, by its path from the repository's root: the package's copy of ui is shipped too. */
-const FOLDERS = ['workflows/dev', 'workflows/dev-planned', 'workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui'];
+const FOLDERS = [
+  'workflows/dev',
+  'workflows/dev-planned',
+  'workflows/dev-build',
+  'workflows/dev-planned-build',
+  'workflows/ui',
+  'packages/agent-orchestrator/workflows/ui',
+];
 /** The folders a person picks for the build: it runs whatever was touched. */
 const BUILD_FOLDERS = FOLDERS.filter((f) => /build|ui/.test(f));
 
 /** How each line ends its build: the e2e only where the run has not set `WF_BASE_REF` — on the merged tree, in ship's check. */
-const AT_MERGE = 'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
-const BUILD_LINE = `npm test && npm run typecheck && npm run build && ${AT_MERGE}`;
+const AT_MERGE =
+  'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
+const BUILD_LINE = `npm test && npm run typecheck && npm run lint && npm run build && ${AT_MERGE}`;
 /** A line as it was before 2026-09-25, with the e2e in every round: what each REFUSED case below must catch. */
 const everyRound = (line: string) => line.replace(AT_MERGE, 'npm run e2e');
 
@@ -56,11 +64,17 @@ fs.writeFileSync(path.join(BIN, 'npm'), '#!/bin/sh\necho "npm $*"\n[ "$*" = "${N
  */
 const baseEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({
   ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('WF_') && !k.startsWith('GIT_'))),
-  PATH: `${BIN}:${process.env.PATH}`, ...extra,
+  PATH: `${BIN}:${process.env.PATH}`,
+  ...extra,
 });
 
 const git = (cwd: string, ...args: string[]) =>
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', env: baseEnv(), stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
+    cwd,
+    encoding: 'utf8',
+    env: baseEnv(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 
 const write = (repo: string, file: string) => {
   fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
@@ -86,7 +100,14 @@ type Ran = { status: number | null; stdout: string; stderr: string };
 
 /** The check as the run executes it: through `CHECK`, the harness the engine spawns, with the environment the run hands it. */
 function asCheck(repo: string, command: string, baseRef: string, extra: Record<string, string> = {}): Ran {
-  const brief = checkBrief(command, { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: baseRef, WF_WORKSPACE: repo, WF_STDERR: '', WF_ARTIFACTS: ROOT });
+  const brief = checkBrief(command, {
+    WF_RUN: 'r-1',
+    WF_STEP: 'implement',
+    WF_BASE_REF: baseRef,
+    WF_WORKSPACE: repo,
+    WF_STDERR: '',
+    WF_ARTIFACTS: ROOT,
+  });
   const { cmd, args } = CHECK.command({ brief });
   const r = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', env: baseEnv(extra) });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
@@ -117,7 +138,12 @@ test('dev and dev-planned judge implement by the same line: the suite and the ty
   assert.ok(DEV.includes('git -c core.quotePath=false diff --no-renames --name-only "$range"'), DEV);
   assert.ok(DEV.includes('range="$WF_BASE_REF...HEAD"') && DEV.includes('range=HEAD...MERGE_HEAD'), DEV);
   // The folders a person picks for the build keep it whatever was touched: they asked for it.
-  assert.deepEqual(BUILD_FOLDERS, ['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui']);
+  assert.deepEqual(BUILD_FOLDERS, [
+    'workflows/dev-build',
+    'workflows/dev-planned-build',
+    'workflows/ui',
+    'packages/agent-orchestrator/workflows/ui',
+  ]);
   for (const folder of BUILD_FOLDERS) assert.equal(checkOf(folder), BUILD_LINE, folder);
   // Every line runs the e2e in one place, behind the one condition.
   for (const folder of FOLDERS) {
@@ -160,7 +186,7 @@ test('REFUSED as a check: a line with the e2e in every round, as each folder had
     assert.match(r.stdout, E2E, `${folder}: the old line ran the e2e in a round\n${r.stdout}`);
   }
   // The build folders' old line, word for word.
-  assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run build && npm run e2e');
+  assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run lint && npm run build && npm run e2e');
 });
 
 test("REFUSED as ship's check: an e2e that fails fails the line on the merged tree; in a round, where it does not run, it cannot", () => {
@@ -198,7 +224,13 @@ test('as a check: a branch that touches the web app runs the build and no e2e', 
 });
 
 test('as a check: a branch that touches only the packages, the docs or the workflows runs neither, and says so', () => {
-  const { repo, base } = branched(['packages/agent-orchestrator/src/run.ts', 'packages/agent-runtime/src/domain.ts', 'docs/pivot.md', 'workflows/dev/README.md', 'apps/webhook/x.ts']);
+  const { repo, base } = branched([
+    'packages/agent-orchestrator/src/run.ts',
+    'packages/agent-runtime/src/domain.ts',
+    'docs/pivot.md',
+    'workflows/dev/README.md',
+    'apps/webhook/x.ts',
+  ]);
   const r = asCheck(repo, DEV, base);
   assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
   assert.match(r.stdout, /^npm run typecheck$/m);
@@ -210,7 +242,7 @@ test('as a check: a branch that touches only the packages, the docs or the workf
 test('as a check: a file moved out of the web app, or one whose name is not ASCII, counts as touching it', () => {
   // A rename is listed by its new path alone under git's default rename detection, and a non-ASCII path is quoted: either would read
   // as a change to the packages only.
-  const { repo, base } = branched(['apps/web/src/lib/shared.ts']);
+  const { repo } = branched(['apps/web/src/lib/shared.ts']);
   git(repo, 'checkout', '-q', '-b', 'moved');
   fs.mkdirSync(path.join(repo, 'packages', 'shared'), { recursive: true });
   git(repo, 'mv', 'apps/web/src/lib/shared.ts', 'packages/shared/shared.ts');
@@ -286,19 +318,35 @@ test('REFUSED by hand: no WF_BASE_REF and no merge in progress fails loudly, and
   assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
 });
 
-test("ui ends in a gated ship, like the build folders, and the check the run executes on its merge, named on its brief, runs the e2e on the merged tree, and none in a round", () => {
+test('ui ends in a gated ship, like the build folders, and the check the run executes on its merge, named on its brief, runs the e2e on the merged tree, and none in a round', () => {
   for (const folder of ['workflows/ui', 'packages/agent-orchestrator/workflows/ui']) {
     const dir = path.join(REPO_ROOT, folder);
     const workflow = loadWorkflows(dir);
     const ship = workflow.find((s) => s.name === 'ship');
     assert.ok(ship, `${folder} has a ship`);
-    assert.deepEqual({ gate: ship.gate, workspace: ship.workspace, after: ship.after, check: ship.check }, { gate: true, workspace: 'main', after: ['review'], check: checkOf(folder) }, folder);
+    assert.deepEqual(
+      { gate: ship.gate, workspace: ship.workspace, after: ship.after, check: ship.check },
+      { gate: true, workspace: 'main', after: ['review'], check: checkOf(folder) },
+      folder,
+    );
 
     // The line the shipper is told the run executes on its merge, taken off its brief as the shipper reads it.
     const run: Run = {
-      id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Make the Factory darker',
-      workflowDir: dir, createdAt: '2026-09-25T00:00:00Z',
-      steps: Object.fromEntries(workflow.map((s) => [s.name, s.name === 'ship' ? { taskId: null } : { taskId: `t-${s.name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
+      id: 'r-1',
+      repo: '/repo',
+      workspace: '/repo',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Make the Factory darker',
+      workflowDir: dir,
+      createdAt: '2026-09-25T00:00:00Z',
+      steps: Object.fromEntries(
+        workflow.map((s) => [
+          s.name,
+          s.name === 'ship' ? { taskId: null } : { taskId: `t-${s.name}`, workspace: '/wt', branch: 'wf/r-1/implement' },
+        ]),
+      ),
     };
     const brief = composeBrief(ship, run, workflow, undefined, '/wf/runs/r-1/artifacts/ship');
     const named = /Once you sign off, the run executes `([^\n]*)` in this checkout, on the merge you left staged/.exec(brief)?.[1];

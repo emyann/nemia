@@ -22,7 +22,18 @@ export type AgentSkill = {
  * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, the skills its
  * sessions are given and its system prompt (`AGENT_OWN_KEYS`). Mirrors `RoleKey` in the package.
  */
-export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'sandbox' | 'tools' | 'disallowedTools' | 'allowedTools' | 'remote' | 'output';
+export type AgentRoleKey =
+  | 'harness'
+  | 'model'
+  | 'effort'
+  | 'context'
+  | 'permissionMode'
+  | 'sandbox'
+  | 'tools'
+  | 'disallowedTools'
+  | 'allowedTools'
+  | 'remote'
+  | 'output';
 
 /** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
@@ -117,7 +128,11 @@ async function agentWrite<T>(method: 'POST' | 'PUT' | 'DELETE', route: string, b
   const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
   if (res.ok && answer) return answer as T;
   const users = Array.isArray(answer?.users) ? answer.users.filter((s): s is string => typeof s === 'string') : [];
-  throw new AgentRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`, users, res.status);
+  throw new AgentRefusal(
+    typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`,
+    users,
+    res.status,
+  );
 }
 
 /** Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses. */
@@ -138,4 +153,5 @@ export type AgentTried = { id: string };
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
  */
-export const tryAgent = (name: string, brief: string): Promise<AgentTried> => agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, { brief });
+export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
+  agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, { brief });

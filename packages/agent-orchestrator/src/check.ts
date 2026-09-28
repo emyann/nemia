@@ -84,13 +84,18 @@ export const checkBrief = (command: string, env: CheckEnv): string => JSON.strin
  */
 export function readCheckBrief(brief: string): { command: string; env: Record<string, string> } {
   let parsed: unknown;
-  try { parsed = JSON.parse(brief); } catch { return { command: brief, env: {} }; }
+  try {
+    parsed = JSON.parse(brief);
+  } catch {
+    return { command: brief, env: {} };
+  }
   if (!parsed || typeof parsed !== 'object' || typeof (parsed as { check?: unknown }).check !== 'string') {
     return { command: brief, env: {} };
   }
   const { check, env } = parsed as { check: string; env?: unknown };
-  const carried = Object.entries(env && typeof env === 'object' ? env : {})
-    .filter((kv): kv is [string, string] => /^WF_[A-Z_]+$/.test(kv[0]) && typeof kv[1] === 'string');
+  const carried = Object.entries(env && typeof env === 'object' ? env : {}).filter(
+    (kv): kv is [string, string] => /^WF_[A-Z_]+$/.test(kv[0]) && typeof kv[1] === 'string',
+  );
   return { command: check, env: Object.fromEntries(carried) };
 }
 
@@ -120,20 +125,21 @@ const TRAILER = '[wf check] exit';
  *   file is pure and the machine that runs the check is the one that knows whether it has `ionice`: one without it
  *   (macOS), or one that refuses it (a container), runs the check as before, and says nothing.
  */
-export const checkScript = (command: string): string => [
-  'if command -v ionice >/dev/null 2>&1; then ionice -c3 -p $$ >/dev/null 2>&1 || :; fi',
-  'wf_check() {',
-  '(',
-  command,
-  ')',
-  '}',
-  // The path is the run's plumbing, not the command's: captured and UNSET before the command runs, or
-  // a command that itself runs a check — this package's own suite, under its own check — would see it
-  // and send its stderr into this file instead of its own log. Measured: the check.test.ts case that
-  // asserts "stderr stays in the log when there is no file for it" read an empty log inside a check.
-  'if [ -n "${WF_STDERR:-}" ]; then wf_stderr="$WF_STDERR"; unset WF_STDERR; wf_check 2>"$wf_stderr"; else wf_check; fi',
-  `c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`,
-].join('\n');
+export const checkScript = (command: string): string =>
+  [
+    'if command -v ionice >/dev/null 2>&1; then ionice -c3 -p $$ >/dev/null 2>&1 || :; fi',
+    'wf_check() {',
+    '(',
+    command,
+    ')',
+    '}',
+    // The path is the run's plumbing, not the command's: captured and UNSET before the command runs, or
+    // a command that itself runs a check — this package's own suite, under its own check — would see it
+    // and send its stderr into this file instead of its own log. Measured: the check.test.ts case that
+    // asserts "stderr stays in the log when there is no file for it" read an empty log inside a check.
+    'if [ -n "${WF_STDERR:-}" ]; then wf_stderr="$WF_STDERR"; unset WF_STDERR; wf_check 2>"$wf_stderr"; else wf_check; fi',
+    `c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`,
+  ].join('\n');
 
 /**
  * The harness. A `HarnessSpec` in shape, typed here by its shape rather than imported: this file is pure,
@@ -165,8 +171,7 @@ export function readVerdict(log: string): Verdict {
 }
 
 /** A check's stdout, as a person wants to read it: without the trailer, the last `n` lines. */
-export const stdoutTail = (log: string, n = CHECK_TAIL_LINES): string =>
-  lastLines(log.replace(/\n?\[wf check\] exit \d+\s*$/, ''), n);
+export const stdoutTail = (log: string, n = CHECK_TAIL_LINES): string => lastLines(log.replace(/\n?\[wf check\] exit \d+\s*$/, ''), n);
 
 /** The last `n` non-trailing lines of some output. */
 export function lastLines(text: string, n = CHECK_TAIL_LINES): string {
@@ -185,13 +190,16 @@ export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfini
  * a worker that ran `npm test`, finished green, and failed the check on the `lint` half. Telling it
  * does not weaken the fence — the fence is about who AUTHORS the command, and that stays the run.
  */
-export const checkContract = (command: string): string => [
-  '', '## Before you sign off', '',
-  `This must exit 0 in this workspace: ${codeSpan(command)}`,
-  '',
-  'The run executes it afterwards, where the work is, and nothing that waits on this step starts',
-  'until it does. Do not weaken it to pass it: the command comes from the run, not from this checkout.',
-].join('\n');
+export const checkContract = (command: string): string =>
+  [
+    '',
+    '## Before you sign off',
+    '',
+    `This must exit 0 in this workspace: ${codeSpan(command)}`,
+    '',
+    'The run executes it afterwards, where the work is, and nothing that waits on this step starts',
+    'until it does. Do not weaken it to pass it: the command comes from the run, not from this checkout.',
+  ].join('\n');
 
 /**
  * The check, told to an ending that lands on it (`landsOnCheck` in run.ts) in place of `checkContract`: the step stages the merge, and the
@@ -200,17 +208,20 @@ export const checkContract = (command: string): string => [
  * otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it
  * cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself.
  */
-export const landingContract = (command: string): string => [
-  '', '## The run checks and lands your merge', '',
-  `Once you sign off, the run executes ${codeSpan(command)} in this checkout, on the merge you left staged, as it executes any step's check.`,
-  "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
-  'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
-  '',
-  'So stage the merge and sign off: merge every result branch in one `git merge --no-ff --no-commit`, leave it staged, and do not run',
-  'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
-  '`git commit` and `git merge --continue` are denied you for that reason; a merge without `--no-commit` would commit it all the same.',
-  "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
-].join('\n');
+export const landingContract = (command: string): string =>
+  [
+    '',
+    '## The run checks and lands your merge',
+    '',
+    `Once you sign off, the run executes ${codeSpan(command)} in this checkout, on the merge you left staged, as it executes any step's check.`,
+    "When it exits 0 the run commits the merge onto the base branch, with the `message` your closeout gives, as the commit's message;",
+    'anything else — a refusal, or a check that did not finish — and the run aborts the merge, and nothing lands.',
+    '',
+    'So stage the merge and sign off: merge every result branch in one `git merge --no-ff --no-commit`, leave it staged, and do not run',
+    'the check, commit, or abort a clean merge yourself. Where it does not merge cleanly, abort it and sign off `blocked`, saying why.',
+    '`git commit` and `git merge --continue` are denied you for that reason; a merge without `--no-commit` would commit it all the same.',
+    "A try that follows a refusal is handed what the check said: the work is the run's result and not yours to change here.",
+  ].join('\n');
 
 /** What a check that did not pass said: the command, its verdict, and the last lines of each stream. */
 export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; stderr: string };
@@ -227,7 +238,9 @@ export function refusalSection(r: CheckRefusal): string {
   const json = JSON.stringify({ command: r.command, exit: r.verdict, stdout: r.stdout, stderr: r.stderr }, null, 2);
   const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [
-    '', '## What the check said', '',
+    '',
+    '## What the check said',
+    '',
     r.verdict === 'unfinished'
       ? 'It did not finish: it was stopped, or killed before it printed an exit code. That is no verdict on the work.'
       : `It exited ${r.verdict}.`,

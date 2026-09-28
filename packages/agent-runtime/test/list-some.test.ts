@@ -13,10 +13,17 @@ const harness = () => {
   const sessions = new Map<string, Sighting>();
   const counts = { observe: 0 };
   const runner = {
-    async spawn(r: { name: string }) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working', busy: true }); },
-    async observe() { counts.observe++; return new Map(sessions); },
+    async spawn(r: { name: string }) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working', busy: true });
+    },
+    async observe() {
+      counts.observe++;
+      return new Map(sessions);
+    },
     async stop() {},
-    async logs(sessionId: string) { return `logs of ${sessionId}`; },
+    async logs(sessionId: string) {
+      return `logs of ${sessionId}`;
+    },
   };
   return { sessions, counts, runner };
 };
@@ -45,11 +52,24 @@ test('the views of some tasks are their views, each journal read once and the ha
   const reads = engine.io().reads;
   const observes = counts.observe;
   const views = await engine.list(asked);
-  assert.deepEqual(views.map((v) => v.id), [flying[1], settled[0], queued, flying[0]], 'in the order asked, with no id twice');
-  assert.deepEqual(views.map((v) => v.phase), expected.map((v) => v.phase));
-  assert.deepEqual(views.map((v) => v.state), expected.map((v) => v.state));
-  assert.deepEqual(views.map((v) => v.phase), ['running (working)', 'succeeded', 'pending', 'running (working)']);
-  assert.equal(engine.io().reads - reads, 4, 'a journal for each task asked, and none of the store\'s other two');
+  assert.deepEqual(
+    views.map((v) => v.id),
+    [flying[1], settled[0], queued, flying[0]],
+    'in the order asked, with no id twice',
+  );
+  assert.deepEqual(
+    views.map((v) => v.phase),
+    expected.map((v) => v.phase),
+  );
+  assert.deepEqual(
+    views.map((v) => v.state),
+    expected.map((v) => v.state),
+  );
+  assert.deepEqual(
+    views.map((v) => v.phase),
+    ['running (working)', 'succeeded', 'pending', 'running (working)'],
+  );
+  assert.equal(engine.io().reads - reads, 4, "a journal for each task asked, and none of the store's other two");
   assert.equal(counts.observe - observes, 1, 'one look at the harness for the two in flight');
 });
 
@@ -57,7 +77,10 @@ test('the views of tasks none of which is in flight observe nothing', async () =
   const { engine, counts, settled, queued } = await board();
   const observes = counts.observe;
   const views = await engine.list([...settled, queued]);
-  assert.deepEqual(views.map((v) => v.phase), ['succeeded', 'succeeded', 'succeeded', 'pending']);
+  assert.deepEqual(
+    views.map((v) => v.phase),
+    ['succeeded', 'succeeded', 'succeeded', 'pending'],
+  );
   assert.equal(counts.observe - observes, 0);
   assert.deepEqual(await engine.list([]), []);
 });
@@ -74,7 +97,11 @@ test('REFUSED: `list` handed anything but a list of task ids, or more than one a
   const { engine, settled } = await board();
   const untyped = engine.list as (...args: unknown[]) => Promise<unknown>;
   for (const args of [[settled[0]], [[1]], [{ ids: settled }], [settled, 'more'], [null]]) {
-    assert.throws(() => untyped(...args), (err: Error & { exitCode?: number }) =>
-      /^list: takes the task ids to view, a list of strings, or nothing for every task/.test(err.message) && err.exitCode === 2, JSON.stringify(args));
+    assert.throws(
+      () => untyped(...args),
+      (err: Error & { exitCode?: number }) =>
+        err.message.startsWith('list: takes the task ids to view, a list of strings, or nothing for every task') && err.exitCode === 2,
+      JSON.stringify(args),
+    );
   }
 });

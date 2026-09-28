@@ -60,7 +60,12 @@ const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read
  * as another site's.
  */
-export function refusedBeforeReading(write: Guarded, host: string | undefined, site: string | undefined, type: string | undefined): Refusal | null {
+export function refusedBeforeReading(
+  write: Guarded,
+  host: string | undefined,
+  site: string | undefined,
+  type: string | undefined,
+): Refusal | null {
   if (host !== undefined && !LOOPBACK_HOST.test(host.trim())) {
     return {
       status: 403,

@@ -5,24 +5,51 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, deepWorkspaces, groupOf, inFullLines, isLesson, lessonGlobs, lessonLine, matches,
-  parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines, budgetWord, dollars,
-  peakMark, readWords, rebuiltCache,
+  AGENT_FACING,
+  CHECK_AFFECTING,
+  LESSON,
+  ROOT_GROUP,
+  branchesToRead,
+  count,
+  deepWorkspaces,
+  groupOf,
+  inFullLines,
+  isLesson,
+  lessonGlobs,
+  lessonLine,
+  matches,
+  parseGlobs,
+  parseNumstat,
+  radius,
+  radiusLines,
+  sensitiveHeading,
+  sensitivePaths,
+  sumUsage,
+  touchedLines,
+  usedLines,
+  budgetWord,
+  dollars,
+  peakMark,
+  readWords,
+  rebuiltCache,
 } from '../src/radius.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
 const numstat = (...lines: string[]) => `${lines.join('\n')}\n`;
 
 test('radius reads a rename at both ends, a binary file with no counts, and a file in no directory', () => {
-  const r = radius(numstat(
-    '12\t3\tpackages/agent-orchestrator/src/radius.ts',
-    '0\t0\tpackages/agent-orchestrator/{test => spec}/old.test.ts',
-    '5\t1\tapps/web/src/{a.ts => b.ts}',
-    '1\t0\tapps/web/src/{ => nested}/x.ts',
-    '-\t-\tapps/web/public/logo.png',
-    '2\t0\tCLAUDE.md',
-    '1\t1\tdocs/old.md => notes/new.md',
-  ), WORKSPACES);
+  const r = radius(
+    numstat(
+      '12\t3\tpackages/agent-orchestrator/src/radius.ts',
+      '0\t0\tpackages/agent-orchestrator/{test => spec}/old.test.ts',
+      '5\t1\tapps/web/src/{a.ts => b.ts}',
+      '1\t0\tapps/web/src/{ => nested}/x.ts',
+      '-\t-\tapps/web/public/logo.png',
+      '2\t0\tCLAUDE.md',
+      '1\t1\tdocs/old.md => notes/new.md',
+    ),
+    WORKSPACES,
+  );
 
   assert.deepEqual(r.changes, [
     { path: 'packages/agent-orchestrator/src/radius.ts', added: 12, removed: 3 },
@@ -84,31 +111,81 @@ test('a branch that changed nothing says so, rather than printing an empty radiu
 });
 
 test('a numstat line the parser cannot read is refused, not skipped', () => {
-  assert.throws(() => parseNumstat('12\t3\tsrc/a.ts\n 6 files changed, 2 insertions(+)\n'), (e: Error) => /^not a line of git diff --numstat: " 6 files changed/.test(e.message));
-  assert.throws(() => parseNumstat('x\t3\tsrc/a.ts'), (e: Error) => /^not a line of git diff --numstat/.test(e.message));
+  assert.throws(
+    () => parseNumstat('12\t3\tsrc/a.ts\n 6 files changed, 2 insertions(+)\n'),
+    (e: Error) => e.message.startsWith('not a line of git diff --numstat: " 6 files changed'),
+  );
+  assert.throws(
+    () => parseNumstat('x\t3\tsrc/a.ts'),
+    (e: Error) => e.message.startsWith('not a line of git diff --numstat'),
+  );
 });
 
 test('a path git quoted is read as the name it is', () => {
-  assert.deepEqual(parseNumstat(numstat('1\t0\t"src/a\\"b.ts"', '2\t0\t"docs/caf\\303\\251\\tx.md"')).map((c) => c.path), ['src/a"b.ts', 'docs/café\tx.md']);
+  assert.deepEqual(
+    parseNumstat(numstat('1\t0\t"src/a\\"b.ts"', '2\t0\t"docs/caf\\303\\251\\tx.md"')).map((c) => c.path),
+    ['src/a"b.ts', 'docs/café\tx.md'],
+  );
 });
 
 test('the shipped lists name what the brief names, and refuse what they do not', () => {
-  const inCheck = ['package.json', 'apps/web/package.json', 'package-lock.json', 'tsconfig.json', 'packages/x/tsconfig.build.json', 'turbo.json',
-    'packages/x/src/a.test.ts', 'b.test.mjs', 'packages/x/test/helpers.ts', 'apps/web/test/e2e/run.ts', '.e2e/shot.png', 'apps/web/.e2e/a/b.png'];
-  const notInCheck = ['src/index.ts', 'package.json.bak', 'mypackage.json', 'src/test.ts', 'src/testing/a.ts', 'latest/a.ts', 'docs/test.md', 'README.md'];
+  const inCheck = [
+    'package.json',
+    'apps/web/package.json',
+    'package-lock.json',
+    'tsconfig.json',
+    'packages/x/tsconfig.build.json',
+    'turbo.json',
+    'packages/x/src/a.test.ts',
+    'b.test.mjs',
+    'packages/x/test/helpers.ts',
+    'apps/web/test/e2e/run.ts',
+    '.e2e/shot.png',
+    'apps/web/.e2e/a/b.png',
+  ];
+  const notInCheck = [
+    'src/index.ts',
+    'package.json.bak',
+    'mypackage.json',
+    'src/test.ts',
+    'src/testing/a.ts',
+    'latest/a.ts',
+    'docs/test.md',
+    'README.md',
+  ];
   for (const f of inCheck) assert.ok(matches(f, CHECK_AFFECTING), `check-affecting: ${f}`);
   for (const f of notInCheck) assert.ok(!matches(f, CHECK_AFFECTING), `not check-affecting: ${f}`);
 
-  const inAgent = ['CLAUDE.md', 'packages/x/CLAUDE.md', 'AGENTS.md', '.claude/settings.json', '.codex/rules/git-commit.rules', '.mcp.json', 'packages/x/README.md', 'README.md'];
+  const inAgent = [
+    'CLAUDE.md',
+    'packages/x/CLAUDE.md',
+    'AGENTS.md',
+    '.claude/settings.json',
+    '.codex/rules/git-commit.rules',
+    '.mcp.json',
+    'packages/x/README.md',
+    'README.md',
+  ];
   const notInAgent = ['docs/claude.md', 'src/index.ts', 'CLAUDE.md.orig', 'my.claude/x', 'README.mdx', 'package.json'];
   for (const f of inAgent) assert.ok(matches(f, AGENT_FACING), `agent-facing: ${f}`);
   for (const f of notInAgent) assert.ok(!matches(f, AGENT_FACING), `not agent-facing: ${f}`);
 
   const lesson = lessonGlobs(WORKSPACES);
-  for (const f of ['CLAUDE.md', 'AGENTS.md', 'apps/web/CLAUDE.md', 'docs/plan.md', 'packages/x/docs/features.md', 'apps/web/docs/a/b.md']) assert.ok(matches(f, lesson), `lesson: ${f}`);
+  for (const f of ['CLAUDE.md', 'AGENTS.md', 'apps/web/CLAUDE.md', 'docs/plan.md', 'packages/x/docs/features.md', 'apps/web/docs/a/b.md'])
+    assert.ok(matches(f, lesson), `lesson: ${f}`);
   // A `docs/` that is not the root's or a workspace package's is product code, not where the next agent reads.
-  for (const f of ['README.md', 'src/docs.ts', 'packages/x/documents/a.md', '.claude/settings.json', 'apps/web/src/routes/docs/index.tsx',
-    'src/docs/strings.ts', 'packages/x/src/docs/a.md', 'packages/docs/a.md', 'vendor/lib/docs/a.md']) assert.ok(!matches(f, lesson), `not a lesson: ${f}`);
+  for (const f of [
+    'README.md',
+    'src/docs.ts',
+    'packages/x/documents/a.md',
+    '.claude/settings.json',
+    'apps/web/src/routes/docs/index.tsx',
+    'src/docs/strings.ts',
+    'packages/x/src/docs/a.md',
+    'packages/docs/a.md',
+    'vendor/lib/docs/a.md',
+  ])
+    assert.ok(!matches(f, lesson), `not a lesson: ${f}`);
   // With no workspaces, only the root's docs/ is a package's.
   assert.ok(matches('docs/a.md', lessonGlobs([])) && !matches('packages/x/docs/features.md', lessonGlobs([])));
   assert.deepEqual(lessonGlobs(['packages/*/', 'apps/*']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
@@ -131,14 +208,26 @@ test("the lesson line: a branch that touched only a package's docs says so, and 
   assert.equal(lessonLine([on('wf/a', '3\t1\tpackages/x/docs/features.md')]), 'lesson  packages/x/docs/features.md +3 −1');
   assert.equal(lessonLine([on('wf/a', '2\t0\tCLAUDE.md', '9\t9\tsrc/a.ts')]), 'lesson  CLAUDE.md +2 −0');
   // README.md is agent-facing, but it is not where a lesson goes.
-  assert.equal(lessonLine([on('wf/a', '9\t9\tsrc/a.ts', '1\t0\tREADME.md', '1\t0\tsrc/a.test.ts')]), 'lesson  nothing written where the next agent reads');
+  assert.equal(
+    lessonLine([on('wf/a', '9\t9\tsrc/a.ts', '1\t0\tREADME.md', '1\t0\tsrc/a.test.ts')]),
+    'lesson  nothing written where the next agent reads',
+  );
   assert.equal(lessonLine([on('wf/a')]), 'lesson  nothing written where the next agent reads');
   // A docs page in an app, or a `docs/` in a package's source, is not a lesson.
-  assert.equal(lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '3\t0\tsrc/docs/strings.ts', '2\t0\tpackages/x/src/docs/a.md')]), 'lesson  nothing written where the next agent reads');
-  assert.equal(lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '1\t0\tapps/web/docs/notes.md')]), 'lesson  apps/web/docs/notes.md +1 −0');
+  assert.equal(
+    lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '3\t0\tsrc/docs/strings.ts', '2\t0\tpackages/x/src/docs/a.md')]),
+    'lesson  nothing written where the next agent reads',
+  );
+  assert.equal(
+    lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '1\t0\tapps/web/docs/notes.md')]),
+    'lesson  apps/web/docs/notes.md +1 −0',
+  );
   // A branch that could not be read is not a branch that wrote nothing.
   assert.equal(lessonLine([on('wf/a'), gone('wf/gone')]), 'lesson  not known — wf/gone could not be read');
-  assert.equal(lessonLine([on('wf/a', '1\t0\tAGENTS.md'), on('wf/b', '2\t0\tdocs/x.md')]), 'lesson  AGENTS.md +1 −0 (wf/a) · docs/x.md +2 −0 (wf/b)');
+  assert.equal(
+    lessonLine([on('wf/a', '1\t0\tAGENTS.md'), on('wf/b', '2\t0\tdocs/x.md')]),
+    'lesson  AGENTS.md +1 −0 (wf/a) · docs/x.md +2 −0 (wf/b)',
+  );
 });
 
 test('what each branch touched is said under the branch, and a branch that could not be read says why', () => {
@@ -156,8 +245,15 @@ test('the files in full: the heading says why, then the diff — or none, said �
   const [heading, ...body] = inFullLines(t, parseGlobs('nothing/**'), '');
   assert.match(heading!, /^── in full: the files --sensitive names \(nothing\/\*\*\)/);
   assert.deepEqual(body, ['none']);
-  assert.match(inFullLines(t, undefined, '')[0]!, /^── in full: the check-affecting files — what a change could edit to make its check pass ─+$/);
-  assert.deepEqual(inFullLines(t, undefined, 'diff --git a/x.test.ts b/x.test.ts\n-assert.equal(1, 1);\n+assert.ok(true);\n\n').slice(1), ['diff --git a/x.test.ts b/x.test.ts', '-assert.equal(1, 1);', '+assert.ok(true);']);
+  assert.match(
+    inFullLines(t, undefined, '')[0]!,
+    /^── in full: the check-affecting files — what a change could edit to make its check pass ─+$/,
+  );
+  assert.deepEqual(inFullLines(t, undefined, 'diff --git a/x.test.ts b/x.test.ts\n-assert.equal(1, 1);\n+assert.ok(true);\n\n').slice(1), [
+    'diff --git a/x.test.ts b/x.test.ts',
+    '-assert.equal(1, 1);',
+    '+assert.ok(true);',
+  ]);
   assert.deepEqual(inFullLines(t, undefined, undefined).slice(1), ['not read: git could not diff wf/a']);
   assert.deepEqual(inFullLines(gone('wf/gone'), undefined, undefined).slice(1), ['not read: git could not diff abc123...wf/gone']);
   assert.match(inFullLines(t, undefined, '', true)[0]!, /, on wf\/a /);
@@ -170,8 +266,14 @@ test('a step with no usage says used not measured, and cost never prints a numbe
     'cost  not measured',
   ]);
   // A measured zero is a zero; an unmeasured count is not one — codex's stream has no turns.
-  assert.deepEqual(usedLines({ turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }), ['used  0 turns · 0 tool calls · 0 in · 0 out', 'cost  not measured']);
-  assert.deepEqual(usedLines({ toolCalls: 4, inputTokens: 20_400 }), ['used  turns not measured · 4 tool calls · 20.4k in · tokens out not measured', 'cost  not measured']);
+  assert.deepEqual(usedLines({ turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }), [
+    'used  0 turns · 0 tool calls · 0 in · 0 out',
+    'cost  not measured',
+  ]);
+  assert.deepEqual(usedLines({ toolCalls: 4, inputTokens: 20_400 }), [
+    'used  turns not measured · 4 tool calls · 20.4k in · tokens out not measured',
+    'cost  not measured',
+  ]);
   for (const u of [undefined, {}, { turns: 1, toolCalls: 1, inputTokens: 1, outputTokens: 1 }]) {
     assert.doesNotMatch(usedLines(u)[1]!, /\d/, JSON.stringify(u));
   }
@@ -180,48 +282,103 @@ test('a step with no usage says used not measured, and cost never prints a numbe
 });
 
 test('attempts sum only what every one of them measured', () => {
-  assert.deepEqual(sumUsage([{ turns: 3, inputTokens: 100, costUsd: 0.5 }, { turns: 4, inputTokens: 50 }]), { turns: 7, inputTokens: 150 });
-  assert.equal(sumUsage([{ turns: 3, toolCalls: 2, inputTokens: 100, outputTokens: 9 }, null]), undefined, 'an attempt nobody measured leaves every count unmeasured');
+  assert.deepEqual(
+    sumUsage([
+      { turns: 3, inputTokens: 100, costUsd: 0.5 },
+      { turns: 4, inputTokens: 50 },
+    ]),
+    { turns: 7, inputTokens: 150 },
+  );
+  assert.equal(
+    sumUsage([{ turns: 3, toolCalls: 2, inputTokens: 100, outputTokens: 9 }, null]),
+    undefined,
+    'an attempt nobody measured leaves every count unmeasured',
+  );
   assert.equal(sumUsage([]), undefined);
   assert.equal(sumUsage([{}]), undefined);
 });
 
 test('a count reads to three figures', () => {
-  assert.deepEqual([0, 999, 1_000, 1_234, 20_400, 112_000, 999_499, 999_999, 6_350_000, 2_500_000_000].map(count),
-    ['0', '999', '1k', '1.23k', '20.4k', '112k', '999k', '1M', '6.35M', '2.5B']);
+  assert.deepEqual([0, 999, 1_000, 1_234, 20_400, 112_000, 999_499, 999_999, 6_350_000, 2_500_000_000].map(count), [
+    '0',
+    '999',
+    '1k',
+    '1.23k',
+    '20.4k',
+    '112k',
+    '999k',
+    '1M',
+    '6.35M',
+    '2.5B',
+  ]);
 });
 
 test("REFUSED before, now read: `./packages/*` from the base's package.json groups by package and counts a package's docs as a lesson, as `packages/*` does", () => {
-  const same = numstat('3\t1\tpackages/x/src/a.ts', '2\t0\tpackages/x/docs/notes.md', '1\t0\tpackages/y/src/docs/b.md', '1\t0\tpackages/README.md');
+  const same = numstat(
+    '3\t1\tpackages/x/src/a.ts',
+    '2\t0\tpackages/x/docs/notes.md',
+    '1\t0\tpackages/y/src/docs/b.md',
+    '1\t0\tpackages/README.md',
+  );
   const r = radius(same, ['./packages/*']);
-  assert.deepEqual(r.groups.map((g) => [g.name, g.files]), [['packages', 1], ['packages/x', 2], ['packages/y', 1]]);
-  assert.deepEqual(r.lessons.map((c) => c.path), ['packages/x/docs/notes.md'], "a package's own docs/, and no docs/ in its source");
+  assert.deepEqual(
+    r.groups.map((g) => [g.name, g.files]),
+    [
+      ['packages', 1],
+      ['packages/x', 2],
+      ['packages/y', 1],
+    ],
+  );
+  assert.deepEqual(
+    r.lessons.map((c) => c.path),
+    ['packages/x/docs/notes.md'],
+    "a package's own docs/, and no docs/ in its source",
+  );
   assert.equal(lessonLine([{ branch: 'wf/a', radius: r }]), 'lesson  packages/x/docs/notes.md +2 −0');
   assert.equal(groupOf('packages/x/src/a.ts', ['./packages/*']), 'packages/x');
   // As written, `./packages/*` matched no path git prints: every package in one `packages` group, and nothing read as a lesson.
-  for (const written of ['./packages/*', './packages/*/', './/packages/*', 'packages/*/']) assert.deepEqual(radius(same, [written]).groups, radius(same, ['packages/*']).groups, written);
+  for (const written of ['./packages/*', './packages/*/', './/packages/*', 'packages/*/'])
+    assert.deepEqual(radius(same, [written]).groups, radius(same, ['packages/*']).groups, written);
   assert.deepEqual(lessonGlobs(['./packages/*', './apps/*/']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
   assert.deepEqual(radius(same, ['./packages/*']).deepWorkspaces, [], 'no ** glob, so nothing to name');
   assert.ok(!radiusLines(r).some((l) => l.startsWith('workspaces')), 'and the screen names none');
 });
 
 test('a workspace glob with `**` is not refused but named on the screen — and each file counts once: in the outermost package on its way, and as a lesson only in its docs/', () => {
-  const r = radius(numstat('1\t0\tpackages/x/src/docs/a.md', '2\t0\tpackages/x/docs/notes.md', '1\t1\tpackages/x/y/z.ts', '4\t0\tpackages/docs/c.md', '5\t0\tsrc/index.ts'), ['packages/**', 'apps/*']);
+  const r = radius(
+    numstat(
+      '1\t0\tpackages/x/src/docs/a.md',
+      '2\t0\tpackages/x/docs/notes.md',
+      '1\t1\tpackages/x/y/z.ts',
+      '4\t0\tpackages/docs/c.md',
+      '5\t0\tsrc/index.ts',
+    ),
+    ['packages/**', 'apps/*'],
+  );
   assert.deepEqual(r.groups, [
     { name: 'packages/docs', files: 1, added: 4, removed: 0, binary: 0 },
     { name: 'packages/x', files: 3, added: 4, removed: 1, binary: 0 },
     { name: 'src', files: 1, added: 5, removed: 0, binary: 0 },
   ]);
-  assert.equal(r.groups.reduce((n, g) => n + g.files, 0), r.changes.length, 'every file in one group');
+  assert.equal(
+    r.groups.reduce((n, g) => n + g.files, 0),
+    r.changes.length,
+    'every file in one group',
+  );
   // `packages/**/docs/` would have taken the source's docs/ and a docs/ directly under packages/ as lessons too.
-  assert.deepEqual(r.lessons.map((c) => c.path), ['packages/x/docs/notes.md']);
+  assert.deepEqual(
+    r.lessons.map((c) => c.path),
+    ['packages/x/docs/notes.md'],
+  );
   assert.ok(matches('packages/x/src/docs/a.md', ['packages/**/docs/']), 'the glob a ** workspace would have made');
   assert.equal(isLesson('packages/x/src/docs/a.md', ['packages/**']), false);
   assert.equal(isLesson('packages/x/docs/notes.md', ['./packages/**/']), true);
   assert.deepEqual(lessonGlobs(['packages/**', 'apps/*']), [...LESSON, 'apps/*/docs/']);
   assert.deepEqual(deepWorkspaces(['./packages/**', 'apps/*']), ['./packages/**'], 'named as written');
-  assert.equal(radiusLines(r).at(-1),
-    "workspaces       packages/** in the base's package.json crosses directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/");
+  assert.equal(
+    radiusLines(r).at(-1),
+    "workspaces       packages/** in the base's package.json crosses directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/",
+  );
   assert.deepEqual(touchedLines([{ branch: 'wf/a', radius: r }]).filter((l) => l.includes('packages/**')).length, 1);
 });
 
@@ -232,48 +389,104 @@ test('the screen reads the result branches, or — before a terminal step has on
 
   // A step that recorded the base branch worked in the repository's own checkout, where the run commits nothing: what that branch holds
   // against the run's frozen base is every other run's merge since. Dropped for a run with worktrees, and only there.
-  assert.deepEqual(branchesToRead([], ['main'], 'main'), [], 'a workflow of one step that works in the checkout: nothing of the run is on a branch');
+  assert.deepEqual(
+    branchesToRead([], ['main'], 'main'),
+    [],
+    'a workflow of one step that works in the checkout: nothing of the run is on a branch',
+  );
   assert.deepEqual(branchesToRead([], ['wf/r/implement', 'main'], 'main'), ['wf/r/implement'], 'the work is read, the base is not');
-  assert.deepEqual(branchesToRead([], ['main']), ['main'], 'a run that worked on its base branch itself (--no-worktree): that branch is its work');
+  assert.deepEqual(
+    branchesToRead([], ['main']),
+    ['main'],
+    'a run that worked on its base branch itself (--no-worktree): that branch is its work',
+  );
   assert.deepEqual(branchesToRead(['main'], ['main'], 'main'), ['main'], 'a result branch is read whatever it is called');
 });
 
 test('what a session used, with the api and tool time its harness counted — beside the counts once either is measured — and its cost to the cent, three figures under one', () => {
-  assert.deepEqual(usedLines({ turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 }),
-    ['used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', 'cost  $3.01']);
+  assert.deepEqual(
+    usedLines({ turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 }),
+    ['used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', 'cost  $3.01'],
+  );
   // `claude-detached` counts api time and cost, and nothing else.
-  assert.deepEqual(usedLines({ costUsd: 4.2, apiMs: 61_000 }),
-    ['used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured', 'cost  $4.20']);
-  assert.equal(usedLines({ turns: 3, toolMs: 400 })[0], 'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured · api not measured · tools <1s', 'a measured moment is not 0s');
-  assert.equal(usedLines({ turns: 3 })[0], 'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured', 'nothing timed it: said as before');
-  assert.deepEqual([dollars(3.012), dollars(4.2), dollars(0.004), dollars(0.00412), dollars(0)], ['$3.01', '$4.20', '$0.004', '$0.00412', '$0.00']);
+  assert.deepEqual(usedLines({ costUsd: 4.2, apiMs: 61_000 }), [
+    'used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured',
+    'cost  $4.20',
+  ]);
+  assert.equal(
+    usedLines({ turns: 3, toolMs: 400 })[0],
+    'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured · api not measured · tools <1s',
+    'a measured moment is not 0s',
+  );
+  assert.equal(
+    usedLines({ turns: 3 })[0],
+    'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+    'nothing timed it: said as before',
+  );
+  assert.deepEqual(
+    [dollars(3.012), dollars(4.2), dollars(0.004), dollars(0.00412), dollars(0)],
+    ['$3.01', '$4.20', '$0.004', '$0.00412', '$0.00'],
+  );
   assert.deepEqual([budgetWord(3), budgetWord(2.5), budgetWord(0.25)], ['$3', '$2.50', '$0.25']);
   // Summed as every count is: only where every attempt measured it.
-  assert.deepEqual(sumUsage([{ apiMs: 1_000, toolMs: 5, costUsd: 1 }, { apiMs: 2_000, costUsd: 0.5 }]), { apiMs: 3_000, costUsd: 1.5 });
+  assert.deepEqual(
+    sumUsage([
+      { apiMs: 1_000, toolMs: 5, costUsd: 1 },
+      { apiMs: 2_000, costUsd: 0.5 },
+    ]),
+    { apiMs: 3_000, costUsd: 1.5 },
+  );
 });
 
-test("what a session read, by price: its classes add up, its peak is the largest, and nothing is said where nobody counted", () => {
+test('what a session read, by price: its classes add up, its peak is the largest, and nothing is said where nobody counted', () => {
   const a = { cacheReadTokens: 20_000_000, cacheWriteTokens: 300_000, uncachedTokens: 12, peakContextTokens: 150_000 };
   const b = { cacheReadTokens: 1_400_000, cacheWriteTokens: 100_000, uncachedTokens: 3, peakContextTokens: 167_000 };
-  assert.deepEqual(sumUsage([a, b]), { cacheReadTokens: 21_400_000, cacheWriteTokens: 400_000, uncachedTokens: 15, peakContextTokens: 167_000 }, 'a peak is not a sum');
+  assert.deepEqual(
+    sumUsage([a, b]),
+    { cacheReadTokens: 21_400_000, cacheWriteTokens: 400_000, uncachedTokens: 15, peakContextTokens: 167_000 },
+    'a peak is not a sum',
+  );
   assert.equal('peakContextTokens' in sumUsage([a, { cacheReadTokens: 1 }])!, false, 'an attempt with no peak may have been the largest');
-  assert.equal('firstContextTokens' in sumUsage([{ ...a, firstContextTokens: 9, firstCacheWriteTokens: 1 }])!, false, "one attempt's first response is not a sum's");
+  assert.equal(
+    'firstContextTokens' in sumUsage([{ ...a, firstContextTokens: 9, firstCacheWriteTokens: 1 }])!,
+    false,
+    "one attempt's first response is not a sum's",
+  );
   assert.equal(sumUsage([{ ...a, rebuiltCaches: 1 }, b, { ...b, rebuiltCaches: 1 }])!.rebuiltCaches, 2);
 
   assert.equal(readWords(sumUsage([a, b])), 'read 21.4M · wrote 400k · peak 167k');
-  assert.equal(readWords({ turns: 3, inputTokens: 1_000, outputTokens: 20, costUsd: 1 }), '', 'a journal from before the classes: nothing, not 0');
+  assert.equal(
+    readWords({ turns: 3, inputTokens: 1_000, outputTokens: 20, costUsd: 1 }),
+    '',
+    'a journal from before the classes: nothing, not 0',
+  );
   assert.equal(readWords(undefined), '');
-  assert.equal(readWords({ cacheReadTokens: 900, cacheWriteTokens: 0, uncachedTokens: 5 }), 'read 900 · wrote 0', 'claude -p and codex: classes, no peak');
-  assert.deepEqual(usedLines({ costUsd: 4.87, ...a }), ['used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured', 'cost  $4.87 · read 20M · wrote 300k · peak 150k']);
+  assert.equal(
+    readWords({ cacheReadTokens: 900, cacheWriteTokens: 0, uncachedTokens: 5 }),
+    'read 900 · wrote 0',
+    'claude -p and codex: classes, no peak',
+  );
+  assert.deepEqual(usedLines({ costUsd: 4.87, ...a }), [
+    'used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+    'cost  $4.87 · read 20M · wrote 300k · peak 150k',
+  ]);
 });
 
 test("a peak is marked where it reached a step's context: cap, or passed 200k with none — and only there", () => {
   assert.equal(peakMark({ peakContextTokens: 200_000 }, 200_000), 'cap');
   assert.equal(peakMark({ peakContextTokens: 167_000 }, 200_000), null, 'the cap held: it never compacted');
   // Measured (engine open issue 26): under --autocompact 200000, compacted at 173,584 and 173,254 — the boundary's context is the peak.
-  assert.equal(peakMark({ peakContextTokens: 173_584, compactions: 2 }, 200_000), 'cap', 'it compacted: it reached its cap, short of it in tokens');
+  assert.equal(
+    peakMark({ peakContextTokens: 173_584, compactions: 2 }, 200_000),
+    'cap',
+    'it compacted: it reached its cap, short of it in tokens',
+  );
   assert.equal(peakMark({ compactions: 1 }, 200_000), 'cap', 'compacted, with no peak measured');
-  assert.equal(peakMark({ peakContextTokens: 173_584, compactions: 2 }, undefined), null, "compacted on the harness's own window, not past 200k");
+  assert.equal(
+    peakMark({ peakContextTokens: 173_584, compactions: 2 }, undefined),
+    null,
+    "compacted on the harness's own window, not past 200k",
+  );
   assert.equal(readWords({ peakContextTokens: 173_584, compactions: 2 }, 200_000), 'peak 174k, compacted twice at its 200k cap');
   assert.equal(readWords({ peakContextTokens: 204_000, compactions: 1 }, 200_000), 'peak 204k, compacted at its 200k cap');
   assert.equal(readWords({ peakContextTokens: 831_000, compactions: 3 }), 'peak 831k, compacted 3 times, past 200k with no cap');
@@ -289,15 +502,33 @@ test("a peak is marked where it reached a step's context: cap, or passed 200k wi
   assert.equal(readWords({ peakContextTokens: 831_000 }), 'peak 831k, past 200k with no cap');
 });
 
-test("a resumed attempt whose first response wrote its context to the cache again rebuilt its cache, and says so in words", () => {
-  const rebuilt = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501, firstContextTokens: 183_006, firstCacheWriteTokens: 183_000 };
+test('a resumed attempt whose first response wrote its context to the cache again rebuilt its cache, and says so in words', () => {
+  const rebuilt = {
+    cacheReadTokens: 183_000,
+    cacheWriteTokens: 184_500,
+    peakContextTokens: 184_501,
+    firstContextTokens: 183_006,
+    firstCacheWriteTokens: 183_000,
+  };
   assert.equal(rebuiltCache(rebuilt, true), true);
   assert.equal(rebuiltCache(rebuilt, false), false, 'a cold start writes its cache once: that is not a rebuild');
   assert.equal(rebuiltCache({ ...rebuilt, firstCacheWriteTokens: 91_503 }, true), false, 'half its first context is not more than half');
   assert.equal(rebuiltCache({ cacheWriteTokens: 184_500, peakContextTokens: 184_501 }, true), false, 'no first response seen, no reading');
   // A warm continuation of a 60k session that works up to 150k: it read its parent's context, and its writes are its growth.
-  const grew = { cacheReadTokens: 4_200_000, cacheWriteTokens: 96_000, peakContextTokens: 150_000, firstContextTokens: 61_000, firstCacheWriteTokens: 1_200 };
+  const grew = {
+    cacheReadTokens: 4_200_000,
+    cacheWriteTokens: 96_000,
+    peakContextTokens: 150_000,
+    firstContextTokens: 61_000,
+    firstCacheWriteTokens: 1_200,
+  };
   assert.equal(rebuiltCache(grew, true), false, 'its writes pass half its peak, and it rebuilt nothing');
-  assert.equal(readWords({ ...rebuilt, rebuiltCaches: 1 }), 'read 183k · wrote 185k · peak 185k · a resumed session wrote its context to the cache again instead of reading it');
-  assert.match(readWords({ ...rebuilt, rebuiltCaches: 2 }), / · 2 resumed sessions wrote their context to the cache again instead of reading it$/);
+  assert.equal(
+    readWords({ ...rebuilt, rebuiltCaches: 1 }),
+    'read 183k · wrote 185k · peak 185k · a resumed session wrote its context to the cache again instead of reading it',
+  );
+  assert.match(
+    readWords({ ...rebuilt, rebuiltCaches: 2 }),
+    / · 2 resumed sessions wrote their context to the cache again instead of reading it$/,
+  );
 });

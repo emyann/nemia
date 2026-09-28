@@ -29,8 +29,12 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
     const c = pass.phases[p];
     return `${p}: ${msWord(c.ms)} ms, ${plural(c.calls, 'call')}, ${bytesWord(c.bytes)} read, ${plural(c.spawned, 'process', 'processes')} started`;
   });
-  const harnesses = Object.entries(pass.harnesses).sort(([a], [b]) => a.localeCompare(b)).map(([name, h]) =>
-    `${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started`);
+  const harnesses = Object.entries(pass.harnesses)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([name, h]) =>
+        `${name}: ${plural(h.calls, 'observe')}, ${msWord(h.ms)} ms, ${plural(h.listed, 'session or run file', 'sessions or run files')} listed, ${plural(h.spawned, 'process', 'processes')} started`,
+    );
   return [
     `The daemon's last pass, at ${clockWord(new Date(pass.at), now, timeZone)}: ${msWord(pass.ms)} ms, ${plural(pass.records, 'run record')} read, ${bytesWord(pass.bytes)} read, ${plural(pass.spawned, 'process', 'processes')} started.`,
     ...phases,

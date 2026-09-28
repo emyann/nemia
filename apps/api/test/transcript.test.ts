@@ -36,7 +36,14 @@ const journal = (taskId: string, events: object[]) => {
   fs.mkdirSync(path.dirname(journalFile(taskId)), { recursive: true });
   fs.appendFileSync(journalFile(taskId), jsonl(events));
 };
-const filed = { kind: 'filed', at: at(0), brief: 'Write the word to WORD.txt, then give your closeout.', cwd: '/code/app', maxAttempts: 1, harness: 'claude' };
+const filed = {
+  kind: 'filed',
+  at: at(0),
+  brief: 'Write the word to WORD.txt, then give your closeout.',
+  cwd: '/code/app',
+  maxAttempts: 1,
+  harness: 'claude',
+};
 const started = [filed, { kind: 'starting', at: at(0), attempt: 1 }, { kind: 'spawned', at: at(0), attempt: 1 }];
 /** The end of a task's one attempt, with the session's id as the engine records it, and the task settled. */
 const ending = (taskId: string, sessionId: string) => [
@@ -56,7 +63,13 @@ const writeTranscript = (sessionId: string, lines: object[]) => {
  */
 const conversation = (sessionId: string): object[] => {
   const line = { sessionId, isSidechain: false, userType: 'external', cwd: '/code/app', version: '2.1.270', gitBranch: 'main' };
-  const said = (type: string, uuid: string, s: number, content: unknown) => ({ ...line, type, uuid, timestamp: at(s), message: { role: type, content } });
+  const said = (type: string, uuid: string, s: number, content: unknown) => ({
+    ...line,
+    type,
+    uuid,
+    timestamp: at(s),
+    message: { role: type, content },
+  });
   return [
     { type: 'custom-title', customTitle: 'ae/t/1', sessionId },
     said('user', 'u-1', 1, 'Write the word to WORD.txt, then give your closeout.'),
@@ -64,8 +77,17 @@ const conversation = (sessionId: string): object[] => {
     said('assistant', 'a-2', 3, [{ type: 'text', text: 'Writing it **now**.' }]),
     said('assistant', 'a-3', 4, [{ type: 'tool_use', id: 'toolu_bash', name: 'Bash', input: { command: 'echo word > WORD.txt' } }]),
     said('user', 'u-2', 5, [{ type: 'tool_result', tool_use_id: 'toolu_bash', content: 'WORD.txt: Permission denied', is_error: true }]),
-    said('assistant', 'a-4', 6, [{ type: 'tool_use', id: 'toolu_closeout', name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } }]),
-    said('user', 'u-3', 7, [{ type: 'tool_result', tool_use_id: 'toolu_closeout', content: [{ type: 'text', text: 'Structured output provided successfully' }] }]),
+    said('assistant', 'a-4', 6, [
+      {
+        type: 'tool_use',
+        id: 'toolu_closeout',
+        name: 'StructuredOutput',
+        input: { outcome: 'blocked', summary: 'WORD.txt is not writable' },
+      },
+    ]),
+    said('user', 'u-3', 7, [
+      { type: 'tool_result', tool_use_id: 'toolu_closeout', content: [{ type: 'text', text: 'Structured output provided successfully' }] },
+    ]),
     { ...line, type: 'system', uuid: 's-1', subtype: 'informational', content: 'Background session idle', timestamp: at(8) },
   ];
 };
@@ -90,27 +112,39 @@ const runningTask = (taskId: string) => {
 
 const RUN = 'r-talk';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
-fs.writeFileSync(path.join(root, 'runs', `${RUN}.json`), JSON.stringify({
-  id: RUN, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Talk it through',
-  workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map((name) => ({ name, after: [], body: `${name} it.` })),
-  steps: {
-    implement: { taskId: 't-implement' },
-    // Held open (thin runtime stage 2 part 4b), their one turn signed: waiting on a person's word, closed on it, and answered.
-    held: { taskId: 't-held' },
-    closed: { taskId: 't-closed' },
-    answered: { taskId: 't-answered' },
-    resumed: { taskId: 't-resumed' },
-    live: { taskId: 't-live' },
-    gone: { taskId: 't-gone' },
-    broken: { taskId: 't-broken' },
-    flaky: { taskId: 't-flaky' },
-    vanishing: { taskId: 't-vanishing' },
-    // Filed, and the engine has no record of its task.
-    lost: { taskId: 't-lost' },
-    review: { taskId: null },
-  },
-}));
+fs.writeFileSync(
+  path.join(root, 'runs', `${RUN}.json`),
+  JSON.stringify({
+    id: RUN,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Talk it through',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
+    workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map(
+      (name) => ({ name, after: [], body: `${name} it.` }),
+    ),
+    steps: {
+      implement: { taskId: 't-implement' },
+      // Held open (thin runtime stage 2 part 4b), their one turn signed: waiting on a person's word, closed on it, and answered.
+      held: { taskId: 't-held' },
+      closed: { taskId: 't-closed' },
+      answered: { taskId: 't-answered' },
+      resumed: { taskId: 't-resumed' },
+      live: { taskId: 't-live' },
+      gone: { taskId: 't-gone' },
+      broken: { taskId: 't-broken' },
+      flaky: { taskId: 't-flaky' },
+      vanishing: { taskId: 't-vanishing' },
+      // Filed, and the engine has no record of its task.
+      lost: { taskId: 't-lost' },
+      review: { taskId: null },
+    },
+  }),
+);
 settledTask('t-implement');
 
 /** A task filed held open whose one turn signed, its conversation on disk, and nothing settled; then `after`, a person's word on it. */
@@ -129,10 +163,17 @@ const streamUrl = (step: string, query = '') => `/api/runs/${RUN}/steps/${step}/
 type Block = { event?: string; data?: string; id?: string };
 /** Server-sent events as a reader gets them: the fields of each block. */
 const blocks = (text: string): Block[] =>
-  text.split('\n\n').filter((block) => block.trim()).map((block) => Object.fromEntries(block.split('\n').map((line) => {
-    const colon = line.indexOf(': ');
-    return [line.slice(0, colon), line.slice(colon + 2)];
-  })));
+  text
+    .split('\n\n')
+    .filter((block) => block.trim())
+    .map((block) =>
+      Object.fromEntries(
+        block.split('\n').map((line) => {
+          const colon = line.indexOf(': ');
+          return [line.slice(0, colon), line.slice(colon + 2)];
+        }),
+      ),
+    );
 const eventsIn = (said: Block[]) => said.filter((b) => b.event === 'transcript').map((b) => JSON.parse(b.data!));
 
 test("a step's transcript is the engine's read of its task's session — its events and cursor — and not live once the task settled", async () => {
@@ -141,7 +182,10 @@ test("a step's transcript is the engine's read of its task's session — its eve
   const body = await res.json();
   const engines = await engine().transcript('t-implement');
   assert.deepEqual(body, { ...engines, live: false });
-  assert.deepEqual(body.events.map((e: { kind: string }) => e.kind), ['text', 'thinking', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'system']);
+  assert.deepEqual(
+    body.events.map((e: { kind: string }) => e.kind),
+    ['text', 'thinking', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'system'],
+  );
   assert.equal(body.events[4].id, body.events[3].id, "a result carries its call's id");
 
   const again = await app.request(url('implement', `?after=${encodeURIComponent(body.cursor)}`));
@@ -149,9 +193,13 @@ test("a step's transcript is the engine's read of its task's session — its eve
   assert.deepEqual(await again.json(), { events: [], cursor: body.cursor, live: false }, 'read again from the cursor it gave: nothing new');
 });
 
-test("a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — nor followed, its stream settled at once", async () => {
+test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — nor followed, its stream settled at once', async () => {
   assert.equal((await engine().view('t-held')).phase, 'input-required', "the seed is the engine's held task, waiting");
-  assert.equal((await engine().view('t-closed')).phase, 'between attempts', 'closed and not yet settled: the engine calls it between attempts until its next pass');
+  assert.equal(
+    (await engine().view('t-closed')).phase,
+    'between attempts',
+    'closed and not yet settled: the engine calls it between attempts until its next pass',
+  );
   for (const step of ['held', 'closed']) {
     const engines = await engine().transcript(`t-${step}`);
     assert.equal(engines.events.length, 8, step);
@@ -170,7 +218,11 @@ test('a held step a person answered is live again, under the same task: its next
 });
 
 test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {
-  for (const [route, headers] of [[url('implement', '?after=page-2'), {}], [streamUrl('implement', '?after=page-2'), {}], [streamUrl('implement'), { 'Last-Event-ID': 'page-2' }]] as const) {
+  for (const [route, headers] of [
+    [url('implement', '?after=page-2'), {}],
+    [streamUrl('implement', '?after=page-2'), {}],
+    [streamUrl('implement'), { 'Last-Event-ID': 'page-2' }],
+  ] as const) {
     const res = await app.request(route, { headers });
     assert.equal(res.status, 400, route);
     assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${route}: an answer, not a stream`);
@@ -198,7 +250,11 @@ test('a run or a step that does not exist is a 404, worded as the log route word
   for (const route of [url('lost'), streamUrl('lost')]) {
     const res = await app.request(route);
     assert.equal(res.status, 404, route);
-    assert.match((await res.json()).error, /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/, route);
+    assert.match(
+      (await res.json()).error,
+      /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
+      route,
+    );
   }
 });
 
@@ -220,7 +276,11 @@ test("the stream of a settled task sends each event, the read's cursor as the id
   const said = blocks(await res.text());
   assert.deepEqual(eventsIn(said), engines.events);
   const sent = said.filter((b) => b.event === 'transcript');
-  assert.deepEqual(sent.map((b) => b.id), [...Array(sent.length - 1).fill(undefined), engines.cursor], 'the cursor rides on the last event of the read only');
+  assert.deepEqual(
+    sent.map((b) => b.id),
+    [...Array(sent.length - 1).fill(undefined), engines.cursor],
+    'the cursor rides on the last event of the read only',
+  );
   assert.deepEqual(said.at(-1), { event: 'settled', data: JSON.stringify({ cursor: engines.cursor }), id: engines.cursor });
   assert.equal(said.length, engines.events.length + 1, 'nothing else is sent');
 });
@@ -245,7 +305,11 @@ test('a stream reconnected with Last-Event-ID resumes from that cursor, over any
 });
 
 /** Read a stream until `until` holds for what it has sent, or it ends. */
-async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: { value: string }, until: (said: Block[]) => boolean): Promise<Block[]> {
+async function readUntil(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  text: { value: string },
+  until: (said: Block[]) => boolean,
+): Promise<Block[]> {
   const decoder = new TextDecoder();
   for (;;) {
     const complete = text.value.slice(0, text.value.lastIndexOf('\n\n') + 2);
@@ -256,29 +320,37 @@ async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: 
   }
 }
 
-test('the stream of a live task follows it: what the session writes next is sent as it is written, and `settled` once the task settles', { timeout: 30_000 }, async () => {
-  const sessionId = runningTask('t-live');
-  const lines = conversation(sessionId);
-  writeTranscript(sessionId, lines.slice(0, 4));
+test(
+  'the stream of a live task follows it: what the session writes next is sent as it is written, and `settled` once the task settles',
+  { timeout: 30_000 },
+  async () => {
+    const sessionId = runningTask('t-live');
+    const lines = conversation(sessionId);
+    writeTranscript(sessionId, lines.slice(0, 4));
 
-  const res = await app.request(streamUrl('live'));
-  assert.equal(res.status, 200);
-  const reader = res.body!.getReader();
-  const text = { value: '' };
-  const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
-  assert.deepEqual(eventsIn(early).map((e) => e.id), ['u-1:0', 'a-1:0', 'a-2:0'], 'what was written when it connected');
-  assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
+    const res = await app.request(streamUrl('live'));
+    assert.equal(res.status, 200);
+    const reader = res.body!.getReader();
+    const text = { value: '' };
+    const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+    assert.deepEqual(
+      eventsIn(early).map((e) => e.id),
+      ['u-1:0', 'a-1:0', 'a-2:0'],
+      'what was written when it connected',
+    );
+    assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
 
-  // The session goes on, and its task settles.
-  writeTranscript(sessionId, lines.slice(4));
-  await sleep(1_500);
-  journal('t-live', ending('t-live', sessionId));
+    // The session goes on, and its task settles.
+    writeTranscript(sessionId, lines.slice(4));
+    await sleep(1_500);
+    journal('t-live', ending('t-live', sessionId));
 
-  const said = await readUntil(reader, text, () => false);
-  const whole = await engine().transcript('t-live');
-  assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
-  assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
-});
+    const said = await readUntil(reader, text, () => false);
+    const whole = await engine().transcript('t-live');
+    assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
+    assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
+  },
+);
 
 test('the stream stops asking the engine once its reader goes away', { timeout: 30_000 }, async () => {
   const sessionId = runningTask('t-gone');
@@ -306,59 +378,73 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
   assert.match(error, /`wf logs r-talk broken` reads its output from the command line\.$/);
 });
 
-test('a read that fails mid-stream is said once and read again every second: following resumes from the same cursor, and ends settled', { timeout: 30_000 }, async () => {
-  const sessionId = runningTask('t-flaky');
-  const lines = conversation(sessionId);
-  writeTranscript(sessionId, lines.slice(0, 4));
-  const res = await app.request(streamUrl('flaky'));
-  const reader = res.body!.getReader();
-  const text = { value: '' };
-  await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+test(
+  'a read that fails mid-stream is said once and read again every second: following resumes from the same cursor, and ends settled',
+  { timeout: 30_000 },
+  async () => {
+    const sessionId = runningTask('t-flaky');
+    const lines = conversation(sessionId);
+    writeTranscript(sessionId, lines.slice(0, 4));
+    const res = await app.request(streamUrl('flaky'));
+    const reader = res.body!.getReader();
+    const text = { value: '' };
+    await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
 
-  // The task's journal cannot be read for a while — a directory where the file was — as a read that fails would find it.
-  const aside = `${journalFile('t-flaky')}.aside`;
-  fs.renameSync(journalFile('t-flaky'), aside);
-  fs.mkdirSync(journalFile('t-flaky'));
-  const failing = (await readUntil(reader, text, (said) => said.some((b) => b.event === 'unreadable'))).filter((b) => b.event === 'unreadable');
-  const { error, retrying } = JSON.parse(failing[0]!.data!);
-  assert.equal(retrying, true, 'said as a read that will be tried again');
-  assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
-  const answered = await app.request(url('flaky'));
-  assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
-  assert.match((await answered.json()).error, /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/);
-  // Some beats of it.
-  await sleep(2_500);
+    // The task's journal cannot be read for a while — a directory where the file was — as a read that fails would find it.
+    const aside = `${journalFile('t-flaky')}.aside`;
+    fs.renameSync(journalFile('t-flaky'), aside);
+    fs.mkdirSync(journalFile('t-flaky'));
+    const failing = (await readUntil(reader, text, (said) => said.some((b) => b.event === 'unreadable'))).filter(
+      (b) => b.event === 'unreadable',
+    );
+    const { error, retrying } = JSON.parse(failing[0]!.data!);
+    assert.equal(retrying, true, 'said as a read that will be tried again');
+    assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
+    const answered = await app.request(url('flaky'));
+    assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
+    assert.match((await answered.json()).error, /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/);
+    // Some beats of it.
+    await sleep(2_500);
 
-  // Readable again, and the session went on, then its task settled.
-  fs.rmdirSync(journalFile('t-flaky'));
-  fs.renameSync(aside, journalFile('t-flaky'));
-  writeTranscript(sessionId, lines.slice(4));
-  await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
-  journal('t-flaky', ending('t-flaky', sessionId));
-  const said = await readUntil(reader, text, () => false);
+    // Readable again, and the session went on, then its task settled.
+    fs.rmdirSync(journalFile('t-flaky'));
+    fs.renameSync(aside, journalFile('t-flaky'));
+    writeTranscript(sessionId, lines.slice(4));
+    await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
+    journal('t-flaky', ending('t-flaky', sessionId));
+    const said = await readUntil(reader, text, () => false);
 
-  assert.deepEqual(said.filter((b) => b.event === 'unreadable').length, 1, 'the failure is said once, however many beats it lasts');
-  const [unreadableAt, readableAt] = [said.findIndex((b) => b.event === 'unreadable'), said.findIndex((b) => b.event === 'readable')];
-  assert.ok(readableAt > unreadableAt, 'and cleared by `readable` once a read works');
-  assert.equal(said.filter((b) => b.event === 'readable').length, 1);
-  assert.deepEqual(eventsIn(said), (await engine().transcript('t-flaky')).events, 'every event, once each: read again from the cursor it had');
-  assert.equal(said.at(-1)?.event, 'settled');
-});
+    assert.deepEqual(said.filter((b) => b.event === 'unreadable').length, 1, 'the failure is said once, however many beats it lasts');
+    const [unreadableAt, readableAt] = [said.findIndex((b) => b.event === 'unreadable'), said.findIndex((b) => b.event === 'readable')];
+    assert.ok(readableAt > unreadableAt, 'and cleared by `readable` once a read works');
+    assert.equal(said.filter((b) => b.event === 'readable').length, 1);
+    assert.deepEqual(
+      eventsIn(said),
+      (await engine().transcript('t-flaky')).events,
+      'every event, once each: read again from the cursor it had',
+    );
+    assert.equal(said.at(-1)?.event, 'settled');
+  },
+);
 
-test("a task that leaves the engine's record mid-stream ends the stream: `unreadable`, not tried again, and never `settled`", { timeout: 30_000 }, async () => {
-  const sessionId = runningTask('t-vanishing');
-  writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
-  const res = await app.request(streamUrl('vanishing'));
-  const reader = res.body!.getReader();
-  const text = { value: '' };
-  await readUntil(reader, text, (said) => eventsIn(said).length >= 1);
-  fs.rmSync(journalFile('t-vanishing'));
-  // Resolves only once the api closes the stream; a stream that went on trying would time the test out.
-  const said = await readUntil(reader, text, () => false);
-  const last = said.at(-1)!;
-  assert.equal(last.event, 'unreadable');
-  const { error, retrying } = JSON.parse(last.data!);
-  assert.equal(retrying, false);
-  assert.match(error, /was filed as task t-vanishing, and the engine has no record of it/);
-  assert.ok(!said.some((b) => b.event === 'settled'));
-});
+test(
+  "a task that leaves the engine's record mid-stream ends the stream: `unreadable`, not tried again, and never `settled`",
+  { timeout: 30_000 },
+  async () => {
+    const sessionId = runningTask('t-vanishing');
+    writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
+    const res = await app.request(streamUrl('vanishing'));
+    const reader = res.body!.getReader();
+    const text = { value: '' };
+    await readUntil(reader, text, (said) => eventsIn(said).length >= 1);
+    fs.rmSync(journalFile('t-vanishing'));
+    // Resolves only once the api closes the stream; a stream that went on trying would time the test out.
+    const said = await readUntil(reader, text, () => false);
+    const last = said.at(-1)!;
+    assert.equal(last.event, 'unreadable');
+    const { error, retrying } = JSON.parse(last.data!);
+    assert.equal(retrying, false);
+    assert.match(error, /was filed as task t-vanishing, and the engine has no record of it/);
+    assert.ok(!said.some((b) => b.event === 'settled'));
+  },
+);

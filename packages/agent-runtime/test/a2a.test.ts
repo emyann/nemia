@@ -8,16 +8,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { A2A_PROTOCOL_VERSION, Role, TaskState } from '@a2a-js/sdk';
-import {
-  ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, UnsupportedOperationError,
-} from '@a2a-js/sdk/errors';
+import { ExtendedAgentCardNotConfiguredError, PushNotificationNotSupportedError, UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { a2aOps, a2aRunner, InProcessTransport } from '../src/a2a-client.ts';
 import { file, requestStop, tick } from '../src/engine.ts';
 import { Journal } from '../src/journal.ts';
 import { HarnessHandler } from '../src/a2a-handler.ts';
 import {
-  closeoutArtifact, closeoutOf, contextRefusal, failedSpawnTask, followUpOf, followUpRefusal, followUpText, messageOf, messageRefusal, nameParts,
-  RUNTIME_EXTENSION, nameOf, sightingOf, spawnOf, startedTask, stateOf, taskOfAttempt, taskOfSighting, wordsOf,
+  closeoutArtifact,
+  closeoutOf,
+  contextRefusal,
+  failedSpawnTask,
+  followUpOf,
+  followUpRefusal,
+  followUpText,
+  messageOf,
+  messageRefusal,
+  nameParts,
+  RUNTIME_EXTENSION,
+  nameOf,
+  sightingOf,
+  spawnOf,
+  startedTask,
+  stateOf,
+  taskOfAttempt,
+  taskOfSighting,
+  wordsOf,
 } from '../src/a2a-map.ts';
 import { SESSION_STATES, type Attempt, type Ended, type SessionState, type Sighting } from '../src/domain.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
@@ -57,14 +72,33 @@ test('a session name is its task and attempt, and nothing else is', () => {
 
 /** A sighting with every optional field set. */
 const full: Sighting = {
-  sessionId: 's-7', state: 'input-required', busy: true, nativeId: 'native-7',
+  sessionId: 's-7',
+  state: 'input-required',
+  busy: true,
+  nativeId: 'native-7',
   usage: {
-    turns: 4, toolCalls: 9, inputTokens: 1200, cacheReadTokens: 900, cacheWriteTokens: 200, uncachedTokens: 100,
-    peakContextTokens: 1100, firstContextTokens: 400, firstCacheWriteTokens: 50, compactions: 1, outputTokens: 300,
-    costUsd: 0.42, apiMs: 5000, toolMs: 700, unpricedModel: true,
+    turns: 4,
+    toolCalls: 9,
+    inputTokens: 1200,
+    cacheReadTokens: 900,
+    cacheWriteTokens: 200,
+    uncachedTokens: 100,
+    peakContextTokens: 1100,
+    firstContextTokens: 400,
+    firstCacheWriteTokens: 50,
+    compactions: 1,
+    outputTokens: 300,
+    costUsd: 0.42,
+    apiMs: 5000,
+    toolMs: 700,
+    unpricedModel: true,
   },
-  exitCode: 0, closeout: { payload: { outcome: 'done', notes: ['a', 'b'] }, at: 1790000000000 }, quietMs: 95_000,
-  waitingFor: 'permission prompt', limit: 'budget', denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
+  exitCode: 0,
+  closeout: { payload: { outcome: 'done', notes: ['a', 'b'] }, at: 1790000000000 },
+  quietMs: 95_000,
+  waitingFor: 'permission prompt',
+  limit: 'budget',
+  denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
 };
 
 test('a sighting rides whole in its Task, and survives a transport that serialises', () => {
@@ -95,9 +129,12 @@ test("attempts that continued one conversation share a context: the harness's id
 test('a closeout is an Artifact of one part: data for a value, text/plain for prose, its time in metadata when known', () => {
   const said = { outcome: 'done', notes: ['a', 'b'] };
   assert.deepEqual(closeoutArtifact(said, 1790000000000), {
-    artifactId: 'closeout', name: 'closeout', description: '',
+    artifactId: 'closeout',
+    name: 'closeout',
+    description: '',
     parts: [{ content: { $case: 'data', value: said }, metadata: undefined, filename: '', mediaType: '' }],
-    metadata: { at: 1790000000000 }, extensions: [],
+    metadata: { at: 1790000000000 },
+    extensions: [],
   });
   assert.deepEqual(closeoutArtifact('Done: the tests pass.').parts, [
     { content: { $case: 'text', value: 'Done: the tests pass.' }, metadata: undefined, filename: '', mediaType: 'text/plain' },
@@ -114,11 +151,13 @@ test('a closeout is an Artifact of one part: data for a value, text/plain for pr
   // Since stage 4a an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED,
   // no Artifact, and `stated: false` on the attempt it carries — for the layer above to judge, as the journal has it.
   const unstated = overTheWire(taskOfAttempt('ae/t-1/1', { ...ended, stated: false }, 'm'));
-  assert.deepEqual([unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.stated],
-    [TaskState.TASK_STATE_COMPLETED, [], false]);
+  assert.deepEqual(
+    [unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.stated],
+    [TaskState.TASK_STATE_COMPLETED, [], false],
+  );
 });
 
-test('a Task whose state is not its sighting\'s carries no sighting', () => {
+test("a Task whose state is not its sighting's carries no sighting", () => {
   const t = taskOfSighting('ae/t-1/3', full);
   assert.equal(sightingOf({ ...t, status: { ...t.status!, state: TaskState.TASK_STATE_WORKING } }), undefined);
   assert.equal(sightingOf(startedTask('ae/t-1/3', messageOf({ name: 'ae/t-1/3', brief: 'b', cwd: '/r' }, 'm'))), undefined);
@@ -126,25 +165,51 @@ test('a Task whose state is not its sighting\'s carries no sighting', () => {
 
 /** An attempt that ended done, signed by nothing, its session's id recorded. */
 const ended: Attempt = {
-  n: 1, startedAt: '2026-09-23T10:00:00.000Z', spawnedAt: '2026-09-23T10:00:01.000Z', ended: 'done', endedAt: '2026-09-23T10:05:00.000Z',
-  reason: 'harness', nativeId: 'conv-a', usage: null, exitCode: 0,
+  n: 1,
+  startedAt: '2026-09-23T10:00:00.000Z',
+  spawnedAt: '2026-09-23T10:00:01.000Z',
+  ended: 'done',
+  endedAt: '2026-09-23T10:05:00.000Z',
+  reason: 'harness',
+  nativeId: 'conv-a',
+  usage: null,
+  exitCode: 0,
 };
 
 const request: SpawnRequest = {
-  name: 'ae/t-1/2', brief: 'write the words down\n\nand then stop.', cwd: '/repo', harness: 'fake',
-  config: { model: 'opus', permissionMode: 'dontAsk', tools: ['Read', 'Edit'], mcp: { web: { command: 'npx', args: ['web'] } }, budgetUsd: 2.5 },
-  resumeFrom: 'native-1', closeoutSchema: { type: 'object', required: ['outcome'] },
+  name: 'ae/t-1/2',
+  brief: 'write the words down\n\nand then stop.',
+  cwd: '/repo',
+  harness: 'fake',
+  config: {
+    model: 'opus',
+    permissionMode: 'dontAsk',
+    tools: ['Read', 'Edit'],
+    mcp: { web: { command: 'npx', args: ['web'] } },
+    budgetUsd: 2.5,
+  },
+  resumeFrom: 'native-1',
+  closeoutSchema: { type: 'object', required: ['outcome'] },
 };
 
 test('a spawn is a user Message: the name its task, the brief its one text part, the session it continues its context, the rest its metadata', () => {
   const m = messageOf(request, 'm-1');
   assert.deepEqual(m, {
-    messageId: 'm-1', contextId: 'native-1', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
-    parts: [{ content: { $case: 'text', value: 'write the words down\n\nand then stop.' }, metadata: undefined, filename: '', mediaType: '' }],
+    messageId: 'm-1',
+    contextId: 'native-1',
+    taskId: 'ae/t-1/2',
+    role: Role.ROLE_USER,
+    parts: [
+      { content: { $case: 'text', value: 'write the words down\n\nand then stop.' }, metadata: undefined, filename: '', mediaType: '' },
+    ],
     metadata: {
-      cwd: '/repo', harness: 'fake', config: request.config, closeoutSchema: request.closeoutSchema,
+      cwd: '/repo',
+      harness: 'fake',
+      config: request.config,
+      closeoutSchema: request.closeoutSchema,
     },
-    extensions: [RUNTIME_EXTENSION], referenceTaskIds: [],
+    extensions: [RUNTIME_EXTENSION],
+    referenceTaskIds: [],
   });
   assert.equal(m.metadata!.config, request.config, 'config is carried whole, never opened');
   assert.equal(messageRefusal(m), undefined);
@@ -155,9 +220,14 @@ test('a spawn is a user Message: the name its task, the brief its one text part,
 test('words said to a session are a user Message on its Task: one text part, no mark, nothing else', () => {
   const m = followUpOf('ae/t-1/2', 'look again\n\nat the tests', 'm-2');
   assert.deepEqual(m, {
-    messageId: 'm-2', contextId: '', taskId: 'ae/t-1/2', role: Role.ROLE_USER,
+    messageId: 'm-2',
+    contextId: '',
+    taskId: 'ae/t-1/2',
+    role: Role.ROLE_USER,
     parts: [{ content: { $case: 'text', value: 'look again\n\nat the tests' }, metadata: undefined, filename: '', mediaType: '' }],
-    metadata: undefined, extensions: [], referenceTaskIds: [],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
   });
   assert.equal(followUpRefusal(m), undefined);
   assert.equal(followUpText(m), 'look again\n\nat the tests');
@@ -171,7 +241,12 @@ test('a spawn with its optional keys unset comes back with every key, as the eng
   assert.deepEqual(m.metadata, { cwd: '/r' }, 'no undefined in metadata');
   assert.equal(m.contextId, '', 'a spawn that starts cold continues no context');
   assert.deepEqual(spawnOf(overTheWire(m)), {
-    name: 'ae/t-1/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined,
+    name: 'ae/t-1/1',
+    brief: 'b',
+    cwd: '/r',
+    harness: undefined,
+    config: undefined,
+    closeoutSchema: undefined,
     resumeFrom: undefined,
   });
 });
@@ -193,8 +268,15 @@ test("a failed spawn's words ride in its Task's status: REJECTED when nothing st
 
 test('an attempt the harness no longer lists is answered from the journal', () => {
   const attempt: Attempt = {
-    n: 1, startedAt: '2026-09-23T10:00:00.000Z', spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null,
-    usage: null, exitCode: null,
+    n: 1,
+    startedAt: '2026-09-23T10:00:00.000Z',
+    spawnedAt: null,
+    ended: null,
+    endedAt: null,
+    reason: null,
+    nativeId: null,
+    usage: null,
+    exitCode: null,
   };
   const cases: Array<[Partial<Attempt>, TaskState]> = [
     [{}, TaskState.TASK_STATE_SUBMITTED],
@@ -231,10 +313,14 @@ test("REFUSED: words sent in a context that is not their session's", () => {
   const s: Sighting = { sessionId: 's-1', state: 'working', nativeId: 'conv-a' };
   assert.equal(contextRefusal('ae/t-1/1', '', s), undefined);
   assert.equal(contextRefusal('ae/t-1/1', 'conv-a', s), undefined);
-  assert.equal(contextRefusal('ae/t-1/1', 'conv-b', s),
-    "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.");
-  assert.equal(contextRefusal('ae/t-1/1', 't-1', { sessionId: 's-1', state: 'working' }),
-    "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.");
+  assert.equal(
+    contextRefusal('ae/t-1/1', 'conv-b', s),
+    "the message's contextId `conv-b` is not the context of session `ae/t-1/1`, `conv-a`: send that, or none.",
+  );
+  assert.equal(
+    contextRefusal('ae/t-1/1', 't-1', { sessionId: 's-1', state: 'working' }),
+    "the message's contextId `t-1` is not the context of session `ae/t-1/1`, which has none known yet: send none.",
+  );
 });
 
 // ─── through the client ─────────────────────────────────────────────────────
@@ -246,39 +332,45 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
   const asked: Array<[string, unknown]> = [];
   let n = 0;
   const ops: RunnerOps = {
-    spawn: (r: SpawnRequest) => Effect.suspend(() => {
-      asked.push(['spawn', r]);
-      if (o.spawnFails instanceof RunnerError) return Effect.fail(o.spawnFails);
-      if (o.spawnFails) return Effect.die(o.spawnFails);
-      sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
-      return Effect.void;
-    }),
+    spawn: (r: SpawnRequest) =>
+      Effect.suspend(() => {
+        asked.push(['spawn', r]);
+        if (o.spawnFails instanceof RunnerError) return Effect.fail(o.spawnFails);
+        if (o.spawnFails) return Effect.die(o.spawnFails);
+        sessions.set(r.name, { sessionId: `s-${++n}`, state: 'working', busy: true });
+        return Effect.void;
+      }),
     observe: Effect.suspend(() => {
       asked.push(['observe', undefined]);
-      return o.observeFails ? Effect.fail(new RunnerError({ verb: 'observe', message: o.observeFails })) : Effect.succeed(new Map(sessions));
+      return o.observeFails
+        ? Effect.fail(new RunnerError({ verb: 'observe', message: o.observeFails }))
+        : Effect.succeed(new Map(sessions));
     }),
-    stop: (id) => Effect.suspend(() => {
-      asked.push(['stop', id]);
-      if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
-      return Effect.void;
-    }),
+    stop: (id) =>
+      Effect.suspend(() => {
+        asked.push(['stop', id]);
+        if (o.stopFails) return Effect.fail(new RunnerError({ verb: 'stop', message: o.stopFails }));
+        for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
+        return Effect.void;
+      }),
     logs: (id) => answer('logs', id, `logs of ${id}`),
     transcript: (id, after) => answer('transcript', [id, after], { events: [conversed(id)], cursor: `${id}@${after ?? 0}+1` }),
     refuses: () => undefined,
-    ...(o.bare ? {} : {
-      find: (name: string) => answer('find', name, sessions.get(name) && { sessionId: sessions.get(name)!.sessionId }),
-      release: (session: Sighting, task: { worktree?: string | boolean }) =>
-        answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
-      say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
-      // Told what is expected, the sessions it names alone.
-      observeFor: (expected: readonly ExpectedSession[]) =>
-        answer('observeFor', expected, {
-          seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
-          // A name it was told to leave unread, as a driver whose registry could not be read leaves one.
-          unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
+    ...(o.bare
+      ? {}
+      : {
+          find: (name: string) => answer('find', name, sessions.get(name) && { sessionId: sessions.get(name)!.sessionId }),
+          release: (session: Sighting, task: { worktree?: string | boolean }) =>
+            answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
+          say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
+          // Told what is expected, the sessions it names alone.
+          observeFor: (expected: readonly ExpectedSession[]) =>
+            answer('observeFor', expected, {
+              seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
+              // A name it was told to leave unread, as a driver whose registry could not be read leaves one.
+              unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
+            }),
         }),
-    }),
   };
   /** A verb that answers `value`, or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect. */
   function answer<A>(verb: string, args: unknown, value: A): Effect.Effect<A, RunnerError> {
@@ -295,7 +387,10 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
 
 /** A line of a session's conversation, as a driver reads it. */
 const conversed = (sessionId: string) => ({
-  id: `${sessionId}-e1`, at: '2026-09-23T10:00:00.000Z', role: 'assistant' as const, kind: 'tool_use' as const,
+  id: `${sessionId}-e1`,
+  at: '2026-09-23T10:00:00.000Z',
+  role: 'assistant' as const,
+  kind: 'tool_use' as const,
   tool: { name: 'Read', input: { file_path: '/repo/a.ts' } },
 });
 
@@ -308,7 +403,12 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
   assert.deepEqual(d.acted(), [['spawn', request]]);
   // The engine's spawn has every key, some undefined: the driver is handed the same keys back.
   const bare: SpawnRequest = {
-    name: 'ae/t-2/1', brief: 'b', cwd: '/r', harness: undefined, config: undefined, closeoutSchema: undefined,
+    name: 'ae/t-2/1',
+    brief: 'b',
+    cwd: '/r',
+    harness: undefined,
+    config: undefined,
+    closeoutSchema: undefined,
     resumeFrom: undefined,
   };
   await Effect.runPromise(d.runner.spawn(bare));
@@ -320,17 +420,27 @@ test("a refused spawn is the harness's refusal, in its words, `refused`", async 
   const d = driven({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true }) });
   const e = await failure(d.runner.spawn(request));
   assert.ok(e instanceof RunnerError);
-  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
-    verb: 'spawn', message: 'fake: no binary called `fake` on PATH', refused: true,
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message, refused: e.refused },
+    {
+      verb: 'spawn',
+      message: 'fake: no binary called `fake` on PATH',
+      refused: true,
+    },
+  );
 });
 
 test('a spawn that may have started is not `refused`, and keeps its words', async () => {
   const d = driven({ spawnFails: new RunnerError({ verb: 'spawn', message: 'fake: the launcher lost its acknowledgement' }) });
   const e = await failure(d.runner.spawn(request));
-  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
-    verb: 'spawn', message: 'fake: the launcher lost its acknowledgement', refused: undefined,
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message, refused: e.refused },
+    {
+      verb: 'spawn',
+      message: 'fake: the launcher lost its acknowledgement',
+      refused: undefined,
+    },
+  );
   assert.equal('refused' in e && e.refused !== undefined, false, 'an ambiguous spawn carries no `refused` at all');
 });
 
@@ -340,19 +450,28 @@ test("a driver's defect passes through the client as the same defect", async () 
   await assert.rejects(Effect.runPromise(d.runner.spawn(request)), (e) => e === boom);
 });
 
-test('a spawn the seam refuses reaches no driver, and says why in A2A\'s words', async () => {
+test("a spawn the seam refuses reaches no driver, and says why in A2A's words", async () => {
   const d = driven();
   const e = await failure(d.runner.spawn({ ...request, name: 'not-a-session' }));
-  assert.deepEqual({ verb: e.verb, message: e.message, refused: e.refused }, {
-    verb: 'spawn', message: '`not-a-session` is not a session name: a session is named `ae/<task>/<n>`, n from 1.', refused: undefined,
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message, refused: e.refused },
+    {
+      verb: 'spawn',
+      message: '`not-a-session` is not a session name: a session is named `ae/<task>/<n>`, n from 1.',
+      refused: undefined,
+    },
+  );
   assert.deepEqual(d.acted(), []);
 });
 
 test("observe through the client is the driver's map, every page of it, from one observe", async () => {
   const d = driven();
   for (let i = 1; i <= 250; i++) {
-    d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: i % 5 === 0 ? 'completed' : 'working', busy: i % 2 === 0 });
+    d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, {
+      sessionId: `s-${i}`,
+      state: i % 5 === 0 ? 'completed' : 'working',
+      busy: i % 2 === 0,
+    });
   }
   d.sessions.set('ae/t-001/2', full);
   const seen = await Effect.runPromise(d.runner.observe);
@@ -365,16 +484,22 @@ test('two observes at once over more than a page each read the whole map: a list
   for (let i = 1; i <= 250; i++) d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: 'working' });
   // The driver answers neither first page until both are asked, so both listings are made before either asks its second.
   let release!: () => void;
-  const both = new Promise<void>((r) => { release = r; });
+  const both = new Promise<void>((r) => {
+    release = r;
+  });
   let pending = 0;
-  const gated = a2aOps('fake', {
-    ...d.ops,
-    observe: Effect.promise(async () => {
-      if (++pending === 2) release();
-      await both;
-      return new Map(d.sessions);
-    }),
-  }, async () => []);
+  const gated = a2aOps(
+    'fake',
+    {
+      ...d.ops,
+      observe: Effect.promise(async () => {
+        if (++pending === 2) release();
+        await both;
+        return new Map(d.sessions);
+      }),
+    },
+    async () => [],
+  );
   const [one, two] = await Effect.runPromise(Effect.all([gated.observe, gated.observe], { concurrency: 'unbounded' }));
   assert.equal(pending, 2, 'the driver was observed once a listing');
   assert.deepEqual(one, d.sessions);
@@ -413,9 +538,13 @@ test("a stop the driver failed is the driver's words", async () => {
 test('a stop of a session no harness lists is refused in words, and the driver is asked nothing', async () => {
   const d = driven();
   const e = await failure(d.runner.stop('s-404'));
-  assert.deepEqual({ verb: e.verb, message: e.message }, {
-    verb: 'stop', message: 'the `fake` harness lists no session `s-404`: there is nothing to stop.',
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message },
+    {
+      verb: 'stop',
+      message: 'the `fake` harness lists no session `s-404`: there is nothing to stop.',
+    },
+  );
   assert.deepEqual(d.acted(), []);
 });
 
@@ -438,8 +567,11 @@ test('part 4: every verb goes through the seam, the transcript by name; refuses 
   }
   assert.ok(d.runner.transcriptOf, 'the transcript is offered by name too');
   assert.equal(d.runner.refuses, d.ops.refuses, 'refuses judges a task before any session: no call to make');
-  assert.deepEqual(Object.keys(d.runner).sort(), [...Object.keys(d.ops), 'transcriptOf'].sort(),
-    "none of the driver's verbs dropped, and one added: the transcript by name");
+  assert.deepEqual(
+    Object.keys(d.runner).sort(),
+    [...Object.keys(d.ops), 'transcriptOf'].sort(),
+    "none of the driver's verbs dropped, and one added: the transcript by name",
+  );
 });
 
 test('REFUSED: a verb the driver lacks is not offered through the seam, since the card does not list it', () => {
@@ -449,7 +581,7 @@ test('REFUSED: a verb the driver lacks is not offered through the seam, since th
   assert.deepEqual(Object.keys(none).sort(), ['logs', 'observe', 'spawn', 'stop']);
 });
 
-test('observeFor through the seam is the driver\'s, told what the engine expects, and stop learns its sessions from it', async () => {
+test("observeFor through the seam is the driver's, told what the engine expects, and stop learns its sessions from it", async () => {
   const d = driven();
   d.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
   d.sessions.set('ae/t-2/1', full);
@@ -465,7 +597,10 @@ test('observeFor through the seam carries the names the driver could not read', 
   const d = driven();
   d.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working', busy: true });
   d.unread.add('ae/t-2/1');
-  const expected = [{ name: 'ae/t-1/1', harness: 'fake' }, { name: 'ae/t-2/1', harness: 'fake' }];
+  const expected = [
+    { name: 'ae/t-1/1', harness: 'fake' },
+    { name: 'ae/t-2/1', harness: 'fake' },
+  ];
   const o = await Effect.runPromise(d.runner.observeFor!(expected));
   assert.deepEqual([...o.seen.keys()], ['ae/t-1/1']);
   assert.deepEqual(o.unread, new Set(['ae/t-2/1']), 'an unread name crosses the seam as unread, not as a session gone');
@@ -481,8 +616,11 @@ test("find, logs and release through the seam answer as the driver does, and the
   assert.deepEqual(await Effect.runPromise(d.runner.release!(done, { worktree: '/w/t-1' })), { turns: 2, costUsd: 0.5 });
   assert.equal(await Effect.runPromise(d.runner.release!({ sessionId: 's-2', state: 'canceled' }, {})), undefined);
   assert.deepEqual(d.acted().slice(1), [
-    ['find', request.name], ['find', 'ae/t-9/1'], ['logs', 's-1'],
-    ['release', [done, { worktree: '/w/t-1' }]], ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
+    ['find', request.name],
+    ['find', 'ae/t-9/1'],
+    ['logs', 's-1'],
+    ['release', [done, { worktree: '/w/t-1' }]],
+    ['release', [{ sessionId: 's-2', state: 'canceled' }, {}]],
   ]);
   assert.equal(d.asked.filter(([v]) => v === 'observe').length, 0, 'none of them lists the harness');
 });
@@ -490,10 +628,16 @@ test("find, logs and release through the seam answer as the driver does, and the
 test("a transcript through the seam is the driver's read, verbatim: the session found by its name, the cursor handed on", async () => {
   const d = driven();
   d.sessions.set('ae/t-1/1', { sessionId: 's-7', state: 'working' });
-  assert.deepEqual(await Effect.runPromise(d.runner.transcriptOf!('ae/t-1/1', 's-7@4+1')), { events: [conversed('s-7')], cursor: 's-7@s-7@4+1+1' });
+  assert.deepEqual(await Effect.runPromise(d.runner.transcriptOf!('ae/t-1/1', 's-7@4+1')), {
+    events: [conversed('s-7')],
+    cursor: 's-7@s-7@4+1+1',
+  });
   assert.deepEqual(await Effect.runPromise(d.runner.transcriptOf!('ae/t-1/1')), { events: [conversed('s-7')], cursor: 's-7@0+1' });
   assert.deepEqual(d.acted(), [
-    ['find', 'ae/t-1/1'], ['transcript', ['s-7', 's-7@4+1']], ['find', 'ae/t-1/1'], ['transcript', ['s-7', undefined]],
+    ['find', 'ae/t-1/1'],
+    ['transcript', ['s-7', 's-7@4+1']],
+    ['find', 'ae/t-1/1'],
+    ['transcript', ['s-7', undefined]],
   ]);
   assert.equal(d.asked.filter(([v]) => v === 'observe').length, 0, 'found by name, so no listing');
   // No session under the name yet: none, and nothing read.
@@ -504,9 +648,13 @@ test("a transcript through the seam is the driver's read, verbatim: the session 
 test('REFUSED: a transcript through the seam of a name that is no session is refused in words, and the driver is not asked', async () => {
   const d = driven();
   const e = await failure(d.runner.transcriptOf!('t-1'));
-  assert.deepEqual({ verb: e.verb, message: e.message }, {
-    verb: 'transcript', message: '`t-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.',
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message },
+    {
+      verb: 'transcript',
+      message: '`t-1` is not a session name: a session is named `ae/<task>/<n>`, n from 1.',
+    },
+  );
   assert.deepEqual(d.asked, []);
 });
 
@@ -520,9 +668,13 @@ test("a transcript by id through the seam is the driver's read of that session, 
 test('REFUSED: a transcript through the seam by an empty id is refused in words, and the driver is not asked', async () => {
   const d = driven();
   const e = await failure(d.runner.transcript!(''));
-  assert.deepEqual({ verb: e.verb, message: e.message }, {
-    verb: 'transcript', message: 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
-  });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message },
+    {
+      verb: 'transcript',
+      message: 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+    },
+  );
   assert.deepEqual(d.asked, []);
 });
 
@@ -562,8 +714,12 @@ test("a driver's defect through find, logs, release, say and transcript is the s
   const d = driven({ fails: boom });
   d.sessions.set(request.name, { sessionId: 's-1', state: 'working' });
   for (const e of [
-    d.runner.find!(request.name), d.runner.logs('s-1'), d.runner.release!({ sessionId: 's-1', state: 'completed' }, {}),
-    d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'), d.runner.transcriptOf!(request.name), d.runner.transcript!('s-1'),
+    d.runner.find!(request.name),
+    d.runner.logs('s-1'),
+    d.runner.release!({ sessionId: 's-1', state: 'completed' }, {}),
+    d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'),
+    d.runner.transcriptOf!(request.name),
+    d.runner.transcript!('s-1'),
   ]) {
     await assert.rejects(Effect.runPromise(e as Effect.Effect<unknown, RunnerError>), (x) => x === boom);
   }
@@ -573,9 +729,15 @@ test('REFUSED: say through the seam to a session that has ended is refused in wo
   const d = driven();
   d.sessions.set(request.name, { sessionId: 's-1', state: 'completed' });
   const e = await failure(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'));
-  assert.deepEqual({ verb: e.verb, message: e.message }, { verb: 'say', message: 'session `ae/t-1/2` has ended (done): it takes no more words.' });
+  assert.deepEqual(
+    { verb: e.verb, message: e.message },
+    { verb: 'say', message: 'session `ae/t-1/2` has ended (done): it takes no more words.' },
+  );
   const gone = await failure(d.runner.say!({ name: 'ae/t-9/1', sessionId: 's-9' }, 'hi'));
-  assert.deepEqual({ verb: gone.verb, message: gone.message }, { verb: 'say', message: 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.' });
+  assert.deepEqual(
+    { verb: gone.verb, message: gone.message },
+    { verb: 'say', message: 'no session `ae/t-9/1` for the `fake` harness to hear anything: it lists none.' },
+  );
   assert.deepEqual(d.acted(), []);
 });
 
@@ -584,16 +746,31 @@ test('the in-process transport maps the three names the handler spells otherwise
   const t = new InProcessTransport(new HarnessHandler('fake', d.ops, async () => []));
   assert.equal(t.protocolName, 'in-process');
   assert.equal(t.protocolVersion, A2A_PROTOCOL_VERSION);
-  await assert.rejects(t.getExtendedAgentCard({ tenant: '' }), (e) => e instanceof ExtendedAgentCardNotConfiguredError
-    && e.message === 'the `fake` harness has no extended card: its card is the whole of it.');
-  await assert.rejects(t.listTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', pageSize: 0, pageToken: '' }),
-    (e) => e instanceof PushNotificationNotSupportedError && e.message === 'the `fake` harness sends no notifications: poll getTask.');
-  const drain = async (g: AsyncGenerator<unknown>) => { for await (const _ of g) { /* nothing is yielded */ } };
-  await assert.rejects(drain(t.resubscribeTask({ tenant: '', id: 'ae/t-1/1' })),
-    (e) => e instanceof UnsupportedOperationError && e.message === 'this agent does not stream: poll getTask.');
-  await assert.rejects(drain(t.sendMessageStream({ tenant: '', message: undefined, configuration: undefined, metadata: undefined })),
-    (e) => e instanceof UnsupportedOperationError
-      && e.message === 'this agent does not stream: send the message with returnImmediately and poll getTask.');
+  await assert.rejects(
+    t.getExtendedAgentCard({ tenant: '' }),
+    (e) =>
+      e instanceof ExtendedAgentCardNotConfiguredError &&
+      e.message === 'the `fake` harness has no extended card: its card is the whole of it.',
+  );
+  await assert.rejects(
+    t.listTaskPushNotificationConfig({ tenant: '', taskId: 'ae/t-1/1', pageSize: 0, pageToken: '' }),
+    (e) => e instanceof PushNotificationNotSupportedError && e.message === 'the `fake` harness sends no notifications: poll getTask.',
+  );
+  const drain = async (g: AsyncGenerator) => {
+    for await (const _ of g) {
+      /* nothing is yielded */
+    }
+  };
+  await assert.rejects(
+    drain(t.resubscribeTask({ tenant: '', id: 'ae/t-1/1' })),
+    (e) => e instanceof UnsupportedOperationError && e.message === 'this agent does not stream: poll getTask.',
+  );
+  await assert.rejects(
+    drain(t.sendMessageStream({ tenant: '', message: undefined, configuration: undefined, metadata: undefined })),
+    (e) =>
+      e instanceof UnsupportedOperationError &&
+      e.message === 'this agent does not stream: send the message with returnImmediately and poll getTask.',
+  );
   assert.deepEqual(d.asked, []);
 });
 
@@ -618,7 +795,9 @@ test('the Effect door takes the same seam: a2aRunner spawns, stops and settles t
   assert.equal(e.message, 'the `fake` harness lists no session `fake-404`: there is nothing to stop.');
 
   // What no harness could use is refused beneath it, as through `Runner.layer`.
-  const refusal = await run(Effect.flatMap(Runner, (r) => Effect.sync(() => r.refuses?.({ brief: 'b', cwd: '/r', config: { model: '' } }))));
+  const refusal = await run(
+    Effect.flatMap(Runner, (r) => Effect.sync(() => r.refuses?.({ brief: 'b', cwd: '/r', config: { model: '' } }))),
+  );
   assert.equal(refusal, "`model` is empty. Leave it out for the harness's default.");
 });
 
@@ -626,14 +805,26 @@ test("the Effect door keeps the transcript: a2aRunner's Runner reads it through 
   const d = driven();
   const run = <A, E>(ops: RunnerOps, e: Effect.Effect<A, E, Runner>) =>
     Effect.runPromise(e.pipe(Effect.provide(a2aRunner(ops, 'fake').pipe(Layer.provideMerge(Journal.test())))));
-  const read = await run(d.ops, Effect.flatMap(Runner, (r) => r.transcript ? r.transcript('s-4', 'c-1') : Effect.succeed<unknown>('dropped')));
+  const read = await run(
+    d.ops,
+    Effect.flatMap(Runner, (r) => (r.transcript ? r.transcript('s-4', 'c-1') : Effect.succeed<unknown>('dropped'))),
+  );
   assert.deepEqual(read, { events: [conversed('s-4')], cursor: 's-4@c-1+1' }, "Runner.transcript is the driver's read");
   assert.deepEqual(d.asked, [['transcript', ['s-4', 'c-1']]]);
   // Only the seam answers this: a driver reached directly would be handed the empty id.
-  const e = await run(d.ops, Effect.flatMap(Runner, (r) => Effect.flip(r.transcript!(''))));
+  const e = await run(
+    d.ops,
+    Effect.flatMap(Runner, (r) => Effect.flip(r.transcript!(''))),
+  );
   assert.equal(e.message, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.');
   assert.equal(d.asked.length, 1);
   // A driver that keeps no conversation: its card lists no sessionTranscript, and Runner has no transcript.
   const bare = { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs };
-  assert.equal(await run(bare, Effect.map(Runner, (r) => r.transcript)), undefined);
+  assert.equal(
+    await run(
+      bare,
+      Effect.map(Runner, (r) => r.transcript),
+    ),
+    undefined,
+  );
 });

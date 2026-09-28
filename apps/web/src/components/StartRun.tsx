@@ -20,7 +20,13 @@ import { afterFor, ignoredRepoNote } from '../lib/inbox';
  * 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it outlives
  * the form, told the api's words, and null when the start is asked again; the form then shows none of its own.
  */
-export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
+export function StartRun({
+  workflow,
+  card,
+  repo,
+  onStarted,
+  onRefused,
+}: {
   workflow: WorkflowListing;
   card?: { name: string; body: string };
   repo?: string;
@@ -94,8 +100,12 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
         <span className="min-w-0 text-xs text-neutral-500">
-          {inFolders ? 'Works in folders it makes for each step' : <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>}, from{' '}
-          <code className="font-mono break-all">{workflow.dir}</code>
+          {inFolders ? (
+            'Works in folders it makes for each step'
+          ) : (
+            <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>
+          )}
+          , from <code className="font-mono break-all">{workflow.dir}</code>
           {card && ', and the card leaves the inbox'}.
         </span>
       </div>
@@ -111,8 +121,14 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           <Link to="/runs/$runId" params={{ runId: start.data.id }} className="font-mono text-sm underline underline-offset-2">
             {start.data.id}
           </Link>
-          . Nothing is filed until <code className="font-mono text-xs">wf tick</code> or <code className="font-mono text-xs">wf up</code> runs
-          {start.variables.after.length > 0 && <>, and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped</>}.
+          . Nothing is filed until <code className="font-mono text-xs">wf tick</code> or <code className="font-mono text-xs">wf up</code>{' '}
+          runs
+          {start.variables.after.length > 0 && (
+            <>
+              , and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped
+            </>
+          )}
+          .
         </p>
       )}
       {start.isError && !onRefused && (
@@ -131,7 +147,15 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
  * may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when it is not
  * the api's own: an inbox card's `repo:`.
  */
-export function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]; onChange: (after: string[]) => void; repo?: string }) {
+export function AfterPicker({
+  selected,
+  onChange,
+  repo,
+}: {
+  selected: readonly string[];
+  onChange: (after: string[]) => void;
+  repo?: string;
+}) {
   const repository = useQuery(repositoryQuery);
   // Read as the page opens, and not on the list's beat: a run started since is here on the next visit.
   const runs = useQuery({ ...runsQuery, refetchInterval: false });

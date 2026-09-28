@@ -65,7 +65,10 @@ export function outputKind(schema: unknown, value: unknown, images: ReadonlySet<
   if (!value.every(isRecord)) return 'json';
   const records = value as Array<Record<string, unknown>>;
   const keys = new Set(records.flatMap((item) => Object.keys(item)));
-  return recordsKind(keys, records.every((item) => Object.values(item).every(isScalar)));
+  return recordsKind(
+    keys,
+    records.every((item) => Object.values(item).every(isScalar)),
+  );
 }
 
 /** The paths of the artifacts that are images the api serves: what `outputKind` is told a string may name. */
@@ -110,12 +113,20 @@ const CUT_WORDS: Readonly<Record<string, string>> = {
 export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>, none: string): Outcome {
   const latest = t.attempts.latest;
   if (t.closeout) return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null };
-  if (t.unreadable) return { by: 'unreadable', words: `It gave a closing statement that could not be read (${t.unreadable.error}). Here it is as it came.` };
+  if (t.unreadable)
+    return {
+      by: 'unreadable',
+      words: `It gave a closing statement that could not be read (${t.unreadable.error}). Here it is as it came.`,
+    };
   if (!latest?.ended || !latest.reason) return { by: 'nobody', words: none };
   const words = MACHINE_WORDS[latest.reason];
   if (words) return { by: 'machine', reason: latest.reason, words };
   if (latest.reason === 'harness' && (latest.ended === 'failed' || latest.ended === 'stopped')) {
-    return { by: 'machine', reason: latest.ended, words: `Its harness ended the session ${latest.ended}, and it said nothing of how it went.` };
+    return {
+      by: 'machine',
+      reason: latest.ended,
+      words: `Its harness ended the session ${latest.ended}, and it said nothing of how it went.`,
+    };
   }
   // A harness's `done` with no statement is `unsigned` since 2026-09-19.
   return { by: 'nobody', words: none };

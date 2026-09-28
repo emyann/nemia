@@ -44,8 +44,13 @@ test('a tick counts the observes that could not read their harness (`unread`), a
   const sessions = new Map<string, PromiseSighting>();
   let failing = false;
   const flaky: PromiseRunner = {
-    spawn: async (r) => { sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' }); },
-    observe: async () => { if (failing) throw new Error('registry: timed out'); return new Map(sessions); },
+    spawn: async (r) => {
+      sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
+    },
+    observe: async () => {
+      if (failing) throw new Error('registry: timed out');
+      return new Map(sessions);
+    },
     stop: async () => {},
     logs: async () => '',
   };
@@ -56,14 +61,18 @@ test('a tick counts the observes that could not read their harness (`unread`), a
   assert.equal(read.observed.flaky!.unread, 0, 'a read that answered left nothing unread');
   failing = true;
   const unread = await engine.tick();
-  assert.deepEqual([unread.observed.flaky!.calls, unread.observed.flaky!.listed, unread.observed.flaky!.unread], [1, 0, 1], 'one observe, nothing listed, one unread');
+  assert.deepEqual(
+    [unread.observed.flaky!.calls, unread.observed.flaky!.listed, unread.observed.flaky!.unread],
+    [1, 0, 1],
+    'one observe, nothing listed, one unread',
+  );
   assert.equal(engine.io().observed.flaky!.unread, 1, 'and the running total has it');
   failing = false;
   assert.equal((await engine.tick()).observed.flaky!.unread, 0);
   assert.equal((await engine.view(id)).state.attempts[0]!.ended, null, 'the attempt still runs');
 });
 
-test('a tick counts only the observes made during it; io() counts every observe, a view\'s too', async () => {
+test("a tick counts only the observes made during it; io() counts every observe, a view's too", async () => {
   const { engine } = await settledEngine();
   // A settled task is viewed off its record (`settled-view.test.ts`); one not settled, on a harness that cannot find, is observed.
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
@@ -73,10 +82,13 @@ test('a tick counts only the observes made during it; io() counts every observe,
   const afterView = engine.io().observed.quick!;
   assert.ok(afterView.calls > before.calls, 'a view observes, and is counted');
   const second = await engine.tick();
-  assert.equal(second.observed.quick!.calls, first.observed.quick!.calls, 'the view\'s observe is not charged to the next pass');
+  assert.equal(second.observed.quick!.calls, first.observed.quick!.calls, "the view's observe is not charged to the next pass");
   assert.equal(engine.io().observed.quick!.calls, afterView.calls + second.observed.quick!.calls, 'the running total has both');
   const until = Date.now() + 20_000;
-  while (!(await engine.view(id)).state.settled && Date.now() < until) { await engine.tick(); await sleep(50); }
+  while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    await engine.tick();
+    await sleep(50);
+  }
 });
 
 test('io() counts the bytes of a journal a view reads, and the worker a pass starts', async () => {
@@ -88,14 +100,20 @@ test('io() counts the bytes of a journal a view reads, and the worker a pass sta
   await engine.view(id);
   const read1 = engine.io();
   const journal = fs.statSync(path.join(root, 'tasks', `${id}.jsonl`)).size;
-  assert.ok(read1.bytesRead - read0.bytesRead >= journal, `a view read the journal's ${journal} bytes (read ${read1.bytesRead - read0.bytesRead})`);
+  assert.ok(
+    read1.bytesRead - read0.bytesRead >= journal,
+    `a view read the journal's ${journal} bytes (read ${read1.bytesRead - read0.bytesRead})`,
+  );
   assert.ok(read1.reads > read0.reads);
 
   const spawn0 = engine.io().spawned;
   await engine.tick();
   assert.ok(engine.io().spawned - spawn0 >= 1, 'the pass that started the attempt started its worker');
   const until = Date.now() + 20_000;
-  while (!(await engine.view(id)).state.settled && Date.now() < until) { await engine.tick(); await sleep(50); }
+  while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    await engine.tick();
+    await sleep(50);
+  }
 });
 
 test('a view reads its journal once, settled or observed', async () => {
@@ -103,7 +121,9 @@ test('a view reads its journal once, settled or observed', async () => {
   // two reads and `wf ls` read 418 journals for 209 tasks (2026-09-25). A harness held in memory, so every read counted is the journal's.
   const sessions = new Map<string, { sessionId: string; state: 'working' | 'done'; busy: boolean }>();
   const inMemory = {
-    spawn: async (r: { name: string }) => { sessions.set(r.name, { sessionId: `s-${sessions.size}`, state: 'working', busy: true }); },
+    spawn: async (r: { name: string }) => {
+      sessions.set(r.name, { sessionId: `s-${sessions.size}`, state: 'working', busy: true });
+    },
     observe: async () => new Map(sessions),
     stop: async () => {},
     logs: async () => '',

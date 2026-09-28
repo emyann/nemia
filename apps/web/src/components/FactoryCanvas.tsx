@@ -174,7 +174,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const reads = useQueries({ queries: opened.map((id) => runQuery(id)) });
   const readsKey = JSON.stringify(reads.map((read) => [read.dataUpdatedAt, read.errorUpdatedAt]));
   const details = useMemo(
-    () => new Map(opened.map((id, i) => [id, { detail: reads[i]?.data ?? null, trouble: reads[i]?.error ? `Could not read its steps: ${reads[i]!.error!.message}` : null }])),
+    () =>
+      new Map(
+        opened.map((id, i) => [
+          id,
+          { detail: reads[i]?.data ?? null, trouble: reads[i]?.error ? `Could not read its steps: ${reads[i]!.error!.message}` : null },
+        ]),
+      ),
     [opened, readsKey],
   );
 
@@ -183,7 +189,17 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const spansKey = JSON.stringify(
     [...opened].reverse().map((id) => {
       const run = shown.find((one) => one.id === id)!;
-      return [id, openSpan(tilesOf(run.steps.map((step) => step.name), run.graph, flowSteps(run), run.cancelledAt !== null))];
+      return [
+        id,
+        openSpan(
+          tilesOf(
+            run.steps.map((step) => step.name),
+            run.graph,
+            flowSteps(run),
+            run.cancelledAt !== null,
+          ),
+        ),
+      ];
     }),
   );
   const spans = useMemo(() => new Map<string, Span>(JSON.parse(spansKey)), [spansKey]);
@@ -317,10 +333,19 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       const span = spans.get(runId) ?? ONE_CELL;
       const width = span.columns * CELL_WIDTH - (CELL_WIDTH - CARD_WIDTH);
       const height = span.rows * CELL_HEIGHT - (CELL_WIDTH - CARD_WIDTH);
-      if (x * zoom + tx >= 0 && y * zoom + ty >= 0 && (x + width) * zoom + tx <= el.clientWidth && (y + height) * zoom + ty <= el.clientHeight) return;
+      if (
+        x * zoom + tx >= 0 &&
+        y * zoom + ty >= 0 &&
+        (x + width) * zoom + tx <= el.clientWidth &&
+        (y + height) * zoom + ty <= el.clientHeight
+      )
+        return;
       const room = 0.9;
       const to = Math.max(REVEAL_MIN_ZOOM, Math.min(zoom, (room * el.clientWidth) / width, (room * el.clientHeight) / height));
-      void setViewport({ x: el.clientWidth / 2 - (x + width / 2) * to, y: el.clientHeight / 2 - (y + height / 2) * to, zoom: to }, { duration: 300 });
+      void setViewport(
+        { x: el.clientWidth / 2 - (x + width / 2) * to, y: el.clientHeight / 2 - (y + height / 2) * to, zoom: to },
+        { duration: 300 },
+      );
     },
     [setViewport, store],
   );
@@ -552,9 +577,10 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   const by = data.last
     ? `as the daemon's last pass ran with it (WF_MAX_RUNS=${data.last.runs}, WF_MAX_CONCURRENT=${data.last.sessions})`
     : "as the api's environment sets it: no pass of the daemon has written its own";
-  const title = data.cap > 0
-    ? `Runs in flight against the cap, ${by}. A run takes a slot while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs, which the floor counts in flight, takes none until it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
-    : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
+  const title =
+    data.cap > 0
+      ? `Runs in flight against the cap, ${by}. A run takes a slot while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs, which the floor counts in flight, takes none until it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
+      : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
   return (
     <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-sm text-muted-foreground">
       {capLine(data, queued)}
@@ -589,8 +615,10 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
             {queued > 0 && (
               <>
                 {' '}
-                {queued === 1 ? 'The card queued beside it starts on its own' : `The ${queued} cards queued beside it start on their own`} while{' '}
-                <code>npx wf up</code> runs.
+                {queued === 1
+                  ? 'The card queued beside it starts on its own'
+                  : `The ${queued} cards queued beside it start on their own`}{' '}
+                while <code>npx wf up</code> runs.
               </>
             )}
           </CardDescription>

@@ -30,13 +30,23 @@ const journal = (taskId: string, events: object[]) =>
   write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((event) => `${JSON.stringify(event)}\n`).join(''));
 
 /** A step's task that ran once from `from` seconds, and signed off with `closeout` — its attempt with the usage the engine read of it, when it read one. */
-const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) => journal(taskId, [
-  { kind: 'filed', at: at(from), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness },
-  { kind: 'starting', at: at(from + 1), attempt: 1 },
-  { kind: 'spawned', at: at(from + 1), attempt: 1 },
-  { kind: 'ended', at: at(from + 60), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
-  { kind: 'settled', at: at(from + 60), outcome: 'succeeded' },
-]);
+const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) =>
+  journal(taskId, [
+    { kind: 'filed', at: at(from), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness },
+    { kind: 'starting', at: at(from + 1), attempt: 1 },
+    { kind: 'spawned', at: at(from + 1), attempt: 1 },
+    {
+      kind: 'ended',
+      at: at(from + 60),
+      attempt: 1,
+      sessionId: `ae/${taskId}/1`,
+      observed: 'done',
+      reason: 'harness',
+      closeout,
+      ...(usage ? { usage } : {}),
+    },
+    { kind: 'settled', at: at(from + 60), outcome: 'succeeded' },
+  ]);
 
 /**
  * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads, and in the log its harness's worker
@@ -44,7 +54,14 @@ const session = (taskId: string, harness: string, from: number, closeout: object
  */
 const refusedCheck = (taskId: string, from: number) => {
   journal(taskId, [
-    { kind: 'filed', at: at(from), brief: JSON.stringify({ check: 'npm test', env: {} }), cwd: '/code/app', maxAttempts: 1, harness: 'check' },
+    {
+      kind: 'filed',
+      at: at(from),
+      brief: JSON.stringify({ check: 'npm test', env: {} }),
+      cwd: '/code/app',
+      maxAttempts: 1,
+      harness: 'check',
+    },
     { kind: 'starting', at: at(from), attempt: 1 },
     { kind: 'spawned', at: at(from), attempt: 1 },
     { kind: 'ended', at: at(from + 10), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
@@ -76,24 +93,52 @@ const USAGE = {
 const R = 'r-cost';
 const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 const recordFile = path.join(root, 'runs', `${R}.json`);
-write(recordFile, JSON.stringify({
-  id: R, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'What it cost',
-  workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: [
-    { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', budget: 2 },
-    { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex', loop: 'implement', rounds: 3, output: { file: 'review.json', schema: again } },
-    { name: 'tokens', after: [], body: 'Pick the tokens.', harness: 'claude', budget: 3, check: 'npm test' },
-  ],
-  steps: {
-    implement: { taskId: 't-implement-2', tries: [{ taskId: 't-implement-1', then: 'round' }] },
-    review: { taskId: 't-review-2', tries: [{ taskId: 't-review-1', then: 'round' }] },
-    tokens: { taskId: 't-tokens-2', check: { taskId: 't-tokens-2-check' }, tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, then: 'nudge' }] },
-  },
-}));
+write(
+  recordFile,
+  JSON.stringify({
+    id: R,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'What it cost',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', budget: 2 },
+      {
+        name: 'review',
+        after: ['implement'],
+        body: 'Review it.',
+        harness: 'codex',
+        loop: 'implement',
+        rounds: 3,
+        output: { file: 'review.json', schema: again },
+      },
+      { name: 'tokens', after: [], body: 'Pick the tokens.', harness: 'claude', budget: 3, check: 'npm test' },
+    ],
+    steps: {
+      implement: { taskId: 't-implement-2', tries: [{ taskId: 't-implement-1', then: 'round' }] },
+      review: { taskId: 't-review-2', tries: [{ taskId: 't-review-1', then: 'round' }] },
+      tokens: {
+        taskId: 't-tokens-2',
+        check: { taskId: 't-tokens-2-check' },
+        tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, then: 'nudge' }],
+      },
+    },
+  }),
+);
 session('t-implement-1', 'claude', 0, done('Implemented it.'), USAGE.implement1);
 session('t-review-1', 'codex', 100, done('Two findings.', { again: true }), USAGE.review);
 // A loop's target owes its answers to the findings from round 2: without them it reads unsigned, and a try would take it on.
-session('t-implement-2', 'claude', 200, done('Answered the review.', { replies: [{ finding: 'src/cache.ts — never expires', answer: 'fixed', why: 'It expires now.' }] }), USAGE.implement2);
+session(
+  't-implement-2',
+  'claude',
+  200,
+  done('Answered the review.', { replies: [{ finding: 'src/cache.ts — never expires', answer: 'fixed', why: 'It expires now.' }] }),
+  USAGE.implement2,
+);
 session('t-review-2', 'codex', 300, done('One finding is still open.', { again: true }), USAGE.review);
 session('t-tokens-1', 'claude', 0, done('Picked them.'), USAGE.tokens1);
 refusedCheck('t-tokens-1-check', 70);
@@ -102,12 +147,22 @@ refusedCheck('t-tokens-2-check', 170);
 
 /** A run nobody priced: one Codex step, done. */
 const FREE = 'r-free';
-write(path.join(root, 'runs', `${FREE}.json`), JSON.stringify({
-  id: FREE, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Nobody priced it',
-  workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: [{ name: 'plan', after: [], body: 'Plan it.', harness: 'codex', budget: 5 }],
-  steps: { plan: { taskId: 't-plan' } },
-}));
+write(
+  path.join(root, 'runs', `${FREE}.json`),
+  JSON.stringify({
+    id: FREE,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Nobody priced it',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
+    workflow: [{ name: 'plan', after: [], body: 'Plan it.', harness: 'codex', budget: 5 }],
+    steps: { plan: { taskId: 't-plan' } },
+  }),
+);
 session('t-plan', 'codex', 0, done('Planned it.'), USAGE.review);
 
 /**
@@ -116,31 +171,62 @@ session('t-plan', 'codex', 0, done('Planned it.'), USAGE.review);
  */
 const R2 = 'r-cost-own';
 const PALETTE_NEEDS = 'Warm colours, or cool ones?';
-write(path.join(root, 'runs', `${R2}.json`), JSON.stringify({
-  id: R2, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Past a budget on its own work',
-  workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: [
-    { name: 'palette', after: [], body: 'Pick a palette.', harness: 'claude', budget: 1 },
-    { name: 'lint', after: [], body: 'Lint it.', harness: 'claude', budget: 1, check: 'npm test' },
-  ],
-  steps: { palette: { taskId: 't-palette' }, lint: { taskId: 't-lint', check: { taskId: 't-lint-check' } } },
-}));
-session('t-palette', 'claude', 0, { outcome: 'blocked', summary: 'Two palettes drafted.', needs: PALETTE_NEEDS, artifacts: [] }, { costUsd: 1.5 });
+write(
+  path.join(root, 'runs', `${R2}.json`),
+  JSON.stringify({
+    id: R2,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Past a budget on its own work',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
+    workflow: [
+      { name: 'palette', after: [], body: 'Pick a palette.', harness: 'claude', budget: 1 },
+      { name: 'lint', after: [], body: 'Lint it.', harness: 'claude', budget: 1, check: 'npm test' },
+    ],
+    steps: { palette: { taskId: 't-palette' }, lint: { taskId: 't-lint', check: { taskId: 't-lint-check' } } },
+  }),
+);
+session(
+  't-palette',
+  'claude',
+  0,
+  { outcome: 'blocked', summary: 'Two palettes drafted.', needs: PALETTE_NEEDS, artifacts: [] },
+  { costUsd: 1.5 },
+);
 session('t-lint', 'claude', 0, done('Linted it.'), { costUsd: 1.2 });
 refusedCheck('t-lint-check', 70);
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
-type Step = { name: string; status: string; note: string | null; used: Record<string, unknown> | null; spent: unknown; budget: unknown; raise: unknown; timeline: Array<{ used: Record<string, unknown> | null }> };
+type Step = {
+  name: string;
+  status: string;
+  note: string | null;
+  used: Record<string, unknown> | null;
+  spent: unknown;
+  budget: unknown;
+  raise: unknown;
+  timeline: Array<{ used: Record<string, unknown> | null }>;
+};
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
 const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
 const stepOf = (run: { steps: Step[] }, name: string): Step => run.steps.find((s) => s.name === name)!;
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
-const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+const BOARD = {
+  'content-type': 'application/json',
+  'sec-fetch-site': 'same-origin',
+  origin: 'http://localhost:5173',
+  host: '127.0.0.1:8787',
+};
 const post = (route: string, body: unknown, headers: Record<string, string> = BOARD) =>
   app.request(route, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
-const askTry = (step: string, body: unknown, headers?: Record<string, string>, run = R) => post(`/api/runs/${run}/steps/${step}/retry`, body, headers);
+const askTry = (step: string, body: unknown, headers?: Record<string, string>, run = R) =>
+  post(`/api/runs/${run}/steps/${step}/retry`, body, headers);
 const askRound = (body: unknown, headers?: Record<string, string>) => post(`/api/runs/${R}/round`, body, headers);
 
 const asksDir = path.join(root, 'runs', `${R}.asks`);
@@ -177,16 +263,48 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   const run = await detail();
   const tokens = stepOf(run, 'tokens');
   const [used, cost] = wordsOf(USAGE.tokens2);
-  assert.deepEqual(tokens.used, { usage: USAGE.tokens2, used, cost, costUsd: 2.5, apiMs: 420_000, toolMs: 31_000, read: null, peak: null, rebuilt: 0 });
+  assert.deepEqual(tokens.used, {
+    usage: USAGE.tokens2,
+    used,
+    cost,
+    costUsd: 2.5,
+    apiMs: 420_000,
+    toolMs: 31_000,
+    read: null,
+    peak: null,
+    rebuilt: 0,
+  });
   assert.equal(cost, '$2.50');
   assert.match(used!, / · api 7m00s · tools 31s$/);
   // Each try's session on the clock, with what it cost: the try before the current one too.
-  assert.deepEqual(tokens.timeline.map((t) => [t.used?.costUsd, t.used?.cost]), [[1.75, '$1.75'], [2.5, '$2.50']]);
+  assert.deepEqual(
+    tokens.timeline.map((t) => [t.used?.costUsd, t.used?.cost]),
+    [
+      [1.75, '$1.75'],
+      [2.5, '$2.50'],
+    ],
+  );
 
   // Codex priced nothing: null, and `not measured` — never 0, nor $0.00.
   const review = stepOf(run, 'review');
-  assert.deepEqual(review.used, { usage: USAGE.review, used: wordsOf(USAGE.review)[0], cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 });
-  assert.deepEqual(review.timeline.map((t) => [t.used?.costUsd, t.used?.apiMs, t.used?.toolMs, t.used?.cost]), [[null, null, null, 'not measured'], [null, null, null, 'not measured']]);
+  assert.deepEqual(review.used, {
+    usage: USAGE.review,
+    used: wordsOf(USAGE.review)[0],
+    cost: 'not measured',
+    costUsd: null,
+    apiMs: null,
+    toolMs: null,
+    read: null,
+    peak: null,
+    rebuilt: 0,
+  });
+  assert.deepEqual(
+    review.timeline.map((t) => [t.used?.costUsd, t.used?.apiMs, t.used?.toolMs, t.used?.cost]),
+    [
+      [null, null, null, 'not measured'],
+      [null, null, null, 'not measured'],
+    ],
+  );
   assert.equal(review.spent, null, 'no try of it was measured: nothing spent is not $0');
 
   // What every try cost together, each session once, as `wf ls` puts it beside the step's word.
@@ -201,10 +319,18 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   assert.equal(run.cost.said, words.cost);
   assert.deepEqual((await summary()).cost, run.cost, 'the list carries it too');
   // On the timeline's totals: each round's sessions, and the run's.
-  assert.deepEqual(run.timeline.rounds.map((r: { round: number; cost: { said: string; measured: number; unmeasured: number } | null }) => [r.round, r.cost?.said, r.cost?.measured, r.cost?.unmeasured]), [
-    [1, '≥$1.20', 1, 1],
-    [2, '≥$0.90', 1, 1],
-  ]);
+  assert.deepEqual(
+    run.timeline.rounds.map((r: { round: number; cost: { said: string; measured: number; unmeasured: number } | null }) => [
+      r.round,
+      r.cost?.said,
+      r.cost?.measured,
+      r.cost?.unmeasured,
+    ]),
+    [
+      [1, '≥$1.20', 1, 1],
+      [2, '≥$0.90', 1, 1],
+    ],
+  );
   assert.deepEqual(run.timeline.run.cost, run.cost);
 
   // A run nobody priced has no cost on either endpoint, and neither has its step: null, never 0.
@@ -223,14 +349,23 @@ test("a step over its budget, on the list and on the detail, in `wf ls`'s words 
   const words = await list(engine(), readRun(R));
   const listed = await summary();
   const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
-  assert.deepEqual(listed.steps.map((s: Step) => s.status), statuses);
-  assert.deepEqual(listed.steps.map(({ name, status, note }: Step) => ({ name, status, note })), words.steps.map(({ name, status, note }) => ({ name, status, note: note ?? null })));
+  assert.deepEqual(
+    listed.steps.map((s: Step) => s.status),
+    statuses,
+  );
+  assert.deepEqual(
+    listed.steps.map(({ name, status, note }: Step) => ({ name, status, note })),
+    words.steps.map(({ name, status, note }) => ({ name, status, note: note ?? null })),
+  );
   assert.deepEqual(listed.waitingOnYou, ['implement', 'review', 'tokens']);
   assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
   assert.equal(listed.moving, false, 'the run files nothing more for a step past its cap on its own word');
 
   const run = await detail();
-  assert.deepEqual(run.steps.map((s: Step) => s.status), statuses);
+  assert.deepEqual(
+    run.steps.map((s: Step) => s.status),
+    statuses,
+  );
   assert.deepEqual(run.waitingOnYou, listed.waitingOnYou);
   const [implement, review, tokens] = ['implement', 'review', 'tokens'].map((name) => stepOf(run, name));
   assert.deepEqual(tokens!.budget, { usd: 3, said: '$3', of: '$4.25 of $3', over: true });
@@ -251,12 +386,23 @@ test("the decision says what `wf decide` says of steps held on their budget — 
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.overBudget, said.overBudgetLine);
-  assert.ok(body.overBudget.startsWith('OVER BUDGET, waiting on you: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)'), body.overBudget);
+  assert.ok(
+    body.overBudget.startsWith(
+      'OVER BUDGET, waiting on you: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)',
+    ),
+    body.overBudget,
+  );
   assert.equal(body.cost, said.runCost[0]!.replace(/^cost\s+/, ''));
   assert.equal(body.cost, 'run $6.35 measured · 2 attempts not measured');
   const once = body.commands.filter((c: { label: string }) => c.label === 'once more');
-  assert.deepEqual(once.map((c: { said: string }) => c.said), said.offers);
-  assert.deepEqual(once.map((c: { command: string }) => c.command), [`wf round ${R} review --budget <amount>`, `wf retry ${R} tokens --budget <amount>`]);
+  assert.deepEqual(
+    once.map((c: { said: string }) => c.said),
+    said.offers,
+  );
+  assert.deepEqual(
+    once.map((c: { command: string }) => c.command),
+    [`wf round ${R} review --budget <amount>`, `wf retry ${R} tokens --budget <amount>`],
+  );
 });
 
 test("REFUSED once pruned: steps over their budget are offered no raise — the decision's OVER BUDGET line is `wf decide`'s, says the run was pruned where it said it waits on you, and no step carries a raise", async () => {
@@ -268,10 +414,17 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
     const said = await decide(engine(), R);
     const body = await (await app.request(`/api/runs/${R}/decision`)).json();
     assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `wf decide` and for the board');
-    assert.equal(body.overBudget, 'OVER BUDGET: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)'
-      + '  — nothing more is filed for them, raised or not, since the run was pruned at 2026-09-15T07:00:00.000Z — its worktrees were removed (wf prune); nothing after them ran');
+    assert.equal(
+      body.overBudget,
+      'OVER BUDGET: implement ($2.10 of $2), review (held: its round would file implement again, which has cost $2.10 of its $2 budget), tokens ($4.25 of $3)' +
+        '  — nothing more is filed for them, raised or not, since the run was pruned at 2026-09-15T07:00:00.000Z — its worktrees were removed (wf prune); nothing after them ran',
+    );
     assert.deepEqual(said.offers, []);
-    assert.deepEqual(body.commands.filter((c: { command: string }) => /^wf (retry|round|accept|approve) /.test(c.command)), [], JSON.stringify(body.commands));
+    assert.deepEqual(
+      body.commands.filter((c: { command: string }) => /^wf (retry|round|accept|approve) /.test(c.command)),
+      [],
+      JSON.stringify(body.commands),
+    );
     // What each raise would be refused in: the verb's own words, which the decision no longer contradicts.
     assert.match(await retryRefuses('tokens', { mode: 'nudge', budget: 10 }), /^r-cost was pruned at 2026-09-15T07:00:00\.000Z: /);
 
@@ -316,14 +469,17 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
     assert.equal(res.status, 400, String(budget));
     const { error } = await res.json();
     assert.equal(error, budgetRefusal(how, command));
-    assert.equal(error, await retryRefuses('tokens', how), "and the sentence `retry()` refuses it with");
+    assert.equal(error, await retryRefuses('tokens', how), 'and the sentence `retry()` refuses it with');
     assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
   }
   for (const budget of ['five', '5', null]) {
     const res = await askTry('tokens', { mode: 'nudge', budget });
     assert.equal(res.status, 400, JSON.stringify(budget));
     const { error } = await res.json();
-    assert.ok(error.startsWith('`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it: dollars, as a JSON number above zero'), error);
+    assert.ok(
+      error.startsWith('`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it: dollars, as a JSON number above zero'),
+      error,
+    );
     assert.ok(error.includes(`This request's was ${JSON.stringify(budget)}`), error);
   }
 
@@ -332,13 +488,16 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
   assert.equal(rechecked.status, 422);
   const { error: noSession } = await rechecked.json();
   assert.equal(noSession, budgetRefusal(recheck, command));
-  assert.ok(noSession.startsWith('--budget raises a step\'s cap for the session a try files, and --recheck files none'), noSession);
+  assert.ok(noSession.startsWith("--budget raises a step's cap for the session a try files, and --recheck files none"), noSession);
 
   // Not above what tokens' tries have cost, $4.25 — at it, or under it — or no raise at all: `retryRefusal`'s, verbatim.
   const refusals: Array<[RetryHow, string]> = [
-    [{ mode: 'nudge', budget: 4 }, '--budget 4 is not above $4.25, what tokens\'s tries have cost'],
-    [{ mode: 'fresh', budget: 4.25 }, '--budget 4.25 is not above $4.25, what tokens\'s tries have cost'],
-    [{ mode: 'nudge' }, 'tokens is over budget: its tries have cost $4.25 of its $3 budget, and the run spends nothing more on it until a person raises the cap.'],
+    [{ mode: 'nudge', budget: 4 }, "--budget 4 is not above $4.25, what tokens's tries have cost"],
+    [{ mode: 'fresh', budget: 4.25 }, "--budget 4.25 is not above $4.25, what tokens's tries have cost"],
+    [
+      { mode: 'nudge' },
+      'tokens is over budget: its tries have cost $4.25 of its $3 budget, and the run spends nothing more on it until a person raises the cap.',
+    ],
   ];
   for (const [how, start] of refusals) {
     const res = await askTry('tokens', how);
@@ -408,7 +567,10 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   // As `wf ls` has it until the tick files them: notes beside the steps, and neither waited on.
   const words = await list(engine(), readRun(R));
   const run = await detail();
-  assert.deepEqual(run.steps.map(({ name, note }: Step) => ({ name, note })), words.steps.map(({ name, note }) => ({ name, note: note ?? null })));
+  assert.deepEqual(
+    run.steps.map(({ name, note }: Step) => ({ name, note })),
+    words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
+  );
   assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--nudge, --budget 5) — the next tick files it');
   assert.equal(stepOf(run, 'review').note, 'round 3 asked (wf round --budget 3) — the next tick files implement');
   assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
@@ -416,7 +578,7 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   fs.rmSync(asksDir, { recursive: true, force: true });
 });
 
-test("a step past its budget on its own work is raised as `wf decide` offers it: one that signed off blocked, with its answer on the same ask — REFUSED without a raise, or below the spend — and one refused by its check, rechecked with neither", async () => {
+test('a step past its budget on its own work is raised as `wf decide` offers it: one that signed off blocked, with its answer on the same ask — REFUSED without a raise, or below the spend — and one refused by its check, rechecked with neither', async () => {
   const run = await detail(R2);
   const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name) as Step & { needs: string | null });
   // Its word is `over budget` however it ended: how it ended on its own work is on the raise, the package's word, with the ways it takes a try.
@@ -426,12 +588,18 @@ test("a step past its budget on its own work is raised as `wf decide` offers it:
   assert.deepEqual(lint!.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
   // Its question is still the closeout's, and `wf decide` answers it with the raise and the answer on one ask.
   assert.equal(palette!.needs, PALETTE_NEEDS);
-  assert.equal((await decide(engine(), R2)).answering.palette, `to answer it, its cap raised above $1.50:  wf retry ${R2} palette --budget <amount> --message "<answer>"`);
+  assert.equal(
+    (await decide(engine(), R2)).answering.palette,
+    `to answer it, its cap raised above $1.50:  wf retry ${R2} palette --budget <amount> --message "<answer>"`,
+  );
 
   const answer = 'Warm ones.';
   const asks = path.join(root, 'runs', `${R2}.asks`);
   const refusals: Array<[RetryHow, string]> = [
-    [{ mode: 'nudge', message: answer }, 'palette is over budget: its tries have cost $1.50 of its $1 budget, and the run spends nothing more on it until a person raises the cap.'],
+    [
+      { mode: 'nudge', message: answer },
+      'palette is over budget: its tries have cost $1.50 of its $1 budget, and the run spends nothing more on it until a person raises the cap.',
+    ],
     [{ mode: 'fresh', message: answer, budget: 1.5 }, "--budget 1.5 is not above $1.50, what palette's tries have cost"],
   ];
   for (const [how, start] of refusals) {
@@ -461,7 +629,10 @@ test("a step past its budget on its own work is raised as `wf decide` offers it:
   // As `wf ls` has them until the tick files them: notes beside the steps, and neither waited on.
   const words = await list(engine(), readRun(R2));
   const after = await detail(R2);
-  assert.deepEqual(after.steps.map(({ name, note }: Step) => ({ name, note })), words.steps.map(({ name, note }) => ({ name, note: note ?? null })));
+  assert.deepEqual(
+    after.steps.map(({ name, note }: Step) => ({ name, note })),
+    words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
+  );
   assert.deepEqual(after.waitingOnYou, []);
   assert.deepEqual(after.waitingOnYou, words.waitingOnYou);
   fs.rmSync(asks, { recursive: true, force: true });

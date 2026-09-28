@@ -11,7 +11,18 @@ import { remoteAgentsFile } from './a2a-agents.ts';
 import { refusalLines } from './deps.ts';
 import { fansOut, isFolderTeam, remoteNameOf, WorkflowError, type Workflow } from './workflow.ts';
 import { loadWorkflows, skillsFor, workflowFolder, workflowsIn, type Places } from './workflow-store.ts';
-import { inboxListing, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxCard, type QueueStarted, type QueueTry } from './inbox.ts';
+import {
+  inboxListing,
+  inboxNameRefusal,
+  nextQueued,
+  noCardLine,
+  noWorkflowRefusal,
+  parseInboxCard,
+  startedRefusal,
+  type InboxCard,
+  type QueueStarted,
+  type QueueTry,
+} from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { workRoot } from './places.ts';
 import { afterRefusal, gateRefusal, inputRefusal, isGitRun, type InputFile, type Run } from './run.ts';
@@ -25,7 +36,8 @@ import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
  * `test/store.test.ts` holds this copy to by asking the engine. A copy, because `start` is synchronous and the engine's door is not; and
  * asked only at filing, the refusal would come after the run was written, on its first pass.
  */
-const NOT_BRIDGED = 'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
+const NOT_BRIDGED =
+  'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a Claude Code job, in its words (agent-runtime's `claudeCodeRefuses`), which
@@ -39,13 +51,16 @@ const JOB_NOT_BRIDGED = 'only a background session (`claude --bg`) can be bridge
  * in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
  */
 function remoteRefusal(steps: readonly Workflow[]): string | undefined {
-  const bridged = Object.entries(HARNESSES).filter(([, h]) => h === 'claude').map(([name]) => name);
+  const bridged = Object.entries(HARNESSES)
+    .filter(([, h]) => h === 'claude')
+    .map(([name]) => name);
   const step = steps.find((s) => s.remote && !bridged.includes(s.harness ?? 'claude'));
   if (step) {
     return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} with \`background: true\` — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
   }
   const job = steps.find((s) => s.remote && !s.background);
-  if (job) return `${job.name}: \`remote: true\` bridges a session to claude.ai, and ${JOB_NOT_BRIDGED}. Write \`background: true\` beside it, or delete \`remote: true\`.`;
+  if (job)
+    return `${job.name}: \`remote: true\` bridges a session to claude.ai, and ${JOB_NOT_BRIDGED}. Write \`background: true\` beside it, or delete \`remote: true\`.`;
   return undefined;
 }
 
@@ -55,19 +70,22 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
  * step's check or try. What `startPlan` asks of every card before the first run is started.
  */
 function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
-  const steps = loadWorkflows(workflowDir, places);   // validated before anything is spent
+  const steps = loadWorkflows(workflowDir, places); // validated before anything is spent
   // A team that says `workspace: folder` (every step or none: `validate`) works in folders the run makes, where there is no base branch to
   // work on in place: --no-worktree would name one, so it is refused rather than read as nothing.
   if (!isolate && isFolderTeam(steps)) {
-    throw Object.assign(new Error(
-      `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n`
-      + `Start it without --no-worktree.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n` +
+          `Start it without --no-worktree.`,
+      ),
+      { exitCode: 2 },
+    );
   }
   if (!isolate && fansOut(steps)) {
     throw new Error(
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
-      'Either drop --no-worktree, or make the steps a chain.',
+        'Either drop --no-worktree, or make the steps a chain.',
     );
   }
   // A run with no worktrees works on the base branch itself, so it has no result branch for an ending step to merge: that step would be
@@ -75,26 +93,37 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
   // spent, rather than after a session has paid for the folder's whole check to find there is nothing to commit.
   const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
   if (ending) {
-    throw Object.assign(new Error(
-      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on ${'the base branch'} itself, where the work already is, so there would be nothing to merge.\n`
-      + `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
+          `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
+      ),
+      { exitCode: 2 },
+    );
   }
   // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
   // the run would read one task as the other.
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash) {
-    throw Object.assign(new Error(
-      `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
+      ),
+      { exitCode: 2 },
+    );
   }
   // Nor for another step's try: any step may be tried again, as `<step>-try<n>`, its check as `<step>-try<n>-check`.
-  const tryClash = steps.map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] })).find(({ of }) => of && steps.some((other) => other.name === of));
+  const tryClash = steps
+    .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
+    .find(({ of }) => of && steps.some((other) => other.name === of));
   if (tryClash) {
     const { s, of } = tryClash;
-    throw Object.assign(new Error(
-      `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
+      ),
+      { exitCode: 2 },
+    );
   }
   // Refused here, before anything is written, and not by the engine when the step is filed: by then the run is on the record.
   const unbridged = remoteRefusal(steps);
@@ -112,12 +141,16 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
  * `engine()` leaves out what is refused, and every other command and run works on.
  */
 function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
-  const remote = steps.map((s) => ({ s, name: remoteNameOf(s.harness) })).filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
+  const remote = steps
+    .map((s) => ({ s, name: remoteNameOf(s.harness) }))
+    .filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
   if (remote.length === 0) return undefined;
   const read = readRemote();
-  if (read.unread) return `${remote[0]!.s.name}: \`harness: ${remote[0]!.s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
+  if (read.unread)
+    return `${remote[0]!.s.name}: \`harness: ${remote[0]!.s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
   const refused = remote.find(({ name }) => read.refused.has(name));
-  if (refused) return `${refused.s.name}: \`harness: ${refused.s.harness}\` names a remote A2A agent whose entry is refused. ${read.refused.get(refused.name)}`;
+  if (refused)
+    return `${refused.s.name}: \`harness: ${refused.s.harness}\` names a remote A2A agent whose entry is refused. ${read.refused.get(refused.name)}`;
   const missing = remote.find(({ name }) => !read.agents.has(name));
   if (!missing) return undefined;
   const file = remoteAgentsFile(HOME);
@@ -127,11 +160,14 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
 
 /** A `.worktreeinclude` with lines `start` refuses, refused where a person is looking, rather than line by line in a daemon's log. Only a run that cuts worktrees reads the file. */
 function refuseInclude(repo: string, isolate: boolean): void {
-  const refused = isolate ? readInclude(repo)?.refused ?? [] : [];
+  const refused = isolate ? (readInclude(repo)?.refused ?? []) : [];
   if (refused.length) {
-    throw Object.assign(new Error(
-      `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
+      ),
+      { exitCode: 2 },
+    );
   }
 }
 
@@ -149,17 +185,30 @@ function refuseInclude(repo: string, isolate: boolean): void {
  * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  */
-export function start(opts: { brief: string; repo: string; repoNamed?: boolean; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string }; gates?: readonly string[] }): Run {
+export function start(opts: {
+  brief: string;
+  repo: string;
+  repoNamed?: boolean;
+  workflowDir: string;
+  isolate?: boolean;
+  after?: readonly string[];
+  inputs?: readonly string[];
+  from?: { inbox: string };
+  gates?: readonly string[];
+}): Run {
   const isolate = opts.isolate ?? true;
   // Where the steps' agents and skills are looked for, beside the folder's own: the repository the run was started on, then the store.
   const places = placesOf(opts.repo);
   const steps = stepsToStart(opts.workflowDir, isolate, places);
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) {
-    throw Object.assign(new Error(
-      `--repo ${opts.repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
-      + `Start it without --repo, or start a workflow whose steps work on a repository.`,
-    ), { exitCode: 2 });
+    throw Object.assign(
+      new Error(
+        `--repo ${opts.repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
+          `Start it without --repo, or start a workflow whose steps work on a repository.`,
+      ),
+      { exitCode: 2 },
+    );
   }
   const gates = opts.gates ?? [];
   const refusedGates = gateRefusal(gates, steps);
@@ -191,9 +240,16 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
     // each step's folder made beneath it when the step is filed (`folderPlace`). `--after` is refused here, a folder run having no branch to wait for.
     const refusedAfter = afterRefusal(after, { place: { kind: 'folder' } }, parentRecord);
     if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
-    run = { id, place: { kind: 'folder' }, workspace: workRoot(runsDir(), id), ...told, steps: stepRecords, createdAt: new Date().toISOString() };
+    run = {
+      id,
+      place: { kind: 'folder' },
+      workspace: workRoot(runsDir(), id),
+      ...told,
+      steps: stepRecords,
+      createdAt: new Date().toISOString(),
+    };
   } else {
-    const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
+    const { workspace, baseRef, branch } = makeWorkspace(opts.repo);
     const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
     if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
     run = {
@@ -216,7 +272,12 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
       for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
     } catch (err) {
       fs.rmSync(path.dirname(dir), { recursive: true, force: true });
-      throw Object.assign(new Error(`--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
+      throw Object.assign(
+        new Error(
+          `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
+        ),
+        { exitCode: 1 },
+      );
     }
   }
   // Rendered before the record is written too, for the same reason; a render that fails takes the run's directory back with it.
@@ -224,7 +285,12 @@ export function start(opts: { brief: string; repo: string; repoNamed?: boolean; 
     writeAgentFiles(run, steps, skillsFor(opts.workflowDir, places));
   } catch (err) {
     fs.rmSync(path.join(runsDir(), run.id), { recursive: true, force: true });
-    throw Object.assign(new Error(`the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
+    throw Object.assign(
+      new Error(
+        `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
+      ),
+      { exitCode: 1 },
+    );
   }
   writeRun(run);
   return run;
@@ -331,7 +397,9 @@ export type InboxStart = {
  * `cardRepoRefusal` — or by hand — may still carry one. The run is started all the same, and the line says the path was not looked at,
  * rather than leaving a person to wonder which repository the work went to.
  */
-export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & { ignoredRepo?: string };
+export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & {
+  ignoredRepo?: string;
+};
 
 /**
  * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }` on
@@ -357,10 +425,14 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new WorkflowError(`${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${path.join(inboxDir(), '<name>.md')} — or park the idea first: wf inbox add "<idea>".`);
+    throw new WorkflowError(
+      `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${path.join(inboxDir(), '<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
+    );
   }
   const card = parseInboxCard(`${opts.name}.md`, text, isDirectory);
-  const started = listRuns().filter((r) => r.from?.inbox === card.name).map((r) => r.id);
+  const started = listRuns()
+    .filter((r) => r.from?.inbox === card.name)
+    .map((r) => r.id);
   if (started.length) throw new WorkflowError(startedRefusal(card, file, started));
 
   const repo = opts.repo ?? card.repo ?? opts.callerRepo;
@@ -374,7 +446,9 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     }
   } else throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
   if (opts.brief !== undefined && !opts.brief.trim()) {
-    throw new WorkflowError(`${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`);
+    throw new WorkflowError(
+      `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
+    );
   }
   // The card's own gate is refused in the card's words; a `--gate` beside it, by `start()` in its own.
   const flags = opts.gates ?? [];
@@ -423,7 +497,11 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
   const listing = inboxListing(files, runs, isDirectory, tries);
   for (const name of tries.keys()) {
     if (listing.some((l) => l.name === name && l.tried)) continue;
-    try { fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true }); } catch { /* removed on a pass that can */ }
+    try {
+      fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true });
+    } catch {
+      /* removed on a pass that can */
+    }
   }
   const next = nextQueued(listing, repo);
   if (!next) return undefined;
@@ -441,14 +519,21 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
   } catch (err) {
     const refused = (err as { exitCode?: number }).exitCode === 2;
     // On one line: git's words come with its command and its stderr, a line each.
-    const why = (err instanceof Error ? err.message : String(err)).split('\n').map((line) => line.trim()).filter(Boolean).join(' / ');
+    const why = (err instanceof Error ? err.message : String(err))
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(' / ');
     const last = next.tried;
-    if (!refused && last && !last.refused && last.why === why && last.repo === on) return { card: next.name, failed: why, again: true, ...where };
+    if (!refused && last && !last.refused && last.why === why && last.repo === on)
+      return { card: next.name, failed: why, again: true, ...where };
     const tried: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
     try {
       fs.mkdirSync(queueDir(), { recursive: true });
       fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(tried, null, 2));
-    } catch { /* said all the same; not written down, the next pass tries the card again, rather than a daemon dying on it */ }
+    } catch {
+      /* said all the same; not written down, the next pass tries the card again, rather than a daemon dying on it */
+    }
     return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
   }
 }

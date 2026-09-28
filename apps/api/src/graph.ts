@@ -4,9 +4,7 @@ import { DEFAULT_ROUNDS, type Workflow } from 'agent-orchestrator/workflow';
  * One edge of a run's graph. `after`: `to` waits on `from`. `loop`: `from` is the looping step, and `to` the step a round
  * runs again — the one edge that points backwards — with `rounds`, how many rounds the loop may run, the first included.
  */
-export type GraphEdge =
-  | { from: string; to: string; kind: 'after' }
-  | { from: string; to: string; kind: 'loop'; rounds: number };
+export type GraphEdge = { from: string; to: string; kind: 'after' } | { from: string; to: string; kind: 'loop'; rounds: number };
 
 /** A run's steps as a graph: where the run's card leads, and every edge between its steps. */
 export type RunGraph = { roots: string[]; edges: GraphEdge[] };

@@ -51,7 +51,10 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
   if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (
-    <section aria-label="Waiting on you" className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+    <section
+      aria-label="Waiting on you"
+      className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+    >
       {asks.length > 0 && (
         <p>
           Waiting on you:{' '}

@@ -11,12 +11,33 @@ const NOW = new Date('2026-09-22T10:00:00.000Z');
 const at = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString();
 
 const held = (over: Partial<Daemon> = {}): Daemon => ({
-  kind: 'ticking', ticking: true, pid: 4242, cwd: '/work/hkb-v2', every: 4_000, startedAt: at(60), passedAt: at(0.1), lastHeardAt: at(0.1),
-  stoppedAt: null, staleAfterMs: 15 * 60_000, identity: 'same', line: 'wf up: ticking, pid 4242', ...over,
+  kind: 'ticking',
+  ticking: true,
+  pid: 4242,
+  cwd: '/work/hkb-v2',
+  every: 4_000,
+  startedAt: at(60),
+  passedAt: at(0.1),
+  lastHeardAt: at(0.1),
+  stoppedAt: null,
+  staleAfterMs: 15 * 60_000,
+  identity: 'same',
+  line: 'wf up: ticking, pid 4242',
+  ...over,
 });
 const free = (kind: 'none' | 'unreadable'): Daemon => ({
-  kind, ticking: false, pid: null, cwd: null, every: null, startedAt: null, passedAt: null, lastHeardAt: null, stoppedAt: null, staleAfterMs: null,
-  identity: null, line: `wf up: ${kind}`,
+  kind,
+  ticking: false,
+  pid: null,
+  cwd: null,
+  every: null,
+  startedAt: null,
+  passedAt: null,
+  lastHeardAt: null,
+  stoppedAt: null,
+  staleAfterMs: null,
+  identity: null,
+  line: `wf up: ${kind}`,
 });
 const said = (d: Daemon): string | null => {
   const words = daemonWords(d, NOW);
@@ -29,7 +50,10 @@ test('a daemon ticking says nothing — a long pass included, its last pass minu
 });
 
 test('no daemon has held the store: nothing ticks, and npx wf up in the repository starts one', () => {
-  assert.equal(said(free('none')), 'Nothing ticks this store, so no run moves: no wf up has held it. Start one with npx wf up in the repository.');
+  assert.equal(
+    said(free('none')),
+    'Nothing ticks this store, so no run moves: no wf up has held it. Start one with npx wf up in the repository.',
+  );
 });
 
 test('a daemon.json that does not read: nothing is known to tick, and the next wf up takes it over', () => {
@@ -44,7 +68,11 @@ test('REFUSED: a daemon that stopped is said, with when, and where to start the 
     said(held({ kind: 'stopped', ticking: false, stoppedAt: at(12), lastHeardAt: at(12) })),
     'Nothing ticks this store, so no run moves: the wf up of pid 4242 stopped 12 min ago. Start one with npx wf up in /work/hkb-v2.',
   );
-  assert.match(said(held({ kind: 'stopped', ticking: false, stoppedAt: at(0.2) }))!, /stopped under a minute ago\./, 'never `just now`, which reads as fine');
+  assert.match(
+    said(held({ kind: 'stopped', ticking: false, stoppedAt: at(0.2) }))!,
+    /stopped under a minute ago\./,
+    'never `just now`, which reads as fine',
+  );
 });
 
 test('REFUSED: a daemon whose process is gone is said, with when it was last heard from', () => {

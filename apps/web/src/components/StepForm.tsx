@@ -24,7 +24,15 @@ const PASTE = '(paste)';
  * key the agent gives it shows the agent's value in place of none — set, it is the step's own; unset, the agent's again. Its agent's file
  * is not edited here.
  */
-export function StepForm({ step, steps, form, schemas, refused, update, onRemoved }: {
+export function StepForm({
+  step,
+  steps,
+  form,
+  schemas,
+  refused,
+  update,
+  onRemoved,
+}: {
   step: DraftStep;
   steps: readonly DraftStep[];
   form: KeyForm;
@@ -56,7 +64,10 @@ export function StepForm({ step, steps, form, schemas, refused, update, onRemove
       </div>
 
       {refused && (
-        <div data-refused-here className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40">
+        <div
+          data-refused-here
+          className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40"
+        >
           <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {step.name}:</p>
           <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refused}</p>
         </div>
@@ -68,7 +79,8 @@ export function StepForm({ step, steps, form, schemas, refused, update, onRemove
         </label>
         {step.own && (
           <p data-agent-note className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
-            Told after <AgentLink from="yours" name={step.spec.agent ?? ''} />'s instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
+            Told after <AgentLink from="yours" name={step.spec.agent ?? ''} />
+            's instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
           </p>
         )}
         <textarea
@@ -82,14 +94,29 @@ export function StepForm({ step, steps, form, schemas, refused, update, onRemove
       </div>
 
       {form.keys.map((field) => (
-        <KeyInput key={`${step.name}:${field.key}`} field={field} step={step} others={others} form={form} schemas={schemas} update={update} />
+        <KeyInput
+          key={`${step.name}:${field.key}`}
+          field={field}
+          step={step}
+          others={others}
+          form={form}
+          schemas={schemas}
+          update={update}
+        />
       ))}
     </section>
   );
 }
 
 /** One key's field: its name, the control its kind is set with, and what it means. */
-function KeyInput({ field, step, others, form, schemas, update }: {
+function KeyInput({
+  field,
+  step,
+  others,
+  form,
+  schemas,
+  update,
+}: {
   field: KeyField;
   step: DraftStep;
   others: readonly string[];
@@ -140,7 +167,13 @@ function KeyInput({ field, step, others, form, schemas, update }: {
     }
     case 'step':
       control = (
-        <Choose id={id} value={(value as string | null) ?? ''} onChange={(v) => set(key, (v || null) as never)} options={others} unset="not set" />
+        <Choose
+          id={id}
+          value={(value as string | null) ?? ''}
+          onChange={(v) => set(key, (v || null) as never)}
+          options={others}
+          unset="not set"
+        />
       );
       break;
     case 'choice':
@@ -169,7 +202,14 @@ function KeyInput({ field, step, others, form, schemas, update }: {
       break;
     case 'text':
       control = (
-        <Typed id={id} value={(value as string | null) ?? ''} mono={key === 'check'} placeholder={given ?? undefined} canon={(typed) => typed.trim()} commit={(typed) => set(key, (typed.trim() || null) as never)} />
+        <Typed
+          id={id}
+          value={(value as string | null) ?? ''}
+          mono={key === 'check'}
+          placeholder={given ?? undefined}
+          canon={(typed) => typed.trim()}
+          commit={(typed) => set(key, (typed.trim() || null) as never)}
+        />
       );
       break;
     case 'list': {
@@ -210,21 +250,38 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           mono
           value={tokens === null ? '' : contextText(tokens)}
           placeholder={given ?? "the model's whole window"}
-          canon={(typed) => { const n = tokensOf(typed); return n === null ? '' : contextText(n); }}
+          canon={(typed) => {
+            const n = tokensOf(typed);
+            return n === null ? '' : contextText(n);
+          }}
           commit={(typed) => set(key, tokensOf(typed) as never)}
         />
       );
       break;
     }
     case 'flag':
-      control = (field.choices ?? []).length === 1 ? (
-        <label className="flex items-center gap-1.5 text-xs">
-          <input id={id} type="checkbox" checked={value === true} onChange={(event) => set(key, (event.target.checked ? true : null) as never)} />
-          <span className="font-mono">{key}: {field.choices![0]}</span>
-        </label>
-      ) : (
-        <Choose id={id} value={value === null ? '' : String(value)} onChange={(v) => set(key, (v === '' ? null : v === 'true') as never)} options={field.choices ?? []} unset={given ?? 'not set'} />
-      );
+      control =
+        (field.choices ?? []).length === 1 ? (
+          <label className="flex items-center gap-1.5 text-xs">
+            <input
+              id={id}
+              type="checkbox"
+              checked={value === true}
+              onChange={(event) => set(key, (event.target.checked ? true : null) as never)}
+            />
+            <span className="font-mono">
+              {key}: {field.choices![0]}
+            </span>
+          </label>
+        ) : (
+          <Choose
+            id={id}
+            value={value === null ? '' : String(value)}
+            onChange={(v) => set(key, (v === '' ? null : v === 'true') as never)}
+            options={field.choices ?? []}
+            unset={given ?? 'not set'}
+          />
+        );
       break;
     case 'schema':
       control = <SchemaInput form={form} id={id} step={step} schemas={schemas} update={update} given={given} />;
@@ -245,7 +302,11 @@ function KeyInput({ field, step, others, form, schemas, update }: {
 /** A value a step's agent gives it, as its field shows it in place of none: `opus — implementer's`, or that the agent sets none either. */
 function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof WorkflowStepSpec], agent: string | null): string {
   if (value === null || (Array.isArray(value) && !value.length)) return `not set — nor by ${agent}`;
-  const text = Array.isArray(value) ? value.join(', ') : key === 'context' && typeof value === 'number' ? contextText(value) : String(value);
+  const text = Array.isArray(value)
+    ? value.join(', ')
+    : key === 'context' && typeof value === 'number'
+      ? contextText(value)
+      : String(value);
   return `${text} — ${agent}'s`;
 }
 
@@ -254,7 +315,14 @@ function Meaning({ children }: { children: string }) {
 }
 
 /** A select of `options`, `unset` first; a value the options lack is kept as one, said by `stray`, so what the file says is never hidden. */
-function Choose({ id, value, onChange, options, unset, stray = (v) => v }: {
+function Choose({
+  id,
+  value,
+  onChange,
+  options,
+  unset,
+  stray = (v) => v,
+}: {
   id: string;
   value: string;
   onChange: (value: string) => void;
@@ -280,7 +348,16 @@ function Choose({ id, value, onChange, options, unset, stray = (v) => v }: {
  * key reads it. `value` is the draft's, as `canon` writes what is typed: when the draft changes under the field — a loop drawn gives it rounds —
  * the field shows the draft's.
  */
-function Typed({ id, value, commit, canon, mono = false, type = 'text', step, placeholder }: {
+function Typed({
+  id,
+  value,
+  commit,
+  canon,
+  mono = false,
+  type = 'text',
+  step,
+  placeholder,
+}: {
   id: string;
   value: string;
   commit: (typed: string) => void;
@@ -312,11 +389,25 @@ function Typed({ id, value, commit, canon, mono = false, type = 'text', step, pl
  * `output:`: a schema beside the step, picked from the folder's — or pasted, with the file it is written to, which is written when the draft is
  * saved and replaces a file of that name. Picking a file or none takes a paste back.
  */
-function SchemaInput({ id, step, form, schemas, update, given }: { id: string; step: DraftStep; form: KeyForm; schemas: readonly string[]; update: DraftUpdate; given: string | null }) {
+function SchemaInput({
+  id,
+  step,
+  form,
+  schemas,
+  update,
+  given,
+}: {
+  id: string;
+  step: DraftStep;
+  form: KeyForm;
+  schemas: readonly string[];
+  update: DraftUpdate;
+  given: string | null;
+}) {
   const text = useId();
   const file = useId();
   const pasted = step.schema;
-  const value = pasted ? PASTE : given !== null ? '' : step.spec.output ?? '';
+  const value = pasted ? PASTE : given !== null ? '' : (step.spec.output ?? '');
 
   return (
     <div className="space-y-1.5">
@@ -334,7 +425,9 @@ function SchemaInput({ id, step, form, schemas, update, given }: { id: string; s
         className={INPUT}
       >
         <option value="">{given ?? 'not set'}</option>
-        {step.spec.output && !pasted && given === null && !schemas.includes(step.spec.output) && <option value={step.spec.output}>{step.spec.output} — not in the folder</option>}
+        {step.spec.output && !pasted && given === null && !schemas.includes(step.spec.output) && (
+          <option value={step.spec.output}>{step.spec.output} — not in the folder</option>
+        )}
         {schemas.map((schema) => (
           <option key={schema} value={schema}>
             {schema}

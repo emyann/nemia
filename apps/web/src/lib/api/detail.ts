@@ -227,7 +227,14 @@ export type TaskSpan = {
  * Mirrors `StepTimelineTry` in apps/api/src/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
  * is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in `wf decide`'s words.
  */
-export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
+export type StepTimelineTry = {
+  try: number;
+  round: number;
+  session: TaskSpan | null;
+  sessionOf: number | null;
+  check: TaskSpan | null;
+  used: StepUsed | null;
+};
 
 /**
  * Mirrors `StepTimelineTotal` in apps/api/src/detail.ts — `TimelineTotal` in agent-orchestrator's timeline.ts, with its cost: a round of a loop — `loop` its
@@ -279,29 +286,39 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
   const restart = 'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.';
   const graph = (detail as { graph?: Partial<RunGraph> | null }).graph;
   if (!graph || !Array.isArray(graph.roots) || !Array.isArray(graph.edges)) {
-    throw new Error(`The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ${restart}`);
+    throw new Error(
+      `The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ${restart}`,
+    );
   }
   const bare = (detail.steps ?? []).find((step) => !Array.isArray((step as { tries?: unknown }).tries));
   if (bare) {
-    throw new Error(`The api answered run '${id}' without the tries of its step '${bare.name}', so it is older than this board, which shows every round a step ran. ${restart}`);
+    throw new Error(
+      `The api answered run '${id}' without the tries of its step '${bare.name}', so it is older than this board, which shows every round a step ran. ${restart}`,
+    );
   }
   const unsaid = detail.steps.find((step) => !Array.isArray((step as { said?: unknown }).said));
   if (unsaid) {
-    throw new Error(`The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`);
+    throw new Error(
+      `The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`,
+    );
   }
   // And a run's page draws where its time went, off each step's timeline and the run's totals.
   const untimed = detail.steps.find((step) => !Array.isArray((step as { timeline?: unknown }).timeline));
   const totals = (detail as { timeline?: Partial<RunDetail['timeline']> | null }).timeline;
   if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
     const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
-    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`);
+    throw new Error(
+      `The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`,
+    );
   }
   // And a gate: who the run waits on in `wf ls`'s words, and each step's need and gate. Without them the banner cannot say `approve plan`, and a
   // step's `approve` read as anything but null would offer Approve on a route that api does not have.
   const ungated = detail.steps.find((step) => !Object.hasOwn(step, 'approve') || !Object.hasOwn(step, 'gate'));
   if (ungated || !Array.isArray((detail as { onYou?: unknown }).onYou)) {
-    const what = ungated ? `the gate of its step '${ungated.name}'` : 'who it waits on in wf ls\'s words';
-    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page approves a step at its gate. ${restart}`);
+    const what = ungated ? `the gate of its step '${ungated.name}'` : "who it waits on in wf ls's words";
+    throw new Error(
+      `The api answered run '${id}' without ${what}, so it is older than this board, whose run page approves a step at its gate. ${restart}`,
+    );
   }
   return detail;
 }

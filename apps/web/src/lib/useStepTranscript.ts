@@ -39,7 +39,8 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
         stop = follow(stream, setState, animationFrames);
       },
       (err: unknown) => {
-        if (!reading.signal.aborted) setState({ events: [], live: false, loading: false, error: err instanceof Error ? err.message : String(err) });
+        if (!reading.signal.aborted)
+          setState({ events: [], live: false, loading: false, error: err instanceof Error ? err.message : String(err) });
       },
     );
 

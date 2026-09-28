@@ -12,4 +12,6 @@ try {
     if (m.type === 'system' && m.subtype === 'init') write({ state: 'working', sessionId: m.session_id });
     if (m.type === 'result') write({ state: m.is_error ? 'failed' : 'done', sessionId: m.session_id, costUsd: m.total_cost_usd });
   }
-} catch (e) { write({ state: 'failed', error: String(e).slice(0, 120) }); }
+} catch (e) {
+  write({ state: 'failed', error: String(e).slice(0, 120) });
+}

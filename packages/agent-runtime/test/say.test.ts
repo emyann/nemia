@@ -27,7 +27,8 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
 const { createEngine } = await import('../src/facade.ts');
-const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, processStart, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner-claude-inbox.ts');
+const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, processStart, CLAUDE_INBOX_LINE_MAX } =
+  await import('../src/runner-claude-inbox.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
 
@@ -42,7 +43,9 @@ const fakeClaude = () => {
   const registry = path.join(bin, 'registry.json');
   const agentsFails = path.join(bin, 'agents-fails');
   fs.writeFileSync(registry, '[]');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
@@ -82,7 +85,9 @@ if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now(), cwd: process.cwd(), pid: 900000 + rows.length });
   save();
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   return {
     bin,
     rows: () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[],
@@ -90,7 +95,15 @@ if (args[0] === '--bg') {
     agentsFails: (fails: boolean) => (fails ? fs.writeFileSync(agentsFails, '') : fs.rmSync(agentsFails, { force: true })),
     /** What the job whose brief is `brief` has read on its stdin, a user message a line; none before it has started. */
     stdin: (brief: string) => {
-      try { return fs.readFileSync(path.join(bin, `${brief}.stdin`), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as { type: string; message: { role: string; content: string } }); } catch { return undefined; }
+      try {
+        return fs
+          .readFileSync(path.join(bin, `${brief}.stdin`), 'utf8')
+          .split('\n')
+          .filter(Boolean)
+          .map((l) => JSON.parse(l) as { type: string; message: { role: string; content: string } });
+      } catch {
+        return undefined;
+      }
     },
   };
 };
@@ -114,7 +127,9 @@ const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) =>
     if (o.neverReads) return;
     let got = '';
     c.setEncoding('utf8');
-    c.on('data', (d) => { got += d; });
+    c.on('data', (d) => {
+      got += d;
+    });
     c.on('end', () => {
       for (const l of got.split('\n')) if (l.trim()) lines.push(JSON.parse(l));
       if (!o.neverCloses) c.end();
@@ -123,15 +138,23 @@ const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) =>
   await new Promise<void>((resolve) => server.listen(at, resolve));
   server.unref();
   return {
-    path: at, lines,
-    close: () => new Promise<void>((resolve) => { for (const c of open) c.destroy(); server.close(() => resolve()); }),
+    path: at,
+    lines,
+    close: () =>
+      new Promise<void>((resolve) => {
+        for (const c of open) c.destroy();
+        server.close(() => resolve());
+      }),
   };
 };
 
 /** The registration Claude Code writes for a running session, by its pid. */
 const register = (row: Row, fields: Record<string, unknown>) => {
   fs.mkdirSync(sessions, { recursive: true });
-  fs.writeFileSync(path.join(sessions, `${row.pid}.json`), JSON.stringify({ pid: row.pid, sessionId: row.sessionId, name: row.name, kind: 'bg', ...fields }));
+  fs.writeFileSync(
+    path.join(sessions, `${row.pid}.json`),
+    JSON.stringify({ pid: row.pid, sessionId: row.sessionId, name: row.name, kind: 'bg', ...fields }),
+  );
 };
 
 /**
@@ -186,7 +209,11 @@ test("at shipped defaults, say hands the words verbatim to the running session's
 
   const said = await engine.say(id, text);
 
-  assert.deepEqual(box.lines, [{ type: 'user', session_id: row.sessionId, message: { role: 'user', content: text } }], 'one line, the words as given, for this session');
+  assert.deepEqual(
+    box.lines,
+    [{ type: 'user', session_id: row.sessionId, message: { role: 'user', content: text } }],
+    'one line, the words as given, for this session',
+  );
   assert.equal(said.attempt, 1);
   assert.equal(said.text, text);
   assert.ok(Number.isFinite(Date.parse(said.at)), 'dated');
@@ -196,7 +223,10 @@ test("at shipped defaults, say hands the words verbatim to the running session's
 
   // Said twice, journalled twice, in order: the record keeps what a person did, not what is new.
   const again = await engine.say(id, 'and the web app');
-  assert.deepEqual((await engine.view(id)).state.said.map((s) => s.text), [text, 'and the web app']);
+  assert.deepEqual(
+    (await engine.view(id)).state.said.map((s) => s.text),
+    [text, 'and the web app'],
+  );
   assert.equal(again.attempt, 1);
   assert.equal(box.lines.length, 2);
   await box.close();
@@ -212,7 +242,7 @@ test('a session its harness lists blocked is running, and its inbox is handed th
   await box.close();
 });
 
-test("a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words", async () => {
+test('a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words', async () => {
   const root = tmp('board');
   const engine = createEngine({ root });
   const { id, box } = await running(engine);
@@ -257,11 +287,18 @@ test('at shipped defaults, a job is told on its stdin: the words, verbatim, as t
   const said = await engine.say(id, text);
   assert.equal(said.attempt, 1);
   assert.deepEqual((await engine.view(id)).state.said, [said], 'journalled');
-  const read = await until(() => { const l = fake.stdin('job-told'); return l && l.length > 1 ? l : undefined; }, 'the words on its stdin');
-  assert.deepEqual(read, [
-    { type: 'user', message: { role: 'user', content: 'job-told' } },
-    { type: 'user', message: { role: 'user', content: text } },
-  ], 'one line each, a line break in the words kept inside theirs');
+  const read = await until(() => {
+    const l = fake.stdin('job-told');
+    return l && l.length > 1 ? l : undefined;
+  }, 'the words on its stdin');
+  assert.deepEqual(
+    read,
+    [
+      { type: 'user', message: { role: 'user', content: 'job-told' } },
+      { type: 'user', message: { role: 'user', content: text } },
+    ],
+    'one line each, a line break in the words kept inside theirs',
+  );
 
   await engine.say(id, 'and the web app');
   await until(() => (fake.stdin('job-told')!.length === 3 ? true : undefined), 'the second words');
@@ -297,13 +334,20 @@ test('a job that has given its result reads nothing more: words said before it e
     assert.match(e.message, /has given its result and reads no more words/);
     return true;
   });
-  assert.deepEqual((await engine.view(id)).state.said.map((s) => s.text), ['finish and linger'], 'nothing more journalled');
+  assert.deepEqual(
+    (await engine.view(id)).state.said.map((s) => s.text),
+    ['finish and linger'],
+    'nothing more journalled',
+  );
   assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
   const inbox = fs.readFileSync(at('.inbox.jsonl'), 'utf8');
   assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
 
   await engine.stop(id);
-  for (let i = 0; i < 20 && !(await engine.view(id)).state.settled; i++) { await engine.tick(); await new Promise((r) => setTimeout(r, 50)); }
+  for (let i = 0; i < 20 && !(await engine.view(id)).state.settled; i++) {
+    await engine.tick();
+    await new Promise((r) => setTimeout(r, 50));
+  }
   await refused(engine, id, 'hello', /has settled/);
 });
 
@@ -393,7 +437,11 @@ test('refused: an attempt that has ended on a task that has not settled — one 
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
   await engine.tick();
   const { state } = await engine.view(id);
-  assert.deepEqual(state.attempts.map((a) => a.ended), ['done'], 'the end is written');
+  assert.deepEqual(
+    state.attempts.map((a) => a.ended),
+    ['done'],
+    'the end is written',
+  );
   assert.equal(state.settled, null, 'and the task waits');
   await refused(engine, id, 'hello', /has no attempt running: attempt 1 ended `done`/, box);
   await box.close();
@@ -419,13 +467,24 @@ test('a registry that cannot be read rejects, not refuses: ask again', async () 
   const { id, row, box } = await running(engine);
   // Registered by a live process, as Claude Code registers one: the listing that fails is the only thing that misses it.
   // On `claude` the listing reads past a registry that failed, so its jobs stay seen; the registration is what says so.
-  fs.writeFileSync(path.join(sessions, `${process.pid}.json`), JSON.stringify({
-    pid: process.pid, sessionId: row.sessionId, name: row.name, kind: 'bg', procStart: processStart(process.pid), messagingSocketPath: box.path,
-  }));
+  fs.writeFileSync(
+    path.join(sessions, `${process.pid}.json`),
+    JSON.stringify({
+      pid: process.pid,
+      sessionId: row.sessionId,
+      name: row.name,
+      kind: 'bg',
+      procStart: processStart(process.pid),
+      messagingSocketPath: box.path,
+    }),
+  );
   fake.agentsFails(true);
   try {
     await failed(engine, id, /the `claude` registry could not be read/);
-  } finally { fake.agentsFails(false); fs.rmSync(path.join(sessions, `${process.pid}.json`)); }
+  } finally {
+    fake.agentsFails(false);
+    fs.rmSync(path.join(sessions, `${process.pid}.json`));
+  }
   assert.equal(box.lines.length, 0);
   await box.close();
 });
@@ -467,7 +526,7 @@ test('a session listed with no process — exited — rejects: nothing to find i
   await box.close();
 });
 
-test('an inbox that is a symlink to a real socket is refused before anything is sent — so is a registration another user owns, or a plain file in the socket\'s place', async () => {
+test("an inbox that is a symlink to a real socket is refused before anything is sent — so is a registration another user owns, or a plain file in the socket's place", async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row, box } = await running(engine, {}, false);
   const link = path.join(tmp('link'), 'in.sock');
@@ -484,7 +543,9 @@ test('an inbox that is a symlink to a real socket is refused before anything is 
   register(row, { messagingSocketPath: box.path });
   assert.equal(await claudeInbox(sessions, row.pid!, row.sessionId), box.path, 'the real socket, registered, is found');
   const me = process.getuid!();
-  await assert.rejects(claudeInbox(sessions, row.pid!, row.sessionId, me + 1), (e: Error) => /cannot be read \(not a file of yours\)/.test(e.message));
+  await assert.rejects(claudeInbox(sessions, row.pid!, row.sessionId, me + 1), (e: Error) =>
+    /cannot be read \(not a file of yours\)/.test(e.message),
+  );
   await box.close();
 });
 
@@ -497,7 +558,11 @@ test("a socket another user owns is refused — the check on what lstat said, ha
   assert.match(inboxSocketRefuses(box.path, stat, me + 1) ?? '', new RegExp(`is owned by uid ${me}, not by you\\. Refusing to send`));
   const link = path.join(tmp('link'), 'in.sock');
   fs.symlinkSync(box.path, link);
-  assert.match(inboxSocketRefuses(link, fs.lstatSync(link), me) ?? '', /is not a socket — a symlink/, 'a link to my own socket, all the same');
+  assert.match(
+    inboxSocketRefuses(link, fs.lstatSync(link), me) ?? '',
+    /is not a socket — a symlink/,
+    'a link to my own socket, all the same',
+  );
   await box.close();
 });
 
@@ -510,7 +575,11 @@ test('an inbox that reads the words and never closes its end — a process busy 
   register(row, { messagingSocketPath: box.path });
   // Waits out the post's whole deadline, five seconds: the inbox never closes.
   const said = await engine.say(id, 'are you there');
-  assert.deepEqual(box.lines.map((l) => l.message?.content), ['are you there'], 'the inbox has the words');
+  assert.deepEqual(
+    box.lines.map((l) => l.message?.content),
+    ['are you there'],
+    'the inbox has the words',
+  );
   assert.deepEqual((await engine.view(id)).state.said, [said], 'and so does the record');
   await box.close();
 });
@@ -522,8 +591,9 @@ test('the post resolves once the whole line is written, closed or not; it reject
 
   // Bigger than a socket's buffer, to an inbox that reads nothing: most of it never leaves this process.
   const deaf = await inbox({ neverReads: true });
-  await assert.rejects(claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200),
-    (e: Error) => /took only part of the line within 200 ms, and an inbox drops a line cut short/.test(e.message));
+  await assert.rejects(claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200), (e: Error) =>
+    /took only part of the line within 200 ms, and an inbox drops a line cut short/.test(e.message),
+  );
 
   const gone = path.join(tmp('gone'), 'in.sock');
   await assert.rejects(claudeInboxPost(gone, claudeInboxLine('s', 'hello'), 200), (e: NodeJS.ErrnoException) => e.code === 'ENOENT');
@@ -539,27 +609,45 @@ const memoryJournal = (failOn?: Event['kind']): PromiseJournal => {
   return {
     async append(taskId, event) {
       if (event.kind === failOn) throw new Error('the store is read-only now');
-      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); feed.push({ taskId, event });
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
     },
-    async read(taskId) { return [...(tasks.get(taskId) ?? [])]; },
-    async list() { return [...tasks.keys()]; },
-    async feed(after) { return { entries: feed.slice(after), cursor: feed.length }; },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()];
+    },
+    async feed(after) {
+      return { entries: feed.slice(after), cursor: feed.length };
+    },
   };
 };
 
-const promiseHarness = (heard?: Array<{ session: { name: string; sessionId: string }; text: string }>, rejectWith?: string): PromiseRunner => {
+const promiseHarness = (
+  heard?: Array<{ session: { name: string; sessionId: string }; text: string }>,
+  rejectWith?: string,
+): PromiseRunner => {
   const sessions = new Map<string, Sighting>();
   return {
-    async spawn(r) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
-    async observe() { return new Map(sessions); },
+    async spawn(r) {
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+    },
+    async observe() {
+      return new Map(sessions);
+    },
     async stop() {},
-    async logs() { return ''; },
-    ...(heard ? {
-      async say(session: { name: string; sessionId: string }, text: string) {
-        if (rejectWith) throw new Error(rejectWith);
-        heard.push({ session, text });
-      },
-    } : {}),
+    async logs() {
+      return '';
+    },
+    ...(heard
+      ? {
+          async say(session: { name: string; sessionId: string }, text: string) {
+            if (rejectWith) throw new Error(rejectWith);
+            heard.push({ session, text });
+          },
+        }
+      : {}),
   };
 };
 
@@ -588,8 +676,11 @@ test("a PromiseRunner's say that rejects journals nothing; a journal that fails 
   const readOnly = createEngine({ journal: memoryJournal('said'), harnesses: { mine: promiseHarness(heard) } });
   const roId = await readOnly.file({ brief: 'b', cwd: '/repo' });
   await readOnly.tick();
-  await assert.rejects(readOnly.say(roId, 'hello'), (e: Refusal) =>
-    e.exitCode === undefined && /was given the words, but they could not be journalled \(the store is read-only now\)/.test(e.message));
+  await assert.rejects(
+    readOnly.say(roId, 'hello'),
+    (e: Refusal) =>
+      e.exitCode === undefined && /was given the words, but they could not be journalled \(the store is read-only now\)/.test(e.message),
+  );
   assert.equal(heard.length, 1, 'the words did go');
 });
 
@@ -601,14 +692,19 @@ const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
  * `ae`, run as a child — and not with `spawnSync`: the inbox is a socket in this process, and a process blocked
  * in `spawnSync` accepts no connection, so the child's words wait out their timeout (found writing this test).
  */
-const aeRun = (args: string[], env: NodeJS.ProcessEnv) => new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
-  const child = spawn(process.execPath, [ae, ...args], { env });
-  let stdout = '';
-  let stderr = '';
-  child.stdout.setEncoding('utf8').on('data', (d: string) => { stdout += d; });
-  child.stderr.setEncoding('utf8').on('data', (d: string) => { stderr += d; });
-  child.on('close', (status) => resolve({ status, stdout, stderr }));
-});
+const aeRun = (args: string[], env: NodeJS.ProcessEnv) =>
+  new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
+    const child = spawn(process.execPath, [ae, ...args], { env });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (d: string) => {
+      stdout += d;
+    });
+    child.stderr.setEncoding('utf8').on('data', (d: string) => {
+      stderr += d;
+    });
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
 
 test('ae say <id> prints the line it journalled, the words being everything after the id; ae say <id> "" exits 2 and journals nothing', async () => {
   const root = tmp('cli-board');

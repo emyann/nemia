@@ -20,7 +20,10 @@ export default {
   route: '/',
   expect: async (page) => {
     const { id, branch } = UNMERGED;
-    const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as { repo: string; steps: { implement: { workspace: string } } };
+    const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
+      repo: string;
+      steps: { implement: { workspace: string } };
+    };
     const lane = record.steps.implement.workspace;
     const files = path.join(store!, 'runs', id, 'artifacts');
     const marker = path.join(store!, 'runs', `${id}.pruned`);
@@ -29,27 +32,44 @@ export default {
 
     try {
       // What a run that finished leaves on disk: its worktree, on its branch, and what its step handed on.
-      if (fs.existsSync(marker) || fs.existsSync(lane) || fs.existsSync(files)) throw new Refused(`${id} is seeded unpruned, with no worktree and no files`);
+      if (fs.existsSync(marker) || fs.existsSync(lane) || fs.existsSync(files))
+        throw new Refused(`${id} is seeded unpruned, with no worktree and no files`);
       git('worktree', 'add', '-q', lane, branch);
       fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
-      fs.writeFileSync(path.join(files, 'implement', 'queue.md'), '# The queue\n\nDrawn at the floor\'s left edge.\n');
+      fs.writeFileSync(path.join(files, 'implement', 'queue.md'), "# The queue\n\nDrawn at the floor's left edge.\n");
       fed(id, 'implement', 'done');
 
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const open = page.locator('[data-prune-open]');
-      await expectVisible(open.filter({ hasText: /^Prune…$/ }), `${id}'s page offers Prune… in its header: it is over, and its worktree and files are on disk`);
+      await expectVisible(
+        open.filter({ hasText: /^Prune…$/ }),
+        `${id}'s page offers Prune… in its header: it is over, and its worktree and files are on disk`,
+      );
       await open.click();
       const dialog = page.getByRole('dialog', { name: `Prune ${id}` });
       await expectVisible(dialog, 'the first press opens the choice of what to give back');
       const choice = (key: string) => dialog.locator(`[data-prune-choice="${key}"]`);
       for (const key of ['worktrees', 'files']) {
-        await expectVisible(choice(key).filter({ hasText: 'Nobody merged it: only the last choice prunes it.' }), `the ${key} choice says why it is not offered`);
-        await expectCount(choice(key).and(page.locator('[data-disabled]')), 1, `and cannot be chosen: nobody merged ${id}, and the api would refuse it`);
+        await expectVisible(
+          choice(key).filter({ hasText: 'Nobody merged it: only the last choice prunes it.' }),
+          `the ${key} choice says why it is not offered`,
+        );
+        await expectCount(
+          choice(key).and(page.locator('[data-disabled]')),
+          1,
+          `and cannot be chosen: nobody merged ${id}, and the api would refuse it`,
+        );
       }
       const third = choice('unmerged');
-      await expectVisible(third.filter({ hasText: 'Its worktrees and its files, though nobody merged it' }), 'the third choice is the prune --unmerged');
-      await expectVisible(third.filter({ hasText: `once pruned, ${branch} is the only copy of it. No branch is ever deleted` }), 'said plainly as leaving its branch the only copy of its work');
+      await expectVisible(
+        third.filter({ hasText: 'Its worktrees and its files, though nobody merged it' }),
+        'the third choice is the prune --unmerged',
+      );
+      await expectVisible(
+        third.filter({ hasText: `once pruned, ${branch} is the only copy of it. No branch is ever deleted` }),
+        'said plainly as leaving its branch the only copy of its work',
+      );
       await expectCount(third.and(page.locator('[data-selected]')), 1, 'and it is chosen: the one choice the api takes');
       if (fs.existsSync(marker)) throw new Refused('opening the choice prunes nothing');
       await settled(page);
@@ -58,7 +78,9 @@ export default {
       await dialog.getByRole('button', { name: 'Prune…', exact: true }).click();
       const question = dialog.locator('[data-prune-question]');
       await expectVisible(
-        question.filter({ hasText: `Prune ${id}: its worktrees and its files, though nobody merged it? This cannot be undone. Its work was never merged: once pruned, ${branch} is the only copy of it.` }),
+        question.filter({
+          hasText: `Prune ${id}: its worktrees and its files, though nobody merged it? This cannot be undone. Its work was never merged: once pruned, ${branch} is the only copy of it.`,
+        }),
         'the second ask says what goes, and the warning again',
       );
       if (fs.existsSync(marker) || !fs.existsSync(lane)) throw new Refused('the first Prune… asks, and prunes nothing');
@@ -84,7 +106,11 @@ export default {
       const mark = row.locator('[data-pruned]', { hasText: /^pruned$/ });
       await expectVisible(mark, `${id}'s row on Runs says pruned`);
       const said = await mark.getAttribute('title');
-      if (!/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(said ?? '')) {
+      if (
+        !/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(
+          said ?? '',
+        )
+      ) {
         throw new Refused(`the row says on hover what went and what was kept, as wf ls says it — its title is ${JSON.stringify(said)}`);
       }
       await settled(page);
@@ -97,7 +123,10 @@ export default {
       await settled(page);
       const card = cardOf(page, id);
       await expectVisible(card.locator('[data-pruned]', { hasText: /^pruned$/ }), `${id}'s card on the Factory says pruned`);
-      await expectVisible(card.getByText('to decide', { exact: true }), 'beside what is still to decide: its branch is still ahead of main');
+      await expectVisible(
+        card.getByText('to decide', { exact: true }),
+        'beside what is still to decide: its branch is still ahead of main',
+      );
       await expectClearOfEachOther(page);
       await photographCard(page, card, path.join(OUT, `prune-card-${theme}.png`));
     } finally {
@@ -110,7 +139,10 @@ export default {
  * The run as seeded again: no marker, no worktree, no files, and the worktree forgotten by git — and its branch, which a prune never touches,
  * as it was. Said on the feed, so every page after reads the store as seeded; each theme's visit prunes it again.
  */
-async function takeBack(page: Page, { id, repo, lane, files, marker }: { id: string; repo: string; lane: string; files: string; marker: string }): Promise<void> {
+async function takeBack(
+  page: Page,
+  { id, repo, lane, files, marker }: { id: string; repo: string; lane: string; files: string; marker: string },
+): Promise<void> {
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   if (fs.existsSync(lane)) git('worktree', 'remove', '--force', lane);
   git('worktree', 'prune');

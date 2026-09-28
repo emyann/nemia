@@ -9,7 +9,9 @@ import type { RunDetail, RunSummary, RunToDecide } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
-type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'waitingFor' | 'approve'> & { lastLine?: string | null };
+type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'waitingFor' | 'approve'> & {
+  lastLine?: string | null;
+};
 
 /**
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
@@ -46,7 +48,9 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
  * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli.ts): that
  * line names the step and the command that approves it, and the same step is not asked for twice.
  */
-export const needsOf = (run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }): Need[] => {
+export const needsOf = (
+  run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null },
+): Need[] => {
   const decided = run.toDecide?.kind === 'approve' ? run.toDecide.step : null;
   return run.steps.flatMap((step) => {
     const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
@@ -96,7 +100,8 @@ export const needLine = (need: Need): string =>
  * (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither does a detail from
  * an api that has no approve route, whose `approve` is not there at all (`withGraph` refuses such a detail first).
  */
-export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
+export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean =>
+  Boolean(step.approve) && !runCancelled;
 
 /** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
 export const stepAnchor = (step: string): string => `step-${step}`;
@@ -121,7 +126,9 @@ export type Offer =
   | { step: string; kind: 'answer'; needs: string | null }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
   | { step: string; kind: 'denied'; calls: string | null }
-  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<RunDetail['steps'][number]['raise']>)
+  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<
+      RunDetail['steps'][number]['raise']
+    >)
   | { step: string; kind: 'continue' }
   | { step: string; kind: 'asked'; try: number; note: string | null };
 

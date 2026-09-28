@@ -312,7 +312,8 @@ orchestrator's calls to the runtime change.
    The A2A seam is unchanged: an attempt is still a Task of its own. **What waits on the owner's reading:** the
    orchestrator filing a gate or a blocked sign-off as a held task and answering it (4b) — `wf ls`, the api and the board
    learn `input-required` beside `needs-human`, never in it — and a step's tries and rounds as attempts of one task (4c, or
-   folded into part 5).
+   folded into part 5). That 4c is not stage 4c below, which is admission. Since 2026-09-28 it is called *tries as attempts*,
+   and it is still open; 4b shipped on 2026-09-24.
 
    **Part 4b done, 2026-09-24: a gate and a blocked sign-off are the step's held task.** A Claude Code job is filed
    `holdOpen`; the run closes it once nothing waits on a person's word, and a person's answer to a blocked sign-off, or a
@@ -458,12 +459,18 @@ orchestrator's calls to the runtime change.
      with the work done. The in-doubt words name the bound, the README says an agent must answer a send within it, and
      open issue 34 counts this beside the crash; a test at shipped defaults shows it happen.
 
-   The rest is filed as three parts:
+   The rest is filed as three parts (as of 2026-09-28, part 2 is done and parts 3 and 4 remain):
    - **Part 2: a workflow step names a remote agent through its `harness:` key.** The orchestrator's `runtime-client.ts`
      builds the entries and supplies `credentials` from the environment, and `harnessOf` and `KEY_HELP` accept them. The
      api's builder and listing and the board's harness picker learn the new values. The part also decides how a remote
      step signs off, since a remote agent may ignore the schema: until then such a task ends `stated: false`, read as
      unsigned. The question for its plan gate: is the URL written in the key, or declared once under a name?
+     **Done, 2026-09-25 (`d180792`; noted 2026-09-28).** The gate's question was answered by declaring each agent once under a
+     name: `a2a-agents.json` in the store maps a name to `{ url }` or `{ card }`, and a step says `harness: a2a:<name>`. Secrets
+     come from `WF_A2A_<NAME>_<SCHEME>` on every request. A remote step is filed with no `config` (`localFields`), a question is
+     answered with `wf say`, and the builder offers each declared agent as a harness. agent-orchestrator's features.md, *Shipped:
+     a step on a remote A2A agent*, says what it left: a remote step's transcript, and `output:` on a remote step. Parts 3 and 4
+     remain.
    - **Part 3: the gRPC binding.** `@grpc/grpc-js`, `@bufbuild/protobuf`, and the SDK's `client/grpc` and `server/grpc`.
    - **Part 4: streaming and subscribe.** SendStreamingMessage and SubscribeToTask, relayed to the transcript and the feed,
      and a restarted runtime resubscribing. It also carries what stage 2 part 5a deferred: the collected files as

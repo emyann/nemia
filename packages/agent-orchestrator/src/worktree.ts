@@ -61,22 +61,50 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
     return wanted === mains ? null : 'package-lock.json';
   }
 
-  let lock: unknown = null;
+  const lock = parsedLock(wanted);
+  return lockfileParting(lock, installedAt(mainRoot, lock));
+}
+
+/**
+ * Where the `package-lock.json` in a repository's checkout — during an ending, the merge staged there — asks for a package its own
+ * `node_modules` does not have on disk: the first package path they disagree on, or null. `lockfileParting` in place, so a package nested
+ * in a workspace's `node_modules` is compared as it is installed, not taken for one a link cannot give.
+ *
+ * Null for a checkout with no lockfile, and for one with no `node_modules`: nobody installed a tree there to bring up to date.
+ */
+export function checkoutParts(repo: string): string | null {
+  if (!fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
+  let text: string;
   try {
-    lock = JSON.parse(wanted);
+    text = fs.readFileSync(path.join(repo, 'package-lock.json'), 'utf8');
   } catch {
-    /* parts at package-lock.json */
+    return null;
   }
+  const lock = parsedLock(text);
+  return lockfileParting(lock, installedAt(repo, lock), true);
+}
+
+/** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
+function parsedLock(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** What `root` has on disk at each package path a lockfile names: a link and where it leads from `root`, a package and its version, or null. */
+function installedAt(root: string, lock: unknown): Record<string, Installed | null> {
   const installed: Record<string, Installed | null> = {};
   for (const key of Object.keys(lockfilePackages(lock) ?? {}).filter(isModuleKey)) {
-    const at = path.join(mainRoot, key);
+    const at = path.join(root, key);
     const st = lstatOf(at);
     if (!st) installed[key] = null;
     else if (st.isSymbolicLink()) {
       installed[key] = {
         link: true,
         resolved: path
-          .relative(mainRoot, path.resolve(path.dirname(at), fs.readlinkSync(at)))
+          .relative(root, path.resolve(path.dirname(at), fs.readlinkSync(at)))
           .split(path.sep)
           .join('/'),
       };
@@ -90,7 +118,7 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
       installed[key] = { link: false, version };
     }
   }
-  return lockfileParting(lock, installed);
+  return installed;
 }
 
 /** Whether git ignores a path in a checkout. `git check-ignore` says no for a tracked path, and for one git has not been told to ignore. */

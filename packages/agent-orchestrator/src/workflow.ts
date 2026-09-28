@@ -37,6 +37,7 @@
  * (`docs/architecture.md`).
  */
 import path from 'node:path';
+import { Invalid } from './refusal/refusal.ts';
 
 export type Workflow = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
@@ -525,9 +526,11 @@ export const CONTEXT_WINDOWS: Readonly<Record<string, { least: number; most: num
   'claude-detached': CLAUDE_CONTEXT,
 };
 
-export class WorkflowError extends Error {
-  /** A step that is wrong is its author's to fix, and the message says how. */
-  readonly exitCode = 2;
+/** A step that is wrong: its author's to fix, and the message says how. An `Invalid`, so its `exitCode` is 2. */
+export class WorkflowError extends Invalid {
+  constructor(message: string) {
+    super({ message });
+  }
 }
 
 function refuse(why: string): never {

@@ -443,7 +443,7 @@ test('the oldest queued card starts first — by when it was queued, not by its 
   const first = await tick(b.e);
   assert.deepEqual([first.queue && 'run' in first.queue ? first.queue.card : first.queue, listRuns().map((r) => r.from?.inbox)], ['z-old-c3d4', ['z-old-c3d4']], 'the oldest, and only it');
   await tick(b.e);
-  assert.deepEqual(listRuns().map((r) => r.from?.inbox).sort(), ['a-young-a1b2', 'z-old-c3d4']);
+  assert.deepEqual(listRuns().map((r) => r.from?.inbox ?? '').sort(), ['a-young-a1b2', 'z-old-c3d4']);
   await tick(b.e);
   assert.equal(listRuns().filter((r) => r.from).length, 2, 'a card not queued is never started');
   assert.ok(fs.existsSync(path.join(INBOX, 'm-parked-e5f6.md')));

@@ -109,7 +109,8 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   // A body of `{}` is no body.
   const behind = await (await queue(second.name, JSON_TYPE, '{}')).json();
   assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2]);
-  assert.deepEqual((await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(), [[first.name, 1], [second.name, 2]].sort());
+  const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
+  assert.deepEqual((await listed()).map((e) => [e.name, e.queued?.place ?? null]).sort(byName), [[first.name, 1], [second.name, 2]].sort(byName));
 
   const off = await unqueue(first.name);
   assert.equal(off.status, 200, await off.clone().text());

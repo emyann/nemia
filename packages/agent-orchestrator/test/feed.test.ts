@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { Run } from '../src/run.ts';
 import { feedPhase, feedWords, listing } from '../src/run.ts';
 import { feedChanges, foldFeed, type FeedLine } from '../src/feed.ts';
 import { scratch } from './scratch.ts';
@@ -59,7 +59,7 @@ const board = () => {
     logs: async () => '(no output yet)',
     feed: async () => ({ entries: [], cursor: 0 }),
   } as unknown as Engine;
-  const set = (id: string, phase: TaskPhase | string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
+  const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   return { e, set, views: () => views };
 };
 

@@ -311,7 +311,7 @@ export async function expectOnScreen(element: Locator, assertion: string, timeou
 export async function expectBetween(middle: Locator, one: Locator, other: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
   const centre = (b: Boxed) => (b.box ? b.box.y + b.box.height / 2 : Number.NaN);
   await until(async () => {
-    const [m, [o] = [], [p] = []] = await Promise.all([boxesOf(middle), boxesOf(one), boxesOf(other)]);
+    const [m, [o], [p]] = await Promise.all([boxesOf(middle), boxesOf(one), boxesOf(other)]);
     const counts = [m.length, o ? 1 : 0, p ? 1 : 0];
     if (!m.length || !o || !p) return `nothing to compare: ${counts[0]}, ${counts[1]} and ${counts[2]} found`;
     const [top, bottom] = [Math.min(centre(o), centre(p)), Math.max(centre(o), centre(p))];

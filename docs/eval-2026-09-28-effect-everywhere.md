@@ -15,7 +15,7 @@ left out. This page gives the evidence to decide from. It changes no code. Every
   run records, `daemon.json` after a crash — are owned by the disk and by the level-triggered pass, not by a scope.
 - **The largest error defect needs no Effect to fix.** `wf` exits 1 on every refusal, whatever `exitCode` the thrown error
   carries (`packages/agent-orchestrator/bin/wf.ts:4-6`, measured below). The api then maps that same `exitCode: 2` to a
-  409 in some routes and a 422 in others (16 checks in 7 files). Typed errors are the part of Effect that fixes this class
+  409 in some routes and a 422 in others (13 checks in 5 files). Typed errors are the part of Effect that fixes this class
   of defect for good, and they can come first: a `Schema.TaggedError` is an `Error`, so plain code can throw one.
 - **Cost.** Start-up is already paid. Every controller and the api load the whole `effect` barrel today, through
   `agent-runtime` (203 modules, about 105–130 ms of a 290 ms import). What it would really cost is knowledge. Effect 4 renamed
@@ -53,8 +53,9 @@ It has not yet written scopes, streams, schedules or fibers, and those are most 
 
 **Today.** A refusal is `Object.assign(new Error(words), { exitCode: 2 })`: 31 sites in the orchestrator's `src` and 4 in the
 api's, plus one class that sets it (`WorkflowError`, `workflow.ts:533`). Readers tell a refusal from a crash by
-`(err as { exitCode?: number }).exitCode === 2`: 6 checks in the orchestrator (`cli.ts` 3, `tick.ts` 2, `start.ts` 1) and 16
-in the api.
+`(err as { exitCode?: number }).exitCode === 2`: 6 checks in the orchestrator (`cli.ts` 3, `tick.ts` 2, `start.ts` 1) and 15
+in the api, in 7 files (`=== 2` or `!== 2`). Thirteen of the api's pick a status; the other two do not
+(`feed.ts:67` ends the stream, `steps.ts:80` throws `Unread`).
 
 - **`wf` loses the code.** `bin/wf.ts:4-6` prints the message and calls `process.exit(1)` for anything `main` throws.
   `WF_ROOT=<empty> wf approve nope step` printed its refusal and exited **1** (`ae`'s bin honours `e.exitCode`,
@@ -83,7 +84,7 @@ the compiler checks the mapping is complete: a `switch` on `_tag` over a closed 
 added and not mapped. A route that reads the disk after a refusal to pick its status would become a refusal that says
 which kind it is when it is thrown.
 
-**Verdict: pays, and first.** It replaces the 16 casts in the api, the 6 `messageOf` copies and the three hand-written error
+**Verdict: pays, and first.** It replaces the 13 casts in the api that pick a status, the 6 `messageOf` copies and the three hand-written error
 classes' status maps. It adds one module of tagged errors per package and one mapping in the api. The `wf` exit status is a
 one-line fix on its own and should not wait for any of this.
 
@@ -93,7 +94,7 @@ What is held and let go by hand:
 
 | Resource | Where | How it is let go | What is skipped |
 |---|---|---|---|
-| The daemon's claim on the store, `daemon.json` | `takeStore` `daemon-store.ts:171-201`, `releaseStore` `:243-251` | `finally` in `wf up` (`cli.ts:1169-1173`) and a signal handler | The handlers call `releaseStore` then `process.exit` (`cli.ts:1111-1113`), so the `finally` never runs: the beat interval is not cleared and the pass in flight is dropped mid-way |
+| The daemon's claim on the store, `daemon.json` | `takeStore` `daemon-store.ts:171-201`, `releaseStore` `:243-251` | `finally` in `wf up` (`cli.ts:1169-1173`) and a signal handler | Two release paths: the handlers call `releaseStore` then `process.exit` (`cli.ts:1111-1113`), so on a signal the `finally` is skipped. Nothing is lost by it — the process ends, and a pass dropped mid-way is picked up by the next — but each new thing `wf up` holds has to be let go in both places |
 | The beat timer | `cli.ts:1120` (unref'd) | `clearInterval` in the same `finally` | as above |
 | `wf watch`'s fs watcher and 1 s timer | `feed-store.ts:275, 282`; `cli.ts:1188-1190` | `stop()` exists and is never called: the command returns a promise that never settles | ends only when the process is killed |
 | The api's feed stream | `apps/api/src/feed.ts:39-43, 83-88` | a hand-made deferred resolved by `stream.onAbort`, then `finally { watch.stop() }` | none known; `test/feed.test.ts:299-315` proves the stop |
@@ -104,7 +105,11 @@ What is held and let go by hand:
 
 **With Effect.** Each resource that lives only as long as the process becomes `Effect.acquireRelease` in a scope: the claim,
 the beat (a forked fiber), the watcher, the child process, the MCP client. Interruption — a signal, the stream's reader
-going, a deadline — then runs every finalizer in order. The `wf up` defect above becomes impossible to write. `quota.ts` and
+going, a deadline — then runs every finalizer in order. For `wf up` that buys one release path instead of two, and an order
+of release the code states; it does not buy a pass that stops cleanly part-way. The store's calls are synchronous, so an
+interruption on a signal also stops the pass at its next `await`, as `process.exit` does now, and the level-triggered pass is
+built to be dropped there. The real gains are in `wf watch`, which has no way to stop at all, and in the api's child process
+and MCP ask, whose 60 and about 25 lines of hand-kept flags and timers become an acquire, a use and a release. `quota.ts` and
 `capabilities.ts` shrink to an acquire, a use under `Effect.timeout`, and a release. `effect/unstable/process` has a
 `ChildProcess` module, but it is *unstable* and needs a platform layer from `@effect/platform-node`, which is not installed.
 The runtime's own pattern, `Effect.callback` around `execFile` with `child.kill()` as the interrupt (`runner.ts:795-814`),
@@ -220,7 +225,7 @@ These are counts of what exists, not estimates of lines written. The lines follo
 
 | Replaced or deleted | Count today | Added |
 |---|---|---|
-| `exitCode === 2` casts in the api | 16 in 7 files | one error union per package, one status mapping in the api |
+| `exitCode === 2` casts in the api that pick a status | 13 in 5 files (of 15 in 7) | one error union per package, one status mapping in the api |
 | `messageOf` copies and inline copies | 6 + 25 | nothing |
 | Hand-written error-to-status maps (`AgentWriteError`, `SkillWriteError`, `Unread`, `cardRefusalStatus`, `queueRefusalStatus`) | 5 | the union's cases |
 | The signal-then-`process.exit` path in `wf up` | `cli.ts:1104-1117` | a scoped claim and a forked beat, interrupted on a signal |
@@ -264,9 +269,10 @@ The three rules of `docs/architecture.md` survive. Each needs a line more in its
 
 One version of `effect` in the tree becomes load-bearing. The runtime README says why: *"Context tags are identity-based, and
 two copies in one tree do not see each other's services"* (`packages/agent-runtime/README.md`, *Using it without Effect*).
-Today the runtime is the one package that depends on `effect` (`^4.0.0-rc.115`, resolved to rc.116 by the lockfile), so one
-copy is all there can be. Once the orchestrator and the api depend on it too, their ranges must resolve to that same copy, and
-once the orchestrator provides a runtime service through the Effect door, a second copy would fail at run time, not at compile.
+Two packages depend on `effect` today, with two ranges that happen to resolve to one copy: the runtime (`^4.0.0-rc.115`) and
+the judge (`^4.0.0-rc.116`, `packages/agent-judge/package.json:13`). The owner is removing the judge in a run of its own, and
+this evaluation leaves it out as a package that will not exist; once that lands, the runtime is the one. Once the orchestrator
+and the api depend on `effect` too, their ranges must resolve to that same copy, and once the orchestrator provides a runtime service through the Effect door, a second copy would fail at run time, not at compile.
 
 ## The public faces
 
@@ -317,8 +323,8 @@ rc.110 to rc.118 came between 2026-08-17 and 2026-09-28, about one a week. The r
 
 **What an upgrade touched, measured.** The runtime was copied beside a fresh `effect@4.0.0-rc.118`, with every other package
 the checkout's own. It typechecks clean. Its suite: 813 tests, 788 pass, 20 skipped, 5 fail. All 5 read the rest of the
-workspace (`contract.test.ts`, `xstate-boundary.test.ts`), which the copy did not have. So rc.116 → rc.118 costs nothing today. The exposure grows with
-use, though. The runtime uses services, layers and tagged errors and little else, and the adoption would add scopes,
+workspace (`contract.test.ts`, `xstate-boundary.test.ts`), which the copy did not have. The judge was not measured, as it is
+being removed. So rc.116 → rc.118 costs the runtime nothing today. The exposure grows with use, though. The runtime uses services, layers and tagged errors and little else, and the adoption would add scopes,
 streams, `Config` and `ManagedRuntime`, which a release candidate is freer to rename.
 
 **Start-up.** This cost is already paid.
@@ -358,7 +364,7 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
 (Effect Schema for records, journals and the api's bodies) and do not overlap it.
 
 1. **One version, and the skill.** Pin `effect` exactly, and the same, in every package that depends on it, with a test
-   that refuses two ranges. Add `.claude/skills/effect/` and the CLAUDE.md lines. No code.
+   that refuses two ranges. It lands after the judge's removal, or it pins the judge's range as well. Add `.claude/skills/effect/` and the CLAUDE.md lines. No code.
 2. **`wf` exits with the refusal's code.** `bin/wf.ts` honours `exitCode`, and a test runs `wf` and asserts 2. Plain code.
 3. **Tagged refusals in the orchestrator.** `Schema.TaggedError` classes that are `Error`s and carry `exitCode: 2`: `Missing`,
    `Conflict`, `Invalid`. The 31 `Object.assign` sites move over, file by file, and the pure kind's boundary test allows
@@ -368,7 +374,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
 5. **`Engine` as a service.** The client's layer wraps the Promise facade, and `test/engine-board.ts` provides
    `Engine.test`. The 13 `board()` copies move over as their files are touched, not in one sweep.
 6. **The daemon's lifetime.** `wf up` and `wf watch` run as Effects: the claim scoped, the beat forked, both interrupted on a
-   signal, and the existing real-process test (`daemon-store.test.ts:332`) extended to assert the beat stops. Decide
+   signal, so the claim has one release path. The existing real-process test (`daemon-store.test.ts:332`) still asserts the
+   store is let go with the signal's exit code, and a new one sends `wf watch` a signal and asserts it exits and leaves no
+   watcher. Decide
    here between `@effect/platform-node`'s `NodeRuntime.runMain` (a new dependency, also rc) and a small `runMain` of our own.
 
    *Stop here and measure:* lines added and removed, test lines touched, typecheck time, and review rounds per card. Then

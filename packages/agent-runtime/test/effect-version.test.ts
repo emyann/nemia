@@ -126,3 +126,71 @@ test('REFUSED: a range in any list or workspace, and two exact pins that differ'
     'the same exact pin in two workspaces, beside one without effect, is not refused',
   );
 });
+
+const SKILL = '.claude/skills/effect/SKILL.md';
+
+/** Whether `effect`'s barrel has a name as the skill writes it: `Either`, or `Context.Tag` for `Tag` on the `Context` module. */
+const has = (barrel: Record<string, unknown>, name: string): boolean => {
+  const [mod, member] = name.split('.');
+  const at = barrel[mod!];
+  return member === undefined ? at !== undefined : typeof at === 'object' && at !== null && member in at;
+};
+
+/**
+ * What the skill's table of Effect 3 names gets wrong about the version it is read against, one sentence each: a version it
+ * was not measured on, a name on the left the version has, a name on the right it lacks, or a table with no row read.
+ */
+function renameProblems(skill: string, barrel: Record<string, unknown>, pin: string): string[] {
+  const section = /## Effect 3 names this version does not have\s*\n([\s\S]*?)\n## Services and layers/.exec(skill)?.[1];
+  if (section === undefined) return [`${SKILL} has no table of Effect 3 names before its Services and layers: put it back`];
+  const measured = /Measured on `([^`]+)`/.exec(section)?.[1];
+  const rows = section
+    .split('\n')
+    .filter((line) => /^\|\s*`/.test(line))
+    .map((line) =>
+      line
+        .split('|')
+        .slice(1, 3)
+        .map((cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]!)),
+    );
+  return [
+    ...(measured === pin
+      ? []
+      : [`${SKILL} was measured on ${measured}, and effect is pinned to ${pin}: measure the table again, then say ${pin}`]),
+    ...(rows.length ? [] : [`${SKILL} lists no Effect 3 name`]),
+    ...rows.flatMap(([gone = [], now = []]) => [
+      ...gone.filter((n) => has(barrel, n)).map((n) => `${SKILL} says ${n} is gone, and effect ${pin} has it: take its row out`),
+      ...now
+        .filter((n) => !has(barrel, n))
+        .map((n) => `${SKILL} says to write ${n}, and effect ${pin} has no such name: find what replaced it`),
+    ]),
+  ];
+}
+
+test("the effect skill's table of Effect 3 names holds for the pinned version", async () => {
+  const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
+  const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
+  assert.deepEqual(renameProblems(skill, barrel, effectSpecs(manifests())[0]!.spec), []);
+  assert.ok((skill.match(/^\|\s*`/gm) ?? []).length >= 11, 'every row read');
+});
+
+test('REFUSED: a table measured on another version, a name it says is gone that is there, a replacement that is not', async () => {
+  const skill = fs.readFileSync(path.join(ROOT, SKILL), 'utf8');
+  const barrel = { ...(await import(EFFECT)) } as Record<string, unknown>;
+  const pin = effectSpecs(manifests())[0]!.spec;
+  assert.deepEqual(renameProblems(skill, barrel, '4.0.0'), [
+    `${SKILL} was measured on ${pin}, and effect is pinned to 4.0.0: measure the table again, then say 4.0.0`,
+  ]);
+  assert.deepEqual(renameProblems(skill.replace('| `Effect.catchAll` |', '| `Effect.catch` |'), barrel, pin), [
+    `${SKILL} says Effect.catch is gone, and effect ${pin} has it: take its row out`,
+  ]);
+  assert.deepEqual(renameProblems(skill.replace('| `Effect.forkChild` |', '| `Effect.fork` |'), barrel, pin), [
+    `${SKILL} says to write Effect.fork, and effect ${pin} has no such name: find what replaced it`,
+  ]);
+  assert.deepEqual(renameProblems(skill.replace('| `Result` |', '| `Either` |'), barrel, pin), [
+    `${SKILL} says to write Either, and effect ${pin} has no such name: find what replaced it`,
+  ]);
+  assert.deepEqual(renameProblems(skill.replace('## Services and layers', '## Layers'), barrel, pin), [
+    `${SKILL} has no table of Effect 3 names before its Services and layers: put it back`,
+  ]);
+});

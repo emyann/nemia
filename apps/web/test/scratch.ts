@@ -1,10 +1,11 @@
 /**
  * Every temporary root a test makes, and whatever is left running in it: taken away before the test file ends.
  *
- * A test that made a root under the machine's temp directory and left it there, and a detached worker a failed test
- * never stopped, both outlive the suite: 12,583 `ae-detached-*` folders had piled up, and workers started by tests were
- * alive hours later, re-parented to init, when a WSL machine froze under the page cache and slab they cost. So a test
- * makes its root here, `scratch(prefix)`, and never by calling `os.tmpdir` (each package's `scratch.test.ts` refuses it).
+ * A root a test leaves under the machine's temp directory, and a detached worker a failed test never stopped, both outlive
+ * the suite: the folders pile up by the thousand, and the workers live on for hours, re-parented to init, holding the page
+ * cache and slab that can freeze a machine. So a test makes its root here, `scratch(prefix)`, and never by calling
+ * `os.tmpdir`; a test that asserts where the code under test runs a process names the directory with `machineTempDir()`,
+ * which makes no root. Each package's `scratch.test.ts` refuses any other call of `os.tmpdir` under `test/`.
  *
  * Each package has this file, the same byte for byte (its `scratch.test.ts` holds the copy to the runtime's): a package
  * reaches another only through its exports, and a test helper is none. Importing it registers two hooks for the file:
@@ -36,9 +37,20 @@ export const scratch = (prefix: string): string => {
   return root;
 };
 
+/**
+ * The machine's temp directory itself, for a test that asserts where the code under test runs a process. Never a place to
+ * make a root in: `scratch` makes one, and `scratch.test.ts` refuses a line that passes this to a `mkdtempSync`.
+ */
+export const machineTempDir = (): string => os.tmpdir();
+
 export type Proc = { pid: number; pgid: number; state: string; args: string; cwd?: string; env?: string };
 
-/** Every process on the machine: from `/proc` where there is one, or else from `ps`, which says no working directory or environment. */
+/**
+ * Every process on the machine: from `/proc` where there is one, or else from `ps`, which says no working directory or environment.
+ * A process that ends while it is read is left out; one of another user's is listed without its working directory and environment,
+ * which only its owner may read. The command's name in `/proc/<pid>/stat` is in parentheses and may hold spaces, so the fields are
+ * counted from its last `)`.
+ */
 const processes = (): Proc[] => {
   if (!fs.existsSync('/proc/self/stat')) {
     return execFileSync('ps', ['-eo', 'pid=,pgid=,stat=,args='], { encoding: 'utf8' })
@@ -53,25 +65,18 @@ const processes = (): Proc[] => {
     if (!/^\d+$/.test(entry)) continue;
     try {
       const stat = fs.readFileSync(`/proc/${entry}/stat`, 'utf8');
-      // The command's name is in parentheses and may hold spaces: the fields are counted from its last `)`.
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       const args = fs.readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0').join(' ').trim();
       let cwd: string | undefined;
       let env: string | undefined;
       try {
         cwd = fs.readlinkSync(`/proc/${entry}/cwd`).replace(/ \(deleted\)$/, '');
-      } catch {
-        /* another user's */
-      }
+      } catch {}
       try {
         env = fs.readFileSync(`/proc/${entry}/environ`, 'utf8').split('\0').join(' ');
-      } catch {
-        /* another user's */
-      }
+      } catch {}
       found.push({ pid: Number(entry), pgid: Number(fields[2]), state: fields[0], args, cwd, env });
-    } catch {
-      /* gone while read */
-    }
+    } catch {}
   }
   return found;
 };
@@ -118,18 +123,18 @@ const until = async (ok: () => boolean, ms: number) => {
   }
   return true;
 };
+/** Sends `sig` to `pid`, or to a process group where `pid` is negative; one already gone is no error. */
 const signal = (pid: number, sig: NodeJS.Signals) => {
   try {
     process.kill(pid, sig);
-  } catch {
-    /* gone */
-  }
+  } catch {}
 };
 const isWorker = (p: Proc) => /\bae-worker\.ts\b/.test(p.args);
 
 /**
  * Stops what runs in `dirs` and waits it out: each worker by SIGTERM, as the runner stops one, and continued in case a
- * test froze it; then the rest killed. Answers what is still alive after both.
+ * test froze it; then the rest killed, each with its process group where it leads one, for what it started, and never with
+ * this process's own group. Answers what is still alive after both.
  */
 export const reap = async (dirs: string[]): Promise<Proc[]> => {
   if (!dirs.length) return [];
@@ -142,7 +147,6 @@ export const reap = async (dirs: string[]): Promise<Proc[]> => {
   const own = processes().find((p) => p.pid === process.pid)?.pgid;
   const rest = runningIn(dirs);
   for (const p of rest) {
-    // Its group too where it leads one, for what it started — never this process's own group.
     if (p.pgid === p.pid && p.pgid !== own) signal(-p.pgid, 'SIGKILL');
     signal(p.pid, 'SIGKILL');
   }

@@ -2,12 +2,15 @@
  * A session's conversation as events — a transcript file where Claude Code keeps one, and a rollout where
  * Codex keeps one, each written by the test.
  *
- * The board shows a step's session as it happens by polling `transcript` with the cursor each read gives
- * (plan §4 S). So what is checked is what a poller sees: every event dated by the harness's own record and
+ * The board shows a step's session as it happens by polling `transcript` with the cursor each read gives.
+ * So what is checked is what a poller sees: every event dated by the harness's own record and
  * given a role; a tool result paired to its call; the closeout a call like any other; a second read
  * emitting only what was appended; and a cursor from a file that shrank, or was replaced, reading again
  * rather than nothing for ever. Then the same through `createEngine()` at shipped defaults, with a fake
- * `claude` or `codex` on PATH: `logs` as it was, and each refusal made to refuse.
+ * `claude` or `codex` on PATH: `logs` beside it, and each refusal made to refuse.
+ *
+ * Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set before the
+ * import; where Codex keeps rollouts is read when one is looked for, so `CODEX_HOME` is set once, for the whole file.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,10 +23,8 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-transcript-${label}-`);
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
-// Where Codex keeps rollouts is read when one is looked for; set here, once, for the whole file.
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
 const { claudeOps } = await import('../src/runner.ts');
@@ -33,12 +34,10 @@ const { codex } = await import('../src/runner-codex.ts');
 const { codexRolloutEvents } = await import('../src/runner-codex-transcript.ts');
 const { claudeDetached } = await import('../src/runner-claude-detached.ts');
 
-/** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns were. */
+/** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns are. */
 const T0 = Date.now() - 3_600_000;
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 const jsonl = (lines: object[]) => lines.map((l) => `${JSON.stringify(l)}\n`).join('');
-
-// ─── Claude Code ────────────────────────────────────────────────────────────
 
 const claudeFile = (sessionId: string) => path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
 const writeClaude = (sessionId: string, text: string) => {
@@ -47,7 +46,7 @@ const writeClaude = (sessionId: string, text: string) => {
 };
 
 /**
- * A transcript as Claude Code 2.1.270 writes one: a title line, the prompt, an attachment, then one line
+ * A transcript as Claude Code writes one: a title line, the prompt, an attachment, then one line
  * per content block — thinking, text, a Bash call and its failed result, the StructuredOutput call and its
  * result — and a system line. Chained by `parentUuid`, as the SDK's reader (`logs`) follows them.
  */
@@ -283,7 +282,6 @@ test('a line of a Claude transcript: the harness speaking is system, a subagent 
 });
 
 test('words another process sent a working session — a peer, or `say` — are a system event with those words; any other attachment gives nothing', () => {
-  // As 2.1.270 wrote it into a `--bg` session's transcript, when a line was posted to its inbox while it worked.
   const line = {
     parentUuid: 'p',
     isSidechain: false,
@@ -301,16 +299,17 @@ test('words another process sent a working session — a peer, or `say` — are 
       isMeta: true,
     },
   };
-  assert.deepEqual(claudeTranscriptEvents(line, 0), [
-    { id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' },
-  ]);
+  assert.deepEqual(
+    claudeTranscriptEvents(line, 0),
+    [{ id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' }],
+    "a line posted to a `--bg` session's inbox while it works, as Claude Code writes it into the transcript",
+  );
   assert.deepEqual(
     claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0),
     [],
     'a queued command of any other origin is not read as words sent in',
   );
   assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { type: 'environment' } }, 0), [], 'nor is any other attachment');
-  // Arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is.
   assert.deepEqual(
     claudeTranscriptEvents(
       {
@@ -324,11 +323,11 @@ test('words another process sent a working session — a peer, or `say` — are 
       0,
     ),
     [{ id: 'idle:0', at: at(1), role: 'system', kind: 'system', text: 'Another Claude session sent a message:\nIdle check' }],
+    'arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is',
   );
 });
 
-test("words the session's own user said while it worked — typed into it, or a job's next line on its stdin — are the user's; a notice of a background task is nothing", () => {
-  // As 2.1.280 wrote it into a `claude -p --input-format stream-json` job's transcript, for a user line on its stdin mid-turn.
+test("words the session's own user said while it worked — typed into it, or a job's next line on its stdin, which Claude Code writes into a `claude -p --input-format stream-json` job's transcript as a queued command with no origin — are the user's; a notice of a background task is nothing", () => {
   const line = {
     parentUuid: 'p',
     isSidechain: false,
@@ -373,7 +372,6 @@ test('read again with its cursor, a transcript gives only what was appended; a l
   const first = await claudeRead(sessionId);
   assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 3));
 
-  // Two more lines, and half of a third.
   const third = lines[7];
   fs.appendFileSync(claudeFile(sessionId), `${lines[5]}\n${lines[6]}\n${third.slice(0, 40)}`);
   const second = await claudeRead(sessionId, first.cursor);
@@ -389,7 +387,6 @@ test('read again with its cursor, a transcript gives only what was appended; a l
 test('read in two pieces, cut at any byte, a transcript gives what it gives read whole', async () => {
   const sessionId = randomUUID();
   const text = jsonl(claudeLines(sessionId));
-  // Every line boundary, and a cut inside every line.
   const cuts = new Set<number>();
   for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) {
     cuts.add(i + 1);
@@ -411,17 +408,19 @@ test('a cursor past the end of a file that shrank reads again from the start; so
   const whole = await claudeRead(sessionId);
   assert.equal(whole.events.length, CLAUDE_EVENTS.length);
 
-  // Cut shorter: the old cursor is past its end.
   writeClaude(sessionId, jsonl(lines.slice(0, 5)));
   const shrunk = await claudeRead(sessionId, whole.cursor);
   assert.deepEqual(shrunk.events, CLAUDE_EVENTS.slice(0, 3), 'read from the start, not nothing for ever');
 
-  // Replaced by another conversation that has grown past the old offset: the offset alone would read mid-line.
   const other = lines.map((l) => JSON.parse(JSON.stringify(l).replaceAll('Writing it now.', 'Writing it now, differently.')) as object);
   writeClaude(sessionId, jsonl([...other, ...other]));
   const replaced = await claudeRead(sessionId, shrunk.cursor);
   assert.equal(replaced.events[0]?.id, 'u-1:0', 'read from the start');
-  assert.equal(replaced.events.length, CLAUDE_EVENTS.length * 2);
+  assert.equal(
+    replaced.events.length,
+    CLAUDE_EVENTS.length * 2,
+    'a conversation grown past the old offset, where the offset alone would read mid-line: all of it',
+  );
 
   assert.deepEqual(
     await claudeRead(randomUUID(), whole.cursor),
@@ -437,8 +436,6 @@ test('a cursor no read gave is refused, naming it', async () => {
     await assert.rejects(claudeRead(sessionId, bad), (e: Error) => e.message.includes(`\`${bad}\` is not a cursor a transcript read gave`));
   }
 });
-
-// ─── Codex, and the detached runner ─────────────────────────────────────────
 
 const rolloutFile = (thread: string) => path.join(codexHome, 'sessions', '2026', '09', '13', `rollout-2026-09-13T06-00-00-${thread}.jsonl`);
 const writeRollout = (thread: string, text: string) => {
@@ -457,10 +454,10 @@ const runFile = (root: string, harness: string, name: string, run: object) => {
 };
 
 /**
- * A rollout as codex-cli 0.154.0 writes one: the session's metadata, the instructions and context Codex
+ * A rollout as Codex writes one: the session's metadata, the instructions and context Codex
  * gives the model, then each thing both as the model was given it (`response_item`) and as a thread item
  * (`event_msg` / `item_completed`) — the prompt, reasoning, a message, a command that failed, a file
- * change, an item of a type not measured, the final answer — and the task's end.
+ * change, an item of a type the reader does not know (`NotMeasuredYet`), the final answer — and the task's end.
  */
 const rolloutLines = (thread: string): object[] => [
   {
@@ -720,8 +717,6 @@ test("claude-detached reads the transcript `claude --bg` would, once its run has
   assert.equal(detachedOps({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
 });
 
-// ─── the engine, at shipped defaults ────────────────────────────────────────
-
 const { createEngine } = await import('../src/facade.ts');
 type PromiseRunner = import('../src/facade.ts').PromiseRunner;
 type Sighting = import('../src/facade.ts').Sighting;
@@ -855,15 +850,21 @@ test("at shipped defaults, a Codex task's transcript is read from its rollout, b
     const engine = createEngine({ root: tmp('root') });
     const id = await engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' });
     await engine.tick();
-    // The worker runs the harness a moment after the tick returns, and keeps the thread id it prints.
     let read = await engine.transcript(id);
     for (const until = Date.now() + 15_000; !read.events.length && Date.now() < until; read = await engine.transcript(id)) await sleep(50);
-    assert.deepEqual(read.events, CODEX_EVENTS);
-    // The worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after: wait for that too.
+    assert.deepEqual(
+      read.events,
+      CODEX_EVENTS,
+      'the worker runs the harness a moment after the tick returns, and keeps the thread id it prints',
+    );
     let logs = await engine.logs(id);
     for (const until = Date.now() + 15_000; !/"thread\.started"/.test(logs) && Date.now() < until; logs = await engine.logs(id))
       await sleep(50);
-    assert.match(logs, /"thread\.started"/);
+    assert.match(
+      logs,
+      /"thread\.started"/,
+      'the worker keeps the thread id the moment it reads it, and its capture of the output reaches the disk after',
+    );
   });
 });
 
@@ -883,12 +884,14 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
       refusal(/^transcript: `from-the-top` is not a cursor a transcript read gave\. Pass the `cursor`/),
     );
     assert.deepEqual((await engine.transcript(id)).events, [], 'the same task, asked without one, is read');
-    // A HarnessSpec's reader is the engine's too, and refuses the same.
     const codexId = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' });
-    await assert.rejects(engine.transcript(codexId, 'page-2'), refusal(/^transcript: `page-2` is not a cursor a transcript read gave\./));
+    await assert.rejects(
+      engine.transcript(codexId, 'page-2'),
+      refusal(/^transcript: `page-2` is not a cursor a transcript read gave\./),
+      "a HarnessSpec's reader is the engine's too, and refuses the same",
+    );
   });
 
-  // A harness brought as a PromiseRunner with no `transcript`, and a HarnessSpec with none.
   const sessions = new Map<string, Sighting>();
   const plain: PromiseRunner = {
     async spawn(r) {
@@ -907,11 +910,13 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
   await assert.rejects(
     own.transcript(ownId),
     refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/),
+    'a harness brought as a PromiseRunner with no `transcript`',
   );
   const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
   await assert.rejects(
     sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })),
     refusal(/^transcript: the `sh` harness keeps no conversation/),
+    'a HarnessSpec with none',
   );
 });
 
@@ -919,7 +924,6 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, string | undefined]> = [];
   const said = (n: number) => ({ id: `e-${n}`, at: at(n), role: 'assistant', kind: 'text', text: `line ${n}` }) as const;
-  // Pages, in a shape no file reader gives.
   const talking: PromiseRunner = {
     async spawn(r) {
       sessions.set(r.name, { sessionId: 's-1', state: 'working' });
@@ -953,10 +957,14 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
   assert.deepEqual(first, { events: [said(1)], cursor: 'page-2' }, "the engine's start is asked as no cursor");
   const second = await engine.transcript(id, first.cursor);
   assert.deepEqual(second, { events: [said(2)], cursor: 'page-3' }, 'its own cursor, not refused');
-  assert.deepEqual(asked, [
-    ['s-1', undefined],
-    ['s-1', 'page-2'],
-  ]);
+  assert.deepEqual(
+    asked,
+    [
+      ['s-1', undefined],
+      ['s-1', 'page-2'],
+    ],
+    'pages, in a shape no file reader gives, passed through as the runner gave them',
+  );
 });
 
 test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {

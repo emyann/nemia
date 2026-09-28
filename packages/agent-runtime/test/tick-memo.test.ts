@@ -1,7 +1,7 @@
 /**
  * What an engine's pass reads of a store of settled tasks, on the files store and through the meter (`Engine.io()`): once
  * a pass has folded a settled task, the passes after it read only the feed's new bytes and the journals the feed names,
- * until the engine is made again (`tick-memo.ts`). Before 2026-09-25 every pass read every journal, twice.
+ * until the engine is made again (`tick-memo.ts`).
  *
  * The harness is a `PromiseRunner` that lists nothing and refuses every spawn, so each task settles on its first pass and
  * the only bytes a pass reads are the journal's: a detached harness would read its run files through the same meter.
@@ -24,7 +24,7 @@ const refusing: PromiseRunner = {
 
 const N = 40;
 
-/** A store of `N` tasks that settled on the first pass, and an engine that has since folded each once more. */
+/** A store of `N` tasks that settled on the first pass, and an engine whose second pass has folded each once more: the feed names each settling. */
 const settledStore = async () => {
   const root = scratch('ae-memo-root-');
   const cwd = scratch('ae-memo-cwd-');
@@ -33,7 +33,6 @@ const settledStore = async () => {
   for (let i = 0; i < N; i++) ids.push(await engine.file({ brief: `task ${i}`, cwd }));
   const first = await engine.tick();
   assert.equal(first.views.length, 0, 'every task settled on the first pass');
-  // The pass after the settling folds each again: the feed names each settling.
   await engine.tick();
   return { root, cwd, engine, ids };
 };
@@ -65,13 +64,12 @@ test("a pass after an entry is appended to one settled task reads the feed's new
   const before = engine.io();
   await engine.tick();
   const after = engine.io();
-  // The feed's new bytes, then the one journal named: folded, and read again by its step, whose decision is nothing.
   assert.equal(
     after.bytesRead - before.bytesRead,
     grown + 2 * journal,
     `read ${after.bytesRead - before.bytesRead}; the feed grew ${grown} and the journal is ${journal}`,
   );
-  assert.equal(after.reads - before.reads, 3);
+  assert.equal(after.reads - before.reads, 3, "the feed's new bytes, then the one journal it names, twice: folded, and read by its step");
 
   const again = engine.io();
   await engine.tick();
@@ -96,8 +94,11 @@ test('a fresh engine on the same store folds every task on its first pass, and r
   const journals = journalsOf(root);
   const feed = sizeOf(path.join(root, 'feed.jsonl'));
   assert.equal(first, feed + 2 * journals, `read ${first}: the feed's ${feed} bytes, and each journal twice (${journals} bytes)`);
-  // Every task was settled before this engine was made, so its first pass wrote nothing for the feed to name.
   const second = engine.io();
   await engine.tick();
-  assert.equal(engine.io().bytesRead - second.bytesRead, 0, 'its second pass reads nothing');
+  assert.equal(
+    engine.io().bytesRead - second.bytesRead,
+    0,
+    'its second pass reads nothing: every task settled before this engine was made, so its first pass wrote nothing for the feed to name',
+  );
 });

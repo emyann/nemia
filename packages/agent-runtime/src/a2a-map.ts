@@ -4,8 +4,7 @@
  * A session is an A2A Task whose id is the session's name, `ae/<task>/<n>`, and whose `contextId` is the harness's own id
  * for the conversation, its `nativeId` — what `--resume` takes — or the empty string until something has seen it. So
  * attempts that continued one conversation share a context where the harness keeps its id on a resume (a Claude Code job,
- * M12; a Codex thread, M13 — both measured live), and a `claude --bg` resume, which starts under a new id, is a context of
- * its own. A spawn is a user
+ * a Codex thread), and a `claude --bg` resume, which starts under a new id, is a context of its own. A spawn is a user
  * Message: the brief its one text part, the session it continues its `contextId` — A2A's meaning for a message sent in a
  * context, that it continues it — and the rest of the request in its metadata, `config` whole and never opened. What a
  * harness sees of a session — the `Sighting` — rides whole in the Task's metadata, and its state is also the Task's,
@@ -295,9 +294,7 @@ export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiti
   });
 };
 
-// ─── a remote agent's Task, which the runtime did not make ─────────────────
-
-/** What a remote Task in an interrupted state waits for, in A2A's word for it. */
+/** What a remote agent's Task, one the runtime did not make, waits for in an interrupted state, in A2A's word for it. */
 const WAITS: ReadonlyMap<TaskState, string> = new Map([
   [TaskState.TASK_STATE_INPUT_REQUIRED, 'input'],
   [TaskState.TASK_STATE_AUTH_REQUIRED, 'authentication'],

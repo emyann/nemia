@@ -1,13 +1,16 @@
 /**
  * MCP servers, at shipped defaults: what a session is given and — the point — what it is not.
  *
- * Spawned with no MCP flags, a Claude Code session loads every server the operator has: user scope
- * (`~/.claude.json`) and their claude.ai connectors — mail, calendar, drive — beside the checkout's
- * `.mcp.json` (the `init` event of `claude -p` on 2.1.270). Strict is not the whole fence: Claude in
- * Chrome, which a user setting switches on, was still connecting in a `--bg` session spawned strict.
- * Every case below goes through
- * `createEngine()`'s own harnesses with a fake `claude` and `codex` on PATH, each writing down the
- * argv it was given, so what is checked is what the engine really runs.
+ * Spawned with no MCP flags, a Claude Code session loads every server the operator has: user scope (`~/.claude.json`) and
+ * their claude.ai connectors — mail, calendar, drive — beside the checkout's `.mcp.json`, as the `init` event of `claude -p`
+ * lists. Strict is not the whole fence: Claude in Chrome, which a user setting switches on, connects in a `--bg` session
+ * spawned strict. A job reads its prompt on its stdin, where no `--mcp-config` list can take it; `claude-detached` takes it as
+ * `-p`'s value, and `claude --bg` last, after the list. A checkout's `.mcp.json` that is not JSON is refused before anything
+ * runs: named on the command line, it stops Claude Code before a session exists, and waiting out the grace window to call
+ * that `lost` would only hide the reason.
+ *
+ * Every case below goes through `createEngine()`'s own harnesses with a fake `claude` and `codex` on PATH, each writing down
+ * the argv it was given, so what is checked is what the engine really runs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,12 +26,14 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-mcp-${label}-`);
 
-/** A fake `claude` and `codex`: each writes its argv, one line per argument, to `<bin>/<name>.argv`. */
+/**
+ * A fake `claude` and `codex`: each writes its argv, one line per argument, to `<bin>/<name>.argv` — written, then moved, so
+ * no reader sees half. `claude agents` answers an empty registry: nobody is running.
+ */
 const fakeBin = () => {
   const bin = tmp('bin');
   for (const name of ['claude', 'codex']) {
     const out = path.join(bin, `${name}.argv`);
-    // `claude agents` is the registry, and nobody is running. Written, then moved, so no reader sees half.
     const agents = name === 'claude' ? `if [ "$1" = agents ]; then echo '[]'; exit 0; fi\n` : '';
     fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${agents}printf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
       mode: 0o755,
@@ -52,7 +57,9 @@ const argvIn = (file: string) => fs.readFileSync(file, 'utf8').replace(/\n$/, ''
 /**
  * File one task at shipped defaults, run one tick, and return the argv its harness was given — none
  * when the spawn was refused before anything ran. Codex reads its config from `codexHome`, an empty
- * one unless a test gives one, so no case depends on the servers this machine's own Codex has.
+ * one unless a test gives one, so no case depends on the servers this machine's own Codex has. A detached harness is run by
+ * its worker a moment after the tick returns, so its argv is waited for, unless the spawn was refused at the tick and wrote
+ * none.
  */
 const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-home')) => {
   const bin = fakeBin();
@@ -65,9 +72,7 @@ const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-h
     await engine.tick();
     const attempt = (await engine.view(id)).state.attempts[0];
     const file = path.join(bin, `${task.harness === 'codex' ? 'codex' : 'claude'}.argv`);
-    // A detached harness is run by its worker, a moment after the tick returns.
     const until = Date.now() + 15_000;
-    // A spawn refused at the tick writes no argv, so there is nothing to wait for.
     if (attempt?.reason !== 'unstartable') while (!fs.existsSync(file) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
     return { root, attempt, args: fs.existsSync(file) ? argvIn(file) : undefined };
   }).finally(() => {
@@ -104,7 +109,6 @@ test("no mcp and no .mcp.json: Claude Code is spawned strict, with no config —
     assert.ok(args.includes('--no-chrome'), `${harness}: nor the operator's Chrome, which no config names and strict leaves on`);
     assert.equal(args.includes('--mcp-config'), false, `${harness}: and no server is named in their place`);
     assert.deepEqual(configsUnder(root), [], `${harness}: nothing written for a task that named no servers`);
-    // A job reads its prompt on its stdin, where no list can take it; `claude-detached` takes it as `-p`'s value.
     if (harness === 'claude-detached') assert.equal(args[args.indexOf('-p') + 1], 'the prompt', `${harness}: the prompt survives`);
     else assert.equal(args.includes('the prompt'), false, `${harness}: the prompt is not an argument`);
   }
@@ -121,15 +125,12 @@ test(".mcp.json in the checkout: named, so strict keeps the repository's servers
     assert.equal(next, '--strict-mcp-config', `${harness}: still strict, and the variadic list is ended by it, not by the prompt`);
     assert.ok(args.includes('--no-chrome'), `${harness}: and still no Chrome`);
   }
-  // `claude --bg` takes its prompt last, after the list; a job on its stdin, where no list reaches it.
   assert.equal((await spawnAtDefaults({ cwd, harness: 'claude', config: { background: true } })).args?.at(-1), 'the prompt');
   const job = (await spawnAtDefaults({ cwd, harness: 'claude' })).args!;
   assert.equal(job.includes('the prompt'), false);
 });
 
 test('a checkout whose .mcp.json is not JSON is refused before anything runs: unstartable, naming the file', async () => {
-  // Named on the command line, it stops Claude Code before a session exists; waiting out the grace
-  // window to call that `lost` would only hide the reason.
   const cwd = tmp('broken');
   fs.writeFileSync(path.join(cwd, '.mcp.json'), '{"mcpServers": nope');
   for (const harness of CLAUDES) {
@@ -214,8 +215,6 @@ test("codex is given a task's servers as one mcp_servers override, and a task wi
 });
 
 test('codex quotes every name and value as TOML, and the override comes before `resume`', () => {
-  // One value, names quoted: a dotted `-c` key is split on every dot, quotes or none. Read back by
-  // codex-cli 0.154.0 (`codex mcp get --json`) as exactly these arguments.
   const args = codex.command({
     name: 'ae/t/2',
     brief: 'the prompt',
@@ -228,6 +227,7 @@ test('codex quotes every name and value as TOML, and the override comes before `
   assert.equal(
     args[at],
     'mcp_servers={"a-b_c"={"command"="/bin/x","args"=["say \\"hi\\"","back\\\\slash","two\\nlines"],"env"={"K-1"="v"}}}',
+    'one value, names quoted: Codex splits a dotted `-c` key on every dot, quotes or none, and `codex mcp get --json` reads this back as exactly these arguments',
   );
   assert.ok(at < args.indexOf('resume'), 'before resume, which rejects flags after its id');
   assert.equal(args.at(-1), 'the prompt');
@@ -248,7 +248,6 @@ test('a relative cwd or root still names each config by an absolute path — Cla
     );
     const { configs } = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv')));
     assert.deepEqual(configs, [path.join(here, 'repo', '.mcp.json'), path.join(here, 'board', 'mcp', 'ae_t_1.json')]);
-    // What Claude Code does with each: resolve it from inside the session's cwd.
     for (const c of configs) assert.ok(fs.existsSync(path.resolve(here, 'repo', c)), `${c} is found from inside repo`);
   } finally {
     process.chdir(was);
@@ -256,8 +255,6 @@ test('a relative cwd or root still names each config by an absolute path — Cla
 });
 
 test("a task's server named like one in the operator's Codex config is refused at spawn — Codex would merge the two", async () => {
-  // As `codex mcp add` writes them. Measured on 0.154.0: a task's `docs` would run the task's command
-  // with the operator's SECRET, and a task's `browser` would not load beside the operator's url.
   const home = tmp('codex-home');
   fs.writeFileSync(
     path.join(home, 'config.toml'),
@@ -276,7 +273,11 @@ test("a task's server named like one in the operator's Codex config is refused a
 
   const clash = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', config: { mcp: MCP } }, home);
   assert.equal(clash.args, undefined, 'codex never ran');
-  assert.equal(clash.attempt?.reason, 'unstartable');
+  assert.equal(
+    clash.attempt?.reason,
+    'unstartable',
+    "Codex merges a task's server into the operator's of its name: the task's `docs` would run with the operator's SECRET, and its `browser` would not load beside the operator's url",
+  );
   assert.match(
     clash.attempt?.error ?? '',
     /`mcp.browser`, `mcp.docs`: .*config\.toml already has a server by that name.*Give the task's server another name/,

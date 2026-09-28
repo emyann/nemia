@@ -5,10 +5,10 @@
  * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
  * whose registry would otherwise keep it for ever. So is a sixth, `transcript`: the same session's
  * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
- * a person's words handed to a session while it runs, which the engine journals and never acts on. And an eighth,
- * `find`: one session by its name, without observing every other, for a read that needs only which session it is. Swap the layer and the same engine drives a
- * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero
- * dollars.
+ * a person's words handed to a session while it runs, which the engine journals and never acts on. And an
+ * eighth, `find`: one session by its name, without observing every other, for a read that needs only which
+ * session it is. Swap the layer and the same engine drives a different harness; `Runner.test()` drives
+ * nothing at all, which is how the engine's tests cost zero dollars.
  *
  * The Claude layer shells out on purpose. `claude --bg` hands the session to the harness, which
  * already owns resume, stop, cross-session messaging and a registry that outlives us — the thing
@@ -114,7 +114,7 @@ export type ExpectedSession = { name: string; harness?: string };
  * not look for this time — a harness, or one mode of it, whose read failed (`claude agents` timing out, the registry busy). A name
  * in `unread` is neither there nor gone: nobody looked. Kept apart from `seen` because the pass reads an absence as the session
  * gone — it forgets a finished one it was letting go, and ends an attempt past its grace `lost` — and a look that failed is not
- * an absence (2026-09-25).
+ * an absence.
  */
 export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<string> };
 
@@ -196,13 +196,15 @@ export type RunnerOps = {
 };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
-  /** Any implementation becomes a Layer. This is the only way a runner reaches the engine. */
+  /**
+   * Any implementation becomes a Layer. This is the only way a runner reaches the engine. Its `refuses` asks first what
+   * no harness could use (`argsRefusalOf`), then the runner's own: the harness arguments are the adapter's, so they are
+   * refused on the adapter's side of the seam, beneath every runner, and so at the Effect door as at `createEngine().file()`.
+   */
   static layer = (ops: RunnerOps) =>
     Layer.succeed(Runner)(
       Runner.of({
         ...ops,
-        // The harness arguments are the adapter's, so what no adapter could use is refused on the adapter's side of the seam:
-        // here, beneath every runner, and so at the Effect door as at `createEngine().file()`.
         refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
       }),
     );
@@ -215,8 +217,8 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
 /**
  * How long a `working` session must write nothing before this harness reports it quiet — stopped, rather than
  * paused (`Sighting.quietMs`). The floor under both quiet rules: on its own for a session the registry lists
- * idle, and beside its own closeout being the last word in the conversation for one the registry lists busy
- * (issue 24). What quiet means for the attempt is `decide`'s.
+ * idle, and beside its own closeout being the last word in the conversation for one the registry lists busy.
+ * What quiet means for the attempt is `decide`'s.
  *
  * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
  * explicit that `working` also covers "between steps of work it drives on its own" — and short
@@ -238,8 +240,8 @@ const FINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'cancel
  * A `waitingFor` that names signing in, in Claude Code's words: `auth`, `authenticate` and its forms, `log in`, `login`,
  * `sign in`, `sign-in` — whole words only, so `author`, `authority` and `oauth-proxy` are not it. `authorize` and
  * `authorization` are left out on purpose: a tool call authorised is a permission, which a person gives with words
- * (`input-required`), not an identity. Written from words, not from a measured wait: Claude Code has not been seen
- * waiting to authenticate, and one worded otherwise reads `input-required` — a wait on a person all the same.
+ * (`input-required`), not an identity. Written from words, not from a wait Claude Code is known to word so: one worded
+ * otherwise reads `input-required` — a wait on a person all the same.
  */
 export const AUTH_WAIT = /\b(?:auth|authenticat(?:e|es|ed|ing|ion)|log[ -]?in|sign[ -]?in)\b/i;
 
@@ -254,7 +256,7 @@ export const AUTH_WAIT = /\b(?:auth|authenticat(?:e|es|ed|ing|ion)|log[ -]?in|si
  *   stopped  → canceled        stopped under it (`claude stop`, or a person at its side)
  *
  * Any other word is `failed`: a state this runner has no reading of is no session it can wait on, and a pass then ends the
- * attempt as the harness's failure, which is what it did before — but writes the journal's word, never the harness's raw one.
+ * attempt as the harness's failure, writing the journal's word, never the harness's raw one.
  */
 export const claudeStateOf = (word: string, waitingFor?: string): SessionState => {
   switch (word) {
@@ -275,7 +277,7 @@ export const claudeStateOf = (word: string, waitingFor?: string): SessionState =
  * A session's closing statement as this runner reads it: what it said, when it said it, and whether its conversation
  * ends with the statement's own result (`lastWord`). The first two go to the engine, which decides whose statement it
  * is; the third never leaves the runner — it is how a session held by something that is not the work is told from one
- * still doing it (issue 24).
+ * still doing it.
  */
 type Statement = { payload: unknown; at: number; lastWord?: boolean };
 
@@ -302,37 +304,49 @@ export type ClaudeOptions = {
  *
  * ## What "done" means for this harness, and why it is decided here
  *
- * `state: done` is not reliable for the work a fleet actually runs. Measured, three times: a short
- * single-deliverable task reached `done` in 67 seconds, while every long multi-step task stopped
- * at `working` and stayed there — 14 minutes in one case, with its transcript frozen and its files
- * written. Whether anyone was attached made no difference (a controlled pair says so).
+ * `state: done` is not reliable for the work a fleet actually runs: a short single-deliverable task
+ * reaches `done`, while a long multi-step one can stop at `working` and stay there, its transcript
+ * frozen and its files written, whether or not anyone is attached.
  *
- * `status` is the signal that does hold. It flipped to `idle` at the exact second the transcript
- * took its final write, in every probe. Claude Code's own web UI tracks `status` for its liveness
- * dot rather than `state`, which is the same conclusion arrived at independently.
+ * `status` is the signal that holds: it turns `idle` at the second the transcript takes its final
+ * write. Claude Code's own web UI tracks `status` for its liveness dot rather than `state`.
  *
  * So this harness reports a session that has stopped in one of two ways:
  *
- *     done   ⟸  state = done
- *     quiet  ⟸  state = working AND not busy AND nothing written for QUIESCENT_AFTER_MS, counted from its
- *               last write or its own start, whichever is later: `quietMs`, with `working` left as it is
- *     quiet  ⟸  state = working AND busy AND the last word in its conversation is its OWN closeout's tool
- *               result, nothing written since for QUIESCENT_AFTER_MS — its process is held by something that
- *               is not the work: a background shell the session left running (issue 24)
+ *     completed  ⟸  state = done
+ *     quiet      ⟸  state = working AND not busy AND nothing written for QUIESCENT_AFTER_MS, counted from its
+ *                   last write or its own start, whichever is later: `quietMs`, with `working` left as it is
+ *     quiet      ⟸  state = working AND busy AND the last word in its conversation is its OWN closeout's tool
+ *                   result, nothing written since for QUIESCENT_AFTER_MS — its process is held by something that
+ *                   is not the work: a background shell the session left running
  *
  * Telling a quiet session from one between steps lives HERE, in the runner, and not in `decide`: `working`
- * and `idle` are this harness's vocabulary; the engine's is `working | blocked | done | failed | stopped`,
- * and translating one into the other is the whole job of a runner. What quiet MEANS does not live here. It
- * was `done`, and a task that had asked for a closing statement and was told none settled `succeeded` (bug 1,
- * `docs/open-issues.md`); only the journal knows whether one was asked for, so `decide` says. A harness that
- * ends by exiting — `codex exec` — answers the same question by exit code and needs none of this.
+ * and `idle` are this harness's vocabulary, the engine's is A2A's (`SessionState`), and translating one into
+ * the other is the whole job of a runner. What quiet MEANS does not live here: a task that asked for a closing
+ * statement and was told none must not settle `succeeded`, and only the journal knows whether one was asked
+ * for, so `decide` says. A harness that ends by exiting — `codex exec` — answers the same question by exit
+ * code and needs none of this.
+ *
+ * ## What it keeps between passes
+ *
+ * - A task's MCP config, under `root`, outside the workspace: a file in a step's worktree travels down its branch.
+ * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`, which a pass
+ *   always makes before it releases anything and `say` is always handed a session from:
+ *   - its state (`listed`), which `release` stops on whatever the sighting it is handed says: a session whose end is
+ *     on the record — quiet, or idle after its closeout — still runs on Claude Code, and `release` must stop it;
+ *   - its process (`pids`), how `say` finds the session's registration and so its inbox; a session listed with no
+ *     process — one that has exited — has none;
+ *   - its start (`starts`), what `release` reads usage from.
+ * - What a finished attempt said and consumed (`Kept`), which only saves reads.
+ *
+ * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
+ * its own, and a wrong count is worse than none.
  */
 export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const quiescentAfterMs = options.quiescentAfterMs ?? QUIESCENT_AFTER_MS;
   const now = options.now ?? (() => Date.now());
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
   const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
-  /** A task's MCP config, kept outside the workspace: a file in a step's worktree travels down its branch. */
   const mcpFile = (name: string) => path.join(root, 'mcp', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
   const transcriptTime =
     options.transcriptTime ??
@@ -372,19 +386,16 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * idle pass instead, because that is when it may just have spoken. Losing this only re-reads.
    *
    * `keep` says which reads are worth keeping, and the caller decides: an attempt whose session the registry
-   * lists FINAL, and a busy session read over a transcript cold for the quiescence floor (issue 24), which is
-   * reached only while nothing has been written and so answers the same until something is. Without that
-   * second one, a session in any tool call longer than ninety seconds — `npm ci`, a build, this repository's
-   * own suite — was read in full on every pass of `wf up`, for the length of the call: measured on a 39.5 MB
-   * transcript, 174–282 ms a read against 17–60 ms for the mtime that gates it (found in review).
+   * lists FINAL, and a busy session read over a transcript cold for the quiescence floor, which is reached
+   * only while nothing has been written and so answers the same until something is. Without that second
+   * one, a session in a tool call longer than the floor — `npm ci`, a build, a test suite — is read in full
+   * on every pass for the length of the call, where the mtime that gates the read costs a fraction of it.
    *
    * Both conditions are what reading again would find, so no driver answers differently for having
-   * seen the session before. Kept by session id, for good, it failed twice on one step
-   * (`let-a-step-say-which-tools-i-v27t-implement`, 2026-09-13). The registry listed the session
-   * final to a `view` — which observes without stepping — at least ten seconds before it gave its (the reading the evidence allows, not a measurement)
-   * StructuredOutput, so "nothing said" was kept, and the end the tick later wrote had no closeout and
-   * that earlier moment's usage. Then the nudged retry `--resume`d the same id and was handed both, to
-   * the byte. An attempt is the row's name, its session, and the start `claude agents` gave it.
+   * seen the session before. Kept by attempt, never by session id alone: the registry can list a session
+   * final to a `view` — which observes without stepping — before it writes its StructuredOutput, and a
+   * `--resume` of the same id is another attempt, never handed what was read of the one before. An attempt
+   * is the row's name, its session, and the start `claude agents` gave it.
    */
   type Kept<T> = { value: T; readAt: number };
   const keptStatements = new Map<string, Kept<Statement | undefined>>();
@@ -410,10 +421,6 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   };
   const statementOf = (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
     keptRead(keptStatements, attempt, keep, writtenAt, () => closeoutFrom(s.sessionId));
-  /**
-   * No start in the registry, no usage — without one, a resumed session's inherited conversation
-   * cannot be told from its own, and a wrong count is worse than none.
-   */
   const usageOf = async (
     attempt: string,
     s: Sighting,
@@ -422,26 +429,54 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     keep = FINAL.has(s.state),
   ) => (since === undefined ? undefined : keptRead(keptUsage, attempt, keep, writtenAt, () => usageFrom(s.sessionId, since)));
 
-  /**
-   * Each of our sessions' state as `claude agents` itself last listed it: what `release` stops on, whatever
-   * the sighting it is handed says. A session whose end is on the record — quiet, or idle after its closeout —
-   * is still running on Claude Code, and `release` must stop that one. Rebuilt by every `observe`, which a
-   * pass always makes before it releases anything.
-   */
   const listed = new Map<string, SessionState>();
-  /**
-   * The process `claude agents` last listed for each of our sessions, by session id: how `say` finds the
-   * session's registration, and so its inbox. Rebuilt by every `observe`, which `say` is always handed a
-   * session from; a session listed with no process — one that has exited — has none.
-   */
   const pids = new Map<string, number>();
-  /** When `claude agents` last listed each of our sessions as started, by session id: what `release` reads usage from. */
   const starts = new Map<string, number>();
 
   return {
+    /**
+     * `claude --bg` under `r.name`, in the task's `cwd`. The MCP configs are found and written before the CLI runs, so
+     * whatever throws there started nothing (`refused`). The flags come in an order that matters: a variadic flag, or one
+     * whose value is optional, directly before the prompt takes the prompt as its value.
+     *
+     * 1. `--tools`, the fence: a tool the session does not have beats one it may not use, and `--allowedTools` only
+     *    pre-approves. An empty list is no tools at all.
+     * 2. `--disallowedTools`, the other half of the fence: a tool the session has, or a command it may run, that it must
+     *    not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny beats every
+     *    allow. Claude Code splits it on commas and spaces outside a rule's parentheses, so one argument holds them.
+     * 3. `--allowedTools`, which is not the fence's opposite: a rule here lets a tool the session HAS be used without
+     *    asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, not even in the
+     *    session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against
+     *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it.
+     * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`):
+     *    the session bridged to claude.ai and listed in its agents view, where it can be driven from a browser or a
+     *    phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag.
+     * 5. `--permission-mode`, always: it ends the variadic lists above, and cannot be taken for the optional name of
+     *    `--remote-control [name]`. `auto` unless the task says otherwise, rather than `acceptEdits`, which approves edits
+     *    and `mkdir`/`mv`/`cp` but not `npm test`, so the first session that runs its own tests waits for a person who is
+     *    not there. `auto` approves everything behind background safety checks, which Claude Code's docs recommend for
+     *    long tasks.
+     * 6. The MCP flags (`claudeMcpArgs`): without `--strict-mcp-config` a session loads every server the operator has —
+     *    user scope, and their claude.ai connectors (mail, calendar, drive). Strict alone drops the checkout's
+     *    `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
+     * 7. `--model` and `--effort`.
+     * 8. `--autocompact`, the context window: past it, the session compacts its conversation and carries on, under
+     *    `--bg` too, and still signs off. The same window on every attempt: a resumed copy keeps only the flags it is
+     *    given, so a continuation given none would run on the model's whole window again.
+     * 9. `--resume`, which continues that conversation in the background under a name that is still ours and still new,
+     *    so a resumed attempt is a row of its own on the board.
+     * 10. `--worktree`, ALWAYS with a name (`worktreeName`): its value is optional, so a bare `--worktree` before the
+     *    prompt takes the prompt as the worktree's name and the session runs with nothing to do. The harness cuts and
+     *    cleans the worktree; the engine only declares that it wants one, as a Pod asks for storage and the kubelet
+     *    provisions it.
+     * 11. `--json-schema`, the closing statement's shape: Claude Code gives the session a StructuredOutput tool for it,
+     *    under `--bg` as under `-p`, though it documents it only for `-p`.
+     * 12. `--max-budget-usd`, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this
+     *    harness (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
+     * 13. The brief, last.
+     */
     spawn: (r) =>
       Effect.try({
-        // Found and written before the CLI runs, so whatever throws here started nothing.
         try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.config?.mcp)]),
         catch: (cause) =>
           new RunnerError({
@@ -458,65 +493,19 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                 '--bg',
                 '--name',
                 r.name,
-                // The fence. `--tools`, not `--allowedTools`: a tool the session does not have beats one it
-                // may not use, and `--allowedTools` only pre-approves. VARIADIC — directly before the prompt
-                // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
-                // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
                 ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
-                // The deny list, the other half of the fence: a tool the session has, or a command it may run, that it
-                // must not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny
-                // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
-                // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
                 ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
-                // The allow list, which is not the fence's opposite: a rule here says a tool the session HAS may be used
-                // without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write —
-                // measured on 2.1.278, in a fresh directory with no settings file, Write was denied in the session's own cwd —
-                // so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against its `cwd`.
-                // Unscoped (`Write`) it would write anywhere; scoped it is denied outside. Variadic, joined and ended as the two
-                // lists above are, and a deny still beats it.
                 ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
-                // The caller's own flags (`config.claude`), after the variadic lists and before the mode. Remote Control among them, only
-                // when the task asks (`claude.remoteControl`): the session bridged to claude.ai and listed in its agents view, where it can be
-                // driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag (measured on
-                // 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt taken as its name — and here
-                // the `--permission-mode` that always follows cannot be taken for one.
                 ...claudeFlagsOf(r.config?.claude),
-                // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
-                // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
-                // session that wants to run its own tests stops and waits for a person who is not there.
-                // `auto` approves everything with background safety checks, which the docs recommend for
-                // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
                 '--permission-mode',
                 r.config?.permissionMode ?? 'auto',
-                // MCP servers: the ones named here and no others. Without `--strict-mcp-config` a session loads
-                // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
-                // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
-                // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
-                // Claude in Chrome is not in any config and survives strict, so `--no-chrome` goes with it.
                 ...mcpArgs,
                 ...(r.config?.model ? ['--model', r.config?.model] : []),
                 ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
-                // The context window: past about it, the session compacts its conversation and carries on — on `--bg` too, and it still
-                // signs off (measured on 2.1.278, open issue 26). Takes a required value, so it can neither swallow the prompt nor be taken
-                // for a `--tools` entry, which the `--permission-mode` above has ended. The same window on every attempt: a resumed
-                // copy keeps only the flags it is given, so a continuation given none would run on the model's whole window again.
                 ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),
-                // `--resume` continues that conversation in the background. The NAME is still ours and
-                // still new, so a resumed attempt is a distinct row on the board from the one it continues.
                 ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
-                // The harness cuts and cleans the worktree; the engine only declares that it wants one.
-                // This is the Pod/volume split: a workload asks for storage, the kubelet provisions it.
-                //
-                // ALWAYS with a name, even when the task did not choose one. `--worktree [name]` takes an
-                // OPTIONAL value, so a bare `--worktree` immediately before the prompt eats the prompt as
-                // the worktree's name and the session runs with nothing to do. Measured, not theorised.
                 ...(r.config?.worktree ? ['--worktree', worktreeName(r)] : []),
-                // The closing statement's shape. Claude Code gives the session a StructuredOutput tool for
-                // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
-                // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
                 ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
-                // The spend cap, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this harness
-                // (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
                 ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
                 r.brief,
               ],
@@ -526,6 +515,35 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         )
         .pipe(Effect.asVoid),
 
+    /**
+     * Every session of ours that `claude agents --all --json` lists, by name, in two passes.
+     *
+     * 1. The registry's rows. A row is ours only when we named it (`ae/`) and it has a `state`: `state` is the session's
+     *    lifecycle and `status` whether its process is busy this instant, two answers and not a fallback chain, and a row
+     *    with no `state` is an interactive session, whose `status` read as a state would record `idle` as a failure. The
+     *    state is put in A2A's names (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is
+     *    carried as the harness says it and judged by nothing here (`Sighting.waitingFor`), trimmed, and only when it is
+     *    a non-empty string. The session id is the native id — `--resume` takes exactly it — and the row's `startedAt`,
+     *    when this session started, is what its usage is counted from. `listed`, `pids` and `starts` are rebuilt here.
+     * 2. This harness's own definition of finished, applied to what is still `working`. What was kept for an attempt no
+     *    longer listed goes with it, so a released session is not read again. The clock is the transcript's mtime, asked
+     *    once a pass at most and only when needed, never a time this process remembers: a driver that ticks once per
+     *    process and exits gets the answer a long-lived one does. Quiet is counted from the transcript's last write or the
+     *    session's own start, whichever is later — a session resumed over a transcript cold for an hour has been quiet
+     *    only since it began — and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
+     *    - A busy session reports nothing it said and nothing quiet: a long tool call writes nothing for minutes. Unless the
+     *      last word in its conversation is its own closeout, from its own start on, and nothing has followed it for the
+     *      floor: then the work is over and something else holds its process — a background shell it left running — and
+     *      its closeout, its usage and its `quietMs` are reported. Both halves are needed: a session in a long turn has
+     *      said nothing since its last tool call, and one whose closeout is its parent's has said nothing of its own. Both
+     *      reads are kept (`Kept`) while the transcript stays as they found it, since this branch is reached only over a
+     *      transcript cold for the floor.
+     *    - Any other session reports what it said, with when, and what it consumed since its own start, as measured or
+     *      not at all. Whether a statement belongs to this attempt is the engine's call: a resumed session carries its
+     *      parent's statements too, and only the journal knows when the attempt began. One still `working` and quiet for
+     *      the floor reports `quietMs` too, statement or not, because an inherited statement is discarded upstream; what
+     *      quiet means is `decide`'s.
+     */
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {
         const rows = JSON.parse(out) as Array<{
@@ -542,18 +560,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         pids.clear();
         starts.clear();
         for (const row of rows) {
-          // `state` and `status` answer different questions and are NOT a fallback chain. `state`
-          // is the session's lifecycle; `status` is whether its process is busy this instant. A
-          // row with no `state` is an interactive session — never one of ours — and reading its
-          // `status` as a state is how `idle` once became a recorded failure.
-          // In A2A's names from here on (`claudeStateOf`); read after `waitingFor`, which tells two waits apart.
           const said = typeof row.state === 'string' && row.state ? row.state : undefined;
-          // Only sessions WE named are ours. Everything else on the machine is somebody else's.
-          // For this harness the session id IS the native id — `--resume` takes exactly it.
-          // What the harness says the session waits for, as it says it: carried onto the sighting and judged by nothing
-          // here (`Sighting.waitingFor`). Trimmed, and only when it is a non-empty string — a harness that says nothing,
-          // or says it in some shape we have no reading of, leaves it unset rather than putting `undefined` in front of
-          // a person.
           const waitingFor = typeof row.waitingFor === 'string' && row.waitingFor.trim() ? row.waitingFor.trim() : undefined;
           if (row.name?.startsWith('ae/') && row.sessionId && said) {
             const state = claudeStateOf(said, waitingFor);
@@ -568,27 +575,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                 nativeId: row.sessionId,
                 ...(waitingFor ? { waitingFor } : {}),
               },
-              // When THIS session started, as the harness recorded it: what usage is counted from.
               startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
             });
           }
         }
         return m;
       }),
-      // Second pass: apply this harness's own definition of finished to whatever is still
-      // `working`. Only quiescent candidates cost a transcript READ — a session whose process is busy costs
-      // its transcript's mtime and nothing more until that has been cold for the floor, and one read then,
-      // kept for as long as it stays cold.
-      //
-      // The clock is the TRANSCRIPT'S, not ours. An earlier version remembered when each session
-      // was first seen idle, which made the verdict depend on the observer surviving long enough
-      // to reach it — true of `wf up`, false of anything that ticks once per process and exits.
-      // Measured, with a one-second window and a month-cold transcript: one long-lived process
-      // said `done`; three consecutive one-shot processes each said `working`, forever. The
-      // transcript's mtime already answers "how long has this been quiet", so nothing needs
-      // remembering and every driver gets the same answer.
       Effect.flatMap((m) => {
-        // What was kept for an attempt no longer listed goes with it: a released session is not read again.
         const attempts = new Set([...m].map(([name, { sighting, startedAt }]) => attemptOf(name, sighting, startedAt)));
         for (const kept of [keptStatements, keptUsage]) for (const key of kept.keys()) if (!attempts.has(key)) kept.delete(key);
         return Effect.forEach(
@@ -596,51 +589,24 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           ([name, { sighting, startedAt }]) =>
             Effect.promise(async () => {
               const attempt = attemptOf(name, sighting, startedAt);
-              // When the transcript was last written: asked once a pass at most, and only if needed.
               let written: Promise<number | undefined> | undefined;
               const writtenAt = () => (written ??= transcriptTime(sighting.sessionId));
-              /**
-               * How long it has been quiet: from its last write or its own start, whichever is later — a
-               * session resumed over a transcript cold for an hour has been quiet only since it began, and
-               * measured by the transcript alone it would end the moment the registry listed it idle. No
-               * transcript, no measure: the deadline is for sessions nobody reads.
-               */
               const quietFor = async () => {
                 const lastWrite = await writtenAt();
                 return lastWrite === undefined ? undefined : now() - Math.max(lastWrite, startedAt ?? lastWrite);
               };
-              // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
-              // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
-              //
-              // Unless the last word in its conversation is its own closeout and nothing has followed it for
-              // the floor. Then the work is over and something else is holding the process: a background shell
-              // the session left running held one for seventy-seven minutes, its closeout unread, and only a
-              // person ending the shell let it go (issue 24). Both halves are needed — a session in a long turn
-              // has said nothing since its last tool call, and one whose closeout is its parent's has said
-              // nothing of its own at all.
-              //
-              // Both reads here are KEPT while the transcript stays as they found it (`keep`), because this branch
-              // is reached only over a transcript nothing has written for the floor: a tool call that runs for
-              // minutes would otherwise be a full read of a multi-megabyte file on every pass, always answering the
-              // same (found in review).
               if (sighting.busy) {
                 const quiet = sighting.state === 'working' ? await quietFor() : undefined;
                 if (quiet === undefined || quiet < quiescentAfterMs || startedAt === undefined) return [name, sighting] as const;
                 const said = await statementOf(attempt, sighting, writtenAt, true);
                 if (!said?.lastWord || said.at < startedAt) return [name, sighting] as const;
-                // Over, so what it consumed is final too — read here as it is for any session that has stopped.
                 const used = await usageOf(attempt, sighting, startedAt, writtenAt, true);
                 return [
                   name,
                   { ...sighting, closeout: { payload: said.payload, at: said.at }, ...(used ? { usage: used } : {}), quietMs: quiet },
                 ] as const;
               }
-              // What the workload SAID, if it said anything — reported with when it was said.
-              // Whether it belongs to this attempt is the engine's call, not ours: a resumed
-              // session carries its parent's statements too, and only the journal knows when
-              // the attempt began.
               const said = await statementOf(attempt, sighting, writtenAt);
-              // And what it has consumed since its own start — reported as measured, or not at all.
               const used = await usageOf(attempt, sighting, startedAt, writtenAt);
               const reported: Sighting = {
                 ...sighting,
@@ -648,10 +614,6 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                 ...(used ? { usage: used } : {}),
               };
               if (reported.state !== 'working') return [name, reported] as const;
-              // The floor underneath, statement or not: how long it has been quiet, once that is long
-              // enough to be stopped rather than paused — reported, not concluded (`decide` says what it
-              // means). Kept even when there IS a statement, because an inherited one is discarded
-              // upstream.
               const quiet = await quietFor();
               return quiet !== undefined && quiet >= quiescentAfterMs
                 ? ([name, { ...reported, quietMs: quiet }] as const)
@@ -663,10 +625,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     ),
 
     /**
-     * The session running under `name`, from its registration (`claudeRegistered`) rather than `claude agents`: about
-     * 2 ms here, where the CLI took about 330 ms (2.1.271, 231 rows). Which session it is, never its state. Every live
-     * registration on the machine this was measured on named the same session, under the same name, as `claude agents`
-     * listed for its pid.
+     * The session running under `name`, from its registration (`claudeRegistered`) rather than `claude agents`, which
+     * costs a process and a read of every row. Which session it is, never its state. A live registration names the same
+     * session, under the same name, as `claude agents` lists for its pid.
      */
     find: (name) =>
       Effect.tryPromise({
@@ -678,38 +639,39 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           new RunnerError({ verb: 'find', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),
 
-    // `claude stop` takes the short id, which is the uuid's first block.
+    /** `claude stop`, with the short id it takes (`short`). */
     stop: (sessionId) => sh('claude', ['stop', short(sessionId)], { verb: 'stop' }).pipe(Effect.asVoid),
 
     /**
      * A session whose end is on the record, let go: `claude stop` if it still runs, then `claude rm`.
-     * Without this it stayed in `claude agents` for good — one that gave its closeout sat `working/idle`
-     * there — and every run's sessions were cleared by hand. Measured before relying on it
-     * (`test/live.test.ts`, 2.1.270): once removed, `ae logs` still reads the session's transcript and
-     * `--resume <id>` still continues it.
+     * Without it a session stays in `claude agents` for good — one that gave its closeout sits `working/idle`
+     * there. Once removed, `ae logs` still reads the session's transcript and `--resume <id>` still continues
+     * it (`test/live.test.ts`).
      *
-     * Only stopped when the task asked for a worktree: `claude rm` deletes "a background session and its
-     * worktree", and the task's work is in that worktree.
+     * 1. Whether it runs is the registry's word (`listed`), not the sighting's: a session whose end is on the
+     *    record — quiet, or idle after its closeout — still runs. A session this runner has not listed, with no
+     *    `observe` made here, has only its sighting to go by. A session with a process listed runs whatever its
+     *    state says: Claude Code keeps a `done` session's process until it is stopped.
+     * 2. `claude stop`, if it runs. A failure means it exited since it was observed, which leaves `rm` as able
+     *    to go on, so it is passed over.
+     * 3. What the session consumed, read again once it is stopped, before `rm`: Claude Code writes a session's
+     *    cost into its transcript only as the process exits, and `claude stop` returns once it has, so the end on
+     *    the record was read with no cost in it. Read before `rm`, because an `rm` that fails leaves the session
+     *    listed, and the next pass's sighting carries the same read.
+     * 4. `claude rm`, only when the task asked for no worktree: `claude rm` deletes "a background session and
+     *    its worktree", and the task's work is in that worktree.
      *
-     * And what the session consumed, read again once it is stopped: Claude Code writes a session's cost into its
-     * transcript only as the process exits, and `claude stop` returns once it has (measured on 2.1.272: 0.6 s, both
-     * `cost-state` lines there as it returned). The end on the record was read before that, with no cost in it.
+     * Resolves with what was read in step 3, or nothing when it stopped nothing.
      */
     release: (session, task) =>
       Effect.gen(function* () {
-        // The registry's word, not the sighting's: a session whose end is on the record — quiet, or idle
-        // after its closeout — is still running (found in review, when quiet was reported `done`). A session
-        // this runner has not listed — no `observe` made here — has only its sighting to go by. A process listed
-        // for it runs whatever its state says: a session `done` keeps its process until it is stopped (2.1.272).
         const running = listed.get(session.sessionId) ?? session.state;
         const alive = running === 'working' || running === 'input-required' || running === 'auth-required' || pids.has(session.sessionId);
         if (alive) {
-          // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
           yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
             Effect.catchTag('RunnerError', () => Effect.succeed('')),
           );
         }
-        // Read before `rm`: one that fails leaves the session listed, and the next pass's sighting carries the same read.
         const since = starts.get(session.sessionId);
         const measured =
           alive && since !== undefined
@@ -719,17 +681,20 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         return measured;
       }),
 
-    // The one verb where the Agent SDK is simply better than the CLI: `getSessionMessages` reads
-    // the stored transcript as TYPED messages, and it works on sessions it never started — the
-    // `claude --bg` ones included. Measured, not assumed.
+    /**
+     * The stored transcript as typed messages, through the Agent SDK's `getSessionMessages`, which reads sessions it
+     * never started, the `claude --bg` ones included.
+     */
     logs: (sessionId) =>
       Effect.tryPromise({
         try: () => getSessionMessages(sessionId),
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }).pipe(Effect.map(renderTranscript)),
 
-    // Read from the raw JSONL rather than through `getSessionMessages`, as the closeout is: the SDK's
-    // messages carry no timestamp, and a board needs to know when each thing was said.
+    /**
+     * Read from the raw JSONL (`readTranscript`) rather than through `getSessionMessages`, as the closeout is: the SDK's
+     * messages carry no timestamp, and a board needs to know when each thing was said.
+     */
     transcript: (sessionId, after) =>
       Effect.tryPromise({
         try: () => readTranscript(transcriptFile(sessionId), after, claudeTranscriptEvents),
@@ -741,10 +706,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * script to post into a session, and the one another session's `SendMessage` reaches. No token: on macOS
      * and Linux the inbox takes a connection without one (it requires one only on native Windows, whose inbox
      * is a named pipe and is refused as not a socket), and the token beside the registration is another
-     * session's credential, not this engine's to read. Measured on 2.1.270, by hand on a busy session and an idle
-     * one, and end to end by `test/live.test.ts` (`docs/open-issues.md`, verified live): a busy session reads the
-     * words between tool calls; an idle one starts a turn with them. One blocked on a permission prompt queues them
-     * and never reads them (open issue 16).
+     * session's credential, not this engine's to read. A busy session reads the words between tool calls; an idle
+     * one starts a turn with them (`test/live.test.ts`). One blocked on a permission prompt queues them and never
+     * reads them.
      *
      * The inbox writes nothing back, so this resolves on the words being taken, not on their being read: a
      * `crossSessionInbound` of `hold` or `refuse` in the operator's settings, a rate limit, or an identical
@@ -767,10 +731,12 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   };
 };
 
-/** A harness that costs nothing: sessions are a map, and a test moves them by hand. */
+/**
+ * A harness that costs nothing: sessions are a map, and a test moves them by hand. Every spawn request is pushed to
+ * `spawned`, so a test can assert what the harness was actually asked for.
+ */
 export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
   const sessions = control?.sessions ?? new Map<string, Sighting>();
-  /** Every spawn request, so a test can assert what the harness was actually asked for. */
   const spawned = control?.spawned ?? [];
   let n = 0;
   return {
@@ -789,8 +755,15 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
   };
 };
 
+/** A session's short id, as `claude stop` and `claude rm` take it: the uuid's first block. */
 const short = (sessionId: string) => sessionId.split('-')[0];
 
+/**
+ * `cmd` run with `args`, answering its stdout, or a `RunnerError` for `verb` with its stderr. Refused (`refused`) only
+ * when the OS never created the process — no binary, no cwd — so nothing ran and nothing started: any other failure ran
+ * the command, and whether it registered a session first is not something its exit code says. Interrupted, it kills
+ * the child.
+ */
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
     countSpawn();
@@ -801,9 +774,6 @@ const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
               new RunnerError({
                 verb: o.verb,
                 message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
-                // The OS never created the process — no binary, no cwd — so nothing ran and nothing
-                // started. Any other failure ran the command, and whether it registered a session first
-                // is not something its exit code says.
                 ...((err as NodeJS.ErrnoException).syscall?.startsWith('spawn') ? { refused: true } : {}),
               }),
             )

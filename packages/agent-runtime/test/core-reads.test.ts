@@ -7,6 +7,10 @@
  * about a harness. So this reads the three files' code, comments left out, and refuses a harness argument named there,
  * and `config` opened — by a member, an index, a destructuring, a spread, `in` or an `Object.*` walk. Passing it on whole
  * is the one use it has.
+ *
+ * The runtime measures a spend and reports it, and the orchestrator decides over budget: a `budget` in the core's code — a field,
+ * an end reason, a comparison of a `limit` — is that judgement coming back, and none of the harness-argument checks sees one that
+ * names no harness argument (`limit === 'budget'`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,12 +23,21 @@ const CORE = ['src/domain.ts', 'src/engine.ts', 'src/lifecycle.ts'];
 const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 
 const NAMED = new RegExp(`\\b(${HARNESS_ARGS.join('|')})\\b`);
+/**
+ * The ways a line opens `config`, in order:
+ *
+ * 1. a member or an index: `state.config.model`, `config?.[k]`, `config!.x`;
+ * 2. a destructuring: `const { model } = state.config`;
+ * 3. a spread into something that is then read;
+ * 4. `key in state.config`;
+ * 5. an `Object.*` walk: `Object.keys(state.config)`.
+ */
 const OPENED = [
-  /\bconfig\s*(\?\.|\.|\[|!)/, // a member or an index: `state.config.model`, `config?.[k]`, `config!.x`
-  /\{[^{}]*\}\s*=\s*[^;\n]*\bconfig\b/, // destructured: `const { model } = state.config`
-  /\.\.\.\s*[\w.?]*\bconfig\b/, // spread into something that is then read
-  /\bin\s+[\w.?]*\bconfig\b/, // `key in state.config`
-  /\bObject\.\w+\(\s*[\w.?]*\bconfig\b/, // `Object.keys(state.config)`
+  /\bconfig\s*(\?\.|\.|\[|!)/,
+  /\{[^{}]*\}\s*=\s*[^;\n]*\bconfig\b/,
+  /\.\.\.\s*[\w.?]*\bconfig\b/,
+  /\bin\s+[\w.?]*\bconfig\b/,
+  /\bObject\.\w+\(\s*[\w.?]*\bconfig\b/,
 ];
 
 /** Each line of `code` that reads a harness argument, as `n: line`. */
@@ -35,8 +48,7 @@ test("domain.ts, lifecycle.ts and engine.ts name no harness argument, and hand a
   for (const file of CORE) assert.deepEqual(reads(codeOf(fs.readFileSync(file, 'utf8'))), [], `${file} reads a harness argument`);
 });
 
-test('the check refuses every way of opening config, and is not refused by carrying it', () => {
-  // Each of these is a read the core must never make; the test above would pass with a check that saw none of them.
+test('the check refuses every way of opening config, and is not refused by carrying it (the test above would pass with a check that saw none of these reads)', () => {
   const REFUSED = [
     'if (state.config?.model === "opus") return [];',
     'const mode = state.config.permissionMode;',
@@ -49,7 +61,6 @@ test('the check refuses every way of opening config, and is not refused by carry
     'contextTokens: spec.contextTokens,',
   ];
   for (const line of REFUSED) assert.equal(reads(line).length, 1, `not refused: ${line}`);
-  // What the core does with it: carry it into the record, the state and the spawn, and hand it to a release.
   const CARRIED = [
     'config?: HarnessArgs;',
     's.config = e.config; s.closeoutSchema = e.closeoutSchema;',
@@ -62,18 +73,17 @@ test('the check refuses every way of opening config, and is not refused by carry
   for (const line of CARRIED) assert.deepEqual(reads(codeOf(line)), [], `refused, and it only carries: ${line}`);
 });
 
-test('engine.ts hands the whole config to every spawn, so a runner is given what the task was filed with', () => {
-  // The other half of passing it on: were the spawn to drop it, no read would show, and every harness would run bare. A
-  // turn's own (an answer's `config`) is laid over it by `configForTurn`, in `harness-args.ts`, never here.
+test('engine.ts hands the whole config to every spawn, so a runner is given what the task was filed with, and a spawn that dropped it would run every harness bare', () => {
   const code = codeOf(fs.readFileSync('src/engine.ts', 'utf8'));
-  assert.match(code, /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s);
+  assert.match(
+    code,
+    /runner\s*\.spawn\(\{[^}]*\bconfig: configForTurn\(state\.config, /s,
+    "a turn's own config (an answer's) is laid over the task's by `configForTurn`, in `harness-args.ts`, never in engine.ts",
+  );
   assert.match(code, /runner\s*\.release\(\s*session,\s*state\.config\b/);
 });
 
 test('domain.ts, lifecycle.ts and engine.ts know no budget: the cap is a harness argument, and a spend is a fact they carry', () => {
-  // Stage 4b: the runtime measures and reports, and the orchestrator decides over budget. A `budget` in the core's code —
-  // a field, an end reason, a comparison of a `limit` — is the judgement coming back, and none of the checks above sees
-  // one that names no harness argument (`limit === 'budget'`).
   const BUDGET = /budget/i;
   for (const file of CORE) {
     const lines = codeOf(fs.readFileSync(file, 'utf8'))

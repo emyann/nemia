@@ -1,7 +1,7 @@
 /**
  * `list(taskIds)`: the views of some tasks, each journal read once and the harnesses looked at once for those in flight among them
- * (`viewsOf` in engine.ts). What the api's list of runs reads for the runs it has not kept, in place of `list()` — every journal in the
- * store, 1,850 on the live store on 2026-09-25 — or a `view` each, which observes its harness for each task in flight.
+ * (`viewsOf` in engine.ts). What the api's list of runs reads for the runs it has not kept, in place of `list()`, which reads every
+ * journal in the store, or a `view` each, which observes its harness for each task in flight.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

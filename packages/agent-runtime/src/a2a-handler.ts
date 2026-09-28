@@ -7,7 +7,7 @@
  *
  * Not the SDK's `DefaultRequestHandler`: that one runs an `AgentExecutor` against a `TaskStore` it writes, and a store
  * the handler writes is a second record beside the journal — the thing a level-triggered runtime cannot have. This is
- * the same interface, so the SDK's HTTP transports can serve it by URL later (stage 6) without a change here.
+ * the same interface, so the SDK's HTTP transports can serve it by URL without a change here.
  *
  * `sendMessage` is a spawn when the message carries the runtime's extension, and otherwise words said to a running
  * session (`say`); `listTasks` is an observe, `getTask` one session's view, `cancelTask` a stop. What A2A has no call
@@ -230,13 +230,15 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * ended takes no more, as A2A refuses a message to a Task in a terminal state. The harness is listed afresh for the
    * session's id: the handler holds no listing of its own, and the message's context, when it sends one, must be that
    * session's. Answered with the session as that listing saw it.
+   *
+   * A harness with no channel into a session (`say`) is refused before any observe, so it is asked nothing. A2A's way on
+   * from an ended session is a message in its context; here, since a plain message naming a Task only continues it, that
+   * is a spawn under a name of its own, once the session has ended: spawned while it runs, a second process would resume
+   * the same conversation beside it.
    */
   private async follow(m: Message): Promise<Task> {
     const refused = followUpRefusal(m);
     if (refused) throw new RequestMalformedError(refused);
-    // A2A's way on is a message in the session's context; here, since a plain message naming a Task only continues it,
-    // that is a spawn under a name of its own — once the session has ended: spawned while it runs, a second process would
-    // resume the same conversation beside it. Before any observe: a harness with no channel is asked nothing.
     if (!this.ops.say) {
       throw new UnsupportedOperationError(
         `the \`${this.harness}\` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked \`${RUNTIME_EXTENSION}\` — in this session's contextId.`,

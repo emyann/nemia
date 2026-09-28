@@ -1,4 +1,8 @@
-// The detached worker: runs an SDK session in its own process, reports via a status file.
+/**
+ * A detached SDK session: runs one Claude Agent SDK session in `<cwd>` on a fixed brief (write `detached` into DETACHED.md), in
+ * its own process, and reports it on `<statusFile>` as `{ pid, state, sessionId?, costUsd?, error? }`, `state` one of
+ * `working`, `done` or `failed`.
+ */
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import fs from 'node:fs';
 const [cwd, statusFile] = process.argv.slice(2);

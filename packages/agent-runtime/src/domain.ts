@@ -42,7 +42,7 @@ import { transition, type LifecycleEvent, type LifecycleState, type Move, type R
  *                   a refusal *at spawn*, before anything started, is `unstartable` and never a sighting.
  *   canceled        stopped under it, by its harness or a person at the harness's side. Recorded `stopped`.
  *
- * `busy` used to be in here and did not belong: it is a value of a DIFFERENT field. See `Sighting.busy`.
+ * Whether the session's process computes is no state: it is a DIFFERENT field, `Sighting.busy`.
  */
 export const SESSION_STATES = [
   'submitted',
@@ -60,7 +60,7 @@ export const isSessionState = (word: unknown): word is SessionState => (SESSION_
 
 /**
  * How an attempt ended, as the journal records it: `ended.observed`, the `record-end` action, `Attempt.ended`. Not A2A's
- * words, and on purpose: every journal written since the first keeps them, an older `wf up` folds what a newer one wrote,
+ * words, and on purpose: every journal keeps them, an older `wf up` folds what a newer one wrote,
  * and the layers above compare them (`ended === 'done'`). A sighting's state becomes one of these through `endOf` alone.
  */
 export type Ended = 'done' | 'failed' | 'stopped';
@@ -79,15 +79,18 @@ export const waitsOnPerson = (s: SessionState | undefined): boolean => s !== und
 /** A session at work: submitted or working. */
 export const atWorkState = (s: SessionState | undefined): boolean => s !== undefined && RUNNING.has(s);
 
+/**
+ * The end each state records when its harness lets the session go. At work and let go of — quiet, or closed out — is an
+ * end the harness vouches for, `done`, as a quiet session is. Waiting on a person has not ended, and has none: no edge
+ * records its end off such a sighting (`harnessEnd`).
+ */
 const ENDS: Record<SessionState, Ended | undefined> = {
-  // At work and let go of — quiet, or closed out — is an end the harness vouches for, as a quiet session has always been.
   submitted: 'done',
   working: 'done',
   completed: 'done',
   failed: 'failed',
   rejected: 'failed',
   canceled: 'stopped',
-  // Waiting on a person has not ended: no edge records its end off such a sighting (`harnessEnd`).
   'input-required': undefined,
   'auth-required': undefined,
 };
@@ -96,7 +99,7 @@ const ENDS: Record<SessionState, Ended | undefined> = {
 export const endOf = (state: SessionState): Ended | undefined => ENDS[state];
 
 /**
- * A session's state in the words every view above the runtime has always printed: `running (working)` is compared exactly
+ * A session's state in the words every view above the runtime prints: `running (working)` is compared exactly
  * by the orchestrator's admission, and `wf ls`, the board and `phaseOfView` read the rest. A2A's names stop at the runtime.
  */
 export type PhaseWord = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
@@ -113,9 +116,10 @@ const PHASE_WORDS: Record<SessionState, PhaseWord> = {
 export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state];
 
 /**
- * The five words `Sighting.state` spoke until A2A's replaced them (2026-09-25), as the runtime's own former vocabulary: what
- * a `PromiseRunner` written before may still report, and what a remote registry entry written before still says. `blocked`
- * is `input-required`, since those words never said which wait; `undefined` for any other word.
+ * A2A's name for one of the runtime's own former words for a session's state — `working`, `blocked`, `done`, `failed`,
+ * `stopped` — which `Sighting.state` spoke before A2A's: what a `PromiseRunner` written against them may still report, and
+ * what a remote registry entry an older runtime wrote still says. `blocked` is `input-required`, since those words never
+ * said which wait; `undefined` for any other word.
  */
 export const formerStateOf = (word: unknown): SessionState | undefined =>
   typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;
@@ -167,7 +171,7 @@ export type Sighting = {
    * How long the session has been quiet — nothing written — present once that is long enough that its runner holds it
    * has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).
    *
-   * **A sighting can be `busy` and quiet at once**, and that combination is the whole of issue 24: a session whose
+   * **A sighting can be `busy` and quiet at once**: a session whose
    * process is doing something other than the work — a background shell it left running — while the last word in its
    * conversation is its own closing statement. Whether a runner can tell those apart is its harness's business; this
    * field is the answer, and `busy` is a separate fact about the process. So a reader of a sighting, and a runner
@@ -186,7 +190,7 @@ export type Sighting = {
    * a session that is not waiting on anybody.
    *
    * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
-   * `state.waiting.reason`, a word a person reads, and Claude Code may add another next month. `decide` does not
+   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` does not
    * read it, and nothing here turns it into a state — `state` already says a session waits on a person
    * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a sighting: read afresh each pass, so a
    * session that stops waiting simply stops carrying it.
@@ -234,7 +238,7 @@ export type Usage = {
   toolCalls?: number;
   /**
    * Every input token the model read, cached ones included: the sum of the three classes below when its runner measured
-   * them, and kept a field of its own so a journal written before they were still folds.
+   * them, and a field of its own so a journal an older runtime wrote, which has only this, still folds.
    */
   inputTokens?: number;
   /**
@@ -287,17 +291,17 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  *                  is `stated` on the end, a fact beside the reason: the layer above judges it, not the engine.
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unsigned`     only in a journal written before stage 4a (2026-09-23): the session ended without the closing
- *                  statement its task asked for, and the engine judged it, recorded `failed`. It judges no longer:
- *                  such an end is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles
- *                  `failed` with the note it always had.
+ *   `unsigned`     only in a journal an older runtime wrote, whose engine judged a session that ended without the
+ *                  closing statement its task asked for, and recorded it `failed`. This engine judges no such end: it
+ *                  is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles `failed`
+ *                  with a note that says so (`attemptNote` in `lifecycle.ts`).
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *                  A harness that ended the session at a limit its configuration set — a spend cap — ends it `harness`
- *                  too, with the limit beside it (`limit`), a fact the layer above judges. A journal written before stage
- *                  4b (2026-09-25) recorded such an end `budget`, and is read as `harness` with `limit: 'budget'`
+ *                  too, with the limit beside it (`limit`), a fact the layer above judges. A journal an older runtime
+ *                  wrote may record such an end `budget`, which is read as `harness` with `limit: 'budget'`
  *                  (`upgrade` in `journal.ts`).
  *   `operator`     a person asked the task to stop, and the attempt was stopped before its harness ended it. Recorded
- *                  `stopped`. Journals before 2026-09-19 settled such an attempt without ending it.
+ *                  `stopped`. A journal an older runtime wrote may settle such an attempt without ending it.
  *   `deadline`     the task ran past its deadline, and the attempt was stopped before its harness ended it. Recorded
  *                  `failed`, and the task settles `failed`.
  *
@@ -305,19 +309,54 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  * neither, and never words the machine wrote in the agent's name. (`harness` on a task that asked for no statement:
  * the harness's own state is all it has, and all it was asked for.)
  *
- * The runtime makes one attempt per start (stage 4a part 2): whatever the reason, an attempt that did not succeed and
+ * The runtime makes one attempt per start: whatever the reason, an attempt that did not succeed and
  * was not stopped settles its task `failed`. The reason is recorded rather than inferred later so that the layer
  * above, which decides whether to try again and which session to continue, can tell a lost session's unjudged work
  * from a conclusion and from a spawn that ran nothing.
  */
 export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'operator' | 'deadline';
 
-// ─── the journal ────────────────────────────────────────────────────────────
-// Every side effect is bracketed by two entries: the intent, then the result. That bracket is
-// what makes a crash between them recoverable — `decide` can always tell which side it is on.
-
+/**
+ * One entry of a task's journal. Every side effect is bracketed by two entries: the intent, then the result. That bracket
+ * is what makes a crash between them recoverable — `decide` can always tell which side it is on.
+ *
+ * - `filed`: the desired state, stated once. A `filed` an older runtime wrote may also carry keys folded unread:
+ *   `maxAttempts` and `resume`, how many attempts a turn had and which session a later one continued — the runtime makes
+ *   one attempt per start, and trying again is the layer above's; and `priority`, which waiting task a free slot went to
+ *   first — the runtime keeps no slots, and the layer above chooses what starts and `admit`s it. It may carry the spend
+ *   cap beside `config`, read as one of the harness's arguments, under it (`upgrade` in `journal.ts`).
+ * - `starting`: INTENT — the engine is about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is
+ *   told instead of the brief — a later turn's answer; in a journal an older runtime wrote, also why a session that
+ *   stopped unsigned was back — decided here with `resumeFrom`, and never re-derived.
+ * - `spawned`: RESULT — the spawn call returned, and the session is the harness's problem now. `error` when the call
+ *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
+ *   find out.
+ * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials` and
+ *   `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
+ *   read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict — `decide`
+ *   does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
+ *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
+ * - `measured`: what an ended attempt consumed, read once its session was let go — for a harness that writes part of it
+ *   only as the session's process exits, which is after the end was written (Claude Code's cost). Merged into the
+ *   attempt's `usage`. A fact for the record, written once; `decide` never reads it.
+ * - `stop-requested`: the operator asked for it to stop.
+ * - `said`: a person's words, handed to the session of the attempt in flight through its harness (`say`). Written once
+ *   the harness took them, so it means they were handed over — not that the session read them, or did what they asked.
+ *   `decide` never reads it: what was said to a session is a fact for whoever reviews the work, not a judgement on it.
+ * - `input`: a person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the
+ *   words its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself
+ *   when they gave any — its spend cap. Read by `decide`: an input starts a turn. Refused by the facade unless the task
+ *   waits for one.
+ * - `closed`: a person's word that a task held open is finished with: it settles once no attempt of it runs. Read by
+ *   `decide`.
+ * - `admitted`: the layer above's word that a queued task's current turn may start: the next pass starts it. Names no
+ *   turn: it admits the turn current when it is written, and a later turn — a person's answer to a task held open — waits
+ *   for one of its own. Written by `admit`, and only while the task waits for it.
+ * - `settled`: terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open — stopped by a
+ *   person, or past its deadline, with no `ended` to carry it — as the harness still listed it: what `logs` reads once
+ *   that session has been let go. `decide` never reads it.
+ */
 export type Event =
-  /** The desired state, stated once. */
   | {
       kind: 'filed';
       at: string;
@@ -328,15 +367,10 @@ export type Event =
       deadlineSeconds?: number;
       /** A session of this harness that the task's attempt should continue rather than start cold. */
       resumeFrom?: string;
-      /*
-       * A journal written before stage 4a part 2 (2026-09-23) carries `maxAttempts` and `resume` here too: how many
-       * attempts a turn had and which session a later one continued. Folded unread: the runtime makes one attempt per
-       * start, and trying again is the layer above's.
-       */
       /**
        * The harness's arguments — model, permission mode, effort, tools, MCP servers, context window, worktree, bridge —
        * as one object, `HarnessArgs`. Carried, never read here: a runner hands them to its harness, and `decide` never
-       * learns what any of them is. A journal written before they moved here has them beside it, and is read as though it
+       * learns what any of them is. A journal an older runtime wrote may have them beside it, and is read as though it
        * had them here (`upgrade` in `journal.ts`).
        */
       config?: HarnessArgs;
@@ -348,48 +382,22 @@ export type Event =
        * it never learns the shape, because the shape is somebody else's vocabulary.
        */
       closeoutSchema?: object;
-      /*
-       * A journal written before stage 4b (2026-09-25) carries the spend cap here too, beside `config`; it is read as one
-       * of the harness's arguments, under it (`upgrade` in `journal.ts`).
-       */
-      /*
-       * A journal written before stage 4c part 2 (2026-09-25) may carry `priority` here: which waiting task a
-       * free slot went to first. The runtime keeps no slots now — the layer above chooses what starts and `admit`s it — so
-       * the key is history, folded unread.
-       */
       /**
-       * Filed to wait for the layer above's word (stage 4c): each turn starts only once an `admitted` entry names it, and a
-       * task not queued starts on the next pass. Written on every filing since, `false` when not asked for; a journal
-       * written before has no key and reads as queued, so a store an older daemon filed into is held for the admission the
-       * upper layer now does rather than started all at once. A Job's `suspend: true`.
+       * Filed to wait for the layer above's word: each turn starts only once an `admitted` entry names it, and a task not
+       * queued starts on the next pass. Written on every filing, `false` when not asked for; a journal an older runtime
+       * wrote has no key and reads as queued, so a store an older daemon filed into is held for the layer above's
+       * admission rather than started all at once. A Job's `suspend: true`.
        */
       queued?: boolean;
       /**
-       * Held open (R1): an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
+       * Held open: an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
        * running — rather than settled. Their answer (`input`) is a new turn, an attempt continuing the session; a `closed`
-       * settles it. Absent on every task filed before, which settles on its first signed end as ever.
+       * settles it. Absent on a task not held open, which settles on its first signed end.
        */
       holdOpen?: true;
     }
-  /**
-   * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
-   * the brief — a later turn's answer; before stage 4a, also why a session that stopped unsigned was back — decided
-   * here with `resumeFrom`, and never re-derived.
-   */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string }
-  /**
-   * RESULT: the spawn call returned. The session is the harness's problem now. `error` when the call
-   * failed without the harness vouching that nothing started: whether a session exists is then the
-   * grace window's to find out.
-   */
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
-  /**
-   * An attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials` and `limit`
-   * come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
-   * read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict —
-   * `decide` does not read it, and the layer above judges what a missing statement means. Absent from every end
-   * written before stage 4a, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
-   */
   | {
       kind: 'ended';
       at: string;
@@ -406,41 +414,12 @@ export type Event =
       limit?: string;
       error?: string;
     }
-  /**
-   * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
-   * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
-   * A fact for the record, written once; `decide` never reads it.
-   */
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
-  /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
-  /**
-   * A person's words, handed to the session of the attempt in flight through its harness (`say`). Written
-   * once the harness took them, so it means they were handed over — not that the session read them, or
-   * did what they asked. `decide` never reads it: what was said to a session is a fact for whoever
-   * reviews the work, not a judgement on it.
-   */
   | ({ kind: 'said' } & Said)
-  /**
-   * A person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the words
-   * its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself when
-   * they gave any — its spend cap. Read by
-   * `decide`: an input starts a turn. Refused by the facade unless the task waits for one.
-   */
   | ({ kind: 'input' } & Input)
-  /** A person's word that a task held open is finished with: it settles once no attempt of it runs. Read by `decide`. */
   | { kind: 'closed'; at: string }
-  /**
-   * The layer above's word that a queued task's current turn may start (stage 4c): the next pass starts it. Names no
-   * turn: it admits the turn current when it is written, and a later turn — a person's
-   * answer to a task held open — waits for one of its own. Written by `admit`, and only while the task waits for it.
-   */
   | { kind: 'admitted'; at: string }
-  /**
-   * Terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open —
-   * stopped by a person, or past its deadline, with no `ended` to carry it — as the harness still
-   * listed it: what `logs` reads once that session has been let go. `decide` never reads it.
-   */
   | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
 
 /** Words said to a running attempt's session, and when the engine wrote them down. See the `said` event. */
@@ -467,14 +446,14 @@ export type Attempt = {
   nativeId: string | null;
   /** What this attempt was told to continue, decided when it started and never re-derived. */
   resumeFrom?: string;
-  /** What it was told instead of the task's brief: a later turn's answer (before stage 4a, why an unsigned session was back). Carried, never read. */
+  /** What it was told instead of the task's brief: a later turn's answer (in a journal an older runtime wrote, also why an unsigned session was back). Carried, never read. */
   nudge?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
   closeout?: unknown;
   /**
    * Whether the closing statement its task asked for came, as its end reported it: `false` is a session its harness
-   * let go with none. Absent where its task asked for none, where no sighting ended it, and on every end written
-   * before stage 4a. Carried, never read: whether that is a failure is the caller's judgement, not the runtime's.
+   * let go with none. Absent where its task asked for none, where no sighting ended it, and on an end an older runtime
+   * wrote. Carried, never read: whether that is a failure is the caller's judgement, not the runtime's.
    */
   stated?: boolean;
   /** What this attempt consumed; `null` when its runner measured nothing, never zeros. Carried, never read. */
@@ -487,7 +466,7 @@ export type Attempt = {
   limit?: string;
   /**
    * Which turn of a task held open it belongs to: how many `input`s were journalled before it started. Absent for turn 0,
-   * so every attempt of a task not held open — and of every journal written before — folds as it did.
+   * so every attempt of a task not held open — and of a journal an older runtime wrote — folds as turn 0.
    */
   turn?: number;
   /** What a failed spawn call said: the refusal behind `unstartable`, or an error after which a session may still exist. */
@@ -513,9 +492,9 @@ export type State = {
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
-  /** Filed to be held open (R1): a signed end waits on a person. See the `filed` event. */
+  /** Filed to be held open: a signed end waits on a person. See the `filed` event. */
   holdOpen?: true;
-  /** Filed to wait for the layer above's word: absent on a journal from before stage 4c, which reads as queued. See the `filed` event. */
+  /** Filed to wait for the layer above's word: absent on a journal an older runtime wrote, which reads as queued. See the `filed` event. */
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
   admitted?: number;
@@ -626,15 +605,14 @@ export function fold(taskId: string, events: readonly Event[]): State {
   return s;
 }
 
-// ─── a task held open: its turns ────────────────────────────────────────────
-// Pure arithmetic over the fold, so `decide` reads a turn and not the journal's order.
-
 /**
- * Turn `n` of a task (the current one by default): its attempts; the session it continues — for a later turn, the one that
- * signed the turn before it, and none if its harness recorded none; for the first, what the task was filed against; the words it is told instead of the brief — every answer given since the turn
- * before it started, so two answers that raced are both heard; and what its configuration gives for itself — the last one
- * given with those words, whole, which the engine lays over the filing's (`configForTurn`). Turn 0 is the task as filed:
- * every attempt of a task not held open, told the brief, with nothing of its own.
+ * Turn `n` of a task (the current one by default), by pure arithmetic over the fold, so `decide` reads a turn and not the
+ * journal's order: its attempts; the session it continues — for a later turn, the one that signed the turn before it,
+ * and none if its harness recorded none; for the first, what the task was filed against; the words it is told instead of
+ * the brief — every answer given since the turn before it started, so two answers that raced are both heard; and what its
+ * configuration gives for itself — the last one given with those words, whole, which the engine lays over the filing's
+ * (`configForTurn`). Turn 0 is the task as filed: every attempt of a task not held open, told the brief, with nothing of
+ * its own.
  */
 export function turnOf(state: State, n = state.inputs.length) {
   const attempts = state.attempts.filter((a) => (a.turn ?? 0) === n);
@@ -656,17 +634,17 @@ export function waitsForInput(state: State): boolean {
 }
 
 /**
- * Whether the task waits for the layer above's word to start its current turn (stage 4c): queued — or filed before the
- * key, which reads as queued — not settled, not asked to stop, no attempt in flight, its turn not yet started, not
- * waiting on a person and not closed, and no `admitted` entry for this turn. The one reading of it: `decide` holds the
- * start on it, `admit` writes an entry only while it holds, and a view says `queued` by it.
+ * Whether the task waits for the layer above's word to start its current turn: queued — or filed by an older runtime,
+ * without the key, which reads as queued — not settled, not asked to stop, no attempt in flight, its turn not yet
+ * started, not waiting on a person and not closed, and no `admitted` entry for this turn. The one reading of it:
+ * `decide` holds the start on it, `admit` writes an entry only while it holds, and a view says `queued` by it.
  */
 export function awaitsAdmission(state: State): boolean {
   return admissionOf(state) === 'queued';
 }
 
 /**
- * Where a queued task stands with the layer above, for a view (stage 4c): `queued` while it waits for its word, `admitted`
+ * Where a queued task stands with the layer above, for a view: `queued` while it waits for its word, `admitted`
  * once given and until the turn starts — a slot the upper layer has handed out — and nothing for a task not queued, or
  * one whose turn has started or has nothing left to start, which the phase says.
  */
@@ -680,16 +658,24 @@ export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
   return state.admitted === turn.n ? 'admitted' : 'queued';
 }
 
-// ─── the decision ───────────────────────────────────────────────────────────
-
+/**
+ * The one step `decide` names:
+ *
+ * - `nothing`: nothing to do. Not an error — the common case on a busy board. `refused` when the lifecycle has no edge for
+ *   what was seen.
+ * - `start`: journal the intent to run attempt N, continuing `resumeFrom`, what its turn continues — told `nudge`, a later
+ *   turn's answer, instead of the brief.
+ * - `spawn`: an intent with no spawn behind it. Named in advance, so this cannot double-start.
+ * - `record-end`: the harness says this attempt is over — or, `unstartable`, refused to start it, in its words (`error`).
+ *   Write it down.
+ * - `stop`: stop a session its harness still holds — for a person, for the deadline, or to continue it. Its end is read
+ *   on a later pass.
+ * - `settle`: the task's terminal entry, its outcome and, where one says why, a `note`.
+ */
 export type Action =
-  /** Nothing to do. Not an error — the common case on a busy board. `refused` when the lifecycle has no edge for what was seen. */
   | { do: 'nothing'; why: string; refused?: Refusal }
-  /** Journal the intent to run attempt N, continuing `resumeFrom`, what its turn continues — told `nudge`, a later turn's answer, instead of the brief. */
   | { do: 'start'; attempt: number; resumeFrom?: string; nudge?: string }
-  /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
-  /** The harness says this attempt is over — or, `unstartable`, refused to start it, in its words (`error`). Write it down. */
   | {
       do: 'record-end';
       attempt: number;
@@ -706,7 +692,7 @@ export type Action =
 
 /**
  * The clock, and how long a spawned session may go unregistered before it is lost. How many sessions may be at work at
- * once is not here: the layer above chooses what starts and `admit`s it (stage 4c), and a task it has admitted starts.
+ * once is not here: the layer above chooses what starts and `admit`s it, and a task it has admitted starts.
  */
 export type Now = {
   at: Date;
@@ -730,7 +716,7 @@ export const settledQuiet = (state: State): boolean => state.settled !== null;
  * calling it twice in a row with the same inputs returns the same answer, which is the whole
  * definition of level-triggered.
  *
- * Since thin runtime stage 5, three readings and a move: where the task stands, read off its journal (`lifecycleOf`);
+ * Three readings and a move: where the task stands, read off its journal (`lifecycleOf`);
  * what the pass saw of it (`observe`); and the lifecycle's edge for that event in that state (`transition`, in
  * `lifecycle.ts`), which names the next state and the one action. An event with no edge is refused, and the refusal is
  * the answer: nothing is done, and the pass reports it. `move` is the lifecycle's; a test hands another to plant a refusal.
@@ -749,10 +735,18 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
  * Where a task stands in its lifecycle, off its journal alone: the state `decide` moves it from. The same journal reads the
  * same state after any restart, so the machine keeps nothing, and a state is only what the record can tell apart — a
  * session blocked on a person is `working` here, and its sighting says the rest.
+ *
+ * The rules, in order, the first that holds answering:
+ *
+ * 1. Settled: the final state its outcome names — `completed`, `canceled` or `failed`.
+ * 2. A person asked it to stop: `stopping`. The operator's intent outranks everything except a terminal state.
+ * 3. Its last attempt has not ended: `working` once spawned, else `starting`.
+ * 4. Held open and closed by a person: `ending`.
+ * 5. Held open and waiting on a person's answer (`waitsForInput`): `input-required`.
+ * 6. Its current turn has an attempt, all ended: `ending`; else `submitted`.
  */
 export function lifecycleOf(state: State): LifecycleState {
   if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
-  // The operator's intent outranks everything except a terminal state.
   if (state.stopRequested) return 'stopping';
   const last = state.attempts.at(-1);
   if (last && last.ended === null) return last.spawnedAt ? 'working' : 'starting';
@@ -765,6 +759,49 @@ export function lifecycleOf(state: State): LifecycleState {
  * What a pass saw of a task: one event, from its journal and the pass's sightings, recomputed on every pass. It names what
  * was seen — the harness let the session go, the deadline passed, nothing runs and the turn ended `failed` — and never
  * what to do about it, which is the edge's.
+ *
+ * The deadline is measured over the time the task has been RUNNING — its current turn, for a task held open — from the
+ * first attempt's intent rather than from filing: a task queued for admission has not started burning its time, and a
+ * deadline that expired in the queue would be a ceiling that quietly fails work instead of delaying it. It is also the
+ * only thing that ends a blocked session: one waiting on a person is running, forever, as far as every other rule here is
+ * concerned.
+ *
+ * With an attempt in flight, the first rule that holds answers:
+ *
+ * 1. `DEADLINE_PASSED`, when it is overdue, a person has not asked it to stop, and its sighting has not ended on its own.
+ *    The deadline stops what runs and ends what it cut; an end its harness recorded is judged by that end, as it would be
+ *    in time, since a pass steps a task until nothing moves and so reads an end recorded past the deadline past it too. A
+ *    person's stop outranks the deadline.
+ * 2. Its sighting, read before the journal's own `spawnedAt`: a crash between the spawn call and its journal entry leaves
+ *    a session running under a name that can still be found, so it is adopted rather than started a second time — the
+ *    whole reason the name is ours. Waiting on a person, `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its
+ *    runner holds it has stopped, and that is its end; whether it gave the statement its task asked for is recorded beside
+ *    it (`stated`) and judged by the layer above, for the engine reports and never nudges — else `SESSION_LIVE`.
+ *    Canceled, `SESSION_STOPPED`; any other end, `SESSION_ENDED`.
+ * 3. `UNREAD`, when its harness could not be read this pass: nothing is known of the session, and an absence read off a
+ *    failed look is no absence, so it never counts toward `lost`. Read before `spawnedAt` for the reason above: an intent
+ *    with no spawn on the record may be a session a crash left running, which an unread harness cannot rule out, so it is
+ *    neither spawned again nor cut. The deadline, read above, still bounds it; for a person's stop, the edge reads
+ *    `overdue`.
+ * 4. `UNSPAWNED`, when its spawn is not on the record.
+ * 5. Spawned, and the harness has never heard of the name: either it has not registered yet — a race measured in seconds
+ *    — or the session is gone. A grace window tells the two apart: `UNSEEN_IN_GRACE` inside it, `LOST` past it.
+ *
+ * With nothing in flight, the first rule that holds answers:
+ *
+ * 1. `NOTHING_OPEN`, when a person asked it to stop.
+ * 2. `CLOSED`, for a task held open and closed: it settles on how its last attempt ended.
+ * 3. `AWAITING_INPUT`, for a task held open whose turn signed: it waits on a person for as long as they take — ahead of
+ *    the deadline, which times work, not a person reading it.
+ * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
+ * 5. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
+ *    per start.
+ * 6. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
+ * 7. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
+ *    Read after every terminal answer, so a queued task can still settle.
+ * 8. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
+ *    later one, the session that signed the turn before it — is still held by its harness: it is stopped first.
+ * 9. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  */
 export function observe(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): LifecycleEvent {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };
@@ -772,29 +809,13 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
   const turn = turnOf(state);
 
-  // The deadline, over the time the task has actually been RUNNING — its current turn, for a task held open.
-  //
-  // Measured from the first attempt's intent rather than from filing: a task queued for admission
-  // has not started burning its time, and a deadline that expires in the queue would be a
-  // ceiling that quietly fails work instead of delaying it.
-  //
-  // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
-  // forever, as far as every other rule here is concerned.
   const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0].startedAt).getTime() : 0;
   const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
 
-  // ---- an attempt is in flight.
   if (last && last.ended === null) {
-    // It stops what runs and ends what it cut; an end its harness recorded is judged by that end, as it would be in time.
-    // A pass steps a task until nothing moves, so an end recorded past the deadline is read past it too: before
-    // 2026-09-24 a check that exited 0 at 607 s of 600 settled `failed` in the pass that recorded its end. A person's
-    // stop outranks the deadline.
     const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
     if (overdue && !state.stopRequested && !endedOwn)
       return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
-    // Note the order: the SIGHTING is read before our own `spawnedAt`. A crash between the spawn call and its journal
-    // entry leaves a session running under a name we can still find, so it is adopted rather than started a second
-    // time. That is the whole reason the name is ours.
     if (sighting) {
       const ending = endOf(sighting.state);
       const seen = {
@@ -803,44 +824,26 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
         asked: state.closeoutSchema !== undefined,
         holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
       };
-      // Quiet and working: its runner holds it has stopped, and that is its end. Whether it gave the statement its task
-      // asked for is recorded beside it (`stated`), and judged by the layer above: the engine reports, and never nudges.
       if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
       if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
       return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
     }
-    // Its harness could not be read this pass: nothing is known of the session, and an absence read off a failed look is no
-    // absence — before 2026-09-25 it counted toward `lost`, and one unread pass past the grace ended a live session's attempt.
-    // Read before our own `spawnedAt`, for the reason above: an intent with no spawn on the record may be a session the crash
-    // left running, which an unread harness cannot rule out, so it is neither spawned again nor cut (found in review). The
-    // deadline, read above, still bounds it; for a person's stop, the edge reads `overdue`.
     if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
     if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
-    // Spawned, and the harness has never heard of the name. Either it has not registered yet (a
-    // race measured in seconds) or the session is gone. A grace window tells the two apart.
     return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
       ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
       : { type: 'LOST', attempt: last.n };
   }
 
-  // ---- nothing in flight.
   if (state.stopRequested) return { type: 'NOTHING_OPEN' };
-  // A task held open (R1): closed, it settles on how its last attempt ended; signed, it waits on a person for as long as
-  // they take — before the deadline, which times work, not a person reading it.
   if (state.holdOpen && state.closed) return { type: 'CLOSED', ...(last ? { last: { n: last.n, ended: last.ended } } : {}) };
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
-  // Judged on the current turn's attempts, which are all of them for a task not held open. One attempt per start.
   const ended = turn.attempts.at(-1);
   if (ended) return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts: turn.attempts.length, turn: turn.n };
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
-  // A queued turn waits for the layer above's word, and is started by the pass after the one that wrote it (stage 4c).
-  // Read after every terminal answer, so a queued task can still settle.
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
-  // The first turn continues what the task was filed against; a later one, the session that signed the turn before it —
-  // which is stopped first if its harness still holds it.
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
-  // In a later turn, told the person's answer; else the brief.
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
 }
 

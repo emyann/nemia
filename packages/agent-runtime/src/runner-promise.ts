@@ -8,9 +8,9 @@ import { formerStateOf, isSessionState, SESSION_STATES, type PhaseWord, type Ses
 import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from './runner.ts';
 
 /**
- * A session as a `PromiseRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five words
- * sightings spoke before them (`working`, `blocked`, `done`, `failed`, `stopped`), which a runner written then still reports
- * and `promiseOps` reads as their names (`formerStateOf`: `blocked` is `input-required`). Any other word is refused.
+ * A session as a `PromiseRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five former
+ * words (`working`, `blocked`, `done`, `failed`, `stopped`), which `promiseOps` reads as their names (`formerStateOf`:
+ * `blocked` is `input-required`). Any other word is refused.
  */
 export type PromiseSighting = Omit<Sighting, 'state'> & { state: SessionState | PhaseWord };
 
@@ -27,7 +27,7 @@ export type PromiseRunner = {
   /**
    * Optional. The session running under `name` — a name the engine chose — found without observing every other, or
    * `undefined` when none runs. Only which session it is: a read that needs its state asks `observe`, and takes
-   * `observe`'s word. Without it, `view`, `transcript` and `logs` observe this harness as they always have.
+   * `observe`'s word. Without it, `view`, `transcript` and `logs` observe this harness.
    */
   find?(name: string): Promise<{ sessionId: string } | undefined>;
   stop(sessionId: string): Promise<void>;
@@ -57,12 +57,14 @@ export type PromiseRunner = {
   say?(session: { name: string; sessionId: string }, text: string): Promise<void>;
 };
 
-/** A `PromiseRunner` as the engine's verbs. */
+/**
+ * A `PromiseRunner` as the engine's verbs. A rejected `spawn` is not taken as proof that nothing started: it is a
+ * refusal (`refused`) only when the error it rejects with says `refused: true`.
+ */
 export const promiseOps = (h: PromiseRunner): RunnerOps => ({
   spawn: (r: SpawnRequest) =>
     Effect.tryPromise({
       try: () => h.spawn(r),
-      // A rejection is not proof that nothing started; a runner that knows says `refused`.
       catch: (cause) =>
         new RunnerError({
           verb: 'spawn',

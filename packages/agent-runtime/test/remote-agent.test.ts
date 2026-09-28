@@ -81,8 +81,6 @@ const writeJournal = (root: string, id: string, events: object[]) =>
   fs.writeFileSync(path.join(root, 'tasks', `${id}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
 
-// ─── the server itself ──────────────────────────────────────────────────────
-
 test('the test agent serves its card and answers a message on each binding it lists', async () => {
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
   const json = await (await fetch(`${s.url}/.well-known/agent-card.json`)).json();
@@ -120,8 +118,6 @@ test('the test agent serves its card and answers a message on each binding it li
     ['jsonrpc', 'rest'],
   );
 });
-
-// ─── what is refused ────────────────────────────────────────────────────────
 
 test('a card that asks for a bearer token, with no credentials to give one: unstartable, naming the scheme, nothing sent', async () => {
   const s = await serve({ security: bearer('t0k'), script: HELD });
@@ -274,8 +270,7 @@ test('say to a remote task at work is refused: its Task takes words only once it
   assert.ok(!journalOf(root, id).some((ev) => ev.kind === 'said'));
 });
 
-// ─── end to end, on each binding ────────────────────────────────────────────
-
+/** The bindings a card lists, each alone and both in each order: the end-to-end tests run on each. */
 const BINDINGS: Binding[][] = [['JSONRPC'], ['HTTP+JSON'], ['JSONRPC', 'HTTP+JSON'], ['HTTP+JSON', 'JSONRPC']];
 const pathOf = (b: Binding) => (b === 'JSONRPC' ? 'jsonrpc' : 'rest');
 
@@ -366,9 +361,8 @@ test('a task held open: its answer is a new Task in the same context, as A2A con
   assert.equal(s.sent[1].taskId, '');
   assert.equal(s.tasks().length, 2);
   assert.deepEqual(second.state.attempts[1].closeout, { turn: 1, heard: 'once more' });
-  // Settled on the context, the view's session is the conversation, and its logs are the latest Task in it.
-  assert.equal(second.sessionId, first.state.attempts[0].nativeId);
-  assert.match(await e.logs(id), /^user: once more\n/);
+  assert.equal(second.sessionId, first.state.attempts[0].nativeId, "settled on the context, the view's session is the conversation");
+  assert.match(await e.logs(id), /^user: once more\n/, 'and its logs are the latest Task in it');
   await e.close(id);
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
 });
@@ -426,8 +420,6 @@ test('an agent that lives under a path has its card read beneath that path, and 
   assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
 });
 
-// ─── restarts ───────────────────────────────────────────────────────────────
-
 test('restart after `spawned`: a new engine over the same root reads the Task by GetTask and settles it, sending nothing', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);
@@ -446,20 +438,18 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
   const { e, root } = engineOn(s);
   const id = await e.file(task());
   await running(e, id);
-  // The crash: the registry holds the Task, and the engine died before `spawned` was written.
   writeJournal(
     root,
     id,
     journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
   );
-  // A spawn asked again for the name adopts what the registry holds.
   await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
   const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const v = await running(again, id);
   assert.equal(v.sessionId, s.tasks()[0]);
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(again, id)).state.settled, 'succeeded');
-  assert.equal(s.counts.sendMessage, 1);
+  assert.equal(s.counts.sendMessage, 1, 'a spawn asked again for the name adopts what the registry holds, and sends nothing');
 });
 
 test('restart with the intent on disk and no Task: never sent twice — a spawn in doubt, then `lost` past the grace window', async () => {
@@ -468,7 +458,6 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   const e = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const id = await e.file(task({ id: 'in-doubt' }));
   const name = `ae/${id}/1`;
-  // The crash: the intent was written, and the send's answer never was.
   fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
   fs.writeFileSync(entryFile(root, name), JSON.stringify({ name, agent: 'remote', messageId: 'm-lost', sentAt: new Date().toISOString() }));
   await e.tick();
@@ -480,7 +469,6 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   );
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
-  // The grace window passes with nothing listed under the name.
   const back = new Date(Date.now() - 31_000).toISOString();
   writeJournal(
     root,
@@ -493,8 +481,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   assert.equal(s.counts.sendMessage ?? 0, 0);
 });
 
-test("a registry written before sightings spoke A2A's names is read in them, in `remote/` and in `remote/done/`, and left as written", async () => {
-  // An agent nothing answers: what is read here is read off the registry alone.
+test("a registry an older runtime wrote, `seen` in its former words, is read in A2A's names, in `remote/` and in `remote/done/`, and left as written", async () => {
   const dead = {
     card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
   };
@@ -505,7 +492,6 @@ test("a registry written before sightings spoke A2A's names is read in them, in 
   for (const id of [signed, stopped, asked, odd]) {
     writeJournal(root, id, [...journalOf(root, id), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   }
-  // Each entry as the runtime before 2026-09-25 wrote it: `seen` in its former words.
   const entry = (id: string, seen: object, ended: boolean) => ({
     name: `ae/${id}/1`,
     agent: 'remote',
@@ -524,7 +510,6 @@ test("a registry written before sightings spoke A2A's names is read in them, in 
   };
   fs.mkdirSync(path.join(root, 'remote', 'done'), { recursive: true });
   for (const [id, en] of Object.entries(open)) fs.writeFileSync(entryFile(root, `ae/${id}/1`), `${JSON.stringify(en)}\n`);
-  // Let go of before the change: a reply, as an agent that answered with a Message left it.
   const replied = {
     name: 'ae/t-old/1',
     agent: 'remote',
@@ -544,20 +529,25 @@ test("a registry written before sightings spoke A2A's names is read in them, in 
   assert.deepEqual(
     [signed, stopped, asked, odd].map((id) => seen.get(`ae/${id}/1`)?.state),
     ['completed', 'canceled', 'auth-required', 'failed'],
+    'an agent nothing answers: read off the registry alone',
   );
-  assert.deepEqual(await Effect.runPromise(ops.find!('ae/t-old/1')), { sessionId: 'm-old' });
+  assert.deepEqual(
+    await Effect.runPromise(ops.find!('ae/t-old/1')),
+    { sessionId: 'm-old' },
+    'a reply let go of, as an agent that answered with a Message left it, is found in `remote/done/`',
+  );
   assert.equal(await Effect.runPromise(ops.logs('m-old')), 'agent: painted', 'read from `remote/done/` by its session');
   assert.equal(await Effect.runPromise(ops.logs('c-old')), 'agent: painted', 'and by its context');
   for (const [id, en] of Object.entries(open))
     assert.deepEqual(JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8')), en, `${id}: the file keeps its words`);
   assert.deepEqual(JSON.parse(fs.readFileSync(doneFile, 'utf8')), replied);
 
-  // And the tasks settle as they did.
   for (let i = 0; i < 3; i++) await e.tick();
   const views = await Promise.all([signed, stopped, asked, odd].map((id) => e.view(id)));
   assert.deepEqual(
     views.map((v) => v.state.settled),
     ['succeeded', 'stopped', null, 'failed'],
+    'and the tasks settle as their former words said',
   );
   assert.equal(views[2].phase, 'needs-human');
   assert.equal(views[2].waitingFor, 'authentication');
@@ -570,7 +560,6 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
   const { e, root } = engineOn(s);
   const id = await e.file(task());
   await running(e, id);
-  // Point the harness at an address nothing answers: every GetTask fails.
   const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
   const dead = createEngine({
     root,
@@ -589,12 +578,10 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
   for (let i = 0; i < 3; i++) await dead.tick();
   const v = await dead.view(id);
   assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
-  assert.equal(v.sessionId, entry.taskId);
+  assert.equal(v.sessionId, entry.taskId, 'every GetTask fails at an address nothing answers: the task reads as last seen');
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
 });
-
-// ─── the secret ─────────────────────────────────────────────────────────────
 
 /** Every file under `dir`, as text. */
 const everyFile = (dir: string): Array<[string, string]> =>
@@ -660,8 +647,6 @@ test('a redirect from the agent is not followed: the send is refused, and the ad
   assert.deepEqual(fs.readdirSync(path.join(root, 'remote')), [], 'the intent went with the refusal');
 });
 
-// ─── an agent that does not answer ──────────────────────────────────────────
-
 /** How long `f` took, in ms, and what it gave. */
 const timed = async <A>(f: () => Promise<A>): Promise<[number, A]> => {
   const from = performance.now();
@@ -682,12 +667,11 @@ test('a request the agent holds is given up after its bound: a card not read ref
   assert.match(card.message, /could not be read at .*agent-card\.json \(.*did not answer within 0\.3 s\): the agent is not reachable/);
   s.hanging.card = false;
 
-  // A send held: the spawn returns once it has waited, and the send goes on to its own bound, `sendMs`, off the pass.
   s.hanging.a2a = true;
   const [sendMs] = await timed(() => Effect.runPromise(ops.spawn({ name: 'ae/send/1', brief: 'b', cwd: '/w' })));
   assert.ok(sendMs < 500, `${sendMs} ms: the spawn waited its 0.1 s and returned`);
   const under = JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8'));
-  assert.equal(under.sending.pid, process.pid);
+  assert.equal(under.sending.pid, process.pid, 'a send held goes on to its own bound, `sendMs`, off the pass, in this process');
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/send/1')?.state, 'submitted', 'being sent: a Task submitted');
   const t0 = Date.now();
   while (JSON.parse(fs.readFileSync(entryFile(root, 'ae/send/1'), 'utf8')).sending && Date.now() - t0 < 3_000)
@@ -728,13 +712,7 @@ test(`at shipped defaults an agent that holds every request holds a pass ${REQUE
   assert.equal((await e.view(id)).phase, 'running (working)');
 });
 
-/*
- * Until stage 6 part 2 this test said the opposite: an agent that replied later than the send's bound, then `REQUEST_MS`, was
- * in doubt on every try, its reply lost and the attempt `lost` (open issue 34), since the send ran inside the pass and
- * could hold it no longer. The send leaves the pass now (the owner's approval of the part 2 plan, 2026-09-25), and the same
- * agent's reply is the session's end: the expectation flipped on purpose, and the send is still made once.
- */
-test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once`, async () => {
+test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once: the send leaves the pass`, async () => {
   const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
   const { root, e } = engineOn(s);
   const id = await e.file(task());
@@ -759,8 +737,6 @@ test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} 
   assert.equal(s.counts.sendMessage, 1, 'sent once');
   assert.match(await e.logs(id), /agent: slow and sure/);
 });
-
-// ─── the send leaves the pass (open issue 34) ───────────────────────────────
 
 /** A gate an agent's first step waits on, and its key. */
 const gate = () => {
@@ -802,7 +778,6 @@ test('an intent whose sending process lives is left to it: read submitted in ano
   const e = createEngine({ root, harnesses: { remote: { url: s.url } } });
   const id = await e.file(task({ id: 'elsewhere' }));
   const name = `ae/${id}/1`;
-  // Another process sends it: one that lives, and whose bound has not come.
   const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
   try {
     fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
@@ -861,7 +836,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
   );
   const done = await settled(createEngine({ root, harnesses: { remote: { url: s.url } } }), id);
-  assert.equal(done.state.attempts[0].reason, 'lost');
+  assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
 });
 
@@ -879,10 +854,9 @@ test('a stop while the agent holds the send cuts it: the task settles stopped, a
   const let_go = path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`);
   assert.ok(fs.existsSync(let_go), 'let go of');
   g.open();
-  // The agent answers a request the stop cut: nothing reads it, and nothing is sent again.
   await new Promise((r) => setTimeout(r, 200));
   await e.tick();
-  assert.equal(s.counts.sendMessage, 1);
+  assert.equal(s.counts.sendMessage, 1, 'the agent answers a request the stop cut: nothing reads it, and nothing is sent again');
   assert.equal(fs.existsSync(entryFile(root, `ae/${id}/1`)), false, 'nothing brought back into the open registry');
 });
 
@@ -900,8 +874,6 @@ test('a refusal that comes after the spawn returned ends the session `rejected`,
     'kept, where a later spawn under the name reads it',
   );
 });
-
-// ─── credentials ────────────────────────────────────────────────────────────
 
 test("credentials is asked by the harness's name too, and missingCredential words the refusal of a secret not given", async () => {
   const s = await serve({ security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
@@ -929,8 +901,6 @@ test('createEngine refuses a missingCredential that is not a function', async ()
   assert.match(err.message, /`missingCredential` is a function, `\(scheme, agentUrl, harness\) => words`/);
 });
 
-// ─── every verb reaches the agent ───────────────────────────────────────────
-
 test('every verb reaches the agent as an A2A method: SendMessage, GetTask, CancelTask', async () => {
   const s = await serve({ script: HELD });
   const { e } = engineOn(s);
@@ -945,8 +915,6 @@ test('every verb reaches the agent as an A2A method: SendMessage, GetTask, Cance
   assert.equal(s.counts.cancelTask, 1);
   assert.equal(s.counts.listTasks ?? 0, 0, 'never a listing: on an agent others use it lists theirs too');
 });
-
-// ─── what a pass costs ──────────────────────────────────────────────────────
 
 test('a pass makes one GetTask per open remote task, and none once they settle', async (t: TestContext) => {
   for (const n of [3, 6]) {

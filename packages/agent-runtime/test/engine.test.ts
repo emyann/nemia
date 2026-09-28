@@ -3,6 +3,19 @@
  *
  * The tests that matter here are the crash ones: the engine is killed at each point in the
  * sequence and restarted, and the board must end up with EXACTLY ONE session per attempt.
+ *
+ * What Claude Code does, which the closing-statement tests stand on:
+ *
+ * - a session stays `working` after calling StructuredOutput;
+ * - a resumed session's transcript holds its parent's whole conversation under the child's own session id, so a parent's
+ *   StructuredOutput call looks exactly like the child's, and only when it was made tells them apart;
+ * - a session that declared itself done while still busy can go on, and rewrite its verdict;
+ * - a `claude --bg` session that called StructuredOutput and ended its turn can be observed blocked and idle, and a statement
+ *   read there as an answer already given would leave it needing a person for ever.
+ *
+ * The judgement is `decide` in `domain.ts` — what it reads (`lifecycleOf`, `observe`, `spawnRefused`) and `needsHuman`, last in
+ * the file — and the lifecycle's edges: the test that it reads no carried field slices `domain.ts` from `decide` to the file's
+ * end, so no name moved or deleted below it can cut the slice short.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,14 +34,15 @@ import { composite } from '../src/runner-composite.ts';
  * tasks it skips, in check mode: every skipped task is folded and decided all the same, and a difference fails the pass
  * (`TickMemoDiverged`), so every tick in this file proves the skip changes nothing. `memo: false` is the Effect door with
  * no memo, which folds every task.
+ *
+ * Returns the harness's `sessions`, `spawned` — every spawn the engine asked for, so a test can assert what the harness was
+ * TOLD — and `run`. The layers are values, so "restarting the engine" is running a new program against the same two, which
+ * is what a new process sees. The memo survives such a restart, which a new process's does not; in check mode that costs no
+ * test its proof, since every task it skips is folded again.
  */
 const board = (journal = Journal.test(), memo: { verify: boolean } | false = { verify: true }) => {
   const sessions = new Map<string, Sighting>();
-  /** Every spawn the engine asked for, so a test can assert what the harness was TOLD. */
   const spawned: SpawnRequest[] = [];
-  // The layers are values, so "restarting the engine" is just running a new program against the
-  // same two — which is exactly what a new process would see. The memo survives such a restart, which a new process's
-  // would not; in check mode that costs no test its proof, since every task it skips is folded again.
   const runner = Runner.test({ sessions, spawned });
   const layer = memo ? Layer.mergeAll(journal, runner, tickMemoLayer(memo)) : Layer.mergeAll(journal, runner);
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
@@ -40,9 +54,8 @@ const spec = { brief: 'do the thing', cwd: '/repo' };
 /**
  * A deadline far from any boundary: 50ms, tested after 150ms have passed.
  *
- * `deadlineSeconds: 0` was the obvious choice and it is a coin flip — `ranFor > 0` is decided by
- * whether a millisecond happened to elapse inside the pass. A test that sits exactly on a
- * comparison is testing the scheduler.
+ * `deadlineSeconds: 0` is a coin flip: `ranFor > 0` is decided by whether a millisecond happened to elapse inside the pass.
+ * A test that sits exactly on a comparison is testing the scheduler.
  */
 const SHORT_DEADLINE = 0.05;
 const pastIt = () => new Promise((r) => setTimeout(r, 150));
@@ -55,11 +68,10 @@ test('the happy path: filed → spawned → running → done → settled', async
   assert.equal(b.sessions.size, 1, 'exactly one session was started');
   assert.equal(await b.run(phaseOf(id)), 'running (working)');
 
-  // The harness finishes the work. The engine finds out by asking, not by being told.
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
   await b.run(tick());
 
-  assert.equal(await b.run(phaseOf(id)), 'succeeded');
+  assert.equal(await b.run(phaseOf(id)), 'succeeded', 'the harness finished the work: the engine finds out by asking, not by being told');
   assert.equal(b.sessions.size, 1, 'and never started a second one');
 });
 
@@ -67,14 +79,12 @@ test('CRASH between minting the id and spawning: the restart spawns that same id
   const b = board();
   const id = await b.run(file(spec));
 
-  // One step only — journals `starting`, then the process dies before the spawn.
   const first = await b.run(step(id, new Map()));
-  assert.equal(first.do, 'start');
+  assert.equal(first.do, 'start', 'one step only journals `starting`, and the process dies before the spawn');
   assert.equal(b.sessions.size, 0, 'nothing was spawned');
 
-  // A new engine, same journal. It must spawn the name the intent implies, not invent a second.
   await b.run(tick());
-  assert.equal(b.sessions.size, 1);
+  assert.equal(b.sessions.size, 1, 'a new engine on the same journal spawns the name the intent implies, and invents no second');
   assert.ok(b.sessions.has(nameFor(id, 1)), 'the session carries the name the journal implies');
 });
 
@@ -85,7 +95,6 @@ test('CRASH while the session runs: the restart adopts it and starts nothing', a
   const running = [...b.sessions.keys()];
   assert.deepEqual(running, [nameFor(id, 1)]);
 
-  // Five restarts while the work is still going.
   for (let i = 0; i < 5; i++) await b.run(tick());
 
   assert.deepEqual([...b.sessions.keys()], running, 'no second session, five restarts later');
@@ -122,7 +131,6 @@ test('stop: one pass asks the harness, the next observes it and settles', async 
   await b.run(tick());
   await b.run(requestStop(id));
 
-  // Pass one sends the request and stops there: what the harness did with it is not yet observed.
   await b.run(tick());
   assert.deepEqual(
     [...b.sessions.values()].map((s) => s.state),
@@ -131,9 +139,8 @@ test('stop: one pass asks the harness, the next observes it and settles', async 
   );
   assert.equal(await b.run(phaseOf(id)), 'running (stopped)', 'not settled on an assumption');
 
-  // Pass two sees it and writes it down.
   await b.run(tick());
-  assert.equal(await b.run(phaseOf(id)), 'stopped');
+  assert.equal(await b.run(phaseOf(id)), 'stopped', 'the second pass sees it and writes it down');
 });
 
 test('a pass over many tasks starts each exactly once', async () => {
@@ -148,8 +155,7 @@ test('a pass over many tasks starts each exactly once', async () => {
   assert.ok(views.every((p) => p === 'running (working)'));
 });
 
-test('a finished task settles while another waits to be admitted — settling is not an admission', async () => {
-  // A queued task is checked after every terminal answer, so a board whose layer above admits nothing still drains.
+test('a finished task settles while another waits to be admitted — settling is not an admission, and a board whose layer above admits nothing still drains', async () => {
   const b = board();
   const id = await b.run(file(spec));
   const waiting = await b.run(file({ ...spec, brief: 'held back', queued: true }));
@@ -174,18 +180,17 @@ test('the feed carries every event, in order, with a cursor that resumes', async
   );
   assert.ok(first.entries.every((e) => e.taskId === id));
 
-  // Nothing new since: an empty read, and the cursor does not move.
   const again = await b.run(Effect.flatMap(Journal, (j) => j.feed(first.cursor)));
-  assert.deepEqual(again.entries, []);
-  assert.equal(again.cursor, first.cursor);
+  assert.deepEqual(again.entries, [], 'nothing new since: an empty read');
+  assert.equal(again.cursor, first.cursor, 'and the cursor does not move');
 
-  // The event a workflow layer actually waits for.
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
   await b.run(tick());
   const after = await b.run(Effect.flatMap(Journal, (j) => j.feed(first.cursor)));
   assert.deepEqual(
     after.entries.map((e) => e.event.kind),
     ['ended', 'settled'],
+    'the events a workflow layer waits for',
   );
 });
 
@@ -201,12 +206,11 @@ test('settleTask is a fixpoint: it stops when nothing moves', async () => {
 
 const phaseOf = (id: string) => Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => Effect.map(view(id, o), (v) => v.phase)));
 
-test('ADOPTION: a session already running under our name is adopted, not duplicated', async () => {
+test('ADOPTION: a session already running under our name is adopted, not duplicated — the spawn happened, and a crash ate the journal entry that records it', async () => {
   const b = board();
   const id = await b.run(file(spec));
 
-  // The spawn happened; the crash ate the journal entry that would have recorded it.
-  await b.run(step(id, new Map())); // journals `starting`
+  await b.run(step(id, new Map()));
   b.sessions.set(nameFor(id, 1), { sessionId: 'orphan', state: 'working' });
 
   await b.run(tick());
@@ -214,19 +218,15 @@ test('ADOPTION: a session already running under our name is adopted, not duplica
   assert.equal(b.sessions.get(nameFor(id, 1))!.sessionId, 'orphan');
 });
 
-// ─── one attempt per start, end to end ──────────────────────────────────────
-
 test('a LOST attempt settles the task failed, its session on the record for the layer above to continue', async () => {
   const b = board();
   const id = await b.run(file(spec));
   await b.run(tick());
 
-  // The session vanishes from the harness entirely — nobody ever said how it ended.
   const first = [...b.sessions.keys()][0];
   const nativeId = b.sessions.get(first)!.nativeId!;
   b.sessions.delete(first);
 
-  // Fast-forward past the grace window by writing the end the engine would: a test should not wait 30 real seconds.
   await b.run(
     Effect.flatMap(Journal, (j) =>
       j.append(id, {
@@ -243,7 +243,11 @@ test('a LOST attempt settles the task failed, its session on the record for the 
 
   await b.run(tick());
   const { state } = await b.run(view(id, new Map()));
-  assert.equal(state.settled, 'failed');
+  assert.equal(
+    state.settled,
+    'failed',
+    'a session gone from the harness, nobody saying how it ended, its end written as the engine writes one past the grace window',
+  );
   assert.equal(b.spawned.length, 1, 'no attempt 2, resumed or clean');
   assert.equal(state.attempts[0].nativeId, nativeId, 'the session a new filing would continue, with `resumeFrom`');
 });
@@ -261,7 +265,7 @@ test('a HARNESS failure settles the task failed, and nothing is started after it
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'failed');
 });
 
-test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: always` settles on its first failure all the same', async () => {
+test('a journal an older runtime wrote with `maxAttempts: 2, resume: always` settles on its first failure all the same', async () => {
   const b = board();
   const id = 'legacy';
   await b.run(
@@ -269,7 +273,6 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
       j.append(id, { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always' } as Event),
     ),
   );
-  // Older than stage 4c too, with no `queued` key: it waits for the word, as the layer above now gives it.
   await b.run(tick());
   assert.equal(b.spawned.length, 0, 'a journal from before stage 4c waits to be admitted');
   await b.run(admit([id]));
@@ -282,8 +285,6 @@ test('a journal filed before stage 4a part 2 with `maxAttempts: 2, resume: alway
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'failed');
 });
 
-// ─── the deadline, end to end ───────────────────────────────────────────────
-
 test('a task past its deadline is stopped and settles failed', async () => {
   const b = board();
   const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
@@ -295,7 +296,6 @@ test('a task past its deadline is stopped and settles failed', async () => {
   );
   await pastIt();
 
-  // Pass one: the deadline is past, so the live session is stopped.
   await b.run(tick());
   assert.deepEqual(
     [...b.sessions.values()].map((s) => s.state),
@@ -303,14 +303,12 @@ test('a task past its deadline is stopped and settles failed', async () => {
     'the harness was told',
   );
 
-  // Pass two: it is no longer live, so the task settles — as failed, not as a clean stop.
   await b.run(tick());
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
-  assert.equal(state.settled, 'failed');
+  assert.equal(state.settled, 'failed', 'the next pass: the session is not live, so the task settles — failed, not a clean stop');
 });
 
 test('a session that finished before the pass past its deadline read it settles on its end, in that one pass', async () => {
-  // The 2026-09-24 check: exit 0 at 607 s of 600, recorded `ended done` and settled `failed` at the same millisecond.
   const b = board();
   const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
   await b.run(tick());
@@ -339,18 +337,20 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
   assert.equal(await b.run(phaseOf('stuck')), 'needs-human', 'blocked, and before its deadline nothing ends it');
   await pastIt();
 
-  await b.run(tick()); // deadline stops it
-  assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'canceled');
-  await b.run(tick()); // and it settles
-  assert.equal(await b.run(phaseOf('stuck')), 'failed');
+  await b.run(tick());
+  assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'canceled', 'the deadline stops it');
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf('stuck')), 'failed', 'and it settles');
 });
 
-// ─── what a pass reports, and what it no longer does ────────────────────────
-// Since stage 4c part 2 (2026-09-25) the pass keeps no ceiling, no pools and no order: which task starts, and when, is the
-// layer above's (`queued` and `admit`; the orchestrator's `toAdmit`). What was tested here — the ceiling, its pools, what a
-// slot is held by, and which task a free one went to — is `agent-orchestrator/test/admission.test.ts`'s and `pool.test.ts`'s.
-
-/** File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote. */
+/**
+ * File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote, with
+ * the `priority` its pass admitted by under its ceiling.
+ *
+ * The pass keeps no ceiling, no pools and no order: which task starts, and when, is the layer above's (`queued` and `admit`;
+ * the orchestrator's `toAdmit`). The ceiling, its pools, what a slot is held by and which task a free one goes to are
+ * `agent-orchestrator/test/admission.test.ts`'s and `pool.test.ts`'s.
+ */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
   b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
 
@@ -366,16 +366,19 @@ test('running counts the sessions at work on each harness as the pass left them:
   const set = (id: string, state: SessionState) => b.sessions.set(nameFor(id, 1), { ...b.sessions.get(nameFor(id, 1))!, state });
   set('c-block', 'input-required');
   set('c-end', 'completed');
-  b.sessions.delete(nameFor('no-harness', 1)); // spawned, and not yet in the registry: at work as far as anyone knows
+  b.sessions.delete(nameFor('no-harness', 1));
   const second = await b.run(tick());
-  assert.deepEqual(second.running, { claude: 1, codex: 1, default: 1 });
+  assert.deepEqual(
+    second.running,
+    { claude: 1, codex: 1, default: 1 },
+    '`no-harness`, spawned and not yet in the registry, is at work as far as anyone knows',
+  );
   assert.equal(await b.run(phaseOf('c-end')), 'succeeded');
   assert.equal(await b.run(phaseOf('x-queued')), 'pending', 'queued, and never counted');
 });
 
 test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and an old priority choose nothing', async () => {
   const b = board();
-  // Filed by an older runtime, whose pass admitted the higher priority and then the earlier filing first under its ceiling.
   await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
   await fileAt(b, 'b', '2026-09-16T10:00:00.000Z', { priority: 5 });
   await fileAt(b, 'c', '2026-09-16T09:00:00.000Z', { priority: Number.NaN });
@@ -390,10 +393,9 @@ test('a pass walks the board in the order the store lists it, and starts every t
   assert.equal('priority' in b.spawned[1], false, 'and no harness is told it');
 });
 
-test('the pass refuses any argument — an old ceiling, pools, anything — and reads nothing', async () => {
+test('the pass refuses any argument — an old ceiling, pools, anything, from a caller untyped as one built against the old door — and reads nothing', async () => {
   const b = board();
   await b.run(file(spec));
-  // Untyped, as a caller built against the old door calls it.
   const untyped: (...a: unknown[]) => ReturnType<typeof tick> = tick;
   for (const args of [[3], [3, { claude: 'claude' }], [undefined]] as const) {
     const refused = await b.run(Effect.flip(untyped(...args)));
@@ -410,7 +412,6 @@ test("step and settleTask refuse the ceiling's old slots — neither drops them,
   const b = board();
   const id = await b.run(file(spec));
   const journalOf = async () => (await b.run(view(id, new Map()))).state.attempts.length;
-  // Untyped, as a caller built against the old door calls them: `step(id, observed, slots)`, `settleTask(id, observed, slots, maxSteps)`.
   const oldStep = step as (...a: unknown[]) => ReturnType<typeof step>;
   for (const extra of [[{ used: 0, max: 3 }], [undefined], [{ used: 0, max: 3 }, 8]]) {
     const refused = await b.run(Effect.flip(oldStep(id, new Map(), ...extra)));
@@ -431,12 +432,9 @@ test("step and settleTask refuse the ceiling's old slots — neither drops them,
   }
   assert.equal(await journalOf(), 0, 'no attempt journalled by a refused step');
   assert.equal(b.sessions.size, 0, 'and nothing started');
-  // The door as it is: two arguments step, and settleTask's own default or a count settles.
-  assert.equal((await b.run(settleTask(id, new Map(), 1))).length, 1);
-  assert.ok((await b.run(settleTask(id, new Map()))).length >= 1);
+  assert.equal((await b.run(settleTask(id, new Map(), 1))).length, 1, 'the door as it is: a count settles');
+  assert.ok((await b.run(settleTask(id, new Map()))).length >= 1, "and settleTask's own default does");
 });
-
-// ─── isolation ──────────────────────────────────────────────────────────────
 
 test('worktree is declared by the task and passed to the harness untouched', async () => {
   const b = board();
@@ -449,8 +447,6 @@ test('worktree is declared by the task and passed to the harness untouched', asy
   await c.run(tick());
   assert.equal(c.spawned.at(-1)!.config?.worktree, 'my-branch');
 });
-
-// ─── the closing statement ──────────────────────────────────────────────────
 
 const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
 
@@ -469,7 +465,6 @@ test('the schema reaches the harness verbatim — the engine never learns its sh
 });
 
 test('a statement made during the attempt ends it, whatever the harness still says', async () => {
-  // `working` is where a Claude Code session stays after calling StructuredOutput — measured.
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
   b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
@@ -481,18 +476,12 @@ test('a statement made during the attempt ends it, whatever the harness still sa
 });
 
 test('a statement made BEFORE the attempt began was inherited, not said', async () => {
-  // Measured: a resumed Claude Code session's transcript holds its parent's whole conversation
-  // under the child's own session id — 460 entries — so a parent's StructuredOutput call arrives
-  // looking exactly like the child's. Only when it was made tells them apart.
   const b = board();
   const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
   b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done', by: 'parent' }, at: 0 } });
   await b.run(tick());
   assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'the parent finishing is not the child finishing');
 
-  // When the harness does end it, the inherited statement is not written down as this attempt's — and this attempt,
-  // having said nothing of its own, is recorded as having stated nothing: `stated: false`, which the layer above reads
-  // as unsigned (stage 4a; the engine judged it `failed` itself from P0.5 until then).
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'completed' });
   await b.run(tick());
   const v = await b.run(view(id, new Map()));
@@ -500,12 +489,11 @@ test('a statement made BEFORE the attempt began was inherited, not said', async 
   assert.deepEqual(
     v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
     [['done', 'harness', undefined, false]],
+    'ended by its harness, the inherited statement is not written down as its own, and having said nothing of its own it is recorded `stated: false`, which the layer above reads as unsigned',
   );
 });
 
 test('a statement from a session that is still busy is not final', async () => {
-  // Measured once, with the file this replaced: a step declared itself done, kept going, found it
-  // could not commit, and rewrote its verdict to blocked eleven seconds later.
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
   b.sessions.set(name, { ...b.sessions.get(name)!, busy: true, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
@@ -514,13 +502,10 @@ test('a statement from a session that is still busy is not final', async () => {
 
   b.sessions.set(name, { ...b.sessions.get(name)!, busy: false });
   await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded', 'idle, its statement is final');
 });
 
 test('a statement ends the attempt when the harness has marked the session blocked, as when working', async () => {
-  // Measured: a `claude --bg` step called StructuredOutput and ended its turn, and the next
-  // observation found it `blocked`, idle. Taken as an answer the harness had already given, the
-  // statement was ignored, `decide` said "needs a person" for ever, and the slot was never freed.
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
   b.sessions.set(name, {
@@ -565,11 +550,10 @@ test('blocked with an inherited statement still needs a person, and the statemen
   await b.run(tick());
   assert.equal(await b.run(phaseOf(id)), 'needs-human');
 
-  // When the harness does end it, the parent's statement is not written down as this attempt's.
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'completed' });
   const action = await b.run(step(id, new Map(b.sessions)));
   assert.ok(action.do === 'record-end');
-  assert.equal(action.closeout, undefined);
+  assert.equal(action.closeout, undefined, "ended by its harness, the parent's statement is not written down as this attempt's");
   assert.equal(action.stated, false, 'nothing of its own was said');
   await b.run(tick());
   const v = await b.run(view(id, new Map()));
@@ -602,9 +586,12 @@ test('a session the harness already ended keeps its statement on the record — 
   await b.run(tick());
 
   const v = await b.run(view(id, new Map()));
-  // `blocked` means something to whoever filed the task. To the engine it is a payload.
   assert.equal(v.state.settled, 'succeeded');
-  assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'blocked' });
+  assert.deepEqual(
+    v.state.attempts[0]?.closeout,
+    { outcome: 'blocked' },
+    '`blocked` means something to whoever filed the task: to the engine it is a payload',
+  );
 });
 
 test('no schema, no statement: a task ends exactly as it did before', async () => {
@@ -621,14 +608,11 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
   assert.equal(v.state.attempts[0]?.closeout, undefined);
 });
 
-// ─── the fence and the effort: carried, never read ──────────────────────────
-
 import fs from 'node:fs';
 
 test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own flags are declared by the task and reach every attempt untouched", async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  // A second attempt is a held task's next turn: one attempt per start, and a turn is a start.
   const id = await b.run(
     file({
       ...spec,
@@ -674,9 +658,6 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
 });
 
 test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
-  // Since stage 5 the judgement is `decide`, what it reads (`lifecycleOf`, `observe`, `spawnRefused`) and the lifecycle's
-  // edges, and `needsHuman` below them, the last of the file. The slice runs from `decide` to the file's end, on purpose:
-  // the name it ended on, `isLive`, moved up beside the session states, and a slice to a deleted name reads -1 (CLAUDE.md).
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const from = source.indexOf('export function decide(');
   assert.ok(from >= 0, 'found decide');
@@ -729,8 +710,6 @@ test('a session its harness ended at its budget ends failed, as its harness said
   );
 });
 
-// ─── usage: carried from the sighting, null when nobody measured ────────────
-
 test('what a session consumed and how it exited go on the attempt, from the sighting that ended it', async () => {
   const b = board();
   const id = await b.run(file(spec));
@@ -751,7 +730,7 @@ test('what a release reads once it has stopped a session is written on the attem
     Journal.test(),
     Runner.layer({
       ...ops,
-      // Stopped by the first call, as Claude Code writes a session's cost only then; listed still, as a worktree task's is.
+      /** Stops the session on the first call, as Claude Code writes a session's cost only then; it stays listed, as a worktree task's does. */
       release: () => Effect.sync(() => (++asked === 1 ? { turns: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
     }),
   );
@@ -777,14 +756,12 @@ test('an attempt nobody measured records null — not zeros that would read as f
   const b = board();
   const id = await b.run(file(spec));
   await b.run(tick());
-  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' }); // the fake harness measures nothing
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed' });
   await b.run(tick());
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
-  assert.equal(a.usage, null);
+  assert.equal(a.usage, null, 'the fake harness measures nothing');
   assert.equal(a.exitCode, null);
 });
-
-// ─── when an attempt ended: the time the engine wrote it down ───────────────
 
 test('the settled view carries when its attempt ended, as journalled — and null while it ran', async () => {
   const b = board();
@@ -802,10 +779,7 @@ test('the settled view carries when its attempt ended, as journalled — and nul
   assert.ok(Date.parse(v.state.attempts[0].startedAt) <= Date.parse(ended.at), 'and it ended after it started');
 });
 
-// ─── what counts as live ────────────────────────────────────────────────────
-
 test('LIVE is exactly the states decide waits on — `busy` is not a state, so it is not one of them', () => {
-  // Exhaustive by type: a state added to `SessionState` and not here does not compile.
   const STATES: Record<SessionState, true> = {
     submitted: true,
     working: true,
@@ -826,11 +800,13 @@ test('LIVE is exactly the states decide waits on — `busy` is not a state, so i
     (state) =>
       decide(inFlight, new Map([[nameFor('t', 1), { sessionId: 's', state }]]), { at: new Date(0), graceMs: GRACE_MS }).do === 'nothing',
   );
-  assert.deepEqual([...LIVE].sort(), waitsOn.sort());
+  assert.deepEqual(
+    [...LIVE].sort(),
+    waitsOn.sort(),
+    'every `SessionState`, by type: a state added to it and not to STATES does not compile',
+  );
   assert.equal((LIVE as ReadonlySet<string>).has('busy'), false);
 });
-
-// ─── a harness that refuses to start ────────────────────────────────────────
 
 import { RunnerError, testOps } from '../src/runner.ts';
 
@@ -873,7 +849,6 @@ test('a spawn the harness refuses ends the attempt, unstartable, in its words �
   const bad = await b.run(file({ ...spec, brief: 'refuse', id: 'a-bad' }));
   const good = await b.run(file({ ...spec, id: 'b-good' }));
 
-  // Before, this pass rejected: every task behind the bad one stalled, on every pass.
   await b.run(tick());
 
   const v = await b.run(view(bad, new Map()));
@@ -896,9 +871,7 @@ test('an unstartable attempt settles the task failed like any other failure: not
   assert.equal(v.state.settled, 'failed');
 });
 
-test('a spawn error that does not say nothing started is recorded as spawned, and its session adopted', async () => {
-  // The reviewer's case: the session exists, the spawn call failed anyway. Ending the attempt here
-  // left a working session nothing would adopt, stop or bound, and a retry beside it.
+test('a spawn error that does not say nothing started is recorded as spawned, and its session adopted — the session exists though the spawn call failed, and ending the attempt would leave a working session nothing adopts, stops or bounds', async () => {
   const b = refusingBoard();
   const id = await b.run(file({ ...spec, brief: 'start-then-fail' }));
 
@@ -912,23 +885,21 @@ test('a spawn error that does not say nothing started is recorded as spawned, an
   await b.run(tick());
   assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'running (working)', 'adopted');
 
-  // Stop reaches it, as it reaches any session the engine knows.
   await b.run(requestStop(id));
   await b.run(tick());
   await b.run(tick());
   v = await b.run(view(id, new Map()));
-  assert.equal(v.state.settled, 'stopped');
+  assert.equal(v.state.settled, 'stopped', 'stop reaches it, as it reaches any session the engine knows');
   assert.equal(b.sessions.size, 1, 'one session, ever');
 });
 
 test('...and when no session shows up, the grace window ends it lost, as for any spawn never registered', async () => {
   const b = board();
   const id = await b.run(file(spec));
-  await b.run(step(id, new Map())); // start
+  await b.run(step(id, new Map()));
   await b.run(
     Effect.flatMap(Journal, (j) =>
       j.append(id, {
-        // a spawn that returned an error
         kind: 'spawned',
         at: new Date().toISOString(),
         attempt: 1,
@@ -951,7 +922,6 @@ test("a move the lifecycle has no edge for is on every pass's report while it la
   const b = board();
   const id = await b.run(file({ ...spec, id: 'held' }));
   const other = await b.run(file({ ...spec, id: 'moving' }));
-  // The shipped machine has an edge for every move a pass makes (lifecycle.test.ts), so the missing one is planted.
   const planted = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
     b.run(Effect.provideService(e, Lifecycle, withoutEdge('working', 'SESSION_LIVE')));
   const first = await planted(tick());
@@ -979,7 +949,7 @@ test("a move the lifecycle has no edge for is on every pass's report while it la
   assert.deepEqual((await b.run(tick())).refused, [], 'the shipped machine refuses nothing');
 });
 
-test('a store of settled tasks, ticked again and again, reports no refusal — a settled task is not observed at all', async () => {
+test('a store of settled tasks, ticked again and again, reports no refusal — a settled task is not observed at all, where its final state, which has no edge, would refuse every event', async () => {
   const b = board();
   for (const id of ['done', 'broke', 'stopped']) await b.run(file({ ...spec, id }));
   await b.run(tick());
@@ -988,7 +958,6 @@ test('a store of settled tasks, ticked again and again, reports no refusal — a
   await b.run(requestStop('stopped'));
   for (let i = 0; i < 3; i++) await b.run(tick());
   assert.deepEqual(await Promise.all(['done', 'broke', 'stopped'].map((id) => b.run(phaseOf(id)))), ['succeeded', 'failed', 'stopped']);
-  // A final state has no edge, so a settled task observed would be refused on every pass: `settledQuiet` keeps it unobserved.
   for (let pass = 0; pass < 3; pass++) assert.deepEqual((await b.run(tick())).refused, [], `pass ${pass}`);
 });
 
@@ -1023,7 +992,10 @@ const countedJournal = () => {
   };
 };
 
-/** `done` settled `succeeded` and `live` at work, on a board of that journal, and a pass after the settling's. */
+/**
+ * `done` settled `succeeded` and `live` at work, on a board of that journal, and a pass after the settling's, which folds
+ * `done` again since the feed names the settling: after it, nothing has.
+ */
 const settledBeside = async (j: ReturnType<typeof countedJournal>, memo: { verify: boolean } | false) => {
   const b = board(j.layer, memo);
   for (const id of ['done', 'live']) await b.run(file({ ...spec, id }));
@@ -1031,7 +1003,6 @@ const settledBeside = async (j: ReturnType<typeof countedJournal>, memo: { verif
   b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'completed' });
   await b.run(tick());
   assert.equal(await b.run(phaseOf('done')), 'succeeded');
-  // The pass after the settling folds it again, since the feed names the settling: after it, nothing has.
   await b.run(tick());
   return b;
 };
@@ -1085,13 +1056,13 @@ test('a pass with no memo — the Effect door, on layers of its own — folds ev
   assert.equal(j.readsOf('done'), before + 2, 'folded, and read again by its step');
 });
 
-test('a settled task still listed is let go on every pass off what the memo kept, and what it consumed is written once', async () => {
+test('a settled task still listed is let go on every pass off what the memo kept, and what it consumed is written once, through the feed, so a memo kept from before it would fail the pass in check mode', async () => {
   const j = countedJournal();
   const sessions = new Map<string, Sighting>();
   const released: string[] = [];
-  // A harness that keeps a session listed after it is let go, and says what it consumed only once it has let it go.
   const runner = Runner.layer({
     ...testOps({ sessions }),
+    /** Says what the session consumed only once it has let it go, and keeps it listed after. */
     release: (s) =>
       Effect.sync(() => {
         released.push(s.sessionId);
@@ -1103,8 +1074,6 @@ test('a settled task still listed is let go on every pass off what the memo kept
   await run(file({ ...spec, id: 'done' }));
   await run(tick());
   sessions.set(nameFor('done', 1), { ...sessions.get(nameFor('done', 1))!, state: 'completed' });
-  // The settling's pass writes `measured` after it folded the task: through the feed, so the next pass folds it again, and
-  // a memo that kept the fold from before would be proved stale there (`TickMemoDiverged`).
   for (let pass = 0; pass < 4; pass++) await run(tick());
   const events = await run(Effect.flatMap(Journal, (jr) => jr.read('done')));
   assert.equal(events.filter((e) => e.kind === 'measured').length, 1, 'measured once');
@@ -1138,14 +1107,7 @@ test('a pass tells its runner the sessions it expects — every attempt of every
   for (let pass = 0; pass < 3; pass++) await run(tick());
   assert.deepEqual(
     told,
-    [
-      [],
-      ['ae/a/1@claude', 'ae/b/1@codex'],
-      ['ae/a/1@claude', 'ae/b/1@codex'],
-      // Folded again on the pass after, as the feed names what its settling wrote.
-      ['ae/a/1@claude', 'ae/b/1@codex'],
-      ['ae/b/1@codex'],
-    ],
+    [[], ['ae/a/1@claude', 'ae/b/1@codex'], ['ae/a/1@claude', 'ae/b/1@codex'], ['ae/a/1@claude', 'ae/b/1@codex'], ['ae/b/1@codex']],
     'nothing before a spawn; both while they run; `a` while it is folded, and not once the memo keeps it',
   );
   assert.equal(observes, 0, 'observe, told nothing, is never asked when the runner can be told');
@@ -1158,14 +1120,15 @@ test('a release the harness refuses is asked again on every pass while the harne
   let refusals = 3;
   let pass = 0;
   const ops = testOps({ sessions });
-  // Like Claude Code's for a background session: it lists only what it is told to look for, and lets a session go by removing it.
   const runner = Runner.layer({
     ...ops,
+    /** Lists only what it is told to look for, as Claude Code does for a background session. */
     observeFor: (expected) =>
       Effect.sync(() => {
         told.push(expected.map((e) => e.name));
         return { seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))), unread: new Set<string>() };
       }),
+    /** Refused `refusals` times, then lets the session go by removing it, as Claude Code does. */
     release: (s) =>
       Effect.suspend(() => {
         asked.push(pass);
@@ -1182,8 +1145,6 @@ test('a release the harness refuses is asked again on every pass while the harne
   sessions.set(name, { ...sessions.get(name)!, state: 'completed' });
   for (pass = 1; pass <= 7; pass++) await run(tick());
   assert.equal((await run(view(id, new Map()))).state.settled, 'succeeded');
-  // Settled on pass 1, folded again on 2 as the feed names what its settling wrote, and kept from 3 on: refused on 1 to 3,
-  // let go on 4, seen gone on 5, and not looked for after.
   assert.deepEqual(asked, [1, 2, 3, 4], 'asked on every pass that listed it, the passes the memo kept the task included');
   assert.deepEqual(
     told.slice(1).map((names) => names.includes(name)),
@@ -1214,7 +1175,8 @@ test("a pass's views are what `view` reads after it: an attempt's measure, writt
 
 /**
  * A harness behind the composite, as `createEngine` puts every harness, whose reads fail on the passes a test chooses: the
- * failure the composite answers for, as a `claude agents` timing out is. Lists only what it is told to look for.
+ * failure the composite answers for, as a `claude agents` timing out is. Lists only what it is told to look for. A read that
+ * fails fails whole, as a registry that timed out does, and the composite says the names it was to find unread.
  */
 const flakyHarness = (sessions: Map<string, Sighting>, readFails: () => boolean) => {
   const ops = testOps({ sessions });
@@ -1224,7 +1186,6 @@ const flakyHarness = (sessions: Map<string, Sighting>, readFails: () => boolean)
         ? Effect.fail(new RunnerError({ verb: 'observe', message: 'claude agents: timed out' }))
         : Effect.succeed(new Map([...sessions].filter(([name]) => !expected || expected.some((e) => e.name === name)))),
     );
-  // A read that fails fails whole, as a registry that timed out does: the composite says the names it was to find unread.
   return {
     ...ops,
     observe: read(),
@@ -1262,7 +1223,6 @@ test('a release refused, then one pass that could not read the harness: the rele
   sessions.set(name, { ...sessions.get(name)!, state: 'completed' });
   for (pass = 1; pass <= 6; pass++) await run(tick());
   assert.equal((await run(view(id, new Map()))).state.settled, 'succeeded');
-  // Settled on pass 1 and kept from 3: refused on 1 to 3, not read on 4, let go on 5.
   assert.deepEqual(asked, [1, 2, 3, 5], 'the pass that could not read asked nothing, and the next good one asked again');
   assert.equal(sessions.has(name), false, 'and the session was let go');
 });
@@ -1277,7 +1237,6 @@ test('a pass that could not read the harness does not end an attempt `lost`, its
   );
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const id = await run(file({ ...spec, harness: 'claude' }));
-  // Spawned twice the grace ago, by an engine before this one, and running under its name since.
   const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
   await run(
     Effect.flatMap(Journal, (j) =>
@@ -1317,7 +1276,6 @@ test('a pass that could not read the harness does not spawn again an intent a cr
   const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude }, 'claude')), tickMemoLayer({ verify: true }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const id = await run(file({ ...spec, harness: 'claude' }));
-  // The intent journalled and the session started, and the engine gone before its `spawned` line.
   await run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'starting', at: new Date().toISOString(), attempt: 1 })));
   sessions.set(nameFor(id, 1), { sessionId: 'kept', state: 'working', nativeId: 'kept' });
   await run(tick());
@@ -1341,7 +1299,6 @@ test('a task on a harness this engine does not have is never spawned on the fall
   const spawns: string[] = [];
   const told: string[] = [];
   const ops = testOps({ sessions });
-  // The fallback records what it is handed and told to look for: a task on a remote agent the engine was made without is neither.
   const claude = {
     ...ops,
     spawn: (r: SpawnRequest) =>
@@ -1357,7 +1314,6 @@ test('a task on a harness this engine does not have is never spawned on the fall
   };
   const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude }, 'claude')), tickMemoLayer({ verify: true }));
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
-  // Filed by an engine that had `a2a:reviewer`: one ready to start, one spawned twice the grace ago and at work on the agent since.
   const ready = await run(file({ ...spec, harness: 'a2a:reviewer' }));
   const away = await run(file({ ...spec, harness: 'a2a:reviewer' }));
   const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();

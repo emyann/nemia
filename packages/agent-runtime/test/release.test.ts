@@ -1,11 +1,15 @@
 /**
  * Letting a finished session go, at shipped defaults — a fake `claude` on PATH that keeps a registry.
  *
- * Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that
- * has given its closeout stays `working/idle` there for good: every run left its sessions behind, to
- * be cleared by hand (open issue 3). So once an attempt's end is on the record, the engine releases its
- * session. What is checked is what `createEngine()` really runs: the fake writes down every call, and
- * keeps its rows the way `claude agents --all --json` prints them.
+ * Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that has given its closeout
+ * stays `working/idle` there for good. So once an attempt's end is on the record, the engine releases its session. What is
+ * checked is what `createEngine()` really runs: the fake writes down every call, and keeps its rows the way `claude agents
+ * --all --json` prints them.
+ *
+ * Claude Code writes a session's cost into its transcript only as its process exits. A session that gave its closeout keeps
+ * its process, and its transcript no cost, until it is stopped, which is after its end is on the record; a `--bg` session
+ * that ended its turn is listed `done`, idle, with its pid, and has no cost until `claude stop`. A release therefore stops a
+ * session whose process runs before it removes it: removed unstopped, nothing would read what it cost.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +22,7 @@ import { scratch } from './scratch.ts';
 const tmp = (label: string) => scratch(`ae-release-${label}-`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
+/** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { createEngine } = await import('../src/facade.ts');
@@ -27,7 +31,7 @@ type Row = { name: string; sessionId: string; state: string; status: string; sta
 
 /**
  * A fake `claude`. `agents` prints its rows; `--bg --name <n>` adds one, working and idle; `stop <short>`
- * marks one stopped and `rm <short>` deletes it, each refusing an id it does not have as 2.1.270 does
+ * marks one stopped and `rm <short>` deletes it, each refusing an id it does not have as Claude Code does
  * ("No job matching"). While `<bin>/rm-fails` exists, `rm` fails. Every call is written down.
  */
 const fakeClaude = () => {
@@ -80,7 +84,7 @@ if (args[0] === '--bg') {
         .map((l) => JSON.parse(l) as string[])
         .filter((a) => a[0] === 'stop' || a[0] === 'rm'),
     rmFails: (fails: boolean) => (fails ? fs.writeFileSync(rmFails, '') : fs.rmSync(rmFails, { force: true })),
-    /** From now on, `stop` writes these totals into the session's transcript as a `cost-state` pair. */
+    /** Makes every later `stop` write these totals into the session's transcript as a `cost-state` pair. */
     costOnStop: (totals: object) => fs.writeFileSync(costOnStop, JSON.stringify(totals)),
   };
 };
@@ -95,7 +99,10 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   }
 };
 
-/** The session's transcript, in which it called StructuredOutput just now: where the runner reads a statement. */
+/**
+ * The session's transcript, in which it called StructuredOutput just now: where the runner reads a statement. A statement
+ * counts only when made after its attempt began, so a test waits a moment after the spawn before it writes one.
+ */
 const said = (row: Row, payload: object) => {
   const dir = path.join(config, 'projects', 'fake-project');
   fs.mkdirSync(dir, { recursive: true });
@@ -127,7 +134,10 @@ const said = (row: Row, payload: object) => {
 
 const short = (row: Row) => row.sessionId.split('-')[0];
 
-/** A transcript with no statement in it, last written `ago` milliseconds ago. */
+/**
+ * A transcript with no statement in it, last written `ago` milliseconds ago. Quiet is counted from the later of a session's
+ * last write and its own start, so a test that wants it quiet dates its start back too.
+ */
 const wrote = (row: Row, ago: number) => {
   const dir = path.join(config, 'projects', 'fake-project');
   fs.mkdirSync(dir, { recursive: true });
@@ -158,7 +168,6 @@ test('a task that gave its closeout settles, and its session is stopped and remo
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
-    // Made after the attempt began, as a statement of its own must be.
     await sleep(10);
     said(row, { outcome: 'done' });
 
@@ -184,8 +193,6 @@ test('a task that gave its closeout settles, and its session is stopped and remo
 });
 
 test("a session's cost, which Claude Code writes only as its process exits, is read once its release has stopped it — and put on the attempt once", async () => {
-  // Measured on 2.1.272: a session that gave its closeout still has its process, and its transcript no cost, until it is
-  // stopped — which is after its end is on the record.
   for (const worktree of [false, true]) {
     const claude = fakeClaude();
     claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
@@ -233,8 +240,6 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
 });
 
 test('a session listed done whose process still runs is stopped before it goes — its cost is written only then', async () => {
-  // Measured on 2.1.272: a `--bg` session that ended its turn was listed `done`, idle, with its pid, and its transcript had
-  // no cost until `claude stop`. Removed without a stop, nothing would have read what it cost.
   const claude = fakeClaude();
   claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
   await onPath(claude.bin, async () => {
@@ -287,8 +292,6 @@ test('a task that asked for a worktree has its session stopped and never removed
 });
 
 test('a session ended by quiet is stopped before it goes — its end is on the record, and claude agents still has it working', async () => {
-  // Found in review: `release` read the sighting's state, which quiescence then rewrote to `done`. A
-  // worktree task's session was then never touched, left working, and any other was removed unstopped.
   for (const worktree of [false, true]) {
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
@@ -301,7 +304,6 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
       await engine.tick();
       const [row] = claude.rows();
       wrote(row, 10 * 60_000);
-      // Started before that, too: quiet is counted from the later of its last write and its own start.
       claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
 
       for (let i = 0; i < 3; i++) await engine.tick();
@@ -327,8 +329,6 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
 });
 
 test('no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs', async () => {
-  // A task a person stops ends its attempt `operator` before it settles, its session's id on that end: once settled
-  // with no end, and left listed for want of that id (found in review), the session is now released and still read.
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
@@ -399,7 +399,6 @@ test("a task settled before its session's id was recorded keeps that session lis
     { name: 'ae/before/1', sessionId: unrecorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
     { name: 'ae/after/1', sessionId: recorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
   ]);
-  // Two journals a person stopped, as an engine without the id wrote one and as this one writes the other.
   const at = new Date().toISOString();
   const stopped = (settled: Event): Event[] => [
     { kind: 'filed', at, brief: 'the prompt', cwd: '/r', harness: 'claude' },
@@ -433,6 +432,7 @@ test("a task settled before its session's id was recorded keeps that session lis
     assert.deepEqual(
       claude.rows().map((r) => r.name),
       ['ae/before/1'],
+      'a journal an older engine wrote settles a stopped task with no session id: that session stays listed',
     );
   });
 });

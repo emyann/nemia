@@ -1408,8 +1408,13 @@ test(
     t.diagnostic(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m13-board');
     const engine = createEngine({ root, harnesses: { codex } });
-    const journal = Journal.filesOps(root);
-    const client = clientOf('codex', detachedOps(codex, root), (taskId) => Effect.runPromise(journal.read(taskId)));
+    const client = clientOf('codex', detachedOps(codex, root), (taskId) =>
+      Effect.runPromise(
+        Effect.gen(function* () {
+          return yield* (yield* Journal).read(taskId);
+        }).pipe(Effect.provide(Journal.files(root))),
+      ),
+    );
     // Said in the brief and nowhere else: only a turn that continues the first thread knows it.
     const secret = `m13-${randomUUID().slice(0, 8)}`;
     const id = await engine.file({

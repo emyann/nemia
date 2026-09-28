@@ -7,8 +7,10 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Journal } from '../src/journal.ts';
-import type { Event } from '../src/domain.ts';
+import { Journal, type JournalError } from '../src/journal.ts';
+import type { Event, Usage } from '../src/domain.ts';
+import { HarnessArgsSchema, type StoredEvent } from '../src/event-schema.ts';
+import type { HarnessArgs } from '../src/harness-args.ts';
 import { scratch } from './scratch.ts';
 
 const root = () => scratch('ae-journal-');
@@ -427,4 +429,121 @@ test("a filing that asked for remoteControl — under config, or beside it from 
   const { createEngine } = await import('../src/facade.ts');
   const { state } = await createEngine({ root: dir }).view('under');
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
+});
+
+// ─── what no runtime wrote: refused with the entry, the field, and what to do ───
+
+const failureOf = <A>(dir: string, e: Effect.Effect<A, JournalError, Journal>) => run(dir, Effect.flip(e));
+
+test('a journal line of a kind no runtime writes fails the read, naming the task, the entry and the kinds, and saying to take it out', async () => {
+  const dir = legacyStore({ 't-bad': [TODAY, { kind: 'nudged', at: '2026-09-24T00:00:01Z' }] });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.equal(error._tag, 'JournalError');
+  assert.equal(error.taskId, 't-bad');
+  assert.ok(
+    error.message.startsWith(`t-bad's journal, entry 2 is no event this runtime writes (its kind is "nudged"; the kinds are filed,`),
+    error.message,
+  );
+  assert.ok(error.message.includes('take it out'), error.message);
+});
+
+test('an event of a known kind missing a field it always carries fails the read, naming the field', async () => {
+  const { at: _, ...noTime } = TODAY;
+  const dir = legacyStore({ 't-bad': [noTime] });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(error.message.startsWith("t-bad's journal, entry 1 is a `filed` event, and its `at` is missing."), error.message);
+});
+
+test('a field of the wrong type fails the read, saying what is there and what the runtime writes', async () => {
+  const dir = legacyStore({
+    't-bad': [TODAY, { kind: 'measured', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { turns: 'three' } }],
+  });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(
+    error.message.startsWith(
+      `t-bad's journal, entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
+    ),
+    error.message,
+  );
+});
+
+test('a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it', async () => {
+  for (const filed of [
+    { ...TODAY, config: { tools: 'Read' } },
+    { ...LEGACY, worktree: 3 },
+  ]) {
+    const dir = legacyStore({ 't-bad': [filed] });
+    const error = await failureOf(
+      dir,
+      Effect.flatMap(Journal, (j) => j.read('t-bad')),
+    );
+    assert.ok(error.message.startsWith("t-bad's journal, entry 1 is a `filed` event, and its `"), error.message);
+  }
+});
+
+test('a feed entry that names no task fails the feed read, naming the entry', async () => {
+  const dir = legacyStore({ 't-ok': [TODAY] });
+  fs.appendFileSync(path.join(dir, 'feed.jsonl'), JSON.stringify({ taskId: 3, event: STARTING }) + '\n');
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.feed(0)),
+  );
+  assert.ok(
+    error.message.startsWith('the feed, entry 2 is no feed entry: its `taskId` is 3, where the runtime writes string.'),
+    error.message,
+  );
+  const kinds = await failureOf(
+    legacyStore({ 't-ok': [TODAY, { kind: 'nudged', at: 'x' }] }),
+    Effect.flatMap(Journal, (j) => j.feed(0)),
+  );
+  assert.ok(kinds.message.startsWith('the feed, entry 2 is no event this runtime writes (its kind is "nudged";'), kinds.message);
+});
+
+test('the in-memory store is decoded the same: an event appended in no shape the runtime writes is refused when read', async () => {
+  const error = await Effect.runPromise(
+    Effect.flatMap(Journal, (j) =>
+      j.append('t-mem', { kind: 'filed', brief: 'b', cwd: '/r' } as never).pipe(Effect.andThen(j.read('t-mem'))),
+    ).pipe(Effect.flip, Effect.provide(Journal.test())),
+  );
+  assert.ok(error.message.startsWith("t-mem's journal, entry 1 is a `filed` event, and its `at` is missing."), error.message);
+});
+
+test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
+  const { createEngine } = await import('../src/facade.ts');
+  const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
+  const engine = createEngine({
+    journal: {
+      append: async () => {},
+      read: async () => events,
+      list: async () => ['t-own'],
+      feed: async () => ({ entries: [], cursor: 0 }),
+    },
+  });
+  await assert.rejects(engine.view('t-own'), (e: Error) =>
+    e.message.includes(`t-own's journal, entry 1 is no event this runtime writes (its kind is "filled"`),
+  );
+});
+
+/** The keys a type names, without the keys of its index signature. */
+type Named<T> = keyof { [K in keyof T as string extends K ? never : K]: T[K] };
+/** Each kind's fields `Event` has and the stored schema forgot: none, or the assignment below does not compile. */
+type Forgotten = {
+  [K in Event['kind']]: Exclude<Named<Extract<Event, { kind: K }>>, Named<Extract<StoredEvent, { kind: K }>>>;
+}[Event['kind']];
+type ForgottenArgs = Exclude<Named<HarnessArgs>, Named<typeof HarnessArgsSchema.Type>>;
+type ForgottenUsage = Exclude<Named<Usage>, Named<NonNullable<Extract<StoredEvent, { kind: 'measured' }>['usage']>>>;
+
+test('the stored schema names every field of every event, of the harness arguments and of the usage: a field added to one is added to it', () => {
+  const none: [Forgotten, ForgottenArgs, ForgottenUsage] extends [never, never, never] ? true : [Forgotten, ForgottenArgs, ForgottenUsage] =
+    true;
+  assert.equal(none, true);
 });

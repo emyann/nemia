@@ -1,0 +1,200 @@
+/**
+ * What a journal holds, as a schema: every event a runtime has ever written, read back from whatever store holds it
+ * (`Journal.layer`), before `upgrade` rewrites a former shape in today's.
+ *
+ * Each event keeps the keys it does not name (`Schema.StructWithRest`): a journal is never rewritten, and a key written by
+ * another version of the runtime — `maxAttempts`, `resume` and `priority` on an old filing, a harness argument beside
+ * `config` — is `upgrade`'s to move or the fold's to leave unread. The rest's `unknown` is also what holds each struct to
+ * the hand-written `Event` in `domain.ts`: a field of `Event` a struct forgot is read as `unknown`, which no field's type
+ * takes, so `tsc` refuses the assignment in `journal.ts`.
+ *
+ * The harness's arguments are checked for their types only. What a filing may carry is `argsRefusalOf`'s at the door;
+ * a journal holds what a door once let through, a former argument included (`FORMER_ARGS`), which `upgrade` moves.
+ */
+import { Schema, SchemaIssue } from 'effect';
+
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+const Strings = Schema.mutable(Schema.Array(Schema.String));
+
+const McpServerSchema = Schema.Union([
+  Schema.Struct({
+    type: Schema.optional(Schema.Literal('stdio')),
+    command: Schema.String,
+    args: Schema.optional(Strings),
+    env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  }),
+  Schema.Struct({
+    type: Schema.Literals(['http', 'sse']),
+    url: Schema.String,
+    headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  }),
+]);
+
+const ClaudeFlagsSchema = Schema.StructWithRest(
+  Schema.Struct({
+    appendSystemPromptFile: Schema.optional(Schema.String),
+    systemPromptFile: Schema.optional(Schema.String),
+    pluginDir: Schema.optional(Strings),
+    settings: Schema.optional(Schema.String),
+    remoteControl: Schema.optional(Schema.Union([Schema.Literal(true), Schema.String])),
+  }),
+  [Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Finite, Schema.Literal(true), Strings]))],
+);
+
+/** `HarnessArgs`, by type: the values `argsRefusalOf` judged when the task was filed. */
+const harnessArgs = {
+  model: Schema.optional(Schema.String),
+  permissionMode: Schema.optional(Schema.String),
+  worktree: Schema.optional(Schema.Union([Schema.String, Schema.Boolean])),
+  tools: Schema.optional(Strings),
+  disallowedTools: Schema.optional(Strings),
+  allowedTools: Schema.optional(Strings),
+  effort: Schema.optional(Schema.String),
+  mcp: Schema.optional(Schema.Record(Schema.String, McpServerSchema)),
+  contextTokens: Schema.optional(Schema.Finite),
+  background: Schema.optional(Schema.Boolean),
+  budgetUsd: Schema.optional(Schema.Finite),
+  claude: Schema.optional(ClaudeFlagsSchema),
+};
+
+/** `FORMER_ARGS`: a harness argument once, a flag of Claude Code's now, which `upgrade` moves into `config.claude`. */
+const formerArgs = { remoteControl: Schema.optional(Schema.Boolean) };
+
+export const HarnessArgsSchema = Schema.StructWithRest(Schema.Struct({ ...harnessArgs, ...formerArgs }), Rest);
+
+const UsageSchema = Schema.StructWithRest(
+  Schema.Struct({
+    turns: Schema.optional(Schema.Finite),
+    toolCalls: Schema.optional(Schema.Finite),
+    inputTokens: Schema.optional(Schema.Finite),
+    cacheReadTokens: Schema.optional(Schema.Finite),
+    cacheWriteTokens: Schema.optional(Schema.Finite),
+    uncachedTokens: Schema.optional(Schema.Finite),
+    peakContextTokens: Schema.optional(Schema.Finite),
+    firstContextTokens: Schema.optional(Schema.Finite),
+    firstCacheWriteTokens: Schema.optional(Schema.Finite),
+    compactions: Schema.optional(Schema.Finite),
+    outputTokens: Schema.optional(Schema.Finite),
+    costUsd: Schema.optional(Schema.Finite),
+    apiMs: Schema.optional(Schema.Finite),
+    toolMs: Schema.optional(Schema.Finite),
+    unpricedModel: Schema.optional(Schema.Literal(true)),
+  }),
+  Rest,
+);
+
+const event = <const K extends string, const F extends Schema.Struct.Fields>(kind: K, fields: F) =>
+  Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal(kind), at: Schema.String, ...fields }), Rest);
+
+/** A filing: until 2026-09-23 its harness's arguments were written beside its own fields, which `upgrade` lifts into `config`. */
+const Filed = event('filed', {
+  ...harnessArgs,
+  ...formerArgs,
+  brief: Schema.String,
+  cwd: Schema.String,
+  harness: Schema.optional(Schema.String),
+  deadlineSeconds: Schema.optional(Schema.Finite),
+  resumeFrom: Schema.optional(Schema.String),
+  config: Schema.optional(HarnessArgsSchema),
+  closeoutSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+  queued: Schema.optional(Schema.Boolean),
+  holdOpen: Schema.optional(Schema.Literal(true)),
+});
+
+/**
+ * An end as any runtime wrote one: `budget` is the reason a journal written before stage 4b (2026-09-25) gave a session its
+ * harness ended at a spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
+ */
+const Ended = event('ended', {
+  attempt: Schema.Finite,
+  sessionId: Schema.String,
+  observed: Schema.Literals(['done', 'failed', 'stopped']),
+  reason: Schema.Literals(['harness', 'lost', 'unsigned', 'unstartable', 'operator', 'deadline', 'budget']),
+  nativeId: Schema.optional(Schema.String),
+  closeout: Schema.optional(Schema.Unknown),
+  stated: Schema.optional(Schema.Boolean),
+  usage: Schema.optional(UsageSchema),
+  exitCode: Schema.optional(Schema.Finite),
+  denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),
+  limit: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
+});
+
+/** A person's answer: `budgetUsd` beside `config` is how one was written before stage 4b, moved under it by `upgrade`. */
+const Input = event('input', {
+  text: Schema.String,
+  config: Schema.optional(HarnessArgsSchema),
+  budgetUsd: Schema.optional(Schema.Finite),
+});
+
+/** Every event a runtime has written, in the shape it was written in. */
+export const StoredEventSchema = Schema.Union([
+  Filed,
+  event('starting', { attempt: Schema.Finite, resumeFrom: Schema.optional(Schema.String), nudge: Schema.optional(Schema.String) }),
+  event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String) }),
+  Ended,
+  event('measured', { attempt: Schema.Finite, usage: UsageSchema }),
+  event('stop-requested', {}),
+  event('said', { attempt: Schema.Finite, text: Schema.String }),
+  Input,
+  event('closed', {}),
+  event('admitted', {}),
+  event('settled', {
+    outcome: Schema.Literals(['succeeded', 'failed', 'stopped']),
+    note: Schema.optional(Schema.String),
+    nativeId: Schema.optional(Schema.String),
+  }),
+]);
+
+/** An event as it was written, a former shape included: what `upgrade` takes. */
+export type StoredEvent = typeof StoredEventSchema.Type;
+
+/** The kinds of event a runtime has written. */
+export const EVENT_KINDS: readonly string[] = StoredEventSchema.members.map((m) => m.schema.fields.kind.literal);
+
+/** A task's journal as a store holds it: its events, in order. */
+export const StoredEventsSchema = Schema.Array(StoredEventSchema);
+
+/** The board's feed as a store holds it: which task each event happened to. */
+export const StoredFeedSchema = Schema.Array(
+  Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest),
+);
+
+const fieldOf = (value: unknown, key: PropertyKey): unknown =>
+  typeof value === 'object' && value !== null && key in value ? (value as Record<PropertyKey, unknown>)[key] : undefined;
+
+const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
+
+/** The first thing a schema refused in `value`: where, and what is there instead of what it expected. */
+export const firstRefusal = (value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } => {
+  const [first] = formatter(error.issue).issues;
+  const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
+  const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
+  const message = first?.message ?? 'is not what the runtime writes';
+  const words =
+    message === 'Missing key'
+      ? 'is missing'
+      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, 'the runtime writes ').replace(/ \| undefined$/, '')}`;
+  return { path, words };
+};
+
+/**
+ * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: the entry, and the
+ * first field of it that is wrong. `entries` is what the store gave: a task's events, or feed entries when `feed` is set.
+ */
+export const journalWords = (whose: string, entries: unknown, error: Schema.SchemaError, feed: boolean): string => {
+  const { path, words } = firstRefusal(entries, error);
+  const [index] = path;
+  const rest = path.slice(feed ? 2 : 1);
+  const entry = typeof index === 'number' ? fieldOf(entries, index) : undefined;
+  const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');
+  const where = `${feed ? 'the feed' : `${whose}'s journal`}${typeof index === 'number' ? `, entry ${index + 1}` : ''}`;
+  const what =
+    feed && path[1] !== 'event'
+      ? `is no feed entry: its ${path.length > 1 ? `\`${String(path[1])}\`` : 'shape'} ${words}`
+      : typeof kind !== 'string' || !EVENT_KINDS.includes(kind)
+        ? `is no event this runtime writes (its kind is ${JSON.stringify(kind) ?? 'missing'}; the kinds are ${EVENT_KINDS.join(', ')})`
+        : `is a \`${kind}\` event, and its ${rest.length ? `\`${rest.map(String).join('.')}\`` : 'shape'} ${words}`;
+  return `${where} ${what}. A journal is written by the runtime alone, and never edited: if a person or another program wrote this entry, take it out; if a newer runtime did, read this store with that runtime.`;
+};

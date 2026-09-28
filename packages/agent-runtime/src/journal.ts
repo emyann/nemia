@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
+import { HarnessArgsSchema, journalWords, StoredEventsSchema, StoredFeedSchema, type StoredEvent } from './event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 import { countRead, readText } from './io-tally.ts';
 
@@ -71,6 +72,38 @@ export type JournalOps = {
 };
 
 /**
+ * A store as the runtime reads it: what `read` and `feed` give back is whatever the store holds, parsed, and is an event
+ * only once `Journal.layer` has decoded it. A `JournalOps` is one; the files store is one that never says its lines are events.
+ */
+export type StoreOps = Omit<JournalOps, 'read' | 'feed'> & {
+  readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
+};
+
+/**
+ * A store's entries as events, the very objects it gave: a decoded struct comes back with its keys in the schema's order, and
+ * the order of `config.claude` is the order of the flags on Claude Code's command line, so the schema is asked whether they
+ * are events (`Schema.is`) and decodes only to say why not.
+ */
+const decodeEvents = (taskId: string, raw: readonly unknown[]) =>
+  Schema.is(StoredEventsSchema)(raw)
+    ? Effect.succeed(raw)
+    : Schema.decodeUnknownEffect(StoredEventsSchema)(raw).pipe(
+        Effect.mapError((error) => new JournalError({ taskId, message: journalWords(taskId, raw, error, false) })),
+      );
+
+const decodeFeed = (raw: readonly unknown[]) =>
+  Schema.is(StoredFeedSchema)(raw)
+    ? Effect.succeed(raw)
+    : Schema.decodeUnknownEffect(StoredFeedSchema)(raw).pipe(
+        Effect.mapError((error) => new JournalError({ taskId: '*', message: journalWords('*', raw, error, true) })),
+      );
+
+/** Harness arguments `upgrade` put together from ones already read as such: the same object, typed. */
+const argsOf = (config: Record<string, unknown>): HarnessArgs =>
+  Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
+
+/**
  * An event as it is read today, whenever it was written. Nothing on disk is rewritten: the journal is append-only, and a
  * line is what was said when it was said, so a change to an event's shape is made where it is read.
  *
@@ -89,27 +122,28 @@ export type JournalOps = {
  * has it moved there: `true` as the flag, where a flag already in `claude` is kept, and `false`, which asked for nothing, dropped.
  * So a task filed bridged before the move is bridged again on its next attempt.
  */
-export const upgrade = (event: Event): Event => {
+export const upgrade = (event: StoredEvent): Event => {
   if (event.kind === 'input') {
-    const { budgetUsd, ...rest } = event as Event & { kind: 'input'; budgetUsd?: unknown };
-    if (budgetUsd === undefined) return event;
-    return { ...rest, config: { budgetUsd, ...rest.config } as HarnessArgs };
+    const { budgetUsd, ...rest } = event;
+    if (budgetUsd === undefined) return rest;
+    return { ...rest, config: { budgetUsd, ...rest.config } };
   }
   if (event.kind === 'ended') {
-    if ((event.reason as string) !== 'budget') return event;
+    if (event.reason !== 'budget') return { ...event, reason: event.reason };
     return { ...event, reason: 'harness', limit: 'budget' };
   }
   if (event.kind !== 'filed') return event;
-  const legacy = event as Event & Record<string, unknown>;
+  const legacy: Record<string, unknown> = event;
   const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS)].filter((key) => Object.hasOwn(legacy, key));
-  const given = legacy.config as Record<string, unknown> | undefined;
-  const former = Object.keys(FORMER_ARGS).filter((key) => given !== undefined && Object.hasOwn(given, key));
+  const given: Record<string, unknown> = event.config ?? {};
+  const former = Object.keys(FORMER_ARGS).filter((key) => Object.hasOwn(given, key));
   if (!moved.length && !former.length) return event;
   const lifted: Record<string, unknown> = {};
-  const { config: _, ...rest }: Record<string, unknown> = legacy;
+  const { config: _, ...rest } = event;
+  const left: Record<string, unknown> = rest;
   for (const key of moved) {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
-    delete rest[key];
+    delete left[key];
   }
   const config: Record<string, unknown> = { ...lifted, ...given };
   const flags: Record<string, unknown> = {};
@@ -117,24 +151,35 @@ export const upgrade = (event: Event): Event => {
     if (config[key] === true) flags[FORMER_ARGS[key]!] = true;
     delete config[key];
   }
-  if (Object.keys(flags).length) config.claude = { ...flags, ...(config.claude as HarnessArgs['claude']) };
-  return { ...(rest as Event & { kind: 'filed' }), ...(Object.keys(config).length ? { config: config as HarnessArgs } : {}) };
+  if (Object.keys(flags).length) config.claude = { ...flags, ...event.config?.claude };
+  return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
 };
 
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
   /**
-   * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where a journal written
-   * before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
+   * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
+   * back is decoded (`event-schema.ts`), an entry no runtime wrote failing the read with a `JournalError` that names it, and
+   * where a journal written before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
    */
-  static layer = (ops: JournalOps) =>
+  static layer = (ops: StoreOps) =>
     Layer.succeed(Journal)(
       Journal.of({
         ...ops,
-        read: (taskId) => ops.read(taskId).pipe(Effect.map((events) => events.map(upgrade))),
+        read: (taskId) =>
+          ops.read(taskId).pipe(
+            Effect.flatMap((raw) => decodeEvents(taskId, raw)),
+            Effect.map((events) => events.map(upgrade)),
+          ),
         feed: (after) =>
           ops
             .feed(after)
-            .pipe(Effect.map(({ entries, cursor }) => ({ entries: entries.map((e) => ({ ...e, event: upgrade(e.event) })), cursor }))),
+            .pipe(
+              Effect.flatMap(({ entries, cursor }) =>
+                decodeFeed(entries).pipe(
+                  Effect.map((decoded) => ({ entries: decoded.map((e) => ({ taskId: e.taskId, event: upgrade(e.event) })), cursor })),
+                ),
+              ),
+            ),
       }),
     );
 
@@ -142,7 +187,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
   static files = (root?: string) => Journal.layer(Journal.filesOps(root));
 
   /** The same implementation as a plain value, for a caller that needs its optional `subscribe`. */
-  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): JournalOps => {
+  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): StoreOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
@@ -168,7 +213,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             return readText(file(taskId))
               .split('\n')
               .filter(Boolean)
-              .map((l) => JSON.parse(l) as Event);
+              .map((l): unknown => JSON.parse(l));
           },
           catch: fail(taskId),
         }),
@@ -206,7 +251,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
               .slice(0, end)
               .split('\n')
               .filter(Boolean)
-              .map((l) => JSON.parse(l) as FeedEntry);
+              .map((l): unknown => JSON.parse(l));
             return { entries, cursor: after + Buffer.byteLength(text.slice(0, end + 1)) };
           },
           catch: fail('*'),

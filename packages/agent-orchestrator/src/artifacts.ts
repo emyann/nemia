@@ -1,7 +1,7 @@
 /**
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`), and what that directory holds
- * (`artifactFiles`).
+ * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`).
  *
  * Beneath the controllers, beside `store.ts` and `worktree.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports
  * what it exported of this before. The closeout itself is read off the engine's record, so `closeoutOf` is `views.ts`'s.
@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Closeout } from './closeout.ts';
 import { inside } from './deps.ts';
-import { artifactPlace, isGitRun, type ArtifactFile, type MissingArtifact, type Run } from './run.ts';
-import { artifactsDir, lstatOf } from './store.ts';
+import { artifactPlace, isGitRun, sizeOf, type ArtifactFile, type MissingArtifact, type Run } from './run.ts';
+import { artifactsDir, checkStderr, lstatOf } from './store.ts';
 import { gitSays } from './worktree.ts';
 
 /**
@@ -159,4 +159,61 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
   };
   walk(artifactsDir(run, stepName));
   return found.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** The note a landed ending's files directory keeps in place of the pictures its check took (`dropLandedPictures`). */
+export const LANDED_PICTURES = 'e2e-pictures.txt';
+
+/**
+ * Remove the pictures an ending's check took of the merged tree, once that check passed and the merge landed: what `landEnding` does on
+ * the pass that writes `{ commit }`. The ship's check runs the e2e on the merge staged in the repository's checkout, with its files
+ * directory as `WF_ARTIFACTS`, after the ship's gate — so no person and no step reads those pictures before it, and after a pass nothing
+ * shows them but `wf decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
+ * implement step's (measured on the owner's store on 2026-09-28: 202 of 252 differ byte for byte), and about 45 MB a run. A check that did
+ * not pass is never landed as a commit, so its pictures, the failed page's among them, stay for whoever reads why.
+ *
+ * Only a regular `.png` directly in the directory that the ending's closeout does not name, and never through a link. In its place a note,
+ * `e2e-pictures.txt`, says what was removed and where what the check said is kept — written before anything is removed, and left as it is
+ * on a later pass, so a pass that dies halfway leaves the whole list and the next one removes the rest. Nothing to remove writes nothing.
+ */
+export function dropLandedPictures(
+  run: Pick<Run, 'id'>, stepName: string, closeout: Closeout | undefined, said: { commit: string; checkTaskId?: string },
+): { removed: string[]; bytes: number } {
+  const dir = artifactsDir(run, stepName);
+  const named = new Set((closeout?.artifacts ?? []).map((file) => (path.isAbsolute(file) ? path.normalize(file) : path.join(dir, path.normalize(file)))));
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return { removed: [], bytes: 0 }; }
+  const pictures = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.png') && !named.has(path.join(dir, entry.name)))
+    .map((entry) => ({ name: entry.name, bytes: lstatOf(path.join(dir, entry.name))?.size ?? 0 }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!pictures.length) return { removed: [], bytes: 0 };
+  const bytes = pictures.reduce((sum, p) => sum + p.bytes, 0);
+  const note = path.join(dir, LANDED_PICTURES);
+  if (!lstatOf(note)) fs.writeFileSync(note, landedPicturesNote(stepName, pictures, bytes, said));
+  const removed: string[] = [];
+  let freed = 0;
+  for (const picture of pictures) {
+    try {
+      fs.rmSync(path.join(dir, picture.name));
+      removed.push(picture.name);
+      freed += picture.bytes;
+    } catch { /* still there: the next pass that lands tries again */ }
+  }
+  return { removed, bytes: freed };
+}
+
+/** The words of `e2e-pictures.txt`: why the pictures went, what they were, and where what the check said still is. */
+function landedPicturesNote(stepName: string, pictures: readonly { name: string; bytes: number }[], bytes: number, said: { commit: string; checkTaskId?: string }): string {
+  return [
+    `${stepName}'s check passed on the merge, and the run committed it as ${said.commit.slice(0, 12)}.`,
+    `So the run removed the ${pictures.length} ${pictures.length === 1 ? 'picture' : 'pictures'} the check's e2e took of the merged tree (${sizeOf(bytes)}): after a pass nobody reads them.`,
+    'A check that does not pass keeps every picture it took, the failed page\'s among them.',
+    'The pictures of the branch that a reviewer read are the implement step\'s, in its own files directory, and are kept.',
+    ...(said.checkTaskId ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ${checkStderr(said.checkTaskId)}`] : []),
+    '',
+    'Removed:',
+    ...pictures.map((p) => `  ${p.name}  ${sizeOf(p.bytes)}`),
+    '',
+  ].join('\n');
 }

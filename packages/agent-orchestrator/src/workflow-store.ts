@@ -38,8 +38,8 @@ import {
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
- * `.claude/skills/` are read, and the store (`WF_ROOT`), whose `workflows/agents/` and `workflows/skills/` are. Neither, and a workflow
- * finds only what is beside it, as before 2026-09-25.
+ * `.claude/skills/` are read, and the store (`WF_ROOT`), whose `workflows/agents/` and `workflows/skills/` are. With neither, a workflow
+ * finds only what is beside it.
  */
 export type Places = { repo?: string; home?: string };
 
@@ -180,7 +180,6 @@ export function formerKeyLines(dir: string): string[] {
   const steps = files.map((file) => [file, read(path.join(dir, file))] as const);
   const agents = [...new Set(steps.flatMap(([, text]) => frontmatterKey(text, 'agent') ?? []))].sort();
   const agentAt = (agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
-  /** The codex line of a file that runs on `harness`, if it names its sandbox as a permission mode. */
   const codexMode = (at: string, text: string, harness: string | undefined): string[] => {
     const word = frontmatterKey(text, 'permissionMode');
     return harness === 'codex' && word !== undefined ? [codexModeLine(at, word)] : [];
@@ -327,7 +326,7 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
  * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md`, of the file it names beside
  * it — the schema its `output:` names — and of each skill its `skills:` gives, every file of the skill's
  * folder, each by name with what it holds, so a file that cannot be read counts as what it says. A write of the agent carries it, and is
- * refused when the agent no longer holds it (`writeAgent`), rather than written over what changed since it was read. The api's `versionOf`
+ * refused when the agent's files hold another (`writeAgent`), rather than written over what changed since it was read. The api's `versionOf`
  * digests a folder's agents through this, so an edit of a skill moves the folder's version too — and so does its card, which is read off
  * those skills' SKILL.md files (`cardSkills`).
  *
@@ -337,7 +336,6 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
   const at = path.join(dir, `${name}.md`);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
   const text = readForVersion(at);
-  // The file the agent names beside it: what its steps declare.
   const beside = typeof text === 'string' ? [frontmatterKey(text, 'output') ?? []].flat() : [];
   const given = typeof text === 'string' ? skillNamesIn(text) : [];
   const found = skills ?? skillsFor(path.join(path.dirname(path.resolve(dir)), '_'));
@@ -355,7 +353,7 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
 /**
  * The version of the skill whose folder is `dir`: a digest of every file in it, as `agentVersion` counts the folder of each skill an agent
  * gives — so a write that moves this moves the version of every agent that gives the skill. Null for a folder with no SKILL.md. A write of the
- * skill carries it, and is refused when the skill no longer holds it (`writeSkill`).
+ * skill carries it, and is refused when the skill's folder holds another (`writeSkill`).
  */
 export function skillVersion(dir: string): string | null {
   if (!fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })) return null;
@@ -435,7 +433,7 @@ export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>
 /**
  * Whether a skill asks to be told whole, in the system prompt after the agent's instructions, rather than named for the session to load:
  * its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (F8: its own `preload` is inert on a plugin's skill), so
- * the run does it when it renders the agent (`renderAgentFiles`).
+ * the run does it when it renders the agent (`writeAgentFiles`). False for a SKILL.md that cannot be read.
  */
 export function preloads(skillDir: string): boolean {
   try {

@@ -5,7 +5,7 @@
  *
  * It passes the runtime's surface through, and wraps one method of it: `file`, so that every task the orchestrator files is `queued` and
  * starts only once the tick admits it (`admission.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
- * stop one, read its logs, say something to it, read the feed — are already the methods of the runtime's `Engine`, which every controller
+ * stop one, read its logs, say something to it, read the feed — are the methods of the runtime's `Engine`, which every controller
  * takes as it is and every test hands a fake of. A wrapper would be a second surface to keep in step with the first, and a place for
  * behaviour to grow; this file holds none but that one.
  *
@@ -38,7 +38,7 @@ export { refusedText } from 'agent-runtime';
 
 /**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's `JournalError`,
- * which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which fail as they did.
+ * which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which the caller rethrows.
  */
 export const unreadableJournal = (err: unknown): string | undefined => {
   if (!(err instanceof Error)) return undefined;
@@ -55,8 +55,7 @@ export const unreadableJournal = (err: unknown): string | undefined => {
  *
  * A `claude` step runs on the engine's `claude`: a job (`claude -p`), which ends on its own, asks nobody in any mode, and keeps a spend
  * cap; a step that says `background: true` is filed with `config.background` and runs as a background session (`claude --bg`), which
- * a person can talk to and bridge to claude.ai. It ran every step on `claude-bg` until stage 2 of the thin runtime
- * (`docs/eval-thin-runtime.md`).
+ * a person can talk to and bridge to claude.ai.
  */
 export const HARNESSES = {
   claude: 'claude',
@@ -68,11 +67,11 @@ export const HARNESSES = {
 /**
  * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
  * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted. The runtime keeps no
- * ceiling of its own since thin runtime stage 4c part 2, and refuses a `maxConcurrent` handed to it.
+ * ceiling of its own, and refuses a `maxConcurrent` handed to it.
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
- * `wf ls`, `wf up`, `wf rm`, the api — works on as before. It is `wf start` that refuses a step naming what was left out, in the file's words.
+ * `wf ls`, `wf up`, `wf rm`, the api — works on. It is `wf start` that refuses a step naming what was left out, in the file's words.
  * A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at work
  * on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  */

@@ -123,9 +123,9 @@ export type StartCard = { file: string; workflow?: string; after: string[]; body
 
 /**
  * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:`, or an inbox card's
- * `repo:`, which is refused by name — or null when it is not: no frontmatter, one with any other key or a line that is not a key, one with
- * nothing in it, or one that never closes. Null means the file's whole text is the brief, as it always was, so a brief that happens to start
- * with `---` is not eaten. Pure.
+ * `repo:`, so a card carried out of the inbox reads as a card and is refused by name — or null when it is not: no frontmatter, one with
+ * any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the file's whole text is the
+ * brief, so a brief that happens to start with `---` is not eaten. Pure.
  *
  * `wf plan` prints `wf start <card> --after …` for each card it did not start, and this is what makes that command start the card's body.
  * Read as a card, a file is held to what `wf plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no card or
@@ -143,7 +143,6 @@ export function cardToStart(file: string, text: string, after: readonly string[]
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith('#'));
-  // `repo:` is an inbox card's key, so a card carried out of the inbox reads as a card, and `readCardKeys` refuses the key by name.
   const isCardLine = (line: string) =>
     line.indexOf(':') > 0 && ([...CARD_KEYS, 'repo'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
   if (!lines.length || !lines.every(isCardLine)) return null;

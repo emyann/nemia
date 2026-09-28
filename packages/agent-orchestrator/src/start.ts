@@ -33,8 +33,8 @@ import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
- * `test/store.test.ts` holds this copy to by asking the engine. A copy, because `start` is synchronous and the engine's door is not; and
- * asked only at filing, the refusal would come after the run was written, on its first pass.
+ * `test/store.test.ts` holds this copy to by asking the engine. A copy, since `start` is synchronous and the engine's door is not, and the
+ * engine refuses only at filing, on the run's first pass, after the run is written.
  */
 const NOT_BRIDGED =
   'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
@@ -65,14 +65,19 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
 }
 
 /**
- * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix: a folder that is not a workflow
- * (`loadWorkflows`), one that can run two steps at once where they would share a directory (`isolate: false`), and a step named for another
- * step's check or try. What `startPlan` asks of every card before the first run is started.
+ * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
+ * before the first run is started. Refused:
+ * - a folder that is not a workflow (`loadWorkflows`);
+ * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that can
+ *   run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run does
+ *   not have into the branch it stands on;
+ * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
+ *   under those names, and would read one task as the other;
+ * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine refuses
+ *   them only when the step is filed, with the run on the record.
  */
 function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
-  const steps = loadWorkflows(workflowDir, places); // validated before anything is spent
-  // A team that says `workspace: folder` (every step or none: `validate`) works in folders the run makes, where there is no base branch to
-  // work on in place: --no-worktree would name one, so it is refused rather than read as nothing.
+  const steps = loadWorkflows(workflowDir, places);
   if (!isolate && isFolderTeam(steps)) {
     throw Object.assign(
       new Error(
@@ -88,9 +93,6 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
         'Either drop --no-worktree, or make the steps a chain.',
     );
   }
-  // A run with no worktrees works on the base branch itself, so it has no result branch for an ending step to merge: that step would be
-  // told the work is on a branch it is already standing on, and its prose would merge a branch into itself. Refused before anything is
-  // spent, rather than after a session has paid for the folder's whole check to find there is nothing to commit.
   const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
   if (ending) {
     throw Object.assign(
@@ -101,8 +103,6 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
       { exitCode: 2 },
     );
   }
-  // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
-  // the run would read one task as the other.
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash) {
     throw Object.assign(
@@ -112,7 +112,6 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
       { exitCode: 2 },
     );
   }
-  // Nor for another step's try: any step may be tried again, as `<step>-try<n>`, its check as `<step>-try<n>-check`.
   const tryClash = steps
     .map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] }))
     .find(({ of }) => of && steps.some((other) => other.name === of));
@@ -125,7 +124,6 @@ function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Wo
       { exitCode: 2 },
     );
   }
-  // Refused here, before anything is written, and not by the engine when the step is filed: by then the run is on the record.
   const unbridged = remoteRefusal(steps);
   if (unbridged) throw Object.assign(new Error(unbridged), { exitCode: 2 });
   const undeclared = undeclaredRefusal(steps);
@@ -173,17 +171,25 @@ function refuseInclude(repo: string, isolate: boolean): void {
 
 /**
  * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
- * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
+ * the record has no `after`.
  *
  * `inputs` are files to hand every step (`wf start --input`), by path from where `wf start` is typed: refused before anything is written
  * when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and their
- * names frozen on the record. Left out, no directory is made, and the record is what it was before there were inputs.
+ * names frozen on the record. Left out, no directory is made, and the record has no `inputs`.
  *
  * `from` says where the brief came from — the inbox card `startFromInbox` starts — and is frozen on the record. Left out, the record has none.
  *
  * `gates` are the steps whose closeout waits for a person before anything after them is filed, beside those the workflow gates itself
  * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
+ *
+ * A team that says `workspace: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
+ * run's own directory in the store is its workspace, each step's folder made beneath it when the step is filed (`folderPlace`).
+ *
+ * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `wf ls`, `wf decide` and the board list
+ * them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record never names a
+ * file that is not there: a copy or a render that fails removes the run's directory, and throws with exit 1.
  */
 export function start(opts: {
   brief: string;
@@ -197,7 +203,6 @@ export function start(opts: {
   gates?: readonly string[];
 }): Run {
   const isolate = opts.isolate ?? true;
-  // Where the steps' agents and skills are looked for, beside the folder's own: the repository the run was started on, then the store.
   const places = placesOf(opts.repo);
   const steps = stepsToStart(opts.workflowDir, isolate, places);
   const folder = isFolderTeam(steps);
@@ -223,7 +228,6 @@ export function start(opts: {
   if (refusedInputs) throw Object.assign(new Error(refusedInputs), { exitCode: 2 });
   const id = runId(opts.brief);
   const after = opts.after ?? [];
-  // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const told = {
     brief: opts.brief,
@@ -236,8 +240,6 @@ export function start(opts: {
   };
   let run: Run;
   if (folder) {
-    // No git at all: the repository `wf start` was typed in is not looked at, and the run's own directory in the store is its workspace,
-    // each step's folder made beneath it when the step is filed (`folderPlace`). `--after` is refused here, a folder run having no branch to wait for.
     const refusedAfter = afterRefusal(after, { place: { kind: 'folder' } }, parentRecord);
     if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
     run = {
@@ -264,7 +266,6 @@ export function start(opts: {
       createdAt: new Date().toISOString(),
     };
   }
-  // Copied before the record is written, so a record never names a file that is not there. A copy that fails takes the directory back with it.
   if (inputs.length) {
     const dir = inputsDir(run);
     try {
@@ -280,7 +281,6 @@ export function start(opts: {
       );
     }
   }
-  // Rendered before the record is written too, for the same reason; a render that fails takes the run's directory back with it.
   try {
     writeAgentFiles(run, steps, skillsFor(opts.workflowDir, places));
   } catch (err) {
@@ -327,7 +327,8 @@ export type PlanStarted = {
 
 /**
  * `wf plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:` names —
- * the record `wf start --after` writes, so the tick, `wf ls`, `wf decide` and the board need nothing new. Nothing else is written: no plan
+ * the record `wf start --after` writes, so the tick, `wf ls`, `wf decide` and the board need nothing new; parents first, so every card a
+ * card's `after:` names has a run by then. Nothing else is written: no plan
  * record, and no file of its own. The runs and their `after` are the plan.
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
@@ -354,7 +355,6 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
   for (const [i, card] of cards.entries()) {
     const runOf = new Map(started.map((p) => [p.card.name, p.runId]));
     try {
-      // Parents first, so every card it names has a run by now.
       const run = startRun({ brief: card.body, repo: opts.repo, workflowDir: folderOf(card), after: card.after.map((a) => runOf.get(a)!) });
       started.push({ card, runId: run.id, workflowDir: run.workflowDir });
     } catch (err) {
@@ -393,9 +393,9 @@ export type InboxStart = {
 /**
  * What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why.
  *
- * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card filed before
- * `cardRepoRefusal` — or by hand — may still carry one. The run is started all the same, and the line says the path was not looked at,
- * rather than leaving a person to wonder which repository the work went to.
+ * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card written by hand, or
+ * by a writer that does not ask `cardRepoRefusal`, may carry one. The run is started all the same, and the line says the path was not
+ * looked at: said, not refused, since a card on disk cannot be edited from the board. A `repo` a person gives for such a team is refused by `start()`.
  */
 export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & {
   ignoredRepo?: string;
@@ -413,8 +413,8 @@ export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run
  * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card. It
  * says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is written,
  * exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there — naming the cards there are — a card that does not read, a card
- * already started, no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, and a `brief` with nothing in it;
- * and whatever `start()` refuses — an `--after`, an `--input`, a `--gate` — as it refuses it.
+ * already started, no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a
+ * `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a `--gate` — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);
@@ -450,7 +450,6 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
     );
   }
-  // The card's own gate is refused in the card's words; a `--gate` beside it, by `start()` in its own.
   const flags = opts.gates ?? [];
   if (card.gate !== undefined) {
     const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir, placesOf(repo)), (step) => `${card.file}: \`gate: ${step}\``);
@@ -469,8 +468,6 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
   });
-  // The card's `repo:` reached `start()` as the repository, and a folder run looks at none: said, not refused, since a card on disk cannot
-  // be edited from the board. A `--repo` given here was refused by `start()` before the run was written.
   const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
   try {
     fs.rmSync(file, { force: true });
@@ -483,13 +480,17 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
  * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card whose
- * `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it.
+ * `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line (`queueLine`) is
+ * the only place a daemon's start is read. The result names the repository (`on`) only for a card that names none, whose start turns on
+ * where the daemon runs.
  *
  * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
  * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
  * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
- * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. The inbox
- * and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way.
+ * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. A
+ * failure is said on one line, its lines joined by ` / `; a try that cannot be written is said all the same, and the next pass tries the
+ * card again. The inbox and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way, or
+ * on a later pass when it cannot be.
  */
 export function startQueued(repo: string, runs: readonly Run[] = listRuns()): QueueStarted | undefined {
   const files = inboxFiles();
@@ -499,26 +500,20 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
     if (listing.some((l) => l.name === name && l.tried)) continue;
     try {
       fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true });
-    } catch {
-      /* removed on a pass that can */
-    }
+    } catch {}
   }
   const next = nextQueued(listing, repo);
   if (!next) return undefined;
   const on = next.repo ?? repo;
-  // Named on the line only for a card that names no repository: whose start turns on where the daemon runs.
   const where = next.repo ? {} : { on };
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
-    // Carried, not dropped: a card whose `repo:` the run never looked at says so wherever it was started, and a tick's line is the only
-    // place a daemon's start is read (`queueLine`).
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
     return started.removed
       ? { card: next.name, run: started.run.id, removed: true, ...ignored }
       : { card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored };
   } catch (err) {
     const refused = (err as { exitCode?: number }).exitCode === 2;
-    // On one line: git's words come with its command and its stderr, a line each.
     const why = (err instanceof Error ? err.message : String(err))
       .split('\n')
       .map((line) => line.trim())
@@ -531,9 +526,7 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
     try {
       fs.mkdirSync(queueDir(), { recursive: true });
       fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(tried, null, 2));
-    } catch {
-      /* said all the same; not written down, the next pass tries the card again, rather than a daemon dying on it */
-    }
+    } catch {}
     return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
   }
 }

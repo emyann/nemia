@@ -37,9 +37,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A time measured on a machine is a floor, never a ceiling.** `meter-store.test.ts` spun 30 ms in its fake and wanted the runtime's
   share under 30: a process parked for 21 ms after the spin failed it at 30.8. Assert what a meter moves as an identity — the phases
   add up to no more than the pass — and force the park with a load hook that adds the time after the spin (same run).
-- `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
-  biome, on purpose, until one replaces more code than it adds.
-- Run both before you commit. Green is the floor, not the bar: a change that makes the suite
+- `npm run typecheck` — `tsc --noEmit` per package.
+- `npm run lint` — oxlint (`.oxlintrc.json`: its correctness rules, type-aware, React's and jsx-a11y's, and the suspicious rules that find
+  a bug) and `oxfmt --check` (`.oxfmtrc.json`: width 140, code only, never markdown or JSON). `npm run format` writes the layout; run it
+  before you commit, since a check refuses a file it would move. Every shipped `check:` runs `npm run lint` after the types. A rule turned
+  off, or a line allowed with `oxlint-disable-next-line`, says why beside it. `.git-blame-ignore-revs` lists the commit that formatted the
+  code: `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone (chosen with the owner, rule by rule, on 2026-09-28).
+- Run all three before you commit. Green is the floor, not the bar: a change that makes the suite
   pass by weakening a test is a finding to report, not a fix.
 - **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)
   though three tests pin those folders: the round trip in `agent-orchestrator/test/workflow.test.ts`, the package's `ui`

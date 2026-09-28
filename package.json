@@ -15,7 +15,8 @@
     "build": "turbo run build",
     "test": "turbo run test --continue",
     "typecheck": "turbo run typecheck",
-    "lint": "oxlint",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
     "e2e": "npm run e2e --workspace web"
   },
   "devDependencies": {

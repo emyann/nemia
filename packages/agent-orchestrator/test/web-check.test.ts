@@ -49,7 +49,7 @@ const BUILD_FOLDERS = FOLDERS.filter((f) => /build|ui/.test(f));
 /** How each line ends its build: the e2e only where the run has not set `WF_BASE_REF` — on the merged tree, in ship's check. */
 const AT_MERGE =
   'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
-const BUILD_LINE = `npm test && npm run typecheck && npm run build && ${AT_MERGE}`;
+const BUILD_LINE = `npm test && npm run typecheck && npm run lint && npm run build && ${AT_MERGE}`;
 /** A line as it was before 2026-09-25, with the e2e in every round: what each REFUSED case below must catch. */
 const everyRound = (line: string) => line.replace(AT_MERGE, 'npm run e2e');
 
@@ -186,7 +186,7 @@ test('REFUSED as a check: a line with the e2e in every round, as each folder had
     assert.match(r.stdout, E2E, `${folder}: the old line ran the e2e in a round\n${r.stdout}`);
   }
   // The build folders' old line, word for word.
-  assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run build && npm run e2e');
+  assert.equal(everyRound(BUILD_LINE), 'npm test && npm run typecheck && npm run lint && npm run build && npm run e2e');
 });
 
 test("REFUSED as ship's check: an e2e that fails fails the line on the merged tree; in a round, where it does not run, it cannot", () => {

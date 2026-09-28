@@ -207,7 +207,7 @@ test("dev-planned-build is dev-planned with dev-build's check on implement: the 
   );
   assert.match(
     byName.implement!.check!,
-    /^npm test && npm run typecheck && npm run build && if \[ -n "\$\{WF_BASE_REF:-\}" \]; then .*; else npm run e2e; fi$/,
+    /^npm test && npm run typecheck && npm run lint && npm run build && if \[ -n "\$\{WF_BASE_REF:-\}" \]; then .*; else npm run e2e; fi$/,
   );
   const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));
   for (const name of ['plan', 'review'])

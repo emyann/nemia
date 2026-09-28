@@ -1776,7 +1776,7 @@ test('the shipped workflow goes round as its folder says: review filed read-only
   assert.deepEqual((implement.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
   assert.match(
     implement.brief,
-    /^## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*[\s\S]*## Before you sign off\n[\s\S]*`npm test && npm run typecheck`/,
+    /^## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*[\s\S]*## Before you sign off\n[\s\S]*`npm test && npm run typecheck && npm run lint`/,
   );
 });
 

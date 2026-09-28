@@ -289,7 +289,7 @@ test("this repository's own workflow checks the suite and the types after every 
   // either half now blocks what follows it rather than handing it on.
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
   assert.deepEqual(Object.keys(steps), ['implement', 'review']);
-  assert.equal(steps.implement?.check, 'npm test && npm run typecheck');
+  assert.equal(steps.implement?.check, 'npm test && npm run typecheck && npm run lint');
   assert.equal(steps.review?.harness, 'codex');
   // Read-only again. It lost the line at C's merge because a read-only reviewer could not write the
   // REVIEW.md that respond read; the review now travels as its closeout (plan §4 J), so it writes nothing.

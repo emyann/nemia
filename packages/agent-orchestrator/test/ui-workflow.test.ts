@@ -26,7 +26,7 @@ const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
 /** The build folders' and ui's implement check: the build every round, and the e2e only where the run set no `WF_BASE_REF` — the merged tree. */
 const BUILD =
-  'npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
+  'npm test && npm run typecheck && npm run lint && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
 /** `dev`'s implement check, as its folder writes it: the suite and the types, then the build and the e2e on what git says was touched. */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
 const ui = loadWorkflows(path.join(WORKFLOWS, 'ui'));

@@ -32,6 +32,8 @@
  * is told them in its system prompt (`--append-system-prompt-file`), and its brief opens on its own note, or on *What was asked for* when it
  * has none. Every one of the forty briefs moved, each exactly by its agent's instructions and the blank line after them, checked by
  * script — old brief = instructions, a blank line, new brief — and nothing past the briefs: plans, phases and forget lines stand.)
+ * And on 2026-09-28, when every shipped check gained `npm run lint` after the types: the implement and ship briefs that print the line
+ * moved, twenty-four values, each exactly by ` && npm run lint`, checked by script — and nothing else.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

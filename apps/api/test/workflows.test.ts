@@ -542,7 +542,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   const atMerge =
     'if [ -n "${WF_BASE_REF:-}" ]; then echo "wf check: no e2e in a round\'s check; it runs once, on the merged tree, where no WF_BASE_REF is set"; else npm run e2e; fi';
   const devCheck =
-    'npm test && npm run typecheck && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf \'%s\\n\' "$touched" | grep -Eq \'^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)\'; then npm run build && ' +
+    'npm test && npm run typecheck && npm run lint && { if [ -n "${WF_BASE_REF:-}" ]; then range="$WF_BASE_REF...HEAD"; else range=HEAD...MERGE_HEAD; fi; touched=$(git -c core.quotePath=false diff --no-renames --name-only "$range" --) || { echo "wf check: cannot tell what the work touched, since git diff --name-only $range failed; the build and the e2e are not skipped on a guess" >&2; false; }; } && if printf \'%s\\n\' "$touched" | grep -Eq \'^(apps/(web|api)/|package(-lock)?\\.json$|turbo\\.json$)\'; then npm run build && ' +
     atMerge +
     '; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root\'s package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi';
   // The run's ending, gated: it stages the merge in the repository's own checkout and signs off its message, and the run executes
@@ -566,7 +566,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   });
   for (const [name, check] of [
     ['dev', devCheck],
-    ['dev-build', `npm test && npm run typecheck && npm run build && ${atMerge}`],
+    ['dev-build', `npm test && npm run typecheck && npm run lint && npm run build && ${atMerge}`],
   ] as const) {
     const w = listed.find((x) => x.name === name)!;
     // Each step with its body as the loader read it, which the builder puts back.
@@ -658,7 +658,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   );
   assert.deepEqual(
     (({ name, spec: keys }) => ({ name, spec: keys }))(listedUi.steps.find((s) => s.name === 'ship')!),
-    ship(`npm test && npm run typecheck && npm run build && ${atMerge}`),
+    ship(`npm test && npm run typecheck && npm run lint && npm run build && ${atMerge}`),
     "ui's ship is dev-build's",
   );
   assert.deepEqual(files(ui), files(path.join(shipped, 'ui')));

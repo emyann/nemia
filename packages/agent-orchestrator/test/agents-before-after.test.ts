@@ -184,12 +184,19 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
  * Every implement check with an e2e moved again when the e2e left the rounds for the merged tree (2026-09-25): a round's check, which the
  * run gives `WF_BASE_REF`, builds and runs no e2e, and the shipper's run of the line, with none, runs it. The build folders' and ui's line
  * is dev-build's, read here too, and web-check.test.ts runs every one of them.
+ *
+ * And every shipped check gained `npm run lint` (oxlint and oxfmt's check) after the types, on 2026-09-28: the package's own folder's
+ * line, the suite and the types alone until then, moved with the rest, and is read here as it stands too.
  */
 const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
 const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')!.check!;
+const PACKAGE_CHECK = loadWorkflows(path.join(REPO, 'packages', 'agent-orchestrator', 'workflows')).find(
+  (s) => s.name === 'implement',
+)!.check!;
 const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
   'workflows/dev/implement': { check: DEV_CHECK },
   'workflows/dev-planned/implement': { check: DEV_CHECK },
+  'packages/agent-orchestrator/workflows/implement': { check: PACKAGE_CHECK },
   ...Object.fromEntries(
     ['workflows/dev-build', 'workflows/dev-planned-build', 'workflows/ui', 'packages/agent-orchestrator/workflows/ui'].map((folder) => [
       `${folder}/implement`,

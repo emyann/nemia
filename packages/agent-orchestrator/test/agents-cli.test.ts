@@ -2,7 +2,8 @@
  * `wf agents`, and `wf agents card <name>`: the two places a `wf` reads agents from, and one agent printed in A2A's shape.
  *
  * The card is JSON on stdout and nothing else — a person pipes it — so what it is *not* goes to stderr. Held here: that
- * separation, the listing's two places, and each refusal at shipped defaults.
+ * separation, the listing's two places, and each refusal at shipped defaults. `WF_ROOT` is set before the import, since the module
+ * reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +13,6 @@ import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-agents-cli-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli.ts');
 
@@ -69,8 +69,7 @@ test('wf agents lists both places, each agent by what it is for and what it says
   assert.match(out, /^scribe {2}repo {2}Writes it down\.$/m);
   assert.match(out, /^ {3}read-a-thing {2}Read a thing — Reads it\.$/m);
   assert.match(out, /^archivist {2}yours {2}Files it away\.$/m);
-  // The repository's place comes first, as it does on the board.
-  assert.ok(out.indexOf('scribe') < out.indexOf('archivist'), out);
+  assert.ok(out.indexOf('scribe') < out.indexOf('archivist'), `the repository's place comes first, as it does on the board:\n${out}`);
   assert.match(out, /one in A2A's shape: wf agents card <name>/);
   fs.rmSync(path.join(YOURS, 'archivist.md'));
 });
@@ -96,8 +95,11 @@ test('wf agents card prints the card alone on stdout, and what it is not on stde
   );
   assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false, extendedAgentCard: false });
   assert.match(card.version, /^[0-9a-f]{16}$/);
-  // Not a field of the card: the honesty about it is a word to the person, not data a reader would take for the protocol's.
-  assert.equal(out.includes('not an address'), false);
+  assert.equal(
+    out.includes('not an address'),
+    false,
+    "not a field of the card: it is a word to the person, not data a reader would take for the protocol's",
+  );
   assert.match(err, /^scribe \(repo\) — a card, not an address: nothing here serves this agent over A2A/m);
 });
 
@@ -125,11 +127,10 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
     '--repo',
     repo,
   );
-  // Said which, each place answers for its own.
   const mine = JSON.parse((await printedBy(t, 'agents', 'card', 'twin', '--repo', repo, '--from', 'yours')).out) as {
     description: string;
   };
-  assert.equal(mine.description, 'Yours.');
+  assert.equal(mine.description, 'Yours.', 'said which, each place answers for its own');
   fs.rmSync(path.join(YOURS, 'twin.md'));
 });
 
@@ -143,7 +144,6 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
       return true;
     },
   );
-  // Your place has a `read-a-thing` of its own by now, so the skill that is nowhere is another.
   fs.writeFileSync(
     path.join(repo, 'workflows', 'agents', 'scribe.md'),
     '---\ndescription: Writes it down.\nskills: gone-away\ntools: Read, Skill\n---\nDo it.\n',
@@ -151,7 +151,11 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
   await assert.rejects(
     () => printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
     (err: Error) => {
-      assert.match(err.message, /gives the skill `gone-away`, and no skills folder has it — looked in /);
+      assert.match(
+        err.message,
+        /gives the skill `gone-away`, and no skills folder has it — looked in /,
+        'your place has a `read-a-thing` of its own, so the skill that is nowhere is another',
+      );
       return true;
     },
   );

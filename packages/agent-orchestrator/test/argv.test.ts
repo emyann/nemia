@@ -2,9 +2,10 @@
  * What Claude Code is spawned with for a shipped step, pinned whole: the client's `engine()` and `tick()` over runs started from the
  * shipped folders, and a fake `claude` first on PATH that writes down each argv it is started with. The argv is compared with
  * `fixtures/argv-shipped.json`, the run's id and every path of the test's made generic, so a harness argument moved from one place to
- * another — `remoteControl` into `config.claude` (2026-09-25) — is shown to hand Claude Code the same words, in the same order.
+ * another — `remoteControl` into `config.claude` — is shown to hand Claude Code the same words, in the same order.
  *
  * Two steps: the supervisor, the one background session shipped (`--bg`, bridged, a window of its own), and dev's implement, a job.
+ * The fake writes down every start of a session; `agents`, `stop` and `rm` are the registry's, and a job waits for the test to end it.
  * To record the fixture again, run this file with `ARGV_RECORD=1` and read the diff line by line: only what you meant to move may move.
  */
 import { test } from 'node:test';
@@ -44,7 +45,6 @@ const spawned = path.join(bin, 'spawned.jsonl');
 const ended = path.join(bin, 'ended');
 fs.writeFileSync(registry, '[]');
 fs.writeFileSync(spawned, '');
-// Every start of a session is written down; `agents`, `stop` and `rm` are the registry's, and a job waits for the test to end it.
 fs.writeFileSync(
   path.join(bin, 'claude'),
   `#!${process.execPath}
@@ -120,11 +120,10 @@ test("the shipped supervisor and dev's implement are spawned with the argv pinne
     supervise: generic(await spawnedFor(supervisor.id, 'supervise'), supervisor.id),
     implement: generic(await spawnedFor(dev.id, 'implement'), dev.id),
   };
-  // What the move must keep: the bridge directly before the mode, and the supervisor's window.
   const s = got.supervise;
-  assert.equal(s[0], '--bg');
+  assert.equal(s[0], '--bg', 'the supervisor is a background session');
   assert.equal(s[s.indexOf('--remote-control') + 1], '--permission-mode', 'the bridge directly before the mode');
-  assert.equal(s[s.indexOf('--autocompact') + 1], '200000');
+  assert.equal(s[s.indexOf('--autocompact') + 1], '200000', "the supervisor's window");
   assert.equal(got.implement.includes('--remote-control'), false, 'a job is never bridged');
   if (process.env.ARGV_RECORD === '1') fs.writeFileSync(FIXTURE, `${JSON.stringify(got, null, 2)}\n`);
   assert.deepEqual(got, JSON.parse(fs.readFileSync(FIXTURE, 'utf8')));

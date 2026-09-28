@@ -134,8 +134,6 @@ const isRuntime = (m: string): boolean => m === 'agent-runtime' || m.startsWith(
  */
 const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
 
-// ─── the rules, each a list of what breaks it ───────────────────────────────
-
 /** Every file is of exactly one kind, and every file a kind names is there. */
 function unsorted(sources: Sources): string[] {
   const kinds = { PURE, STORE, CONTROLLER, CLIENT: [CLIENT] };
@@ -201,7 +199,10 @@ function cliBreaks(sources: Sources): string[] {
   return [...reaching('src/cli.ts', CLI_REACHES), ...reaching('bin/wf.ts', BIN_REACHES)];
 }
 
-/** Only the client imports agent-runtime, a type included — and it does; every controller beneath the CLI imports the client, and the client no controller. */
+/**
+ * Only the client imports agent-runtime, a type included — and it does; every controller beneath the CLI imports the client, and the client
+ * no controller.
+ */
 function clientBreaks(sources: Sources): string[] {
   const out = Object.entries(sources)
     .filter(([file, imports]) => file !== CLIENT && imports.some(isRuntime))
@@ -217,14 +218,13 @@ function clientBreaks(sources: Sources): string[] {
 
 /**
  * No cycle among the client and the controllers: an ES module read in a cycle can be read before it has run, and a name it exports is then
- * not yet there. Each cycle is named once, from its least file.
+ * not yet there. Each cycle is named once, from its least file, found as the shortest way back to its start, breadth first.
  */
 function cycles(sources: Sources): string[] {
   const nodes = [CLIENT, ...CONTROLLER].sort();
   const edges = (file: string) => (sources[file] ?? []).filter((m) => nodes.includes(m)).sort();
   const found = new Set<string>();
   for (const from of nodes) {
-    // The shortest way back to `from`, breadth first.
     const back = new Map<string, string>();
     const queue = [from];
     while (queue.length) {
@@ -248,8 +248,6 @@ function cycles(sources: Sources): string[] {
   }
   return [...found].sort();
 }
-
-// ─── the planted sources: the package's, with one thing broken ──────────────
 
 /** The package's sources with `file`'s imports changed by `change`: a copy, so each plant breaks one thing. */
 const planted = (file: string, change: (imports: readonly string[]) => readonly string[]): Sources => {

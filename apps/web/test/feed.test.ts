@@ -5,15 +5,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { QueryKey } from '@tanstack/react-query';
-import { END_GRACE_MS, type Frames } from '../src/lib/following.ts';
+import { END_GRACE_MS, type Frames, type StreamLike } from '../src/lib/following.ts';
 import { FALLBACK_MS, type FeedStatus, followFeed, keysOf, pace, polled, REOPEN_MS } from '../src/lib/feed.ts';
 
 /** An EventSource as far as `followFeed` uses it: its state, its events, and `close`. */
-class Stream extends EventTarget {
+class Stream implements StreamLike {
   readyState = 0;
+  readonly #target = new EventTarget();
+  /** Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here. */
+  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+    this.#target.addEventListener(type, listener as EventListener);
+  }
+  dispatchEvent(event: Event): void {
+    this.#target.dispatchEvent(event);
+  }
   readonly after: string | undefined;
   constructor(after: string | undefined) {
-    super();
     this.after = after;
   }
   close() {
@@ -165,7 +172,8 @@ test('the events that arrive together are read again once a frame, each key once
   f.stream().send('step', line('r-1', 'implement'), '20');
   f.stream().send('run', line('r-1'), '30');
   f.stream().send('step', line('r-2', 'plan'), '40');
-  assert.deepEqual(f.invalidated, [], 'nothing before the frame');
+  // Typed as the list is: `assert.deepEqual` narrows what it compares to the type of what it is compared with, and `[]` is `never[]`.
+  assert.deepEqual(f.invalidated, [] as QueryKey[][], 'nothing before the frame');
   f.frame();
   assert.equal(f.invalidated.length, 1, 'one invalidation for the frame');
   assert.deepEqual(

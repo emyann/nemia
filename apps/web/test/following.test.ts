@@ -4,12 +4,20 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationFrames, END_GRACE_MS, follow, type Following } from '../src/lib/following.ts';
+import { animationFrames, END_GRACE_MS, follow, type Following, type StreamLike } from '../src/lib/following.ts';
 import type { TranscriptEvent } from '../src/lib/api.ts';
 
 /** An EventSource as far as `follow` uses it: its state, its events, and `close`. */
-class Stream extends EventTarget {
+class Stream implements StreamLike {
   readyState = 1;
+  readonly #target = new EventTarget();
+  /** Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here. */
+  addEventListener(type: string, listener: (event: MessageEvent) => void): void {
+    this.#target.addEventListener(type, listener as EventListener);
+  }
+  dispatchEvent(event: Event): void {
+    this.#target.dispatchEvent(event);
+  }
   close() {
     this.readyState = 2;
   }

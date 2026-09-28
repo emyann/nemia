@@ -38,16 +38,39 @@ import type { Point } from '../src/lib/layout.ts';
 const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
+  place: 'git',
+  work: null,
   brief: 'Do the thing',
+  workflowDir: '/code/app/workflows/dev',
+  try: null,
   createdAt: '2026-09-13T00:00:00.000Z',
   startedAt: null,
   cancelledAt: null,
+  pruned: null,
   status: 'running',
   moving: false,
-  steps: statuses.map((status, i) => ({ name: `step-${i}`, taskId: status === 'waiting' ? null : `t-${i}`, branch: null, status })),
+  cost: null,
+  steps: statuses.map((status, i) => ({
+    name: `step-${i}`,
+    taskId: status === 'waiting' ? null : `t-${i}`,
+    branch: null,
+    status,
+    note: null,
+    needs: null,
+    blockedByHarness: false,
+    waitingFor: null,
+    approve: null,
+    denied: null,
+  })),
+  graph: { roots: [], edges: [] },
   waitingOnYou: [],
+  // `wf ls`'s words for who it waits on: the steps by name, unless a test says them otherwise.
+  onYou: extra.waitingOnYou ?? [],
   after: [],
   waiting: null,
+  heldUntil: [],
+  holding: null,
+  toDecide: null,
   ...extra,
 });
 
@@ -608,6 +631,8 @@ const approve = (id: string, step: string): RunSummary['toDecide'] => ({
   kind: 'approve',
   step,
   says: 'Merge it onto the base branch.',
+  back: [step],
+  onto: 'main',
   said: `Merge it onto the base branch. — wf approve ${id} ${step}`,
   command: `wf approve ${id} ${step}`,
 });
@@ -1131,7 +1156,7 @@ const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
 
 test('a run held until runs that may still ship is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs', () => {
   // A step at its gate, held: `assess` calls a held run running whatever its steps say, and the api says nothing waits on you, and nothing moves.
-  const gated = { status: 'running', moving: false, waitingOnYou: [] as string[], waiting: null };
+  const gated = { status: 'running' as const, moving: false, waitingOnYou: [] as string[], waiting: null };
   const lifts = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(false) });
   assert.deepEqual([inFlight(lifts), waitsOnYou(lifts)], [true, false]);
   const yours = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(true) });

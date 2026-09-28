@@ -128,6 +128,12 @@ const packageSources = (): Sources =>
 
 const isRuntime = (m: string): boolean => m === 'agent-runtime' || m.startsWith('agent-runtime/');
 
+/**
+ * Effect, by any subpath. A pure file takes what a store file decoded, and the api loads `agent-orchestrator/run` and
+ * `agent-orchestrator/workflow`, which are pure and load no Effect: a schema lives beside the read it decodes.
+ */
+const isEffect = (m: string): boolean => m === 'effect' || m.startsWith('effect/') || m.startsWith('@effect/');
+
 // ─── the rules, each a list of what breaks it ───────────────────────────────
 
 /** Every file is of exactly one kind, and every file a kind names is there. */
@@ -146,11 +152,11 @@ function unsorted(sources: Sources): string[] {
   return out;
 }
 
-/** A pure file imports no runtime, no disk, no process, and no store, controller or client file. */
+/** A pure file imports no runtime, no disk, no process, no Effect, and no store, controller or client file. */
 function impurities(sources: Sources): string[] {
   return PURE.flatMap((file) =>
     (sources[file] ?? [])
-      .filter((m) => isRuntime(m) || IMPURE.includes(m) || STORE.includes(m) || CONTROLLER.includes(m) || m === CLIENT)
+      .filter((m) => isRuntime(m) || isEffect(m) || IMPURE.includes(m) || STORE.includes(m) || CONTROLLER.includes(m) || m === CLIENT)
       .map((m) => `${file} is pure and imports ${m}`),
   );
 }
@@ -292,11 +298,13 @@ test('REFUSED: a file of no kind, a file of two, and a kind naming a file that i
   assert.equal(named.length, new Set(named).size, 'and no file is in two kinds today');
 });
 
-test('pure files import no runtime, read no disk, spawn nothing, and reach for no store or controller file', () => {
+test('pure files import no runtime, read no disk, spawn nothing, load no Effect, and reach for no store or controller file', () => {
   assert.deepEqual(impurities(packageSources()), []);
 });
 
-test('REFUSED: a pure file that reads the disk, spawns, imports the runtime, or reaches for a store or a controller file', () => {
+test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or Effect, or reaches for a store or a controller file', () => {
+  assert.deepEqual(impurities(adding('src/run.ts', 'effect')), ['src/run.ts is pure and imports effect']);
+  assert.deepEqual(impurities(adding('src/daemon.ts', 'effect/Schema')), ['src/daemon.ts is pure and imports effect/Schema']);
   assert.deepEqual(impurities(adding('src/radius.ts', 'node:fs')), ['src/radius.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'fs')), ['src/workflow.ts is pure and imports fs']);
   assert.deepEqual(impurities(adding('src/check.ts', 'node:child_process')), ['src/check.ts is pure and imports node:child_process']);

@@ -224,8 +224,10 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
     return { path: w.path, ...(hold ?? {}), ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
   });
-  // A run once pruned was agreed to be pruned unmerged, or was merged: its merge is not asked again.
-  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || Boolean(run.pruned) });
+  // A run once pruned was agreed to be pruned unmerged, or was merged: its merge is not asked again of its worktrees. Its
+  // files are asked again: that agreement was to lose the worktrees, and the files of a run still waiting on its decision
+  // go only under a --unmerged given for them.
+  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || (Boolean(run.pruned) && !files) });
   if (refusal) return { id, kind: 'refused', refusal, ...none };
 
   const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));

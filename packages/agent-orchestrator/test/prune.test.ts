@@ -552,9 +552,20 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   const u = await prune(b.e, unmerged.run.id, { artifacts: true, yes: true });
   assert.equal(u.refusal, `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: wf prune ${unmerged.run.id} --unmerged.`);
   kept(unmerged.run.id, unmergedShot);
-  // And once its worktree is gone by a plain prune under --unmerged, the files may follow: that was agreed.
+  // Once its worktree is gone by a plain prune under --unmerged, its files are still asked for: that word was for the worktree.
   assert.equal((await prune(b.e, unmerged.run.id, { yes: true, unmerged: true })).kind, 'pruned');
-  assert.equal((await prune(b.e, unmerged.run.id, { artifacts: true, yes: true })).kind, 'pruned');
+  const mark = fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8');
+  const after = await prune(b.e, unmerged.run.id, { artifacts: true, yes: true });
+  assert.equal(after.refusal, u.refusal, 'refused with the not-merged words');
+  assert.ok(fs.existsSync(unmergedShot), 'its files kept');
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark, 'and its mark as it was');
+  // With no run named, it is refused there too, and its line says why.
+  const all = await typed(t, b.e, 'prune', '--artifacts', '--yes');
+  assert.ok(all.printed.includes(`${unmerged.run.id}  not pruned: ${u.refusal}`), all.printed.join('\n'));
+  assert.ok(fs.existsSync(unmergedShot), 'its files kept by the prune of every run');
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark);
+  // Given --unmerged for them, they go.
+  assert.equal((await prune(b.e, unmerged.run.id, { artifacts: true, unmerged: true, yes: true })).kind, 'pruned');
   assert.ok(!fs.existsSync(unmergedShot));
 
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));

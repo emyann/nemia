@@ -26,8 +26,8 @@ export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
  * dependency of it — and the runtime client (`runtime-client.ts`) is the only file in the workspace that knows the engine exists.
  */
 export { nameFor } from './runtime-client.ts';
-export { pruneLines, prunedBytes, prunedRefusal, prunedWords, pruneRefusal, sizeOf } from './run.ts';
-export type { Pruned, PruneFacts, Pruning } from './run.ts';
+export { filesPrunedWords, pruneLines, prunedBytes, prunedKept, prunedRefusal, prunedWords, pruneRefusal, pruningBytes, sizeOf } from './run.ts';
+export type { Pruned, PrunedFiles, PruneFacts, Pruning } from './run.ts';
 export { heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord } from './run.ts';
 export type { Hold } from './run.ts';
 export { acceptAsk, acceptanceOf, acceptedLines, approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, namesInOrder, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, tryNote, waitAdvice, waitWord } from './run.ts';

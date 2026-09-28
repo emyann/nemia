@@ -45,7 +45,8 @@ export const inboxDir = (): string => path.join(HOME, 'inbox');
 export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
 
 /**
- * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk — a person's fact, in a file of its own
+ * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its files
+ * directory went and what that freed — a person's fact, in a file of its own
  * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
  * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `wf rm` removes it with the run.
  */
@@ -56,8 +57,13 @@ function readPruned(id: string): Pruned | undefined {
   let text: string;
   try { text = readText(pruneFile(id)); } catch { return undefined; }
   try {
-    const { at, worktrees } = JSON.parse(text) as Partial<Pruned>;
-    return { at: typeof at === 'string' ? at : '', worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [] };
+    const { at, worktrees, artifacts } = JSON.parse(text) as Partial<Pruned>;
+    return {
+      at: typeof at === 'string' ? at : '',
+      worktrees: Array.isArray(worktrees) ? worktrees.filter((w) => typeof w?.path === 'string' && typeof w?.bytes === 'number') : [],
+      // Its files too (`wf prune --artifacts`), when the marker says so: a field that no longer reads says they went, at a time it does not say.
+      ...(artifacts === undefined ? {} : { artifacts: { at: typeof artifacts?.at === 'string' ? artifacts.at : '', bytes: typeof artifacts?.bytes === 'number' ? artifacts.bytes : 0 } }),
+    };
   } catch {
     return { at: '', worktrees: [] };
   }

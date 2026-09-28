@@ -1,5 +1,5 @@
 /**
- * The lifecycle is a statechart, and `decide` moves a task only along its edges (thin runtime stage 5).
+ * The lifecycle is a statechart, and `decide` moves a task only along its edges.
  *
  * The corpus below is every journal shape `decide.test.ts` walks — filed, queued, admitted, starting, spawned, ended each way,
  * held open and answered or closed, asked to stop — under every sighting a harness can give, before and after the grace
@@ -7,6 +7,10 @@
  * off the journal and the sighting (`observe`), and the machine's move. Every move must be an edge; applied to the journal,
  * it must land where `lifecycleOf` then says; and every edge of the machine must be taken by some case, so the table holds
  * no edge the runtime cannot reach. An event with no edge is refused, at shipped defaults, and the refusal is `decide`'s answer.
+ *
+ * The tick's memo (`tick-memo.ts`) skips a settled task until the feed names it, and folds it again when the feed does. That is
+ * sound only if a settled task stays settled whatever is appended to it, and decides nothing whatever the pass sees — an attempt
+ * left open, a session live or blocked, a clock past its deadline and every grace window.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,7 +60,7 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
   canceled: { state: 'canceled' },
 };
 
-// And a pass that could not read the harness, as well as every sighting it can read.
+/** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness. */
 const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true });
 
 /** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
@@ -111,17 +115,20 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
     assert.equal(lifecycleOf(after), moved.to, `${c.name}: ${key} by ${moved.action.do}, and the journal then reads ${lifecycleOf(after)}`);
   }
   assert.ok(cases > 1000, `the corpus is the product it says (${cases} cases)`);
-  // The engine's one event, which only the spawn call can know: from the intent, the attempt's unstartable end.
   const intent = fold(TASK, JOURNALS['intent, no spawn']);
   const end = spawnRefused(intent, 1, 'no such model');
-  assert.deepEqual(end, {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: '(never started)',
-    observed: 'failed',
-    reason: 'unstartable',
-    error: 'no such model',
-  });
+  assert.deepEqual(
+    end,
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: '(never started)',
+      observed: 'failed',
+      reason: 'unstartable',
+      error: 'no such model',
+    },
+    "the engine's one event, which only the spawn call can know: from the intent, the attempt's unstartable end",
+  );
   assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn'], ...journalled(end, 2 * S)])), 'ending');
   taken.add(edgeKey('starting', 'SPAWN_REFUSED', 'ending'));
   assert.deepEqual(
@@ -157,7 +164,7 @@ test('ADOPTION after a crash: an intent with no spawn and a session under its na
   assert.equal(lifecycleOf(state), 'starting', 'the journal is the state: reading it again reads the same, restart or not');
 });
 
-test('REFUSED: an event with no edge in the state it meets is refused, at shipped defaults, and nothing is done', () => {
+test('REFUSED: an event with no edge in the state it meets is refused, at shipped defaults, and nothing is done; a final state refuses every event', () => {
   const sighting: Sighting = { sessionId: 's', state: 'working' };
   const seen = { attempt: 1, sighting, asked: false, holds: false };
   const cases: Array<[LifecycleState, LifecycleEvent]> = [
@@ -176,7 +183,6 @@ test('REFUSED: an event with no edge in the state it meets is refused, at shippe
   ];
   for (const [from, event] of cases)
     assert.deepEqual(transition(from, event), { refused: { state: from, event: event.type } }, `${from} on ${event.type}`);
-  // A final state takes nothing: every event is refused there.
   for (const from of FINAL)
     for (const e of edgesOf()) assert.ok('refused' in transition(from, { type: e.event } as LifecycleEvent), `${from} took ${e.event}`);
 });
@@ -196,8 +202,7 @@ test('REFUSED: decide answers a missing edge with nothing, and says which — it
     why: 'refused: no edge from starting on SPAWN_REFUSED',
     refused: { state: 'starting', event: 'SPAWN_REFUSED' },
   });
-  // The pruned machine is a copy: the shipped one keeps the edge.
-  assert.equal(decide(state, observed, now).do, 'record-end');
+  assert.equal(decide(state, observed, now).do, 'record-end', 'the pruned machine is a copy: the shipped one keeps the edge');
 });
 
 test('a settled task is decided nothing before anything is observed of it, on any pass — its state is final and would refuse every event', () => {
@@ -207,8 +212,7 @@ test('a settled task is decided nothing before anything is observed of it, on an
     const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
     const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
     assert.deepEqual(decide(state, observed, now), { do: 'nothing', why: `settled: ${outcome}` }, 'no refusal on it');
-    // What the short-circuit saves: asked, the machine would refuse it.
-    assert.ok(FINAL.has(lifecycleOf(state)));
+    assert.ok(FINAL.has(lifecycleOf(state)), 'what the short-circuit saves: its state is final, and asked, the machine would refuse it');
     assert.deepEqual(transition(lifecycleOf(state), observe(state, observed, now)), {
       refused: { state: lifecycleOf(state), event: 'SETTLED' },
     });
@@ -232,9 +236,6 @@ const LATER: Record<string, Event[]> = {
 };
 
 test("what the tick's memo rests on: a settled task decides nothing in every journal shape, under every sighting and clock, whatever is appended after", () => {
-  // The pass skips a settled task until the feed names it (`tick-memo.ts`), and folds it again when the feed does. That is
-  // sound only if a settled task stays settled whatever is appended to it, and decides nothing whatever the pass sees —
-  // an attempt left open, a session live or blocked, a clock past its deadline and every grace window.
   let cases = 0;
   for (const c of corpus())
     for (const outcome of ['succeeded', 'failed', 'stopped'] as const)
@@ -249,16 +250,16 @@ test("what the tick's memo rests on: a settled task decides nothing in every jou
         cases++;
       }
   assert.ok(cases > 10_000, `every shape, every outcome, every later entry (${cases} cases)`);
-  // Among them, settled over an attempt still open, with its session live and the deadline long past.
   const open = fold(TASK, [filed({ deadlineSeconds: 1 }), starting(1), spawned(1), { kind: 'settled', at: at(3 * S), outcome: 'stopped' }]);
   assert.equal(open.attempts.at(-1)!.ended, null, 'the attempt is open');
   assert.equal(
     decide(open, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' }]]), { at: new Date(T0.getTime() + 1e9), graceMs: 0 }).do,
     'nothing',
+    'settled over an attempt still open, with its session live and the deadline long past',
   );
 });
 
-test('the machine: its states are the ones named, each edge names one action, and every state but a final one leaves or holds by an edge', () => {
+test('the machine: its states are the ones named, each edge names one action, every state but a final one leaves or holds by an edge, every state is reached, and a guarded edge falls through to one with no guard, so a guard never leaves an event unanswered', () => {
   assert.deepEqual(Object.keys(MACHINE.root.states), [...STATES]);
   assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
   const actions = new Set(['nothing', 'start', 'spawn', 'record-end', 'stop', 'settle']);
@@ -269,8 +270,6 @@ test('the machine: its states are the ones named, each edge names one action, an
         edgesOf().some((e) => e.from === s),
         `${s} has no edge`,
       );
-  // Reachable from where a task begins, or entered by a person's word, which its verb journals and no pass moves by
-  // (`requestStop`, `answer`, `close`): the stop from any state not final, an answer or a close from a turn that waits.
   const reached = new Set<string>(['submitted', 'stopping']);
   for (let grew = true; grew;) {
     grew = false;
@@ -283,8 +282,8 @@ test('the machine: its states are the ones named, each edge names one action, an
   assert.deepEqual(
     STATES.filter((s) => !reached.has(s)),
     [],
+    "reached from where a task begins, or entered by a person's word, which its verb journals and no pass moves by (`requestStop`, `answer`, `close`): the stop from any state not final, an answer or a close from a turn that waits",
   );
-  // Guarded edges fall through to one with no guard, so a guard never leaves an event unanswered by accident.
   const last = new Map(edgesOf().map((e) => [`${e.from} ${e.event}`, e]));
   for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
 });
@@ -305,25 +304,31 @@ test('UNREAD: a pass that could not read the harness does nothing to an attempt 
     assert.deepEqual(observe(state, new Map(), now), { type: 'UNREAD', attempt: 1, overdue: false });
     assert.deepEqual(decide(state, new Map(), now), { do: 'nothing', why: 'its harness could not be read this pass' });
   }
-  // Read, and not there: the grace still tells a late registration from a session gone.
-  assert.deepEqual(observe(state, new Map(), { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000 }), { type: 'LOST', attempt: 1 });
-  // Another task's name unread says nothing of this one.
+  assert.deepEqual(
+    observe(state, new Map(), { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000 }),
+    { type: 'LOST', attempt: 1 },
+    'read, and not there: the grace still tells a late registration from a session gone',
+  );
   assert.deepEqual(
     observe(state, new Map(), { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000, unread: new Set([nameFor('t-2', 1)]) }),
     { type: 'LOST', attempt: 1 },
+    "another task's name unread says nothing of this one",
   );
-  // Past its deadline, the deadline ends it, as it does a session nobody sees.
   const timed = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1)]);
   const past = { at: new Date(T0.getTime() + 45 * S), graceMs: 30_000, unread };
-  assert.deepEqual(decide(timed, new Map(), past), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: '(never seen)',
-    observed: 'failed',
-    reason: 'deadline',
-    nativeId: undefined,
-    closeout: undefined,
-  });
+  assert.deepEqual(
+    decide(timed, new Map(), past),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: '(never seen)',
+      observed: 'failed',
+      reason: 'deadline',
+      nativeId: undefined,
+      closeout: undefined,
+    },
+    'past its deadline, the deadline ends it, as it does a session nobody sees',
+  );
 });
 
 test("UNREAD in `stopping`: a person's stop waits for a read before the deadline, and ends the attempt once it has passed, so the stop is bounded", () => {
@@ -358,19 +363,25 @@ test("UNREAD in `stopping`: a person's stop waits for a read before the deadline
     to: 'stopping',
     action: { do: 'nothing', why: 'its harness could not be read this pass' },
   });
-  // What the cut then leads to: nothing open, and the stop settles the task, as ever.
   const after = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1), stop, ...journalled(cut as Action, 45 * S)]);
-  assert.deepEqual(decide(after, new Map(), read(46 * S)), { do: 'settle', outcome: 'stopped', note: 'operator' });
+  assert.deepEqual(
+    decide(after, new Map(), read(46 * S)),
+    { do: 'settle', outcome: 'stopped', note: 'operator' },
+    'what the cut leads to: nothing open, and the stop settles the task',
+  );
 });
 
 test('UNREAD before the missing spawn: an intent with no spawn on the record whose harness could not be read is neither spawned again nor cut by a stop, until a read or its deadline', () => {
   const unread = new Set([nameFor(TASK, 1)]);
   const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
   const nothing = { do: 'nothing', why: 'its harness could not be read this pass' };
-  // A crash between the spawn and its entry: a session may run under the name, which an unread harness cannot rule out.
   const intent = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1)]);
   assert.equal(lifecycleOf(intent), 'starting');
-  assert.deepEqual(observe(intent, new Map(), read(2 * S)), { type: 'UNREAD', attempt: 1, overdue: false });
+  assert.deepEqual(
+    observe(intent, new Map(), read(2 * S)),
+    { type: 'UNREAD', attempt: 1, overdue: false },
+    'after a crash between the spawn and its entry a session may run under the name, which an unread harness cannot rule out',
+  );
   assert.deepEqual(decide(intent, new Map(), read(2 * S)), nothing, 'not spawned a second time');
   assert.deepEqual(
     decide(intent, new Map(), { at: new Date(T0.getTime() + 2 * S), graceMs: 30_000 }),
@@ -378,16 +389,19 @@ test('UNREAD before the missing spawn: an intent with no spawn on the record who
     'read, and not there: spawned',
   );
   assert.deepEqual(decide(intent, new Map(), read(45 * S)).do, 'record-end', 'the deadline, read first, still ends it');
-  // A person's stop on it waits for a read as a spawned one does, and is cut once the deadline has passed.
   const stopped = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), { kind: 'stop-requested', at: at(2 * S) }]);
   assert.deepEqual(decide(stopped, new Map(), read(30 * S)), nothing, 'not cut on a read that failed');
-  assert.deepEqual(decide(stopped, new Map(), read(45 * S)), {
-    do: 'record-end',
-    attempt: 1,
-    sessionId: '(never seen)',
-    observed: 'stopped',
-    reason: 'operator',
-    nativeId: undefined,
-    closeout: undefined,
-  });
+  assert.deepEqual(
+    decide(stopped, new Map(), read(45 * S)),
+    {
+      do: 'record-end',
+      attempt: 1,
+      sessionId: '(never seen)',
+      observed: 'stopped',
+      reason: 'operator',
+      nativeId: undefined,
+      closeout: undefined,
+    },
+    "a person's stop on it waits for a read as a spawned one's does, and is cut once the deadline has passed",
+  );
 });

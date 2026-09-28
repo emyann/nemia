@@ -74,8 +74,14 @@ holds what every change needs.
 - **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record at `wf start`.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
 - **Errors say what to do next.** Throw `Error` with `.exitCode = 2` and a message naming the fix.
-- **Code reads by itself.** No `//` comment in code but a lint directive; a JSDoc says what a declaration is, takes, returns and refuses,
-  never its history. A comment is never evidence that a problem is settled.
+- **Code reads by itself.** No `//` or `/* */` comment in code but a lint or TypeScript directive with its `-- reason`; a JSDoc sits on
+  a file's head or a declaration and says what it is, takes, returns and refuses — never its history, a workaround, a run, a date or a
+  card: history lives in git, CLAUDE.md and the tests. A comment is never evidence that a problem is settled: read the code and its test.
+  - The guards: the oxlint plugin `lint/comments.ts`, oxlint's `no-warning-comments` and `no-inline-comments`, in one override block per
+    package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
+    (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
+  - A block is off while its `excludeFiles` names its package. The card that cleans a package switches its guards on by deleting that
+    one line, and edits nothing shared.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
 
 ## Git

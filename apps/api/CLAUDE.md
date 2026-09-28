@@ -25,3 +25,7 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   agree with a verb's refusal reads `Decidable.awaiting`, which `test/prune.test.ts` holds to `wf prune`'s own answer.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
+- **A request body is decoded by its route's schema** (`readBody` in `body.ts`) and refused in the route's own words, the first wrong
+  key named: no schema message reaches a response. A new key goes into the schema and its `*_SHAPE`, with a test that makes it refuse.
+- **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
+  runtime always writes fails the read, not the assertion you meant.

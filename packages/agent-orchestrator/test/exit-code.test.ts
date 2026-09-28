@@ -1,8 +1,9 @@
 /**
  * `wf` run as a process exits with a refusal's code, and 1 on anything else. The package refuses with `exitCode` 2 and a sentence saying
- * what to do next (CLAUDE.md, *Errors say what to do next*), and `bin/wf.ts` exited 1 on every error until 2026-09-28, so a script could
- * not tell a refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `wf` exits with.
- * A fake `claude` and `codex` first on PATH, so nothing real is asked.
+ * what to do next (CLAUDE.md, *Errors say what to do next*); a `bin/wf.ts` that exits 1 on every error leaves a script unable to tell a
+ * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `wf` exits with.
+ * A fake `claude` and `codex` first on PATH, so nothing real is asked. `WF_ROOT` is set before the command line is imported, which reads
+ * it as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,6 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = scratch('wf-exit-code-store-');
 const { exitCodeOf } = await import('../src/cli.ts');
 

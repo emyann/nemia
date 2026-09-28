@@ -1,6 +1,6 @@
 /**
- * `wf prune`: a run's worktrees removed, and nothing else of it — over a store and repositories of its own, with git for real. A file of its
- * own, since `WF_ROOT` is read once, as the package loads.
+ * `wf prune`: a run's worktrees removed, and nothing else of it — over a store and repositories of its own, with git for real. A file of
+ * its own, since `WF_ROOT` is read once, as the package loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -82,7 +82,9 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 
 /**
  * A run that is over: started for real, its one step filed in a worktree of its own, `work` committed on its branch, signed off, and handed
- * off by a pass — with a `node_modules` in the worktree that git ignores, holding a link out of it and a file of main's, hardlinked. Merged into `main` with `merged`.
+ * off by a pass, which leaves nothing uncommitted — with a `node_modules` in the worktree that git ignores, holding a link out of it and a
+ * megabyte of main's, hardlinked as the run provisions a package, which removing the worktree does not free. Merged into `main` with
+ * `merged`.
  */
 const aFinished = async (
   b: ReturnType<typeof board>,
@@ -106,7 +108,6 @@ const aFinished = async (
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
   fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me\n');
   fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
-  // And a package of main's, hardlinked as the run provisions one: a megabyte removing the worktree does not free.
   fs.mkdirSync(path.join(repo, 'node_modules', 'big'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'node_modules', 'big', 'index.js'), 'y'.repeat(1024 * 1024));
   fs.mkdirSync(path.join(wt, 'node_modules', 'big'));
@@ -117,7 +118,7 @@ const aFinished = async (
     typeof closeout === 'function' ? closeout(run.id) : closeout,
     costUsd === undefined ? undefined : { costUsd },
   );
-  await advance(b.e, readRun(run.id)); // the hand-off: nothing left uncommitted
+  await advance(b.e, readRun(run.id));
   const branch = `wf/${run.id}/implement`;
   if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', branch);
   return { run, repo, wt, branch, outside };
@@ -152,9 +153,12 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
   fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
 
-  // A dry run, as the CLI says it with nobody at a terminal: the worktree and its size, and how to remove it.
   const dry = await typed(t, b.e, 'prune', run.id);
-  assert.equal(dry.error, undefined);
+  assert.equal(
+    dry.error,
+    undefined,
+    'a dry run, as the CLI says it with nobody at a terminal: the worktree and its size, and how to remove it',
+  );
   assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${wt.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}  \\d+\\.\\d KB$`));
   assert.match(dry.printed[2], /^1 run to prune, \d+\.\d KB in all$/);
@@ -192,9 +196,8 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
     'the record itself never holds it',
   );
 
-  // Still on the board, as it was, with the word beside it.
   const ls = await typed(t, b.e, 'ls', run.id);
-  assert.match(ls.printed[0], new RegExp(`^${run.id}  add a flag  \\(pruned\\)`));
+  assert.match(ls.printed[0], new RegExp(`^${run.id}  add a flag  \\(pruned\\)`), 'still on the board, as it was, with the word beside it');
   const d = await decide(b.e, run.id);
   assert.equal(d.decision.kind, 'shipped');
   assert.equal((d.closeouts.implement as { summary?: string }).summary, 'did it', "its closeout is the engine's, and still read");
@@ -204,18 +207,16 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
     `  pruned at ${pruned.at} — its worktrees were removed (wf prune); its branches, record and files are kept`,
   );
 
-  // And a tick after it files nothing, and writes nothing into the record it should not.
   const filings = [...b.filings];
   await advance(b.e, readRun(run.id));
-  assert.deepEqual(b.filings, filings);
+  assert.deepEqual(b.filings, filings, 'a tick after it files nothing');
 
   const again = await prune(b.e, run.id, { yes: true });
   assert.deepEqual([again.kind, again.nothing], ['nothing', `its worktrees were removed at ${pruned.at} (wf prune)`]);
   assert.equal(readRun(run.id).pruned!.at, pruned.at, 'a prune with nothing to do leaves the marker as it was');
 
-  // `wf rm` still forgets it, and the marker goes with it.
-  assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
-  assert.ok(!under('runs', `${run.id}.pruned`));
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten', '`wf rm` still forgets it');
+  assert.ok(!under('runs', `${run.id}.pruned`), 'and the marker goes with it');
 });
 
 test('REFUSED at shipped defaults: a run not over — named, and told to cancel first; nothing removed, exit 2', async (t) => {
@@ -328,7 +329,6 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
 });
 
 test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
-  // A gated step that signed off: the run is not running, and not merged, so --unmerged is given, and the gate alone holds it.
   const b = board();
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
   fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
@@ -342,43 +342,61 @@ test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at 
   const gateWords = (flags: string) =>
     `implement waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${run.id} implement. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id}${flags}.`;
   const atGate = await prune(b.e, run.id, { yes: true, unmerged: true });
-  assert.equal(atGate.kind, 'refused');
-  // The prune it names is the one given, --unmerged kept: this run is not merged, and without it the next prune is refused in turn.
-  assert.equal(atGate.refusal, gateWords(' --unmerged'));
-  // Without --unmerged, the gate alone is said: --unmerged gets past no gate, so offering it would name a command that is refused in turn.
+  assert.equal(
+    atGate.kind,
+    'refused',
+    'a gated step that signed off: the run is not running, and not merged, so --unmerged is given, and the gate alone holds it',
+  );
+  assert.equal(
+    atGate.refusal,
+    gateWords(' --unmerged'),
+    'the prune it names is the one given, --unmerged kept: this run is not merged, and without it the next prune is refused in turn',
+  );
   const bare = await prune(b.e, run.id, { yes: true });
-  assert.equal(bare.refusal, gateWords(''));
-  assert.doesNotMatch(bare.refusal, /--unmerged/);
+  assert.equal(bare.refusal, gateWords(''), 'without --unmerged, the gate alone is said');
+  assert.doesNotMatch(
+    bare.refusal,
+    /--unmerged/,
+    '--unmerged gets past no gate, so offering it would name a command that is refused in turn',
+  );
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 
-  // A retry asked of a step that shipped, which no pass files: the run is over and merged, and the ask alone holds it — until it is taken back.
   const shipped = await aFinished(b, { merged: true });
   const asks = path.join(ROOT, 'runs', `${shipped.run.id}.asks`);
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
   assert.equal((await decide(b.e, shipped.run.id)).decision.kind, 'shipped');
   const asked = await prune(b.e, shipped.run.id, { yes: true });
-  assert.equal(asked.kind, 'refused');
+  assert.equal(
+    asked.kind,
+    'refused',
+    'a retry asked of a step that shipped, which no pass files: the run is over and merged, and the ask alone holds it',
+  );
   assert.equal(
     asked.refusal,
     `try 2 of implement is asked for, and no pass files it as the run stands. Take that ask back, then wf prune ${shipped.run.id}: rm ${path.join(asks, 'retry-implement-2')}.`,
   );
   assert.ok(fs.existsSync(shipped.wt) && !under('runs', `${shipped.run.id}.pruned`));
   fs.rmSync(path.join(asks, 'retry-implement-2'));
-  assert.equal((await prune(b.e, shipped.run.id, { yes: true })).kind, 'pruned');
+  assert.equal((await prune(b.e, shipped.run.id, { yes: true })).kind, 'pruned', 'until the ask is taken back');
 
-  // Once what held it is cleared, the next prune says what is left: called off at its gate, the run that is not merged prunes with no word
-  // more, since a cancelled run is never tried again (features.md, left for later); the gate no longer holds either way.
   assert.equal((await typed(t, b.e, 'cancel', run.id)).error, undefined);
-  assert.equal((await prune(b.e, run.id, { yes: true })).kind, 'pruned');
+  assert.equal(
+    (await prune(b.e, run.id, { yes: true })).kind,
+    'pruned',
+    'called off at its gate, the run that is not merged prunes with no word more, since a cancelled run is never tried again; the gate no longer holds',
+  );
 });
 
 test('REFUSED after a prune: a retry, a round, an approval and an acceptance — each would file work into a worktree that is gone — and a pass files nothing on an ask a person wrote by hand', async (t) => {
   const b = board();
   const { run } = await aFinished(b);
-  // A step that signed off blocked: a person may try it again, until the run is pruned.
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
-  assert.equal((await decide(b.e, run.id)).answering.implement !== undefined, true, 'an answer is offered before');
+  assert.equal(
+    (await decide(b.e, run.id)).answering.implement !== undefined,
+    true,
+    'a step that signed off blocked: a person may try it again, and an answer is offered before the run is pruned',
+  );
   assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/, 'and `wf ls` says it waits on you');
   assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
   const at = readRun(run.id).pruned!.at;
@@ -400,13 +418,16 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}], 'and nothing is offered');
   assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `wf ls` waits on nobody');
 
-  // The verbs are one writer of the asks; a person with a text editor is another. The pass is the guard that holds.
   const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
   const filings = [...b.filings];
   await advance(b.e, readRun(run.id));
-  assert.deepEqual(b.filings, filings, 'nothing filed');
+  assert.deepEqual(
+    b.filings,
+    filings,
+    'nothing filed of an ask written by hand: the verbs are one writer of the asks, a person with a text editor another, and the pass is the guard that holds',
+  );
   assert.doesNotMatch(
     (await typed(t, b.e, 'ls', run.id)).printed.join('\n'),
     /asked|due|files it/,
@@ -416,7 +437,6 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
 
 test('REFUSED after a prune: a step over its budget is offered no raise — `decide`, `wf decide` and the api say the run was pruned where they said it waits on you, as `wf ls` does', async (t) => {
   const b = board();
-  // Signed off blocked past its budget, and nothing about a budget holds `wf prune`: finished and not merged, it is pruned under --unmerged.
   const { run } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
   const before = await decide(b.e, run.id);
   assert.equal(
@@ -429,7 +449,11 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
     `to answer it, its cap raised above $3.40:  wf retry ${run.id} implement --budget <amount> --message "<answer>"`,
   );
   assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/);
-  assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
+  assert.equal(
+    (await prune(b.e, run.id, { yes: true, unmerged: true })).kind,
+    'pruned',
+    'signed off blocked past its budget, finished and not merged: nothing about a budget holds `wf prune` under --unmerged',
+  );
   const at = readRun(run.id).pruned!.at;
 
   const d = await decide(b.e, run.id);
@@ -501,12 +525,11 @@ const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
 test('`wf prune --artifacts` on a run that shipped: its worktree and its files, listed with their sizes until --yes, then removed — a link among the files as a link — and what freed said; its record, asks, inputs and rendered prompts are kept; `wf decide` reads it and says the files went; a second prune has nothing to do', async (t) => {
   const b = board();
-  // The closeout names a shot in the step's files directory, as a step names a screenshot it took.
   const shotOf = (id: string) => path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
   const run0 = await aFinished(b, { merged: true, closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
   const id = run0.run.id;
   const shot = aShot(id);
-  assert.equal(shot, shotOf(id));
+  assert.equal(shot, shotOf(id), "the closeout names a shot in the step's files directory, as a step names a screenshot it took");
   const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
   fs.writeFileSync(path.join(outside, 'precious.png'), 'keep me\n');
   fs.symlinkSync(outside, path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'linked'));
@@ -527,8 +550,7 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   const measured = (await prune(b.e, id, { artifacts: true })).artifacts!.bytes;
   assert.ok(measured >= 32 * 1024, `what the files hold is counted (${measured})`);
 
-  // Without the flag, the files are not offered: the worktree alone, as ever.
-  assert.equal((await prune(b.e, id)).artifacts, undefined);
+  assert.equal((await prune(b.e, id)).artifacts, undefined, 'without the flag, the files are not offered: the worktree alone');
 
   const done = await typed(t, b.e, 'prune', id, '--artifacts', '--yes');
   assert.equal(done.error, undefined);
@@ -557,7 +579,6 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   );
   assert.doesNotMatch(text, /not kept|missing/, 'a shipped run is said shipped, as before');
 
-  // A run a person agreed to prune unmerged is still decided on its closeouts: a file its step named reads as pruned, not as never made.
   const open = await aFinished(b, { closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
   const openShot = aShot(open.run.id);
   assert.equal((await prune(b.e, open.run.id, { artifacts: true, unmerged: true, yes: true })).kind, 'pruned');
@@ -565,7 +586,10 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   const read = await typed(t, b.e, 'decide', open.run.id);
   assert.equal(read.error, undefined, 'wf decide reads it');
   const openText = read.printed.join('\n');
-  assert.ok(openText.includes(`    !! not kept: ${openShot}  — its files were removed at ${openAt} (wf prune --artifacts)`), openText);
+  assert.ok(
+    openText.includes(`    !! not kept: ${openShot}  — its files were removed at ${openAt} (wf prune --artifacts)`),
+    `a run a person agreed to prune unmerged is still decided on its closeouts: a file its step named reads as pruned, not as never made:\n${openText}`,
+  );
   assert.doesNotMatch(openText, /!! missing|not there/, 'the file is not said to be missing as if never written');
   assert.ok(shot, 'the shot the shipped run named went too');
 
@@ -603,7 +627,6 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
   assert.deepEqual([after.at, after.worktrees], [first.at, first.worktrees], 'when the worktrees went, and which, is as it was');
   assert.ok(after.artifacts && !under('runs', run.id, 'artifacts'));
 
-  // A run that worked in its repository itself: nothing but its files to give back, and pruned once they go.
   const inPlace = start({ brief: 'in place', repo: aRepo(), workflowDir: oneStep(), isolate: false });
   await advance(b.e, readRun(inPlace.id));
   b.settle(`${inPlace.id}-implement`, 'succeeded', SIGNED);
@@ -612,7 +635,7 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
   assert.deepEqual(
     [(await prune(b.e, inPlace.id)).kind, (await prune(b.e, inPlace.id)).nothing],
     ['nothing', `it cut no worktree — it worked in ${inPlace.repo} itself`],
-    'without the flag, nothing',
+    'a run that worked in its repository itself has nothing but its files to give back: without the flag, nothing',
   );
   assert.equal(
     (await prune(b.e, inPlace.id, { artifacts: true, yes: true })).refusal,
@@ -622,9 +645,12 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
     under('runs', inPlace.id, 'artifacts', 'implement', 'shot.png') && !under('runs', `${inPlace.id}.pruned`),
     'refused: its files kept, and no mark',
   );
-  // The command it offers is the one that prunes them: the plain --unmerged of a run that cut no worktree has nothing to prune.
   const bare = await followed(t, b.e, (await prune(b.e, inPlace.id, { artifacts: true, yes: true })).refusal!);
-  assert.equal(bare.error, undefined, bare.command);
+  assert.equal(
+    bare.error,
+    undefined,
+    `${bare.command}: the command it offers is the one that prunes them, since the plain --unmerged of a run that cut no worktree has nothing to prune`,
+  );
   assert.ok(
     bare.printed.includes(`${inPlace.id}  pruned: removed its files, 40.0 KB freed; its record and branches are kept`),
     bare.printed.join('\n'),
@@ -632,7 +658,7 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
   assert.ok(!under('runs', inPlace.id, 'artifacts'), 'its files gone');
   const marked = readRun(inPlace.id).pruned!;
   assert.deepEqual(marked.worktrees, []);
-  assert.equal(marked.at, marked.artifacts!.at);
+  assert.equal(marked.at, marked.artifacts!.at, 'pruned once its files go');
   await assert.rejects(retry(b.e, inPlace.id, 'implement', { mode: 'nudge' }), (err: Error) =>
     err.message.startsWith(
       `${inPlace.id} was pruned at ${marked.at}: its files were removed (wf prune --artifacts), and a retry would file work`,
@@ -654,7 +680,6 @@ test('`wf prune --artifacts` marks the run before its files go, and a prune that
   const b = board();
   const { run } = await aFinished(b, { merged: true });
   aShot(run.id);
-  // The order, seen from inside the removal: the marker already says the files go.
   const rm = fs.rmSync;
   let seen: unknown;
   const mocked = t.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => {
@@ -664,10 +689,12 @@ test('`wf prune --artifacts` marks the run before its files go, and a prune that
   });
   assert.equal((await prune(b.e, run.id, { artifacts: true, yes: true })).kind, 'pruned');
   mocked.mock.restore();
-  assert.ok((seen as { artifacts?: unknown } | undefined)?.artifacts, `marked before the removal: ${JSON.stringify(seen)}`);
+  assert.ok(
+    (seen as { artifacts?: unknown } | undefined)?.artifacts,
+    `marked before the removal, as seen from inside it: ${JSON.stringify(seen)}`,
+  );
 
   if (process.getuid?.() === 0) return t.skip('root removes what a mode forbids');
-  // Files that will not go, of runs with no worktree to remove: a directory nobody may write in.
   const locked = (id: string) => {
     aShot(id);
     fs.chmodSync(path.join(ROOT, 'runs', id, 'artifacts', 'implement'), 0o555);
@@ -681,7 +708,7 @@ test('`wf prune --artifacts` marks the run before its files go, and a prune that
   const never = await prune(b.e, inPlace.id, { artifacts: true, yes: true, unmerged: true });
   assert.equal(never.kind, 'pruned');
   assert.equal(never.artifacts, undefined, 'nothing freed');
-  assert.equal(never.left.length, 1);
+  assert.equal(never.left.length, 1, 'files in a directory nobody may write in, of a run with no worktree to remove, will not go');
   assert.match(
     pruneLines(never).at(-1)!,
     new RegExp(
@@ -725,21 +752,29 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
     `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: wf prune ${unmerged.run.id} --unmerged --artifacts.`,
   );
   kept(unmerged.run.id, unmergedShot);
-  // Once its worktree is gone by a plain prune under --unmerged, its files are still asked for: that word was for the worktree.
   assert.equal((await prune(b.e, unmerged.run.id, { yes: true, unmerged: true })).kind, 'pruned');
   const mark = fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8');
   const after = await prune(b.e, unmerged.run.id, { artifacts: true, yes: true });
-  assert.equal(after.refusal, u.refusal, 'refused with the not-merged words');
+  assert.equal(
+    after.refusal,
+    u.refusal,
+    'once its worktree is gone by a plain prune under --unmerged, its files are still refused with the not-merged words: that word was for the worktree',
+  );
   assert.ok(fs.existsSync(unmergedShot), 'its files kept');
   assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark, 'and its mark as it was');
-  // With no run named, it is refused there too, and its line says why.
   const all = await typed(t, b.e, 'prune', '--artifacts', '--yes');
-  assert.ok(all.printed.includes(`${unmerged.run.id}  not pruned: ${u.refusal}`), all.printed.join('\n'));
+  assert.ok(
+    all.printed.includes(`${unmerged.run.id}  not pruned: ${u.refusal}`),
+    `with no run named, it is refused there too, and its line says why:\n${all.printed.join('\n')}`,
+  );
   assert.ok(fs.existsSync(unmergedShot), 'its files kept by the prune of every run');
   assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${unmerged.run.id}.pruned`), 'utf8'), mark);
-  // The command it offers is the one that takes them, not the plain --unmerged already run, which now has nothing to prune.
   const offered = await followed(t, b.e, after.refusal);
-  assert.equal(offered.error, undefined, offered.command);
+  assert.equal(
+    offered.error,
+    undefined,
+    `${offered.command}: the command it offers is the one that takes them, not the plain --unmerged already run, which now has nothing to prune`,
+  );
   assert.ok(
     offered.printed.includes(`${unmerged.run.id}  pruned: removed its files, 40.0 KB freed; its record and branches are kept`),
     offered.printed.join('\n'),
@@ -776,9 +811,8 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   assert.match((await prune(b.e, dirty.run.id, { artifacts: true, yes: true })).refusal!, /holds changes no commit has \(notes\.md\)/);
   kept(dirty.run.id, dirtyShot);
 
-  // And a flag near it is not taken for it.
   const flag = await typed(t, b.e, 'prune', '--artifact');
-  assert.equal(flag.error?.exitCode, 2);
+  assert.equal(flag.error?.exitCode, 2, 'a flag near it is not taken for it');
   assert.match(flag.error.message, /^wf prune does not take --artifact\. .*--artifacts/);
 });
 
@@ -793,11 +827,11 @@ test('pruneLines and sizeOf say what a person reads', () => {
       '   kept /w/b: git would not remove it — fatal: nope; look in it before anything is forced: git -C /w/b status',
     ],
   );
-  // Files that would not go are offered the prune that removes them later: given --unmerged, repeated, or a run nobody decided is refused it.
   const files = { path: '/s/runs/r-1/artifacts', files: 'EACCES' } as const;
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files], unmerged: true }).at(-1),
     '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is read as before; wf prune r-1 --unmerged --artifacts removes it once it can be',
+    'files that would not go are offered the prune that removes them later: given --unmerged, repeated, or a run nobody decided is refused it',
   );
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files] }).at(-1),

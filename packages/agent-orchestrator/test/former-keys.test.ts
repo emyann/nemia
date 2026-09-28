@@ -1,7 +1,7 @@
 /**
- * `wf start` on a folder that still writes a list under the name it had until 2026-09-23 — `disallow:`, `allow:` — starts the run, and
- * says which lines to rename. The parsing and the frozen records are held in `workflow.test.ts` and `store.test.ts`; this is what a person
- * is told.
+ * `wf start` on a folder that still writes a list under its former name — `disallow:`, `allow:` — starts the run, and says which lines to
+ * rename. The parsing and the frozen records are held in `workflow.test.ts` and `store.test.ts`; this is what a person is told.
+ * `WF_ROOT` is set before the runner is imported, which reads it as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,6 @@ import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-former-keys-');
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { readRun } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');

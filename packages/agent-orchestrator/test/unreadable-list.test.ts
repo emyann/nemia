@@ -1,8 +1,11 @@
 /**
- * A journal that does not read is a check's, or an earlier try's: `wf ls` says the run it belongs to is unreadable, in the words the board's
- * list says it with (`unjudgedWords`), marks `unreadable` the step whose check or try it is, and lists every other run — a run waiting on it
- * among them, and with a cap on runs in flight (`runSlots`) — while `wf decide` of such a run refuses in those words. Walked through the
+ * A journal that does not read is a check's, or an earlier try's: `wf ls` says the run it belongs to is unreadable, in the words the
+ * board's list says it with (`unjudgedWords`), marks `unreadable` the step whose check or try it is, and lists every other run — a run
+ * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `wf decide` of such a run refuses in those words. Walked through the
  * runtime itself, `createEngine` over an in-memory journal that hands back what was put in it, as a store does.
+ *
+ * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `wf ls` reads
+ * the slots.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +18,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-unreadable-list-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it. A cap on runs, so `wf ls` reads the slots.
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_RUNS = '4';
 const { main } = await import('../src/cli.ts');

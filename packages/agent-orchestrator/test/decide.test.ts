@@ -141,7 +141,9 @@ const board = () => {
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const USAGE = { turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 };
 
-/** `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check. */
+/**
+ * `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check.
+ */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);

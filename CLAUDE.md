@@ -43,6 +43,14 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   before you commit, since a check refuses a file it would move. Every shipped `check:` runs `npm run lint` after the types. A rule turned
   off, or a line allowed with `oxlint-disable-next-line`, says why beside it. `.git-blame-ignore-revs` lists the commit that formatted the
   code: `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone (chosen with the owner, rule by rule, on 2026-09-28).
+- **The web app is compiled by the React Compiler, and only `npm run build` and the e2e see it.** It enters through
+  `@rolldown/plugin-babel` after the router's plugin, so each code-split route is compiled; the web's node tests load `src/` as it is
+  written. A function it cannot compile it leaves alone and says so at build, `React Compiler skipped <file>:<line>: <why>` (the logger in
+  `apps/web/vite.config.ts`): read the build's output for that line. What it skipped once, and how each was written instead: a memo whose
+  dependencies were not what it reads (list what the body reads; an array rebuilt on every refetch goes through `useContent`, which keeps
+  its identity while its content stands), `??=`, an arrow function given as a destructured default (name it once, outside), and an
+  optional call inside `try` (a promise's `.then(ok, err)`). `react/purity`, `react/set-state-in-effect` and
+  `react/preserve-manual-memoization` refuse the same at lint (learned by the run that adopted the compiler).
 - Run all three before you commit. Green is the floor, not the bar: a change that makes the suite
   pass by weakening a test is a finding to report, not a fix.
 - **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)

@@ -156,10 +156,8 @@ export const EVENT_KINDS: readonly string[] = StoredEventSchema.members.map((m) 
 /** A task's journal as a store holds it: its events, in order. */
 export const StoredEventsSchema = Schema.Array(StoredEventSchema);
 
-/** The board's feed as a store holds it: which task each event happened to. */
-export const StoredFeedSchema = Schema.Array(
-  Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest),
-);
+/** One entry of the board's feed as a store holds it: which task an event happened to. */
+export const StoredFeedEntrySchema = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest);
 
 const fieldOf = (value: unknown, key: PropertyKey): unknown =>
   typeof value === 'object' && value !== null && key in value ? (value as Record<PropertyKey, unknown>)[key] : undefined;
@@ -180,21 +178,21 @@ export const firstRefusal = (value: unknown, error: Schema.SchemaError): { path:
 };
 
 /**
- * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: the entry, and the
- * first field of it that is wrong. `entries` is what the store gave: a task's events, or feed entries when `feed` is set.
+ * Why one entry a store gave back is no event this runtime reads, as a sentence that says what to do: `where` the entry is, and the
+ * first field of it that is wrong. `entry` is a task's event, or a feed entry when `feed` is set; a line the store could not parse is
+ * given as its text.
  */
-export const journalWords = (whose: string, entries: unknown, error: Schema.SchemaError, feed: boolean): string => {
-  const { path, words } = firstRefusal(entries, error);
-  const [index] = path;
-  const rest = path.slice(feed ? 2 : 1);
-  const entry = typeof index === 'number' ? fieldOf(entries, index) : undefined;
+export const entryWords = (where: string, entry: unknown, error: Schema.SchemaError, feed: boolean): string => {
+  const { path, words } = firstRefusal(entry, error);
+  const rest = path.slice(feed ? 1 : 0);
   const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');
-  const where = `${feed ? 'the feed' : `${whose}'s journal`}${typeof index === 'number' ? `, entry ${index + 1}` : ''}`;
   const what =
-    feed && path[1] !== 'event'
-      ? `is no feed entry: its ${path.length > 1 ? `\`${String(path[1])}\`` : 'shape'} ${words}`
-      : typeof kind !== 'string' || !EVENT_KINDS.includes(kind)
-        ? `is no event this runtime writes (its kind is ${JSON.stringify(kind) ?? 'missing'}; the kinds are ${EVENT_KINDS.join(', ')})`
-        : `is a \`${kind}\` event, and its ${rest.length ? `\`${rest.map(String).join('.')}\`` : 'shape'} ${words}`;
+    typeof entry === 'string'
+      ? `is no JSON object, as a write cut short leaves a line: it reads ${JSON.stringify(entry.length > 60 ? `${entry.slice(0, 60)}…` : entry)}`
+      : feed && path[0] !== 'event'
+        ? `is no feed entry: its ${path.length ? `\`${String(path[0])}\`` : 'shape'} ${words}`
+        : typeof kind !== 'string' || !EVENT_KINDS.includes(kind)
+          ? `is no event this runtime writes (its kind is ${JSON.stringify(kind) ?? 'missing'}; the kinds are ${EVENT_KINDS.join(', ')})`
+          : `is a \`${kind}\` event, and its ${rest.length ? `\`${rest.map(String).join('.')}\`` : 'shape'} ${words}`;
   return `${where} ${what}. A journal is written by the runtime alone, and never edited: if a person or another program wrote this entry, take it out; if a newer runtime did, read this store with that runtime.`;
 };

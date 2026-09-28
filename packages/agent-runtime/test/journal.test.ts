@@ -444,7 +444,9 @@ test('a journal line of a kind no runtime writes fails the read, naming the task
   assert.equal(error._tag, 'JournalError');
   assert.equal(error.taskId, 't-bad');
   assert.ok(
-    error.message.startsWith(`t-bad's journal, entry 2 is no event this runtime writes (its kind is "nudged"; the kinds are filed,`),
+    error.message.startsWith(
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 2 is no event this runtime writes (its kind is "nudged"; the kinds are filed,`,
+    ),
     error.message,
   );
   assert.ok(error.message.includes('take it out'), error.message);
@@ -457,7 +459,12 @@ test('an event of a known kind missing a field it always carries fails the read,
     dir,
     Effect.flatMap(Journal, (j) => j.read('t-bad')),
   );
-  assert.ok(error.message.startsWith("t-bad's journal, entry 1 is a `filed` event, and its `at` is missing."), error.message);
+  assert.ok(
+    error.message.startsWith(
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 1 is a \`filed\` event, and its \`at\` is missing.`,
+    ),
+    error.message,
+  );
 });
 
 test('a field of the wrong type fails the read, saying what is there and what the runtime writes', async () => {
@@ -470,7 +477,7 @@ test('a field of the wrong type fails the read, saying what is there and what th
   );
   assert.ok(
     error.message.startsWith(
-      `t-bad's journal, entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
     ),
     error.message,
   );
@@ -486,26 +493,68 @@ test('a harness argument of the wrong type is refused under config and beside it
       dir,
       Effect.flatMap(Journal, (j) => j.read('t-bad')),
     );
-    assert.ok(error.message.startsWith("t-bad's journal, entry 1 is a `filed` event, and its `"), error.message);
+    assert.ok(
+      error.message.startsWith(`t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 1 is a \`filed\` event, and its \``),
+      error.message,
+    );
   }
 });
 
-test('a feed entry that names no task fails the feed read, naming the entry', async () => {
-  const dir = legacyStore({ 't-ok': [TODAY] });
-  fs.appendFileSync(path.join(dir, 'feed.jsonl'), JSON.stringify({ taskId: 3, event: STARTING }) + '\n');
+test("a line of a task's journal cut short fails that task's read, naming the entry and what it reads", async () => {
+  const dir = legacyStore({ 't-cut': [TODAY] });
+  fs.appendFileSync(path.join(dir, 'tasks', 't-cut.jsonl'), '{"kind":"start\n');
   const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-cut')),
+  );
+  assert.ok(
+    error.message.startsWith(
+      `t-cut's journal (${path.join(dir, 'tasks', 't-cut.jsonl')}), entry 2 is no JSON object, as a write cut short leaves a line: it reads "{\\"kind\\":\\"start".`,
+    ),
+    error.message,
+  );
+});
+
+test('a feed entry no runtime wrote is skipped and said, naming the file, the entry and the field, and the cursor is past it', async () => {
+  const dir = legacyStore({ 't-ok': [TODAY] });
+  const feedFile = path.join(dir, 'feed.jsonl');
+  fs.appendFileSync(feedFile, JSON.stringify({ taskId: 3, event: STARTING }) + '\n');
+  fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-odd', event: { kind: 'nudged', at: 'x' } }) + '\n');
+  fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
+  fs.appendFileSync(feedFile, JSON.stringify({ taskId: 't-ok', event: STARTING }) + '\n');
+  const read = await run(
     dir,
     Effect.flatMap(Journal, (j) => j.feed(0)),
   );
+  assert.deepEqual(
+    read.entries.map((e) => [e.taskId, e.event.kind]),
+    [
+      ['t-ok', 'filed'],
+      ['t-ok', 'starting'],
+    ],
+  );
+  assert.equal(read.cursor, fs.statSync(feedFile).size);
+  const [noTask, noKind, cut] = read.refused ?? [];
+  assert.equal(read.refused?.length, 3);
+  assert.equal(noTask?.taskId, undefined);
   assert.ok(
-    error.message.startsWith('the feed, entry 2 is no feed entry: its `taskId` is 3, where the runtime writes string.'),
-    error.message,
+    noTask?.why.startsWith(
+      `the feed (${feedFile}), entry 2 read from cursor 0 is no feed entry: its \`taskId\` is 3, where the runtime writes string.`,
+    ),
+    noTask?.why,
   );
-  const kinds = await failureOf(
-    legacyStore({ 't-ok': [TODAY, { kind: 'nudged', at: 'x' }] }),
-    Effect.flatMap(Journal, (j) => j.feed(0)),
+  assert.equal(noKind?.taskId, 't-odd');
+  assert.ok(
+    noKind?.why.startsWith(`the feed (${feedFile}), entry 3 read from cursor 0 is no event this runtime writes (its kind is "nudged";`),
+    noKind?.why,
   );
-  assert.ok(kinds.message.startsWith('the feed, entry 2 is no event this runtime writes (its kind is "nudged";'), kinds.message);
+  assert.equal(cut?.taskId, undefined);
+  assert.ok(cut?.why.startsWith(`the feed (${feedFile}), entry 4 read from cursor 0 is no JSON object`), cut?.why);
+  const again = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.feed(read.cursor)),
+  );
+  assert.deepEqual(again, { entries: [], cursor: read.cursor });
 });
 
 test('the in-memory store is decoded the same: an event appended in no shape the runtime writes is refused when read', async () => {

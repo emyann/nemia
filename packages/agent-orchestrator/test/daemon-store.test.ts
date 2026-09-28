@@ -78,6 +78,7 @@ const pass = (said: Partial<TickReport> = {}): TickReport => ({
   ms: 0,
   observed: {},
   refused: [],
+  unreadable: [],
   ...said,
 });
 

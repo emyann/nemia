@@ -506,12 +506,14 @@ export async function main(argv: string[]): Promise<void> {
           .join(' ') || 'idle';
       console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
       for (const m of r.refused) console.log(refusedText(m));
+      for (const why of r.unreadable) console.error(`left out: ${why}`);
       return;
     }
 
     case 'feed': {
-      const { entries, cursor } = await engine.feed(Number(arg) || 0);
+      const { entries, cursor, refused = [] } = await engine.feed(Number(arg) || 0);
       for (const e of entries) console.log(entryLine(e.taskId, e.event));
+      for (const r of refused) console.error(`skipped: ${r.why}`);
       return console.log(`cursor: ${cursor}`);
     }
 
@@ -536,10 +538,13 @@ export async function main(argv: string[]): Promise<void> {
     case 'up': {
       const every = Number(arg) || 3_000;
       console.log(`up — ticking every ${every}ms, ^C to stop`);
+      let leftOut = new Set<string>();
       await new Promise<void>(() => {
         engine.start({
           intervalMs: every,
           onTick: (r) => {
+            for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
+            leftOut = new Set(r.unreadable);
             if (!r.actions) return;
             const load = Object.entries(r.running)
               .map(([h, n]) => `${h}:${n}`)

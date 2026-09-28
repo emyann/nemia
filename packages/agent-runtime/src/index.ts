@@ -48,7 +48,7 @@ export type { Filing, RefusedMove, TaskView } from './engine.ts';
 
 // ─── the feed: how an upper layer reacts without polling a task ─────────────
 export { Journal, JournalError } from './journal.ts';
-export type { FeedEntry, Cursor, JournalOps } from './journal.ts';
+export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './journal.ts';
 
 // ─── harnesses: bring your own ──────────────────────────────────────────────
 export { Runner, RunnerError, claudeOps, testOps } from './runner.ts';

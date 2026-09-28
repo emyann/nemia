@@ -7,12 +7,19 @@
  *
  * It is a service (not an import) so tests run against memory and spend no filesystem.
  */
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Context, Effect, Layer, Result, Schema } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { Event } from './domain.ts';
-import { HarnessArgsSchema, journalWords, StoredEventsSchema, StoredFeedSchema, type StoredEvent } from './event-schema.ts';
+import {
+  entryWords,
+  HarnessArgsSchema,
+  StoredEventSchema,
+  StoredEventsSchema,
+  StoredFeedEntrySchema,
+  type StoredEvent,
+} from './event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from './harness-args.ts';
 import { countRead, readText } from './io-tally.ts';
 
@@ -33,6 +40,12 @@ export type FeedEntry = { taskId: string; event: Event };
  * back a cursor it was given.
  */
 export type Cursor = number;
+
+/**
+ * A feed entry no runtime wrote, skipped by the read that met it: the task it names, when it names one, and why it is no entry, naming
+ * where it is. The cursor the read returns is past it, so it is said once, by the read that met it, and never stops a reader.
+ */
+export type FeedRefusal = { taskId?: string; why: string };
 
 export class JournalError extends Schema.TaggedError<JournalError>()('JournalError', {
   taskId: Schema.String,
@@ -61,7 +74,7 @@ export type JournalOps = {
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
    * replays rather than being told to start over. Pass 0 to read the whole history.
    */
-  readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor }, JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
   /**
    * Optional: call `onChange` when something has been appended, so a watcher can read instead of
    * poll. A store that cannot signal simply omits this and watchers fall back to a timer — the
@@ -78,26 +91,55 @@ export type JournalOps = {
 export type StoreOps = Omit<JournalOps, 'read' | 'feed'> & {
   readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
   readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
+  /** Optional: where the store keeps a task's journal and the feed, named in the words of an entry no runtime wrote. */
+  readonly located?: { readonly journal: (taskId: string) => string; readonly feed: string };
+};
+
+const isEvent = Schema.is(StoredEventSchema);
+const isFeedEntry = Schema.is(StoredFeedEntrySchema);
+const refusalOf = (schema: typeof StoredEventSchema | typeof StoredFeedEntrySchema, entry: unknown) => {
+  const decoded = Schema.decodeUnknownResult(schema)(entry);
+  return Result.isFailure(decoded) ? decoded.failure : undefined;
 };
 
 /**
  * A store's entries as events, the very objects it gave: a decoded struct comes back with its keys in the schema's order, and
  * the order of `config.claude` is the order of the flags on Claude Code's command line, so the schema is asked whether they
- * are events (`Schema.is`) and decodes only to say why not.
+ * are events (`Schema.is`) and decodes only to say why not. One entry no runtime wrote fails the read, naming it: the task cannot
+ * be folded without it.
  */
-const decodeEvents = (taskId: string, raw: readonly unknown[]) =>
-  Schema.is(StoredEventsSchema)(raw)
-    ? Effect.succeed(raw)
-    : Schema.decodeUnknownEffect(StoredEventsSchema)(raw).pipe(
-        Effect.mapError((error) => new JournalError({ taskId, message: journalWords(taskId, raw, error, false) })),
-      );
+const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps['located']) => {
+  if (Schema.is(StoredEventsSchema)(raw)) return Effect.succeed(raw);
+  const index = raw.findIndex((entry) => !isEvent(entry));
+  const where = `${taskId}'s journal${located ? ` (${located.journal(taskId)})` : ''}, entry ${index + 1}`;
+  const error = refusalOf(StoredEventSchema, raw[index]);
+  const message = error ? entryWords(where, raw[index], error, false) : `${where} is not what the runtime writes.`;
+  return Effect.fail(new JournalError({ taskId, message }));
+};
 
-const decodeFeed = (raw: readonly unknown[]) =>
-  Schema.is(StoredFeedSchema)(raw)
-    ? Effect.succeed(raw)
-    : Schema.decodeUnknownEffect(StoredFeedSchema)(raw).pipe(
-        Effect.mapError((error) => new JournalError({ taskId: '*', message: journalWords('*', raw, error, true) })),
-      );
+/**
+ * A store's feed entries, those no runtime wrote left out: each is skipped with why (`FeedRefusal`), and the cursor is past it all the
+ * same, so one entry nobody can read stops no reader and no pass. The task it names, when it names one, is still named: its journal is
+ * read again, and says for itself whether it reads.
+ */
+const decodeFeed = (raw: readonly unknown[], after: Cursor, located: StoreOps['located']) => {
+  const entries: FeedEntry[] = [];
+  const refused: FeedRefusal[] = [];
+  raw.forEach((entry, index) => {
+    if (isFeedEntry(entry)) {
+      entries.push({ taskId: entry.taskId, event: upgrade(entry.event) });
+      return;
+    }
+    const where = `the feed${located ? ` (${located.feed})` : ''}, entry ${index + 1} read from cursor ${after}`;
+    const error = refusalOf(StoredFeedEntrySchema, entry);
+    const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
+    refused.push({
+      ...(typeof taskId === 'string' ? { taskId } : {}),
+      why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
+    });
+  });
+  return { entries, refused };
+};
 
 /** Harness arguments `upgrade` put together from ones already read as such: the same object, typed. */
 const argsOf = (config: Record<string, unknown>): HarnessArgs =>
@@ -158,7 +200,8 @@ export const upgrade = (event: StoredEvent): Event => {
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
   /**
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
-   * back is decoded (`event-schema.ts`), an entry no runtime wrote failing the read with a `JournalError` that names it, and
+   * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
+   * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
    * where a journal written before an event's shape changed is read in today's (`upgrade`), whoever's store it is.
    */
   static layer = (ops: StoreOps) =>
@@ -167,19 +210,16 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         ...ops,
         read: (taskId) =>
           ops.read(taskId).pipe(
-            Effect.flatMap((raw) => decodeEvents(taskId, raw)),
+            Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),
             Effect.map((events) => events.map(upgrade)),
           ),
         feed: (after) =>
-          ops
-            .feed(after)
-            .pipe(
-              Effect.flatMap(({ entries, cursor }) =>
-                decodeFeed(entries).pipe(
-                  Effect.map((decoded) => ({ entries: decoded.map((e) => ({ taskId: e.taskId, event: upgrade(e.event) })), cursor })),
-                ),
-              ),
-            ),
+          ops.feed(after).pipe(
+            Effect.map(({ entries, cursor }) => {
+              const { entries: read, refused } = decodeFeed(entries, after, ops.located);
+              return { entries: read, cursor, ...(refused.length ? { refused } : {}) };
+            }),
+          ),
       }),
     );
 
@@ -193,8 +233,17 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
     const feedFile = path.join(root, 'feed.jsonl');
     const fail = (taskId: string) => (cause: unknown) =>
       new JournalError({ taskId, message: cause instanceof Error ? cause.message : String(cause) });
+    /** A line as the store holds it: its JSON, or its text where it is none — a write cut short — for the decoder to refuse by place. */
+    const parsed = (line: string): unknown => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return line;
+      }
+    };
 
     return {
+      located: { journal: file, feed: feedFile },
       append: (taskId, event) =>
         Effect.try({
           try: () => {
@@ -210,10 +259,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
         Effect.try({
           try: () => {
             if (!fs.existsSync(file(taskId))) return [];
-            return readText(file(taskId))
-              .split('\n')
-              .filter(Boolean)
-              .map((l): unknown => JSON.parse(l));
+            return readText(file(taskId)).split('\n').filter(Boolean).map(parsed);
           },
           catch: fail(taskId),
         }),
@@ -247,11 +293,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
             const text = buf.toString('utf8');
             const end = text.lastIndexOf('\n');
             if (end < 0) return { entries: [], cursor: after };
-            const entries = text
-              .slice(0, end)
-              .split('\n')
-              .filter(Boolean)
-              .map((l): unknown => JSON.parse(l));
+            const entries = text.slice(0, end).split('\n').filter(Boolean).map(parsed);
             return { entries, cursor: after + Buffer.byteLength(text.slice(0, end + 1)) };
           },
           catch: fail('*'),

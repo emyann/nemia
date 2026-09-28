@@ -1,6 +1,7 @@
 /**
  * Git and a git run's worktrees: the `git` helpers, the starting workspace, a step's worktree cut and merged, what `.worktreeinclude` copies
- * into it and the `node_modules` it is given (`deps.ts` decides, this applies), and the hand-off commit of what a step left uncommitted.
+ * into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
+ * uncommitted.
  *
  * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
  * exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.ts`'s, and a step's artifacts
@@ -342,7 +343,7 @@ export function makeWorkspace(repo: string): { workspace: string; baseRef: strin
 /**
  * The workspace a step runs in, made real.
  *
- * A folder run's steps work in folders the run makes, and nothing here is git's (`places.ts`). Without
+ * A folder run's steps work in folders the run makes, and nothing here is git's (`places.store.ts`). Without
  * isolation every step works in the repository itself, which is safe only as `validate` refuses a
  * workflow that could run two steps at once in that mode. `workspace: main` is the repository's own
  * checkout, as a person left it, for a workflow's last step: it merges onto the base branch, which is

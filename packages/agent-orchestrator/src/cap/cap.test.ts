@@ -1,5 +1,5 @@
 /**
- * The admission the tick makes off the runtime's views (`src/admission.ts`): which queued tasks start, per pool, under the ceiling.
+ * The admission the tick makes off the runtime's views (`src/cap/cap.ts`): which queued tasks start, per pool, under the ceiling.
  *
  * Each rule has a fixture in the order that rule has to undo, so that its test fails without it: the id tiebreak (views
  * given in reversed id order), the filing-time compare (a later id filed first), momentum (a first step filed before an after-step),

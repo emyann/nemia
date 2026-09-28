@@ -1866,7 +1866,7 @@ export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spe
 
 /**
  * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting task a free
- * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `admission.ts`). A run's next step
+ * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `cap.ts`). A run's next step
  * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap would take the slot;
  * above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap
  * on runs in flight and the queue are the tick's. Nothing is carried on the filing: `momentumOf` reads it off the run records by these

@@ -1,5 +1,5 @@
 /**
- * What a pass costs, in words: the pure half of the pass's meter (`tally.ts` counts; this composes and says). A pass's cost
+ * What a pass costs, in words: the pure half of the pass's meter (`tally.store.ts` counts; this composes and says). A pass's cost
  * (`PassCost`) is its time and, phase by phase, where the time went, the calls made, the bytes read and the processes started — with each
  * harness's observes as the runtime reported them. `wf up` says one line of it an interval (`summaryLine`), and `wf up --stats` and
  * `wf tick --stats` the last pass whole (`breakdownLines`).

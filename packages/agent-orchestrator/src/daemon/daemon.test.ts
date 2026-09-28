@@ -1,6 +1,6 @@
 /**
  * Who ticks the store, as data: `daemon.json`'s text judged at a fixed `now` with liveness handed in, and the words said of it. The file on
- * disk, `wf up` and `wf tick` taking and refusing the store, are daemon-store.test.ts's.
+ * disk, `wf up` and `wf tick` taking and refusing the store, are daemon.store.test.ts's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,7 +34,7 @@ const text = (file: DaemonFile | Record<string, unknown>) => JSON.stringify(file
 const as = (identity: Identity) => ({ now: NOW, identify: () => identity });
 const live = as('same');
 const dead = as('gone');
-/** The pure judgement of the file's text as `daemon-store.ts` reads it: undefined for no file, else the text and what it holds. */
+/** The pure judgement of the file's text as `daemon.store.ts` reads it: undefined for no file, else the text and what it holds. */
 const judged = (text: string | undefined, how: { now: number; identify: () => Identity }) =>
   standingOf(text === undefined ? undefined : { text, file: parseDaemonFile(text) }, how);
 const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => judged(text(file), how).kind;

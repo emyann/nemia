@@ -416,7 +416,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
       '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
       holds,
     ],
-    'the store taken is said once per start; daemon-store.test.ts has the rest of it',
+    'the store taken is said once per start; daemon.store.test.ts has the rest of it',
   );
 
   emptyStore('two');

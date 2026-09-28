@@ -1,6 +1,6 @@
 /**
- * What a pass costs, counted on a store (`tally.ts`, composed by `tick`): the phases add up to the pass, the run records read are counted,
- * the harnesses' observes are moved out of the runtime's pass, and the cost is written for `wf up --stats` and read back.
+ * What a pass costs, counted on a store (`tally.store.ts`, composed by `tick`): the phases add up to the pass, the run records read are
+ * counted, the harnesses' observes are moved out of the runtime's pass, and the cost is written for `wf up --stats` and read back.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT`: the runs of the other store tests would be counted in it. `WF_ROOT` is
  * read as the module loads, so it is set before the import. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of

@@ -30,7 +30,7 @@ data. The shell reads the world, asks the core, and applies one decision; an `if
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,
-its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest.ts`, `restMemo` in
+its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest/rest.ts`, `restMemo` in
 `src/tick.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
 (`WF_VERIFY_REST`).
@@ -49,28 +49,36 @@ the machine, or the readings `decide` moves by.
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and
 `packages/agent-runtime/test/xstate-boundary.test.ts`.
 
-**2. Inside the orchestrator, every file is of one of four kinds**, named in
-`packages/agent-orchestrator/test/boundary.test.ts`.
+**2. Inside the orchestrator, every file is of one of four kinds**, held by
+`packages/agent-orchestrator/test/boundary.test.ts`. A file in a feature folder (`src/<feature>/`) says its kind by its
+name: `x.store.ts` is a store, `x.verb.ts` a controller, any other name pure, and every file of `src/cli/` is the CLI's.
+A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: admission, check, closeout, daemon, deps, feed, inbox, meter, plan, radius, rendering, rest, retry, run, timeline, workflow.
-- **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client: places,
-  workflow-store, store, worktree, branches, artifacts, authoring, daemon-store, feed-store, inbox-store, tally. They load as a
-  tree. At the bottom are places.ts, workflow-store.ts and tally.ts (the pass's meter), which import no store file. store.ts
-  imports only those three, and worktree.ts imports only store.ts, places.ts and tally.ts. No other store file is imported by another. Outside the store,
-  only the client and the controllers beneath the CLI import a store file, and one of them imports each.
+  kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — cap, check, closeout, daemon,
+  feed, inbox, meter, plan, rest, timeline, workspace.
+- **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
+  workflow-store, store, worktree, branches, artifacts and authoring at the top, and daemon.store, feed.store,
+  inbox.store, tally.store, places.store and a2a.store in the folders. They load as a tree. At the bottom are
+  record/places.store.ts, workflow-store.ts and meter/tally.store.ts (the pass's meter), which import no store file.
+  store.ts imports only those three, and worktree.ts imports only store.ts and the two others. No other store file is
+  imported by another. Outside the store, only the client and the controllers beneath the CLI import a store file, and
+  one of them imports each.
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; views.ts,
   start.ts, tick.ts, verbs.ts, forget.ts and decide.ts beneath it, split by concern; and cli.ts and bin/wf.ts above it.
   cli.ts reaches the package only through runner.ts and workflow.ts, and bin/wf.ts only through cli.ts. The client and
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.
 
-A file in src or bin that no kind names fails the suite.
+A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
+folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two
+source files that need each other's values, no source file that imports a test, and a folder's pure code imported from
+outside through its face — its `index.ts`, or its one pure file.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`) and
-passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI imports it, and it
-imports no controller.
+passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
+through a controller it imports, and it imports no controller.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package, so a change elsewhere alone is not in their package's turbo cache

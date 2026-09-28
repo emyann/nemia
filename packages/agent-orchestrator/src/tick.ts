@@ -1250,8 +1250,8 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
- * Metered as it goes (`tally.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a test
- * that meters its own — is counted as part of that one and carries no cost of its own.
+ * Metered as it goes (`tally.store.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a
+ * test that meters its own — is counted as part of that one and carries no cost of its own.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
  * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and throws

@@ -24,8 +24,8 @@
  * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
  * removed; a card still there whose name a record carries is one whose removal failed, and `wf inbox` says it was started, composed on read.
  *
- * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one (inbox-store.ts
- * and start.ts read them).
+ * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
+ * (inbox.store.ts and start.ts read them).
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
@@ -474,7 +474,7 @@ export function queueRefusal(
 /**
  * The name of the inbox card `at` names — a path under the inbox `dir`, as its path from there, less a trailing `.md`, so `<dir>/<name>` is
  * the card `wf inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `wf start <path>` start a card
- * out of the inbox. Both paths are taken as given; inbox-store.ts resolves links first.
+ * out of the inbox. Both paths are taken as given; inbox.store.ts resolves links first.
  *
  * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
  * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`

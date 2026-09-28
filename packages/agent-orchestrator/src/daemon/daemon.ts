@@ -1,7 +1,7 @@
 /**
  * Who ticks the store — pure: `$WF_ROOT/daemon.json`, the file `wf up` takes the store with, judged against a clock and a liveness answer the
- * caller brings, and the words a refusal, a takeover and `wf ls` say of it. `daemon-store.ts` reads the file, asks the process table and writes it;
- * nothing here reads a disk or signals a process.
+ * caller brings, and the words a refusal, a takeover and `wf ls` say of it. `daemon.store.ts` reads the file, asks the process table and
+ * writes it; nothing here reads a disk or signals a process.
  *
  * One `wf up` per store, since the tick keeps one writer per file and two ticks are two writers. The file is the daemon's alone: it writes it
  * as it takes the store, after every pass it completes, on a beat of its interval while it lives — a pass in flight included — and as it
@@ -83,7 +83,7 @@ export function everyOf(arg: string | undefined): { every: number } | { refusal:
 
 /**
  * `daemon.json` as it was read: its text, and the file it holds — undefined when the text does not read as one (`parseDaemonFile` in
- * `daemon-store.ts`, which checks it against what `wf up` writes).
+ * `daemon.store.ts`, which checks it against what `wf up` writes).
  */
 export type DaemonRead = { text: string; file: DaemonFile | undefined };
 

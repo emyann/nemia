@@ -9,12 +9,12 @@
  * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them: `store.ts` (the run store —
- * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon-store.ts` (`tick.json` and who
- * ticks the store), `feed-store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
+ * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon.store.ts` (`tick.json` and who
+ * ticks the store), `feed.store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
  * `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step hands over), `authoring.ts` (a workflow
- * folder and an agent written) and `inbox-store.ts` (the inbox and the queue on disk). They import neither the runtime nor a controller, and
- * `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree and
- * no cycle can form (`test/boundary.test.ts`).
+ * folder and an agent written) and `inbox.store.ts` (the inbox and the queue on disk). They import neither the runtime nor a controller,
+ * and `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree
+ * and no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export {

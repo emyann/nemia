@@ -4,7 +4,7 @@
  * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText` and `refusedText`), which they import from here and never from the runtime.
  *
  * It passes the runtime's surface through, and wraps one method of it: `file`, so that every task the orchestrator files is `queued` and
- * starts only once the tick admits it (`admission.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
+ * starts only once the tick admits it (`cap.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
  * stop one, read its logs, say something to it, read the feed — are the methods of the runtime's `Engine`, which every controller
  * takes as it is and every test hands a fake of. A wrapper would be a second surface to keep in step with the first, and a place for
  * behaviour to grow; this file holds none but that one.
@@ -49,7 +49,7 @@ export const unreadableJournal = (err: unknown): string | undefined => {
 /**
  * The engine, with one harness of the run's own beside the three it ships.
  *
- * `check` runs a step's `check:` command (`src/check.ts`). Passing `harnesses` REPLACES the engine's
+ * `check` runs a step's `check:` command (`src/check/check.ts`). Passing `harnesses` REPLACES the engine's
  * default map rather than adding to it, so the defaults are named again here — leaving them out would
  * quietly send every `claude` step to whichever harness came first.
  *

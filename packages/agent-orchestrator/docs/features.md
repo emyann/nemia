@@ -153,7 +153,7 @@ What it leaves:
 A worktree the run cuts no longer links the main checkout's whole `node_modules`. Through that link a
 branch's app imported main's workspace packages, and M1's check was refused four times over it (plan
 §4b): a dependency the branch pinned was not in the shared tree, and main moving under the branch
-failed tests the branch never touched. `depsPlan` (`src/deps.ts`, pure) gives the worktree a directory
+failed tests the branch never touched. `depsPlan` (`src/workspace/workspace.ts`, pure) gives the worktree a directory
 of its own. Workspace packages link to the worktree's copies and third-party packages to main's (hardlinked
 since 2026-09-23, the next section), and `.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
 package main's `node_modules` does not have on disk (`lockfileParting`), `provisionDeps` runs `npm ci`
@@ -510,7 +510,7 @@ What it leaves:
   path, so a step's own photographs reach its files directory by a copy, which a `dontAsk` step cannot make.
   They stay in `/tmp/playwright-mcp`, one directory for every step on the machine (plan §4b); the skill names a
   folder per run and step inside it.
-- **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/closeout.ts`) heads a finding with
+- **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/closeout/closeout.ts`) heads a finding with
   `file:line` only when `file` is at its top level, so a `where` finding prints
   `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.
   Reading `where.file`/`where.line` and `where.page`/`where.theme` there is a few lines and a case in
@@ -948,7 +948,7 @@ waited is told what its parents concluded, without a person pasting it. Nothing 
 
 What was built:
 
-- **A card is a markdown file.** `parsePlan(files)` in the new `src/plan.ts` is pure. Handed the folder's entries, it
+- **A card is a markdown file.** `parsePlan(files)` in the new `src/plan/plan.ts` is pure. Handed the folder's entries, it
   reads each `<card>.md` as a card named for its file, with exactly two frontmatter keys, `workflow:` and `after:`
   (card names, comma-separated), and its body as the brief. `README.md` is skipped. It refuses by name, with the fix:
   - a key a card does not have, set twice or to nothing, and a line that is not `key: value`;
@@ -998,7 +998,7 @@ What was built:
 
 What was measured:
 
-- Pure tests in `test/plan.test.ts` (7):
+- Pure tests in `src/plan/plan.test.ts` (7):
   - the diamond, parsed from its files in any order, with the README skipped, and a Windows file read as the same card;
   - `planOrder` parents first, and by name among the cards that may go next;
   - each refusal above by name, including a cycle of three with a card waiting on it and a root beside it, named
@@ -1369,7 +1369,7 @@ What was built:
 
 What was measured:
 
-- `test/plan.test.ts`:
+- `src/plan/plan.test.ts`:
   - `cardToStart` reads three cards: one with both keys and a body of two paragraphs, one saved on Windows with a comment, and
     one with only `after:`.
   - It gives null for six briefs that are not cards.
@@ -1595,7 +1595,7 @@ What was built:
 
 - **The folder.** `$WF_ROOT/inbox/`, beside `runs/`, holds one `<name>.md` per card (`inboxDir`). A card is a plan's card with two
   differences. `workflow:` is optional. `repo:` is a key of its own, also optional: the absolute path of the repository the idea is about.
-  `parseInboxCard` in the new `src/inbox.ts` is pure and closes the keys through `frontmatterKeys`, which a plan's card now uses too. It
+  `parseInboxCard` in the new `src/inbox/inbox.ts` is pure and closes the keys through `frontmatterKeys`, which a plan's card now uses too. It
   refuses `after:` by name, saying where a wait is given instead (`wf start --after`). It refuses a `repo:` that is not absolute, or that
   names no directory, asking a predicate so the module reads no disk. `test/boundary.test.ts` holds `inbox.ts` to that.
 - **A plan's card refuses `repo:`** by name, since a plan's repository is `wf plan --repo`. `cardToStart` reads `repo:` as a card's line,
@@ -1634,7 +1634,7 @@ What was built:
 
 What was measured:
 
-- `test/inbox.test.ts` (11 tests, pure):
+- `src/inbox/inbox.test.ts` (11 tests, pure):
   - the card with each key and neither, saved on Windows, and a comment-only frontmatter over a body that opens with a rule;
   - every refusal of a card: an unknown key, `after:`, a key set to nothing or twice, a relative `repo:`, one naming no directory, an
     empty body, and a frontmatter that never closes;
@@ -1646,7 +1646,7 @@ What was measured:
   - `inboxNameOf` for every path under the inbox (with `.md`, without, a file that is not a card, a folder inside it) and for seven outside
     it or the inbox itself; `workflowAt`, and `ideaCard` writing a file's relative `workflow:` absolute against its folder — a name, an
     absolute path and the flag's left as given; the no-workflow and already-started refusals, and `fromNote`.
-- `test/inbox-store.test.ts` (10 tests, a temporary `WF_ROOT`, through `main`):
+- `src/inbox/inbox.store.test.ts` (10 tests, a temporary `WF_ROOT`, through `main`):
   - `wf inbox` on no folder;
   - `add` of text, of text with flags, of a file with the flag over its key, by the function with a workflow path, and of text with
     `--workflow` given as a relative path, written absolute;
@@ -1667,7 +1667,7 @@ What was measured:
   - a removal made to fail with a read-only inbox. The run is written, the start says the card is still there, `wf inbox` lists
     `started as`, a second start is refused through the CLI and the function, and `wf inbox rm` clears it. The test skips as root, which
     removes the file anyway; here it ran.
-- `test/plan.test.ts` refuses `repo:` on a plan's card, and on a card `wf start` is given. `test/store.test.ts` has one refusal's wording
+- `src/plan/plan.test.ts` refuses `repo:` on a plan's card, and on a card `wf start` is given. `test/store.test.ts` has one refusal's wording
   updated: `wf start`'s unknown-flag message now names `--brief`.
 - Each guard was broken on purpose and the four test files rerun. 29 breaks, each failing at least one test:
   - `repo:` not read as a card's line: 1; `repo:` taken on a plan's card: 2;
@@ -1988,7 +1988,7 @@ What was built:
   off the `listing` the pass builds from the reads its judgement already made — the engine is asked nothing more). A run whose record
   is gone gets one `removed`. The tick is the one writer: last in the pass, after the queue, in one append, and a failure to write is the
   pass's `feedError`, which `wf tick` and `wf up` print and nothing else reads.
-- **Compared against the feed, not memory** (`src/feed.ts`): a process folds the feed as far as it has read it (`foldFeed`), reads on
+- **Compared against the feed, not memory** (`src/feed/feed.ts`): a process folds the feed as far as it has read it (`foldFeed`), reads on
   from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
   for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
 - **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
@@ -2020,7 +2020,7 @@ Where it departs from the card, and why:
 - **`wf rm` writes nothing to the feed itself**; the next pass sees the record gone and writes `removed`. `wf prune` the same: the run's
   word gains `(pruned)` on the next pass.
 
-Tested in `test/feed.test.ts`: a transition written once over four passes; nothing written across a restart (a fresh fold); a live word
+Tested in `src/feed/feed.test.ts`: a transition written once over four passes; nothing written across a restart (a fresh fold); a live word
 moving writes nothing; a cancel and a removal each one line; a cursor inside a line refused by the read, `wf feed` and `wf watch` (before it
 says it is watching); a partial line neither read nor passed, and read once it ends; a torn line ended; `wf watch` delivering lines by count
 under a bound, and nothing after `stop()`; `wf --help`; and no engine read added. Each was checked to fail with its rule deleted (the
@@ -2056,7 +2056,7 @@ The api's half of what was sketched here. What was built, in `apps/api/src/feed.
 Tested in `apps/api/test/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
 `removed` with the feed's end as each id; a reconnect by `Last-Event-ID` over `?after`; a cursor inside a line, past the end, and not a
 number refused by address and by header, each a 400; a truncated feed ending the stream; three streams holding three watchers and none
-once their readers go, and a closed socket giving its watcher back. And in the package's `test/feed.test.ts`: each line's cursor is one
+once their readers go, and a closed socket giving its watcher back. And in the package's `src/feed/feed.test.ts`: each line's cursor is one
 the feed takes, from which a read gives exactly the lines after it, with a non-ASCII note and a torn line before a good one.
 
 ### Still to build: the board follows the feed (a card of its own)
@@ -2093,7 +2093,7 @@ change, so nothing said whether a daemon was ticking at all: a run `waiting` and
   holding the store and being named as a pid to kill (round 3's finding; where it cannot be compared a live pid holds, said unconfirmed,
   with `ps` to check it first) — and `stoppedAt` once it stopped on a signal or a failure. `wf up [ms]` refuses, exit 2, an interval that is not
   a whole number from 1 to 2147483647, before the store is taken: `-5` and `1e400` (JSON's `null`) would not read back, and a daemon whose
-  file does not read holds nothing. Judged purely by `daemonStanding` (`src/daemon.ts`): `none`, `unreadable`, `stopped`, `gone`, `stalled` or `ticking`.
+  file does not read holds nothing. Judged purely by `daemonStanding` (`src/daemon/daemon.ts`): `none`, `unreadable`, `stopped`, `gone`, `stalled` or `ticking`.
 - **A second `wf up`, and a `wf tick` by hand, are refused by name, exit 2, while the store is `ticking`** — a live pid whose start, last
   pass or beat is within `staleAfterMs(every)` = max(10 × its interval, 15 minutes). Not the last pass alone: a pass files every ready step
   of every run, each perhaps behind a ten-minute `npm ci`, so it has no bound, and a daemon read as stalled mid-pass would be taken over while
@@ -2102,8 +2102,8 @@ change, so nothing said whether a daemon was ticking at all: a run `waiting` and
 - **Anything else is taken over** — claimed with a link on an empty store, renamed over the rest — and a daemon that finds another pid in
   the file at the start of a pass stops. `wf ls` ends on a line saying whether a daemon ticks and when its last pass was.
 
-Tested in `test/daemon.test.ts` (each standing, both sides of the threshold at 4000 ms and at 600 000 ms, alive-but-stale and
-dead-but-fresh, a long pass heard from by its beat, the intervals refused, the words) and `test/daemon-store.test.ts` (the file written pass by pass and let go; both refusals at shipped
+Tested in `src/daemon/daemon.test.ts` (each standing, both sides of the threshold at 4000 ms and at 600 000 ms, alive-but-stale and
+dead-but-fresh, a long pass heard from by its beat, the intervals refused, the words) and `src/daemon/daemon.store.test.ts` (the file written pass by pass and let go; both refusals at shipped
 defaults, the file untouched and no pass run; a stale, gone, stopped and unreadable holder taken over; a daemon taken over mid-run
 stopping without writing over its successor; a hand tick writing nothing; SIGTERM writing `stoppedAt`, exit 143; a pass in flight beating
 and read as ticking throughout; the beat writing nothing but its own file; `wf up -5` refused with the store untouched; a live pid under
@@ -2474,7 +2474,7 @@ What was measured:
   timeline shows the `run slot` wait; a run waiting on `--after` not counted, and the one after it held at 2 of 2; no cap and cap 0 filing
   all three at once; the oldest by `createdAt` admitted first against the id order; `wf up`'s two ceilings, and `WF_MAX_RUNS=two` refused by
   `wf up`, `wf tick` and `wf ls`.
-- `test/inbox.test.ts` (4 new), pure: a queued card read, and `queued:` refused as a word, a date, a local time, an offset, an impossible date
+- `src/inbox/inbox.test.ts` (4 new), pure: a queued card read, and `queued:` refused as a word, a date, a local time, an offset, an impossible date
   and a number, on a card with no `workflow:`, twice, and in a file given to `wf inbox add`; `queuedText` writing and taking off the key, a
   body that opens with a rule, and a text that would not read; `queueRefusal` on a started card, a queued one, and one with no workflow;
   `inboxListing`'s places by time then name, a started card out of the order, a refusal only while the text is the same, `nextQueued` passing
@@ -2504,7 +2504,7 @@ Round 2's review found three things, each fixed:
   directory, so the listing had no `queued` for it, and no pass tried it: `wf up` said nothing, though the brief names the repository gone as
   a refusal said there. `inboxListing` now reads such a card's `queued:` without the directory check, so it keeps its place beside why it
   does not read; the tick tries it, `startFromInbox` refuses it by name, and the refusal is written down as any. `--off` takes it back without
-  the check. Tested pure in `test/inbox.test.ts` — a card with another fault is in no queue — and in `test/queue-store.test.ts`, deleting a
+  the check. Tested pure in `src/inbox/inbox.test.ts` — a card with another fault is in no queue — and in `test/queue-store.test.ts`, deleting a
   queued card's repository: named on `wf tick` and in `wf inbox`, the card behind it started on the next pass, and taken back. Leaving it out
   of the queue fails two; `--off` with the check, one.
 - **Every failure of a start stuck as a refusal**, and a refusal stuck wherever the daemon ran. The catch wrote down any error — git failing
@@ -4639,7 +4639,7 @@ orchestrator's, and nothing beneath it to lift. The number §12 had is left behi
 - **The runtime keeps no ceiling, no pools and no order.** `decide` has no ceiling branch and `Now` is the time and the grace; a pass
   walks the board in the order the store lists it, starts every task not queued, and reports `running`, the sessions at work per
   harness. `DEFAULT_MAX_CONCURRENT`, `poolsOf`, `pool?` on a harness, `CLAUDE_POOL`, `State.priority` and the runtime's `admissionOrder`
-  are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `test/admission.test.ts` and
+  are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `src/cap/cap.test.ts` and
   `test/pool.test.ts` hold. The orchestrator's own `admissionOrder`, the runs in flight under `WF_MAX_RUNS`, is another thing and stays.
 - **Each is refused by name, never dropped** (exit 2, each with a test that makes it refuse at shipped defaults, each shown to fail with
   its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `createEngine`; a harness that names a `pool`; any
@@ -4666,7 +4666,7 @@ Shipped 2026-09-25. The runtime admitted its own tasks: a ceiling per pool (`max
   `admission: 'queued' | 'admitted'`, `tick()` reports the view of every task it left unsettled (`TickReport.views`, `viewOfState`), and
   `ae admit` gives the word by hand. A filing with no `queued` key, from before, reads as queued (`packages/agent-runtime/README.md`,
   *Queued and admitted*).
-- **The orchestrator admits** (`src/admission.ts`, pure). The client files every task `queued` and builds its engine with no ceiling
+- **The orchestrator admits** (`src/cap/cap.ts`, pure). The client files every task `queued` and builds its engine with no ceiling
   (`runtime-client.ts`). After the engine's pass the tick takes the report's views, counts per pool what holds a slot (`holdsSlot`: at
   work, starting, or admitted and not yet started; a blocked session or one held for an answer none), orders the waiting by momentum,
   filing time and id (`momentumOf` off the run records, since no filing carries `priority` any more), and admits under
@@ -4728,7 +4728,7 @@ Shipped 2026-09-25. Measured with the pass's meter (*What a pass costs*, the REA
 191 records took 470 to 600 ms a pass, git 400 to 480 ms of it in 233 processes, almost all of it for runs that had finished.
 The owner chose an in-memory memo in the daemon, keyed by what the run was judged on, with main's commit left out of the key.
 
-- **At rest** (`atRest`, `src/rest.ts`, pure) is a run whose status is final — succeeded, failed, cancelled, or pruned whatever its
+- **At rest** (`atRest`, `src/rest/rest.ts`, pure) is a run whose status is final — succeeded, failed, cancelled, or pruned whatever its
   steps say — with its workflow frozen on it, not held, every task settled, and a full pass that found nothing due, did nothing, said no
   note, owed no hand-off and no landing, and read nothing of another run (a claim on the checkout, a wait, a slot, the cap).
 - **Its inputs**, each of which takes it out of the memo: its record, compared whole; every file beside it in the store — `.cancelled`,
@@ -4780,7 +4780,7 @@ Shipped 2026-09-25. The owner's `wf up --stats` after the memo said `rested 98` 
 a pass and 336 journal reads (10:25). The plan guessed that pruned and cancelled runs were kept out by a claim on the checkout or a
 retry due. **Measured first**, read-only. The live records were copied and their repositories pointed at scratch clones, and each run's
 `RestFacts` was built by a proxy engine over the copy. No pass ran on the live store. Each run was counted under the clauses of `atRest` that keep it
-out (`restBlockers`, `src/rest.ts`, which `atRest` is now written on). There were 195 records, on the second pass:
+out (`restBlockers`, `src/rest/rest.ts`, which `atRest` is now written on). There were 195 records, on the second pass:
 
 | clause | runs | what they were |
 |---|---|---|
@@ -4805,7 +4805,7 @@ out (`restBlockers`, `src/rest.ts`, which `atRest` is now written on). There wer
   not depend on the slot. A run with nothing ready wants no slot.
 - **`WF_VERIFY_REST` names the clause.** A memo answer that a full pass finds not at rest throws with the clauses that hold it out
   (`finds it not at rest (status, settled, inFlight)`).
-- **Tested** (`test/rest-store.test.ts`, `test/rest.test.ts`). Every clause alone gives its name. A run called off before it started
+- **Tested** (`test/rest-store.test.ts`, `src/rest/rest.test.ts`). Every clause alone gives its name. A run called off before it started
   rests, and a `.pruned` marker takes it out. Three finished runs (succeeded, failed at a step, called off) whose worktrees were removed
   owe no hand-off and rest, with the pass's cost unchanged. `wf prune` of a run with one worktree of two gone is `prunable`. The verify
   message names the clauses. Each test was run against its mutant and failed: the unstarted routing reverted, the existence filter taken
@@ -4893,7 +4893,7 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
 Shipped 2026-09-25. Part 1 made a remote A2A agent a harness of the runtime; this part lets a workflow step name one. The README's
 *A remote A2A agent as a step* says how it reads.
 
-- **Declared in the store.** `a2a-agents.json` maps a name to `{ url }` or `{ card }` (`src/a2a-agents.ts`); the runtime client hands
+- **Declared in the store.** `a2a-agents.json` maps a name to `{ url }` or `{ card }` (`src/harness/a2a.store.ts`); the runtime client hands
   each to the engine as the harness `a2a:<name>`, judged by the runtime's own rule (`remoteConfigRefusal`, exported for it). What is
   refused, the file or an entry, is left out and said on stderr (`readRemote`), so a bad file stops no command; `wf start` refuses a
   step naming a name the file does not declare, or one refused, in the file's words. A step already filed on a name left out is never

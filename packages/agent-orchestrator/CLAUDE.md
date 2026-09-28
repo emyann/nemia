@@ -1,7 +1,12 @@
 # packages/agent-orchestrator — `wf`
 
 Runs of steps from folders of markdown, a tick that files and admits them on the runtime, and the verbs a person uses. Its files are
-pure, store, controller or the client (`test/boundary.test.ts`).
+pure, store, controller or the client (`test/boundary.test.ts`), and its folders are held by `test/layout.test.ts`.
+
+## Folders
+
+- **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
+  `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
 
 ## Keys, agents and folders
 

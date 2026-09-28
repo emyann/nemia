@@ -7,11 +7,11 @@ import './styles.css';
 
 const queryClient = new QueryClient();
 
+/** The board's router: its loaders read through the query cache, so it holds no data of its own and caches no preload. */
 const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
-  // Loaders read through the query cache, so the router never holds data of its own.
   defaultPreloadStaleTime: 0,
 });
 

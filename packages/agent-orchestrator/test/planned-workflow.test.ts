@@ -1,11 +1,13 @@
 /**
- * `workflows/dev-planned/`, the workflow for a brief that warrants a plan before the work, held to its shape at shipped defaults — so an edit
- * that gives the plan a tool that writes, drops the question it may ask, or unhooks implement from the plan fails the suite rather than a run.
+ * `workflows/dev-planned/`, the workflow for a brief that warrants a plan before the work, held to its shape at shipped defaults — so an
+ * edit that gives the plan a tool that writes, drops the question it may ask, or unhooks implement from the plan fails the suite rather
+ * than a run.
  *
  *   plan → implement ⇄ review
  *
- * Plan mode and AskUserQuestion are withheld from a session nobody sits beside (plan §4 Q), so planning is a step on tools that cannot
- * write, whose closeout is the plan, and asking is that step's `blocked` with the question in `needs`, answered by `wf retry --message`.
+ * Plan mode and AskUserQuestion are withheld from a session nobody sits beside, since nobody is there to answer them, so planning is a
+ * step on tools that cannot write, whose closeout is the plan, and asking is that step's `blocked` with the question in `needs`, answered
+ * by `wf retry --message`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

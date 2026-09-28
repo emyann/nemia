@@ -733,10 +733,10 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
 
 /**
  * Why a Claude Code session filed in `permissionMode` — the mode a step names, or `undefined` for none — would not run in it on `model`, as
- * the words after what names the model: `names no \`permissionMode:\`, and Claude Code drops \`auto\` …`. `undefined` when it would: on codex, which has
- * sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says `default` from its
- * first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording for the load's
- * refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
+ * the words after what names the model: `names no \`permissionMode:\`, …, and Claude Code drops \`auto\` …`. `undefined` when it would:
+ * on codex, which has sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says
+ * `default` from its first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording
+ * for the load's refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
  */
 export function autoDropped(
   harness: string | undefined,

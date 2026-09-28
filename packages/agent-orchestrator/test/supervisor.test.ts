@@ -35,7 +35,7 @@ const FOLDER = path.join(REPO, 'workflows', 'supervisor');
 /** A step's prose with its line breaks as spaces, so a sentence is found wherever the file wraps it. */
 const said = (text: string) => text.replace(/\s+/g, ' ');
 
-/** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"), as every implement is denied it. */
+/** The tools an unattended session is given and no step needs, as measured on a worker: every implement is denied them. */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
 /**

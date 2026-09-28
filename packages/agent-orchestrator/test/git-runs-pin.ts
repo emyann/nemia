@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { composeBrief, decision, forgetLine, listing, toDecide, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
-import type { Closeout } from '../src/closeout.ts';
+import type { Closeout } from '../src/closeout/closeout.ts';
 import { outputFields, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/workflow-store.ts';
 

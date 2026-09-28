@@ -25,8 +25,8 @@ delete process.env.WF_MAX_RUNS;
 const { readRun, start } = await import('../src/runner.ts');
 const { tick } = await import('../src/tick.ts');
 const { main } = await import('../src/cli.ts');
-const { readFeed } = await import('../src/feed-store.ts');
-const { REMOVED } = await import('../src/feed.ts');
+const { readFeed } = await import('../src/feed/feed.store.ts');
+const { REMOVED } = await import('../src/feed/feed.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

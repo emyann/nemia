@@ -32,7 +32,7 @@ const {
   start,
   touchedBy,
 } = await import('../src/runner.ts');
-const { metered } = await import('../src/tally.ts');
+const { metered } = await import('../src/meter/tally.store.ts');
 const { main } = await import('../src/cli.ts');
 
 /** A run this file started on a repository, as `touchedBy` and `sensitiveDiff` read one: a git run. */

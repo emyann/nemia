@@ -7,7 +7,8 @@
  * only on the summary's `Failed:` line, so without `--continue` a person reads the longest file of another package as
  * the failure.
  *
- * Each file under a package's `test/` is among the files of a tsconfig its `typecheck` script runs. A tsconfig that
+ * Each file under a package's `test/`, and each `*.test.ts` beside the code in its `src/`, is among the files of a
+ * tsconfig its `typecheck` script runs, and a package's `test` script runs the tests beside its code. A tsconfig that
  * includes `src` alone typechecks none of its tests: a test that reads a field moved under `config` asserts `undefined`
  * and passes, a harness's refusal handed a fence at a place it no longer reads passes as accepting it, and a test file
  * that declares one type twice goes unseen.
@@ -30,7 +31,7 @@ test("the root's test script lets every package finish when one fails, so a fail
   );
 });
 
-test("every file under each package's test/ is in a tsconfig the package's typecheck script runs", () => {
+test("every file under each package's test/, and every test beside its code in src/, is in a tsconfig the package's typecheck script runs", () => {
   const repo = path.join(import.meta.dirname, '..', '..', '..');
   const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
   let seen = 0;
@@ -39,14 +40,51 @@ test("every file under each package's test/ is in a tsconfig the package's typec
     if (!fs.existsSync(testDir)) continue;
     const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
     const checked = new Set(typecheckedBy(dir, pkg.scripts.typecheck ?? ''));
-    const tests = (fs.readdirSync(testDir, { recursive: true }) as string[])
-      .filter((f) => /\.tsx?$/.test(f))
-      .map((f) => path.join(testDir, f));
+    const tests = [
+      ...(fs.readdirSync(testDir, { recursive: true }) as string[]).filter((f) => /\.tsx?$/.test(f)).map((f) => path.join(testDir, f)),
+      ...testsBeside(dir),
+    ];
     const unchecked = tests.filter((f) => !checked.has(f)).map((f) => path.relative(repo, f));
     assert.deepEqual(unchecked, [], `${pkg.name}'s typecheck (${pkg.scripts.typecheck}) leaves these out: include them in its tsconfig`);
     seen += tests.length;
   }
   assert.ok(seen > 100, `read ${seen} test files, far fewer than the workspace has`);
+});
+
+/** The tests beside the code in a package's `src/`, by absolute path. */
+const testsBeside = (dir: string): string[] => {
+  const src = path.join(dir, 'src');
+  if (!fs.existsSync(src)) return [];
+  return (fs.readdirSync(src, { recursive: true }) as string[]).filter((f) => /\.test\.tsx?$/.test(f)).map((f) => path.join(src, f));
+};
+
+/** The glob a `test` script gives `node --test` for the tests beside the code, quoted so Node expands it and reaches nested folders. */
+const BESIDE_GLOB = "'src/**/*.test.ts'";
+
+/** Where a package with tests beside its code has a `test` script that does not run them. */
+const unrunBeside = (name: string, script: string, beside: number): string[] =>
+  beside && !script.split(/\s+/).includes(BESIDE_GLOB)
+    ? [`${name} has ${beside} tests beside its code, and its test script (${script}) runs none: add ${BESIDE_GLOB} to it`]
+    : [];
+
+test('REFUSED: a package whose tests beside the code its test script does not run', () => {
+  assert.deepEqual(unrunBeside('x', 'node --test test/*.test.ts', 2), [
+    "x has 2 tests beside its code, and its test script (node --test test/*.test.ts) runs none: add 'src/**/*.test.ts' to it",
+  ]);
+  assert.equal(unrunBeside('x', 'node --test test/*.test.ts src/**/*.test.ts', 2).length, 1, 'unquoted, the shell stops at one folder');
+  assert.deepEqual(unrunBeside('x', "node --test 'test/*.test.ts' 'src/**/*.test.ts'", 2), []);
+  assert.deepEqual(unrunBeside('x', 'node --test test/*.test.ts', 0), [], 'a package with none needs no glob');
+});
+
+test("every package's test script runs the tests beside its code", () => {
+  const repo = path.join(import.meta.dirname, '..', '..', '..');
+  const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  assert.ok(testsBeside(path.join(import.meta.dirname, '..')).length > 0, "the scan finds the tests beside this package's code");
+  const refused = packages.flatMap((dir) => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
+    return unrunBeside(pkg.name, pkg.scripts.test ?? '', testsBeside(dir).length);
+  });
+  assert.deepEqual(refused, []);
 });
 
 /** Every file the tsconfigs named by a `typecheck` script (`tsc --noEmit`, `tsc --noEmit -p <dir or file>`, joined by `&&`) check. */

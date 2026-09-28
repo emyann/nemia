@@ -7,8 +7,8 @@
  * no step's task, and the engine has never heard of the run, so `cancelledAt` lives on the run.
  */
 import path from 'node:path';
-import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
-import { depsLines, inside, type Provisioned } from './deps.ts';
+import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check/check.ts';
+import { depsLines, inside, type Provisioned } from './workspace/workspace.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
@@ -28,9 +28,9 @@ import {
   upstreamOf,
   type Workflow,
 } from './workflow.ts';
-import type { TaskClock } from './timeline.ts';
+import type { TaskClock } from './timeline/timeline.ts';
 import { briefBody } from './rendering.ts';
-import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout.ts';
+import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout/closeout.ts';
 import {
   answerOf,
   dueNote,
@@ -48,7 +48,7 @@ import {
 } from './retry.ts';
 
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
-export { declaredOutput, parseCloseout } from './closeout.ts';
+export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; retry.ts imports only types from here. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry.ts';
 
@@ -1866,7 +1866,7 @@ export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spe
 
 /**
  * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting task a free
- * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `admission.ts`). A run's next step
+ * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `cap.ts`). A run's next step
  * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap would take the slot;
  * above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap
  * on runs in flight and the queue are the tick's. Nothing is carried on the filing: `momentumOf` reads it off the run records by these

@@ -837,7 +837,7 @@ any task in the call). `queued` that is not true or false is refused at `file()`
 `queued: true` is how `ae start` files one.
 
 It is for a layer above that decides itself what runs when: agent-orchestrator files every task `queued`, and admits per
-pool, under its own ceiling and in its own order (its `admission.ts`, thin runtime stage 4c). It reads what to admit
+pool, under its own ceiling and in its own order (`agent-orchestrator/src/cap/cap.ts`, thin runtime stage 4c). It reads what to admit
 off the pass it just ran: `tick()` returns the view of every task it left unsettled (`TickReport.views`, built by
 `viewOfState` off the pass's one observation), so the layer above decides with no second look at any harness.
 

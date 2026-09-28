@@ -16,7 +16,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
-import { queueLine } from '../src/inbox.ts';
+import { queueLine } from '../src/inbox/inbox.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-queue-');
@@ -28,7 +28,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, cancel, decide, listRuns, readInbox, readRun, start, tick } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
-const { queueTries } = await import('../src/inbox-store.ts');
+const { queueTries } = await import('../src/inbox/inbox.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -416,7 +416,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
       '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
       holds,
     ],
-    'the store taken is said once per start; daemon-store.test.ts has the rest of it',
+    'the store taken is said once per start; daemon.store.test.ts has the rest of it',
   );
 
   emptyStore('two');

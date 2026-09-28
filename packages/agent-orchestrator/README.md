@@ -843,7 +843,7 @@ filed, it fills in the rest:
   notes say so. `.bin` and each `@scope` are directories of the worktree's own, so installing into the
   worktree never writes main's tree; `.bin` holds npm's relative links, so a workspace package's bin
   runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
-  `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/worktree.ts`
+  `.vite-temp`) are left out. `src/workspace/workspace.ts` decides from names, and `provisionDeps` in `src/worktree.ts`
   does the work.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's
   `package-lock.json` names, the run looks at what is on disk at that path in the main checkout's
@@ -1009,7 +1009,7 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   A check no longer passes or fails on what `main` holds.
 - **A step is told before it is judged.** Every brief with a check says the command must exit 0 in the
   workspace, that the run executes it afterwards, and not to weaken it.
-- **It is an engine task,** on a `check` harness the run hands the engine (`src/check.ts`): `sh -c` with
+- **It is an engine task,** on a `check` harness the run hands the engine (`src/check/check.ts`): `sh -c` with
   the command in a subshell, stderr to a file of its own, and the exit code printed last. So a check
   outlives a tick that dies, is stopped by `wf cancel`, ends at a twenty-minute deadline, runs once and is
   never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
@@ -1556,7 +1556,7 @@ screen shows what the branch touched, read out of git:
   An attempt that measured none of it says nothing, and nothing here is priced: the cost is still the harness's.
   After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
   ended attempts had no cost on them.
-- **timeline** is where the step's time went (`timeline` in `src/timeline.ts`, pure): a row for each try's
+- **timeline** is where the step's time went (`timeline` in `src/timeline/timeline.ts`, pure): a row for each try's
   session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait
   for a slot behind other runs; *ran*, spawned → ended; beside a session, what it used, and what it cost where that was measured. The spawn and the end are the engine's attempts; the
   filing is on the engine's feed, since a task's view carries no filing time, and a queue the feed cannot
@@ -1779,7 +1779,7 @@ Read the note and say whether it is right.
 { "reviewer": { "url": "https://agents.example.com/reviewer" } }
 ```
 
-- **`~/.agent-workflows/a2a-agents.json`** (`$WF_ROOT/a2a-agents.json`, `src/a2a-agents.ts`) maps each name to `{ "url": … }`, the
+- **`~/.agent-workflows/a2a-agents.json`** (`$WF_ROOT/a2a-agents.json`, `src/harness/a2a.store.ts`) maps each name to `{ "url": … }`, the
   agent's base URL, whose card is read at `.well-known/agent-card.json` beneath it, or to `{ "card": { … } }`, the card itself. A name
   is lowercase words joined by dashes. The runtime judges each entry by its own rule (an `http:` or `https:` address with no user name or
   password, a card with an interface). It is read when a process makes its engine, so an edit reaches a running `wf up` or api when it
@@ -2237,7 +2237,7 @@ up — every 4000ms, ^C to stop
 - **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions at work, not runs.** It is the tick's own ceiling, per pool, and the only one (thin runtime stage 4c;
   the engine's `maxConcurrent` until part 1, retired from the engine in part 2, which now refuses it): `claude` and `claude-detached` share one, since they share one subscription; `codex` has its
   own; and a step's check runs on the `check` harness, a pool of its own, so a suite never waits behind a session (`POOLS` in
-  `src/admission.ts`). Both steps of `dev` are on `claude`, so one run's review competes with another run's implement for the same slots.
+  `src/cap/cap.ts`). Both steps of `dev` are on `claude`, so one run's review competes with another run's implement for the same slots.
   A task holds a slot while its session works, while it is starting, and once it is admitted until it starts; a session its harness lists
   `blocked` holds none, since it makes no API calls, and one held open for an answer none (`holdsSlot`).
 - **The tick admits; the engine starts.** Every task the run files is filed `queued` (`src/runtime-client.ts`), and the engine starts
@@ -2357,7 +2357,7 @@ The tick keeps one writer per file, and two ticks are two writers. So `wf up` ta
 when its timer last wrote the file, and `procStart` when its process started (clock ticks since boot, `/proc/<pid>/stat`), which with the
 pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
 doing, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always through a hidden file renamed over it, so a
-reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon.ts`): no file, a file that does
+reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon/daemon.ts`): no file, a file that does
 not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` fails, or the pid's start is not `procStart`), one alive that has been silent for a long while
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
@@ -2388,7 +2388,7 @@ before the store is taken: `wf up -5` would write an interval the file does not 
 
 ## What a pass costs: `wf up --stats`
 
-Every pass is measured as it runs, phase by phase (`src/tally.ts` counts, `src/meter.ts` composes and words it), and what it cost is
+Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` counts, `src/meter/meter.ts` composes and words it), and what it cost is
 written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on it; it is there to say where a pass's time goes.
 
 - **The phases** are `records` (the run records, with the files beside each), `asks` (a person's asks, approvals, acceptances and
@@ -2396,7 +2396,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   runtime's own pass, less its observe), `git` (every git command, whether it judged or acted — so it is a phase of its own rather than
   part of `act`), `assess` (the judgement — which queued tasks to admit among it — and any time counted as no other phase) and `act`
   (filing, admitting, stopping, collecting artifacts, and writing the record, the feed and the ceilings). A phase inside another counts as the inner one, so the phases add up to the pass's
-  time, which is measured apart from them; `test/meter-store.test.ts` holds the one against the other.
+  time, which is measured apart from them; `src/meter/tally.store.test.ts` holds the one against the other.
 - **Each phase says its time, its calls, the bytes read and the processes started.** The bytes are those read through the store's
   readers and the runtime's (a thin wrapper each, not a syscall tracer), so what git reads is not in them. The runtime reports what it
   read and started, and each harness's observes — how many, their time, what they listed, the processes they started (`Engine.io()`,
@@ -2413,7 +2413,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   measuring it 1.8 to 2.9 ms, under half a percent; git took 400 to 480 ms of the pass, in 233 processes, and the records 13 to 28 ms for
   their 2.8 MB. Outside a pass the readers count nothing, at the price of one comparison. The api serves the last pass beside the ceilings (`/api/ceilings`), and the Factory's header says `a pass takes N ms`.
 - **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
-  workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest.ts`) — is
+  workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
   asks directory and its `done/`: `restStamps`, one `readdir` and a `stat` each), each of its tasks' journals (the runtime's feed, read
   once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (one `git for-each-ref` a
@@ -2549,7 +2549,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
 | `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
-| `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
+| `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed (`wf feed`, `wf watch`) | the tick | kept: the run's lines stay, and the next pass writes its one `removed` |
 | `engine/` | the engine's board: tasks, journal, feed | the engine | not touched |
 | `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
@@ -2702,28 +2702,28 @@ holding a concurrency slot forever.
 |---|---|
 | `src/workflow.ts` | the format — pure: parse a folder of markdown from its text (`parseFolder`), and render a step or an agent back to it (`renderStep`, `renderAgent`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
 | `src/workflow-store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
-| `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
-| `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
+| `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
+| `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, and what a step is told, `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` included |
-| `src/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against a clock and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
-| `src/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
-| `src/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
+| `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against a clock and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
+| `src/timeline/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
+| `src/closeout/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
 | `src/retry.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`tryOf`, `retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`, `retryRefusal`) stays in `run.ts` |
-| `src/admission.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`) |
-| `src/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick.ts`'s |
-| `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
-| `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
+| `src/cap/cap.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`) |
+| `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick.ts`'s |
+| `src/check/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
+| `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
 | `src/store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
-| `src/daemon-store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
-| `src/feed-store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
-| `src/tally.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
-| `src/places.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `workflow-store.ts`, and reads no git |
+| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
+| `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
+| `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
+| `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `workflow-store.ts`, and reads no git |
 | `src/worktree.ts` | git and a git run's worktrees: the `git` helpers, a step's worktree cut and merged (`workspaceFor`), what `.worktreeinclude` copies into it, its `node_modules` (`provisionDeps`), and the hand-off commit |
 | `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), and a landed ending's check pictures removed (`dropLandedPictures`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
-| `src/inbox-store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
+| `src/inbox/inbox.store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
 | `src/views.ts` | what the engine's views of a run's tasks say: a step's phase (`phaseOfView`), whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/start.ts` | a run started (`start`), a plan's cards started (`readPlan`, `startPlan`), an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
@@ -2732,8 +2732,8 @@ holding a concurrency slot forever.
 | `src/forget.ts` | a run forgotten (`forget`, `wf rm`) and its worktrees pruned (`prune`) |
 | `src/decide.ts` | what a person reads of a run: `wf ls` (`list`) and `wf decide` (`decide`) |
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
-| `src/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
-| `src/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), and a line in words (`feedLineWords`); the file is `src/feed-store.ts`'s |
+| `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
+| `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), and a line in words (`feedLineWords`); the file is `src/feed/feed.store.ts`'s |
 | `src/cli.ts` | the verbs |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`) and
@@ -2754,25 +2754,33 @@ for the same reason, and so does the `wf` command.
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
-| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon.ts`) |
+| `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
-| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed.ts`, `src/feed-store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
+| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
 `assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
-file in `src/` and `bin/` is of one of four kinds, and `test/boundary.test.ts` names each and fails the suite on a file
-it does not. **Pure** files (`run.ts`, `workflow.ts`, `check.ts` and the rest of `PURE`) import no runtime, read no disk,
+file in `src/` and `bin/` is of one of four kinds, and `test/boundary.test.ts` fails the suite on a file of none. A file
+in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts` a store, `x.verb.ts` a controller, any
+other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
+`CLIENT`. **Pure** files (`run.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
-no runtime, never a controller and not the client, and load as a tree — `places.ts`, `workflow-store.ts` and `tally.ts` (the pass's
-meter) at the bottom, `store.ts` on those three, `worktree.ts` on `store.ts`, `places.ts` and `tally.ts` — and outside the store only the client and the
-controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which
-re-exports; `views.ts`, `start.ts`, `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts`, which import one another one way,
-with no cycle; and `cli.ts` and `bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and
-`bin/wf.ts` only through `cli.ts`. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the
-runtime is reached through one client (`CLIENT` in the same test), which every controller beneath the CLI imports and
-which imports no controller. Outside the package, the apps reach it through
-`agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`).
+no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`
+and `meter/tally.store.ts` (the pass's meter) at the bottom, `store.ts` on those three, `worktree.ts` on `store.ts` and
+the two others — and outside the store only the client and the controllers beneath the CLI import them.
+**Controllers** use the runtime through the client: `runner.ts`, the root, which re-exports; `views.ts`, `start.ts`,
+`tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts`, which import one another one way, with no cycle; and `cli.ts` and
+`bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and `bin/wf.ts` only through
+`cli.ts`. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
+through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
+controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
+files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that
+imports a test, and a folder's pure code imported from outside it through its face — its `index.ts`, or its one pure
+file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
+files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
+`agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`), whose names
+`test/entries.test.ts` pins.
 `docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.

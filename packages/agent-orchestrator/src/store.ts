@@ -34,8 +34,8 @@ import {
   rendersAgent,
   type SkillAgain,
 } from './rendering.ts';
-import { inputsRoot } from './places.ts';
-import { countRecord, readText, within } from './tally.ts';
+import { inputsRoot } from './record/places.store.ts';
+import { countRecord, readText, within } from './meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -843,8 +843,8 @@ export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path
  * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
  *
  * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
- * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is `places.ts`'s
- * (`inputsRoot`), as that is where the copy is read from.
+ * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is
+ * `places.store.ts`'s (`inputsRoot`), as that is where the copy is read from.
  */
 export const inputsDir = (run: Pick<Run, 'id'>): string => inputsRoot(runsDir(), run.id);
 

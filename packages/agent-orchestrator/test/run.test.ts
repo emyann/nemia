@@ -132,7 +132,7 @@ import {
   placeText,
   REPLIES_SCHEMA,
   type Closeout,
-} from '../src/closeout.ts';
+} from '../src/closeout/closeout.ts';
 import {
   answerOf,
   continuesFrom,
@@ -149,9 +149,17 @@ import {
   type RetryHow,
   type RetryMode,
 } from '../src/retry.ts';
-import { firstFiledAt, runStartedAt, taskUsage, timeline, timelineLines, timelineTotalLines, type TaskClock } from '../src/timeline.ts';
+import {
+  firstFiledAt,
+  runStartedAt,
+  taskUsage,
+  timeline,
+  timelineLines,
+  timelineTotalLines,
+  type TaskClock,
+} from '../src/timeline/timeline.ts';
 import type { TaskView } from 'agent-runtime';
-import type { Verdict } from '../src/check.ts';
+import type { Verdict } from '../src/check/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });

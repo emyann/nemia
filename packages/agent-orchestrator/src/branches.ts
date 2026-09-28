@@ -8,7 +8,7 @@
  * a controller, and `runner.ts` re-exports most of what it exports. What asks the engine as well — `parentOf`, `decide` — is
  * the controllers' (`views.ts`, `decide.ts`).
  */
-import { execCounted } from './tally.ts';
+import { execCounted } from './meter/tally.store.ts';
 import { isGitRun, resultSteps, type BranchStanding, type GitRun, type ParentRun, type Run, type Shipped } from './run.ts';
 import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
 import { readRun, stepsOf } from './store.ts';

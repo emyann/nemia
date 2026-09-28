@@ -111,6 +111,16 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
       `apps/web/test/x.test.ts imports ../../../packages/agent-orchestrator/src/feed.ts, a path into packages/agent-orchestrator: ${instead}`,
     ],
   );
+  assert.deepEqual(
+    breaches('apps/api/src/x.ts', "import { feedWords } from '../../../packages/agent-orchestrator/src/feed/feed.ts';", GUARDED),
+    [
+      `apps/api/src/x.ts imports ../../../packages/agent-orchestrator/src/feed/feed.ts, a path into packages/agent-orchestrator: ${instead}`,
+    ],
+    'REFUSED: a path into a feature folder',
+  );
+  assert.deepEqual(refused("import type { Tally } from 'agent-orchestrator/src/meter/tally.store.ts';"), [
+    `${at} imports agent-orchestrator/src/meter/tally.store.ts, which is not an entry of agent-orchestrator: ${instead}`,
+  ]);
   assert.deepEqual(refused("const f = await import(new URL('./feed.ts', import.meta.resolve('agent-orchestrator')).href);"), [
     `${at}:1 resolves agent-orchestrator to build a path beside its entry: ${instead}`,
   ]);

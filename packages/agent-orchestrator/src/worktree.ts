@@ -1,6 +1,7 @@
 /**
  * Git and a git run's worktrees: the `git` helpers, the starting workspace, a step's worktree cut and merged, what `.worktreeinclude` copies
- * into it and the `node_modules` it is given (`deps.ts` decides, this applies), and the hand-off commit of what a step left uncommitted.
+ * into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
+ * uncommitted.
  *
  * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
  * exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.ts`'s, and a step's artifacts
@@ -10,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { lastLines } from './check.ts';
+import { lastLines } from './check/check.ts';
 import {
   depsPlan,
   inside,
@@ -24,12 +25,12 @@ import {
   type Installed,
   type Provisioned,
   type WorktreeInclude,
-} from './deps.ts';
-import { folderPlace } from './places.ts';
+} from './workspace/workspace.ts';
+import { folderPlace } from './record/places.store.ts';
 import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
 import { HOME, lstatOf, runsDir } from './store.ts';
-import { countSpawn, execCounted, readText } from './tally.ts';
+import { countSpawn, execCounted, readText } from './meter/tally.store.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
@@ -342,7 +343,7 @@ export function makeWorkspace(repo: string): { workspace: string; baseRef: strin
 /**
  * The workspace a step runs in, made real.
  *
- * A folder run's steps work in folders the run makes, and nothing here is git's (`places.ts`). Without
+ * A folder run's steps work in folders the run makes, and nothing here is git's (`places.store.ts`). Without
  * isolation every step works in the repository itself, which is safe only as `validate` refuses a
  * workflow that could run two steps at once in that mode. `workspace: main` is the repository's own
  * checkout, as a person left it, for a workflow's last step: it merges onto the base branch, which is

@@ -7,8 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { HARNESSES, readRemote } from './runtime-client.ts';
-import { remoteAgentsFile } from './a2a-agents.ts';
-import { refusalLines } from './deps.ts';
+import { remoteAgentsFile } from './harness/a2a.store.ts';
+import { refusalLines } from './workspace/workspace.ts';
 import { fansOut, isFolderTeam, remoteNameOf, WorkflowError, type Workflow } from './workflow.ts';
 import { loadWorkflows, skillsFor, workflowFolder, workflowsIn, type Places } from './workflow-store.ts';
 import {
@@ -22,14 +22,14 @@ import {
   type InboxCard,
   type QueueStarted,
   type QueueTry,
-} from './inbox.ts';
-import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { workRoot } from './places.ts';
+} from './inbox/inbox.ts';
+import { parsePlan, planOrder, type Card, type Planned } from './plan/plan.ts';
+import { workRoot } from './record/places.store.ts';
 import { afterRefusal, gateRefusal, inputRefusal, isGitRun, type InputFile, type Run } from './run.ts';
 import { HOME, inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, writeAgentFiles, writeRun } from './store.ts';
 import { makeWorkspace, readInclude } from './worktree.ts';
 import { parentRecord } from './branches.ts';
-import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox-store.ts';
+import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox/inbox.store.ts';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which

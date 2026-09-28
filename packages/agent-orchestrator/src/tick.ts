@@ -10,10 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { refusedText, unreadableJournal, type ClaudeFlags, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
+import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check/check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from './workflow.ts';
-import type { QueueStarted } from './inbox.ts';
-import { folderPlace } from './places.ts';
+import type { QueueStarted } from './inbox/inbox.ts';
+import { folderPlace } from './record/places.store.ts';
 import {
   admissionOrder,
   holdsOpen,
@@ -84,7 +84,7 @@ import {
   type CloseoutAsked,
   type TaskPhase,
 } from './run.ts';
-import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout.ts';
+import { closeoutSchemaOf, parseCloseout, type Closeout } from './closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from './retry.ts';
 import {
   agentFilesDir,
@@ -108,12 +108,12 @@ import {
   runsDir,
   stepsOf,
 } from './store.ts';
-import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon-store.ts';
-import { feedFile, recordFeed } from './feed-store.ts';
+import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon/daemon.store.ts';
+import { feedFile, recordFeed } from './feed/feed.store.ts';
 import { abortMerge, checkoutParts, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
 import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
-import { evictedBy, restBlockers, type RestFacts } from './rest.ts';
+import { evictedBy, restBlockers, type RestFacts } from './rest/rest.ts';
 import {
   answersIn,
   closeoutAsked,
@@ -138,9 +138,9 @@ import {
 import { placesOf, startQueued } from './start.ts';
 import { skillsFor } from './workflow-store.ts';
 import { renderedFlags, rendersAgent, unrendered } from './rendering.ts';
-import { momentumOf, toAdmit } from './admission.ts';
-import { addRuntime, aside, countRested, metered, within, type Tallies } from './tally.ts';
-import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
+import { momentumOf, toAdmit } from './cap/cap.ts';
+import { addRuntime, aside, countRested, metered, within, type Tallies } from './meter/tally.store.ts';
+import { passCost, type HarnessCost, type PassCost, type Phase } from './meter/meter.ts';
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
@@ -1250,8 +1250,8 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
- * Metered as it goes (`tally.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a test
- * that meters its own — is counted as part of that one and carries no cost of its own.
+ * Metered as it goes (`tally.store.ts`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a
+ * test that meters its own — is counted as part of that one and carries no cost of its own.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
  * before every pass, which answers every run afresh. `verifyRest` judges every run the memo answers again as a full pass would, and throws

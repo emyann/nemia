@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import { denialText, type Engine, type TaskView } from './runtime-client.ts';
-import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
+import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check/check.ts';
 import type { Consumed } from './radius.ts';
 import type { Workflow } from './workflow.ts';
 import {
@@ -23,8 +23,8 @@ import {
   type StepRecord,
   type TaskPhase,
 } from './run.ts';
-import { parseCloseout, type Closeout } from './closeout.ts';
-import { signedAndHeld, taskUsage } from './timeline.ts';
+import { parseCloseout, type Closeout } from './closeout/closeout.ts';
+import { signedAndHeld, taskUsage } from './timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
 import { continuesFrom } from './retry.ts';

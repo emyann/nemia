@@ -37,9 +37,9 @@ import {
   type ToDecide,
   type Wait,
 } from './run.ts';
-import { parseCloseout, type Closeout } from './closeout.ts';
+import { parseCloseout, type Closeout } from './closeout/closeout.ts';
 import { answerOf, type Retry } from './retry.ts';
-import { timeline, type Timeline } from './timeline.ts';
+import { timeline, type Timeline } from './timeline/timeline.ts';
 import { readAnswers, readAsks, readRun, stepsOf } from './store.ts';
 import { branchReader, shippedOf, standingsOf, type BranchReader } from './branches.ts';
 import {

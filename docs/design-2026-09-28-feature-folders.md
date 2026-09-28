@@ -18,15 +18,21 @@ complexity limits come on in oxlint as a ratchet: new code meets them, and today
 2. **Tests live beside the code**, in the feature's folder (`src/retry/retry.test.ts` next to `src/retry/retry.ts`).
 3. A feature folder holds a few small files **split by kind first** (pure, store, controller), with a face other features import from. The
    owner's guide is two to six files a folder, each within the limits.
-4. The limits: lines per file, lines per function, cyclomatic complexity, and **cognitive complexity at 15 per function**
-   (`sonarjs/cognitive-complexity`, through oxlint's `jsPlugins`, with `eslint-plugin-sonarjs` as a dev dependency). No Halstead.
+4. The limits: lines per function (80), cyclomatic complexity (20) and **cognitive complexity at 15 per function**
+   (`sonarjs/cognitive-complexity`, through oxlint's `jsPlugins`, with `eslint-plugin-sonarjs` as a dev dependency) shape the code. Lines
+   per file are held at **500 code lines, a ceiling against giant files, never a target**. No Halstead.
 5. **Against fragmentation.** An agent reads by grep and in chunks, so a decision split across many files costs it more than one long file.
    These rules follow:
    - a decision's steps stay in one file;
    - a helper used once sits beside its caller;
    - a split follows the feature (rules, store, verb), never a generic `utils` module;
-   - a file is about 500 lines, so one read takes it whole.
+   - a file of up to 500 code lines is never split for size, so one read takes a decision whole.
 6. **Each restructure's closeout compares the tokens its agents read per step** with a similar card from before, using the runs' own meter.
+7. **File names follow the feature**: a folder's pure file is named after it (`say/say.ts`), and stores and verbs carry a suffix
+   (`retry/retry.verb.ts`, `record/record.store.ts`).
+8. **A folder's `index.ts` re-exports its pure files only**; stores and verbs are imported by their own path.
+9. **About 39 folders in the orchestrator**, small features included, and the client rule of `boundary.test.ts` **read through
+   imports** (see "The kinds, by path").
 
 ## What was measured
 
@@ -43,18 +49,28 @@ The scope is `src` and `bin` of the runtime, the orchestrator and the api, plus 
 | cyclomatic complexity | 3 | 10 | 16 | 25 |
 | cognitive complexity (1,206 functions above 1) | 4 | 16 | 22 | 42 |
 
-**File density.** Among files of 150 code lines or more, raw lines per code line are 1.17 (p25), 1.38 (p50) and 1.54 (p75). So 300 code
-lines is about 415 lines on screen, and 350 code lines is 480 to 540.
+**File density.** Among files of 150 code lines or more, raw lines per code line are 1.17 (p25), 1.38 (p50) and 1.54 (p75). So 500 code
+lines is about 690 lines on screen (585 to 770).
 
 Offenders at the thresholds chosen below:
 
-| package | files over 350 code lines | functions over 80 lines | cyclomatic over 20 | cognitive over 15 |
+| package | files over 500 code lines | functions over 80 lines | cyclomatic over 20 | cognitive over 15 |
 |---|---|---|---|---|
-| runtime | 7 | 12 | 21 | 27 |
-| orchestrator | 9 | 18 | 39 | 64 |
-| api | 6 | 4 | 10 | 17 |
-| web | 8 | 31 | 17 | 15 |
-| **total** | **30** | **65** | **87** | **123** |
+| runtime | 3 | 12 | 21 | 27 |
+| orchestrator | 5 | 18 | 39 | 64 |
+| api | 2 | 4 | 10 | 17 |
+| web | 2 | 31 | 17 | 15 |
+| **total** | **12** | **65** | **87** | **123** |
+
+The twelve files over 500 code lines:
+
+- orchestrator: `run.ts` 3,618, `workflow.ts` 1,987, `cli.ts` 1,531, `tick.ts` 1,189, `authoring.ts` 519;
+- runtime: `a2a-remote.ts` 620, `facade.ts` 578, `engine.ts` 520;
+- api: `agents.ts` 549, `builder.ts` 521;
+- web: `Decide.tsx` 753, and the vendored `components/ui/sidebar.tsx` 556.
+
+The owner counted 20 files over 500. The same scope read other ways gives 32 on raw lines, 24 with only blank lines skipped, and 16
+with only comments skipped. 12 is the count the rule makes as it will run, with both skipped.
 
 **Cognitive complexity.** This count is 123 over 15 and 60 over 22. The owner measured 131 over 15, most likely over a wider tree than
 `src` and `bin`. The 60 over 22 and the worst functions agree:
@@ -65,7 +81,9 @@ Offenders at the thresholds chosen below:
 - `retryRefusal`: 83
 - the `decision` step of `list`: 70
 
-84 files carry at least one offence: runtime 18, orchestrator 21, api 13, web 32.
+84 files carry at least one offence: runtime 18, orchestrator 21, api 13, web 32. One of the web's is the vendored `sidebar.tsx`, which
+has an override of its own (see "Not limited"). That leaves 83 files for the baseline, 31 of them the web's. At 500 the union is the same
+as it was at 350: every file between 350 and 500 code lines also has a function over one of the three function limits.
 
 The worst in every measure are the same few:
 
@@ -85,10 +103,15 @@ Every size rule skips blank lines and comments, so JSDoc is never a reason to sp
 
 | rule | threshold | why this number |
 |---|---|---|
-| `max-lines` (per file) | **350** code lines | About 500 lines on screen at this code's density (see "File density"): one read takes a file whole. 300 (ESLint's default) would be about 415, and would cut files the anti-fragmentation rule wants kept. 30 files on the baseline. |
+| `max-lines` (per file) | **500** code lines | The owner's number: a ceiling against giant files, never a target. It is about 690 lines on screen at this code's density (see "File density"). 11 files on the baseline, and the vendored `sidebar.tsx` in its own override. |
 | `max-lines-per-function` | **80** code lines | One screen at 140 columns; p98 is 92. At 50, 150 functions would offend, most of them web components whose JSX is one render. 65 on the baseline. |
 | `complexity` (cyclomatic) | **20** | ESLint's default; p95 is 16. It counts paths, so it says how many tests a function needs. 87 on the baseline. |
 | `sonarjs/cognitive-complexity` | **15** | The owner's number and Sonar's default; p90 is 16. It weighs nesting, which cyclomatic does not, so it catches the nested `if` in a loop in a `case` that makes `main` unreadable. 123 on the baseline. |
+
+**The function rules shape the code; the file rule only stops a giant.** Lines per function (80), cyclomatic (20) and cognitive (15)
+are the rules that make code readable, and they are what a card works to. A file under 500 code lines is never split for its size, and
+the file limit must not push a cohesive decision apart: a decision's steps stay in one file, even a long one. Below 500, a file splits only
+where the kinds part (pure, store, verb) or where a feature's own sections already break.
 
 **Cyclomatic and cognitive both stay.** They disagree where it matters. A flat `switch` of 30 verbs is 30 cyclomatic and about 1 cognitive
 (`KeyInput`, 51 cyclomatic). A 12-line triple-nested loop is low cyclomatic and high cognitive.
@@ -104,7 +127,8 @@ Every size rule skips blank lines and comments, so JSDoc is never a reason to sp
 ### The ratchet
 
 **In `.oxlintrc.json`.** The four rules are on at the thresholds above for every file. After them, one override block per baselined file
-sets that file's **own ceiling**: its measure today, rule by rule, and nothing higher. For example:
+sets that file's **own ceiling**: its measure today, rule by rule, and nothing higher. A rule the file does not break is left at its
+threshold. For example:
 
 ```jsonc
 {
@@ -128,7 +152,7 @@ spawns oxlint over the baselined files with the four rules at their thresholds a
 
 - **A ceiling above the measure.** When a file or its worst function shrinks, its ceiling must come down in the same commit.
 - **More offenders in a file than its record allows.** A ceiling holds only the worst function, so without this a second function could
-  grow up to it unseen. The record is a map in the test: file → offenders per rule, 84 entries on the first day.
+  grow up to it unseen. The record is a map in the test: file → offenders per rule, 83 entries on the first day.
 - **An override for a file the record does not know.** A new file never joins the list.
 - **A record entry with no override**, and **a file with no offender left**: that entry must come off.
 
@@ -154,9 +178,10 @@ feed, the workflow format, the tick, the CLI. Its folder holds everything that t
 
 The runtime and the api have no kinds test today and do not get one. Their files take plain names; their rules are by folder (below).
 
-**Within a kind, split only past the limit, and only along the feature's own sections.** A feature under 350 code lines of pure code has
-one pure file, named after its folder (`say/say.ts`). A larger one splits where its sections already break: rules and their sentences
-(`retry/retry.ts`, `retry/retry-words.ts`). It never splits into a `utils.ts`, `helpers.ts`, `common.ts`, `shared.ts` or `misc.ts`, and a
+**Within a kind, split only past the limit, and only along the feature's own sections.** A feature under 500 code lines of pure code has
+one pure file, named after its folder (`say/say.ts`). A larger one splits where its sections already break: the brief and its sections
+(`brief/brief.ts`, `brief/brief-sections.ts`), the key readers and the tool rules (`keys/keys.ts`, `keys/tools.ts`). A file that is
+already its own file today, and whose feature would pass 500 with it, stays apart (`retry/retry-ask.ts`). It never splits into a `utils.ts`, `helpers.ts`, `common.ts`, `shared.ts` or `misc.ts`, and a
 test refuses those names. A helper used once moves with its caller. A decision — `retryRefusal`, `decide`, one phase of the tick — stays in
 one file with its steps, even at 300 lines. When its function passes 80 lines, it becomes a short sequence of named steps **in the same
 file**.
@@ -220,26 +245,26 @@ Pure layering, leaf first. "code" is today's code lines moving in, from the decl
 
 | folder | files | from today |
 |---|---|---|
-| `record/` | `record.ts`, `record.store.ts`, `asks.store.ts`, `places.store.ts`, `index.ts` | the record's shape (`run.ts` 1–479 without `assess`; `StepRecord`, `Landed`, `refusedCheck`, `TRIED_FROM`, `SETTLED`, task ids; the shared words): ~130 code. `store.ts`'s run folder and record → `record.store.ts`. A person's files — asks, approvals, acceptances, holds, the cancel and prune marks — → `asks.store.ts`. `places.ts` → `places.store.ts`. |
-| `status/` | `status.ts`, `spend.ts`, `index.ts` | the step's status and the facts it reads: gate facts, loop facts, landing facts, `held`, `standing`, `ownStatus`, `stepStatus` (~230). Spend (`run.ts` 1825–2064) and `radius.ts`'s usage words (`Consumed`, `sumUsage`, `dollars`, `durationWord`, `usedLines`, …) → `spend.ts`. |
+| `record/` | `record.ts`, `record.store.ts`, `places.store.ts` | the record's shape (`run.ts` 1–479 without `assess`; `StepRecord`, `Landed`, `refusedCheck`, `TRIED_FROM`, `SETTLED`, task ids; the shared words): ~130 code. `store.ts` without its agent and inbox parts (~430 code: the run folder, the record, and a person's files — asks, approvals, acceptances, holds, the cancel and prune marks) → `record.store.ts`. `places.ts` → `places.store.ts`, the bottom of the store tree. |
+| `status/` | `status.ts` | the step's status and the facts it reads: gate facts, loop facts, landing facts, `held`, `standing`, `ownStatus`, `stepStatus`; spend (`run.ts` 1825–2064); `radius.ts`'s usage words (`Consumed`, `sumUsage`, `dollars`, `durationWord`, `usedLines`, …): ~305 + 106 = ~410 code, one file |
 | `wait/` | `wait.ts`, `wait.verb.ts` | `run.ts` 1175–1211 and 1322–1573 (waits, holds, their advice and refusals); `verbs.ts`'s `hold`, `unhold` |
 | `artifacts/` | `artifacts.ts`, `artifacts.store.ts` | `run.ts` 4187–4344; `artifacts.ts` |
 | `prune/` | `prune.ts`, `prune.verb.ts` | `run.ts` 3922–4132; `forget.ts`'s `prune` |
 | `ending/` | `ending.ts`, `ending.verb.ts` | `run.ts` 803–1175 (landing, one checkout, `toDecide`, `gateRefusal`) without the facts that went to `status/`; `tick.ts`'s `landEnding`, `checkoutHold`, `mainClaim` |
 | `gate/` | `gate.ts`, `gate.verb.ts` | `run.ts` 479–803's refusals (`approvalRefusal`, `approvalWordsRefusal`, `holdsOpen`); `verbs.ts`'s `approve` |
 | `round/` | `round.ts`, `round.verb.ts` | `run.ts` 2817–3347 without the loop facts (`roundsDue`, `roundAsk`, `acceptAsk`, notes, `roundLines`: ~310); `verbs.ts`'s `round`, `accept` |
-| `retry/` | `retry.ts`, `retry-words.ts`, `retry-ask.ts`, `retry.verb.ts`, `index.ts` | `run.ts` 2064–2761: `retryable`, `retriesDue`, `retryRefusal` → `retry.ts` (~310); `tryNote`, `retryLines`, `deniedOffer`, `answerLines` → `retry-words.ts`; today's `retry.ts` → `retry-ask.ts`; `verbs.ts`'s `retry` |
-| `tick/` | `assess.ts`, `tick.verb.ts`, `advance.verb.ts`, `file-tries.verb.ts`, `file-steps.verb.ts`, `rest.verb.ts` | `run.ts`'s `assess`; `tick.ts` (see below) |
-| `cap/` | `cap.ts`, `pool.ts`, `index.ts` | `run.ts` 1211–1320, `heldCheckouts`, `inFlight`; `admission.ts` → `pool.ts` |
-| `branches/` | `tips.ts`, `radius.ts`, `branches.store.ts`, `index.ts` | `run.ts` 1574–1670; `radius.ts` without the usage words; `branches.ts` and `tick.ts`'s `resultTips` (it reads refs from git and takes no engine: a store, beside `refsOf`) → `branches.store.ts` |
-| `workspace/` | `workspace.ts`, `deps.ts`, `worktree.store.ts`, `deps.store.ts`, `index.ts` | `run.ts` 5979–end plus `handOffDue`, `downstreamOf`; `deps.ts`; `worktree.ts`, its dependency provisioning (`provisionDeps`, `lockfileParts`) → `deps.store.ts` |
+| `retry/` | `retry.ts`, `retry-ask.ts`, `retry.verb.ts`, `index.ts` | `run.ts` 2064–2761 (`retryable`, `retriesDue`, `retryRefusal` and their words `tryNote`, `retryLines`, `deniedOffer`, `answerLines`: ~470 code) → `retry.ts`; today's `retry.ts` (85) → `retry-ask.ts`, since together they pass 500; `verbs.ts`'s `retry` |
+| `tick/` | `assess.ts`, `tick.verb.ts`, `advance.verb.ts`, `file.verb.ts` | `run.ts`'s `assess`; `tick.ts` (see below) |
+| `cap/` | `cap.ts` | `run.ts` 1211–1320, `heldCheckouts`, `inFlight` (84 code); `admission.ts` (58) |
+| `branches/` | `branches.ts`, `branches.store.ts` | `run.ts` 1574–1670 (result tips, 31 code) and `radius.ts` without the usage words (~220) → `branches.ts`; `branches.ts` and `tick.ts`'s `resultTips` (it reads refs from git and takes no engine: a store, beside `refsOf`) → `branches.store.ts` |
+| `workspace/` | `workspace.ts`, `worktree.store.ts` | `run.ts` 5979–end plus `handOffDue`, `downstreamOf` (63 code) and `deps.ts` (140) → `workspace.ts`; `worktree.ts` whole (352) → `worktree.store.ts` |
 | `say/` | `say.ts`, `say.verb.ts` | `run.ts` 2761–2817; `verbs.ts`'s `say`, `strayAsk` |
 | `cancel/` | `cancel.ts`, `cancel.verb.ts` | `run.ts` 3347–3442 (`cancelPlan`); `verbs.ts`'s `cancel` |
 | `list/` | `list.ts`, `list.verb.ts` | `run.ts` 4572–4980 (`wf ls`'s words); `decide.ts`'s `list` |
 | `forget/` | `forget.ts`, `forget.verb.ts` | `run.ts` 3442–3922 (~335); `forget.ts`'s `forget` |
 | `start/` | `inputs.ts`, `start.verb.ts` | `run.ts` 4132–4187 (files a person gave); `start.ts`'s `start`, `placesOf` |
 | `decide/` | `decide.ts`, `decide.verb.ts` | `run.ts` 4344–4572 (`decision`); `decide.ts`'s `decide` |
-| `feed/` | `feed-words.ts`, `feed.ts`, `feed.store.ts`, `index.ts` | `run.ts` 4980–5114; `feed.ts`; `feed-store.ts` |
+| `feed/` | `feed.ts`, `feed.store.ts` | `run.ts` 4980–5114 (52 code) and `feed.ts` (40) → `feed.ts`; `feed-store.ts` → `feed.store.ts` |
 | `brief/` | `brief.ts`, `brief-sections.ts`, `index.ts` | `run.ts` 5114–5979 (~614 code): `composeBrief`, `remoteBrief`, the from-run sections → `brief.ts`; the retry, said, round, loop, replies, approved and accepted sections and `gateLines` → `brief-sections.ts` |
 | `timeline/` | `timeline.ts` | `timeline.ts` |
 | `check/` | `check.ts` | `check.ts` (its one path, `checkStderr`, stays in `record.store.ts` with the run folder's layout) |
@@ -250,7 +275,7 @@ Pure layering, leaf first. "code" is today's code lines moving in, from the decl
 | `former/` | `former.ts` | `workflow.ts` 897–1015, 2658–2721, 2926–3040 (former names, in text and on records) |
 | `workflow/` | `step-file.ts`, `validate.ts`, `index.ts` | `workflow.ts` 531–897 (parse and render of one step file) → `step-file.ts`; 2737–3160 (validation, order, loops, graph) → `validate.ts` |
 | `folder/` | `folder.ts`, `folder.store.ts` | `workflow.ts` 2115–2203 and 2721–2737 (a folder of markdown is a workflow); `workflow-store.ts`'s roots and loading; `authoring.ts`'s `writeWorkflow` |
-| `agents/` | `agents.ts`, `spawn.ts`, `agents.store.ts`, `agents-write.store.ts`, `index.ts` | `workflow.ts` 2203–2658; `rendering.ts` → `spawn.ts`; `workflow-store.ts`'s `loadAgents`, `agentUsers`, `agentVersion`; `store.ts`'s `agentFilesDir`, `writeAgentFiles`, `skillsAgain`; `authoring.ts`'s agent half |
+| `agents/` | `agents.ts`, `agents.store.ts` | `workflow.ts` 2203–2658 (253 code) and `rendering.ts` (78) → `agents.ts`; `workflow-store.ts`'s `agentsFor`, `loadAgents`, `agentUsers`, `agentVersion`, `store.ts`'s `agentFilesDir`, `writeAgentFiles`, `skillsAgain` and `authoring.ts`'s agent half (~415 code together) → `agents.store.ts` |
 | `skills/` | `skills.ts`, `skills.store.ts` | `workflow.ts` 1749–2046; `workflow-store.ts`'s skill reads; `authoring.ts`'s `copySkill`, `writeSkill` |
 | `inbox/` | `inbox.ts`, `inbox.store.ts`, `inbox.verb.ts` | `inbox.ts` (319 code, kept whole); `inbox-store.ts`, `inboxDir`; `start.ts`'s `startFromInbox`, `startQueued` (they start a run through `start/start.verb.ts`) |
 | `plan/` | `plan.ts`, `plan.store.ts`, `plan.verb.ts` | `plan.ts`; `start.ts`'s `readPlan` (a folder read, no engine) → `plan.store.ts`; `startPlan` (it starts each card through `start/start.verb.ts`) → `plan.verb.ts` |
@@ -265,9 +290,9 @@ Every file of today, where it goes:
 | today | goes to |
 |---|---|
 | `a2a-agents.ts` | `harness/a2a.store.ts` |
-| `admission.ts` | `cap/pool.ts` |
+| `admission.ts` | `cap/cap.ts` |
 | `artifacts.ts` | `artifacts/artifacts.store.ts` |
-| `authoring.ts` | `folder/folder.store.ts`, `agents/agents-write.store.ts`, `agents/agents.store.ts` (places, list, find), `skills/skills.store.ts` |
+| `authoring.ts` | `folder/folder.store.ts`, `agents/agents.store.ts`, `skills/skills.store.ts` |
 | `branches.ts` | `branches/branches.store.ts` |
 | `check.ts` | `check/check.ts` |
 | `cli.ts` | `cli/` |
@@ -275,7 +300,7 @@ Every file of today, where it goes:
 | `daemon.ts` | `daemon/daemon.ts` |
 | `daemon-store.ts` | `daemon/daemon.store.ts` |
 | `decide.ts` | `list/list.verb.ts`, `decide/decide.verb.ts` |
-| `deps.ts` | `workspace/deps.ts` |
+| `deps.ts` | `workspace/workspace.ts` |
 | `feed.ts` | `feed/feed.ts` |
 | `feed-store.ts` | `feed/feed.store.ts` |
 | `forget.ts` | `forget/forget.verb.ts`, `prune/prune.verb.ts` |
@@ -284,15 +309,15 @@ Every file of today, where it goes:
 | `meter.ts` | `meter/meter.ts` |
 | `places.ts` | `record/places.store.ts` |
 | `plan.ts` | `plan/plan.ts` |
-| `radius.ts` | `branches/radius.ts`, `status/spend.ts` (the usage words) |
-| `rendering.ts` | `agents/spawn.ts` |
+| `radius.ts` | `branches/branches.ts`, `status/status.ts` (the usage words) |
+| `rendering.ts` | `agents/agents.ts` |
 | `rest.ts` | `rest/rest.ts` |
 | `retry.ts` | `retry/retry-ask.ts` |
 | `run.ts` | the folders above; `src/run.ts` stays as the barrel |
 | `runner.ts` | stays |
 | `runtime-client.ts` | stays |
 | `start.ts` | `start/start.verb.ts`, `plan/plan.store.ts`, `plan/plan.verb.ts`, `inbox/inbox.verb.ts` |
-| `store.ts` | `record/record.store.ts`, `record/asks.store.ts`, `agents/agents.store.ts`, `inbox/inbox.store.ts` |
+| `store.ts` | `record/record.store.ts`, `agents/agents.store.ts`, `inbox/inbox.store.ts` |
 | `tally.ts` | `meter/tally.store.ts` |
 | `tick.ts` | `tick/`, `ending/ending.verb.ts`, `branches/branches.store.ts`, `meter/meter.verb.ts` |
 | `timeline.ts` | `timeline/timeline.ts` |
@@ -300,7 +325,7 @@ Every file of today, where it goes:
 | `views.ts` | `views/` |
 | `workflow.ts` | the folders above; `src/workflow.ts` stays as the barrel |
 | `workflow-store.ts` | `folder/folder.store.ts`, `agents/agents.store.ts`, `skills/skills.store.ts` |
-| `worktree.ts` | `workspace/worktree.store.ts`, `workspace/deps.store.ts` |
+| `worktree.ts` | `workspace/worktree.store.ts` |
 
 ### `run.ts`, section by section
 
@@ -313,10 +338,10 @@ Every file of today, where it goes:
 | 1175–1211 | waiting on a run | `wait/wait.ts` |
 | 1211–1320 | a cap on runs in flight | `cap/cap.ts` |
 | 1322–1573 | (same marker) waits and holds | `wait/wait.ts` |
-| 1574–1670 | (same marker) result tips | `branches/tips.ts` |
+| 1574–1670 | (same marker) result tips | `branches/branches.ts` |
 | 1670–1825 | (same marker) step status | `status/status.ts`; `TRIED_FROM`, `SETTLED` → `record/record.ts` |
-| 1825–2064 | what a step may spend | `status/spend.ts`; `checkTaskId`, `stepTaskId`, `namesInOrder` → `record/record.ts`; `handOffDue`, `downstreamOf` → `workspace/workspace.ts` |
-| 2064–2761 | trying again | `StepRecord`, `Landed`, `refusedCheck` → `record/record.ts`; the rest → `retry/retry.ts`, `retry/retry-words.ts` |
+| 1825–2064 | what a step may spend | `status/status.ts`; `checkTaskId`, `stepTaskId`, `namesInOrder` → `record/record.ts`; `handOffDue`, `downstreamOf` → `workspace/workspace.ts` |
+| 2064–2761 | trying again | `StepRecord`, `Landed`, `refusedCheck` → `record/record.ts`; the rest → `retry/retry.ts` |
 | 2761–2817 | saying something | `say/say.ts` |
 | 2817–3347 | going round again | the loop facts (`capOf`, `roundOf`, `roundIn`, `loopOf`, `owedFields`, `owesReplies`, `askingTry`, `roundSpans`, `roundWord`) → `status/status.ts`; the rest → `round/round.ts` |
 | 3347–3442 | calling one off | `inFlight` → `cap/cap.ts`; `cancelPlan` → `cancel/cancel.ts` |
@@ -326,7 +351,7 @@ Every file of today, where it goes:
 | 4187–4344 | files for the steps after | `artifacts/artifacts.ts` |
 | 4344–4572 | handing it back | `decide/decide.ts` |
 | 4572–4980 | what `wf ls` says | `list/list.ts`; `oneLine`, `DENIED_SHOWN`, `DENIED_CAP` → `record/record.ts` |
-| 4980–5114 | what the feed says | `feed/feed-words.ts` |
+| 4980–5114 | what the feed says | `feed/feed.ts` |
 | 5114–5979 | (same marker) the brief | `brief/brief.ts`, `brief/brief-sections.ts`; `fenced`, `dataBlock` → `record/record.ts` |
 | 5979–6062 | where a step works | `workspace/workspace.ts` |
 
@@ -387,8 +412,9 @@ seventh file: `main.ts` is then about 290 code lines, and the folder keeps to si
 
 `advanceRun` (428–1090, 463 lines, cognitive 197) is one pass over one run: read, decide, act. It becomes a short sequence of named
 phases in `advance.verb.ts`, so the order of a pass reads in one place. The four filing phases are each a decision of their own ("file a
-retry?", "file this step?"), so they go to two files with their steps kept together. That keeps "a decision's steps stay in one file" true
-at the level of each decision.
+retry?", "file this step?"), and together they are `file.verb.ts` (~380 code), each with its steps whole. What is left of the tick
+(~200 code: the pass over live runs and runs at rest, the slots) is `tick.verb.ts`. `tick.ts` is 1,189 code lines today, so the tick
+passes 500 in any one file; it splits along these three sections and no further.
 
 | lines | what | goes to |
 |---|---|---|
@@ -396,15 +422,15 @@ at the level of each decision.
 | 162–301 | `adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps` (the read phase) | `tick/advance.verb.ts` |
 | 301–428 | `Advanced`, `advance`; `checkoutHold`, `mainClaim` | `advance` → `tick/advance.verb.ts`; `checkoutHold`, `mainClaim` → `ending/ending.verb.ts` |
 | 433–594 | `advanceRun`: read, cancelled, hand-off and artifacts, landing, checkout hold, hold lift, `assess`, waiting tasks closed, parents and admission, feed words | `tick/advance.verb.ts`, one named phase each |
-| 595–867 | retries filed, rounds filed | `tick/file-tries.verb.ts` |
-| 868–1017 | checks filed, ready roots filed with their parents' closeouts | `tick/file-steps.verb.ts` |
+| 595–867 | retries filed, rounds filed | `tick/file.verb.ts` |
+| 868–1017 | checks filed, ready roots filed with their parents' closeouts | `tick/file.verb.ts` |
 | 1018–1090 | slot held first, tips, record written, rest facts | `tick/advance.verb.ts` |
 | 1090–1300 | `handOffOwed`, `closeHeld`, `closeWaitingTasks`, `answerHeld` | `tick/advance.verb.ts` |
 | | `resultTips` | `branches/branches.store.ts` |
 | | `landEnding` | `ending/ending.verb.ts` |
-| | `localFields`, `toldOf`, `parentCloseouts` | `tick/file-steps.verb.ts` |
+| | `localFields`, `toldOf`, `parentCloseouts` | `tick/file.verb.ts` |
 | 1300–1430 | `Pass`, `refusalLines`, `tick`, `pass`; `runSlots` (1671) | `tick/tick.verb.ts` |
-| 1430–1568 | runs at rest: `RestMemo`, `restingPass`, `advanceResting` | `tick/rest.verb.ts` |
+| 1430–1568 | runs at rest: `RestMemo`, `restingPass`, `advanceResting` | `tick/tick.verb.ts` |
 | 1568–1671 | what the pass cost: `ENGINE_PHASES`, `ioOf`, `engineCall`, `meteredEngine`, `costOf` | `meter/meter.verb.ts` |
 
 ### The kinds, by path
@@ -425,8 +451,7 @@ single files today (`CLI_REACHES`, and every controller importing the client) re
 
   Any other file at the root of `src`, or any `.ts` it cannot place, is of no kind and fails `unsorted` as today.
 - **`STORE_BOTTOM` becomes** `record/places.store.ts`, `folder/folder.store.ts`, `meter/tally.store.ts`. **`STORE_SHARED`:**
-  `record/record.store.ts` and `record/asks.store.ts` may import only the bottom and each other; `workspace/worktree.store.ts` only the
-  record's stores, the places and the tally.
+  `record/record.store.ts` may import only the bottom; `workspace/worktree.store.ts` only the record's store, the places and the tally.
 - **A controller reaches the client through controllers.** Today `clientBreaks` refuses any controller beneath the CLI that does not
   import `runtime-client.ts` itself. Every `*.verb.ts` in the map above does, because each takes an `Engine`, whose type comes from the
   client, with two exceptions that start a run by calling `start`: `plan/plan.verb.ts` and `inbox/inbox.verb.ts`, both importing
@@ -439,9 +464,9 @@ single files today (`CLI_REACHES`, and every controller importing the client) re
     named `x.verb.ts` to escape the store tree. Its plant is `plan/plan.verb.ts` with its import of `start/start.verb.ts` taken out, which
     must be refused.
 
-  The alternative that keeps the rule word for word puts the three starters back in one file with `start` (about 365 code lines today,
-  over the limit on day one) or gives each verb an import of the client it does not use; both are worse than the rule read through
-  controllers.
+  The alternative that keeps the rule word for word puts the plan's and the inbox's starters in `start/` with `start`, or gives each
+  verb an import of the client it does not use. The first takes a verb out of the feature a person asks for by name (`wf plan`,
+  `wf inbox`); the second is an import that says something false. The owner approved the rule read through imports on 2026-09-28.
 - **Each rule's REFUSED plant is rewritten at a new path** and still makes its rule refuse. The test's own checks on its plants stay.
 - **Two rules join it:**
   - a pure file outside a folder imports that folder's pure code only through its face;
@@ -457,7 +482,7 @@ root.
 | `src/facade.ts` | stays, entry `agent-runtime`: a barrel of today's names, and its "vocabulary" section (932–951) |
 | `src/index.ts` | stays, entry `agent-runtime/effect`; its paths change |
 | `core/session.ts` | `domain.ts` 47–130: `SESSION_STATES`, `isLive`, `endOf`, `phaseWordOf`, `formerStateOf`, `Outcome`. **This breaks the `domain` ↔ `lifecycle` cycle**: both import `session.ts`, and `lifecycle.ts` no longer imports `domain.ts`. |
-| `core/domain.ts` | the rest of `domain.ts`, and `nameParts` from `a2a-map.ts` (the inverse of `nameFor`, which is here: it reads a session name, and the Claude driver and the A2A map both use it): sightings, the journal's events and `fold`, a task held open, the decision (`decide`, `observe`, `lifecycleOf`). It stays **the whole judgement** in one file, as the root `CLAUDE.md` says: ~330 code lines, under the limit once the states move out. |
+| `core/domain.ts` | the rest of `domain.ts`, and `nameParts` from `a2a-map.ts` (the inverse of `nameFor`, which is here: it reads a session name, and the Claude driver and the A2A map both use it): sightings, the journal's events and `fold`, a task held open, the decision (`decide`, `observe`, `lifecycleOf`). It stays **the whole judgement** in one file, as the root `CLAUDE.md` says (~330 code lines). The states move out to break the cycle, not for size. |
 | `core/lifecycle.ts` | `lifecycle.ts` |
 | `core/index.ts` | the core's face |
 | `core/engine/filing.ts` | `engine.ts` 83–342: filing, admitting, answering, closing, and their refusals |
@@ -475,18 +500,16 @@ root.
 | `harness/claude/bg.ts` | `runner.ts` 226–770 (`claudeOps`: `claude --bg`) |
 | `harness/claude/code.ts` | `runner-claude-code.ts` and `runner-claude-detached.ts` (the `-p` spec it composes) |
 | `harness/claude/inbox.ts` | `runner-claude-inbox.ts` |
-| `harness/claude/transcript.ts` | `runner-claude-transcript.ts` (372 code: baseline) |
+| `harness/claude/transcript.ts` | `runner-claude-transcript.ts` (372 code, under the file limit; on the baseline for its functions: two over 80 lines, cognitive up to 70) |
 | `harness/claude/vocabulary.ts` | `runner-claude-vocabulary.ts` |
 | `harness/claude/index.ts` | the face |
 | `harness/codex/codex.ts`, `harness/codex/transcript.ts` | `runner-codex.ts`, `runner-codex-transcript.ts` |
 | `harness/detached/detached.ts`, `harness/detached/output.ts` | `runner-detached.ts`, `runner-detached-output.ts` |
 | `a2a/client.ts`, `a2a/handler.ts`, `a2a/map.ts`, `a2a/remote.ts`, `a2a/index.ts` | `a2a-client.ts`, `a2a-handler.ts`, `a2a-map.ts`, `a2a-remote.ts` (620 code: baseline; its split card cuts the card and config refusals, 77–343, from `remoteOps`) |
-| `facade/consumer.ts` | `facade.ts` 63–352: what a consumer implements |
-| `facade/adapters.ts` | `facade.ts` 352–512: the adapters and what the door refuses |
-| `facade/engine.ts` | `facade.ts` 512–932: `createEngine` (330-line function: baseline, split into named steps in the same file) |
+| `facade/consumer.ts` | `facade.ts` 63–512: what a consumer implements, the adapters and what the door refuses |
+| `facade/engine.ts` | `facade.ts` 512–932: `createEngine` (330-line function: on the baseline, split into named steps in the same file). `facade.ts` is 578 code lines, so it splits once, between what a consumer writes and the engine it gets. |
 | `facade/promise.ts` | `runner-promise.ts`: a harness a consumer writes in Promises is a door concern |
-| `cli/brief.ts` | `cli.ts`'s `BRIEF_KEYS`, `parseBrief` |
-| `cli/main.ts` | `cli.ts`'s `main` and its line formatters; imports `cli/brief.ts`; `bin/ae.ts` imports it |
+| `cli/main.ts` | `cli.ts` whole (425 code, under the file limit): `BRIEF_KEYS`, `parseBrief`, `main` and its line formatters. `parseBrief` (118 lines) and `main` become named steps in the same file. `bin/ae.ts` imports it. |
 
 `facade/` has no `index.ts`: `src/facade.ts` is its face.
 
@@ -508,15 +531,15 @@ core, before the harness moves, and both callers import it from the core's face.
 | folder | files | from today |
 |---|---|---|
 | `runs/` | `runs.ts`, `judged.ts`, `resting.ts`, `graph.ts`, `index.ts` | the runs list and its memo |
-| `detail/` | `detail.ts`, `tries.ts`, `usage.ts`, `index.ts` | one run's page (`detail.ts` 470 code: baseline) |
+| `detail/` | `detail.ts`, `tries.ts`, `usage.ts`, `index.ts` | one run's page (`detail.ts` 470 code, under the file limit; on the baseline for one function's length and complexity) |
 | `steps/` | `steps.ts`, `logs.ts`, `artifacts.ts`, `index.ts` | a step's transcript, logs, files |
 | `decide/` | `decision.ts`, `merge.ts`, `index.ts` | what is on a person to decide |
 | `asks/` | `asks.ts` | retry, approve, round, accept, say |
 | `inbox/` | `inbox.ts` | the inbox and its queue |
 | `factory/` | `ceilings.ts`, `daemon.ts`, `feed.ts`, `quota.ts`, `index.ts` | the floor's gauges |
 | `capabilities/` | `capabilities.ts`, `reach.ts`, `index.ts` | mounted together at `/api/capabilities` |
-| `workflows/` | `workflows.ts`, `builder.ts`, `index.ts` | both on the baseline |
-| `agents/` | `agents.ts`, `skills.ts`, `try.ts`, `index.ts` | agents, skills, trying an agent (`agents.ts`, `skills.ts` on the baseline) |
+| `workflows/` | `workflows.ts`, `builder.ts`, `index.ts` | `builder.ts` (521 code) is over the file limit; `workflows.ts` (442) is on the baseline for its functions' complexity only |
+| `agents/` | `agents.ts`, `skills.ts`, `try.ts`, `index.ts` | agents, skills, trying an agent. `agents.ts` (549 code) is over the file limit; `skills.ts` (462) is on the baseline for one function's cognitive complexity only |
 
 `app.ts` mounts each folder's routes through its face. `capabilities.ts` builds `HOME_REPO` from its own place
 (`path.resolve(import.meta.dirname, '..', '..', '..')`); one folder deeper, it needs one more `..`, and `skills.ts`'s `SHIPPED_SKILLS` reads
@@ -533,7 +556,7 @@ The web is already foldered, and by its stack's rules rather than by habit:
 Moving to feature folders would fight the router's generator and the shadcn CLI, and buy no boundary: the web has no store or verb kinds
 to keep apart.
 
-What it needs is the limits. 32 of its files are on the baseline, most for long components (`Decide.tsx` 753 code lines, `Floor` 315
+What it needs is the limits. 31 of its files are on the baseline (the vendored `sidebar.tsx` has its own override), most for long components (`Decide.tsx` 753 code lines, `Floor` 315
 lines in one function). A component is cut into its sub-components. Where a page's parts outgrow `components/`, they go into a folder
 named for the page (`components/decide/`). That work is ordinary, card by card, under the same ratchet. The web's tests stay in `test/`,
 where its `tsconfig` and the e2e under their own config expect them.
@@ -728,20 +751,15 @@ The lasting measure is not the restructure's own cost, which is mostly moving fi
 read**: after each package lands, the next three cards touching it are compared the same way with three before it. If an agent reads more
 per step after the split than before, the anti-fragmentation rules are wrong somewhere, and the numbers say where.
 
-## Open for the owner
+## Decided at review (owner, 2026-09-28)
 
-1. **File names.**
-   - This design names a folder's one pure file after the folder (`say/say.ts`) and gives stores and verbs a suffix (`retry.verb.ts`),
-     instead of `rules.ts`, `store.ts`, `verb.ts` in every folder. The reason: grep, stack traces and editor tabs show a file name first,
-     and 39 files called `verb.ts` make each hit a read of its path.
-   - The owner's shape (`rules.ts`, `verb.ts`) works the same with the kinds read from the name.
-2. **The face.**
-   - `index.ts` re-exports only pure files, and stores and verbs are imported by path. A face that re-exported everything would make
-     every pure file that imports it reach the disk, under the boundary test's direct-import reading.
-   - The alternative, a boundary test that resolves each name through the face, costs a module resolver in a test. It was not chosen.
-3. **`max-lines` at 350 code lines** rather than 300, from the owner's "about 500 lines, one read" and the measured density.
-4. **About 39 folders in the orchestrator.** Small features (`say`, `cancel`, `timeline`) are folders of one or two files, because each is
-   a verb a person asks for by name. Merging them into neighbours would save folders, not reads.
-5. **A controller reaches the client through controllers** (see "The kinds, by path"). This is the one rule of `boundary.test.ts` whose
-   reading changes. It is followed through imports so that `plan.verb.ts` and `inbox.verb.ts` can start a run through `start.verb.ts`
-   without importing a client they do not use. Every refusal it makes today is kept.
+The choices this note first left open were settled by the owner on 2026-09-28 and are in "Decided" above:
+
+1. **File names follow the feature** (`say/say.ts`, `retry/retry.verb.ts`), not `rules.ts`, `store.ts` and `verb.ts` in every folder:
+   grep, stack traces and editor tabs show a file name first.
+2. **`index.ts` re-exports pure files only.** A face that re-exported a store would make every pure file that imports it reach the disk,
+   under the boundary test's direct-import reading.
+3. **`max-lines` is 500 code lines**, a ceiling against giant files, never a target. The function rules shape the code.
+4. **About 39 folders in the orchestrator**, small features (`say`, `cancel`, `timeline`) included: each is a verb a person asks for by
+   name.
+5. **The client rule of `boundary.test.ts` is read through imports** (see "The kinds, by path"). Every refusal it makes today is kept.

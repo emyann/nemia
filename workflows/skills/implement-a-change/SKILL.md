@@ -12,3 +12,7 @@ in your commit message rather than stopping to ask.
 If the work changes what a person sees in the web app, run the e2e yourself before you sign off —
 `WF_ARTIFACTS=<the directory under *Files for the steps after you*> npm run e2e` — and read the PNGs it
 writes. Your check builds the web app but runs no e2e: that runs once, on the merged tree, at the ship.
+
+When the change writes code that imports from `effect`, and the repository has an `effect` skill, use it:
+load it with the Skill tool, or read `.claude/skills/effect/SKILL.md`, from the workspace root, with your
+Read tool if it is not loaded for you. It says which version is installed and what that version renamed.

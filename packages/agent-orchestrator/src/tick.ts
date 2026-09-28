@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { refusedText, type ClaudeFlags, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
+import { refusedText, unreadableJournal, type ClaudeFlags, type Engine, type RefusedMove, type TaskView } from './runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from './check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from './workflow.ts';
 import type { QueueStarted } from './inbox.ts';
@@ -1303,7 +1303,9 @@ export type Pass = {
   refused?: RefusedMove[];
   /**
    * Why the runtime left a task out of this pass, or skipped a feed entry, as it said it (`TickReport.unreadable`): a journal holding an
-   * entry no runtime wrote, on every pass while it lasts. Absent when there were none. `wf up` says each once while it lasts.
+   * entry no runtime wrote, on every pass while it lasts. And each run a read of whose tasks rejected so (`unreadableJournal`): it is left
+   * out of `runs` and of the feed, judged on no pass until the journal reads, and counted in flight, while every other run advances; its
+   * line carries the runtime's words, said once. Absent when there were none. `wf up` says each once while it lasts.
    */
   unreadable?: string[];
 };
@@ -1394,28 +1396,48 @@ async function pass(engine: Engine, repo: string, memo: RestMemo, verify: boolea
   const admitting = toAdmit({ views: report.views, momentum: momentumOf(runsWithSteps(runs)), ceiling: ran.sessions });
   if (admitting.length) await e.admit(admitting);
   const done = new Map<string, Advanced>();
+  const unjudged = new Map<string, string>();
+  const judged = async (run: Run, slot?: RunSlot): Promise<Advanced | undefined> => {
+    try {
+      return await advanceResting(e, run, resting, slot);
+    } catch (err) {
+      const why = unreadableJournal(err);
+      if (why === undefined) throw err;
+      unjudged.set(run.id, why);
+      return undefined;
+    }
+  };
   // A finished run is judged as every other is, on every pass — from the memo while nothing it was judged by has changed (`advanceResting`).
-  for (const run of runs.filter(hasStarted)) done.set(run.id, await advanceResting(e, run, resting));
-  let counted = [...done.values()].filter((a) => a.inFlight).length;
+  for (const run of runs.filter(hasStarted)) {
+    const advanced = await judged(run);
+    if (advanced) done.set(run.id, advanced);
+  }
+  let counted = [...done.values()].filter((a) => a.inFlight).length + unjudged.size;
   // A run with nothing filed as well, with its slot: one called off before it started rests like a finished one.
   for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
-    const advanced = await advanceResting(e, run, resting, { inFlight: counted, cap });
-    done.set(run.id, advanced);
-    if (advanced.inFlight) counted++;
+    const advanced = await judged(run, { inFlight: counted, cap });
+    if (advanced) done.set(run.id, advanced);
+    if (!advanced || advanced.inFlight) counted++;
   }
   const queue = slotFree({ inFlight: counted, cap }) ? within('act', () => startQueued(repo, runs)) : undefined;
   // Last, and apart: what the pass judged, written where it changed. A feed that cannot be written costs the report, never the pass.
   let feedError: string | undefined;
   try {
-    recordFeed(new Map(runs.map((run) => [run.id, done.get(run.id)!.feed])));
+    recordFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
+      unjudged: new Set(unjudged.keys()),
+    });
   } catch (err) {
     feedError = `the feed (${feedFile()}) was not written on this pass: ${(err as Error).message}`;
   }
   // An engine's report from before the runtime reported refusals — a test's fake — carries none.
   const refused = report.refused ?? [];
-  const unreadable = report.unreadable ?? [];
+  const causes = new Set(unjudged.values());
+  const unreadable = [
+    ...(report.unreadable ?? []).filter((why) => !causes.has(why)),
+    ...[...unjudged].map(([id, why]) => `${id} is not advanced while a task it reads is unreadable: ${why}`),
+  ];
   return {
-    runs: runs.map((run) => done.get(run.id)!),
+    runs: runs.flatMap((run) => done.get(run.id) ?? []),
     ...(queue ? { queue } : {}),
     ...(feedError ? { feedError } : {}),
     ...(refused.length ? { refused } : {}),

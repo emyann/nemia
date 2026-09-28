@@ -37,6 +37,16 @@ export { denialText } from 'agent-runtime';
 export { refusedText } from 'agent-runtime';
 
 /**
+ * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's `JournalError`,
+ * which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which fail as they did.
+ */
+export const unreadableJournal = (err: unknown): string | undefined => {
+  if (!(err instanceof Error)) return undefined;
+  const { _tag, taskId } = err as Error & { _tag?: unknown; taskId?: unknown };
+  return _tag === 'JournalError' && typeof taskId === 'string' && taskId !== '*' ? err.message : undefined;
+};
+
+/**
  * The engine, with one harness of the run's own beside the three it ships.
  *
  * `check` runs a step's `check:` command (`src/check.ts`). Passing `harnesses` REPLACES the engine's

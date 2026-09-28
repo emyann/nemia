@@ -1055,7 +1055,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (const why of unreadable ?? []) console.error(`left out: ${why}`);
       for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
       if (queue) console.log(queueLine(queue));
-      if (!results.length && !queue) console.log('no runs');
+      if (!results.length && !queue && !unreadable?.length) console.log('no runs');
       for (const r of results) {
         const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
         const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';

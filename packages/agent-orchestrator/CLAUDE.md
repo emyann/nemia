@@ -61,6 +61,8 @@ pure, store, controller or the client (`test/boundary.test.ts`).
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).
 - **A step on a remote agent is filed with its local fields left out, never `undefined`** (`localFields`).
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
+- **A task journal that does not read stops its own run, never the pass**: `pass` in tick.ts leaves the run unjudged, in flight and out
+  of the feed's `removed` (`unreadableJournal`); `test/unreadable-journal.test.ts` walks it on the runtime itself.
 - **A step's fence is read through `modeOf`**: Claude Code's is `permissionMode`, Codex's `sandbox`.
 - **The ending's check is the run's**: the shipper stages the merge; the tick commits on the check's exit 0 or aborts (`landingDue`),
   level-triggered off `MERGE_HEAD`, reading conflicts with `ls-files --unmerged` (never `git diff`, which takes the index lock). A landed

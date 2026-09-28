@@ -1,15 +1,10 @@
 /**
  * A run is one workflow, once, over one workspace.
  *
- * Same shape as the engine underneath it: `assess()` is pure and decides everything; the file
- * store and the engine calls are the I/O around it. A run holds no status of its own — whether it
- * is finished is a question about its steps' tasks, and the engine can answer that. Copying the
- * answer here would be a second source of truth that goes stale the moment a task settles.
- *
- * Cancellation is the exception, and it is the one that proves the rule: "somebody called this
- * off" is not a fact about any step's task, so there is nothing here to copy. The engine can be
- * asked to stop a task, but it has never heard of the run — which is why `cancelledAt` lives on
- * the run, and is the only state this file writes down rather than derives.
+ * Same shape as the engine underneath it: `assess()` is pure and decides everything; the file store and the engine calls are the I/O
+ * around it. A run holds no status of its own: whether it is finished is a question about its steps' tasks, which the engine answers,
+ * and a copy here would go stale the moment a task settles. Cancellation is the exception: "somebody called this off" is a fact about
+ * no step's task, and the engine has never heard of the run, so `cancelledAt` lives on the run.
  */
 import path from 'node:path';
 import { checkContract, landingContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
@@ -52,30 +47,25 @@ import {
   type RetryMode,
 } from './retry.ts';
 
-// apps/api reads these two from the `agent-orchestrator/run` subpath. closeout.ts imports nothing from here, so this is no cycle; its other names
-// are read from closeout.ts, as the timeline's are from timeline.ts.
+/** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
 export { declaredOutput, parseCloseout } from './closeout.ts';
-// And these three, which apps/api reads from the subpath too (answerOf and EarlierTry in tries.ts, messageRefusal in test/asks.test.ts), as
-// retry.ts's other names are read from retry.ts.
-// retry.ts imports only types from here, so this is no cycle either.
+/** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; retry.ts imports only types from here. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
 
 /**
- * What the engine's record of a task says of its closeout: `false`, never asked for one — a task from before closeouts; `true`,
- * asked; `unsigned`, asked, and its last attempt ended without it — `stated: false` on its end since stage 4a, where the runtime
- * reports and this layer judges, or the `reason: 'unsigned'` the runtime wrote when it judged it. `stepStatus` reads it; a caller with
- * only a yes or a no gives that (`closeoutAsked` in views.ts reads all three).
+ * What the engine's record of a task says of its closeout: `false`, never asked for one; `true`, asked; `unsigned`, asked, and its
+ * last attempt ended without it (`stated: false` on its end, or `reason: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
+ * or a no gives that (`closeoutAsked` in views.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
 /**
  * A run record: a git run (`GitRun`), whose steps work on branches of one repository, or a folder run (`FolderRun`), whose steps work
- * in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a git run — every record from
- * before there were kinds is one, and reads as it always did — and `{ kind: 'folder' }` on a folder run, an object so that a later kind
- * can say which workspace it is.
+ * in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a git run, as on any record
+ * that names no kind, and `{ kind: 'folder' }` on a folder run, an object so that another kind can say which workspace it is.
  */
 export type Run = GitRun | FolderRun;
 
@@ -121,32 +111,31 @@ type RunBase = {
    *
    * A fence, not a cache. The folder is a path anybody can edit — with `--no-worktree` a step works
    * in the very checkout it lives in — and a `check:` is the command that judges a step: one the step
-   * could rewrite would be a step marking its own homework. Every pass reads this. Absent only on
-   * records from before it existed, which fall back to the folder.
+   * could rewrite would be a step marking its own homework. Every pass reads this. Absent, the folder
+   * is read.
    */
   workflow?: Workflow[];
   /**
    * The runs this one waits on (`wf start --after`), frozen at start like the workflow: none of its steps is filed until
-   * every one of them has shipped (`runReady`). Absent on a run that waits on none, and on every record from before there was
-   * an `after`, which reads as waiting on none.
+   * every one of them has shipped (`runReady`). Absent on a run that waits on none.
    */
   after?: string[];
   /**
    * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in store.ts), by name, in the order given.
    * Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a run
-   * given none, and on every record from before there were inputs.
+   * given none.
    */
   inputs?: string[];
   /**
    * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox` in
    * start.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this run,
-   * and `wf decide` names the card under the run's line. Absent on a run started any other way, and on every record from before the inbox.
+   * and `wf decide` names the card under the run's line. Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**
    * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `wf start --gate <step>`, and an inbox
    * card's `gate:`. Each such step's closeout waits for a person — `wf approve` — before anything after it is filed (`hasGate`). Absent on a
-   * run given none, and on every record from before there were gates.
+   * run given none.
    */
   gates?: string[];
   /**
@@ -165,15 +154,13 @@ type RunBase = {
   acceptances?: Acceptance[];
   /**
    * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it. What
-   * says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held, and on every record
-   * from before there was a cap.
+   * says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.
    */
   slotHeldAt?: string;
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in branches.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
-   * records from before there were tips.
+   * (`isShipped` in branches.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished.
    */
   tips?: Record<string, string>;
   /**
@@ -207,7 +194,7 @@ type RunBase = {
    *
    * Both are the CURRENT try's. A step tried again (`retries:`, `wf retry`) keeps the tries it replaced
    * beside them, under `tries`, in order — so everything that reads `taskId` and `check` reads the try
-   * that decides the step, as it did before there were tries.
+   * that decides the step.
    */
   steps: Record<string, StepRecord>;
   createdAt: string;
@@ -269,7 +256,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   failed, stopped  the engine's own words for the step's task
  *
  * Only `verified` and `unverified` let a follower be filed. The engine's `succeeded` means the session
- * ended; the run no longer reads it as the work being done.
+ * ended, never that the work is done.
  */
 export type StepStatus =
   | 'waiting'
@@ -329,8 +316,8 @@ export type Assessment = {
    * stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not `failed`.
    *
    * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `wf cancel`, `toDecide`) reads a run
-   * that stopped. This is for what a person reads of it: the feed's run line said `failed` of a run waiting at its ship gate while `wf ls`
-   * and `wf decide` said it was awaiting approval and nothing had failed.
+   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `wf ls` and `wf decide` say
+   * is awaiting approval.
    */
   stoppedOn?: 'awaiting approval' | 'blocked';
   /** What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing. */
@@ -343,79 +330,63 @@ export type Assessment = {
 };
 
 /**
- * What should happen to this run now. Pure — hand it the engine's view of each task and it
- * decides; it reads no disk and calls no engine.
+ * What should happen to this run now. Pure — hand it the engine's view of each task and it decides; it reads no disk and calls no
+ * engine.
+ *
+ * - A cancelled run files nothing more, however its predecessors ended: no step, no check, no try, no round.
+ * - A pruned run honours no person's ask, since its worktrees are gone (`mayFile`): an ask written by hand is no try due. A held run
+ *   honours none until the hold lifts, files nothing and asks nothing of a person; it is `running`, since a hold is no decision about the
+ *   work, with `heldUntil`, and keeps `blocked`, since what can never run is a fact about the steps.
+ * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
+ *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
+ * - An ending step `heldByCheckout` holds is not filed, neither a first session nor a person's try of it, since two sessions trial merging
+ *   in one checkout collide: it goes to `held`, is filed once the other run's step settles, and a try of it stays `running`, so the run
+ *   still counts against the cap on runs in flight.
+ * - An ending held at its gate on work this pass files again (`unheld`) is `waiting`: its gate holds on what that work says.
+ * - A check already filed is never filed twice; a step that waits on one final without satisfying `after` is `blocked`, never left to hang.
+ *
+ * @param closeoutOf How each step signed off, when it left a closeout: a session that ends cleanly can still say `outcome: "blocked"`,
+ *   which the engine cannot tell from finished work.
+ * @param askedCloseout Whether a task was asked for a closeout: the schema on the engine's record of its filing.
+ * @param verdictOf What each step's current check exited with, read only for a check that did not pass (`refusedCheck`). Left out, no
+ *   check has refused, so no try of `retries:` is due.
+ * @param asks What people asked for with `wf retry`, and the run has not consumed yet.
+ * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet.
+ * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to
+ *   stop it first.
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.
+ * @param standings Where each result branch stands against the base branch on this pass (`branchStandings` in branches.ts): what says a
+ *   run whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
+ * @param checkout The run whose `workspace: main` step is in the repository's own checkout (`checkoutHold` in tick.ts), if one is. Left
+ *   out, nothing holds the checkout.
  */
 export function assess(
   steps: readonly Workflow[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  /**
-   * How each step signed off, when it left a closeout.
-   *
-   * A step can end its session cleanly and still not have done the work — `outcome: "blocked"` is
-   * it saying so. The engine cannot know that: it settled a session, and a session that stops
-   * because the agent is stuck stops exactly like one that finished. So the DAG asks here.
-   */
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  /** Whether a task was asked for a closeout: the schema on the engine's record of its filing. */
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /**
-   * What each step's current check exited with. Read only for a check that did not pass — see `refusedCheck`.
-   * Left out, no check is taken to have refused, so no try of `retries:` is due.
-   */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  /** What people asked for with `wf retry`, and the run has not consumed yet. */
   asks: readonly RetryAsk[] = [],
-  /** What people asked for with `wf round`, and the run has not consumed yet. */
   roundAsks: readonly RoundAsk[] = [],
-  /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
   harnessBlocked: (taskId: string) => boolean = () => false,
-  /** What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, nothing is known spent, and no step is over. */
   spendOf: SpendOf = () => undefined,
-  /**
-   * Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts): what says a run
-   * whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
-   */
   standings: readonly BranchStanding[] = [],
-  /**
-   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts),
-   * if one is: such a step is not filed while another is working there, whatever else is ready. Left out, nothing holds the checkout.
-   */
   checkout?: CheckoutHold,
 ): Assessment {
-  // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
-  // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
-  // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
-  // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
   if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], held: [], status: 'cancelled' };
-  // A pruned run is read as it ended, and a person's ask of it is honoured by nobody: its worktrees are gone, so the verbs refuse one and
-  // the tick files none (`mayFile`). One written by hand is not a try due, here or anywhere that reads this.
   if (run.pruned) [asks, roundAsks] = [[], []];
-  // A held run files nothing, a person's ask no more than a step, until the hold lifts: an ask written by hand waits on its file for then.
   if (run.hold) [asks, roundAsks] = [[], []];
 
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
-  // A step about to be tried again is not final: what waits on it waits, and the run is still going.
-  // An ending step works in the repository's own checkout, and while another run's is in that one directory nothing of it is filed
-  // (`heldByCheckout`): not a first session, and not the try a person asked for after it ended blocked or its check refused — two sessions
-  // trial merging there at once is the collision the hold is for. The try is not filed on this pass, and the step is still `running` all
-  // the same: a try a person asked for is work asked for and not yet filed, so nobody is waited on for it. Reading it as the status it
-  // ended with made the run `failed` while its ending waited its turn — `wf decide` said "BLOCKED, waiting on you: ship" and offered a
-  // `wf retry` that `retryRefusal` refuses, while `wf ls` said it was waiting on the checkout, and the run stopped counting against the
-  // cap on runs in flight. The held names go to `held`, which is what makes it count.
   const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   const retry = due.filter((r) => !heldByCheckout(steps, r.step, checkout));
   const held: string[] = due.filter((r) => heldByCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');
-  // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer. And no step of that loop is held
-  // on its budget on the pass before the round is filed: the round is what a person raised the cap for (`roundSpans`).
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
   for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, stood.get(name)!.own);
   for (const r of round) status.set(r.step, 'running');
-  // Nor is an ending held at its gate on work this pass files again (`unheld`): its gate holds on what the work says, and the work is
-  // being said again — a person's send-back, or a round.
   for (const name of unheld(steps, run, retry, round)) status.set(name, 'waiting');
   const ready: string[] = [];
   const check: string[] = [];
@@ -423,16 +394,10 @@ export function assess(
 
   for (const step of steps) {
     const own = status.get(step.name)!;
-    // Due: signed off, declared, and not filed. A check already filed is `checking` too, and is
-    // never filed twice.
     if (own === 'checking' && !run.steps[step.name]?.check) check.push(step.name);
     if (own !== 'waiting') continue;
     const deps = step.after.map((a) => status.get(a) ?? 'waiting');
-    // A predecessor that is final without satisfying `after` is final for its followers too. Said
-    // plainly rather than left to hang, because a run that waits forever looks like a bug.
     if (deps.some(stopsFollowers)) blocked.push(step.name);
-    // An ending step works in the repository's own checkout, and another run's is in it (`heldByCheckout`): it waits, and is filed once
-    // that one settles. Everything else it needs is here, so nothing but the checkout is between it and being filed.
     else if (!deps.every(satisfiesAfter)) continue;
     else if (heldByCheckout(steps, step.name, checkout)) held.push(step.name);
     else ready.push(step.name);
@@ -445,9 +410,6 @@ export function assess(
       ? 'failed'
       : 'running';
 
-  // A held run is paused, whatever its steps say: nothing is filed, and nothing is asked of a person — a step's question stays on its record,
-  // to be asked once the hold lifts. It is `running`, since it has not stopped: a hold is not a decision about the work, and a run the tick
-  // will pick up again is not finished. `blocked` is kept, as what can never run is a fact about the steps and not a word due.
   if (run.hold) return { ready: [], check: [], retry: [], round: [], blocked, held: [], status: 'running', heldUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
   const stoppedOn =
@@ -476,8 +438,6 @@ function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus
   return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
 }
 
-// ─── a gate: a handoff that waits for a person ─────────────────────────────
-
 /** Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with. */
 export const hasGate = (step: Pick<Workflow, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean =>
   step.gate === true || Boolean(run.gates?.includes(step.name));
@@ -496,7 +456,7 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
  * rather than a new task: the step signed off `blocked`, or it is gated and the try it is on is not approved — checking, or at its gate.
  * Anything else closes it (`e.close`), which settles it as it signed: an ungated step that signed off, a gated one once approved, a check
  * that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned, whose
- * steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`, as every try was before tasks were held open.
+ * steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`.
  */
 export function holdsOpen(
   step: Workflow,
@@ -511,14 +471,13 @@ export function holdsOpen(
   if (run.cancelledAt || run.pruned) return false;
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   if (own === 'blocked') return true;
-  // `awaiting approval` is a gate with no approval of the try it is on (`atGate`), and `wf approve` refuses a step still checking.
   return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
 }
 
 /**
- * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, without `background: true`. The
- * one harness the runtime's held task was measured on (agent-runtime's open issue 28, M12); a codex step, a `claude-detached` one and a
- * background session are filed to settle when they sign, as before, and a person's word to them is a try of its own. Never a check.
+ * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, without `background: true`, the
+ * one harness the runtime's held task is proven on (agent-runtime's open issue 28). A codex step, a `claude-detached` one and a
+ * background session are filed to settle when they sign, and a person's word to them is a try of its own. Never a check.
  */
 export const holdsOpenOn = (step: Pick<Workflow, 'harness' | 'background'>): boolean =>
   (step.harness ?? 'claude') === 'claude' && !step.background;
@@ -564,6 +523,15 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'wf 
  * said so; a send-back already asked for — the try after this one, which would spend an approval of this one at once — or one asked with no
  * words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why and what to
  * do instead.
+ *
+ * An ending approved before it is filed (`approvedFirst`) is judged on the work it would act on, not on its own closeout: refused while a
+ * send-back of that work is asked for, which would change what is approved; while a step its gate waits on has not handed on
+ * (`notHandedOn`, so the refusal and the gate agree, a looping step that asked for another round among them); and at its gate with its
+ * result already on the base branch (`resultOnBase`), where nothing is left to merge.
+ *
+ * @param asks What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for.
+ * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.ts). Left out, git is not
+ *   asked, and the gate alone speaks.
  */
 export function approvalRefusal(
   steps: readonly Workflow[],
@@ -574,13 +542,8 @@ export function approvalRefusal(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  /** What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for. */
   asks: readonly RetryAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  /**
-   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an ending whose result git
-   * already has has nothing to merge (`resultOnBase`). Left out, git is not asked, and the gate alone speaks.
-   */
   standings: readonly BranchStanding[] = [],
 ): string | null {
   const command = `wf approve ${run.id} ${name}`;
@@ -620,8 +583,6 @@ export function approvalRefusal(
     return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
   }
   const { status } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
-  // An ending step is approved before it is filed (`approvedFirst`), so its gate holds on the work it would act on, not on its own
-  // closeout: refused while that work is unfinished, and while a send-back of it is asked for, which would change what is approved.
   if (approvedFirst(step, run) && !run.steps[name].taskId) {
     const back = asks.find((a) => step.after.includes(a.step));
     if (back) {
@@ -631,16 +592,12 @@ export function approvalRefusal(
       );
     }
     if (status !== 'awaiting approval') {
-      // The same steps the gate itself waits on (`notHandedOn`), so the refusal cannot say one thing while the gate reads another: a
-      // looping step that asked for another round is one of them, though it signed off.
       const unfinished = notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
       return (
         `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} handed on — ` +
         `your approval is then what files it, and nothing of it runs before that. See where the run stands: wf ls ${run.id}.`
       );
     }
-    // At its gate, with the result it would merge already on the base branch — merged by hand, say (`resultOnBase`). Approving would file a
-    // session to merge what the base branch has, and nothing is left for anybody to decide: the one thing there is, is closing the record.
     if (resultOnBase(standings)) {
       return (
         `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. ` +
@@ -670,11 +627,10 @@ export function approvalRefusal(
 /**
  * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not approved
  * for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate holds it:
- * the round is its loop's, and the gate is on what comes after. Pure.
+ * the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed (`approvedFirst`) is
+ * that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
  */
 function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined): boolean {
-  // A later try of an ending held before it is filed (`approvedFirst`) — shipped again on a person's word, after the approval that filed
-  // its first — is that act again: it has nothing to hand on, so nothing to hold, though the approval names a try it is past.
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
   if (approvedFirst(step, run) && run.steps[step.name]?.tries?.length) return false;
   if (askedAgain(step, run, closeoutOf)) return false;
@@ -696,7 +652,8 @@ export const approvedFirst = (step: Pick<Workflow, 'name' | 'gate' | 'workspace'
  * Whether the run waits at that step's gate now, with nothing of the step filed: it is approved first (`approvedFirst`), it has not been
  * filed, nobody has approved the try it would be filed on, and every step it waits on has satisfied it. Pure.
  *
- * Level-triggered like the rest: a step of the work sent back un-holds it on the next pass, and finishing again holds it anew.
+ * Level-triggered like the rest: a step of the work sent back un-holds it on the next pass, and finishing again holds it anew. False on a
+ * cancelled run, which files nothing, so that its unfiled steps read as waiting.
  */
 function waitsAtGate(
   step: Workflow,
@@ -708,7 +665,6 @@ function waitsAtGate(
   spendOf: SpendOf,
   verdictOf: (step: string) => Verdict | undefined,
 ): boolean {
-  // A cancelled run files nothing, so no gate of its holds anything: its unfiled steps read as the waiting steps they are.
   if (run.cancelledAt || !approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
   return notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).length === 0;
 }
@@ -722,6 +678,9 @@ function waitsAtGate(
  * gate in the very pass that sends the work round again: `wf ls` would offer the merge while the reviewer was asking for a change, and an
  * approval taken then names a try nothing spends, so the round's work would merge unread. `atGate` keeps the same rule for a gated step of
  * its own loop; this is that rule for the step after one.
+ *
+ * A predecessor approved first itself is read on its own work (`ownStatus`): `validate` refuses one that anything waits on, and reading
+ * it so keeps this from asking itself where it stands.
  */
 function notHandedOn(
   step: Workflow,
@@ -737,8 +696,6 @@ function notHandedOn(
     const dep = steps.find((s) => s.name === name);
     if (!dep) return true;
     if (dep.loop && roundWanted(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) return true;
-    // A predecessor that is approved first itself is read on its own work: `validate` refuses one that anything waits on, and reading it
-    // so is what keeps this from asking itself where it stands.
     return !satisfiesAfter(
       approvedFirst(dep, run)
         ? ownStatus(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
@@ -754,12 +711,13 @@ function notHandedOn(
  * A person's `wf retry` of the work is the send-back at an ending's gate, and between the ask and the pass that files it the record alone
  * still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected to the
  * work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
+ *
+ * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`): the pass that files the try moves the
+ * ending's try behind (`sentBack`), and it waits for the work again.
  */
 export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
   const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
   const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
-  // And an ending that stopped on the base branch whose work a try due sends back (`Retry.back`): the pass that files it moves the ending's
-  // try behind (`sentBack`), and it waits for the work again.
   return new Set([...held.map((s) => s.name), ...retry.flatMap((r) => r.back ?? [])]);
 }
 
@@ -800,15 +758,13 @@ export function sentBack(record: StepRecord): StepRecord {
 /** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
 
-// ─── an ending that lands on its check ──────────────────────────────────────
-
 /**
  * Whether an ending's merge is landed by the run on its check: it works in the repository's own checkout, a person approves it before it
  * is filed (`approvedFirst`), and it has a `check:` — which the parser takes beside `workspace: main` only with `gate: true`. Pure.
  *
  * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the
- * merge onto the base branch on its word, with the message the step signed off, or aborts it (`landingDue`). A frozen run whose ending has
- * no check keeps its old recipe: the step runs the check itself, in its prose, and commits or aborts on what it found.
+ * merge onto the base branch on its word, with the message the step signed off, or aborts it (`landingDue`). An ending with no check runs
+ * one itself, in its prose, and commits or aborts on what it found.
  */
 export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check'>, run: Pick<Run, 'gates'>): boolean =>
   approvedFirst(step, run) && step.check !== undefined;
@@ -853,12 +809,14 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  * through `merge` (`mergeState`: a handful of git calls in a person's own checkout), and only once a landing can be due: never while the
  * step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — MERGE_HEAD is there,
  * read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing staged
- * is recorded as landing nothing on the first pass that reads it settled, with one `stat` of the checkout and no git, and the merges a
- * person stages there after it are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the checkout and the engine as they are and
- * does the same, so a merge staged by an ending is never left staged once nothing of it runs.
+ * is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know reads `running`, and waits),
+ * with one `stat` of the checkout and no git, and the merges a person stages there after it — to resolve by hand what stopped it, or a
+ * trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the
+ * checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once nothing of it runs.
  *
- * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on a merge that is not this run's
- * (`other`), which is never touched — the run did not start it. Once neither runs:
+ * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files its check,
+ * with the merge staged or on HEAD, unless the run is held, which aborts it; nor on a merge that is not this run's (`other`), which is
+ * never touched — the run did not start it. Once neither runs:
  * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
  *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
  *   person's approval, and its check is the run's own, from the folder frozen on the record.
@@ -866,9 +824,9 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  *   waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
  *   step gave no message to commit it with.
- * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having staged none (nothing is checked or committed); the
- *   check passed and the result is on the checkout's HEAD already (it landed there as that commit); or the check ended and the merge it
- *   judged is no longer staged.
+ * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having
+ *   staged none (nothing is checked or committed); the check passed and the result is on the checkout's HEAD already (it landed there as
+ *   that commit); or the check ended and the merge it judged is no longer staged.
  */
 export function landingDue(
   step: Workflow,
@@ -886,10 +844,6 @@ export function landingDue(
   if (busy(phaseOf(record.taskId))) return undefined;
   const check = record.check ? phaseOf(record.check.taskId) : undefined;
   if (check && busy(check)) return undefined;
-  // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget — with nothing staged: written down at
-  // once, with no git, so a merge of the run's branch a person stages later in their own checkout — to resolve what stopped it by hand, or
-  // a trial merge — is theirs, and no pass takes it back. Only an ending the engine has settled (`endingStopped`'s words): a task it does not
-  // know this pass reads `running`, and waits.
   const ended = SETTLED.has(phaseOf(record.taskId)) && (TRIED_FROM.has(own) || own === 'budget exhausted');
   const nothing = ended
     ? { act: 'record' as const, landed: { untouched: `${step.name} ended ${own}, and nothing of it was staged` } }
@@ -900,14 +854,12 @@ export function landingDue(
   const ours = merging === 'ours';
   const onHead = !ours && merging === 'none' && missing.length === 0;
   const end = (why: string): Landing | undefined => (ours ? { act: 'abort', why } : { act: 'record', landed: { aborted: why } });
-  // Anything but a signed hand-off — blocked, unsigned, failed, stopped, denied, ended at its budget: the step's own word stands, and what it
-  // left staged is taken back.
   if (own !== 'checking') return ours ? { act: 'abort', why: `${step.name} ended ${own} with its merge staged` } : nothing;
   if (run.cancelledAt) return end('the run was called off before its merge was committed');
   if (ours && conflicted) return end('the merge it staged has conflicts');
   if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`);
   if (!check) {
-    if (ours || onHead) return run.hold ? end('the run was held before its check was filed') : undefined; // the check is filed on this pass
+    if (ours || onHead) return run.hold ? end('the run was held before its check was filed') : undefined;
     return {
       act: 'record',
       landed: { aborted: `${step.name} signed off with no merge of the run's result staged, so nothing was checked or committed` },
@@ -958,8 +910,6 @@ export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
 /** The longest `landedWords` a `wf ls` line prints: the reason for an abort can be git's refusal, whole (`commitMerge`). */
 const LANDED_CAP = 160;
 
-// ─── one checkout, one ending step ──────────────────────────────────────────
-
 /**
  * Which run's `workspace: main` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
  * and its step.
@@ -979,8 +929,8 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
  * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
  * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is in flight has the checkout, and
- * every other run of the same repository waiting to file one is held until it settles. With none in it, the oldest approval takes it —
- * then by id — so which pass reads which run first decides nothing.
+ * every other run of the same repository waiting to file one is held until it settles, and a run in it is never held. With none in it,
+ * the oldest approval takes it — then by id — so which pass reads which run first decides nothing.
  *
  * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
  * and a run held on one pass is asked again on the next.
@@ -990,7 +940,6 @@ export function heldCheckouts(claims: readonly MainClaim[]): Map<string, Checkou
   const repos = new Map<string, MainClaim[]>();
   for (const c of claims) repos.set(c.repo, [...(repos.get(c.repo) ?? []), c]);
   for (const group of repos.values()) {
-    // A step already in the checkout keeps it; a run that is in it is not waiting for it, whatever else the group says.
     let taken = group.find((c) => c.holds);
     const waiting = group
       .filter((c) => !c.holds && c.at !== undefined)
@@ -1057,10 +1006,9 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string 
 
 /**
  * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that merges
- * has nothing left to merge — a person merged it by hand, as happened to the run that built the checkout hold, or the work committed
- * nothing past the run's base. Pure.
+ * has nothing left to merge — a person merged it by hand, or the work committed nothing past the run's base. Pure.
  *
- * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks, as it always did.
+ * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks.
  */
 export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
   standings.length > 0 && standings.every((b) => b.where === 'on');
@@ -1088,6 +1036,11 @@ const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: re
  *
  * Level-triggered: nothing is stored, the branches are read off git each pass, and a run whose branch a person merged stops being one to
  * decide without anybody telling the run. Nothing while the run is running, nor for a cancelled one.
+ *
+ * Never `approve` on a pruned run, whose approval is refused (`prunedRefusal`): what its branches hold is what is left to decide. Nothing
+ * for an ending that has not run whose result git already has (`resultOnBase`): there is nothing for an approval to file, and `wf
+ * approve` is refused in those words. `git` only on a run every step of which finished: one that waits on a person for a step that
+ * broke says so.
  */
 export function toDecide(
   steps: readonly Workflow[],
@@ -1098,17 +1051,10 @@ export function toDecide(
 ): ToDecide | undefined {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
-  // A pruned run's approval is refused (`prunedRefusal`), so it is not what is left to decide: what its branches hold is.
   if (waiting && !run.pruned) {
-    // Unless git has already taken the result (`resultOnBase`): an ending that has not run would merge a branch the base branch already
-    // has, so there is nothing to decide and nothing for an approval to file. Read off git each pass, like the `git` kind below — a person
-    // who merges by hand tells the run nothing, and this is how it finds out. Its listing says where the branch stands, and `wf approve` is
-    // refused in those words (`approvalRefusal`).
     if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
-    // What it would do, for an ending that has not run; its closeout, which the screen prints, for a gated step that has signed off.
     return { kind: 'approve', step: waiting.name, says: run.steps[waiting.name]?.taskId ? null : firstLine(waiting.body) };
   }
-  // Only a run every step of which finished: one waiting on a person for a step that broke is waiting on them for that, and says so.
   if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
   return ahead.length ? { kind: 'git', branches: ahead } : undefined;
@@ -1171,8 +1117,6 @@ export function gateRefusal(
   return null;
 }
 
-// ─── waiting on a run ───────────────────────────────────────────────────────
-
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
  * started never waits on a run again.
@@ -1181,7 +1125,7 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
 
 /**
  * Whether the gate applies to this run, and a parent is read at all: it waits on runs, nobody has called it off, and nothing of it has
- * been filed. None for a record from before there was an `after`; none for a cancelled run, which files nothing anyway; and none for a
+ * been filed. None for a run with no `after`; none for a cancelled run, which files nothing anyway; and none for a
  * run that has started — whose parents are never read again, so a parent's branch deleted after the merge (`wf decide`'s "drop it", a
  * `git branch -d` after shipping) cannot un-ready it.
  */
@@ -1200,8 +1144,6 @@ export function waitingOn(run: Run, shipped: (runId: string) => boolean): string
  */
 export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean => waitingOn(run, shipped).length === 0;
 
-// ─── a cap on runs in flight ────────────────────────────────────────────────
-
 /**
  * The cap on runs in flight (`WF_MAX_RUNS`), and how many are in flight as a run with nothing filed is judged: every run that has started and
  * is in flight on the pass (`slotNeed`), then each run with nothing filed admitted before it, oldest first (`admissionOrder`) — serial, as the
@@ -1210,7 +1152,7 @@ export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean
 export type RunSlot = { inFlight: number; cap: number };
 
 /**
- * `WF_MAX_RUNS` as a cap: a whole count, 0 — or unset, or empty — for none, today's behaviour. Refused by name, exit 2, when it is anything
+ * `WF_MAX_RUNS` as a cap: a whole count, 0 — or unset, or empty — for none. Refused by name, exit 2, when it is anything
  * else: read as no cap, a mistyped value would lift the cap it was set to hold.
  */
 export function runCapOf(value: string | undefined): number {
@@ -1230,28 +1172,28 @@ export function runCapOf(value: string | undefined): number {
  * What a run asks of the cap on a pass. Pure.
  *
  * `inFlight`: it counts against the cap — a task of it, a step's or a check's, filed and not settled (`inFlight`), or, on a run that has
- * started and nobody called off, something the pass files (a step ready, a check, try or round due): a run between two steps is still in
- * flight. A cancelled run counts while the engine is still stopping what it had in flight; one that waits on a person, or has finished, does not.
+ * started and nobody called off, something the pass files (a step ready, a check, try or round due) or the checkout holds back
+ * (`Assessment.held`): a run between two steps is still in flight, and one whose ending waits on another run's in one directory waits on
+ * no person, and would otherwise free the very slot it is queued for. A cancelled run counts while the engine is still stopping what it
+ * had in flight; one that waits on a person, or has finished, does not.
  *
  * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
  * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
  *
  * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap holds,
- * so the cap neither counts it nor holds it. Judged without the steps — a caller that passes none — every run is counted, as every run was.
+ * so the cap neither counts it nor holds it.
+ *
+ * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held'>,
   shipped: (runId: string) => boolean,
-  /** The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted, as every run was. */
   steps: readonly Pick<Workflow, 'slot'>[] = [],
 ): { inFlight: boolean; wants: boolean } {
-  // A run that watches the others is in nobody's way and waits for nobody: it neither counts against the cap nor asks it for anything.
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  // What the checkout holds back counts as due (`Assessment.held`): the word that files it is given, and what stands in the way is another
-  // run's ending in one directory — not a person. A run that stopped counting there would free the very slot the ending is queued for.
   const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.held.length > 0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
@@ -1489,7 +1431,6 @@ export function holdRefusal(
     }
     if (shipped) return `--until ${u}: ${u} has already shipped onto ${record.branch}, so there is nothing to wait for: ${drop}.`;
   }
-  // The circle: from each run named, along what each run waits on — `--after` while it has not started, and a hold — back to this one.
   const byId = new Map(others.map((r) => [r.id, r]));
   const waitsOn = (r: Run): Array<[string, string]> => [
     ...(gated(r) ? r.after!.map((a) => [a, `${r.id} --after ${a}`] as [string, string]) : []),
@@ -1521,8 +1462,10 @@ export function holdRefusal(
  * Refused: an id given twice; a run the store does not have; a run on another repository, or shipping onto another base branch — it would
  * never ship onto this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
  * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `wf decide` never calls shipped, whatever git says of its
- * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. Handed only what
- * the record and git say (`parentRecord` in branches.ts): nothing here needs the engine. The run itself cannot be named: it has no id yet.
+ * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. A
+ * folder run is refused on either side, since it ships onto no branch: as the parent, and as this run, whatever the id names. Handed only
+ * what the record and git say (`parentRecord` in branches.ts): nothing here needs the engine. The run itself cannot be named: it has no
+ * id yet.
  */
 export function afterRefusal(
   after: readonly string[],
@@ -1534,8 +1477,6 @@ export function afterRefusal(
     const without = `start it without --after ${id}`;
     if (seen.has(id)) return `--after ${id} is given twice, and a run waits on another once. Give each run one --after.`;
     seen.add(id);
-    // A run waits for another to SHIP, onto its base branch: a folder run has neither, so it is refused on either side of --after — this
-    // side whatever the id names, since no run could be waited on.
     if (child.repo === undefined) {
       return `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
     }
@@ -1629,13 +1570,12 @@ export function tipsSeen(
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
  * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
  * ended it, and says so — `stated: false` — and settles the task `succeeded`; this layer judges it
- * (`closeoutAsked`) and nudges it once a round (`retriesDue`). Until stage 4a the runtime judged it
- * itself: `failed`, with reason `unsigned`. Either is this word: read as `failed`, the run would be
- * called failed rather than waiting on you, and a nudged try told its session broke rather than that
- * it gave no closeout. Only a `failed` task — one a person stopped is `stopped`. A task that settled
- * `succeeded` with nothing said is `unsigned` too.
- * An unreadable closeout counts as none: the run cannot read that the work is done. A task never
- * asked — a run from before closeouts — is not held to one.
+ * (`closeoutAsked`) and nudges it once a round (`retriesDue`). A task the runtime ended `failed` with
+ * reason `unsigned` is this word too: read as `failed`, the run would be called failed rather than
+ * waiting on you, and a nudged try told its session broke rather than that it gave no closeout. Only
+ * a `failed` task — one a person stopped is `stopped`. A task that settled `succeeded` with nothing
+ * said is `unsigned` too. An unreadable closeout counts as none: the run cannot read that the work is
+ * done. A task never asked for a closeout is not held to one.
  *
  * **A declared output is part of the closeout.** A step whose `output:` declares fields and whose
  * closeout lacks one did not say what it was asked to say, and a step that reads it would be handed
@@ -1653,11 +1593,12 @@ export function tipsSeen(
  * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for.
  *
  * **A budget is spent once the engine says so.** A task whose harness ended its last attempt at its cap is `budget exhausted`, whatever
- * else its session left: the runtime reports the cut (`limit: 'budget'`) and judges nothing of it, so this is where it is judged. A step whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to
- * spend, is `over budget` where another session of it would be the way on (`held`): its try ended without letting what waits on it run —
- * which `retries:` would try again, or a person — or its loop asks for a round that would file it again. A check that did not finish is no
- * such end: its way on is the check again, which costs nothing, so the step reads `failed (check)` as before, and only a check that
- * refused (`refusedCheck`, off `verdictOf`) holds it. A step that did the work and is not asked for again keeps its word: nothing more is
+ * else its session left: the runtime reports the cut (`limit: 'budget'`) and judges nothing of it, so this is where it is judged. A step
+ * whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to spend, is `over budget` where
+ * another session of it would be the way on (`held`): its try ended without letting what waits on it run — which `retries:` would try
+ * again, or a person — or its loop asks for a round that would file it again. A check that did not finish is no such end: its way on is
+ * the check again, which costs nothing, so the step reads `failed (check)`, and only a check that refused (`refusedCheck`, off
+ * `verdictOf`) holds it. A step that did the work and is not asked for again keeps its word: nothing more is
  * filed for it anyway, and what waits on it runs. Only what the engine measured counts, so a `claude` session still running, whose cost
  * is written as its process exits, counts once it has ended — and a step can overrun by one try.
  *
@@ -1665,6 +1606,11 @@ export function tipsSeen(
  * approval` until the try it is on is approved (`approvalOf`), whatever its closeout says: it stops what follows as `blocked` does, and
  * only a person moves it — `wf approve`, or a send-back with `wf retry --message`. Its check comes first: a gated step still `checking`
  * is checking. A looping step that asked for another round is not held: the gate is on what comes after it, and a round is not that.
+ *
+ * @param steps The run's steps: what says whether this one is a loop's target, and owes `replies`.
+ * @param spendOf What each task's sessions cost (`taskSpend`). Left out, nothing is known spent: no step is over budget, nor ended at one.
+ * @param verdictOf What each step's current check exited with (`refusedCheck`): only a check that refused holds a step over its budget.
+ *   Left out, no check has refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
  */
 export function stepStatus(
   step: Workflow,
@@ -1672,14 +1618,8 @@ export function stepStatus(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** The run's steps: what says whether this one is a loop's target, and owes `replies`. */
   steps: readonly Workflow[] = [],
-  /** What each task's sessions cost (`taskSpend`). Left out, nothing is known spent: no step is over budget, nor ended at one. */
   spendOf: SpendOf = () => undefined,
-  /**
-   * What each step's current check exited with (`refusedCheck`): only a check that refused holds a step over its budget. Left out, no check
-   * is taken to have refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
-   */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): StepStatus {
   return standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
@@ -1687,7 +1627,7 @@ export function stepStatus(
 
 /**
  * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways are
- * its own status's.
+ * its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed (`waitsAtGate`).
  */
 function standing(
   step: Workflow,
@@ -1702,7 +1642,6 @@ function standing(
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };
-  // And the gate an ending step waits at before it is filed, whose approval is what files it (`waitsAtGate`).
   if (own === 'waiting' && waitsAtGate(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))
     return { own, status: 'awaiting approval' };
   return { own, status: own };
@@ -1776,6 +1715,12 @@ function roundWanted(
  * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
  * the session, and its own. What a try's brief says the last try ended as (`retrySection`): being over budget is why nothing was filed, not
  * how the try ended.
+ *
+ * `budget exhausted` for a task its harness cut off at its cap, settled `failed` or `succeeded`: cut off, not concluded, and no attempt
+ * follows (agent-runtime's README). `denied` for a signed step denied a call under `denials: fail`, before its check, which would judge
+ * work done without the tool. An ending that lands on its check (`landsOnCheck`) stands where the run's landing of its merge left it
+ * (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has committed or
+ * aborted it, so nothing offers a try of it while its merge is staged in the checkout.
  */
 export function ownStatus(
   step: Workflow,
@@ -1792,8 +1737,6 @@ export function ownStatus(
   if (said?.outcome === 'blocked') return 'blocked';
 
   const phase = phaseOf(st.taskId);
-  // Cut off at its cap, not concluded, and no attempt follows (agent-runtime's README). The runtime settles the task as its harness ended
-  // the session and carries the cut unjudged (stage 4b), so a cap reached on a session its harness called done is as spent as a failed one.
   if ((phase === 'failed' || phase === 'succeeded') && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
@@ -1802,16 +1745,12 @@ export function ownStatus(
   if (!said && (asked || step.output)) return 'unsigned';
   if (said && declaredOutput(step, said, owedFields(step, run, steps)).missing.length) return 'unsigned';
   if (said && step.loop && typeof said.output?.again !== 'boolean') return 'unsigned';
-  // Signed, and denied a call on a step that says a denial fails it: before its check, which would judge work done without the tool.
   if (step.denials === 'fail' && spendOf(st.taskId)?.denied?.length) return 'denied';
   const signed = (s: 'verified' | 'unverified'): StepStatus =>
     askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
   if (!step.check) return signed('unverified');
 
   const check = st.check ? phaseOf(st.check.taskId) : undefined;
-  // An ending that lands on its check stands where the run's landing of its merge left it (`landingDue`), never on the check alone: `verified`
-  // once the run has committed the merge, and `checking` until it has committed it or aborted it — so nothing reads the step settled, and
-  // offers a try of it, while its merge is still staged in the checkout.
   if (landsOnCheck(step, run)) {
     const landed = st.landed;
     if (!landed) return 'checking';
@@ -1820,8 +1759,6 @@ export function ownStatus(
   }
   return check === 'succeeded' ? signed('verified') : check === 'failed' || check === 'stopped' ? 'failed (check)' : 'checking';
 }
-
-// ─── what a step may spend ──────────────────────────────────────────────────
 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`), and
@@ -1918,7 +1855,8 @@ export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${do
  * refuses one on a background session, which keeps none (open issue 17), and the parser refuses a budget beside `background: true`.
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
- * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is left anew.
+ * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is
+ * left anew.
  */
 export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
   const job = step.harness === 'claude-detached' || ((step.harness ?? 'claude') === 'claude' && !step.background);
@@ -1929,10 +1867,10 @@ export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spe
 /**
  * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting task a free
  * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `admission.ts`). A run's next step
- * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap took the slot; above
- * them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap on
- * runs in flight and the queue are the tick's, and unchanged. It was the runtime's `priority` on the filing until thin runtime stage 4c;
- * now nothing is carried on the filing, and `momentumOf` reads it back off the run records by these rules.
+ * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap would take the slot;
+ * above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap
+ * on runs in flight and the queue are the tick's. Nothing is carried on the filing: `momentumOf` reads it off the run records by these
+ * rules.
  */
 export const MOMENTUM = 1;
 
@@ -1985,8 +1923,8 @@ export function budgetRefusal(how: RetryHow, command = 'wf retry <runId> <step>'
  * before writing the run down finds it under this id on the next pass, and adopts it rather than
  * filing a second — the engine's own rule for a session, one layer up.
  *
- * The current try's, unless another is named: `<run>-<step>-check` on the first try, as before there were
- * tries, and `<run>-<step>-try<n>-check` on the n-th.
+ * The current try's, unless another is named: `<run>-<step>-check` on the first try, and
+ * `<run>-<step>-try<n>-check` on the n-th.
  */
 export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)): string =>
   n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
@@ -1997,8 +1935,8 @@ export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
 
 /**
  * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that
- * the workflow does not, in the record's order. Pure. What `wf decide` prints each step in: a record written before steps were ordered is
- * keyed in the folder's order, and read by its keys a `plan → implement ⇄ review` run printed implement first.
+ * the workflow does not, in the record's order. Pure. What `wf decide` prints each step in: a record may be keyed in the folder's order,
+ * and read by its keys a `plan → implement ⇄ review` run would print implement first.
  */
 export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workflow, 'name'>[]): string[] => [
   ...steps.map((s) => s.name).filter((name) => Object.hasOwn(run.steps, name)),
@@ -2020,28 +1958,26 @@ export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workf
  * or every later step of a `--no-worktree` run. The directory is that step's now: its work in progress,
  * and later its own check's litter, are in it. Handing the step off before its follower is filed is
  * enough, and `advance` does that in the same pass that files the follower.
+ *
+ * Never a step that works in the repository's own checkout (`workspace: main`): what lies in a person's
+ * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
+ * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
+ * the next step's, and not this step's to sign.
  */
 export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
-  return (
-    Object.entries(run.steps)
-      // Never a step that works in the repository's own checkout (`workspace: main`): what is lying in a person's checkout is
-      // not the run's to commit under a step's name, and such a step commits its own work there, as a person would.
-      .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
-      // Once for each try (`handedOff`): what is in the workspace after the step's hand-off is a person's, or the next step's, and not
-      // this step's to sign. Measured: a person's edits in a reviewed worktree, left while its ending ran, were committed on the next pass
-      // as `review: hand off what was left uncommitted`.
-      .filter(
-        ([name, s]) =>
-          s.taskId &&
-          s.workspace &&
-          !s.check &&
-          s.handedOff !== s.taskId &&
-          finished.includes(phaseOf(s.taskId)) &&
-          ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace),
-      )
-      .map(([name]) => name)
-  );
+  return Object.entries(run.steps)
+    .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
+    .filter(
+      ([name, s]) =>
+        s.taskId &&
+        s.workspace &&
+        !s.check &&
+        s.handedOff !== s.taskId &&
+        finished.includes(phaseOf(s.taskId)) &&
+        ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace),
+    )
+    .map(([name]) => name);
 }
 
 /** Every step that waits on `name`, directly or through another. */
@@ -2059,12 +1995,6 @@ function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   }
   return found;
 }
-
-// ─── trying again ───────────────────────────────────────────────────────────
-//
-// What a try is — its modes, a person's ask, the tries a record keeps, the words for them — is retry.ts's. What stays here reads a step's
-// standing (`standing`, the gates, the budget), which retry.ts, beneath this file, cannot import without a cycle; and the record's own
-// `StepRecord`, `refusedCheck` and `overBudgetLine`, which belong with the run record and with what a step may spend.
 
 /** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
 export type StepRecord = {
@@ -2112,13 +2042,12 @@ export type Landed = { commit: string } | { aborted: string } | { untouched: str
  * Refused: it ran to its end and exited non-zero — settled `failed`, with an exit code. Did not finish:
  * `stopped` — killed, or never started — or `failed` without an exit code, which is a check stopped at its
  * deadline or lost. That is no verdict on the work: `retries:` spends no try on it, and `wf decide` offers
- * `wf retry --recheck`. Measured, on 2026-09-13: three checks were killed by the harness for "low memory" with
- * 16 GB free, and the work was fine each time.
+ * `wf retry --recheck`.
  *
  * Only a number is a refusal. A verdict nobody read (`undefined`) is no evidence of one, and is read as `listing`
- * already words it: `unfinished`. Read the other way, a caller that passed none — the api's `assess`, as first
- * shipped — called a check stopped at its deadline refused, and a run the tick had left waiting on a person read
- * running, with a try due that the tick would never file.
+ * words it: `unfinished`. Read the other way, a caller that passed none would call a check stopped at its
+ * deadline refused, and a run the tick left waiting on a person would read running, with a try due that the
+ * tick never files.
  */
 export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): boolean => phase === 'failed' && typeof verdict === 'number';
 
@@ -2127,17 +2056,17 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  *
  * Only a try that is over and let nothing that waits on it run: its check did not pass, it ended without its
  * closeout, it signed off blocked, or its session failed or was stopped. `recheck` only where a check did not
- * pass, since nothing else has a check to run again. A step that signed off blocked only once its session
+ * pass, since nothing else has a check to run again, and never on an ending that lands on its check
+ * (`landsOnCheck`): the run aborted the merge its check judged, so a recheck would judge the checkout
+ * without it. A step that signed off blocked only once its session
  * has settled: a session can outlive its closeout, and a try resuming one still running would be two agents
  * in one conversation.
  *
  * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
  * `harnessBlocked` says it — and that signed nothing, `blockedByHarness`. It reads `running`, and nothing in it
- * moves without a person: measured on 2026-09-13 and 2026-09-14, a `--bg` session stopped on "Could not refresh
- * your login because another Claude Code process is refreshing it" and waited for ever. `nudge` and `fresh` may be
- * asked for it, and the tick stops the session before it files the try (`stopFirst`), so no two agents share the
- * conversation. Not `recheck`: nothing of it was checked. Left out, `harnessBlocked` says no session is blocked,
- * and such a step is running, with nothing to try, as it was.
+ * moves without a person. `nudge` and `fresh` may be asked for it, and the tick stops the session before it
+ * files the try (`stopFirst`), so no two agents share the conversation. Not `recheck`: nothing of it was
+ * checked. Left out, `harnessBlocked` says no session is blocked, and such a step is running, with nothing to try.
  *
  * A step `over budget` from a try is tried the ways its own status takes, and one `budget exhausted` as a session that failed — each with
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
@@ -2155,8 +2084,15 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  *
  * And the looping step an ending waits on, once that ending has been filed and stopped on the base branch (`endingStopped`): a try of it
  * sends the work back from there through the folder's loop — the step filed again with what the person and the ending said, free to ask for
- * a round — and `back` names the endings whose try the pass that files it moves behind (`sentBack`). Only a looping step: its `again: true`
- * is what gives the work a round, and a folder with no loop before its ending has no way back but a new run (`retryRefusal` says so).
+ * a round — and `back` names the endings whose try the pass that files it moves behind (`sentBack`), once every step after it that has been
+ * filed is such an ending. Only a looping step: its `again: true` is what gives the work a round, and a folder with no loop before its
+ * ending has no way back but a new run (`retryRefusal` says so).
+ *
+ * @param harnessBlocked Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human`
+ *   (`harnessBlocked` in views.ts).
+ * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`.
+ * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that
+ *   did not finish does not.
  */
 export function retryable(
   step: Workflow,
@@ -2165,11 +2101,8 @@ export function retryable(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   steps: readonly Workflow[] = [],
-  /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in views.ts). */
   harnessBlocked: (taskId: string) => boolean = () => false,
-  /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`. */
   spendOf: SpendOf = () => undefined,
-  /** What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that did not finish does not. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; sendsBack?: true; back?: string[]; raise?: Raise } {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
@@ -2177,11 +2110,8 @@ export function retryable(
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
-  // At its gate, or approved with something after it and none of it filed yet: a person may still send it back. Once what follows is filed,
-  // it has handed on — and a step nothing waits on hands on with its approval: its run is over, and may be merged and shipped.
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
-  // Every step after it that has been filed is an ending that stopped on the base branch, and none of them is filed again yet.
   const stopped = followers.filter((f) => run.steps[f.name]?.taskId);
   const back =
     step.loop &&
@@ -2195,13 +2125,10 @@ export function retryable(
     (status === 'awaiting approval' ||
       Boolean(back) ||
       (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled) ||
-      // Or the run is parked at an ending step's gate, which holds before that step is filed (`waitsAtGate`): the objection is about this
-      // step's work, since the ending has nothing of its own to object to yet.
       (satisfiesAfter(status) &&
         noneFiled &&
         followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
   const modes: RetryMode[] =
-    // Not an ending that lands on its check: the run aborted the merge its check judged, so a recheck would judge the checkout without it.
     tried === 'failed (check)'
       ? landsOnCheck(step, run)
         ? ['nudge', 'fresh']
@@ -2247,20 +2174,19 @@ const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boole
  * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `wf retry` takes for a session its harness
  * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
  * the session, and the session can work again before a tick stops it, told something by a peer with no `wf up` running. Left for its
- * task to settle, that ask was neither due nor spent, `wf ls` said nothing of it, and the step's next failure filed it at once, ahead of
- * `retries:`. So the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written;
- * `runsOn` marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has
- * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
- * person, as it always has.
+ * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
+ * the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written; `runsOn`
+ * marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
+ * the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the person.
  *
  * And a session that ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
- * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`), told it ended without calling `StructuredOutput`, that its work stands and it
- * should change nothing and sign off, finishing first if it had not, and signing off anyway saying what stops it if it cannot
- * (`retrySection`). Once a round (`signoffsSpent`), never in a loop: a nudge that ends unsigned again leaves the step `unsigned`, on a
- * person. Keyed on what the engine recorded (`closeoutAsked`: `stated: false`, or an old journal's reason `unsigned`), not on the step's
- * word `unsigned`, which also covers a closeout short of a declared field — a statement given, which a reminder to give one would not
- * mend — and a journal written before the engine said anything of a `done` with no statement. Nor
- * is a step over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
+ * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`),
+ * told it ended without calling `StructuredOutput`, that its work stands and it should change nothing and sign off, finishing first if
+ * it had not, and signing off anyway saying what stops it if it cannot (`retrySection`). Once a round (`signoffsSpent`), never in a
+ * loop: a nudge that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine recorded (`closeoutAsked`:
+ * `stated: false`, or a reason `unsigned`), not on the step's word `unsigned`, which also covers a closeout short of a declared field —
+ * a statement given, which a reminder to give one would not mend — and a `done` whose end says nothing of a statement. Nor is a step
+ * over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
@@ -2270,6 +2196,13 @@ const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boole
  *
  * A step at its gate, or approved and not handed on (`sendsBack`), is tried only on an ask with words (`heard`): a wordless one, asked while
  * its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed on.
+ *
+ * An ending the work is sent back from is not also tried: its own ask, written by hand beside the send-back, names the try the send-back
+ * takes, and is spent by it (`spentAsks`).
+ *
+ * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due,
+ *   to stop it first.
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
  */
 export function retriesDue(
   steps: readonly Workflow[],
@@ -2279,9 +2212,7 @@ export function retriesDue(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
-  /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
   harnessBlocked: (taskId: string) => boolean = () => false,
-  /** What each task's sessions cost (`taskSpend`): what holds a step over its budget. */
   spendOf: SpendOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
@@ -2330,8 +2261,6 @@ export function retriesDue(
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'signoff' });
     }
   }
-  // An ending the work is sent back from is not also tried: its own ask, written by hand beside the send-back that `wf retry` refuses to
-  // take with one waiting, names a try the send-back takes, and is spent by it (`spentAsks`).
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
 
@@ -2342,17 +2271,33 @@ const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
  * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
  * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
- * `auto` would run in `default` on (`autoDropped`, F21, as the load refuses it on the step's own `model:`); a cancelled
- * run, which files nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
- * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
- * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
+ * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
+ * nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let
+ * what waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run
+ * aborted; and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a
+ * person.
+ *
+ * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
+ * other: shipping again would act on the work being changed, and a send-back would take back the try a person asked to ship again on.
+ * A send-back from it goes through the folder's loop, to the looping step it waits on, and a folder with none is told it has no such way.
+ * An ending at its gate with nothing of it filed has no try to replace: it is offered its approval, and the send-back of the work it would
+ * act on (`sendBackTo`).
+ *
+ * A send-back is an objection, refused with no words: a try with nothing to change would sign off as it did, and wait there again. At an
+ * ending's gate held before it is filed (`waitsAtGate`), the refusal names that gate and the ending's approval, never the step's own,
+ * which would be refused itself.
  *
  * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
  * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
  *
  * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at it,
  * asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step, whose
- * cap is not what stops it; and an ask already waiting that no tick will honour, for want of one.
+ * cap is not what stops it; and an ask already waiting that no tick will honour, for want of one. A step over its budget whose check did
+ * not finish is offered the recheck first, which costs nothing and needs no `--budget`.
+ *
+ * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
+ *   running, and refused.
+ * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
  */
 export function retryRefusal(
   steps: readonly Workflow[],
@@ -2364,9 +2309,7 @@ export function retryRefusal(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
-  /** Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is running, and refused. */
   harnessBlocked: (taskId: string) => boolean = () => false,
-  /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one. */
   spendOf: SpendOf = () => undefined,
 ): string | null {
   const command = `wf retry ${run.id} ${name}`;
@@ -2405,7 +2348,6 @@ export function retryRefusal(
     verdictOf,
   );
   const pending = asks.find((a) => a.step === name && a.try === next);
-  // An ending that stopped on the base branch (`endingStopped`), the step's own or the one downstream of it: what is said beside it.
   const stoppedAt = steps.find((s) => endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
   const again = stoppedAt ? `wf retry ${run.id} ${stoppedAt.name}` : '';
   const stoppedWords = (ending: Workflow): string =>
@@ -2419,8 +2361,6 @@ export function retryRefusal(
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
-  // The two ways on from an ending that stopped on the base branch take the same try of it, so one waiting refuses the other: shipping again
-  // would do the act on the work being changed, and a send-back would take back the try a person asked to ship again on.
   const shipping = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
   if (shipping) {
     return (
@@ -2435,8 +2375,6 @@ export function retryRefusal(
     }
   }
   if (!modes.length) {
-    // An ending stopped on the base branch, and a step of the work it waited on: the send-back goes through the folder's loop — the looping
-    // step the ending waits on, whose `again: true` gives the work a round. A folder with none has no such way, and none is made up here.
     if (stoppedAt && satisfiesAfter(status)) {
       const through = stoppedAt.after.filter((a) => steps.find((s) => s.name === a)?.loop);
       if (through.length) {
@@ -2450,8 +2388,6 @@ export function retryRefusal(
         `Ship again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (wf cancel ${run.id}) and start one for the work on the base branch as it is now (wf start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
       );
     }
-    // An ending step waiting at its gate with nothing of it filed (`approvedFirst`): there is no try of it to replace, and the two things
-    // there are to say to it are the approval that files it and an objection to the work it would act on (`sendBackTo`).
     if (status === 'awaiting approval' && !run.steps[name].taskId) {
       const back = sendBackTo(step, run)
         .map((s) => `wf retry ${run.id} ${s} --message "<objection>"`)
@@ -2491,7 +2427,6 @@ export function retryRefusal(
         : `Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`
     }`;
   }
-  // A send-back is an objection: a try of a step at its gate with nothing to change would sign off as it did, and wait there again.
   if (sendsBack && how.message === undefined) {
     const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
     if (back) {
@@ -2501,9 +2436,6 @@ export function retryRefusal(
         `${say} — or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${run.id} ${ending.name}.`
       );
     }
-    // The gate may be another step's: an ending step is held before it is filed (`waitsAtGate`), and the send-back from it goes to the work
-    // it would act on, which is this step. Then the step at the gate is the one to name, and the approval to offer is the ending's — this
-    // step has no gate of its own, so `wf approve` of it would be refused, and a refusal never names a command that is itself refused.
     const ending = steps.find(
       (s) => s.after.includes(name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf),
     );
@@ -2518,7 +2450,6 @@ export function retryRefusal(
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
-    // A check that did not finish is no verdict: run again as the work stands, it costs nothing, and may pass.
     if (status === 'failed (check)' && modes.includes('recheck')) {
       return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
     }
@@ -2556,7 +2487,8 @@ export function retryRefusal(
  * How a step's record reached the try it is on, for `wf ls` and `wf decide`: `try 2, by retries: 2` — and for a step of a loop past its
  * first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
  * A try a person asked for with a message says so, last: `try 2, nudged on your word, answered` — `answered` is the caller's
- * reading of the ask files (`answerOf`), since the record keeps no message.
+ * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
+ * for: `budget $5`.
  */
 export function tryNote(step: Workflow, record: StepRecord | undefined, steps: readonly Workflow[] = [], answered = false): string {
   const last = record?.tries?.at(-1);
@@ -2564,7 +2496,6 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const looping = loopOf(steps, step.name);
   const round = roundIn(record);
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
-  // The cap a person raised with it, beside the try it was raised for.
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
   if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how =
@@ -2590,6 +2521,18 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  *
  * The board reads these lines too: `apps/api` cuts the command out of each (`ONCE_MORE`), and its tests pin the shape
  * `<step>: …:  wf retry <run> <step>  (--fresh…`. The answer to a blocked step is `answerLines`', beside its question.
+ *
+ * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
+ * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. The looping step an ending that stopped
+ * on the base branch waits on is offered the send-back, which no gate line offers, and the ending a ship again for what was not the work.
+ * An ending that lands on its check, whose merge the run aborted, is offered with why, and one whose check did not finish a merge again,
+ * with nothing staged for `--recheck` to judge. Otherwise a check that did not finish is offered `--recheck` first, past a budget or not;
+ * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
+ * agent's try, a new Task, never its session continued, with no `--model` (`remoteRetryRefusal`).
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`.
+ * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`,
+ *   one that did not finish the recheck.
  */
 export function retryLines(
   steps: readonly Workflow[],
@@ -2598,13 +2541,9 @@ export function retryLines(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`. */
   spendOf: SpendOf = () => undefined,
-  /** What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`, one that did not finish the recheck. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): string[] {
-  // None on a pruned run: every try works in a worktree `wf prune` removed, and `wf retry` refuses it (`prunedRefusal`). None on a held
-  // run either, whose try is refused while the hold stands (`heldRefusal`) — and whose decision is `running`, which says so already.
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   const lines: string[] = [];
   for (const step of steps) {
@@ -2620,23 +2559,18 @@ export function retryLines(
       verdictOf,
     );
     const command = `wf retry ${run.id} ${step.name}`;
-    // The send-back from an ending that stopped on the base branch, which no gate line offers: the ending is not at its gate.
     if (back) {
       lines.push(
         `${step.name}: ${back.join(', ')} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step.name} is filed again with your objection and what ${back.join(', ')} said, may ask for a round, and ${back.join(', ')} waits at its gate for a new approval:  ${command} --message "<objection>"`,
       );
       continue;
     }
-    // A step at its gate is offered its approval and its send-back beside it (`gateLines`), never a try with nothing to change.
     if (!modes.length || sendsBack) continue;
-    // An ending that stopped on the base branch is tried again for what was not the work; the send-back above is for what was.
     const shipAgain = endingStopped(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
       ? ' Ship again, when what stopped it was not the work — a dirty checkout, a flaky test.'
       : '';
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
     const record = run.steps[step.name];
-    // An ending that lands on its check, which the run aborted: said with why, and a check that did not finish is tried by merging again,
-    // since there is nothing staged for `--recheck` to judge (`retryRefusal`).
     if (landsOnCheck(step, run) && record?.landed && 'aborted' in record.landed) {
       const budget = raise ? ` --budget <amount>` : '';
       const session = raise
@@ -2653,7 +2587,6 @@ export function retryLines(
       }
       continue;
     }
-    // A check that did not finish first, past a budget or not: run again as the work stands, it costs nothing. A session needs the raise.
     if (d.unfinishedCheck.includes(step.name)) {
       const session = raise
         ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})`
@@ -2663,7 +2596,6 @@ export function retryLines(
       );
     } else if (raise) {
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
-      // Why it stopped, beside the cap it reached: a person paying for a session of it decides on a broken session differently.
       const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
       lines.push(
@@ -2674,7 +2606,6 @@ export function retryLines(
         `${step.name}: ${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
-      // A remote agent's try is a new Task, never its session continued, and takes no `--model` (`remoteRetryRefusal`).
       lines.push(
         `${step.name}: ${status}. Send it again, as a new Task told what happened:  ${command}${spent ? `  (${spent.slice(2)})` : ''}`,
       );
@@ -2726,7 +2657,9 @@ function shownList(words: readonly string[]): string {
  * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `wf ls` does:
  * `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Pure. Undefined with no step over budget.
  * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`). On a pruned run it waits on nobody, and
- * says the run was pruned where it would say so: the raise it waits for is refused (`prunedRefusal`), as `listing` waits on nobody for it.
+ * says the run was pruned where it would say so: the raise it waits for, a try or a round, is refused (`prunedRefusal`), as `listing`
+ * waits on nobody for it. On a held run it waits on nobody either: the raise is refused while the hold stands (`heldRefusal`), and asked
+ * for once it lifts.
  */
 export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
   if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
@@ -2739,10 +2672,8 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
     return `${name} (held: its round would file ${others.map((o) => `${o.name} again, which has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ')})`;
   });
   const them = d.overBudget.length > 1 ? 'them' : 'it';
-  // A pruned run waits on nobody for its budget: the raise it would wait for is a try or a round, and each is refused (`prunedRefusal`).
   if (run.pruned)
     return `OVER BUDGET: ${why.join(', ')}  — nothing more is filed for ${them}, raised or not, since the run was ${prunedWords(run.pruned)}; nothing after ${them} ran`;
-  // Nor a held one, for now: the raise is refused while the hold stands (`heldRefusal`), and asked for once it lifts.
   if (run.hold) return `OVER BUDGET: ${why.join(', ')}  — ${heldLater(run.hold, 'the raise')}; nothing after ${them} ran`;
   return `OVER BUDGET, waiting on you: ${why.join(', ')}  — the run files nothing more for ${them} on its own; nothing after ${them} ran`;
 }
@@ -2750,7 +2681,10 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
 /**
  * For each step that signed off blocked and may be tried again, the `wf retry` that answers its `needs`, as `wf decide` prints it under the
  * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which a
- * try would run beside, and none on a run that is not waiting on a person.
+ * try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose question stays with
+ * nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  */
 export function answerLines(
   steps: readonly Workflow[],
@@ -2759,11 +2693,8 @@ export function answerLines(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too. */
   spendOf: SpendOf = () => undefined,
 ): Record<string, string> {
-  // None on a pruned run, whose try `wf retry` refuses (`prunedRefusal`): its question stays, with nothing to answer it with. Nor on a
-  // held one (`heldRefusal`), whose question is asked again once the hold lifts.
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
@@ -2776,8 +2707,6 @@ export function answerLines(
   }
   return lines;
 }
-
-// ─── saying something to a running step ─────────────────────────────────────
 
 /**
  * A person's words, said to a step's session while it ran (`wf say`), as the engine journalled them: when, to which attempt of the step's
@@ -2796,6 +2725,7 @@ export type SaidTo = Said & { try: number };
  * a step with no task filed; and a step whose current try's task has settled, where no session is running to hear anything — words for such
  * a step go into its next try's brief, with `wf retry --message`. Everything else about the session — words that are empty, an attempt not
  * started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
+ * A settled step of a pruned or a held run is told that the try that would carry the words is refused (`prunedRefusal`, `heldRefusal`).
  */
 export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
   if (!steps.some((s) => s.name === name) || !run.steps[name])
@@ -2808,7 +2738,6 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
   const phase = phaseOf(taskId);
   if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
     const settled = `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything.`;
-    // The try that would carry the words is refused of a pruned run (`prunedRefusal`) and, while it stands, of a held one (`heldRefusal`).
     if (run.pruned) return `${settled} Nor is it tried again: ${run.id} was ${prunedWords(run.pruned)}.`;
     if (run.hold)
       return `${settled} Words for the step go into its next try's brief, and no try is filed while ${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))}: say them once the hold lifts, or lift it first: wf hold ${run.id} --off.`;
@@ -2832,8 +2761,6 @@ export function saidLines(said: readonly SaidTo[]): string[] {
     ...fenced(s.text, 'text'),
   ]);
 }
-
-// ─── going round again ──────────────────────────────────────────────────────
 
 /**
  * A loop going round again: the looping step, the step its `loop:` runs again, the round to file, and on whose word — the looping step's
@@ -2909,6 +2836,8 @@ export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[])
  *
  * A loop with a step over its budget goes round on nobody's word but a person's raising the cap: its looping step reads `over budget`, so
  * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has cost.
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  */
 export function roundsDue(
   steps: readonly Workflow[],
@@ -2917,7 +2846,6 @@ export function roundsDue(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
-  /** What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. */
   spendOf: SpendOf = () => undefined,
 ): Round[] {
   const due: Round[] = [];
@@ -2969,14 +2897,14 @@ export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[])
  * Every step of the loop moves its try behind it, `then: 'round'`, and keeps its workspace and branch. The target's place is taken by the
  * task just filed, which continues its session. Every other step's is left unfiled, for `assess` to file once what it waits on is verified
  * — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it, and a
- * pass that reads the record after this files no second round.
+ * pass that reads the record after this files no second round. A cap a person raised with the round is kept on each step it was raised
+ * for, in force from its next try (`budgetOf`).
  */
 export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskId: string): Run['steps'] {
   const looping = steps.find((s) => s.name === r.step);
   const next = { ...run.steps };
   for (const name of looping ? loopSpan(steps, looping) : []) {
     const { check, tries = [], handedOff: _, landed: __, ...rest } = run.steps[name] ?? { taskId: null };
-    // A cap a person raised with the round is kept on each step it was raised for, in force from its next try (`budgetOf`).
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round', ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
@@ -2997,6 +2925,17 @@ export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] 
  *
  * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget` above
  * what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
+ *
+ * A loop a person ended themselves (`wf accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the loop
+ * is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that ran
+ * on it and take none of that back. A step of the loop that stopped in the round, on its own status whatever its budget, is a try's to
+ * take on; one over budget only because a round would file it again has not stopped. A step of the loop at its gate is moved by a
+ * person's word, not a round. A loop that is over, with an ending held at its gate before it is filed (`waitsAtGate`) waiting on it, is
+ * offered that approval and the send-back of the work (`sendBackTo`); with an ending that stopped on the base branch (`endingStopped`),
+ * the send-back of the looping step, whose `again: true` is the round, or the ending's ship again.
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
+ * @param budget The cap `wf round --budget` raises the loop's steps over their budget to.
  */
 export function roundAsk(
   steps: readonly Workflow[],
@@ -3006,9 +2945,7 @@ export function roundAsk(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
-  /** What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. */
   spendOf: SpendOf = () => undefined,
-  /** The cap `wf round --budget` raises the loop's steps over their budget to. */
   budget?: number,
 ): { step: string; round: number; budget?: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
@@ -3045,12 +2982,7 @@ export function roundAsk(
   const looping = named ?? loops[0];
   const now = roundOf(run, looping.name);
   const accepted = acceptanceOf(run, looping.name);
-  // What waits on the loop and has a task of its own. Nothing does while the loop asks for another round — `assess` holds them — so this
-  // is work a tick filed on the strength of an acceptance, and it is there whether the acceptance still is or not.
   const filed = steps.filter((s) => s.after.includes(looping.name)).find((s) => run.steps[s.name]?.taskId);
-  // A loop a person ended themselves (`wf accept`) reads `verified` again, so without this the refusals below would tell them the step
-  // "signed off without asking for another round", which is the one thing it did not do. While no tick has acted on their word there is
-  // nothing to undo, so the way back into the loop is to take the word back; once one has, it is not, and the answers are the ones below.
   if (accepted && !filed) {
     return no(
       `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept): its loop is over on their word. ` +
@@ -3080,15 +3012,12 @@ export function roundAsk(
       steps,
       spendOf,
     );
-  // A step that stopped in the round is a try's to take on: its own status, whatever its budget. One over budget only because a round would
-  // file it again has not stopped.
   const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
   if (stuck) {
     return no(
       `${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: wf retry ${run.id} ${stuck} — or see why: wf decide ${run.id}.`,
     );
   }
-  // A step of the loop at its gate has signed off and waits for a person, whose word — not another round — is what moves it.
   const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');
   if (gate) {
     const handedOn =
@@ -3101,9 +3030,6 @@ export function roundAsk(
   }
   const { status, own } = at(looping.name);
   if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
-    // The loop asks for another round and something after it is already filed: the one way to that is a person's acceptance, honoured by a
-    // tick, and then taken back by hand — an acceptance is level-triggered, unlike a retry ask, which is unconsumed by definition. A round
-    // would file the loop's work again under a step that has run on it, and take none of that back, so the acceptance is not undone here.
     if (filed) {
       return no(
         `${filed.name} waits on ${looping.name} and has already been filed (${ownStatus(filed, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}), so a round would file ${looping.loop} again under a step that ran on its work, and take none of that back. ` +
@@ -3138,15 +3064,10 @@ export function roundAsk(
     );
   }
   if (satisfiesAfter(status)) {
-    // Two ways a loop is over with its `again` still true or not asked: the step said so itself, or a person did (`wf accept`) and a tick
-    // filed what waited. Every answer below is the same for both, so which it was is written once.
     const ended = accepted
       ? `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept)`
       : `${looping.name} signed off without asking for another round (\`again: false\`)`;
     const overNow = `${ended}, so its loop is over${accepted ? ' on their word' : ''}`;
-    // What waits on it may be an ending held at its gate before it is filed (`waitsAtGate`): nothing has been filed, and saying so would
-    // send a person to `wf ls` to read a run that is waiting for them. The two things there are to say to it are the approval that files
-    // it and an objection to the work it would act on (`sendBackTo`), which is this loop.
     const ending = steps.find(
       (s) => s.after.includes(looping.name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, () => undefined),
     );
@@ -3159,8 +3080,6 @@ export function roundAsk(
           `where nothing of ${ending.name} has run and your approval is what files it. Approve it: wf approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`,
       );
     }
-    // An ending that waits on it was approved and stopped on the base branch (`endingStopped`): what changes the work there is a person's
-    // objection, which a round does not carry — the send-back files the looping step with it, and its `again: true` is the round.
     const stopped = steps.find(
       (s) => s.after.includes(looping.name) && endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf),
     );
@@ -3197,6 +3116,9 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
  * no loop, or several and none named; a try already accepted; a round already asked for, which the next tick files; a round the run files
  * itself, below the cap, and one held on a step's budget below the cap — each named with the `wf round` that is the way on; a loop that ended
  * `again: false`, which handed on by itself; and a round still running.
+ *
+ * @param asks What people asked for with `wf round`, and the run has not consumed yet: a round already asked for.
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  */
 export function acceptAsk(
   steps: readonly Workflow[],
@@ -3206,9 +3128,7 @@ export function acceptAsk(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** What people asked for with `wf round`, and the run has not consumed yet: a round already asked for. */
   asks: readonly RoundAsk[] = [],
-  /** What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. */
   spendOf: SpendOf = () => undefined,
 ): { step: string; try: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
@@ -3268,8 +3188,6 @@ export function acceptAsk(
   const { status, own } = at(looping.name);
   if (status === 'exhausted') return { step: looping.name, try: n };
 
-  // Below the cap the run does the round itself, and a person raising a budget is what un-holds one: neither is theirs to end early. `wf
-  // accept` is for the one place `wf decide` had nothing else to offer — the cap, with `again` still true.
   const left = capOf(looping) - now;
   if (status === 'over budget' && satisfiesAfter(own)) {
     return no(
@@ -3332,10 +3250,12 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
 /**
  * What `wf decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `wf round` that takes it once more,
  * with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
+ *
+ * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
+ * is `retryLines`' to offer. `wf accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
+ * budget raising it is the way on (`acceptAsk`).
  */
 export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): string[] {
-  // None on a pruned run: `wf round` and `wf accept` each file work into a worktree `wf prune` removed, and refuse it (`prunedRefusal`).
-  // None on a held run, where each is refused while the hold stands (`heldRefusal`).
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   return steps
     .filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name)))
@@ -3343,14 +3263,11 @@ export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, sp
       const name = looping.name;
       const over = loopOver(steps, looping, run, spendOf);
       const exhausted = d.exhausted.includes(name);
-      // Over budget and not held for it — its own try stopped — is `retryLines`' to offer.
       if (!exhausted && !over.length) return [];
       const raise = over.length ? `, and ${overWords(over)}` : '';
       const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
       const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
       const again = `${name}: it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}:  wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
-      // Out of rounds, the other answer a person has: the findings are real and are not this run's work. Not offered below the cap, where
-      // the run goes round itself, nor on a round held for a budget, where raising it is the way on (`acceptAsk`).
       if (!exhausted) return [again];
       const after = steps.filter((s) => s.after.includes(name)).map((s) => s.name);
       const then = after.length
@@ -3362,8 +3279,6 @@ export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, sp
       ];
     });
 }
-
-// ─── calling one off ────────────────────────────────────────────────────────
 
 /**
  * What cancelling this run has to do — and, because they are the same decision, what to tell the
@@ -3386,8 +3301,8 @@ export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, sp
  * "Finished" has to mean both of those — and no step waiting at its gate, whose approval would file what follows — because
  * `failed` does not mean a run has stopped moving:
  * in a fan-out where `a` failed and `b` succeeded, a step waiting only on `b` is still READY while
- * the run as a whole reads failed. Treating that as finished wrote no mark, and the next tick
- * filed the step anyway — the exact thing cancelling is for.
+ * the run as a whole reads failed. Treating that as finished would write no mark, and the next tick
+ * would file the step anyway — the exact thing cancelling is for.
  */
 export type CancelPlan =
   | { kind: 'cancel'; stop: InFlight[] }
@@ -3396,26 +3311,32 @@ export type CancelPlan =
 
 export type InFlight = { name: string; taskId: string };
 
-/** The tasks the engine is still holding for this run — steps and their checks: filed, and settled neither way. */
+/**
+ * The tasks the engine is still holding for this run — steps and their checks: filed, and settled neither way. A check is stopped with a
+ * run called off like any task, and a `pending` task counts, since the next tick would start it.
+ */
 export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFlight[] {
   const live: InFlight[] = [];
   for (const [name, step] of Object.entries(run.steps)) {
-    // A check is in flight like any task: a suite still running for a run somebody called off is
-    // stopped with it.
     for (const [label, taskId] of [
       [name, step.taskId],
       [`${name} (check)`, step.check?.taskId],
     ] as const) {
       if (!taskId) continue;
       const phase = phaseOf(taskId);
-      // `pending` counts: a task that is filed and waiting for a slot has not started, but the next
-      // tick would start it — which is precisely what the person cancelling does not want.
       if (phase === 'pending' || phase === 'running') live.push({ name: label, taskId });
     }
   }
   return live;
 }
 
+/**
+ * What cancelling the run has to do (`CancelPlan`). Whatever is in flight is stopped whatever the rest of the run looks like: a fan-out
+ * can have one sibling still working while another has failed the run. With nothing in flight, the run is finished only when no step is
+ * ready and no check, try or round is due (`assess`), and no step waits at its gate, whose approval would file what waits on it.
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget has no try due, and nothing is filed for it.
+ */
 export function cancelPlan(
   steps: readonly Workflow[],
   run: Run,
@@ -3425,18 +3346,12 @@ export function cancelPlan(
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
-  /** What each task's sessions cost (`taskSpend`): a step over its budget has no try due, and nothing is filed for it. */
   spendOf: SpendOf = () => undefined,
 ): CancelPlan {
-  // Whatever is in flight is stopped whatever the rest of the run looks like. A fan-out can have
-  // one sibling still working while another has already failed the run as a whole, and that
-  // session is exactly the one the person cancelling wants to stop.
   const stop = inFlight(run, phaseOf);
   if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
   if (stop.length) return { kind: 'cancel', stop };
 
-  // Nothing in flight, so the question is only whether a tick would still file something — a step, a
-  // check, a try or a round. `ready`, `check`, `retry` and `round` are the honest test for that; `status` alone is not.
   const { ready, check, retry, round, status } = assess(
     steps,
     run,
@@ -3449,7 +3364,6 @@ export function cancelPlan(
     () => false,
     spendOf,
   );
-  // Nor is a run waiting at a gate finished: an approval would file what waits on it, and the mark is what stops that.
   const atGate = steps.some(
     (s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval',
   );
@@ -3457,8 +3371,6 @@ export function cancelPlan(
     return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }
-
-// ─── forgetting a run ───────────────────────────────────────────────────────
 
 /**
  * How `wf rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged into
@@ -3508,19 +3420,32 @@ const andList = (items: readonly string[]): string =>
  *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever. And
  *   a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
+ * - **an ending that lands on its check whose merge is not landed** (`landingOpen`), with nothing of it running, cancelled or not: a pass
+ *   checks it and commits or aborts it, and with the record gone none would, and the merge would stay staged in the checkout.
  *
- * A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers then, hold it too.
+ * An ending that has not run whose result git already has (`resultOnBase`) is not named at its gate: its approval is refused
+ * (`approvalRefusal`). A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers
+ * then, hold it too. A cancelled run never ships, so for a run held until it does, the fix named is lifting that hold.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
- * record from before runs froze their workflow whose folder no longer reads (`stepsOf`): nothing ready can be judged, and nothing needs to
- * be, since no pass can file anything of it — every pass reads that folder, and dies on it. Its tasks in flight, its asks and the runs
- * that wait on it are judged as any run's.
+ * record that froze no workflow and whose folder does not read (`stepsOf`): nothing ready can be judged, and nothing needs to be, since
+ * no pass can file anything of it — every pass reads that folder, and dies on it. Its tasks in flight, its asks and the runs that wait on
+ * it are judged as any run's.
+ *
+ * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it ships.
+ * @param askAt Where an ask's file is, for the command that takes it back.
+ * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an
+ *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
+ * @param verb The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`.
+ * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.ts), for an ending that lands on its
+ *   check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the engine
+ *   say holds it.
+ * @param command The command its fixes name, when it is more than `wf <verb> <id>`: a prune's, with the flags it was given (`pruneAgain`).
  */
 export function forgetRefusal(
   steps: readonly Workflow[] | undefined,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  /** Every other run in the store: whether one waits on this run, and has not started, or is held until it ships. */
   others: readonly Run[] = [],
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
@@ -3528,21 +3453,10 @@ export function forgetRefusal(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  /** Where an ask's file is, for the command that takes it back. */
   askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
-  /**
-   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an ending whose result git
-   * already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
-   */
   standings: readonly BranchStanding[] = [],
-  /** The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`. */
   verb: 'rm' | 'prune' = 'rm',
-  /**
-   * Whose merge is in progress in the repository's checkout (`mergeState` in worktree.ts), for an ending that lands on its check: one staged
-   * and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the engine say holds it.
-   */
   merging: MergeState['merging'] = 'none',
-  /** The command its fixes name, when it is more than `wf <verb> <id>`: a prune's, with the flags it was given (`pruneAgain`). */
   command = `wf ${verb} ${run.id}`,
 ): string | null {
   const held: string[] = [];
@@ -3550,7 +3464,6 @@ export function forgetRefusal(
   const id = run.id;
   const again = command;
 
-  // What the engine still holds: the step's own task and its check, by the words a person reads them by.
   const live: string[] = [];
   for (const [name, record] of Object.entries(run.steps)) {
     for (const [label, taskId] of [
@@ -3562,8 +3475,6 @@ export function forgetRefusal(
     }
   }
   if (live.length) held.push(andList(live));
-  // An ending that lands on its check, with nothing of it running and its merge not landed: a pass checks it, commits it or aborts it —
-  // cancelled or not — and once the record is gone no pass would, and the merge would stay staged in the repository's checkout.
   const ending = steps?.find((s) => landsOnCheck(s, run));
   const unlanded =
     ending &&
@@ -3582,7 +3493,6 @@ export function forgetRefusal(
   const unheard: AskName[] = [];
   let waits = false;
   let atGates: string[] = [];
-  // A held run is read as it would stand once the hold lifts: what a pass files then is as much its work as what it files now.
   const { hold, ...free } = run;
   const lifts = hold ? `, once the hold lifts — it is ${holdWord(hold.until.map((u) => ({ run: u })))}` : '';
   if (!run.cancelledAt) {
@@ -3602,8 +3512,6 @@ export function forgetRefusal(
         );
       }
       for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
-      // Save an ending that has not run whose result git already has: nothing files it — its approval is refused (`approvalRefusal`) — and the
-      // run has shipped as git reads it (`decision`), so naming the approval here would name a command that is itself refused.
       const takenByHand = (st: Workflow): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
       atGates = steps
         .filter(
@@ -3614,8 +3522,6 @@ export function forgetRefusal(
         .map((s) => s.name);
       if (atGates.length) {
         const one = atGates.length === 1;
-        // What the approval would file: what waits on a step that has run and handed on — and the step itself, at an ending's gate, which
-        // holds before it is filed and has nothing waiting on it.
         const files = atGates.every((name) => !run.steps[name]?.taskId)
           ? one
             ? 'it is filed'
@@ -3630,7 +3536,6 @@ export function forgetRefusal(
     }
     if (due.length)
       held.push(hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
-    // A person's word no pass has spent, and none will file as the step stands: what the pass files is named above.
     for (const ask of asks) {
       if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
       unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
@@ -3648,7 +3553,6 @@ export function forgetRefusal(
     }
   }
 
-  // Said once for what cancelling settles — what is in flight, what a pass would file — and once for the asks nothing files.
   if (live.length && run.cancelledAt) {
     fixes.push(`It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (wf ls ${id})`);
   } else if (live.length || due.length || waits || atGates.length) {
@@ -3674,7 +3578,6 @@ export function forgetRefusal(
       `Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`,
     );
   }
-  // A run held until this one ships is stranded the same way: its hold would name no such run, and nothing would lift it.
   const holders = others
     .filter((o) => o.id !== id && !o.cancelledAt && o.hold?.until.includes(id))
     .map((o) => o.id)
@@ -3684,7 +3587,6 @@ export function forgetRefusal(
     held.push(
       `${andList(holders)} ${one ? 'is' : 'are'} held until it ships: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`,
     );
-    // A cancelled run never ships, so what is left is the lift.
     const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `wf hold ${h} --off`).join(', ')}`;
     fixes.push(
       run.cancelledAt
@@ -3862,7 +3764,7 @@ export type Forgot = {
   branches: BranchFate[];
   /** What was removed besides the worktrees, from `WF_ROOT`: the record first. */
   files: string[];
-  /** For a record from before runs froze their workflow, when its folder no longer reads: why. */
+  /** For a record that froze no workflow, when its folder does not read: why. */
   unfrozen?: string;
 };
 
@@ -3938,8 +3840,6 @@ function leftWords(f: Forgot): string {
     .join(';');
 }
 
-// ─── pruning a run ──────────────────────────────────────────────────────────
-
 /**
  * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it was
  * pruned — or that its marker no longer says — and what was removed. Pure.
@@ -3968,12 +3868,12 @@ const neverApproved = (pruned: Pruned): string => `not approved, and never can b
 /**
  * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
  * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
- * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record.
+ * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A run
+ * whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
  */
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
   const { at, worktrees, artifacts } = run.pruned;
-  // Its files alone, of a run whose worktrees were gone or never cut: a pruned run is over all the same, and nothing more of it is filed.
   if (artifacts && !worktrees.length) {
     return `${run.id} was pruned at ${artifacts.at}: its files were removed (wf prune --artifacts), and ${what} would file work on a run whose files the steps after it read are gone. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
   }
@@ -3994,7 +3894,7 @@ export function heldRefusal(run: Run, what: string): string | null {
 
 /**
  * What `wf prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `wf decide` says
- * (`decision`), undefined for a record from before runs froze their workflow whose folder no longer reads; `held` is why `wf rm` would not
+ * (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `wf rm` would not
  * forget it (`forgetRefusal`, worded for `wf prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in tick.ts); and each worktree git
  * lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch (`heldWorktree`), and each
  * change `git status --porcelain` lists in it.
@@ -4027,9 +3927,11 @@ export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: 
  * - **a run that is not over** (`decision` says running), or whose workflow no longer reads, so that nobody can say.
  * - **whatever holds `wf rm`** (`held`): a task in flight, anything due, an ask no pass has spent, a step at its gate. A run waiting on
  *   this one is no reason here, since the record it reads stays.
- * - **a run finished and not merged**, unless `unmerged` — or pruned before, whose merge is not asked again of its worktrees; its files, when
- *   this prune would remove them (`files`), are asked again, since that word was for the worktrees — and said only once nothing above holds it, since `--unmerged` clears none of that: pruned, none of its steps can be tried again, sent round or approved
- *   (`prunedRefusal`), and its branch is the one place its work is left.
+ * - **a run finished and not merged**, unless `unmerged` — or already pruned, whose merge is not asked again of its worktrees; its files,
+ *   when this prune would remove them (`files`), are asked again, since that word was for the worktrees — and said only once nothing
+ *   above holds it, since `--unmerged` clears none of that: pruned, none of its steps can be tried again, sent round or approved
+ *   (`prunedRefusal`), and its branch is the one place its work is left. A run that worked in the repository itself has no branch to
+ *   merge, and is refused so only for its files, which are part of what a person reads to decide it.
  * - **a hand-off still owed** (`owed`): what a pass would commit, and the files it would collect, are only in the worktree.
  * - **a worktree git would not remove, or that holds what no branch has**: locked; on no branch; or with changes no commit holds — where
  *   `wf rm` would commit them under a step's name, `wf prune` leaves that to a person, since the run is not being forgotten.
@@ -4057,9 +3959,6 @@ export function pruneRefusal(
   } else if (facts.held) {
     said.push(facts.held.replace(/\.$/, ''));
   }
-  // Not beside what holds `wf rm`: `--unmerged` gets past none of it, and a person told to run it would be refused again. Once that is
-  // cleared — a gate approved or the run called off, an ask taken back — the next `wf prune` says this, if it still holds.
-  // A run that worked in the repository itself has no branch to merge and never reads shipped; only its files bring it here (`--artifacts`).
   if (facts.decided === 'awaiting' && !agreed && !facts.held && !run.isolate) {
     said.push(
       `it finished on ${run.branch} itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: ${pruneAgain(id, { unmerged: true, artifacts })}`,
@@ -4127,7 +4026,7 @@ export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): numbe
 
 /**
  * What `wf prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
- * `--artifacts`. Pure. A prune of the worktrees alone says, as it always did, that the files are kept.
+ * `--artifacts`. Pure. A prune of the worktrees alone says that the files are kept.
  */
 export function pruneLines(p: Pruning): string[] {
   const n = p.worktrees.length;
@@ -4147,8 +4046,6 @@ export function pruneLines(p: Pruning): string[] {
     ),
   ];
 }
-
-// ─── files a person gave the run ────────────────────────────────────────────
 
 /**
  * A file `wf start --input` was given, as start.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
@@ -4203,8 +4100,6 @@ export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.fro
 export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
   names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined;
 
-// ─── files for the steps after it ───────────────────────────────────────────
-
 /**
  * Where a step's files go, told on its brief beside the closeout contract.
  *
@@ -4226,9 +4121,8 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  *
  * `inFolder` for a step of a folder run (`workspace: folder`): there the *first* way is the one that does harm. Such a step runs in
  * `dontAsk` (`validateFolderMode` in workflow.ts), fenced to its own folder, and that directory sits beside the folder, outside the
- * fence: told to put a file there, the session is denied — and before that rule it was worse, since a mode that could ask sat on the
- * prompt for ever. The second way needs nothing outside the fence and hands the file over all the same. So it too is told one way,
- * and neither mentions a branch, since a folder run has none.
+ * fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
+ * the same. So it too is told one way, and neither mentions a branch, since a folder run has none.
  */
 export const artifactsContract = (dir: string, inMain = false, inFolder = false): string =>
   (inFolder
@@ -4290,13 +4184,13 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
  */
 export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside';
 
+/** Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`. */
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
   if (!path.isAbsolute(file)) {
     const rel = path.normalize(file);
     return rel === '..' || rel.startsWith(`..${path.sep}`) ? 'escapes' : 'workspace';
   }
   const within = path.relative(path.resolve(dir), path.resolve(file));
-  // Empty is the directory itself, which is not a file in it.
   return within && within !== '..' && !within.startsWith(`..${path.sep}`) && !path.isAbsolute(within) ? 'files' : 'outside';
 }
 
@@ -4319,14 +4213,15 @@ export type MissingArtifact = { path: string; why: 'not there' | 'directory' | '
 /**
  * What `wf decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
  * a refusal is named as one, never passed over — and then every file in the step's directory, collected or written there, with its size.
+ *
+ * With its files removed by `wf prune --artifacts`, a file the directory does not have, and one named from a workspace also gone, is
+ * said `not kept`: a step's files are collected at its hand-off, and the marker cannot tell one the step never wrote from one it did.
  */
 export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[], pruned?: Pruned): string[] {
   const line = (why: MissingArtifact['why'], say: (names: string) => string): string[] => {
     const names = missing.filter((m) => m.why === why).map((m) => m.path);
     return names.length ? [say(names.join(', '))] : [];
   };
-  // Its files removed by `wf prune --artifacts`: a file the directory no longer has, and one named from a workspace also gone, were there to
-  // read until then — a step's files are collected at its hand-off. The marker cannot tell one the step never wrote from one it did.
   const filesGone = pruned?.artifacts;
   const gone = filesGone ? missing.filter((m) => m.why === 'missing' || m.why === 'not there').map((m) => m.path) : [];
   return [
@@ -4360,8 +4255,6 @@ export const sizeOf = (bytes: number): string =>
         ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
         : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 
-// ─── handing it back ────────────────────────────────────────────────────────
-
 /**
  * What is left for a person to do about this run.
  *
@@ -4372,14 +4265,14 @@ export const sizeOf = (bytes: number): string =>
  * of settling `succeeded` and going quiet.
  *
  * `shipped` is ASKED, not stored. Whether the work landed is a question git can already answer —
- * is the result branch an ancestor of the base branch — and a `decidedAt` field would be a second
+ * is the result branch an ancestor of the base branch — and a stored decision would be a second
  * copy of it, wrong the moment somebody merges by hand. A run still holds no status of its own;
  * cancellation remains the single exception, and it is one because nothing else knows it.
  *
  * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
  * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
- * as shipped, a run whose last step failed with nothing committed said `shipped`: `wf decide` hid the
- * failure, and a run waiting on it (`--after`) started. So `shipped` says which yes it is (`Shipped`).
+ * as shipped, a run whose last step failed with nothing committed would say `shipped`: `wf decide` would
+ * hide the failure, and a run waiting on it (`--after`) would start. So `shipped` says which yes it is (`Shipped`).
  */
 export type Decision =
   | { kind: 'running'; waiting: string[] }
@@ -4429,6 +4322,31 @@ export type Decision =
  */
 export type Shipped = boolean | 'unchanged';
 
+/**
+ * What is left for a person to do about this run (`Decision`). Pure. Read on `assess`'s inputs: a step a round due files again is held
+ * on no budget (`roundSpans`); an ending un-held at its gate (`unheld`) needs no reading here, since the try or round due makes the run
+ * `running`, and `gateLines` words that window.
+ *
+ * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
+ * repository's own checkout (`heldByCheckout`), a step the next tick tries again and a loop going round again.
+ *
+ * A run that worked directly on its base branch is never asked whether it shipped: git's answer is always yes. Every result branch is
+ * asked, not some — a fan-out that ends in two branches is not shipped because one landed — each once, and none after the first that is
+ * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not shipped while one does, save
+ * an ending at its gate that has not run whose result git already has (`resultOnBase`): the merge its gate holds was made by hand, so
+ * the run is shipped and a run `--after` it starts (`parentOf`), since its approval is refused and that child would wait for ever.
+ *
+ * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
+ * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
+ * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `blocked`,
+ * a person's call.
+ *
+ * @param verdictOf What each step's current check exited with: a refusal and a check that did not finish are told apart.
+ * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too.
+ * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person.
+ * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+ *   tick.ts): what this run is still running for.
+ */
 export function decision(
   steps: readonly Workflow[],
   run: Run,
@@ -4436,15 +4354,11 @@ export function decision(
   shipped: (branch: string) => Shipped,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** What each step's current check exited with: a refusal and a check that did not finish are told apart. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
-  /** Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too. */
   harnessBlocked: (taskId: string) => boolean = () => false,
-  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person. */
   spendOf: SpendOf = () => undefined,
-  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts): what this run is still running for. */
   checkout?: CheckoutHold,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
@@ -4464,16 +4378,9 @@ export function decision(
     checkout,
   );
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
-  // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
-  //
-  // An ending un-held at its gate (`unheld`) takes no adjustment here, though `assess`, `listing` and `gateLines` each take one: this map
-  // is read in the branches below, and a try or a round due makes `assess` call the run `running`, which returns before them. The word a
-  // person would have seen in that window was `gateLines`'s, and that is where the adjustment is.
   const refiled = roundSpans(steps, round);
   const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
   if (status === 'running') {
-    // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
-    // whose check is still running is one of them: its agent has finished, its verdict has not.
     const live = steps
       .filter(
         (s) =>
@@ -4481,11 +4388,7 @@ export function decision(
           (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name].taskId!))),
       )
       .map((s) => s.name);
-    // An ending step waiting for the repository's own checkout is waited on too: a person's word that files it is given, and what holds it
-    // is another run's step in that one directory. `checkoutHold` answers only for a step this pass would otherwise file (`mainClaim`).
     const waitsForCheckout = checkout ? steps.filter((s) => heldByCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
-    // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
-    // blocked session the tick stops first is both live and due, and named once.
     return {
       kind: 'running',
       waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
@@ -4496,41 +4399,24 @@ export function decision(
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 
-  // A run that worked directly on its base branch is never asked whether it shipped. Git's answer
-  // is `main is an ancestor of main` — always yes — and it was read before the steps were
-  // classified, so a failed or blocked `--no-worktree` run printed "shipped" with no closeout.
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
-  // Every terminal branch, not some: a fan-out that ends in two branches is not shipped because
-  // one of them landed. Each is asked once, and none after the first that is not on the base branch.
   const said = new Map<string, Shipped>();
   const landed = (branch: string): Shipped => {
     if (!said.has(branch)) said.set(branch, shipped(branch));
     return said.get(branch)!;
   };
-  // A step waiting at its gate is a person's word not yet given, and git cannot give it: the run is not shipped while one does.
   const atGate = steps
     .filter((s) => statusOf.get(s.name) === 'awaiting approval')
     .map((s) => s.name)
     .sort();
-  // Save one: an ending at its gate that has not run, whose result git already has on the base branch (`resultOnBase`, as `toDecide`,
-  // `listing` and `approvalRefusal` read it). Its gate holds one thing, the merge, and a person has made it by hand — so the word is given,
-  // by the only other hand that merges onto the base. Read as the no-ending kind is read, off git: shipped, and a run `--after` it starts
-  // (`parentOf`). Held back instead, that child waited for ever — the approval that would release it is refused, since there is nothing
-  // left to merge, and the `wf cancel` the refusal names makes its parent one that never ships. Any other gate still holds whatever git says.
   const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
   const byHand =
     atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => landed(b) !== false);
   const awaitingApproval = byHand ? [] : atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(landed);
-  // Work past the base on the base branch was merged by a person: shipped, whatever the steps said.
   if (onBase && branches.every((b) => landed(b) === true)) return { kind: 'shipped', branches };
 
-  // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
-  // engine recorded as failed is a thing that broke; one its check refused broke something the run
-  // can name. Lumping them loses the only bit that decides whether you read a summary or a log.
-  // By how each step ended on its own work (`ownStatus`): a step past its budget whose session broke is still a step that broke, and one
-  // that gave no closeout still gave none. Being over budget is said beside that, in `overBudget`, never in its place.
   const named = (...want: StepStatus[]) =>
     steps
       .filter((s) => want.includes(standingOf.get(s.name)!.own))
@@ -4538,22 +4424,17 @@ export function decision(
       .sort();
   const stuck = named('blocked');
   const failed = named('failed', 'stopped');
-  // A check that refused and one that never finished are both `failed (check)`, and both stop what follows. They
-  // ask different things of a person: read what the suite said, or run it again.
   const checkFailed = named('failed (check)');
   const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name].check!.taskId), verdictOf(name)));
   const failedCheck = checkFailed.filter((name) => !unfinishedCheck.includes(name));
   const unsigned = named('unsigned');
   const unverified = named('unverified');
-  // A loop out of rounds broke nothing: its step asked for more than the workflow allows, and a person decides.
   const exhausted = named('exhausted');
-  // Nor did a cap reached: spending more on the step is a person's call.
   const pastBudget = steps
     .filter((s) => statusOf.get(s.name) === 'over budget')
     .map((s) => s.name)
     .sort();
   const budgetExhausted = named('budget exhausted');
-  // Nor did a call its harness denied: the step did its work without it, and whether that stands is a person's call.
   const denied = named('denied');
   const outcome =
     failed.length || checkFailed.length
@@ -4567,7 +4448,6 @@ export function decision(
           awaitingApproval.length
         ? 'blocked'
         : 'succeeded';
-  // A branch that never moved is on the base branch from the moment it was cut: shipped only when there was nothing wrong to hide.
   if (onBase && outcome === 'succeeded') return { kind: 'shipped', branches };
   return {
     kind: 'awaiting',
@@ -4588,8 +4468,6 @@ export function decision(
   };
 }
 
-// ─── what `wf ls` says ──────────────────────────────────────────────────────
-
 export type Listing = {
   /**
    * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
@@ -4601,8 +4479,8 @@ export type Listing = {
   waitingOnYou: string[];
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `wf ls` says
-   * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off, so
-   * the listing of such a run reads as it did before holds; empty on a hold whose file names no run, which `Run.hold` still says.
+   * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
+   * on a hold whose file names no run, which `Run.hold` still says.
    */
   holding?: Wait[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
@@ -4629,70 +4507,83 @@ export type Listing = {
  * for a step whose only evidence is its own word, on every line where that is true, because a step
  * nobody checked must not pass for one somebody did.
  *
- * Where the run has no verdict of its own, the step's closeout goes beside the word, as before. A step
- * that stopped itself `blocked` ended its session as cleanly as one that finished the work, so the
- * engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in the word `wf decide`
- * uses. A step still running shows the engine's own word for it. Nothing is inferred for a step with
- * no closeout — a missing closeout is not a claim that the work was done, and an old run must still list.
+ * Where the run has no verdict of its own, the step's closeout goes beside the word — `closeout unreadable`
+ * for one nobody can read. A step that stopped itself `blocked` ended its session as cleanly as one that
+ * finished the work, so the engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in
+ * the word `wf decide` uses. A step still running shows the engine's own word for it, and a session whose
+ * word is exactly `needs-human` what the harness says it waits for (`waitingWords`). Nothing is inferred
+ * for a step with no closeout — a missing closeout is not a claim that the work was done, and a run with
+ * none still lists. A cap reached says what was spent and the cap in force; a looping step held on another
+ * step's budget shows that step's.
  *
  * One line per step, deliberately. The summary, `needs` and a check's output were written for
  * `wf decide`, where there is room to read them; here they would turn a list into a report.
+ *
+ * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
+ * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
+ * filed names the run whose step has the checkout (`checkoutWord`). The engine's word for a settled task
+ * is its outcome, and `input-required` reads as it signed (`phaseOfView`), while its line prints the word.
+ *
+ * Nothing waits on a person for a step the next tick tries again, nor for a loop going round again, and
+ * none of either is due on a run cancelled, pruned or held, whose `waitingOnYou` is empty. A step a round
+ * due files again reads no budget hold (`roundSpans`); an ending whose work is sent back reads `waiting`
+ * (`unheld`); and an ending at its gate whose result git already has waits on nobody, its note saying
+ * where the branch stands (`resultOnBase`).
+ *
+ * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
+ * says so (`heldByCheckout`) — or that a person accepted its loop (`wf accept`), never their words, which
+ * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
+ * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
+ * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ *
+ * @param phaseOf The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is.
+ * @param verdictOf What a refused check exited with, as its log tells it.
+ * @param asks What people asked for with `wf retry`, and the run has not consumed yet.
+ * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet.
+ * @param answers Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`).
+ * @param waits The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be.
+ * @param saidTo How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its
+ *   task.
+ * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts.
+ * @param slot The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be.
+ * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts):
+ *   what says a finished run is one nobody has decided.
+ * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+ *   tick.ts): what this run's ending says where `waiting` would be.
+ * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's
+ *   `needs-human` on the step's line, and nowhere else. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly,
+ *   here and by everything that reads a step's status — `harnessBlocked` in views.ts, the api's `needsOf`, `stepState` on the board — so
+ *   the phase a decision is made on stays the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in decide.ts
+ *   passes this; the api does not, and its step's `status` reaches the board's chip unchanged.
+ * @param deniedOf What each task's sessions were denied, as permission rules name them (`deniedOf` in views.ts): said as
+ *   `denied: Skill(look), Bash(pytest)` (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its
+ *   status — which stays the word every reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field
+ *   of its own (`StepNeeds.denied`).
+ * @param holds The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
+ *   the runs the hold names, each taken as one that may still ship.
  */
 export function listing(
   steps: readonly Workflow[],
   run: Run,
-  /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
   phaseOf: (taskId: string) => string,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  /** What a refused check exited with, as its log tells it. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  /** What people asked for with `wf retry`, and the run has not consumed yet. */
   asks: readonly RetryAsk[] = [],
-  /** What people asked for with `wf round`, and the run has not consumed yet. */
   roundAsks: readonly RoundAsk[] = [],
-  /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   answers: readonly RetryAsk[] = [],
-  /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
   waits: readonly Wait[] = [],
-  /** How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its task. */
   saidTo: (step: string) => number = () => 0,
-  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts. */
   spendOf: SpendOf = () => undefined,
-  /** The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be. */
   slot?: RunSlot,
-  /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts): what says a finished run is one nobody has decided. */
   standings: readonly BranchStanding[] = [],
-  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in tick.ts): what this run's ending says where `waiting` would be. */
   checkout?: CheckoutHold,
-  /**
-   * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's `needs-human`
-   * on the step's line, and nowhere else.
-   *
-   * **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and by everything that reads a step's
-   * status — `harnessBlocked` in views.ts, the api's `needsOf`, `stepState` on the board — so the phase a decision is made on stays
-   * the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in decide.ts passes this; the api does not, and
-   * its step's `status` reaches the board's chip unchanged.
-   */
   waitingOf: (taskId: string) => string | undefined = () => undefined,
-  /**
-   * What each task's sessions were denied, as permission rules name them (`deniedOf` in views.ts): said as `denied: Skill(look), Bash(pytest)`
-   * (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its status — which stays the word every
-   * reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field of its own (`StepNeeds.denied`).
-   */
   deniedOf: (taskId: string) => readonly string[] = () => [],
-  /**
-   * The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out, the runs
-   * the hold names, each taken as one that may still ship.
-   */
   holds?: readonly Wait[],
 ): Listing {
-  // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
-  // The engine's word for a settled task IS its outcome, and `unknown` a task it has no record of, which the tick stops nothing of; any other
-  // word is a task still going — but `input-required`, a task held open whose turn signed, which the run reads as it signed, settled
-  // (`phaseOfView`). The word itself is still what a step's line prints: `input-required · BLOCKED`.
   const settledOf = (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
     if (word === 'input-required') return 'succeeded';
@@ -4702,43 +4593,29 @@ export function listing(
     const c = closeoutOf(name);
     return c && !('error' in c) ? c : undefined;
   };
-  // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did. So is a loop going round again.
-  // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
   const due =
     run.cancelledAt || run.pruned || run.hold
       ? []
       : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
   const rounds =
     run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
-  // And no step a round due files again reads held on its budget: a person raised the cap for the round (`roundSpans`).
   const refiled = roundSpans(steps, rounds);
-  // Nor does an ending step hold its gate while the work it would act on is filed again (`unheld`): it reads as the waiting step it is.
   const waitingAgain = unheld(steps, run, due, rounds);
-  // And an ending at its gate whose work git already has on the base branch waits on nobody (`resultOnBase`), as `toDecide` reads it: its
-  // line says where the branch stands where the approval would be, and `wf approve` is refused in those words (`approvalRefusal`).
   const takenByHand = (name: string): boolean =>
     resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
-  /** Looping steps whose round waits on a step of their loop's budget. */
   const heldLoops = new Set<string>();
-  /** Steps waiting at their gate for a person. */
   const atGates = new Set<string>();
-  /** Steps whose word says what they spent: `over budget $4.20 of $3`, `budget exhausted $3.02 of $3`. Their line carries no `cost` beside it. */
   const priced = new Set<string>();
   const rows = steps.map((step) => {
     const row = lineOf(step);
     const spent = stepSpend(run, step.name, spendOf);
-    // What its tries have cost so far, beside its word, once a cost was measured.
     const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
-    // A loop a person ended as it stands (`wf accept`): its step reads verified again, so only this says the loop was not the reviewer's to
-    // close. The words they gave are NOT here — they are free text, and `wf ls` pads this column to the widest status (`cli.ts`).
     const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
-    // A try the checkout holds back says that, where the try due would say the next tick files it: the ask stands, and is honoured once the
-    // step in that checkout settles (`heldByCheckout`). The step's own word — blocked, failed ✗ check — is its status, and stays there.
     const heldOut = retry && checkout && heldByCheckout(steps, step.name, checkout) ? checkout : undefined;
     const tried = heldOut
       ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
@@ -4758,19 +4635,13 @@ export function listing(
                       .map((r) => r.step)
                       .join(', ')}) — it waits at its gate again once that settles`
                   : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
-    // A step at its gate says the two words a person has, beside the try it is on: a gate held again after a send-back is on its second.
-    // An ending whose result git already has says that instead, and the one command there still is.
     const gate =
       !atGates.has(step.name) || retry
         ? ''
         : takenByHand(step.name)
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
-    // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh. And
-    // what its current try's sessions were denied, last: a tool the step was not allowed, which it carried on without.
     const taskId = run.steps[step.name]?.taskId;
-    // What the run did with the merge of an ending that lands on its check, once it has: the commit it made, or why it made none. A new try
-    // clears it (`landed`). An ending the run found nothing staged of is said as it stopped, and nothing more: the run did nothing.
     const landed = run.steps[step.name]?.landed;
     const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
     const note = [tried, gate, landing, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : '']
@@ -4784,12 +4655,7 @@ export function listing(
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
-    // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed — and one the cap on runs in flight
-    // holds says so, with the count: what waits on a root still says `waiting`. An ending step waiting at its gate says that instead: it is
-    // not filed, and a person's approval is what files it.
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
-      // An ending step approved and not filed says which run's step has the checkout it works in, where `waiting` would be — unless its own
-      // work is being said again (`unheld`), which is what it waits for first.
       if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, status: checkoutWord(checkout), branch };
       return {
@@ -4798,7 +4664,6 @@ export function listing(
         branch,
       };
     }
-    // An ending that stopped on the base branch, whose work a try due sends back: the pass that files it takes its try back (`sentBack`).
     if (waitingAgain.has(name)) return { name, status: 'waiting', branch };
 
     const status = refiled.has(name) ? own : stands;
@@ -4812,47 +4677,31 @@ export function listing(
       status === 'budget exhausted' ||
       status === 'denied';
     if (onYou && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
-    // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
-      // Its cost is in its word when the word shows its own spend. A looping step held on another step's budget shows that step's, and
-      // its own goes beside it, as any step's does.
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
       return { name, status: budgetStatus(step, status), branch };
     }
-    // A gate held says so in a word of its own: its check passed or it had none, and nothing after it is filed until a person says so.
     if (status === 'awaiting approval') {
       atGates.add(name);
       return { name, status: 'awaiting approval', branch };
     }
-    // A loop out of rounds says so in a word of its own: its check passed or it had none, and it still stops what follows.
     if (status === 'exhausted') {
       exhausted.add(name);
       return { name, status: 'rounds exhausted', branch };
     }
-    // The run's own verdict, where it has one, and nothing beside it.
     if (status === 'verified') return { name, status: 'verified ✓', branch };
     if (status === 'checking') return { name, status: 'checking', branch };
     if (status === 'failed (check)') return { name, status: `failed ✗ check (${verdictWord(verdictOf(name) ?? 'unfinished')})`, branch };
-    // A step its `denials: fail` stopped, in the word every reader compares: what it was denied is its note (`deniedWords`), never in it.
     if (status === 'denied') return { name, status: 'denied', branch };
 
     const c = closeoutOf(name);
-    // Still worth a word: a statement nobody can read is not the same as no statement, and
-    // `wf decide` prints the reason.
     const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
-    // A step with no task of its own never reaches here but for its own word: the gate above is the one status a step reads unfiled.
     const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
-    // And for a session the harness blocked, what it says it waits for: `needs-human: waiting for a permission prompt`. Only where the
-    // engine's word is exactly `needs-human` — the phase is the fact, this is the detail beside it.
     const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
     return { name, status: `${word}${waitsFor ? `: ${waitingWords(waitsFor)}` : ''}${said}`, branch };
   }
 
-  /**
-   * A step at its budget, in one word and the amounts: `over budget $4.20 of $3`, `budget exhausted $3.02 of $3` — and a looping step whose
-   * round waits on another step's, that step's: `over budget — implement $4.20 of $3`.
-   */
   function budgetStatus(step: Workflow, status: StepStatus): string {
     const spent = stepSpend(run, step.name, spendOf);
     const cap = budgetOf(step, run.steps[step.name]);
@@ -4865,11 +4714,7 @@ export function listing(
       .join(', ')}`;
   }
 
-  // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
-  // though each step still signed off the way it did, and its line still says so.
   const total = runSpend(run, spendOf);
-  // What is left for a person to decide about the result, as `assess` judges it on these same inputs: `wf ls` says it where it says who
-  // a run waits on, and the board reads it there.
   const { toDecide: decide } = assess(
     steps,
     run,
@@ -4909,16 +4754,16 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
 /**
  * What the harness says a blocked session is waiting for, in a sentence a person reads: `waiting for a permission prompt`.
  *
- * **One writer for these words**, because `wf ls`, `wf decide` and the board all say the same fact and must not word it three ways
- * (the `ignoredRepoLine` lesson). The word itself is the harness's — no enum, here or in the engine — so all this does is put an
+ * **One writer for these words**, because `wf ls`, `wf decide` and the board all say the same fact and must not word it three ways.
+ * The word itself is the harness's — no enum, here or in the engine — so all this does is put an
  * article in front of it and clip it: `a`/`an` by the sound, none where the word brings its own determiner or is plural. That rule is
- * a guess about English, not about the harness, and it is wrong for an odd noun phrase a future Claude Code emits; the only value
- * measured is `permission prompt`, and the alternative — printing the word bare — reads wrong for that one.
+ * a guess about English, not about the harness, and it is wrong for an odd noun phrase a harness emits; printing the word bare reads
+ * wrong for `permission prompt`.
  *
  * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
  * would run, say — and `wf ls` pads each status to the width of the widest (`cli.ts`): a status with a newline in it breaks its row in
  * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
- * before the word is measured or clipped. A browser would have collapsed it and nothing would have shown there.
+ * before the word is measured or clipped.
  */
 export function waitingWords(waitingFor: string): string {
   const shown = oneLine(waitingFor, WAIT_CAP);
@@ -4962,8 +4807,8 @@ export function deniedWords(denied: readonly string[]): string {
  * whole sentence says it in one line (`harnessWaitLine`, `wf decide`) and one whose card says the wait already puts this under it (the
  * board's banner): the same words either way, and never assembled twice.
  *
- * The advice assumes the wait is something a person can answer in the harness, which is true of the one value measured. A `waitingFor`
- * naming something nobody can answer would carry advice that misleads: if that ever shows up, the fix is to word the advice off the word.
+ * The advice assumes the wait is something a person can answer in the harness, as a `permission prompt` is: a `waitingFor` naming
+ * something nobody can answer there is given the same advice.
  *
  * A step on a remote A2A agent (`harness: a2a:<name>`, given as `remote`) is in no Claude Code: its Task waits on its caller, and the
  * answer is a follow-up message on it, which `wf say` sends; the question is the Task's last message, which `wf logs` prints.
@@ -4980,9 +4825,9 @@ export const harnessWaitLine = (waitingFor: string, session: string | null, remo
 /**
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
+ * Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
  */
 const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
-  // Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
   run.pruned
     ? neverApproved(run.pruned)
     : run.hold
@@ -4995,8 +4840,6 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: 
  */
 export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));
-
-// ─── what the feed says ─────────────────────────────────────────────────────
 
 /** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
 export type FeedSaid = { word: string; note?: string };
@@ -5028,12 +4871,14 @@ export const feedPhase = (word: string): string =>
  *
  * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
  * moves with every other run's start and end while nothing of this one does.
+ *
+ * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
+ *   word.
  */
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
   { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
-  /** How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its word. */
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
 ): FeedWords {
   const onYou = onYouWords(l);
@@ -5129,34 +4974,45 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
  * A step after a loop a person ended as it stands is handed the same way what they said and what the loop still had open (`## Accepted`):
  * it was filed because a person decided the findings are not this run's work, and it is the only step that can tell anyone — see
  * `acceptedSection`.
+ *
+ * Every brief ends on what finishing means: the command the step is judged by, when it has one, where its files go, and then the
+ * closeout, last, because it says to give it last. A loop's target past its first round answers the findings it was handed. A folder
+ * run's steps are told of folders and never of git (`placeOf`). A try or a round that continues the last session is told only what
+ * became of it and the contracts; a step that continues another (`resume`) is told what it reads and a tree the run installed, never the
+ * spec again. How the run provisioned the tree is said only when it did more than link it (`depsLines`). What was asked for carries the
+ * files given with it (`inputsLine`), one line and only when there are any.
+ *
+ * A fan-in works on a branch with every step it waits on merged in, unless it works in the repository's checkout or in a folder, where
+ * nothing is merged. A folder step is told which earlier steps worked in its own folder, read off the folders the record names, not the
+ * plan, and the folders it was given (`givenPlan`), inside the fence — never those of steps it does not wait on; it is told to judge
+ * only what it can open. A step in the repository's own checkout (`workspace: main`) is told the run's result branches, or, for a run
+ * that cut none, that there is no work of its to read; never where the checkout stands, since a step composed again on every answer
+ * would name a commit behind it. Unless it has a check of its own, which the run executes on its merge (`landingContract`), it is told
+ * the workflow's checks its work was judged by (`workChecks`).
+ *
+ * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
+ * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in store.ts).
+ * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.ts).
+ * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
+ * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
+ * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
+ *   (`fromRunSection`), gathered by tick.ts. Given to no other step: a run without `after`, and every step after a root, is composed
+ *   without it.
+ * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in store.ts): named, with `run.inputs`, under
+ *   what was asked for.
  */
 export function composeBrief(
   step: Workflow,
   run: Run,
   steps: readonly Workflow[],
-  /** How each step signed off. Read only for the steps this one names in `input:`. */
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  /** The directory the run made for this step's files (`artifactsDir` in store.ts). */
   artifactsDir?: string,
-  /** What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.ts). */
   deps?: Provisioned,
-  /** For a step tried again: the try, and what became of the one before it (`retrySection`). */
   retry?: RetryBriefing,
-  /** For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`). */
   round?: RoundBriefing,
-  /**
-   * For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded (`fromRunSection`),
-   * gathered by tick.ts. Given to no other step: a run without `after`, and every step after a root, is composed as it always was.
-   */
   parents?: readonly ParentCloseout[],
-  /** The directory the run copied `wf start --input` files into (`inputsDir` in store.ts): named, with `run.inputs`, under what was asked for. */
   inputsDir?: string,
 ): string {
-  // What finishing means, on every brief: the command this step will be judged by, when it has one,
-  // where its files for the steps after it go, and then the closeout — last, because it says to give it
-  // last. Mechanism, not prose a workflow author has to remember to repeat. A loop's target past its first
-  // round answers the findings it was handed, filed as the round or tried again within it.
-  // A folder run's steps are told of folders, and never of git: there is no repository, branch or commit to name (`placeOf`).
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
     ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check) : checkContract(step.check)] : []),
@@ -5172,27 +5028,16 @@ export function composeBrief(
     : round
       ? roundSection(step, round, steps, closeoutOf, inFolder)
       : '';
-  // A try or a round that continues the last session has everything but what became of it.
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  // What this step reads of the steps it waits on — their declared output, and only if it asked — and, on a
-  // looping step, what its loop is and what the last round's answers were.
   const given =
     (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
     (step.loop ? loopSection(step, run, steps, closeoutOf) : '') +
     again;
-  // Said only when the run did more than link its dependencies: a minute of `npm ci`, or a failure.
   const tree = depsLines(deps);
-  // What the runs this one waited on concluded, beside what this run was asked: the work this one starts from. And what a person approved at
-  // each gate before it: read off the run as this pass files the step.
   const approved = approvedSection(step, run, steps);
-  // And what a person accepted of a loop before it, with the findings it left open: this step is the reason they are on anybody's screen.
   const accepted = acceptedSection(step, run, steps, closeoutOf);
   const handed = [...(parents ?? []).map((p) => fromRunSection(p)), ...(approved ? [approved] : []), ...(accepted ? [accepted] : [])];
 
-  // A step that CONTINUES another already has the context — its own. Repeating the spec back and
-  // pointing it at the workspace would be telling someone what they spent an hour doing. What it reads
-  // is new to it all the same, and so is a tree the run installed. A new session for a step tried again,
-  // or for a round, continues nothing, and is told what any step starting cold is.
   if (step.resume && !retry && !round)
     return (
       briefBody(step) + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
@@ -5202,15 +5047,11 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
-  // A rendered agent's instructions are in the system prompt, and a step with no note of its own then opens on what was asked for.
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
-  // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged,
-  // or in a folder, where nothing is either (`folderPlace`): a folder step is told where the steps before it worked, below.
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
       ...opening,
@@ -5232,19 +5073,12 @@ export function composeBrief(
 
   if (earlier.length || tree.length || step.workspace === 'main' || inFolder) parts.push('', '## Where to look', '');
   if (inFolder) {
-    // A folder step continues its one parent's folder (`inherit`), and any other starts in an empty folder of its own. Which earlier steps
-    // worked *here* is read off the folders the record names, not off the plan: a root tried again, or a loop's target in its next round,
-    // works in the folder it made, and a step that continued that folder has worked in it too. The rest it reads and leaves as they are.
     parts.push(
       'This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.',
     );
     const plan = workspacePlan(steps, step);
     const here = run.steps[step.name]?.workspace ?? (plan.kind === 'inherit' ? run.steps[plan.from]?.workspace : undefined);
     const inHere = earlier.filter((name) => here !== undefined && run.steps[name]?.workspace === here);
-    // The steps whose folders this one was GIVEN, which is not the same list as the steps before it: what the run copied in is what this
-    // step declared it waits on (`givenPlan`), and the brief names the copies, inside the fence. `earlier`'s fallback — every step filed
-    // so far, for a step that declares no `after` — is a fact about the run, not about this folder: named here it would point a fenced
-    // session at folders nobody copied and nobody can read.
     const given = givenPlan(run, plan);
     if (inHere.length) parts.push('', `This folder has already been worked in by: ${inHere.join(', ')}. Their work is on disk here.`);
     if (given.from.length) {
@@ -5258,20 +5092,14 @@ export function composeBrief(
         'Read what you need there. Each is a copy, taken as this step was filed, so nothing you do to it reaches them: what you make goes in this folder, outside `given`.',
       );
     }
-    // Said of work this step can actually open: what is in its own folder, or what was copied into it. A step that declares no `after`
-    // is given neither, however many steps have run beside it, and is told to judge nothing.
     if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
   } else if (step.workspace === 'main') {
-    // The one step that is not where the run's work is. Its directory is the repository as a person left it, and the work is on the
-    // run's branches, so it is told those rather than told to read the workspace. What it does here, a person sees in their checkout.
     const results = resultSteps(steps)
       .map((s) => run.steps[s.name]?.branch)
       .filter((b): b is string => Boolean(b));
     parts.push(`You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`);
-    // A run whose ending step is its whole workflow cut no branch and has no work of its own to name: saying where the work is, with
-    // nothing to say, printed an empty fence and told a session to look for a branch that was never made.
     if (results.length) {
       parts.push(
         `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : "The run's work is"} on ${results.join(' and ')}, cut from \`${run.baseRef}\`:`,
@@ -5282,17 +5110,11 @@ export function composeBrief(
         '',
       );
     } else {
-      // And nothing about where the checkout stands. `run.baseRef` is the sha frozen at `wf start`, and the sentence above already names
-      // the branch: a step that does not end — the supervisor — is composed again on every answer, so from the first merge on, a
-      // present-tense "the checkout is at <sha>" named a commit several merges behind. The historical sentence above keeps the sha,
-      // because what a result branch was cut from does not move.
       parts.push(
         `This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`,
         '',
       );
     }
-    // The check is the folder's, not the ending's words: one shipper serves every folder, and each is told the check its work was judged by.
-    // An ending with a check of its own is told that one, which the run executes on its merge (`landingContract`), and not the work's too.
     for (const check of step.check ? [] : workChecks(steps))
       parts.push(`This workflow's check, which its work was judged by: \`${check}\``, '');
     parts.push(
@@ -5383,7 +5205,8 @@ function remoteTrySection(step: Workflow, r: RetryBriefing): string {
  * For a new session of a loop's target within a round past the first — a fresh try, or a nudge with no session left to continue — the
  * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
- * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`).
+ * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`). The
+ * section is given as continuing (`resumed: true`), since `retrySection` has said the session is new.
  */
 function retriedInRound(
   step: Workflow,
@@ -5396,7 +5219,6 @@ function retriedInRound(
   if (retry.resumed || !looping || !owesReplies(steps, run, step.name)) return '';
   const round = roundOf(run, step.name);
   const rounds = capOf(looping);
-  // `resumed: true` only keeps the section from saying this is a new session: `retrySection` has just said so.
   return roundSection(step, { loop: looping.name, round, rounds, by: round > rounds ? 'ask' : 'again', resumed: true }, steps, closeoutOf);
 }
 
@@ -5461,9 +5283,8 @@ function endingSection(step: Workflow, e: EndingStopped): string[] {
 
 /**
  * What the run's sign-off nudge tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
- * pinned by a test. It names the tool: the engine's own nudge named nothing until 2026-09-17, and did not get a finished step to sign
- * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-runtime's open issue 25). Since
- * stage 4a it is the only one: the engine reports an end without its statement and nudges nothing.
+ * pinned by a test. It names the tool, `StructuredOutput`, and says to change nothing (agent-runtime's open issue 25). It is the only
+ * nudge: the engine reports an end without its statement and nudges nothing.
  */
 export const SIGNOFF = [
   'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',
@@ -5487,12 +5308,19 @@ const NEW_SESSION_IN_FOLDER =
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
  * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
  * brief's structure the run's: a pasted snippet that leaves a fence open, or a line that reads as a heading, would
- * otherwise swallow or split the sections after it, and on a nudge those are the only instructions left. The answer is beside why the step is back, and before the evidence: a step that signed
- * off blocked reads the answer to its `needs` first. A try without a message is told exactly what it was before.
+ * otherwise swallow or split the sections after it, and on a nudge those are the only instructions left. The answer is
+ * beside why the step is back, and before the evidence: a step that signed off blocked reads the answer to its `needs`
+ * first. A try without a message is given no `## Your answer`.
  *
- * A try that continues its session is told only this, since it has the rest. A new session is told it is new
- * and that the work on the branch is an earlier session's — and, like any step after another, is not given
- * that session's reasoning. What the check printed travels: it is evidence the run gathered, not an account.
+ * A try that continues its session is told only this, since it has the rest, and what was said to the session while it
+ * ran before the answer given now (`saidSection`). A new session is told it is new and that the work on the branch is an
+ * earlier session's — and, like any step after another, is not given that session's reasoning. What the check printed
+ * travels: it is evidence the run gathered, not an account. So does what the session was denied, as data.
+ *
+ * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off nudge to a
+ * session it continues is `SIGNOFF` alone, in place of why and who; a new session is told as any try is. A try sent
+ * back from an ending that stopped on the base branch is told why in the ending's terms, then what it said
+ * (`endingSection`).
  */
 export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false): string {
   const why: Partial<Record<StepStatus, string>> = {
@@ -5509,13 +5337,10 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
     'awaiting approval':
       "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
   };
-  // Beside why the last try ended, never in its place: a budget reached is why nothing more was filed, not what the session has to fix.
   const pastBudget =
     r.budget !== undefined && r.status !== 'budget exhausted'
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
       : [];
-  // The run's own sign-off nudge, to the session that did not sign off, says it in the owner's words (`SIGNOFF`), in place of why and who:
-  // it is the whole of what is asked. With no session to continue, a new one has no last turn to be told of, and is told as any try is.
   if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', SIGNOFF, ...saidSection(r.said)].join('\n');
   const who =
     r.by === 'retries'
@@ -5530,14 +5355,11 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
       ? NEW_SESSION_IN_FOLDER
       : NEW_SESSION;
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
-  // What was said to the session while it ran comes before the answer given now, in the order a person said them.
   const told = r.resumed ? saidSection(r.said) : [];
-  // Sent back from an ending that stopped on the base branch: why is the ending's, and what it said follows the objection.
   const said = r.ending
     ? `You signed off, and the work went on to ${r.ending.step}, which a person approved: it acts on ${r.ending.onto} in the repository's own checkout, and it stopped there — \`${r.ending.status}\` — without doing what it was approved for. ` +
       `A person sent the work back to you rather than ship it again: what they object to is below, then what ${r.ending.step} said.`
     : (why[r.status] ?? `The last try ended \`${r.status}\`.`);
-  // What was denied, as data: each call as the runtime names it, whose path or command is the session's own words.
   const denied =
     r.status === 'denied' && r.denied?.length ? ['', '## What your session was denied', '', ...fenced(r.denied.join('\n'), 'text')] : [];
   return [
@@ -5596,9 +5418,9 @@ export type RoundBriefing = {
  * honest answers to a finding — fix it, say why not in `replies`, or sign off blocked — and then the findings, as data (`## From <loop>`),
  * without `again` and without the reviewer's summary.
  *
- * The answers are respond.md's, which was a step of its own until the loop replaced it. They are on the brief because they are what the run
- * needs of the step: a disagreement said in `replies` travels to the next round's reviewer as data, where it can be weighed; one said
- * nowhere is a finding raised again, round after round, until a person is handed the argument cold.
+ * The answers are on the brief because they are what the run needs of the step: a disagreement said in `replies` travels to the next
+ * round's reviewer as data, where it can be weighed; one said nowhere is a finding raised again, round after round, until a person is
+ * handed the argument cold.
  */
 export function roundSection(
   step: Workflow,
@@ -5745,11 +5567,12 @@ function dataBlock(value: unknown): string[] {
  * The declared fields and nothing else — not the summary, needs or artifacts. The summary was written
  * for the person who decides, and handing a producer's account of its work to the step after it is
  * the anchoring `composeBrief` exists to prevent. JSON in a fence, under a label saying whose it is,
- * so it reads as what another step said and not as this step's instructions: data, never instruction,
- * as hkb handed a parent's result on.
+ * so it reads as what another step said and not as this step's instructions: data, never instruction.
  *
  * A round hands its target the looping step's declared output the same way, saying why it is given, and
- * without `again`, which is the loop's routing word and not a finding.
+ * without `again`, which is the loop's routing word and not a finding. A step not yet signed off is said
+ * to be so: only a brief shown before the step is filed reads that, since nothing that reads a step is
+ * filed until it has given every field it declares.
  */
 function fromSection(
   from: string,
@@ -5762,8 +5585,6 @@ function fromSection(
   const names = fields.map((f) => `\`${f}\``).join(', ');
   const said = closeoutOf(from);
   const head = ['', `## From ${from}`, ''];
-  // Only in a brief shown before the step is filed: nothing that reads a step is filed until it has
-  // given every field it declares.
   if (!producer || !said)
     return [...head, `${from} has not signed off yet. What it declares — ${names} — is given here when it has.`].join('\n');
 
@@ -5780,7 +5601,8 @@ function fromSection(
 /**
  * `## Approved`: what a person approved at each gate this step comes after, directly or through another (`hasGate`, `upstreamOf`), in the order
  * the steps run — the step, the try, when, and the words given with it (`wf approve --message`), fenced as data. Nothing for a step after no
- * approved gate, so a run with no gate composes as it always did.
+ * approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is given its own
+ * approval too: the words a person gave with it are the terms it acts on.
  *
  * It travels as a parent run's closeout does, one level down: a person read what the gated step handed on and said it may go on, and their
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
@@ -5788,8 +5610,6 @@ function fromSection(
  */
 function approvedSection(step: Workflow, run: Run, steps: readonly Workflow[]): string {
   const before = upstreamOf(steps, step.name);
-  // Its own approval too, where that is what files it: an ending step is approved before it runs (`approvedFirst`), and the words a
-  // person gave with it are the terms it acts on.
   const approved = steps
     .filter((s) => hasGate(s, run) && (before.has(s.name) || (s.name === step.name && approvedFirst(s, run))))
     .flatMap((s) => {
@@ -5826,7 +5646,7 @@ function approvedSection(step: Workflow, run: Run, steps: readonly Workflow[]): 
 /**
  * `## Accepted`: what a person accepted of each loop this step comes after (`acceptanceOf`, `upstreamOf`) — the looping step, the try, when,
  * and the words they gave, fenced as data — and then, under *From <loop>*, what that step declared: the findings the loop ended with open.
- * Nothing for a step after no accepted loop, so a run where no loop ran out of rounds composes as it always did.
+ * Nothing for a step after no accepted loop, so a run where no loop ran out of rounds composes no such section.
  *
  * It is on the brief because this step is the only one that can carry it anywhere. A loop ended by a person is a decision about scope: the
  * change is good enough, and what the reviewer found is somebody's later work. An ending step that merges without knowing that writes a
@@ -5860,6 +5680,13 @@ function acceptedSection(step: Workflow, run: Run, steps: readonly Workflow[], c
 /**
  * What `wf decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the try it
  * is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no gate. Pure.
+ *
+ * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
+ * `wf approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until the
+ * hold lifts (`heldRefusal`).
+ *
+ * @param asks What people asked for with `wf retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`).
+ * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet: the same.
  */
 export function gateLines(
   steps: readonly Workflow[],
@@ -5869,14 +5696,10 @@ export function gateLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   spendOf: SpendOf = () => undefined,
-  /** What people asked for with `wf retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`). */
   asks: readonly RetryAsk[] = [],
-  /** What people asked for with `wf round`, and the run has not consumed yet: the same. */
   roundAsks: readonly RoundAsk[] = [],
 ): Record<string, string> {
   const lines: Record<string, string> = {};
-  // An ending whose work this pass files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it: between a person's
-  // send-back and the pass that honours it, this offered the approval that `wf approve` was refusing at the same moment.
   const waitingAgain = unheld(
     steps,
     run,
@@ -5889,12 +5712,10 @@ export function gateLines(
     if (given) {
       lines[step.name] = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
     } else if (standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval') {
-      // Never approved, and now never can be: `wf approve` and the send-back each file work into a worktree `wf prune` removed.
       if (run.pruned) {
         lines[step.name] = neverApproved(run.pruned);
         continue;
       }
-      // Not approved yet, and not asked for while the run is held: `wf approve` and the send-back are each refused until it lifts.
       if (run.hold) {
         lines[step.name] = `awaiting approval:  ${heldLater(run.hold, 'its approval')}`;
         continue;
@@ -5935,7 +5756,7 @@ export type ParentCloseout = { run: string; asked: string; steps: readonly Paren
  * `## From run <id>`: what a run this one waited on concluded, as data, on each of this run's roots.
  *
  * The first line of what it was asked, and for each of its terminal steps the closeout's `summary` and what its `output:` declares, as
- * `## From <step>` gives it. The summary travels here, and never between two steps of a run, because it is no longer an account nobody has
+ * `## From <step>` gives it. The summary travels here, and never between two steps of a run, because it is not an account nobody has
  * judged: the parent shipped, which means a person read that summary beside its diff and put the work on the base this run is cut from.
  * Between steps it would anchor a reviewer on the author's view of unjudged work; one run later it is the record of work already in the
  * workspace, as a merged pull request's description is to the next person who opens the code. It is still another run's words — fenced,
@@ -5995,8 +5816,6 @@ function fromRunSection(parent: ParentCloseout, remote = false): string {
   return lines.join('\n');
 }
 
-// ─── where a step works ─────────────────────────────────────────────────────
-
 /**
  * Which workspace a step needs. Pure — it reads the shape of the workflow, nothing else.
  *
@@ -6009,8 +5828,8 @@ function fromRunSection(parent: ParentCloseout, remote = false): string {
  *     it starts. Two agents editing one directory at once is the arrangement we are avoiding, and
  *     for an agent a worktree costs nothing, so there is no reason to share one.
  *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
- *     of their work combined. `after: a, b` already means "wait for both"; it now also means
- *     "and give me both". Nobody has to learn a new key for the thing they already asked for.
+ *     of their work combined. `after: a, b` means "wait for both" and "give me both". Nobody has
+ *     to learn a new key for the thing they already asked for.
  *   - **main** — the one a step says rather than the shape: `workspace: main`, the repository's own
  *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
  *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
@@ -6036,24 +5855,20 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
 
 /**
  * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
- * both, because the brief naming a path the fence denies is the defect this exists to close.
+ * both, so the brief never names a path the fence denies.
  *
  * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow.ts): a call outside the step's own directory is denied with no
- * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So two things the run has always written into a
- * folder brief — the run's `inputs/`, and the folders of the steps this one waits on but did not continue — were paths no session could
- * read. Copying is what makes them true: a read inside the session's own directory needs no permission of any harness, which is what the
- * shipped `note-reviewer` (`tools: Read, Glob, Grep`, `permissionMode: dontAsk`, no `allowedTools:`) measured live when it read `note.md` in its
- * cwd. Reaching out instead would mean a new field on the engine's task, a per-harness argument for it, and a fresh live measurement;
- * `artifactsContract`'s folder branch already chose the same way round, and this follows it.
+ * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of the
+ * steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
+ * harness. `artifactsContract`'s folder branch goes the same way round.
  *
  * Keyed on the workspace plan, so what is copied is what the step DECLARED it waits on — a fork's parent, a fan-in's parents — and never
- * `composeBrief`'s "every step filed so far" fallback, which no `make` ever copied. A step that continues another's folder (`inherit`) is
- * given nothing: it is standing in the folder that was given it. Pure.
+ * `composeBrief`'s "every step filed so far" fallback, which no `make` copies. Every folder of a folder run holds the run's inputs, so a
+ * step that continues another's folder (`inherit`) is given nothing more: it is standing in the folder that was given it, and an
+ * `inherit` chain ends at a step that made one. Pure.
  */
 export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
   if (placeOf(run) !== 'folder' || plan.kind === 'main') return { inputs: null, from: [] };
-  // Every folder of a folder run holds the run's inputs: a step that makes its own folder is given them here, and one that continues
-  // another's folder is standing in a folder that was — an `inherit` chain bottoms out at a step that made one.
   const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
@@ -6066,8 +5881,11 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
   };
 }
 
+/**
+ * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: main`), never read off the shape; a fan-in
+ * merges onto the first of its parents by name.
+ */
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
-  // Said by the step, not by the shape: the repository's own checkout, where the base branch is (`workspace: main`).
   if (step.workspace === 'main') return { kind: 'main' };
   if (step.after.length === 0) return { kind: 'fork', from: null };
   if (step.after.length > 1) {

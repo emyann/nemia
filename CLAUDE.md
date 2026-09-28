@@ -81,7 +81,10 @@ holds what every change needs.
     package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
   - A block is off while its `excludeFiles` names its package. The card that cleans a package switches its guards on by deleting that
+    one line, and edits nothing shared. The runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it.
     one line, and edits nothing shared.
+  - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc. `oxfmt`
+    rewraps no comment, so a line you join stays within its 140 columns; a `(` `)` it drops once a comment inside them goes is its own.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
 
 ## Git

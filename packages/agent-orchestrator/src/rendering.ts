@@ -12,7 +12,7 @@
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied (F16, F17).
  *
  * The step's brief is then its own note alone (`briefBody`): the instructions are in the system prompt. A codex step is handed them in its
- * brief as before, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's (F13), and a
+ * brief, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's (F13), and a
  * step on a remote A2A agent, which keeps its operator's.
  */
 import path from 'node:path';
@@ -29,9 +29,10 @@ export const pluginOf = (agent: string): string => `hkb-${agent}`;
 
 /**
  * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and takes no
- * system prompt — whose record says what its agent is (`StepAgent.instructions`, `skills`, `systemPrompt`, absent on a record from before
- * 2026-09-25), and which starts a session of its own. A step that continues another's session keeps that session's system prompt, so it is
- * told its agent's instructions in its brief, as before (and may give no skills, nor a system prompt: `composedRefusal`).
+ * system prompt — whose record gives its agent instructions, skills or a system prompt other than `default` (`StepAgent.instructions`,
+ * `skills`, `systemPrompt`; a record without them renders nothing), and which starts a session of its own. A step that continues another's
+ * session keeps that session's system prompt, so it is told its agent's instructions in its brief (and may give no skills, nor a system
+ * prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
@@ -47,7 +48,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
 
 /**
  * A step as it is told when its rendered folder is not there — removed by hand, or never written — with its agent's instructions in its
- * brief and no flags, as a step from before 2026-09-25 is: filing it with a flag naming a file that is not there would end the session at
+ * brief and no flags: filing it with a flag naming a file that is not there would end the session at
  * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
  * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare name,
  * as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `wf start` reaches it).
@@ -119,7 +120,7 @@ export const pluginManifest = (agent: string): string =>
 /**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
  * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and the style chosen (`no-coding`). Undefined for a
- * step not rendered (`rendersAgent`), which is filed as before.
+ * step not rendered (`rendersAgent`), which is filed with none.
  */
 export function renderedFlags(
   step: Workflow,

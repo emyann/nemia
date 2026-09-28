@@ -62,15 +62,13 @@ test('the feed spans tasks and the cursor resumes exactly where it stopped', asy
   );
   assert.ok(first.cursor > 0);
 
-  // A reader that has caught up sees nothing and does not move.
   const caughtUp = await run(
     dir,
     Effect.flatMap(Journal, (j) => j.feed(first.cursor)),
   );
-  assert.deepEqual(caughtUp.entries, []);
-  assert.equal(caughtUp.cursor, first.cursor);
+  assert.deepEqual(caughtUp.entries, [], 'a reader that has caught up sees nothing');
+  assert.equal(caughtUp.cursor, first.cursor, 'and does not move');
 
-  // ...and then sees exactly what arrived after it, once.
   await run(
     dir,
     Effect.flatMap(Journal, (j) => j.append('t3', ev('spawned', '2026-01-01T00:00:02Z'))),
@@ -82,6 +80,7 @@ test('the feed spans tasks and the cursor resumes exactly where it stopped', asy
   assert.deepEqual(
     next.entries.map((e) => e.taskId),
     ['t3'],
+    'then sees exactly what arrived after it',
   );
 
   const again = await run(
@@ -113,7 +112,6 @@ test('a half-written trailing line is never handed to a consumer', async () => {
     dir,
     Effect.flatMap(Journal, (j) => j.append('t1', ev('starting', '2026-01-01T00:00:00Z'))),
   );
-  // Simulate a write caught mid-flight.
   fs.appendFileSync(path.join(dir, 'feed.jsonl'), '{"taskId":"t2","eve');
 
   const got = await run(
@@ -126,7 +124,6 @@ test('a half-written trailing line is never handed to a consumer', async () => {
     'the partial line is not parsed',
   );
 
-  // And the cursor stops before it, so the line is delivered once it is complete.
   fs.appendFileSync(path.join(dir, 'feed.jsonl'), 'nt":{"kind":"spawned","at":"2026-01-01T00:00:01Z","attempt":1}}\n');
   const after = await run(
     dir,
@@ -135,6 +132,7 @@ test('a half-written trailing line is never handed to a consumer', async () => {
   assert.deepEqual(
     after.entries.map((e) => e.taskId),
     ['t2'],
+    'the cursor stops before the partial line, so the line is delivered once it is complete',
   );
 });
 
@@ -165,9 +163,10 @@ test('a missing board is empty, not an error', async () => {
   );
 });
 
-// ─── a journal written before the harness's arguments moved under `config` ───
-
-/** A `filed` line as the engine wrote one until 2026-09-23: the harness's arguments beside the task's own fields. */
+/**
+ * A `filed` line an older runtime wrote: the harness's arguments beside the task's own fields, where `upgrade` reads them
+ * under `config`.
+ */
 const LEGACY = {
   kind: 'filed',
   at: '2026-09-01T00:00:00Z',
@@ -206,14 +205,17 @@ test("an old filed event is read with the harness's arguments under config, and 
     dir,
     Effect.flatMap(Journal, (j) => j.read('t-old')),
   );
-  // The spend cap was the task's own field then, and is one of the harness's arguments since stage 4b: lifted with them.
-  assert.deepEqual(filed, {
-    kind: 'filed',
-    at: LEGACY.at,
-    brief: 'b',
-    cwd: '/r',
-    config: { budgetUsd: 2, model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 },
-  });
+  assert.deepEqual(
+    filed,
+    {
+      kind: 'filed',
+      at: LEGACY.at,
+      brief: 'b',
+      cwd: '/r',
+      config: { budgetUsd: 2, model: 'opus', permissionMode: 'dontAsk', tools: ['Read'], worktree: true, contextTokens: 200000 },
+    },
+    "the spend cap beside the task's fields is one of the harness's arguments: lifted under config with them",
+  );
   assert.deepEqual(starting, STARTING, 'an event that never carried them is as written');
 
   const { entries } = await run(
@@ -248,7 +250,7 @@ test('a store with tasks filed on both sides of the change reads them alike, and
   assert.deepEqual((await engine.view('t-new')).state.config, { model: 'haiku' });
 });
 
-test('config is the newer word: a value there is kept over one beside it, and an undefined one is no argument', async () => {
+test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async () => {
   const dir = legacyStore({ t: [{ ...LEGACY, config: { model: 'haiku' } }], bare: [{ ...TODAY, config: undefined, model: undefined }] });
   const [both] = await run(
     dir,
@@ -262,7 +264,6 @@ test('config is the newer word: a value there is kept over one beside it, and an
     worktree: true,
     contextTokens: 200000,
   });
-  // JSON drops an undefined, so this is the in-memory case: a consumer's store that kept the key.
   const [bare] = await Effect.runPromise(
     Effect.flatMap(Journal, (j) => j.read('bare')).pipe(
       Effect.provide(
@@ -293,9 +294,10 @@ test("a consumer's own store is read in today's shape too: the upgrade is the Jo
   assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
 });
 
-// ─── a journal written while the runtime judged the spend cap (until stage 4b, 2026-09-25) ───
-
-/** A held-open task as the engine journalled one in stage 4a: its cap beside `config`, a turn's cap on its answer, a capped end. */
+/**
+ * A held-open task as a runtime that judged the spend cap journalled one: its cap beside `config`, a turn's cap on its
+ * answer, and an end with `reason: 'budget'`, which `upgrade` reads as the harness's end at that limit.
+ */
 const CAPPED = [
   { kind: 'filed', at: '2026-09-24T00:00:00Z', brief: 'b', cwd: '/r', holdOpen: true, budgetUsd: 1, config: { model: 'haiku' } },
   { kind: 'starting', at: '2026-09-24T00:00:01Z', attempt: 1 },
@@ -322,7 +324,7 @@ const CAPPED = [
   },
 ];
 
-test("a journal from before stage 4b reads its caps under config and a capped end as the harness's, with the limit beside it — and no byte on disk changes", async () => {
+test("a journal from a runtime that judged the spend cap reads its caps under config and a capped end as the harness's, with the limit beside it — and no byte on disk changes", async () => {
   const dir = legacyStore({ 't-capped': CAPPED });
   const before = bytesOf(dir);
   const events = await run(
@@ -382,17 +384,13 @@ test("an input's cap is laid under a config it already has, never over it: confi
   assert.deepEqual(input, { kind: 'input', at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 2 } });
 });
 
-// ─── a journal written while a bridge to claude.ai was a harness argument of its own (until 2026-09-25) ───
-
-test("a filing that asked for remoteControl — under config, or beside it from before config — reads it as Claude Code's flag in config.claude, and no byte on disk changes", async () => {
+test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, — under config, or beside it from before config — reads it as Claude Code's flag in config.claude, and no byte on disk changes", async () => {
   const dir = legacyStore({
     under: [{ ...TODAY, config: { background: true, remoteControl: true } }],
     beside: [{ ...TODAY, config: undefined, background: true, remoteControl: true }],
-    // A flag already in the bag is the newer word, and is kept; the bridge goes first, where the runtime gave it.
     both: [
       { ...TODAY, config: { background: true, remoteControl: true, claude: { appendSystemPromptFile: 'p.md', remoteControl: 'phone' } } },
     ],
-    // `false` asked for nothing, and is no flag: dropped.
     off: [{ ...TODAY, config: { model: 'haiku', remoteControl: false } }],
   });
   const before = bytesOf(dir);
@@ -407,9 +405,17 @@ test("a filing that asked for remoteControl — under config, or beside it from 
     ).config;
   assert.deepEqual(await read('under'), { background: true, claude: { remoteControl: true } });
   assert.deepEqual(await read('beside'), { background: true, claude: { remoteControl: true } });
-  assert.deepEqual(await read('both'), { background: true, claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } });
-  assert.deepEqual(Object.keys(((await read('both')) as { claude: object }).claude), ['remoteControl', 'appendSystemPromptFile']);
-  assert.deepEqual(await read('off'), { model: 'haiku' });
+  assert.deepEqual(
+    await read('both'),
+    { background: true, claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } },
+    'a flag already in config.claude is the newer word, and is kept',
+  );
+  assert.deepEqual(
+    Object.keys(((await read('both')) as { claude: object }).claude),
+    ['remoteControl', 'appendSystemPromptFile'],
+    'the bridge goes first, where the runtime gave it',
+  );
+  assert.deepEqual(await read('off'), { model: 'haiku' }, '`false` asked for nothing, and is no flag: dropped');
   const { entries } = await run(
     dir,
     Effect.flatMap(Journal, (j) => j.feed(0)),
@@ -430,8 +436,6 @@ test("a filing that asked for remoteControl — under config, or beside it from 
   const { state } = await createEngine({ root: dir }).view('under');
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
 });
-
-// ─── what no runtime wrote: refused with the entry, the field, and what to do ───
 
 const failureOf = <A>(dir: string, e: Effect.Effect<A, JournalError, Journal>) => run(dir, Effect.flip(e));
 

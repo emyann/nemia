@@ -47,8 +47,8 @@ const FINAL: ReadonlySet<Assessment['status']> = new Set(['succeeded', 'failed',
 
 /**
  * Whether a run is at rest after the pass that read `f`: its status is final — succeeded, failed (a gate waiting on a person included) or
- * cancelled — or it is pruned; its workflow is frozen on its record (an older record reads its folder, which is not an input the memo
- * watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is another
+ * cancelled — or it is pruned; its workflow is frozen on its record (a record without one reads its folder, which is not an input the
+ * memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is another
  * run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;

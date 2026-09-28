@@ -14,7 +14,13 @@ import { sightingOf } from '../src/a2a-map.ts';
 import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest } from '../src/facade.ts';
 import type { RunnerOps } from '../src/runner.ts';
 
-/** A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. */
+/**
+ * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With
+ * `spawnHangs`, a spawn registers its session and never answers: the runtime dies inside it.
+ *
+ * Returns `runtime`, a runtime's process started on what outlives it, and `client`, the fake's agent as a new process builds
+ * it: a client over a handler with nothing in its memory.
+ */
 const world = (o: { spawnHangs?: boolean } = {}) => {
   const tasks = new Map<string, Event[]>();
   const journal: PromiseJournal = {
@@ -39,7 +45,6 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
       asked.push(['spawn', r.name]);
       const id = `s-${++n}`;
       sessions.set(r.name, { sessionId: id, state: 'working', busy: true, nativeId: id });
-      // The runtime dies with the session registered and the spawn not yet answered.
       if (o.spawnHangs) await new Promise(() => {});
     },
     async observe() {
@@ -54,9 +59,7 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
       return '';
     },
   } satisfies PromiseRunner;
-  /** A runtime's process, started on what outlives it. */
   const runtime = () => createEngine({ journal, harnesses: { fake } });
-  /** The fake's agent as a new process builds it: a client over a handler with nothing in its memory. */
   const ops: RunnerOps = {
     spawn: (r) => Effect.promise(() => fake.spawn(r)),
     observe: Effect.promise(() => fake.observe()),
@@ -87,11 +90,14 @@ test('a restarted runtime answers for a session it never started, then stops it 
   await a.tick();
   assert.deepEqual(w.sessions.get('ae/t-r/1'), { sessionId: 's-1', state: 'working', busy: true, nativeId: 's-1' });
 
-  // The first runtime is gone. The second has not ticked, and its agent holds nothing.
   const b = w.runtime();
   const fresh = w.client();
   const task = await fresh.getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
-  assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING);
+  assert.equal(
+    task.status!.state,
+    TaskState.TASK_STATE_WORKING,
+    'the first runtime gone, the second not yet ticked: an agent that holds nothing answers off the harness',
+  );
   assert.deepEqual(sightingOf(task), w.sessions.get('ae/t-r/1'));
   const listed = await fresh.listTasks(listing);
   assert.deepEqual(
@@ -99,24 +105,25 @@ test('a restarted runtime answers for a session it never started, then stops it 
     [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]],
   );
 
-  // Stopped by the second runtime: its tick cancels the session through its agent, which stops it on the harness.
   await b.stop(id);
   w.asked.length = 0;
   await b.tick();
-  // The pass observes; then the agent asked to cancel observes to find the session, and stops it: the seam's path.
-  assert.deepEqual(w.asked, [
-    ['observe', undefined],
-    ['observe', undefined],
-    ['stop', 's-1'],
-  ]);
+  assert.deepEqual(
+    w.asked,
+    [
+      ['observe', undefined],
+      ['observe', undefined],
+      ['stop', 's-1'],
+    ],
+    "the second runtime's pass observes; then its agent, asked to cancel, observes to find the session and stops it on the harness",
+  );
   assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
   await b.tick();
   assert.equal((await b.view(id)).phase, 'stopped');
 
-  // The harness lets the session go; the journal still answers for it.
   w.sessions.delete('ae/t-r/1');
   const after = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
-  assert.equal(after.status!.state, TaskState.TASK_STATE_CANCELED);
+  assert.equal(after.status!.state, TaskState.TASK_STATE_CANCELED, 'the harness let the session go: the journal answers for it');
   assert.equal((after.metadata!.attempt as { reason: string }).reason, 'operator');
 });
 
@@ -124,7 +131,6 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
   const w = world({ spawnHangs: true });
   const a = w.runtime();
   const id = await a.file(filing);
-  // Never answered: the session exists, and the journal says only that its attempt was starting.
   void a.tick();
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(
@@ -134,6 +140,7 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
   assert.deepEqual(
     (await w.journal.read(id)).map((e) => e.kind),
     ['filed', 'starting'],
+    'the spawn never answered: the session exists, and the journal says only that its attempt was starting',
   );
 
   const b = w.runtime();

@@ -1,14 +1,14 @@
 /**
  * The Agent SDK as a Runner — the same four verbs, different guarantees.
  *
- * ## What the SDK can and cannot do here, measured rather than assumed
+ * ## What the SDK can and cannot do here
  *
  * The SDK is a typed wrapper around the same CLI, but the wrapping is over **stdio stream-json**:
  * `query()` owns a child process and streams from it for the life of the iterator. So:
  *
  *   - `query()` runs the session IN THIS PROCESS. Kill the engine, kill the session.
  *   - `extraArgs: { bg: null }` does not escape that: the flag detaches the child, the SDK waits
- *     for messages that never come, and nothing is created. (Tried it. It hangs.)
+ *     for messages that never come, and the query hangs with nothing created.
  *   - There is no SDK call for the background-session registry — the `working`/`blocked`/`done`
  *     states behind `claude agents --json` are a CLI-level concept.
  *
@@ -19,7 +19,7 @@
  *
  *   `Runner.claude()`  durable. The harness owns the session; the engine may die at any point.
  *                      Telemetry is coarse: a state, and the transcript after the fact.
- *   `Runner.sdk()`     rich. This process owns the session; cost, turns and tool calls arrive
+ *   `sdkRunner()`      rich. This process owns the session; cost, turns and tool calls arrive
  *                      live, and a gate can refuse a tool call. NOT durable.
  *
  * The engine does not change between them — only what is true after a crash does. That is the
@@ -35,6 +35,20 @@ import type { HarnessArgs } from './harness-args.ts';
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: SessionState; abort: AbortController; toolCalls: number; usage?: Usage };
 
+/**
+ * The Agent SDK runner, as a `Runner` layer made by `Runner.layer`, so it refuses what every harness refuses of a task's
+ * `config` (`argsRefusalOf`), as every runner does.
+ *
+ * - `spawn` returns at once, as handing the work to a harness does: the session runs on a detached fiber, which dies
+ *   with this process where a harness's session does not.
+ * - `observe` lists every session this process runs, with its `usage` once the SDK's `result` message has given it
+ *   and none before. The usage is what the SDK reports and nothing more: a cost or a token count it leaves out stays
+ *   out rather than becoming a 0 that reads as free, and the input's classes are given only when the SDK gave all three.
+ * - A session whose messages end without a `result` — an abort, a crashed child — is `canceled` when it was aborted
+ *   and `failed` otherwise, never left `working` for the engine to wait on until its grace window expires.
+ * - `logs` reads the stored transcript as typed messages (`getSessionMessages`), and works on sessions this process
+ *   never started, the ones `claude --bg` created included.
+ */
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
 
@@ -64,8 +78,6 @@ export const sdkRunner = () => {
             const calls = (m.message.content as Array<{ type?: string }>).filter((b) => b.type === 'tool_use').length;
             set({ toolCalls: (live.get(name)?.toolCalls ?? 0) + calls });
           } else if (m.type === 'result') {
-            // Measured at the end, from what the SDK reports — and only what it reports: a cost or a
-            // token count it leaves out stays out, rather than becoming a 0 that reads as free.
             const u = m.usage as
               | { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
               | undefined;
@@ -81,7 +93,6 @@ export const sdkRunner = () => {
                       outputTokens: u.output_tokens,
                     }
                   : {}),
-                // Its classes only when the SDK gave all three: a class it left out is not measured, not 0.
                 ...(typeof u?.input_tokens === 'number' &&
                 typeof u.cache_creation_input_tokens === 'number' &&
                 typeof u.cache_read_input_tokens === 'number'
@@ -96,28 +107,22 @@ export const sdkRunner = () => {
             });
           }
         }
-        // The iterator can end without a result message (an abort, a crashed child). Never leave
-        // a session `working` — the engine would wait on it until its grace window expired.
         if (live.get(name)?.state === 'working') set({ state: abort.signal.aborted ? 'canceled' : 'failed' });
       } catch {
         set({ state: abort.signal.aborted ? 'canceled' : 'failed' });
       }
     });
 
-  // Through `Runner.layer`, as every runner is: it asks the checks every harness shares of a task's `config` (`argsRefusalOf`).
   return Runner.layer({
     spawn: (r) =>
       Effect.gen(function* () {
         const abort = new AbortController();
         live.set(r.name, { sessionId: `(starting ${r.name})`, state: 'working', abort, toolCalls: 0 });
-        // Detached: `spawn` returns at once, the same as handing the work to the harness would.
-        // The difference is only that this fiber dies with the process, and the harness's does not.
         yield* Effect.forkDetach(pump(r.name, r, abort));
       }),
 
     observe: Effect.sync(() => {
       const m = new Map<string, Sighting>();
-      // Usage rides the same seam as every runner's: present once measured, absent before.
       for (const [name, s] of live) m.set(name, { sessionId: s.sessionId, state: s.state, ...(s.usage ? { usage: s.usage } : {}) });
       return m;
     }),
@@ -127,8 +132,6 @@ export const sdkRunner = () => {
         for (const s of live.values()) if (s.sessionId === sessionId) s.abort.abort();
       }),
 
-    // Typed, and it works on sessions this process never started — including ones `claude --bg`
-    // created. This is the SDK call worth having whichever runner is in use.
     logs: (sessionId) =>
       Effect.tryPromise({
         try: () => getSessionMessages(sessionId),

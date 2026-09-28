@@ -10,7 +10,7 @@ import { readTextAsync } from './io-tally.ts';
 
 /**
  * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and
- * delivers nothing, and says so to nobody (`Ftt` in 2.1.270's inbox), so `say` refuses it first.
+ * delivers nothing, and says so to nobody, so `say` refuses it first.
  */
 export const CLAUDE_INBOX_LINE_MAX = 1_048_576;
 
@@ -27,7 +27,7 @@ export const claudeInboxLine = (sessionId: string, text: string): string =>
  *
  * `bypassPermissions`: Claude Code holds a message from outside for a person to approve when the session it
  * reaches bypasses permission prompts, and a background session nobody has attached to keeps that approval
- * open for ever (the cross-session messaging docs, and 2.1.270's inbound gate). Words sent there reach nobody.
+ * open for ever (Claude Code's cross-session messaging docs, and its inbound gate). Words sent there reach nobody.
  */
 export const claudeSayRefuses = (task: { permissionMode?: string }, text: string): string | undefined => {
   if (task.permissionMode === 'bypassPermissions') {
@@ -116,7 +116,8 @@ const signalable = (pid: number): boolean => {
 
 /**
  * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what Claude Code writes in a session's
- * registration as `procStart` (measured on the live `--bg` sessions of 2.1.271). `undefined` where there is no `/proc`.
+ * registration as `procStart` for a `--bg` session. `undefined` where there is no `/proc`. The second field is the
+ * command's name in parentheses, which may hold spaces and parentheses, so the fields are counted from the last `)`.
  */
 export const processStart = (pid: number): string | undefined => {
   let stat: string;
@@ -125,23 +126,25 @@ export const processStart = (pid: number): string | undefined => {
   } catch {
     return undefined;
   }
-  // The second field is the command's name in parentheses, which may hold spaces and parentheses: count from the last.
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
 };
 
 /**
  * The running background session Claude Code has registered under `name` — from `<sessionsDir>/<pid>.json`, which the
  * session writes for itself (`pid`, `sessionId`, `name`, `kind`) and `say` reads an inbox from — or `undefined`. A few
- * milliseconds, where `claude agents --json` takes a third of a second (2.1.271).
+ * milliseconds, where `claude agents --json` takes a third of a second.
  *
  * Which session it is, and nothing of its state: the file does not say whether a session is working, idle or blocked,
- * and that stays the registry's. And a running session only, because a registration outlives its process (18 of the
- * 21 on the machine this was written on had none). So a file is taken only when:
+ * and that stays the registry's. And a running session only, because a registration outlives its process, most of them
+ * by far. So a file is taken only when:
  *
  * - it is a file this user owns, named for the `pid` it holds, of a `bg` session: an interactive one is never ours;
  * - a process this user may signal runs under that pid;
  * - where the system says when a process started (`/proc`), it started when the registration says (`procStart`): a pid
  *   another process has taken since is not the session. Without `/proc` (macOS) that check is not made.
+ *
+ * A file gone since the directory was read, or read mid-write, is not found this time; a directory that cannot be read
+ * finds none.
  *
  * `uid` is who "this user" is, and `startOf` when a process started: both passed only by a test.
  */
@@ -167,7 +170,7 @@ export const claudeRegistered = async (
       r = JSON.parse(await readTextAsync(file));
     } catch {
       continue;
-    } // gone since the directory was read, or read mid-write: not found this time
+    }
     if (r?.name !== name || r.kind !== 'bg' || r.pid !== pid || typeof r.sessionId !== 'string' || !r.sessionId) continue;
     if (!signalable(pid)) continue;
     const started = startOf(pid);
@@ -186,8 +189,9 @@ const SAY_TIMEOUT_MS = 5_000;
  * Resolves once the whole line is written: from then on it is in the socket's queue, and Claude Code reads it
  * when its loop comes back to the connection. So an inbox slow to close its end — a process busy past the
  * deadline — has still been given the words, and this says so, rather than reporting words it handed over as
- * words it did not (found in review). Rejects when the line was not all written: the connection refused or
- * reset, or still being written at the deadline. An inbox drops a line cut short, so then nothing was given.
+ * words it did not. Rejects when the line was not all written: the connection refused or
+ * reset, or still being written at the deadline. An inbox drops a line cut short, so then nothing was given. The inbox
+ * answers nothing; anything it does say is read and dropped.
  */
 export const claudeInboxPost = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) =>
   new Promise<void>((resolve, reject) => {
@@ -212,9 +216,7 @@ export const claudeInboxPost = (socket: string, line: string, timeoutMs = SAY_TI
         written = true;
       }),
     );
-    c.on('data', () => {
-      /* the inbox answers nothing; anything it did say is not ours to read */
-    });
+    c.on('data', () => {});
     c.on('error', (e) => finish(e));
     c.on('close', () => finish(written ? undefined : new Error(`${socket} closed the connection before the words were written`)));
   });

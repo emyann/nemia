@@ -3321,8 +3321,8 @@ What was built, four commits:
   `wf ls` says `waiting on the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
   `checkoutLine`). The word is `waiting on the checkout (…)`, not `waiting for …`: the board takes `waiting`, `waiting on …` and `pending`
   for a step with nothing filed and anything else for a session at work (`stepState`, `apps/web/src/lib/status.ts`), so `waiting for …`
-  would have drawn a step with no session as one that is running. `slotWord` (`waiting for a run slot (…)`) reads as working there for the
-  same reason, and is the board's to fix. Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
+  would have drawn a step with no session as one that is running. `slotWord` (`waiting for a run slot (…)`) read as working there for the
+  same reason, until the board learned it as a wait of its own (`waiting-for-slot`). Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
   asks — including what that pass has already filed — so the order a pass takes the runs in decides nothing, and a restart changes nothing.
   `assess`, `listing` and `decision` take the hold as they take a run slot. A step holds the checkout while the engine holds its task in
   flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold every other run's

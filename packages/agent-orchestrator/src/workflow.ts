@@ -26,10 +26,10 @@
  * the run only files the round and counts, the way `retries` is a count.
  *
  * **The keys are a closed list.** A key the parser does not know is refused by name, and a value
- * it cannot use is refused with the fix, before anything is spent. Accepting and ignoring is what
- * this replaces: `afer: implement` read as no `after` at all and started the reviewer at once,
- * beside the implementer, with write access; `deadlineSeconds: 5m` read as NaN and stopped the
- * step on its first tick. A `check:` the parser drops is a constraint nobody enforces.
+ * it cannot use is refused with the fix, before anything is spent. Accepted and ignored,
+ * `afer: implement` would read as no `after` at all and start the reviewer at once, beside the
+ * implementer, with write access; `deadlineSeconds: 5m` would read as NaN and stop the step on its
+ * first tick. A `check:` the parser drops is a constraint nobody enforces.
  *
  * **This file is the format as data, and reads nothing.** It parses and checks text, and writes a step or an agent back to text;
  * `workflow-store.ts` is what reads a folder from disk and hands it here (`loadWorkflows`, `loadAgents`, `workflowFolder`, …). So
@@ -47,7 +47,7 @@ export type Workflow = {
    * Continue that step's session instead of starting cold — the author coming back to answer,
    * with their own memory of why they did it that way.
    *
-   * The second and last structural key. Like `after` it is a relationship between steps, not
+   * A structural key: like `after` it is a relationship between steps, not
    * control flow: there is still nothing here that branches, loops or evaluates a condition.
    * Implies `after`, since you cannot continue a session that has not run.
    */
@@ -55,7 +55,7 @@ export type Workflow = {
   /**
    * `workspace: main`: the step runs in the repository's own checkout rather than a worktree of its own.
    *
-   * The third structural key, and the only one that is about a directory: everything else about where a step works is the shape of
+   * A structural key, and the only one that is about a directory: everything else about where a step works is the shape of
    * the workflow (`workspacePlan`). A run's work happens on branches in worktrees, which is what keeps two steps out of each other's
    * way — and merging one of those branches onto the base branch is the one thing a worktree cannot do, since the base branch is
    * checked out in the repository. So the step that ends a run works where a person would.
@@ -64,7 +64,7 @@ export type Workflow = {
    * with a `resume:`, whose session ran in another directory and was told none of what an ending needs, and on a step anything waits on,
    * or one that ends a workflow beside another: a run has one ending (`validate`).
    *
-   * `workspace: folder`: the step works in a folder the run makes for it, and the run needs no git repository — the first kind of
+   * `workspace: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of
    * workspace that is not the git kind (`place` on the run record). A team is of one kind: every step says it, or none does
    * (`validate`). A step that continues another's session (`resume:`) works in that step's folder, as it would in its worktree; any
    * other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and their files.
@@ -105,10 +105,10 @@ export type Workflow = {
    * Codex's sandbox, `codex exec -s`: one of `SANDBOXES` for the harness the step runs on — `read-only`, `workspace-write`,
    * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
    *
-   * On codex the key was `permissionMode:` until 2026-09-23, and a folder or an agent that says so is still read: a sandbox's word is read
-   * as `sandbox:` (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename
-   * (`codexModeLine`). A run frozen before holds the field as `permissionMode` and is read the same way (`asNamed`). The engine's task
-   * still calls it `permissionMode`: the tick hands it over under that name (`modeOf`).
+   * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
+   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename (`codexModeLine`). A
+   * run record that holds the field as `permissionMode` is read the same way (`asNamed`). The engine's task calls it `permissionMode`: the
+   * tick hands it over under that name (`modeOf`).
    */
   sandbox?: string;
   /**
@@ -132,14 +132,13 @@ export type Workflow = {
    *
    * The key a fenced step in a fresh folder needs. `dontAsk` never asks a person who is not there — it denies, and the
    * session reads the refusal and carries on — but it never allows a write either, in the session's own directory or
-   * anywhere (measured on Claude Code 2.1.278). `allowedTools: Edit(**)` gives back the writes inside the directory the
+   * anywhere (Claude Code 2.1.278). `allowedTools: Edit(**)` gives back the writes inside the directory the
    * session was started in and no others: the glob is resolved against its `cwd`, a write outside it is still denied
    * with no prompt, and unscoped (`Edit`) it would write anywhere on the machine.
    *
    * `Edit(…)` is the rule for every file-editing tool, Write and NotebookEdit with it: Claude Code matches a file
    * permission check against `Edit` rules alone, warns on stderr that a `Write(…)` rule is not matched, and denies
-   * the write — measured on 2.1.278, where `Write(**)` on the allow list left the shipped note writer unable to write its own
-   * note, and said so nowhere the run could read. So a path rule on a file-editing tool that is not `Edit` is refused
+   * the write, saying so nowhere the run can read. So a path rule on a file-editing tool that is not `Edit` is refused
    * (`fileRuleRefusal`). Refused on codex too, which has no tool list: its fence is the sandbox.
    */
   allowedTools?: string[];
@@ -236,8 +235,8 @@ export type Workflow = {
 /**
  * Where an agent-attached step's keys and words came from: the agent's name, the keys the step set itself, and its own note — and, for each
  * key the step did not set, the value it read as, as its line would write it (`given`): the agent's, or what the parser makes of the step's
- * other keys (`after:` from `resume:`, `rounds:` from `loop:`). A key whose value is no longer its given one was changed on the step since
- * it was read, and is the step's own from then on (`renderStep`).
+ * other keys (`after:` from `resume:`, `rounds:` from `loop:`). A key whose value differs from its given one was changed on the step, and
+ * is the step's own from then on (`renderStep`).
  */
 export type StepAgent = {
   name: string;
@@ -246,8 +245,8 @@ export type StepAgent = {
   given: Partial<Record<StepKey, string>>;
   /**
    * The agent's own instructions, its skills and its system prompt, as the step was resolved: what `wf start` renders for a Claude Code step,
-   * which is then told its instructions in its system prompt and its note alone in its brief (`renderedFor`). Absent on a record written
-   * before 2026-09-25, whose steps are told both in the brief, as before.
+   * which is then told its instructions in its system prompt and its note alone in its brief (`rendersAgent`, `briefBody`). Absent on a
+   * record without them, whose step is told both in its brief.
    */
   instructions?: string;
   skills?: string[];
@@ -377,7 +376,6 @@ const REFUSED: Record<string, string> = {
   guide:
     "the harness reads CLAUDE.md or AGENTS.md from the step's workspace on its own. Standing rules belong" +
     ' in that file, and what only this step needs to know belongs in the body',
-  // Retired on 2026-09-23 (thin runtime, stage 4a part 2), with the runtime's own `maxAttempts` and `resume`.
   maxAttempts:
     'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing' +
     " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `wf retry <run> <step>`" +
@@ -463,16 +461,15 @@ function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, har
     said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
 }
 
-/*
- * The words each harness takes, copied from the engine — which is the source. agent-runtime exports them:
- * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`. `codex.refuses` also takes
- * `bypassPermissions`, as the widest sandbox, since the engine's task names a sandbox as its `permissionMode`; a step does not
- * (`sandbox:`), and says `danger-full-access`.
+/**
+ * Claude Code's permission modes. The words each harness takes are copied from the engine, which is the source and exports them:
+ * `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`. `codex.refuses` also takes `bypassPermissions`, as
+ * the widest sandbox, since the engine's task names a sandbox as its `permissionMode`; a step does not (`sandbox:`), and says
+ * `danger-full-access`.
  *
- * A copy and not an import, because this file is pure and imports no runtime (`docs/architecture.md`), and the
- * engine refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked
- * here, so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the runtime's lists and
- * fails the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
+ * A copy and not an import, because this file is pure and imports no runtime (`docs/architecture.md`), and the engine refuses these words
+ * only when the run files a step — after `wf start`, with a run on the record. Checked here, so a word is refused before anything is
+ * spent. `test/vocabulary.test.ts` imports the runtime's lists and fails when a copy differs.
  */
 const CLAUDE_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
 const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -544,10 +541,11 @@ const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
 /**
  * A markdown file's frontmatter and its body, trimmed: how a step is written, and a plan's card (`plan.ts`). `block` is the lines
  * between the two `---`, or null for a file with none. `name` is what a refusal calls the file.
+ *
+ * A byte-order mark and `\r\n` are read away first: left in, either one hides the frontmatter in the body, and every key in it is
+ * dropped without a word. Refused: a frontmatter opened on the first line that never closes.
  */
 export function splitFrontmatter(name: string, text: string): { block: string | null; body: string } {
-  // A file saved with a byte-order mark or `\r\n` is the same file. Left in, either one hides the
-  // frontmatter in the body, and every key in it is dropped without a word.
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const m = FRONTMATTER.exec(text);
   if (!m && /^---[ \t]*\n/.test(text)) {
@@ -565,9 +563,12 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
- * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key — and what the step is told is the agent's instructions, a blank line, then the step's own note —
- * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
- * parser sees the resolved step; `agent` on it says what was the step's own.
+ * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key, so a step with a fence
+ * of its own is given neither of its agent's — and what the step is told is the agent's instructions, a blank line, then the step's own
+ * note — the agent's alone when the step has none. The step's own lines are read against the harness it runs on, its agent's where it
+ * names none, before the two are merged: a step's `permissionMode:` on codex is its own `sandbox:`. A schema the agent's `output:` names is
+ * read beside the agent, and one the step names beside the step. Everything downstream of the parser sees the resolved step; `agent` on it
+ * says what was the step's own.
  */
 export function parseWorkflow(
   name: string,
@@ -589,18 +590,13 @@ export function parseWorkflow(
     return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
   }
   const agent = agentOf(name, attached, agents);
-  // The step's own lines are read against the harness the step will run on, its agent's where it names none, before the two are merged: so a
-  // step's `permissionMode:` from before `sandbox:` is its own `sandbox:`, and wins over its agent's as any key of its own does.
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
-  // A fence is one key on each harness, and a step's own replaces its agent's under either name: so a step that runs a Claude Code agent on
-  // codex with a sandbox of its own is not also given the agent's permission mode, which no line of it could unset — and the other way round.
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
   if (!body)
     throw new WorkflowError(
       `${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`,
     );
-  // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.systemPrompt, step);
@@ -663,7 +659,8 @@ function agentOf(step: string, name: string, agents: Agents | undefined): Agent 
 
 /**
  * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
- * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it.
+ * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it. `resume: x` adds `x` to
+ * `after`. Refused: `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no parent.
  */
 function stepFrom(
   name: string,
@@ -676,13 +673,11 @@ function stepFrom(
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
   if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
   const background = backgroundOf(name, meta.background, harness);
   const output = outputOf(name, meta.output, read);
-  // What Claude Code's `/agents` wizard writes for "the parent's model" (`.claude/agents/`, 2.1.282), and a run's session has no parent.
   if (meta.model?.trim() === 'inherit') {
     refuse(
       `${name}: \`model: inherit\` is Claude Code's word for a subagent that runs on the model of the conversation that called it, and a step's session is called by no conversation: it would be started as \`--model inherit\`. Delete the line for the harness's own default, or name a model: \`model: sonnet\`.`,
@@ -787,6 +782,9 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools',
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a line break in a value, which ends the line and makes what
  * follows a line of its own — a key, even; and a comma inside a step's name in `after:` or `input:`, which would be read as two names.
+ *
+ * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
+ * would be read as the frontmatter, and after an empty one, as its block.
  */
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find(
@@ -799,17 +797,18 @@ export function renderStep(step: StepDraft): string {
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
-    // A key the step did not set is left to its agent — unless it was changed since, and is the step's now.
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [`${key}: ${value}`];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
   if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
-  // A body that opens on `---` would be read as the frontmatter, were there none before it — and as its block, were that block empty.
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
 
-/** One key's value as its line writes it, or `undefined` for a key the step does not set. */
+/**
+ * One key's value as its line writes it, or `undefined` for a key the step does not set. `output:` is written as the file it names, the
+ * schema being the folder's; one naming no file is written with no value, which the parser refuses.
+ */
 function writtenValue(step: string, key: StepKey, value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   let text: string;
@@ -829,7 +828,6 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
   } else if (key === 'context' && typeof value === 'number') {
     text = contextText(value);
   } else if (key === 'output' && typeof value === 'object') {
-    // The file it names: the schema is the folder's. An `output` naming no file is written with no value, which the parser refuses.
     text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
   } else if (typeof value === 'object' || typeof value === 'function') {
     refuse(
@@ -889,24 +887,25 @@ const unknownKey = (step: string, key: string): string =>
     : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
 
 /**
- * A key's former name, and the name it has now: what a step or an agent file written before a key was renamed still says. Claude Code's
- * `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:` — were `disallow:` and `allow:` here until
- * 2026-09-23. A former name is read as the key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files
- * still use one (`formerKeyLine`); nothing writes one (`renderStep`, `renderAgent`); and a run frozen before, whose steps hold the former
- * fields, is read under the new ones (`asNamed`). A key renamed later adds its line here, and `asNamed` carries it.
+ * A key's former name, and the name it has now: `disallow:` and `allow:` are the former names of `disallowedTools:` and `allowedTools:`,
+ * Claude Code's `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:`. A former name is read as the
+ * key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files still use one (`formerKeyLine`); nothing
+ * writes one (`renderStep`, `renderAgent`); and a run record whose steps hold the former fields is read under the current ones
+ * (`asNamed`). A key renamed adds its line here, and `asNamed` carries it.
  */
 export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disallow: 'disallowedTools', allow: 'allowedTools' };
 
 /**
- * The date `sandbox:` took over from `permissionMode:` on a codex step: before it, a codex step named its sandbox as its permission mode, the
- * engine's task field. Not a line of `FORMER_KEYS`, since `permissionMode` is still a key — Claude Code's — and is former only on codex.
+ * When `sandbox:` took over from `permissionMode:`, the engine's task field, as the name of a codex step's sandbox: what the refusal of both
+ * on one step quotes (`codexSandboxNamed`). Not a line of `FORMER_KEYS`, since `permissionMode` is still a key — Claude Code's — and is
+ * former only on codex.
  */
 const SANDBOX_SINCE = '2026-09-23';
 
 /**
- * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine took for
- * the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, written before the key
- * was Codex's own still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
+ * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes for
+ * the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a codex
+ * sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
  * codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming `sandbox:`. Pure.
  */
 function codexSandboxNamed<K extends string>(
@@ -931,8 +930,8 @@ function codexSandboxNamed<K extends string>(
 const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
 
 /**
- * The sandbox a codex file's `permissionMode: <word>` is read as, written before 2026-09-23, or `undefined` for a word that names none,
- * which the parser refuses. For code outside the package that reads a file's lines the parser did not read — the api's picture of an agent
+ * The sandbox a codex file's former `permissionMode: <word>` is read as, or `undefined` for a word that names none, which the parser
+ * refuses. For code outside the package that reads a file's lines the parser did not read — the api's picture of an agent
  * that does not load — so it reads the former line as the parser would. Pure.
  */
 export const formerSandbox = (word: string): string | undefined => {
@@ -955,6 +954,8 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
 /**
  * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A line
  * under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as written.
+ * Blank lines and lines opening on `#`, the comment character, are skipped. A key set twice, under either name, is refused rather than
+ * last-one-wins: both values are something the author meant, and a step would wait on half of what it was written to wait on.
  */
 function readKeys<K extends string>(
   step: string,
@@ -965,7 +966,6 @@ function readKeys<K extends string>(
   const spelled: Spelled = {};
   for (const raw of block.split('\n')) {
     const line = raw.trim();
-    // Blank lines group a long frontmatter; `#` is the comment character every reader expects.
     if (!line || line.startsWith('#')) continue;
     const i = line.indexOf(':');
     if (i <= 0) {
@@ -979,8 +979,6 @@ function readKeys<K extends string>(
 
     const refused = refusal(key);
     if (refused !== undefined) refuse(refused);
-    // Refused rather than last-one-wins: both values are something the author meant, and picking
-    // one silently is how a step ends up waiting on half of what it was written to wait on.
     if (Object.hasOwn(meta, key)) {
       const first = spelled[key] ?? key;
       if (first !== written) {
@@ -1048,7 +1046,8 @@ const FENCE_ELSEWHERE = {
 
 /**
  * A permission mode, a sandbox or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. A harness with
- * no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other key.
+ * no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other key. A
+ * word of the other fence — a sandbox written as a mode, or the other way round — is named as such in the refusal.
  */
 function wordOf(step: string, key: keyof typeof VOCABULARY, word: string | undefined, harness: string | undefined): string | undefined {
   const { lists, noun } = VOCABULARY[key];
@@ -1066,7 +1065,6 @@ function wordOf(step: string, key: keyof typeof VOCABULARY, word: string | undef
     );
   }
   const owner = HARNESSES.find((h) => lists[h]?.includes(word));
-  // The other fence's word: a sandbox written as a mode, on a harness that has modes, or the other way round.
   const other = key === 'permissionMode' ? 'sandbox' : key === 'sandbox' ? 'permissionMode' : undefined;
   const across = other && HARNESSES.find((h) => VOCABULARY[other].lists[h]?.includes(word));
   return refuse(
@@ -1167,9 +1165,10 @@ const RULE_LIST = {
  * not a rule the allow list should take.
  *
  * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
- * refused as `tools:` refuses one. Only the parentheses are looked in: a quote is legal inside a rule — `Bash(git commit -m 'wip')`
- * — and `tools:`'s quote check fired on such a rule whenever another entry followed it. A list written in brackets or quotes
- * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list at all.
+ * refused as `tools:` refuses one. Only the parentheses are looked in, not the quotes `tools:` looks in: a quote is legal inside a rule —
+ * `Bash(git commit -m 'wip')`. A list written in brackets or quotes splits into entries that are not rules, and is refused for that.
+ * Refused on codex, which has no tool list at all. A line under the key's former name (`spelled`) is quoted as written, and said to be
+ * the key.
  */
 function rulesOf(
   step: string,
@@ -1180,7 +1179,6 @@ function rulesOf(
 ): string[] | undefined {
   if (written === undefined) return undefined;
   const w = RULE_LIST[key];
-  // A line under the key's former name is quoted as written, and said to be the key.
   const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
   const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
   if (harness === 'codex') {
@@ -1228,10 +1226,10 @@ const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
 /**
  * A path rule on a file-editing tool that is not `Edit`, which Claude Code accepts, warns about on stderr and never matches.
  *
- * Measured on Claude Code 2.1.278, on the allow list. The shipped note writer was given `Write(**)` to allow and could not write its
- * own `note.md` — `Permission to use Write has been denied because Claude Code is running in don't ask mode` — while the harness
- * said, on a stderr nobody reads, `Write(**) is not matched by file permission checks — only Edit(path) rules are`. With `Edit(**)`
- * it wrote inside its folder and was denied outside it, which is the fence.
+ * On Claude Code 2.1.278, a session in `dontAsk` given `Write(**)` to allow is denied its writes — `Permission to use Write has been
+ * denied because Claude Code is running in don't ask mode` — while the harness says, on a stderr nobody reads, `Write(**) is not matched
+ * by file permission checks — only Edit(path) rules are`. With `Edit(**)` it writes inside its folder and is denied outside it, which is
+ * the fence.
  *
  * Refused on the deny list too, on the harness's own sentence: what it does not match is the *file permission check*, which is the one
  * check a deny rule on a write is read in. An inert allow denies a step its own work, which a person finds by the work not happening; an
@@ -1279,13 +1277,15 @@ function backgroundOf(step: string, background: string | undefined, harness: str
   return background === 'true';
 }
 
+/**
+ * A count (`COUNTS`) as written, refused unless a whole number of at least its least, in digits. A `deadlineSeconds:` written with a unit —
+ * `5m` — would read as NaN and stop the step on its first tick: its refusal does the arithmetic, `deadlineSeconds: 300`.
+ */
 function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const { least, counts, example } = COUNTS[key];
   const n = /^\d+$/.test(value) ? Number(value) : NaN;
   if (Number.isSafeInteger(n) && n >= least) return n;
-  // `5m` is the one that shipped: NaN, journalled as null, and the step stopped on its first tick.
-  // The unit is what the author meant, so the message does the arithmetic rather than the author.
   const unit = key === 'deadlineSeconds' ? /^(\d+)\s*([smh])$/.exec(value) : null;
   const instead = unit
     ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\``
@@ -1442,8 +1442,8 @@ function gateOf(step: string, gate: string | undefined): true | undefined {
 
 /**
  * The words `workspace:` takes. `main`: a step of a git run works in the repository's checkout rather than where the workflow's shape puts
- * it. `folder`: the run is not a git run at all, and the step works in a folder the run makes — the first of the kinds a workspace can be
- * beside git's, which is what a step without the line is.
+ * it. `folder`: the run is not a git run at all, and the step works in a folder the run makes — a kind a workspace can be beside git's,
+ * which is what a step without the line is.
  */
 export const WORKSPACES: readonly string[] = ['main', 'folder'];
 
@@ -1451,7 +1451,7 @@ export const WORKSPACES: readonly string[] = ['main', 'folder'];
  * `workspace:` as written: `main`, `folder`, or refused. A step without the line works where the shape of the workflow puts it
  * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
  * a directory the run would have to invent. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
- * stages, and commits that merge onto the base branch on its word; and not on codex, which cannot be denied the commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
+ * stages, and commits or aborts that merge onto the base branch on its word (`landingDue`); and not on codex, which cannot be denied the commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
  */
 function workspaceOf(
   step: string,
@@ -1474,20 +1474,16 @@ function workspaceOf(
       `${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`,
     );
   }
-  // A check beside it is run by the run on the merge the step leaves staged, and it lands or aborts that merge (`landingDue`): only on a step a
-  // person approves first, since the run commits onto the base branch on the check's word, and nothing else may start that.
   if (check !== undefined && gate?.trim() !== 'true') {
     refuse(
       `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no \`gate: true\`. Add \`gate: true\`, or delete the \`check:\` line.`,
     );
   }
-  // The run keeps such a step from committing the merge itself with a deny list (`filedDenies`), and codex takes none.
   if (check !== undefined && harness === 'codex') {
     refuse(
       `${step}: \`workspace: main\` with \`check: ${check}\` has the run commit the merge the step stages once the check passes, and keeps the session from committing it first by denying \`git commit\` — which codex cannot be denied: one shell, fenced by its sandbox, and a sandbox that lets it stage a merge lets it commit one. Run the ending on claude — delete \`harness: codex\` — or delete the \`check:\` line.`,
     );
   }
-  // A try of an ending does the act on the base branch again, and only a person asks for one: `wf retry`, never `retries:`.
   if (retries !== undefined) {
     refuse(
       `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: wf retry <run> ${step}. Delete the \`retries:\` line.`,
@@ -1617,7 +1613,10 @@ export function disallowedBy(denied: string, disallowedTools: readonly string[],
   });
 }
 
-/** Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. Pure. */
+/**
+ * Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. A relative pattern with no `/`
+ * in it names a file at any depth below the directory, as a gitignore line does. Pure.
+ */
 function pathUnder(pattern: string, path: string, cwd: string | undefined): boolean {
   const target = path.startsWith('/') ? path.replace(/^\/\//, '/') : cwd ? `${dirOf(cwd)}/${path.replace(/^\.\//, '')}` : undefined;
   if (target === undefined || pattern.startsWith('~')) return false;
@@ -1628,7 +1627,6 @@ function pathUnder(pattern: string, path: string, cwd: string | undefined): bool
     .split(/(\*\*|\*|\?)/)
     .map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&')))
     .join('');
-  // A relative pattern with no `/` in it names a file at any depth below the directory, as a gitignore line does.
   const from = relative ? `${dirOf(cwd!).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
   return new RegExp(`^${from}${glob}(?:/.*)?$`, 's').test(target);
 }
@@ -1649,9 +1647,11 @@ function slotOf(step: string, slot: string | undefined): 'none' | undefined {
   );
 }
 
+/**
+ * `check:` as written, refused when it is `none`, `""` or `''`: each reads as no check to a person and as a command to the shell, which
+ * cannot find it and exits 127 on every try.
+ */
 function checkOf(step: string, check: string | undefined): string | undefined {
-  // Each of these reads as "no check" to a person and as a command to the shell, which cannot find
-  // it: exit 127 on every attempt, for a check nobody meant to run.
   if (check !== undefined && ['none', '""', "''"].includes(check)) {
     refuse(
       `${step}: \`check: ${check}\` would run \`${check}\` as a shell command, which exits 127 and fails the step every time. Delete the line — a step without \`check:\` runs no check.`,
@@ -1667,6 +1667,10 @@ function checkOf(step: string, check: string | undefined): string | undefined {
  * structured output that is not: every object in it lists every property in `required` and sets
  * `additionalProperties: false`. Refused here rather than by the harness at spawn, which is after a
  * run has started and a step has been filed on it.
+ *
+ * `step` is a step's name, `review`, or an agent's file, `agents/reviewer.md`. A file outside the folder is refused before it is read: a
+ * folder is what a run freezes and the builder writes back, and a schema outside it is part of the step that neither carries; read
+ * through the api, it would also answer a refusal with the start of whatever it holds.
  */
 function outputOf(
   step: string,
@@ -1675,10 +1679,7 @@ function outputOf(
 ): StepOutput | undefined {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
-  // An agent is named by its file, `agents/reviewer.md`; a step by its name, `review`.
   const beside = step.endsWith('.md') ? step : `${step}.md`;
-  // Refused before it is read: a folder is what a run freezes and the builder writes back, and a schema outside it is part of the step
-  // that neither carries. Read through the api, a file outside it would also answer a refusal with the start of whatever it holds.
   if (path.isAbsolute(file) || path.normalize(file).split(/[\\/]/)[0] === '..') {
     refuse(
       `${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${beside} and name it from there — \`output: ${path.basename(beside, '.md')}.schema.json\` — or delete the line, and the step declares no output.`,
@@ -1738,8 +1739,8 @@ function outputOf(
 const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * One thing an agent says it can do, in the A2A protocol's words: its `AgentSkill`, as `specification/a2a.proto` defines it (protocol 1.0,
- * read 2026-09-19) and as the specification's sample card spells it in JSON — camelCase.
+ * One thing an agent says it can do, in the A2A protocol's words: its `AgentSkill`, as `specification/a2a.proto` defines it (protocol 1.0)
+ * and as the specification's sample card spells it in JSON — camelCase.
  *
  * `id`, `name`, `description` and `tags` are REQUIRED there and are required here. `examples` are the sentences a person would actually
  * type — "use this when…" is one. `inputModes` and `outputModes` are media types, and say nothing an agent's card does not already say by
@@ -1793,7 +1794,10 @@ export function skillEntryOf(file: string, id: string, text: string): AgentSkill
   };
 }
 
-/** The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one line of text, or a list — and refused as it refuses. */
+/**
+ * The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one line of text, or a list — and refused as it refuses:
+ * a line that goes on from a card key's — indented, or a list's `- item` — is refused with the one-line form.
+ */
 function entryValuesOf(
   file: string,
   text: string,
@@ -1809,7 +1813,6 @@ function entryValuesOf(
   for (const raw of block.split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    // A line that goes on from the one above it: an indented line, or a list's `- item`.
     if (/^\s/.test(raw) || line === '-' || line.startsWith('- ')) {
       if (reading !== undefined) refuse(oneLine(file, reading));
       continue;
@@ -2002,7 +2005,8 @@ const oneLine = (file: string, key: EntryKey): string =>
 /**
  * One value of a card key, as YAML reads it where the two agree: a plain value, one in double quotes (JSON's escapes, which are YAML's), one in
  * single quotes (`''` a quote), or a one-line list in JSON. Refused: a block scalar, a flow map, an anchor, an alias or a tag, a plain value
- * YAML would read as a map (a colon and a space) and a quote or a list never closed — each with the one-line form. `undefined` for none.
+ * YAML would read as a map (a colon and a space) and a quote or a list never closed — each with the one-line form. A plain value ends at
+ * ` #`, where YAML's comment begins. `undefined` for none.
  */
 function entryValue(file: string, key: EntryKey, written: string): string | string[] | undefined {
   if (!written) return undefined;
@@ -2026,9 +2030,7 @@ function entryValue(file: string, key: EntryKey, written: string): string | stri
     try {
       const read: unknown = JSON.parse(written);
       if (typeof read === 'string') return read;
-    } catch {
-      /* refused below */
-    }
+    } catch {}
     return cannot('is not one quoted line: a quote inside it is written \\", and nothing follows the closing quote');
   }
   if (written.startsWith("'")) {
@@ -2039,7 +2041,6 @@ function entryValue(file: string, key: EntryKey, written: string): string | stri
   }
   if (/^[{&*!%@`]/.test(written)) return cannot('starts with a character YAML reads as something other than text');
   if (/:(\s|$)/.test(written)) return cannot('holds a colon and a space, which YAML reads as a map, not as text');
-  // A ` #` ends a plain value in YAML: what follows is a comment.
   return written.replace(/\s+#.*$/, '');
 }
 
@@ -2069,8 +2070,8 @@ const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
  *
  * Every keyword that holds a schema is read, because an object the walk skips is an object nobody
  * checked. A reference is refused rather than followed: resolving one is a second reading of the
- * schema that can disagree with the harness's, and a `$ref` under a field once carried a loose object
- * past this check to the harness.
+ * schema that can disagree with the harness's, and a loose object behind it would reach the harness
+ * unchecked.
  */
 function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
   if (!isObject(node)) return undefined;
@@ -2219,7 +2220,7 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: what it is for, the skills it is given and its system prompt. A step has none of them, so none is a `STEP_KEY`, and code outside the package that reads the role keys leaves them out
+ * The agent keys that are the agent's own and no step's: what it is for, the skills it is given and its system prompt. A step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by hand).
  */
 export const AGENT_OWN_KEYS = ['description', 'skills', 'systemPrompt'] as const;
@@ -2260,15 +2261,13 @@ export type SkillCost = { preload: boolean; listed: number; body: number; perTur
 /** Tokens, about: four characters to a token, rounded up. */
 export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
 
-/** `SkillCost` of the skill `id`, from its SKILL.md's `text`. */
+/** `SkillCost` of the skill `id`, from its SKILL.md's `text`: one whose frontmatter never closes is read as all body. */
 export function skillTurnCost(id: string, text: string): SkillCost {
   let block: string | null = null;
   let body = text;
   try {
     ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text));
-  } catch {
-    /* read as all body */
-  }
+  } catch {}
   const framed = `---\n${block ?? ''}---\n`;
   const preload = block !== null && frontmatterKey(framed, 'preload') === 'true';
   const description = block === null ? '' : (frontmatterKey(framed, 'description') ?? '').replace(/^(["'])(.*)\1$/, '$2');
@@ -2285,13 +2284,13 @@ export function skillTurnCost(id: string, text: string): SkillCost {
 export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; looked: readonly string[] };
 
 /**
- * The models Claude Code runs in `default` when asked for `auto` (F21, 2.1.282, measured in `docs/spike-2026-09-25-agents-skills.md`): the
+ * The models Claude Code runs in `default` when asked for `auto` (F21, Claude Code 2.1.282): the
  * session starts in `auto`, says `default` from its first turn, and a job denies every call `default` would ask about. Each name as written
- * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not measured is let through: this is what is known to fail.
+ * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not listed is let through: the list is what is known to fail.
  */
 export const AUTO_UNSUPPORTED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
 
-/** Whether Claude Code keeps `auto` on `model`: false for one measured to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
+/** Whether Claude Code keeps `auto` on `model`: false for one known to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
 export const keepsAuto = (model: string | undefined): boolean =>
   model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
 
@@ -2339,9 +2338,11 @@ const CLAUDE_CODE_REFUSED: Record<string, string> = {
   isolation: "where a step works is the step's `workspace:` — a worktree of its own unless it says `main` or `folder`",
 };
 
-/** Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. */
+/**
+ * Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. `name` is
+ * one it may: Claude Code's own agent files say their name, and `parseAgent` holds it to the file's.
+ */
 function agentKeyRefusal(file: string, key: string): string | undefined {
-  // Claude Code's own agent files say their name, and one in `.claude/agents/` is read as it is written (`parseAgent` holds it to the file's).
   if (isAgentKey(key) || key === 'name' || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
   if (key === 'card') return cardRetired(file, 'card');
   if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
@@ -2361,12 +2362,12 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 /**
  * One agent, from its file's text: `name` is the file's, minus `.md`. Each value is judged as a step's would be, in the file's name, so a
  * line no step could run with is refused where it is written — a step that sets a key of its own is judged again with it. The body may be
- * empty: an agent that only sets how its steps run.
+ * empty: an agent that only sets how its steps run. `color` (`CLAUDE_CODE_IGNORED`) is read and dropped, and a `skills:` line that names a
+ * card file is refused (`cardRetired`).
  */
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
-  // `color` is Claude Code's alone (`CLAUDE_CODE_IGNORED`): read, and dropped here.
   const {
     meta: { description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written },
     spelled,
@@ -2379,7 +2380,6 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
       `${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`,
     );
   }
-  // `skills:` named a card file until 2026-09-25 and `card:` did after it, until agents card 2 generated the card from the skills.
   if (listed !== undefined && isCardFile(listed)) refuse(cardRetired(file, 'skills', listed));
   const keys = codexSandboxNamed(file, written as Partial<Record<RoleKey, string>>, written.harness);
   const step = stepFrom(file, keys, body, read, spelled);
@@ -2403,12 +2403,12 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   };
 }
 
-/** Whether a `skills:` value is a card's file, as the line named one until 2026-09-25: one `.json` file. No skill's name ends so. */
+/** Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so. */
 export const isCardFile = (value: string): boolean => !value.includes(',') && /\.json$/i.test(value.trim());
 
 /**
- * The refusal of a card file an agent still names — by `card:`, or by a `skills:` line written before 2026-09-25 — since agents card 2
- * generated the card from the agent's skills (`cardSkills` in `workflow-store.ts`). Refused rather than read and dropped: a line the run
+ * The refusal of a card file an agent names — by `card:`, or by a `skills:` line that names one (`isCardFile`) — since an agent's card is
+ * generated from its skills (`cardSkills` in `workflow-store.ts`). Refused rather than read and dropped: a line the run
  * reads and ignores is a constraint nobody enforces, and a person editing that file would see no change on the card.
  */
 export function cardRetired(file: string, key: 'card' | 'skills', named?: string): string {
@@ -2448,7 +2448,8 @@ function systemPromptOf(file: string, written: string | undefined): SystemPrompt
  * Why an agent's skills or system prompt cannot reach the sessions of a step that runs as `step` does — its harness, tools and deny list —
  * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`), and
  * again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or `harness:`
- * can take away what the agent's allowed.
+ * can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a system prompt other than `default`
+ * are refused: a session continued keeps the system prompt it was started with, and the plugins with it (F13).
  */
 function composedRefusal(
   named: string,
@@ -2457,7 +2458,6 @@ function composedRefusal(
   step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
 ): string | undefined {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
-  // A session continued keeps the system prompt it was started with, and the plugins with it (F13): what this agent gives would reach nothing.
   if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
     return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with (F13): it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
   }
@@ -2509,8 +2509,8 @@ export type AgentDraft = {
  * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what it
  * rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one no
  * agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; one of its own lines
- * among the keys, where it would be written twice; a card file, retired by agents card 2 (`cardRetired`), sent as `card` or as `skills:`, from a
- * page drawn before; and a line break in a value, which would make what follows it a line of its own — a key, even.
+ * among the keys, where it would be written twice; a card file (`cardRetired`), which a stale page sends as `card` or as a `skills:` naming
+ * one, and which is written nowhere; and a line break in a value, which would make what follows it a line of its own — a key, even.
  */
 export function renderAgent(draft: AgentDraft): string {
   const file = `${AGENTS_FOLDER}/${draft.name}.md`;
@@ -2529,7 +2529,6 @@ export function renderAgent(draft: AgentDraft): string {
   }
   if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined)
     refuse(codexModeWritten(file, keys.permissionMode));
-  // A card file is what a page drawn before agents card 2 sends — as `card`, or as `skills:` from before 2026-09-25 — and is written nowhere now.
   const sent = (draft as { card?: unknown }).card;
   if (sent != null)
     refuse(
@@ -2560,13 +2559,13 @@ export function renderAgent(draft: AgentDraft): string {
 
 /**
  * A local agent described in the A2A protocol's terms — its name, what it is for, what it can do — and **not** an A2A Agent Card. Protocol
- * 1.0, read at the source on 2026-09-19: `specification/a2a.proto` in a2aproject/A2A, and the specification's Agent Card section.
+ * 1.0, as `specification/a2a.proto` in a2aproject/A2A and the specification's Agent Card section define it.
  *
  * The protocol marks `supported_interfaces` REQUIRED: it is the list of URLs and bindings a client would call the agent at. Nothing here
  * serves this agent over A2A, so there is no URL to give, and this leaves the field out rather than give an address that does not answer. A
  * document missing a REQUIRED field is not a valid `AgentCard`, so everything that prints this says so in the same breath (`wf agents card`
- * on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission: the slice that serves a card deletes it
- * deliberately.
+ * on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission, which only
+ * code that serves a card over A2A may lift.
  *
  * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here
  * fills them honestly. `capabilities` in A2A are protocol features, not reach: streaming, push notifications, an extended card. None of the
@@ -2688,11 +2687,10 @@ export function formerKeysIn(text: string): string[] {
   });
 }
 
-/** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
 /**
- * Why a former name is not written: read from a file, it is never put in one (`renderStep`, `renderAgent`). What sends one is a form drawn
- * before the key was renamed — a board page left open across the change — and its save is refused rather than written under a name the
- * file would then carry on.
+ * Why a former name is not written: read from a file, it is never put in one (`renderStep`, `renderAgent`). What sends one is a stale form
+ * — a board page drawn when the key had its former name — and its save is refused rather than written under a name the file would then
+ * carry on.
  */
 const formerKeyWritten = (file: string, former: string): string =>
   `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file written before 2026-09-23 may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page open since before then sends the former name: reload it, and save again.`;
@@ -2700,8 +2698,8 @@ const formerKeyWritten = (file: string, former: string): string =>
 /**
  * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read from a
  * file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and `writeWorkflow` for a
- * step whose harness is its agent's. What sends one is a form drawn before the key was Codex's own, or a step moved onto codex that kept its
- * Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
+ * step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as `permissionMode`, or a step moved onto
+ * codex that kept its Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is what \`sandbox:\` was called there until ${SANDBOX_SINCE}, which a file written before may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page open since before then sends the former name — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
@@ -2710,6 +2708,7 @@ export const codexModeWritten = (file: string, word: string): string =>
 export const codexModeLine = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox, which a codex step says since ${SANDBOX_SINCE}. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
+/** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it, which the key took on 2026-09-23. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
@@ -2742,6 +2741,10 @@ export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boo
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
  * wait on each other, or a step reads the output of one that has not finished or declares none. All
  * are caught here, before anything is spent.
+ *
+ * A step reads an `input:` it waits on through `after:` or through `resume:`, which the parser adds to `after`. A step resumes a session
+ * on the harness that made it, never another, and in the one window of its session's whole chain (`sessionContext`). The steps wait on
+ * each other when some are left once every step that waits on nothing left is taken away.
  */
 export function validate(steps: readonly Workflow[]): void {
   const names = new Set(steps.map((s) => s.name));
@@ -2754,7 +2757,6 @@ export function validate(steps: readonly Workflow[]): void {
       const producer = steps.find((x) => x.name === from);
       if (!producer)
         throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
-      // Directly, or through `resume` — which the parser has already added to `after`.
       if (!s.after.includes(from) && s.resume !== from) {
         throw new WorkflowError(
           `${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`,
@@ -2769,12 +2771,9 @@ export function validate(steps: readonly Workflow[]): void {
     if (s.resume) {
       const target = steps.find((x) => x.name === s.resume);
       if (!target) throw new WorkflowError(`${s.name}: resumes "${s.resume}", which is not a step here`);
-      // A session belongs to the harness that made it. Continuing it from another is not resuming,
-      // it is a different agent claiming someone else's memory.
       if ((target.harness ?? 'claude') !== (s.harness ?? 'claude')) {
         throw new WorkflowError(`${s.name}: resumes ${target.name}, which runs on a different harness (${target.harness ?? 'claude'})`);
       }
-      // One window for a session's whole chain: the continuation is filed with the one its session was started with (`sessionContext`).
       const window = sessionContext(target, steps);
       if (s.context !== undefined && s.context !== window) {
         throw new WorkflowError(
@@ -2789,7 +2788,6 @@ export function validate(steps: readonly Workflow[]): void {
   validateMainWorkspace(steps);
   validateSlot(steps);
 
-  // Kahn's algorithm: if anything is left when nothing else can be removed, it is a cycle.
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
   for (let moved = true; moved;) {
     moved = false;
@@ -2859,16 +2857,13 @@ const DEFAULT_MODE = 'auto';
 /**
  * The way a step of a folder team cannot be run: as a background session in a permission mode that can stop and ask.
  *
- * Measured, on Claude Code 2.1.278, in folders no settings file had ever named. A fenced `--bg` session whose first act is anything
- * outside its own directory — reading the run's artifacts directory beside it, or the store, to learn what it is writing about — is
- * asked to approve it, and nobody is there: `claude agents` reads it `blocked`, `waitingFor: 'permission prompt'`, and it waits for
- * ever. The shipped `note` team's first live run sat that way for thirty-one minutes in `acceptEdits`, and a session in `auto` sat the
- * same way for as long as it was watched. In `dontAsk` the same call is denied with no prompt, the session is told so, and it carries
- * on — measured beside it, on `--bg`, in the same kind of folder.
+ * On Claude Code 2.1.278, in a folder no settings file names, a fenced `--bg` session that reaches outside its own directory — the run's
+ * artifacts beside it, or the store — is asked to approve it, and nobody is there: `claude agents` reads it `blocked`, `waitingFor:
+ * 'permission prompt'`, and it waits for ever, in `acceptEdits` and in `auto` alike. In `dontAsk` the same call is denied with no
+ * prompt, the session is told so, and it carries on.
  *
  * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
- * `default` and `acceptEdits`, in folders under `/tmp`, told to write outside its folder, run a command and fetch a page, was denied
- * each call it could not make, carried on and exited on its own. So a step run as a job — every `claude` step without `background: true`,
+ * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude` step without `background: true`,
  * every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one shell, fenced by the sandbox its
  * `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a harness's own: Codex has no
  * permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
@@ -2898,8 +2893,8 @@ function validateFolderMode(steps: readonly Workflow[]): void {
  *
  * The cap on runs in flight holds the work this machine does at once. A run outside it is a session that watches the runs inside it —
  * one step, which is how a reader tells the two apart at a glance, and how the machinery does. The line on one step of a workflow of
- * work would take the whole run out of the cap, since a slot is a run's and not a step's, so it is refused here rather than the pass a
- * cap nobody notices lets four runs through.
+ * work would take the whole run out of the cap, since a slot is a run's and not a step's, so it is refused here rather than let the
+ * run's other steps past the cap with nothing said.
  */
 function validateSlot(steps: readonly Workflow[]): void {
   const watcher = steps.find((s) => s.slot === 'none');
@@ -2923,7 +2918,6 @@ function validateSlot(steps: readonly Workflow[]): void {
  * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
  * steps that wait on each other go last, as given, rather than nowhere.
  */
-
 export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: readonly S[]): S[] {
   const names = new Set(steps.map((s) => s.name));
   const order: S[] = [];
@@ -2940,22 +2934,21 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
 }
 
 /**
- * A step read back off a record as it ran when it was frozen. Every `claude` step was a background session (`claude --bg`) until thin
- * runtime stage 2 part 2, and `remote: true` was taken there: frozen with no `background`, such a step would now be filed as a job with a
- * bridge, which the runtime refuses at `file` — and a refusal thrown out of one run's `advance` stops the whole pass, every run in the store
- * with it, on every pass after. Read by `stepsOf` and never by `wf start`, which has refused `remote: true` without `background: true`
- * since: so it changes only what was frozen before, and nothing a folder can say today. Pure.
+ * A step read back off a record as it runs: a `claude` step frozen with `remote: true` and no `background` is a background session
+ * (`claude --bg`). Filed as a job with a bridge, it would be refused by the runtime at `file` — and a refusal thrown out of one run's
+ * `advance` stops the whole pass, every run in the store with it, on every pass after. Read by `stepsOf` and never by `wf start`, which
+ * refuses `remote: true` without `background: true`: so it changes only a frozen record, and nothing a folder can say. Pure.
  */
 export const asRan = (step: Workflow): Workflow =>
   step.remote && step.background === undefined && (step.harness ?? 'claude') === 'claude' ? { ...step, background: true } : step;
 
 /**
- * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen before a key was renamed holds the step's
- * field under its former name, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
+ * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
+ * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
  * a former name, and the next pass that writes the record back writes the new ones, with the former beside them (`withFormerNames`). A
  * field under both names keeps the new one's value. A step with no former name is returned as it is. A codex step's sandbox, frozen under
- * `permissionMode` before the key was Codex's own, is read as `sandbox` the same way (`sandboxRead`). Pure.
+ * `permissionMode`, is read as `sandbox` the same way (`sandboxRead`). Pure.
  */
 export function asNamed(step: Workflow): Workflow {
   return sandboxRead(renamedKeys(step));
@@ -2991,7 +2984,7 @@ function renamedKeys(step: Workflow): Workflow {
 }
 
 /**
- * A codex step frozen before `sandbox:` read with it (`SANDBOX_SINCE`): its sandbox is the field `permissionMode` — the engine's task field,
+ * A codex step frozen with its sandbox under the former key (`SANDBOX_SINCE`): its sandbox is the field `permissionMode` — the engine's task field,
  * which the step carried under that name — and the key `permissionMode` among its agent's `keys` and `given`. Read so, the tick would file
  * it with no sandbox, and Codex would run it in `workspace-write`: wider than a reviewer written `read-only`, and said nowhere. So the field
  * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a record written with both — `withFormerNames` — keeps `sandbox`'s.
@@ -3020,19 +3013,18 @@ function sandboxRead(step: Workflow): Workflow {
 
 /**
  * A step as a record is written: each renamed field under its name now and, with the same value, under its former one (`FORMER_KEYS`). A
- * `wf up` daemon started before the rename runs its old code until it is restarted, and its tick reads a step's rule lists by the former
- * names alone: a record with the new ones only would have it file every step of a run started since with no rule list, and say nothing —
- * a reviewer's `Bash(npm run build)` deny and the supervisor's git denies gone. `asNamed` reads the record back under the new names
- * alone, so no reader of today's code sees the copy. Only the step's own fields are copied: they are all the old tick filed from. A codex
- * step's `sandbox` is copied to `permissionMode`, the field the old tick filed Codex's sandbox from: without it, a codex reviewer written
- * `sandbox: read-only` would be filed by an old daemon with no sandbox, and run in Codex's `workspace-write`. Pure.
+ * `wf up` daemon runs the code it started with until it is restarted, and a tick on code that knows only the former names reads a step's
+ * rule lists by them alone: a record with the new ones only would have it file every step with no rule list, and say nothing — a
+ * reviewer's `Bash(npm run build)` deny and the supervisor's git denies gone. `asNamed` reads the record back under the new names alone,
+ * so no reader of this code sees the copy. Only the step's own fields are copied: they are all such a tick files from. A codex step's
+ * `sandbox` is copied to `permissionMode`, the field such a tick files Codex's sandbox from (`sandboxRead`): without it, a codex reviewer
+ * written `sandbox: read-only` would be filed with no sandbox, and run in Codex's `workspace-write`. Pure.
  */
 export function withFormerNames(step: Workflow): Workflow {
   const fields = step as unknown as Record<string, unknown>;
   const copies = Object.entries(FORMER_KEYS)
     .filter(([, now]) => fields[now] !== undefined)
     .map(([former, now]) => [former, fields[now]]);
-  // A codex step's sandbox, under the field the old tick filed it from: `permissionMode` (`sandboxRead`).
   if (step.harness === 'codex' && step.sandbox !== undefined) copies.push(['permissionMode', step.sandbox]);
   return copies.length ? { ...step, ...Object.fromEntries(copies) } : step;
 }
@@ -3073,9 +3065,10 @@ export function loopSpan(steps: readonly Workflow[], looping: Workflow): string[
  *
  * A round works in the workspaces the first one made. A step that inherits its predecessor's gets the target's
  * new commits by being there; one that forked or merged a worktree of its own was cut once, from the first
- * round's branch, and would review work that is no longer the change. So a loop's steps are a chain. A step in
+ * round's branch, and would review work that is not the change. So a loop's steps are a chain. A step in
  * one is a new session each round, so it cannot `resume:` another; a step in two would be re-filed by a round of
- * either; and a target's `output:` may not take the field the run adds to it.
+ * either; and a target's `output:` may not take the field the run adds to it. A target runs on a harness of ours: each round continues
+ * it in the session it kept, and the run keeps none of a remote agent's.
  */
 function validateLoops(steps: readonly Workflow[]): void {
   const spans = new Map<string, Workflow>();
@@ -3089,7 +3082,6 @@ function validateLoops(steps: readonly Workflow[]): void {
     }
     const producer = steps.find((x) => x.name === target);
     if (!producer) throw new WorkflowError(`${named} names a step that is not here. Correct the name, or delete the line.`);
-    // A loop's target is continued each round, in the session it kept (`resumeFrom`), and the run keeps none of a remote agent's.
     if (isRemoteHarness(producer.harness)) {
       throw new WorkflowError(
         `${named}, and ${target} runs on \`harness: ${producer.harness}\`, a remote A2A agent: a loop's target is continued each round in the session it kept, and the run keeps none of a remote agent's. Loop back to a step on a harness of ours, or delete the line.`,
@@ -3141,7 +3133,7 @@ function validateLoops(steps: readonly Workflow[]): void {
  * Could two steps of this workflow ever run at the same time?
  *
  * True when there is more than one starting point, or when any step is followed by more than one.
- * Used to refuse `--no-worktree` on a workflow that fans out: without isolation those steps would
+ * `wf start` refuses `--no-worktree` on a workflow that fans out: without isolation those steps would
  * share a directory, which is the arrangement the whole worktree design exists to prevent.
  */
 export function fansOut(steps: readonly Workflow[]): boolean {

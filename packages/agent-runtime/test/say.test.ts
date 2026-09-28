@@ -6,8 +6,16 @@
  * gave a running step are on its record, so a reviewer can tell a change they authorised from a step
  * overstepping. So what is checked is that the words reach the inbox verbatim and land on the journal, and that
  * every refusal refuses — with exit 2, nothing sent and nothing journalled — while a delivery that fails
- * rejects plainly and journals nothing either. The inbox is found as Claude Code 2.1.270 registers it
- * (`<config>/sessions/<pid>.json`, `messagingSocketPath`), measured on a live `--bg` session first.
+ * rejects plainly and journals nothing either. The inbox is found where Claude Code registers it: the
+ * `messagingSocketPath` of `<config>/sessions/<pid>.json`.
+ *
+ * - Where Claude Code keeps its registrations is read when a runner is made, and its transcripts when the runner is
+ *   loaded, so `CLAUDE_CONFIG_DIR` is pointed here before the import.
+ * - A registry that cannot be read is met with a registration by a live process, as Claude Code writes one, so that the
+ *   failed listing is the only thing that misses the session: on `claude` the listing reads past a registry that
+ *   failed, and its jobs stay seen.
+ * - The cases of a session that cannot be found each get a board of their own, so that each case's registration and
+ *   inbox are the only ones its engine reads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,8 +29,6 @@ import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-say-${label}-`);
 
-// Where Claude Code keeps its registrations is read when a runner is made, and its transcripts when the runner
-// is loaded, so both are pointed here before the import.
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
@@ -34,7 +40,7 @@ type Row = { name: string; sessionId: string; state: string; status: string; sta
 
 /**
  * A fake `claude`. `agents` prints its rows, each with a `pid`, busy, as a session at work is listed; `--bg --name <n>`
- * adds one; `stop` and `rm` do what they do. `-p`, a job, reads its stdin a line at a time, as 2.1.280 does, and writes
+ * adds one; `stop` and `rm` do what they do. `-p`, a job, reads its stdin a line at a time, as Claude Code does, and writes
  * each line to `<bin>/<brief>.stdin`, the brief being its first line's words; told `finish`, it prints its result, and
  * exits once its stdin ends — told `finish and linger`, not for a minute. While `<bin>/agents-fails` exists, `agents` fails.
  */
@@ -200,8 +206,6 @@ const failed = async (engine: Engine, id: string, pattern: RegExp) => {
   assert.deepEqual((await engine.view(id)).state.said, []);
 };
 
-// ─── delivery ───────────────────────────────────────────────────────────────
-
 test("at shipped defaults, say hands the words verbatim to the running session's inbox, addressed to its session, then journals them", async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row, box } = await running(engine);
@@ -221,11 +225,11 @@ test("at shipped defaults, say hands the words verbatim to the running session's
   const last = (await entries(engine, id)).at(-1)!.event;
   assert.deepEqual(last, { kind: 'said', ...said }, 'and the feed has it, last');
 
-  // Said twice, journalled twice, in order: the record keeps what a person did, not what is new.
   const again = await engine.say(id, 'and the web app');
   assert.deepEqual(
     (await engine.view(id)).state.said.map((s) => s.text),
     [text, 'and the web app'],
+    'said twice, journalled twice, in order: the record keeps what a person did, not what is new',
   );
   assert.equal(again.attempt, 1);
   assert.equal(box.lines.length, 2);
@@ -246,7 +250,6 @@ test('a task journalled on claude before a job was its default runs --bg with no
   const root = tmp('board');
   const engine = createEngine({ root });
   const { id, box } = await running(engine);
-  // Its filing as it was written then: the same session, the config saying nothing of a mode.
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
   const event = JSON.parse(filed);
@@ -322,25 +325,27 @@ test('a job that has given its result reads nothing more: words said before it e
   const engine = createEngine({ root });
   const id = await job(engine, 'job-lingers');
   await engine.say(id, 'finish and linger');
-  // Where the worker keeps the job, named as the runner names its files.
-  const at = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
-  const runFile = at('.json');
+  const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
+  const runFile = workerFile('.json');
   await until(() => (JSON.parse(fs.readFileSync(runFile, 'utf8')).inputClosed ? true : undefined), 'its input closed at its result');
   assert.equal(JSON.parse(fs.readFileSync(runFile, 'utf8')).state, 'working', 'and it is still running');
 
-  // Its harness lists it working, so this is the worker's word, not the engine's: a rejection, with no exit code.
-  await assert.rejects(engine.say(id, 'one more thing'), (e: Refusal) => {
-    assert.equal(e.exitCode, undefined, `not a refusal: ${e.message}`);
-    assert.match(e.message, /has given its result and reads no more words/);
-    return true;
-  });
+  await assert.rejects(
+    engine.say(id, 'one more thing'),
+    (e: Refusal) => {
+      assert.equal(e.exitCode, undefined, `not a refusal: ${e.message}`);
+      assert.match(e.message, /has given its result and reads no more words/);
+      return true;
+    },
+    "its harness lists it working, so this is the worker's word, not the engine's: a rejection, with no exit code",
+  );
   assert.deepEqual(
     (await engine.view(id)).state.said.map((s) => s.text),
     ['finish and linger'],
     'nothing more journalled',
   );
   assert.equal(fake.stdin('job-lingers')!.length, 2, 'nothing written on');
-  const inbox = fs.readFileSync(at('.inbox.jsonl'), 'utf8');
+  const inbox = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
   assert.equal(inbox.split('\n').filter(Boolean).length, 1, 'nothing appended');
 
   await engine.stop(id);
@@ -350,8 +355,6 @@ test('a job that has given its result reads nothing more: words said before it e
   }
   await refused(engine, id, 'hello', /has settled/);
 });
-
-// ─── refusals: exit 2, nothing sent, nothing journalled ─────────────────────
 
 test('refused: empty words, and words that are only whitespace', async () => {
   const engine = createEngine({ root: tmp('board') });
@@ -429,9 +432,7 @@ test('refused: a task asked to stop, before its session has', async () => {
   await box.close();
 });
 
-test('refused: an attempt that has ended on a task that has not settled — one held open, waiting on its answer', async () => {
-  // A task makes one attempt per start, so the window is a task held open between turns: its turn ended `done`, and
-  // nothing runs to hear anything until a person answers it.
+test('refused: an attempt that has ended on a task that has not settled — one held open between turns, where nothing runs to hear anything until a person answers it', async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row, box } = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
@@ -460,13 +461,9 @@ test('refused: an attempt its harness does not list, and one it lists as no long
   await quiet.box.close();
 });
 
-// ─── deliveries that fail: rejected plainly, nothing journalled ─────────────
-
 test('a registry that cannot be read rejects, not refuses: ask again', async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row, box } = await running(engine);
-  // Registered by a live process, as Claude Code registers one: the listing that fails is the only thing that misses it.
-  // On `claude` the listing reads past a registry that failed, so its jobs stay seen; the registration is what says so.
   fs.writeFileSync(
     path.join(sessions, `${process.pid}.json`),
     JSON.stringify({
@@ -490,7 +487,6 @@ test('a registry that cannot be read rejects, not refuses: ask again', async () 
 });
 
 test('a session with no registration, one registered to another session, one with no inbox, and one whose inbox is gone: rejected, nothing journalled', async () => {
-  // A board each, so each case's registration and inbox are the only ones its engine reads.
   const board = () => createEngine({ root: tmp('board') });
 
   const e1 = board();
@@ -566,14 +562,11 @@ test("a socket another user owns is refused — the check on what lstat said, ha
   await box.close();
 });
 
-// ─── the post: given once the whole line is written ─────────────────────────
-
 test('an inbox that reads the words and never closes its end — a process busy past the deadline — was given them: said, and journalled', async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row } = await running(engine, {}, false);
   const box = await inbox({ neverCloses: true });
   register(row, { messagingSocketPath: box.path });
-  // Waits out the post's whole deadline, five seconds: the inbox never closes.
   const said = await engine.say(id, 'are you there');
   assert.deepEqual(
     box.lines.map((l) => l.message?.content),
@@ -589,10 +582,11 @@ test('the post resolves once the whole line is written, closed or not; it reject
   await claudeInboxPost(slow.path, claudeInboxLine('s', 'hello'), 200);
   assert.equal(slow.lines.length, 1);
 
-  // Bigger than a socket's buffer, to an inbox that reads nothing: most of it never leaves this process.
   const deaf = await inbox({ neverReads: true });
-  await assert.rejects(claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200), (e: Error) =>
-    /took only part of the line within 200 ms, and an inbox drops a line cut short/.test(e.message),
+  await assert.rejects(
+    claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200),
+    (e: Error) => /took only part of the line within 200 ms, and an inbox drops a line cut short/.test(e.message),
+    "a line bigger than a socket's buffer, to an inbox that reads nothing: most of it never leaves this process",
   );
 
   const gone = path.join(tmp('gone'), 'in.sock');
@@ -600,8 +594,6 @@ test('the post resolves once the whole line is written, closed or not; it reject
   await slow.close();
   await deaf.close();
 });
-
-// ─── a harness brought as a PromiseRunner ───────────────────────────────────
 
 const memoryJournal = (failOn?: Event['kind']): PromiseJournal => {
   const tasks = new Map<string, Event[]>();
@@ -624,6 +616,10 @@ const memoryJournal = (failOn?: Event['kind']): PromiseJournal => {
   };
 };
 
+/**
+ * A harness brought as a `PromiseRunner`, whose sessions work until stopped. Given `heard`, it has a `say` that records
+ * what it is handed there, or rejects with `rejectWith`; without, it has no `say`.
+ */
 const promiseHarness = (
   heard?: Array<{ session: { name: string; sessionId: string }; text: string }>,
   rejectWith?: string,
@@ -684,13 +680,11 @@ test("a PromiseRunner's say that rejects journals nothing; a journal that fails 
   assert.equal(heard.length, 1, 'the words did go');
 });
 
-// ─── ae say ─────────────────────────────────────────────────────────────────
-
 const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
 /**
  * `ae`, run as a child — and not with `spawnSync`: the inbox is a socket in this process, and a process blocked
- * in `spawnSync` accepts no connection, so the child's words wait out their timeout (found writing this test).
+ * in `spawnSync` accepts no connection, so the child's words would wait out their timeout.
  */
 const aeRun = (args: string[], env: NodeJS.ProcessEnv) =>
   new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {

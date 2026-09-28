@@ -1,11 +1,20 @@
 /**
- * Codex as an A2A agent (thin runtime, stage 3): the `codex` harness's detached driver behind its handler, asked through the
- * SDK's `Client`, with the REAL worker running a fake `codex` first on PATH — a node script that answers as `codex exec
- * --json` does, and does what the session's `fake.json` in its working directory tells it.
+ * Codex as an A2A agent: the `codex` harness's detached driver behind its handler, asked through the SDK's `Client`, with
+ * the REAL worker running a fake `codex` first on PATH — a node script that answers as `codex exec --json` does, and does
+ * what the session's `fake.json` in its working directory tells it. Every session runs under an empty `CODEX_HOME`, so no
+ * operator's config trusts or serves anything to it.
  *
  * What maps, each proved here: the Task's context is the Codex thread (`thread.started`), empty until Codex prints it; the
  * closing statement written to `-o` is the Task's one Artifact, data or prose; `cancelTask` ends the harness and what it
- * started; and a task held open is `INPUT_REQUIRED` between turns, its answer resuming the same thread in the same context.
+ * started, whether sent once the context shows the harness running or the moment the Task exists (the window before the
+ * worker's pid is on disk is made to happen on demand in `detached.test.ts`); and a task held open is `INPUT_REQUIRED`
+ * between turns, its answer resuming the same thread in the same context.
+ *
+ * A held attempt ends on its statement (`closedOut`): once Codex has written `-o`, the task waits, though Codex has not yet
+ * exited and its Task stays working, the harness's word, until the worker writes `done`. Under load the worker reads the
+ * thread line off Codex's stdout after Codex has written `-o`, so the run file carries a statement and no thread: an attempt
+ * ended then would be recorded with no session, and `answer` would refuse the task that waits on it. The fake makes that
+ * happen on demand: it writes `-o` first and holds its thread line on a file.
  *
  * What `codex exec` cannot do, each pinned here rather than faked: it takes no words while it runs (its card says `say:
  * false`, and a follow-up is refused with nothing written to it), and it is never `INPUT_REQUIRED` while it runs — the worker
@@ -97,7 +106,6 @@ before(() => {
     mode: 0o755,
   });
   process.env.PATH = `${bin}:${prev.PATH}`;
-  // An empty Codex home: no operator's config trusts or serves anything to these sessions.
   process.env.CODEX_HOME = scratch('ae-codex-agent-home-');
 });
 after(() => {
@@ -247,8 +255,6 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
   const cwd = workdir({ grandchild: true, sleepMs: 30_000 });
   const client = agent(root);
   await send(client, { name: 'ae/c-stop/1', brief: 'b', cwd, harness: 'codex' });
-  // A context means the harness is running, so this cancel ends a running process. One sent the moment the Task exists is
-  // below; the window before the worker's pid is on disk is made to happen on demand in `detached.test.ts` (open issue 30).
   await until(async () => (await get(client, 'ae/c-stop/1')).contextId === THREAD, 'the thread printed');
   const harness = pidIn(cwd, 'pid');
   const grandchild = pidIn(cwd, 'grandchild');
@@ -271,7 +277,6 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
   );
   assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
 
-  // Canceled as soon as it is sent, whether or not its worker has published a pid: it ends CANCELED, and no harness runs on.
   const early = workdir({ sleepMs: 30_000 });
   await send(client, { name: 'ae/c-stop/3', brief: 'b', cwd: early, harness: 'codex' });
   assert.equal(
@@ -294,8 +299,6 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
     return (await engine.view(id)).phase === want;
   };
 
-  // Codex has written its answer and not yet exited. The engine ends a signed attempt on its statement (`closedOut`), so the
-  // task already waits; the harness still lists the session, and its Task says so until the worker writes `done`.
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ exitOn: 'exit1' } satisfies Fake));
   await until(() => phase('input-required'), 'turn 0 signed and waiting');
   assert.equal(
@@ -318,7 +321,6 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   );
   assert.equal(alive(pidIn(cwd, 'pid')), false, 'nothing runs while it waits');
 
-  // The next turn waits on a gate, so it is caught running.
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ gate: 'go2' } satisfies Fake));
   await engine.answer(id, 'the words');
   await until(() => phase('running (working)'), 'the answer started turn 1');
@@ -353,9 +355,6 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
 });
 
 test('a held Codex attempt whose statement is on disk before its thread is read is not ended on the statement: it ends once its session is known, and the answer resumes that thread', async () => {
-  // Under load the worker reads the thread line off Codex's stdout after Codex has written `-o`: the run file then carries a
-  // statement and no thread. Ended on the statement, the attempt was recorded with no session, and `answer` refused a task
-  // that waited on it — once in a loaded suite, on 2026-09-25. The fake writes `-o` first and holds its thread line on a file.
   const root = tmp('store');
   const cwd = workdir({ threadOn: 'thread-go', exitOn: 'exit1' });
   const engine = createEngine({ root, harnesses: { codex } });
@@ -423,7 +422,6 @@ test('what `codex exec` cannot take while it runs: its card says no words, and a
   fs.writeFileSync(path.join(cwd, 'go'), '');
   await until(() => stateIs(client, 'ae/c-say/1', TaskState.TASK_STATE_COMPLETED), 'completed');
 
-  // The refusal's advice, followed once the session has ended: a spawn of its own, marked, in the session's context.
   const context = (await get(client, 'ae/c-say/1')).contextId;
   assert.equal(context, THREAD);
   const next = await ran(client, { name: 'ae/c-say/2', brief: 'hello', cwd, harness: 'codex', resumeFrom: context });

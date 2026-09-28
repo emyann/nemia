@@ -27,8 +27,8 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `say`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every driver has;
- * `noFind` takes `find` alone away.
+ * driver may have — `find`, `release`, `say`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
+ * driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
   o: {
@@ -98,11 +98,13 @@ const harness = (
               asked.push(['say', [session, text]]);
               return o.sayFails ? Effect.fail(new RunnerError({ verb: 'say', message: o.sayFails })) : Effect.void;
             }),
-          // Told what is expected, it lists those alone: what a driver that reads less when told looks like.
+          /**
+           * Told what is expected, it lists those alone: what a driver that reads less when told looks like. A name it was
+           * told to leave unread (`unread`) it leaves unread, as a driver whose registry could not be read leaves one.
+           */
           observeFor: (expected: readonly ExpectedSession[]) =>
             Effect.suspend(() => {
               asked.push(['observeFor', expected]);
-              // A name it was told to leave unread (`unread`), as a driver whose registry could not be read leaves one.
               const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
               return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
             }),
@@ -127,7 +129,6 @@ const harness = (
         }),
   };
   const handler = new HarnessHandler('fake', ops, async (id) => journal.get(id) ?? []);
-  /** What the harness was asked, reads left out. */
   const acted = () => asked.filter(([verb]) => verb !== 'observe');
   return { handler, sessions, unread, asked, acted, journal };
 };
@@ -563,7 +564,6 @@ test('listings overlap: each is paged from the listing its token names, whatever
   for (let i = 1; i <= 3; i++) h.sessions.set(`ae/t-${i}/1`, { sessionId: `s-${i}`, state: 'working' });
   const first = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
   assert.equal(first.nextPageToken, '1:2');
-  // A second listing, made while the first is still being paged, sees a harness that moved.
   h.sessions.set('ae/t-4/1', { sessionId: 's-4', state: 'working' });
   const second = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
   assert.equal(second.nextPageToken, '2:2');
@@ -578,6 +578,7 @@ test('listings overlap: each is paged from the listing its token names, whatever
   assert.deepEqual(
     theirs.tasks.map((t) => t.id),
     ['ae/t-3/1', 'ae/t-4/1'],
+    'the second listing, made while the first was being paged, sees the harness that moved',
   );
   assert.equal(h.asked.filter(([verb]) => verb === 'observe').length, 2, 'one observe a listing');
 });
@@ -588,17 +589,27 @@ test('REFUSED: a page of a listing whose last page was served, of one dropped, o
   const refused = (token: string) =>
     refusedWith(RequestMalformedError, `\`pageToken: ${token}\` is not a page of a listing still open: list again from the first page.`);
 
-  // Served to its end: its pages are gone with it.
   const done = await h.handler.listTasks(listing({ pageSize: 2 }), ctx);
   await h.handler.listTasks(listing({ pageSize: 2, pageToken: done.nextPageToken }), ctx);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 2, pageToken: done.nextPageToken }), ctx), refused(done.nextPageToken));
+  await assert.rejects(
+    h.handler.listTasks(listing({ pageSize: 2, pageToken: done.nextPageToken }), ctx),
+    refused(done.nextPageToken),
+    'served to its end: its pages are gone with it',
+  );
 
-  // Left part-way, then outnumbered: the oldest of more than OPEN_LISTINGS open is dropped, and the rest still served.
   const tokens: string[] = [];
   for (let i = 0; i <= OPEN_LISTINGS; i++) tokens.push((await h.handler.listTasks(listing({ pageSize: 1 }), ctx)).nextPageToken);
-  await assert.rejects(h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[0] }), ctx), refused(tokens[0]));
-  assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[1] }), ctx)).tasks.length, 1);
-  assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens.at(-1) }), ctx)).tasks.length, 1);
+  await assert.rejects(
+    h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[0] }), ctx),
+    refused(tokens[0]),
+    'left part-way, then outnumbered: the oldest of more than OPEN_LISTINGS open is dropped',
+  );
+  assert.equal(
+    (await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens[1] }), ctx)).tasks.length,
+    1,
+    'and the rest still served',
+  );
+  assert.equal((await h.handler.listTasks(listing({ pageSize: 1, pageToken: tokens.at(-1) }), ctx)).tasks.length, 1, 'the newest too');
 
   const open = await h.handler.listTasks(listing({ pageSize: 1 }), ctx);
   await assert.rejects(
@@ -749,7 +760,6 @@ test('a spawn that continues a session carries it as its context, and the harnes
 
 test("a listing by context is every attempt that continued the conversation, whatever the runtime's task", async () => {
   const h = harness();
-  // Filed in the opposite order to the names, so a listing that kept the harness's order or sorted by id alone would differ.
   h.sessions.set('ae/t-2/1', { sessionId: 'job-3', state: 'working', nativeId: 'conv-a' });
   h.sessions.set('ae/t-1/2', { sessionId: 'job-2', state: 'completed', nativeId: 'conv-a' });
   h.sessions.set('ae/t-1/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-b' });
@@ -761,6 +771,7 @@ test("a listing by context is every attempt that continued the conversation, wha
       ['ae/t-1/2', 'conv-a'],
       ['ae/t-2/1', 'conv-a'],
     ],
+    "filed in the opposite order to the names, so a listing that kept the harness's order or sorted by id alone would differ",
   );
   assert.deepEqual(
     (await h.handler.listTasks(listing({ contextId: 'conv-b' }), ctx)).tasks.map((t) => t.id),
@@ -787,9 +798,8 @@ test('a listing carries what each session closed with only when it asks for arti
     [['closeout'], []],
   );
   assert.deepEqual(closeoutOf(full.tasks[0]), { outcome: 'done' });
-  // Paged: each page asks for itself.
   const first = await h.handler.listTasks({ ...listing({ pageSize: 1 }), includeArtifacts: true }, ctx);
-  assert.equal(first.tasks[0].artifacts.length, 1);
+  assert.equal(first.tasks[0].artifacts.length, 1, 'paged: each page asks for itself');
   const rest = await h.handler.listTasks({ ...listing({ pageSize: 1, pageToken: first.nextPageToken }) }, ctx);
   assert.deepEqual(
     rest.tasks.map((t) => t.id),
@@ -819,7 +829,6 @@ const held = (after: Event[] = []): Event[] => [
 test('a signed session its task holds open is INPUT_REQUIRED on a read, listed by its harness or let go; a listing says what the harness does', async () => {
   const listed = harness();
   listed.journal.set('t-h', held());
-  // A Claude Code job is never let go: its harness lists it done while its task waits.
   const job: Sighting = {
     sessionId: 'job-1',
     state: 'completed',
@@ -837,6 +846,7 @@ test('a signed session its task holds open is INPUT_REQUIRED on a read, listed b
   assert.deepEqual(
     inList.map((t) => t.status!.state),
     [TaskState.TASK_STATE_COMPLETED],
+    'a Claude Code job is never let go: its harness lists it done while its task waits',
   );
   assert.deepEqual(sightingOf(inList[0]), job, 'observe reads the harness, unchanged');
 
@@ -850,7 +860,7 @@ test('a signed session its task holds open is INPUT_REQUIRED on a read, listed b
   assert.deepEqual(listed.acted().concat(gone.acted()), [], 'a read, and nothing asked of the harness');
 });
 
-test('REFUSED: a held task answered or closed waits on nobody, and a task not held open never did — each read COMPLETED', async () => {
+test("REFUSED: a held task answered or closed waits on nobody, and a task not held open never did — each read COMPLETED; the answer's turn, signed, waits again", async () => {
   const at = '2026-09-23T10:06:00.000Z';
   const cases: Array<[string, Event[]]> = [
     ['answered, its next turn not begun', held([{ kind: 'input', at, text: 'go on' }])],
@@ -869,7 +879,6 @@ test('REFUSED: a held task answered or closed waits on nobody, and a task not he
       );
     }
   }
-  // The answer's turn signed, and waits again: its attempt is the one waiting; the first turn's is done.
   const h = harness();
   h.journal.set(
     't-h',
@@ -1042,16 +1051,22 @@ test('a transcript is read by the id the journal ended its attempt with, and no 
     { kind: 'spawned', at, attempt: 1 },
     { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'done', reason: 'harness', nativeId: 's-old' },
   ]);
-  // The harness lists another session under the name now: the record's id is read, not the listing's.
   h.sessions.set('ae/t-1/1', { sessionId: 's-new', state: 'working' });
   const read = await h.handler.sessionTranscript({ name: 'ae/t-1/1', after: 'c-7' }, ctx);
-  assert.deepEqual(read?.cursor, 's-old@c-7+1');
+  assert.deepEqual(
+    read?.cursor,
+    's-old@c-7+1',
+    "the harness lists another session under the name: the record's id is read, not the listing's",
+  );
   assert.deepEqual(h.asked, [['transcript', ['s-old', 'c-7']]], 'no find, no listing');
 
-  // A task settled with its attempt open carries the session's id too.
   h.journal.set('t-2', [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'settled', at, outcome: 'failed', nativeId: 's-left' }]);
   h.sessions.set('ae/t-2/1', { sessionId: 's-other', state: 'working' });
-  assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-2/1' }, ctx))?.cursor, 's-left@0+1');
+  assert.equal(
+    (await h.handler.sessionTranscript({ name: 'ae/t-2/1' }, ctx))?.cursor,
+    's-left@0+1',
+    "a task settled with its attempt open carries the session's id too",
+  );
   assert.deepEqual(h.asked.slice(1), [['transcript', ['s-left', undefined]]]);
 });
 
@@ -1078,35 +1093,43 @@ test('a transcript of an attempt in flight: found by name when the harness can f
 
 test('a transcript whose session its harness cannot name this time is none, and the harness is not asked to read one', async () => {
   const flight: Event[] = [filed, { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }];
-  // Not registered yet: found as none, then listed as none.
   const early = harness();
   early.journal.set('t-1', flight);
-  assert.equal(await early.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
+  assert.equal(
+    await early.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
+    null,
+    'not registered yet: found as none, then listed as none',
+  );
   assert.deepEqual(early.asked, [
     ['find', 'ae/t-1/1'],
     ['observe', undefined],
   ]);
 
-  // A find that fails is nothing found; a listing that fails is nothing listed. Neither is the caller's error.
   const broken = harness({ findFails: new TypeError('the registry file is torn'), observeFails: 'fake ls: exit 3' });
   broken.journal.set('t-1', flight);
   broken.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
-  assert.equal(await broken.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx), null);
+  assert.equal(
+    await broken.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx),
+    null,
+    "a find that fails is nothing found; a listing that fails is nothing listed. Neither is the caller's error",
+  );
   assert.deepEqual(broken.asked, [
     ['find', 'ae/t-1/1'],
     ['observe', undefined],
   ]);
 
-  // A find that fails, and a listing that names it: read.
   const listed = harness({ findFails: new RunnerError({ verb: 'find', message: 'fake: no registration file' }) });
   listed.journal.set('t-1', flight);
   listed.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
-  assert.equal((await listed.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
+  assert.equal(
+    (await listed.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor,
+    's-1@0+1',
+    'a find that fails, and a listing that names it: read',
+  );
 });
 
 test('a transcript of an ended attempt with no id on the record, or of a name no attempt is journalled under yet, is observed', async () => {
   const h = harness();
-  // Ended before `ended` carried an id: no find, which reads only what is in flight — the listing.
   h.journal.set('t-1', [
     filed,
     { kind: 'starting', at, attempt: 1 },
@@ -1115,14 +1138,21 @@ test('a transcript of an ended attempt with no id on the record, or of a name no
   ]);
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
   assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');
-  assert.deepEqual(h.asked, [
-    ['observe', undefined],
-    ['transcript', ['s-1', undefined]],
-  ]);
+  assert.deepEqual(
+    h.asked,
+    [
+      ['observe', undefined],
+      ['transcript', ['s-1', undefined]],
+    ],
+    'an `ended` with no id, as an older runtime wrote one: no find, which reads only what is in flight — the listing',
+  );
 
-  // A session is listed before its spawn is written: a name with no attempt on the record is asked of the harness.
   h.sessions.set('ae/t-9/1', { sessionId: 's-9', state: 'working' });
-  assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-9/1' }, ctx))?.cursor, 's-9@0+1');
+  assert.equal(
+    (await h.handler.sessionTranscript({ name: 'ae/t-9/1' }, ctx))?.cursor,
+    's-9@0+1',
+    'a session is listed before its spawn is written: a name with no attempt on the record is asked of the harness',
+  );
   assert.deepEqual(h.asked.slice(2), [
     ['find', 'ae/t-9/1'],
     ['transcript', ['s-9', undefined]],

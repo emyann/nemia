@@ -2,10 +2,9 @@
  * The README, held to the code.
  *
  * A README is read as a description of what exists, so a sentence naming an environment variable
- * nothing reads, a file that is not there, or a verb `ae` does not have is a false claim, not a
- * stale one. `AE_RUNNER=sdk` was described as wired with no reader anywhere, beside a test count
- * four times too small and a file table two to three times off. Each check below is first made to
- * refuse a README that says such a thing, then run against the real one.
+ * nothing reads, a file that is not there, a verb `ae` does not have, or a hand-kept count of tests
+ * or lines is a false claim, not a stale one. Each check below is first made to refuse a README that
+ * says such a thing, then run against the real one.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

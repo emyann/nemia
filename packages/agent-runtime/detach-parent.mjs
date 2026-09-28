@@ -1,4 +1,6 @@
-// The "engine": spawn the worker detached, then exit at once.
+/**
+ * The parent of a detached SDK session: spawns `detach-worker.mjs` detached on `<cwd> <statusFile>`, and exits at once.
+ */
 import { spawn } from 'node:child_process';
 const [cwd, statusFile] = process.argv.slice(2);
 const child = spawn(process.execPath, ['./detach-worker.mjs', cwd, statusFile], {

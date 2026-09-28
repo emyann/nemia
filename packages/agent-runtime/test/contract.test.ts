@@ -148,8 +148,7 @@ test('and what is not a route is not refused: the entries, the CLI spawned, and 
   assert.deepEqual(breaches('packages/agent-orchestrator/test/x.test.ts', text, GUARDED), []);
 });
 
-/** The package's exports map, pinned: an entry added is a contract widened, and is a change to this test and to docs/architecture.md. */
-test("agent-runtime's exports are . (facade.ts) and ./effect (index.ts), and nothing else but its package.json", () => {
+test("agent-runtime's exports are . (facade.ts) and ./effect (index.ts), and nothing else but its package.json: the map is pinned, and an entry added is a contract widened, a change to this test and to docs/architecture.md", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, { '.': './src/facade.ts', './effect': './src/index.ts', './package.json': './package.json' });
 });

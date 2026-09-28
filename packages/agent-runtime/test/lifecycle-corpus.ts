@@ -1,8 +1,8 @@
 /**
  * The lifecycle's corpus, shared: every journal shape `decide.test.ts` walks, under every deadline and every time a pass
  * can read it, crossed with the sightings a test hands in. `lifecycle.test.ts` hands in the sightings a harness gives in
- * A2A's names; `session-state.test.ts` hands in the same sightings as the words they were spoken in before, translated,
- * and holds each case to what `decide` answered before the words changed (`fixtures/decide-corpus.json`).
+ * A2A's names; `session-state.test.ts` hands in the same sightings in the runtime's former words, translated, and holds each
+ * case to the answer of `decide` that `fixtures/decide-corpus.json` records.
  */
 import { fold, nameFor, type Ended, type Event, type Sighting } from '../src/domain.ts';
 
@@ -93,8 +93,8 @@ export type Case = {
 };
 
 /**
- * Every journal shape, under every deadline, sighting and time: `sightings` keyed by the name a case takes. With `unread`, one
- * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`, 2026-09-25). Asked
+ * Every journal shape, under every deadline, sighting and time: `SIGHTINGS` keyed by the name a case takes. With `unread`, one
+ * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`). Asked
  * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded.
  */
 export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>, options: { unread?: boolean } = {}): Case[] =>

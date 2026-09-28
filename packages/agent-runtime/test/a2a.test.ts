@@ -1,6 +1,6 @@
 /**
- * The A2A seam beneath the engine's harnesses (thin runtime, stage 1 parts 2 to 4): the mappings, round-tripped, and a
- * harness driven through the SDK's `Client`, whose words reach the engine unchanged.
+ * The A2A seam beneath the engine's harnesses: the mappings, round-tripped, and a harness driven through the SDK's
+ * `Client`, whose words reach the engine unchanged.
  *
  * Strings are compared exactly, never by pattern: a word the seam changed on its way from a harness fails here.
  */
@@ -40,8 +40,7 @@ import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, typ
 /** JSON's round trip, as a transport that serialises would carry a value. */
 const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)));
 
-test('each session state is its A2A state, exactly, and back', () => {
-  // The table itself, not only its round trip: two states swapped would still round-trip.
+test('each session state is its A2A state, exactly, and back: the table itself, since two states swapped would still round-trip', () => {
   const expected: Record<SessionState, TaskState> = {
     submitted: TaskState.TASK_STATE_SUBMITTED,
     working: TaskState.TASK_STATE_WORKING,
@@ -119,11 +118,14 @@ test('a sighting rides whole in its Task, and survives a transport that serialis
 });
 
 test("attempts that continued one conversation share a context: the harness's id, not the runtime's task", () => {
-  // A job resumed keeps its session's id (M12): two attempts, one context; another task's session another.
   const first = taskOfSighting('ae/t-1/1', { sessionId: 'job-1', state: 'completed', nativeId: 'conv-a' });
   const again = taskOfSighting('ae/t-1/2', { sessionId: 'job-2', state: 'working', nativeId: 'conv-a' });
   const other = taskOfSighting('ae/t-1/3', { sessionId: 'job-3', state: 'working', nativeId: 'conv-b' });
-  assert.deepEqual([first.contextId, again.contextId, other.contextId], ['conv-a', 'conv-a', 'conv-b']);
+  assert.deepEqual(
+    [first.contextId, again.contextId, other.contextId],
+    ['conv-a', 'conv-a', 'conv-b'],
+    "a job resumed keeps its session's id: two attempts, one context; another task's session another",
+  );
 });
 
 test('a closeout is an Artifact of one part: data for a value, text/plain for prose, its time in metadata when known', () => {
@@ -140,7 +142,6 @@ test('a closeout is an Artifact of one part: data for a value, text/plain for pr
     { content: { $case: 'text', value: 'Done: the tests pass.' }, metadata: undefined, filename: '', mediaType: 'text/plain' },
   ]);
   assert.equal(closeoutArtifact('x').metadata, undefined, 'no time given, none said');
-  // Any JSON value a data part carries, and back as it went, over the wire.
   for (const payload of [said, 'prose', 7, ['a', 1], true, null, '']) {
     const t = taskOfAttempt('ae/t-1/1', { ...ended, closeout: payload }, 'm');
     assert.equal(t.artifacts.length, 1, JSON.stringify(payload));
@@ -148,12 +149,11 @@ test('a closeout is an Artifact of one part: data for a value, text/plain for pr
   }
   assert.deepEqual(taskOfAttempt('ae/t-1/1', ended, 'm').artifacts, [], 'an attempt that said nothing has no Artifact');
   assert.equal(closeoutOf(taskOfAttempt('ae/t-1/1', ended, 'm')), undefined);
-  // Since stage 4a an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED,
-  // no Artifact, and `stated: false` on the attempt it carries — for the layer above to judge, as the journal has it.
   const unstated = overTheWire(taskOfAttempt('ae/t-1/1', { ...ended, stated: false }, 'm'));
   assert.deepEqual(
     [unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.stated],
     [TaskState.TASK_STATE_COMPLETED, [], false],
+    "an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED, no Artifact, and `stated: false` on the attempt it carries, for the layer above to judge",
   );
 });
 
@@ -232,8 +232,11 @@ test('words said to a session are a user Message on its Task: one text part, no 
   assert.equal(followUpRefusal(m), undefined);
   assert.equal(followUpText(m), 'look again\n\nat the tests');
   assert.equal(followUpText(overTheWire(m)), 'look again\n\nat the tests');
-  // Not a spawn: no cwd, and no mark to be read as one.
-  assert.equal(messageRefusal(m), "the message's metadata has no `cwd`: say where the session works.");
+  assert.equal(
+    messageRefusal(m),
+    "the message's metadata has no `cwd`: say where the session works.",
+    'not a spawn: no cwd, and no mark to be read as one',
+  );
 });
 
 test('a spawn with its optional keys unset comes back with every key, as the engine asks for one', () => {
@@ -266,7 +269,7 @@ test("a failed spawn's words ride in its Task's status: REJECTED when nothing st
   assert.equal(wordsOf(started), undefined);
 });
 
-test('an attempt the harness no longer lists is answered from the journal', () => {
+test('an attempt the harness no longer lists is answered from the journal; an end word no runtime records, as an older journal may carry, is an end, not a success', () => {
   const attempt: Attempt = {
     n: 1,
     startedAt: '2026-09-23T10:00:00.000Z',
@@ -285,7 +288,6 @@ test('an attempt the harness no longer lists is answered from the journal', () =
     [{ ended: 'done', reason: 'harness' }, TaskState.TASK_STATE_COMPLETED],
     [{ ended: 'stopped', reason: 'operator' }, TaskState.TASK_STATE_CANCELED],
     [{ ended: 'failed', reason: 'harness' }, TaskState.TASK_STATE_FAILED],
-    // A word no end is recorded with now, as a journal from an older runtime may carry one: an end, not a success.
     [{ ended: 'working' as Ended, reason: 'lost' }, TaskState.TASK_STATE_FAILED],
     [{ ended: 'stopped', reason: 'deadline' }, TaskState.TASK_STATE_CANCELED],
   ];
@@ -323,9 +325,10 @@ test("REFUSED: words sent in a context that is not their session's", () => {
   );
 });
 
-// ─── through the client ─────────────────────────────────────────────────────
-
-/** A driver a test moves by hand, what it was asked, and the same driver behind the A2A client. */
+/**
+ * A driver a test moves by hand, what it was asked, and the same driver behind the A2A client. Each verb answers its value,
+ * or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect.
+ */
 const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: string; fails?: unknown; bare?: boolean } = {}) => {
   const sessions = new Map<string, Sighting>();
   const unread = new Set<string>();
@@ -363,16 +366,15 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
           release: (session: Sighting, task: { worktree?: string | boolean }) =>
             answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
           say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
-          // Told what is expected, the sessions it names alone.
+          /** Told what is expected, the sessions it names alone. */
           observeFor: (expected: readonly ExpectedSession[]) =>
             answer('observeFor', expected, {
               seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))),
-              // A name it was told to leave unread, as a driver whose registry could not be read leaves one.
+              /** A name it was told to leave unread, as a driver whose registry could not be read leaves one. */
               unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))),
             }),
         }),
   };
-  /** A verb that answers `value`, or fails as `o.fails` says: a `RunnerError` in its words, anything else a defect. */
   function answer<A>(verb: string, args: unknown, value: A): Effect.Effect<A, RunnerError> {
     return Effect.suspend(() => {
       asked.push([verb, args]);
@@ -401,7 +403,6 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
   const d = driven();
   await Effect.runPromise(d.runner.spawn(request));
   assert.deepEqual(d.acted(), [['spawn', request]]);
-  // The engine's spawn has every key, some undefined: the driver is handed the same keys back.
   const bare: SpawnRequest = {
     name: 'ae/t-2/1',
     brief: 'b',
@@ -413,7 +414,11 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
   };
   await Effect.runPromise(d.runner.spawn(bare));
   assert.deepEqual(d.acted()[1], ['spawn', bare]);
-  assert.deepEqual(Object.keys(d.acted()[1][1] as object).sort(), Object.keys(bare).sort());
+  assert.deepEqual(
+    Object.keys(d.acted()[1][1] as object).sort(),
+    Object.keys(bare).sort(),
+    "the engine's spawn has every key, some undefined: the driver is handed the same keys back",
+  );
 });
 
 test("a refused spawn is the harness's refusal, in its words, `refused`", async () => {
@@ -482,7 +487,6 @@ test("observe through the client is the driver's map, every page of it, from one
 test('two observes at once over more than a page each read the whole map: a listing made since does not end one being paged', async () => {
   const d = driven();
   for (let i = 1; i <= 250; i++) d.sessions.set(`ae/t-${String(i).padStart(3, '0')}/1`, { sessionId: `s-${i}`, state: 'working' });
-  // The driver answers neither first page until both are asked, so both listings are made before either asks its second.
   let release!: () => void;
   const both = new Promise<void>((r) => {
     release = r;
@@ -557,9 +561,7 @@ test('a stop of a session that ended since the listing does nothing, as a driver
   assert.deepEqual(d.acted(), [['spawn', request]]);
 });
 
-// Part 3 pinned the transcript as the driver's own, reached directly; part 4 moves it through the seam, asked by the
-// session's name (`transcriptOf`), so the pin is reversed here on purpose, not loosened.
-test('part 4: every verb goes through the seam, the transcript by name; refuses alone reaches the driver directly', () => {
+test('every verb goes through the seam, the transcript by name too; refuses alone reaches the driver directly', () => {
   const d = driven();
   for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript', 'observeFor'] as const) {
     assert.ok(d.runner[verb], `${verb} is offered`);
@@ -640,9 +642,8 @@ test("a transcript through the seam is the driver's read, verbatim: the session 
     ['transcript', ['s-7', undefined]],
   ]);
   assert.equal(d.asked.filter(([v]) => v === 'observe').length, 0, 'found by name, so no listing');
-  // No session under the name yet: none, and nothing read.
-  assert.equal(await Effect.runPromise(d.runner.transcriptOf!('ae/t-9/1')), null);
-  assert.equal(d.acted().filter(([v]) => v === 'transcript').length, 2);
+  assert.equal(await Effect.runPromise(d.runner.transcriptOf!('ae/t-9/1')), null, 'no session under the name yet: none');
+  assert.equal(d.acted().filter(([v]) => v === 'transcript').length, 2, 'and nothing read');
 });
 
 test('REFUSED: a transcript through the seam of a name that is no session is refused in words, and the driver is not asked', async () => {
@@ -758,7 +759,6 @@ test('the in-process transport maps the three names the handler spells otherwise
   );
   const drain = async (g: AsyncGenerator) => {
     for await (const _ of g) {
-      /* nothing is yielded */
     }
   };
   await assert.rejects(
@@ -790,15 +790,21 @@ test('the Effect door takes the same seam: a2aRunner spawns, stops and settles t
   await run(tick());
   assert.equal(sessions.get(`ae/${id}/1`)!.state, 'canceled', 'the stop reached the driver through cancelTask');
 
-  // Only the seam answers this: a driver reached directly is handed any id, and testOps does nothing with one it lacks.
   const e = await run(Effect.flatMap(Runner, (r) => Effect.flip(r.stop('fake-404'))));
-  assert.equal(e.message, 'the `fake` harness lists no session `fake-404`: there is nothing to stop.');
+  assert.equal(
+    e.message,
+    'the `fake` harness lists no session `fake-404`: there is nothing to stop.',
+    'only the seam answers this: a driver reached directly is handed any id, and testOps does nothing with one it lacks',
+  );
 
-  // What no harness could use is refused beneath it, as through `Runner.layer`.
   const refusal = await run(
     Effect.flatMap(Runner, (r) => Effect.sync(() => r.refuses?.({ brief: 'b', cwd: '/r', config: { model: '' } }))),
   );
-  assert.equal(refusal, "`model` is empty. Leave it out for the harness's default.");
+  assert.equal(
+    refusal,
+    "`model` is empty. Leave it out for the harness's default.",
+    'what no harness could use is refused beneath it, as through `Runner.layer`',
+  );
 });
 
 test("the Effect door keeps the transcript: a2aRunner's Runner reads it through the seam, and a driver without one has none", async () => {
@@ -811,14 +817,16 @@ test("the Effect door keeps the transcript: a2aRunner's Runner reads it through 
   );
   assert.deepEqual(read, { events: [conversed('s-4')], cursor: 's-4@c-1+1' }, "Runner.transcript is the driver's read");
   assert.deepEqual(d.asked, [['transcript', ['s-4', 'c-1']]]);
-  // Only the seam answers this: a driver reached directly would be handed the empty id.
   const e = await run(
     d.ops,
     Effect.flatMap(Runner, (r) => Effect.flip(r.transcript!(''))),
   );
-  assert.equal(e.message, 'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.');
+  assert.equal(
+    e.message,
+    'the request names no session: send the id its harness lists it under as `sessionId`, or its name as `name`.',
+    'only the seam answers this: a driver reached directly would be handed the empty id',
+  );
   assert.equal(d.asked.length, 1);
-  // A driver that keeps no conversation: its card lists no sessionTranscript, and Runner has no transcript.
   const bare = { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs };
   assert.equal(
     await run(
@@ -826,5 +834,6 @@ test("the Effect door keeps the transcript: a2aRunner's Runner reads it through 
       Effect.map(Runner, (r) => r.transcript),
     ),
     undefined,
+    'a driver that keeps no conversation: its card lists no sessionTranscript, and Runner has no transcript',
   );
 });

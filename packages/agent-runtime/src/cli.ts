@@ -26,11 +26,9 @@ import {
 /**
  * Every key a brief may have — a closed list, on purpose.
  *
- * The parser used to collect any `key: value` line and read the ones it knew, so a typo was a
- * default and a bad value was a surprise: `maxAtempts: 3` ran once, and `deadlineSeconds: 5m`
- * became NaN, was journalled as `null`, and stopped the task on its first pass. A key this list
- * does not name is refused by name, with the list. A test feeds every key through the parser, so
- * none can be accepted here and then dropped.
+ * A key this list does not name is refused by name, with the list, so a typo is never read as a default; each value is
+ * checked by `parseBrief`, so `deadlineSeconds: 5m` is refused rather than journalled as `null`. A test feeds every key
+ * through the parser, so none can be accepted here and then dropped.
  */
 export const BRIEF_KEYS = [
   'cwd',
@@ -53,7 +51,10 @@ export type BriefKey = (typeof BRIEF_KEYS)[number];
 
 const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
 
-/** Keys a brief had until the runtime made one attempt per start (stage 4a part 2): refused by name, saying where trying again went. */
+/**
+ * The keys a brief refuses, since the runtime makes one attempt per start (`RETIRED_KEYS`): each refused by name, at any
+ * value, in the words of `retiredKeyRefusal`, which say where trying again goes.
+ */
 const RETIRED_BRIEF_KEYS = ['maxAttempts', 'resume'] as const;
 const isRetiredBriefKey = (key: string): key is (typeof RETIRED_BRIEF_KEYS)[number] =>
   (RETIRED_BRIEF_KEYS as readonly string[]).includes(key);
@@ -77,6 +78,22 @@ const isDirectory = (p: string) => {
  * `maxAttempts` or `resume`, a `cwd` or schema file that is not there, and a brief with nothing to do. What a
  * value means to a harness — a permission mode, a harness name — is the engine's to check, and
  * `file()` checks it, so this is not the only door that does.
+ *
+ * How a frontmatter line is read:
+ *
+ * - `#` after a space starts a comment, as it would in YAML: `harness: codex  # the reviewer` means codex.
+ * - `budgetUsd` is digits and a point, above 0: `$5` and `5 USD`, which a person writes, are refused, where `Number` would
+ *   read the one as NaN.
+ * - `contextTokens` is a whole number in digits; `200k` is refused with the arithmetic done. Whether the harness takes the
+ *   number is `file()`'s to say.
+ * - `queued`, `holdOpen` and `background` are `true` or `false`; `queued: true` holds the task until `ae admit` starts it.
+ * - `closeoutSchema` is a path to a JSON Schema file, relative to where `ae` runs: frontmatter is one line per key, and a
+ *   schema is not.
+ * - `tools` is one line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
+ * - `worktree: true` lets the harness name it, `false` is no worktree, and any other value names it.
+ * - `resumeFrom` names the session to continue: the task's one attempt starts from it rather than cold.
+ *
+ * The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
  */
 export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const source = text.replace(/\r\n/g, '\n');
@@ -86,8 +103,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
 
   const meta = new Map<BriefKey, string>();
   for (const raw of m?.[1]?.split('\n') ?? []) {
-    // `#` after a space starts a comment, as it would in YAML — so `harness: codex  # the reviewer`
-    // means codex, and not a harness called "codex  # the reviewer".
     const line = raw.replace(/(^|\s)#.*$/, '').trim();
     if (!line) continue;
     const i = line.indexOf(':');
@@ -111,15 +126,12 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     );
   }
   const budgetUsd = meta.get('budgetUsd');
-  // Digits and a point: `$5` and `5 USD` are what a person writes, and `Number` would make the one NaN and refuse neither.
   if (budgetUsd !== undefined && !(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
     throw refuse(
       `\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`,
     );
   }
   const contextTokens = meta.get('contextTokens');
-  // Digits: a number of tokens. `200k` is what a person writes, and the refusal does the arithmetic. Whether the harness takes the
-  // number is `file()`'s to say.
   if (contextTokens !== undefined && !(/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens)))) {
     const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
     throw refuse(
@@ -132,7 +144,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
       `\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`,
     );
   }
-  // The one way to hold a task back from `ae` since the runtime's ceiling was retired (stage 4c part 2): `ae admit` starts it.
   const queued = meta.get('queued');
   if (queued !== undefined && queued !== 'true' && queued !== 'false') {
     throw refuse(
@@ -150,7 +161,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
   }
 
-  // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
   let closeoutSchema: object | undefined;
   const schemaPath = meta.get('closeoutSchema');
   if (schemaPath !== undefined) {
@@ -174,7 +184,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     closeoutSchema = parsed;
   }
 
-  // One line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
   const toolList = meta
     .get('tools')
     ?.split(',')
@@ -186,12 +195,10 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   }
 
   const worktree = meta.get('worktree');
-  // The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
   const config: HarnessArgs = Object.fromEntries(
     Object.entries({
       model: meta.get('model'),
       permissionMode: meta.get('permissionMode'),
-      // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
       worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
       tools: toolList,
       effort: meta.get('effort'),
@@ -205,7 +212,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
     harness: meta.get('harness'),
     deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
-    // Which session to CONTINUE: the task's one attempt starts from it rather than cold.
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
     ...(holdOpen === 'true' ? { holdOpen: true as const } : {}),
@@ -284,27 +290,28 @@ const ranLine = (a: Attempt): string =>
 
 /**
  * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
- * the runtime records since stage 4a, where it once recorded `failed (unsigned)` itself. What it means for the work is the
- * layer above's to say; `ae` says only what happened.
+ * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
  */
 const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');
 
-/** One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. */
+/**
+ * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
+ * its harness ended at its spend cap says so as `failed (budget)`, the limit beside the end; what the harness denied the
+ * session is said as the rules a person would write to allow it: the calls it went on without.
+ */
 export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
   if (a.ended === null) return `attempt ${a.n}  running ${when}`;
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
-  // A session its harness ended at its spend cap says so as it did when the runtime judged the cap: `failed (budget)`.
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
-  // What the harness denied the session, as the rules a person would write to allow it: the calls it went on without.
   const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
   return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
 };
 
 /**
- * One task, for `ae ls`: `queued` while it waits for `ae admit` (stage 4c), and its latest attempt's cost beside its turns
+ * One task, for `ae ls`: `queued` while it waits for `ae admit`, and its latest attempt's cost beside its turns
  * — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
  * Code writes a session's cost as its process exits. A task held open and answered says which turn it is on — `turn 1`.
  */
@@ -317,10 +324,7 @@ export const taskLine = (v: TaskView) => {
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0].slice(0, 44)}`;
 };
 
-/**
- * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
- * read three different ways depending on which verb printed it.
- */
+/** The word each kind of journal entry is printed with. */
 const KINDS: Record<string, string> = {
   filed: 'filed',
   starting: 'starting',
@@ -335,6 +339,10 @@ const KINDS: Record<string, string> = {
   admitted: 'admitted',
 };
 
+/**
+ * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
+ * read three different ways depending on which verb printed it.
+ */
 export const entryLine = (taskId: string, event: Event) => {
   const extra =
     event.kind === 'settled'
@@ -404,12 +412,24 @@ const HELP = `ae — an engine for agent sessions
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster`;
 
 /**
- * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: it was the runtime's ceiling until stage 4c part 2
- * (2026-09-25), and read and dropped, a person who set it would believe in a ceiling nothing keeps.
+ * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: the runtime keeps no ceiling, and read and dropped, the
+ * variable would have a person who set it believe in a ceiling nothing keeps.
  */
 export const AE_MAX_CONCURRENT_RETIRED =
   'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
 
+/**
+ * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
+ * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
+ *
+ * - `say` and `answer` take everything after the id as the words, so an unquoted sentence is one message — for `answer`,
+ *   but a `--budget <usd>`, the next turn's cap. An empty message is the engine's to refuse, as every refusal is: exit 2,
+ *   and nothing journalled.
+ * - `watch` is `engine.watch`, never a poll loop of `engine.feed`: the store PUSHES (the file journal watches the feed), a
+ *   timer is only the backstop for a store that cannot or an OS event that is dropped, and a drain guard keeps
+ *   "at-least-once, in order" true when a push and a tick land together, all behind one method: a CLI that re-implemented
+ *   its easy half would be the worst consumer of its own API.
+ */
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
   if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
@@ -457,15 +477,12 @@ export async function main(argv: string[]): Promise<void> {
       await engine.stop(arg);
       return console.log(`${arg}  stop requested`);
 
-    // The words are everything after the id, so an unquoted sentence is one message. An empty one is the
-    // engine's to refuse, as every refusal is: exit 2, and nothing journalled.
     case 'say': {
       if (!arg) return console.log(HELP);
       const said = await engine.say(arg, argv.slice(2).join(' '));
       return console.log(entryLine(arg, { kind: 'said', ...said }));
     }
 
-    // As for `say`, the words are everything after the id — but a `--budget <usd>`, which is the next turn's cap.
     case 'answer': {
       if (!arg) return console.log(HELP);
       const rest = argv.slice(2);
@@ -518,11 +535,6 @@ export async function main(argv: string[]): Promise<void> {
       return console.log(`cursor: ${cursor}`);
     }
 
-    // `engine.watch`, not a poll loop of `engine.feed`. The store PUSHES (the file journal watches
-    // the feed), the timer is only the backstop for a store that cannot or an OS event that got
-    // dropped, and a drain guard keeps "at-least-once, in order" true when a push and a tick land
-    // together. All of that already exists behind one method; re-implementing the easy half of it
-    // here is how a CLI ends up being the worst consumer of its own API.
     case 'watch': {
       const from = Number(arg) || 0;
       console.log(`watching from ${from}, ^C to stop`);

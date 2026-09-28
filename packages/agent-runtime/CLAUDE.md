@@ -22,6 +22,9 @@ One session run to completion, durably, on one harness. `decide` (`src/domain.ts
 - **The engine can say a task waits before its harness has let the session go** (`closedOut`, and it waits for the session before ending
   on a statement on disk): a test asserts both sides, or waits for the Task.
 - **`io().reads` counts every file the runtime reads**, not only journals.
+- **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no
+  `.usage`, `.claude` or another key the test refuses. A case name in `test/lifecycle-corpus.ts` is a key of
+  `test/fixtures/decide-corpus.json`: renaming one is re-recording the fixture.
 
 ## Arguments and doors
 

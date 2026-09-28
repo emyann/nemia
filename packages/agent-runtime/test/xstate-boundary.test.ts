@@ -1,5 +1,5 @@
 /**
- * XState stays inside the lifecycle (thin runtime stage 5): `src/lifecycle.ts` is the one file that imports it, no other
+ * XState stays inside the lifecycle: `src/lifecycle.ts` is the one file that imports it, no other
  * package of the workspace depends on it or imports it, and neither of the runtime's entries hands a consumer an XState name
  * or value, the machine, or the readings `decide` moves by. The machine is the runtime's judgement, as `decide` is, and a
  * consumer that could call it would be deciding beside the pass.
@@ -95,9 +95,16 @@ test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a 
   for (const [file, line, spec] of planted) {
     assert.deepEqual(xstateBreaches(file, `// the lifecycle\n${line}\n`), [`${file} imports ${spec}: ${why}`], `${file}: ${line}`);
   }
-  // Not refused: the lifecycle itself, and prose that names XState.
-  assert.deepEqual(xstateBreaches(`packages/agent-runtime/${LIFECYCLE}`, "import { setup } from 'xstate';"), []);
-  assert.deepEqual(xstateBreaches('packages/agent-runtime/src/engine.ts', "// import { transition } from 'xstate';\n * from 'xstate'"), []);
+  assert.deepEqual(
+    xstateBreaches(`packages/agent-runtime/${LIFECYCLE}`, "import { setup } from 'xstate';"),
+    [],
+    'not refused: the lifecycle itself',
+  );
+  assert.deepEqual(
+    xstateBreaches('packages/agent-runtime/src/engine.ts', "// import { transition } from 'xstate';\n * from 'xstate'"),
+    [],
+    'not refused: prose that names XState',
+  );
 });
 
 /** The workspaces whose package.json names XState in any dependency list. */
@@ -129,7 +136,6 @@ test('XState is a dependency of the runtime alone, pinned', () => {
     /^\d+\.\d+\.\d+$/,
     'an exact version: the lifecycle leans on how its `transition` answers a missing edge',
   );
-  // REFUSED: a second workspace that depends on it, as a dev dependency or a scoped package.
   assert.deepEqual(
     dependents({
       a: { dependencies: { xstate: '5' } },
@@ -137,6 +143,7 @@ test('XState is a dependency of the runtime alone, pinned', () => {
       c: { dependencies: { effect: '4' } },
     }),
     ['a', 'b'],
+    'REFUSED: a second workspace that depends on it, as a dev dependency or a scoped package',
   );
 });
 

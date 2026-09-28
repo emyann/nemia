@@ -2,8 +2,8 @@
  * The store's two files about the tick itself: `tick.json`, the ceilings the last pass ran with, and `daemon.json`, who ticks the store —
  * read, judged by `daemon.ts`'s pure half against the process table, and written.
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what it exported of
- * this before.
+ * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
+ * exports of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,9 +81,7 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
     fs.mkdirSync(HOME, { recursive: true });
     fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
     fs.renameSync(hidden, tickFile());
-  } catch {
-    /* read from the reader's own environment instead */
-  }
+  } catch {}
 }
 
 /**
@@ -99,7 +97,7 @@ const HarnessCostSchema = Schema.StructWithRest(
 );
 
 /**
- * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase there; `rested` is absent from a pass written before there was one.
+ * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase there; `rested` may be absent.
  * A key it does not name is kept, as a newer `wf` may write one.
  */
 const isPassCost = Schema.is(
@@ -138,7 +136,7 @@ export function lastPassCost(): PassCost | undefined {
 
 /**
  * A pass's cost written down, through a hidden file renamed over the last, so a reader never reads half of it. A store that cannot be written
- * loses only this, and the pass goes on. Answers with the time the write took, which is measuring's too.
+ * loses only this, which the next pass writes again, and the pass goes on. Answers with the time the write took, which is measuring's too.
  */
 export function recordPassCost(cost: PassCost): number {
   const t0 = performance.now();
@@ -147,13 +145,9 @@ export function recordPassCost(cost: PassCost): number {
     fs.mkdirSync(HOME, { recursive: true });
     fs.writeFileSync(hidden, JSON.stringify(cost, null, 2));
     fs.renameSync(hidden, statsFile());
-  } catch {
-    /* the next pass writes it again */
-  }
+  } catch {}
   return performance.now() - t0;
 }
-
-// ─── who ticks the store ────────────────────────────────────────────────────
 
 /** `$WF_ROOT/daemon.json`: the store taken by one `wf up`, written by it alone (`daemon.ts`). */
 export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
@@ -162,8 +156,8 @@ const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN
 
 /**
  * `daemon.json` as `wf up` writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and `kill(-n)`
- * signal process groups, not a process. `passedAt` is absent from a file written before its first pass by an older `wf up`, and read as
- * `null`. A key it does not name is dropped: the file is the daemon's alone, and written whole by it.
+ * signal process groups, not a process. `passedAt` may be absent, and is read as `null`. A key it does not name is dropped: the file is
+ * the daemon's alone, and written whole by it.
  */
 const DaemonFileSchema = Schema.Struct({
   pid: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -211,7 +205,7 @@ export function alive(pid: number): boolean {
 }
 
 /**
- * When process `pid` started, in clock ticks since boot: field 22 of `/proc/<pid>/stat`, read after the last `)`, since the command name
+ * When process `pid` started, in clock ticks since boot: field 22 of `/proc/<pid>/stat`, read after the last `)`, as the command name
  * before it may hold spaces and parentheses. Undefined where there is no `/proc`, or the process is gone.
  */
 export function procStartOf(pid: number): number | undefined {
@@ -311,9 +305,7 @@ export function beat(held: DaemonFile, at = new Date().toISOString()): void {
   try {
     const file = readDaemon()?.file;
     if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
-  } catch {
-    /* the next pass writes the file, or fails saying why */
-  }
+  } catch {}
 }
 
 /**
@@ -325,9 +317,7 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
   try {
     const file = readDaemon()?.file;
     if (file?.pid === held.pid && !file.stoppedAt) writeDaemon({ ...file, stoppedAt: at });
-  } catch {
-    /* read as gone once the process is */
-  }
+  } catch {}
 }
 
 /** Why a pass by hand may not run now — a daemon ticks the store — or undefined when it may. A `wf tick` never writes the file. */

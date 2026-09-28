@@ -7,7 +7,8 @@
  * of it, so a test counts the passes and reads the file between them. A holder that is alive is a real process of the test's — a sleeper —
  * written with its own start from `/proc`, as `wf up` writes its own; one that is gone is a child that has exited; and a pid reused after
  * a crash is the sleeper under a start that is not its own. `WF_ROOT` is read as the module loads, so it is set before the import;
- * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
+ * `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in
+ * tick.ts).
  */
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

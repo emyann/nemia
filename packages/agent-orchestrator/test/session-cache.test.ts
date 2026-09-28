@@ -2,17 +2,18 @@
  * A continued session keeps its prompt cache: every task the run files with `resumeFrom` carries what the task whose session it continues
  * was filed with — its closeout schema, byte for byte as JSON, its model, effort, tools, disallowed tools and permission mode. Each of those
  * is part of the cached prompt: the schema is Claude Code's `StructuredOutput` tool, a tool sits at the front, and a changed one rewrites the
- * whole conversation at twenty times the price of reading it. Measured 2026-09-18: 43 continuations filed with another schema than the one
- * they continued rewrote 200k to 640k tokens each (docs/pivot-2026-09-18.md §1, Finding 2).
+ * whole conversation at twenty times the price of reading it: a continuation filed with another schema than the one it continues rewrites
+ * hundreds of thousands of tokens.
  *
- * And its context window (`contextTokens`), which is not part of the cached prompt — a resume given another window, or none, read the whole
- * prompt from the cache (agent-runtime open issue 26) — but which a resumed session keeps only when it is given it again: Claude Code's copy
- * of a `--bg` session keeps the flags it was started with and no others, so a continuation filed without the window runs on the model's
- * whole window, and one filed with another compacts where the session it continues did not.
+ * And its context window (`contextTokens`), which is not part of the cached prompt — a resume given another window, or none, reads the
+ * whole prompt from the cache (agent-runtime open issue 26) — but which a resumed session keeps only when it is given it again: Claude
+ * Code's copy of a `--bg` session keeps the flags it was started with and no others, so a continuation filed without the window runs on the
+ * model's whole window, and one filed with another compacts where the session it continues did not.
  *
  * Walked at shipped defaults, over every shipped folder with a loop: a first try, a nudge, an answer to a blocked step (`wf retry
  * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own. And the run's own nudge
- * to sign off, filed with no person's word when a session ends `unsigned`.
+ * to sign off, filed with no person's word when a session ends `unsigned`. `WF_ROOT` is read as the module loads, so it is set before the
+ * import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +28,6 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.ts');
 
@@ -137,6 +137,8 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 /**
  * A run of `dir` through a loop's first try, a nudge, an answer to its blocked try, round 2 and round 3, every other step signing off with
  * what its schema asks for — and the tasks it filed, in order. `first` is how try 2 is asked for: a nudge, or a new session on a model.
+ * The target's try 1 ends unsigned, so a nudge follows; try 2 signs blocked, so an answer follows; try 3, round 1, is handed no `replies`;
+ * the looping step's rounds 1 and 2 ask again, and its round 3 is done.
  */
 async function walk(
   dir: string,
@@ -175,14 +177,14 @@ async function walk(
       if (n === 1) {
         b.settle(id, 'succeeded');
         continue;
-      } // unsigned: a nudge follows
+      }
       if (n === 2) {
         b.settle(id, 'succeeded', { ...said, outcome: 'blocked', needs: 'which flag?' });
         continue;
-      } // blocked: an answer follows
-      if (n === 3) said.replies = []; // round 1: handed nothing
+      }
+      if (n === 3) said.replies = [];
       const r = tryOfId(id, looping.name);
-      if (r) said.again = r < 3; // rounds 1 and 2 ask again; 3 is done
+      if (r) said.again = r < 3;
       b.settle(id, 'succeeded', said);
     }
     if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, first);
@@ -196,18 +198,16 @@ for (const name of LOOPED) {
   test(`${name}, at shipped defaults: every continued session is filed with what the session it continues was — schema, model, effort, tools — through a nudge, an answer, round 2 and round 3`, async () => {
     const { id, filed, target, looping, steps } = await walk(path.join(SHIPPED, name));
     const resumed = filed.filter((f) => f.resumeFrom).map((f) => f.id.slice(id.length + 1));
-    // The walk reached what it claims to: a nudge (try 2), an answer (try 3), round 2 (try 4), round 3 (try 5), and review's third round.
     assert.deepEqual(
       resumed,
       [2, 3, 4, 5].map((n) => `${target}-try${n}`),
-      filed.map((f) => f.id).join('\n'),
+      `the walk reached a nudge (try 2), an answer (try 3), round 2 (try 4) and round 3 (try 5):\n${filed.map((f) => f.id).join('\n')}`,
     );
     assert.ok(
       filed.some((f) => f.id.endsWith(`-${looping}-try3`)),
       'round 3 was reviewed',
     );
     assert.deepEqual(chainDifferences(filed), []);
-    // And the chain is the one the frozen workflow gives the target, `replies` and all, from its first try.
     for (const f of filed.filter((x) => x.id.includes(`-${target}`) && !x.id.endsWith('-check'))) {
       assert.equal(
         JSON.stringify(f.closeoutSchema),
@@ -217,15 +217,14 @@ for (const name of LOOPED) {
             steps,
           ),
         ),
-        f.id,
+        `${f.id}: the chain is the one the frozen workflow gives the target, from its first try`,
       );
-      assert.ok((f.closeoutSchema as { required: string[] }).required.includes('replies'), f.id);
+      assert.ok((f.closeoutSchema as { required: string[] }).required.includes('replies'), `${f.id}: replies and all`);
     }
   });
 }
 
 test("REFUSED before the fix, now kept: a `wf retry --model` session is continued on its model — by the answer to it, and by the round after — not on the step's", async () => {
-  // Try 2 a new session on sonnet (`--model sonnet`), blocked; try 3 answers it, continuing sonnet's session; round 2 continues try 3's.
   const { id, filed, target } = await walk(path.join(SHIPPED, 'dev'), { mode: 'fresh', model: 'sonnet' });
   const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
   assert.deepEqual(
@@ -236,6 +235,7 @@ test("REFUSED before the fix, now kept: a `wf retry --model` session is continue
       ['sonnet', true],
       ['sonnet', true],
     ],
+    "try 2 a new session on sonnet (`--model sonnet`), blocked; try 3 answers it, continuing sonnet's session; round 2 continues try 3's",
   );
   assert.equal(filed.find((f) => f.id === `${id}-${target}`)!.config?.model, 'opus', "the first try on the step's model");
   assert.deepEqual(chainDifferences(filed), []);
@@ -298,7 +298,6 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
 });
 
 test('REFUSED by the check: a chain that changes its schema — round 1 without `replies`, round 2 with them, as it was filed before — or its model, effort, tools, fence or mode', () => {
-  // The opposite first: the target's round-1 session filed as it was until 2026-09-18, and round 2 continuing it with `replies`.
   const target: Workflow = { name: 'implement', after: [], body: 'implement it' };
   const steps: Workflow[] = [target, { name: 'review', after: ['implement'], body: 'review it', loop: 'implement' }];
   const was = { ...closeoutSchemaOf(target, steps), properties: CLOSEOUT_SCHEMA.properties, required: CLOSEOUT_SCHEMA.required };
@@ -311,8 +310,11 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
       config: { model: 'opus', effort: 'high' },
     },
   ];
-  assert.deepEqual(chainDifferences(chain), ["r-implement-try2: closeoutSchema is not r-implement's"]);
-  // Byte for byte: the same fields in another order is another tool.
+  assert.deepEqual(
+    chainDifferences(chain),
+    ["r-implement-try2: closeoutSchema is not r-implement's"],
+    "the target's round-1 session filed without `replies`, and round 2 continuing it with them",
+  );
   const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
   assert.deepEqual(
     chainDifferences([
@@ -320,6 +322,7 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
       { ...chain[1], closeoutSchema: reordered, resumeFrom: 'native-r-implement' },
     ]),
     ["r-implement-try2: closeoutSchema is not r-implement's"],
+    'byte for byte: the same fields in another order is another tool',
   );
 
   const args = {
@@ -375,7 +378,6 @@ for (const name of LOOPED) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);
         if (id.endsWith('-check')) b.settle(id, 'succeeded', undefined, 0);
-        // The target ends as the engine records a session that never called StructuredOutput: failed, its last attempt `unsigned`.
         else if (id === first) b.settle(id, 'failed', undefined, undefined, 'unsigned');
         else
           b.settle(id, 'succeeded', {
@@ -386,7 +388,10 @@ for (const name of LOOPED) {
           });
       }
     }
-    assert.ok(b.tasks.has(nudge), `the run filed ${nudge} itself: ${[...b.tasks.keys()].join(', ')}`);
+    assert.ok(
+      b.tasks.has(nudge),
+      `the run filed ${nudge} itself, its target ended as the engine records a session that never called StructuredOutput, failed with its last attempt unsigned: ${[...b.tasks.keys()].join(', ')}`,
+    );
     const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
     assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
     assert.deepEqual(chainDifferences(filed), []);

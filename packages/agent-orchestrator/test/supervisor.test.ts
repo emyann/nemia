@@ -4,8 +4,13 @@
  *   supervise        (one step, `workspace: main`, `slot: none`, `remote: true`, no check)
  *
  * What it watches is every other run: it prepares a decision, asks by signing off `blocked`, and acts on the answer. So the two things
- * the package had to be able to do are here: a step answered many times over, each answer a try of the same session, and a run the cap on
- * runs in flight (`WF_MAX_RUNS`) neither holds nor counts.
+ * the package does for it are here: a step answered many times over, each answer a try of the same session, and a run the cap on runs in
+ * flight (`WF_MAX_RUNS`) neither holds nor counts.
+ *
+ * Its brief is held to its sentences: what it watches and reads before it decides; the three moments to ask and a person's idea; how it
+ * asks, its own sign-off the question and the answer continuing the session; what it does with a yes, and never does; a clean checkout,
+ * since it shares the checkout with every run's ending step, which stops at a dirty tree; no background loop when nothing needs a person;
+ * and where the lessons go. `WF_ROOT` is read as the module loads, so it is set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +26,6 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
-// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
 const { advance, list, readRun, retry, runSlots, start } = await import('../src/runner.ts');
 
@@ -72,14 +76,14 @@ const folderOf = (steps: Record<string, string>): string => {
 
 /**
  * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, every filing, and each task's own session
- * (`native-<id>`). A settled task carries the closeout it is given.
+ * (`native-<id>`). A settled task carries the closeout it is given. `reads` is every `view` the caller asked for, in order: what a pass
+ * costs the engine.
  */
 const board = () => {
   type Filed = TaskSpec & { id: string };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; costUsd?: number }>();
   const filings: string[] = [];
   const stopped: string[] = [];
-  /** Every `view` the caller asked for, in order: what a pass costs the engine, which is the point of one of the tests below. */
   const reads: string[] = [];
   const e = {
     view: async (id: string) => {
@@ -131,8 +135,6 @@ const board = () => {
   return { e, tasks, filings, stopped, reads, settle };
 };
 
-// ─── the folder, held to its shape ──────────────────────────────────────────
-
 test("the supervisor is one step that never ends: in the repository's checkout, outside the cap on runs in flight, bridged to a phone, with implement's denies and no check", () => {
   const steps = loadWorkflows(FOLDER);
   assert.deepEqual(
@@ -161,7 +163,6 @@ test("the supervisor is one step that never ends: in the repository's checkout, 
   assert.deepEqual(
     { after, workspace, slot, harness, model, effort, context, remote, disallowedTools, check, tools, output, gate, loop, resume, input },
     {
-      // A window of its own: the one session here that never ends grows on every answer, so it compacts rather than reads up to a million.
       after: [],
       workspace: 'main',
       slot: 'none',
@@ -179,57 +180,55 @@ test("the supervisor is one step that never ends: in the repository's checkout, 
       resume: undefined,
       input: undefined,
     },
+    'a window of its own: the one session here that never ends grows on every answer, so it compacts rather than reads up to a million',
   );
   assert.deepEqual(
     terminalSteps(steps).map((s) => s.name),
     ['supervise'],
     'it is the whole workflow',
   );
-  // No `output:` and no `gate:`, which is what lets it sign off `blocked` and be answered for ever: a declared output would have to be
-  // invented on every one of those sign-offs, and a gate holds a handoff this step never makes.
-  assert.equal(supervise.output, undefined);
+  assert.equal(
+    supervise.output,
+    undefined,
+    'no `output:` and no `gate:`, so it signs off `blocked` and is answered for ever: a declared output would have to be invented on every one of those sign-offs, and a gate holds a handoff this step never makes',
+  );
   assert.ok(workflowDescription(FOLDER), 'the folder says what it is for');
 });
 
 test("the supervisor's brief is the loop: what it watches, how it reads a run to decide, how it asks and is answered, and that it never types git for a run", () => {
   const body = said(loadWorkflows(FOLDER)[0].body);
   for (const sentence of [
-    // What it watches, and what it reads before it decides anything.
     '`wf ls` is the pass.',
     "the run's workflow folder — its README, and its last step's file",
     '`wf decide <run>`',
     'The look skill (`.claude/skills/look/SKILL.md`) reads them',
-    // The three moments §9 names, and the fourth.
     '**A run to decide.**',
     '**A plan waiting.**',
     '**A stall.**',
     '**An idea from the person.**',
     'wf retry <run> <step> --message "<their answer>"',
     'wf say <run> <step> "<words>"',
-    // How it asks: its own sign-off is the question, and the answer continues the session.
     'Sign off `blocked` with:',
     'their answer starts it again — the same session, continued',
     'There is no cap on how many times: that is the loop.',
-    // What it does with a yes, and what it never does.
     '**`wf approve <run> <step> --message "<their words>"`**, and nothing more.',
     '**Never type git for a run.**',
     'Never `git add -A`, never `git commit -a`, never push, never merge, never delete a branch.',
-    // It shares the checkout with every run's ending step, which stops at a dirty tree.
     '**Leave the checkout clean, always.**',
     '**Commit what you wrote before any `wf approve`.**',
     '**Never sign off with a file of yours uncommitted.**',
     '`git add <path>` for a file git does not track yet',
-    // What it does when nothing needs a person, and the trap that cost the operator seventy-seven minutes.
     '**Never a background loop**',
     'End anything you start before you sign off.',
     'Sign off only to ask a person something',
-    // Where the lessons go.
     'a trap in `CLAUDE.md`',
   ])
     assert.ok(body.includes(sentence), `${sentence}\n\n${body}`);
 
-  // The skill it is told to use is in the repository, under that name, and this step has every tool, so `Skill` loads it.
-  assert.ok(fs.existsSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md')));
+  assert.ok(
+    fs.existsSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md')),
+    'the skill it is told to use is in the repository, under that name, and this step has every tool, so `Skill` loads it',
+  );
   assert.equal(loadWorkflows(FOLDER)[0].tools, undefined, "the harness's own set: it reads the store, git, the registry and the browser");
 });
 
@@ -237,18 +236,20 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
   const { disallowedTools } = loadWorkflows(FOLDER)[0];
   assert.ok(disallowedTools, 'the step carries a deny list');
 
-  // Each one on its own, so a rule dropped from the folder fails here by name rather than in one deepEqual nobody reads.
   for (const verb of GIT_DENIED) {
     assert.ok(disallowedTools.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallowedTools.join(', ')}`);
     assert.ok(denies(disallowedTools, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
   }
-  // The merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type — in either spelling.
-  assert.ok(denies(disallowedTools, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'));
+  assert.ok(
+    denies(disallowedTools, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'),
+    "the merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type",
+  );
   assert.ok(denies(disallowedTools, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
-  // And throwing away a person's uncommitted work, in either spelling.
-  assert.ok(denies(disallowedTools, 'git checkout -- CLAUDE.md') && denies(disallowedTools, 'git restore CLAUDE.md'));
+  assert.ok(
+    denies(disallowedTools, 'git checkout -- CLAUDE.md') && denies(disallowedTools, 'git restore CLAUDE.md'),
+    "throwing away a person's uncommitted work, in either spelling",
+  );
 
-  // And what its bookkeeping is told to do — write and commit by path, and read the world — is not denied by any of them.
   for (const command of [
     'git add packages/agent-orchestrator/docs/features.md',
     'git commit CLAUDE.md -m "a trap the queue taught"',
@@ -259,15 +260,15 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
   ])
     assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
 
-  // `git push` and `git branch -D` are the checkout's own refusal too (`.claude/settings.json`), which is why the step says nothing of
-  // `git branch`: denying it by prefix would take `git branch --list` with it, and that is diagnosis.
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
   assert.ok(settings.permissions.deny.includes('Bash(git push:*)'));
   assert.ok(settings.permissions.deny.some((r) => r.startsWith('Bash(git branch -D')));
-  assert.equal(denies(disallowedTools, 'git branch --list'), false);
+  assert.equal(
+    denies(disallowedTools, 'git branch --list'),
+    false,
+    "`git branch -D` is the checkout's own refusal, so the step says nothing of `git branch`: denying it by prefix would take `git branch --list`, which is diagnosis",
+  );
 });
-
-// ─── a step that never ends ─────────────────────────────────────────────────
 
 test('a step answered five times over keeps working: each answer a try of the same session, told what was said, on the window it was started with, and nothing capping the count', async () => {
   const repo = aRepo();
@@ -288,9 +289,12 @@ test('a step answered five times over keeps working: each answer a try of the sa
       artifacts: [],
       needs: `Merge r-${n}, or hold it?`,
     });
-    // The pass that reads the question files nothing: it waits on a person, as `wf ls` says.
     const quiet = await advance(e, readRun(run.id));
-    assert.deepEqual([quiet.filed, quiet.tried], [[], []], `answer ${n}: nothing is filed until a person answers`);
+    assert.deepEqual(
+      [quiet.filed, quiet.tried],
+      [[], []],
+      `answer ${n}: the pass that reads the question files nothing until a person answers`,
+    );
     assert.deepEqual((await list(e, readRun(run.id))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
 
     await retry(e, run.id, 'supervise', { mode: 'nudge', message: `yes, merge r-${n}` });
@@ -300,9 +304,11 @@ test('a step answered five times over keeps working: each answer a try of the sa
     assert.ok(tasks.has(next), `try ${n + 1} is on the board: ${filings.join(', ')}`);
     assert.match(tasks.get(next)!.spec.brief, new RegExp(`## Your answer[\\s\\S]*yes, merge r-${n}`), `try ${n + 1} is told answer ${n}`);
     assert.equal(tasks.get(next)!.spec.resumeFrom, `native-${taskId}`, `try ${n + 1} continues try ${n}'s session`);
-    // Claude Code's copy of a resumed session keeps only the flags it is given: an answer filed without the window would run the
-    // session that grows the most on the model's whole one again.
-    assert.equal(tasks.get(next)!.spec.config?.contextTokens, 200_000, `try ${n + 1} continues on the same window`);
+    assert.equal(
+      tasks.get(next)!.spec.config?.contextTokens,
+      200_000,
+      `try ${n + 1} continues on the same window: Claude Code's copy of a resumed session keeps only the flags it is given`,
+    );
   }
   assert.equal(readRun(run.id).steps.supervise?.tries?.length, 5, 'five tries behind the one it is on, and the sixth running');
   assert.equal(filings.length, 6);
@@ -314,7 +320,6 @@ test('a pass over a step answered again and again reads what it is working on, n
   const run = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
   await advance(e, readRun(run.id));
 
-  /** What one pass asked the engine for, over a step that has been answered `n` times. */
   const passReads = async (): Promise<string[]> => {
     reads.length = 0;
     await advance(e, readRun(run.id));
@@ -336,8 +341,6 @@ test('a pass over a step answered again and again reads what it is working on, n
   assert.deepEqual(later, [`${run.id}-supervise-try7`], 'the try it is on, and nothing else');
   assert.equal(later.length, early.length, 'a pass costs the same at six answers as at one: it does not grow with them');
 
-  // A cap in force is the one thing those tries are read for — what they have cost together — so a run with one reads every last one,
-  // and the step it holds still reads over budget.
   const capped = start({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false });
   await advance(e, readRun(capped.id));
   settle(`${capped.id}-implement`, 'failed', undefined, undefined, 0.6);
@@ -347,7 +350,10 @@ test('a pass over a step answered again and again reads what it is working on, n
   settle(`${capped.id}-implement-try2`, 'failed', undefined, undefined, 0.6);
   reads.length = 0;
   await advance(e, readRun(capped.id));
-  assert.ok(reads.includes(`${capped.id}-implement`), `try 1 is read while a cap is in force: ${reads.join(', ')}`);
+  assert.ok(
+    reads.includes(`${capped.id}-implement`),
+    `try 1 is read while a cap is in force, the one thing those tries are read for, what they cost together: ${reads.join(', ')}`,
+  );
   const held = await list(e, readRun(capped.id));
   assert.deepEqual(
     held.steps.map((st) => st.status),
@@ -356,34 +362,37 @@ test('a pass over a step answered again and again reads what it is working on, n
   );
 });
 
-// ─── and one the cap on runs in flight does not hold ────────────────────────
-
 test("`slot: none` on disk: the supervisor's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
   const repo = aRepo();
   const { e, filings, settle } = board();
   const watcher = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
   const work = start({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude' }), isolate: false });
 
-  // One slot, and it is taken: the work run with nothing filed is held, and the supervisor is not.
   const full = { inFlight: 1, cap: 1 };
   const held = await advance(e, readRun(work.id), full);
-  assert.deepEqual([held.filed, held.held], [[], full], 'the work waits for a run slot');
+  assert.deepEqual([held.filed, held.held], [[], full], 'one slot, and it is taken: the work waits for a run slot');
   const watching = await advance(e, readRun(watcher.id), full);
   assert.deepEqual(watching.filed, ['supervise'], 'the supervisor files its step all the same');
   assert.equal(watching.held, undefined, 'and is not held');
   assert.equal(watching.inFlight, false, "nor counted: what it filed is its own watching, not a run's work");
 
-  // And it holds nobody: with the supervisor running, one slot is still free for the work.
   process.env.WF_MAX_RUNS = '1';
-  assert.deepEqual([...(await runSlots(e, [readRun(watcher.id), readRun(work.id)]))], [], 'nothing held');
+  assert.deepEqual(
+    [...(await runSlots(e, [readRun(watcher.id), readRun(work.id)]))],
+    [],
+    'nothing held: with the supervisor running, one slot is still free for the work',
+  );
   const free = await advance(e, readRun(work.id), { inFlight: 0, cap: 1 });
   assert.deepEqual(free.filed, ['implement'], 'the work takes the slot the supervisor never held');
   assert.equal(free.inFlight, true);
 
-  // Its own filing is not counted even while its session runs, pass after pass.
   settle(`${watcher.id}-supervise`, 'succeeded', { outcome: 'blocked', summary: 'a run is ready', artifacts: [], needs: 'Merge it?' });
   for (let pass = 0; pass < 2; pass++)
-    assert.equal((await advance(e, readRun(watcher.id), { inFlight: 1, cap: 1 })).inFlight, false, `pass ${pass}`);
+    assert.equal(
+      (await advance(e, readRun(watcher.id), { inFlight: 1, cap: 1 })).inFlight,
+      false,
+      `pass ${pass}: its own filing is not counted while its session runs`,
+    );
   assert.deepEqual([...(await runSlots(e, [readRun(watcher.id), readRun(work.id)]))], []);
   delete process.env.WF_MAX_RUNS;
   assert.ok(filings.includes(`${watcher.id}-supervise`) && filings.includes(`${work.id}-implement`));
@@ -410,6 +419,8 @@ test("REFUSED at `wf start`, with nothing written: `slot: none` on a step of a w
     );
   }
   assert.equal(runs(), before, 'nothing written');
-  // The shipped folder is the shape that is allowed: one step, and it starts.
-  assert.ok(start({ brief: 'watch it', repo, workflowDir: FOLDER }).id);
+  assert.ok(
+    start({ brief: 'watch it', repo, workflowDir: FOLDER }).id,
+    'the shipped folder is the shape that is allowed: one step, and it starts',
+  );
 });

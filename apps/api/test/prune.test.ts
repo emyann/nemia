@@ -111,7 +111,10 @@ const listed = async (): Promise<Map<string, Summary>> => {
 const detail = async (id: string) => {
   const res = await app.request(`/api/runs/${id}`);
   assert.equal(res.status, 200);
-  return res.json() as Promise<{ pruned: { at: string; worktrees: Array<{ path: string }>; artifacts: { at: string } | null } | null }>;
+  return res.json() as Promise<{
+    pruned: { at: string; worktrees: Array<{ path: string }>; artifacts: { at: string } | null } | null;
+    onDisk: { worktrees: boolean; files: boolean };
+  }>;
 };
 
 /**
@@ -133,6 +136,7 @@ const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: bo
 test('a finished, merged run pruned on the board with its files is pruned as `wf prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so', async () => {
   const before = await listed();
   assert.equal(before.get('p-merged')!.pruned, null, 'a run nobody pruned says nothing of it');
+  assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
   const res = await pruneOn('p-merged', { artifacts: true });
   assert.equal(res.status, 200);
   const body = await res.json();
@@ -155,6 +159,8 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   const page = await detail('p-merged');
   assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
   assert.deepEqual(page.pruned!.worktrees.map((w) => w.path), [worktreeOf('p-merged')]);
+  // Nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test).
+  assert.deepEqual(page.onDisk, { worktrees: false, files: false });
 });
 
 test('REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `wf prune`, and nothing is touched', async () => {
@@ -194,6 +200,8 @@ test('a finished run nobody merged, pruned with `unmerged`, loses its worktree a
   assert.equal(pruned.artifacts, undefined);
   assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
   assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
+  // Its files are still there to give back, and nothing else.
+  assert.deepEqual((await detail('p-unmerged')).onDisk, { worktrees: false, files: true });
 });
 
 test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf prune`, whatever the switches, and nothing is touched', async () => {

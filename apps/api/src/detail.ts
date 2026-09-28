@@ -1,5 +1,7 @@
 /** One run in full, for a person reading it (`GET /api/runs/:id`): the spec, and per step what it was told and how it went. */
-import { budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, phaseOfView, remoteAgents, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
+import fs from 'node:fs';
+import path from 'node:path';
+import { artifactsDir, budgetWord, closeoutAsked, closeoutReader, consumption, dollars, exitVerdicts, fromNote, HARNESSES, HOME, phaseOfView, remoteAgents, type Retry, type RetryMode, runStartedAt, type Said, type Spend, type SpendOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry } from 'agent-orchestrator';
 import { acceptanceOf, addSpend, approvalOf, budgetOf, composeBrief, gatesOf, hasGate, isGitRun, loopOver, overBudget, ownStatus, type PlaceKind, placeOf, retryable, type Run, type StepRecord, type StepStatus } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from './artifacts.ts';
@@ -156,6 +158,12 @@ export type RunDetail = {
    * named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
    */
   pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
+  /**
+   * What `wf prune` would still find of the run on disk: its worktrees' directory (`worktrees/<id>`, which a prune removes once it has
+   * removed what is in it) and its files directory (`runs/<id>/artifacts`). The board offers to prune only what is there, so no button it
+   * draws can be answered `nothing to prune`; the api judges the prune again all the same.
+   */
+  onDisk: { worktrees: boolean; files: boolean };
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
@@ -476,6 +484,7 @@ export async function detail(run: Run): Promise<RunDetail> {
       worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
       artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
     } : null,
+    onDisk: onDiskOf(run),
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
@@ -625,4 +634,10 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const mode = modeOf(filedTools);
   if (mode === undefined) return null;
   return { mode, by: filedTools && modeOf(undefined) !== mode ? 'tools' : by };
+}
+
+/** What of a run `wf prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
+function onDiskOf(run: Run): RunDetail['onDisk'] {
+  const files = path.dirname(artifactsDir(run, '_'));
+  return { worktrees: isGitRun(run) && fs.existsSync(path.join(HOME, 'worktrees', run.id)), files: fs.existsSync(files) };
 }

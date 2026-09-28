@@ -21,7 +21,7 @@ export function PruneRun({ run }: { run: RunDetail }) {
   return (
     <DialogTrigger>
       <Button variant="outline" size="sm" data-prune-open>
-        {run.pruned ? 'Prune its files…' : 'Prune…'}
+        {run.onDisk.worktrees ? 'Prune…' : 'Prune its files…'}
       </Button>
       <Popover placement="bottom end" offset={6} className={cn(POPOVER, 'w-96')}>
         <Dialog aria-label={`Prune ${run.id}`} className="space-y-3 outline-none">

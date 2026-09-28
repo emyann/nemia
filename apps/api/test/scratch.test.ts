@@ -2,7 +2,7 @@
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
  * a call of `os.tmpdir` anywhere else under `test/` is refused, and each package's copy of the helper is this one. A test
  * of where the code under test runs a process names the temp directory with `machineTempDir()`, which the scan refuses
- * only on a line that makes a root with `mkdtemp`.
+ * only on a line that makes a root with `mkdtempSync`.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -16,7 +16,7 @@ const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', '
 /** The one file under `test/` that may make a root by hand: the helper. */
 const ALLOWED = ['scratch.ts'];
 
-/** Each line of `text` that calls the temp directory by name, or makes a root with `mkdtemp` in `machineTempDir()`. */
+/** Each line of `text` that calls the temp directory by name, or makes a root with `mkdtempSync` in `machineTempDir()`. */
 const tmpdirCalls = (text: string) =>
   text
     .split('\n')

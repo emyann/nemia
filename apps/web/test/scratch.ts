@@ -39,7 +39,7 @@ export const scratch = (prefix: string): string => {
 
 /**
  * The machine's temp directory itself, for a test that asserts where the code under test runs a process. Never a place to
- * make a root in: `scratch` makes one, and `scratch.test.ts` refuses a line that passes this to a `mkdtemp`.
+ * make a root in: `scratch` makes one, and `scratch.test.ts` refuses a line that passes this to a `mkdtempSync`.
  */
 export const machineTempDir = (): string => os.tmpdir();
 

@@ -11,6 +11,8 @@ const { app } = await import('../src/app.ts');
 const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } =
   await import('../src/capabilities.ts');
 const { DISALLOW, askDenierOf, bashCovers } = await import('../src/reach.ts');
+type CapabilitiesWithSteps = import('../src/reach.ts').CapabilitiesWithSteps;
+type StepReach = import('../src/reach.ts').StepReach;
 // A step's own deny rules are said to come from its line, as the step writes it: every assertion below reads the constant, so this one reads the words.
 assert.equal(DISALLOW, 'disallowedTools:');
 
@@ -33,7 +35,7 @@ const served = async (repo: string) => {
   process.env.HKB_REPO = repo;
   try {
     const res = await app.request('/api/capabilities');
-    return { status: res.status, body: await res.json() };
+    return { status: res.status, body: (await res.json()) as CapabilitiesWithSteps };
   } finally {
     delete process.env.HKB_REPO;
   }
@@ -158,7 +160,7 @@ test('a server that lists its tools: each with its description, and the one a ru
       checkedAt: undefined,
     },
   );
-  assert.ok(Date.parse(server.checkedAt) > 0, `checkedAt is when it was asked: ${server.checkedAt}`);
+  assert.ok(Date.parse(server.checkedAt ?? '') > 0, `checkedAt is when it was asked: ${server.checkedAt}`);
 });
 
 test('a server whose command does not exist is an error on its entry: a 200, and the other server still lists its tools', async () => {
@@ -176,7 +178,7 @@ test('a server whose command does not exist is an error on its entry: a 200, and
     '`hkb-no-such-mcp-server --stdio` did not start: there is no command `hkb-no-such-mcp-server` on its PATH. Install it, or fix `command` for missing in .mcp.json.',
   );
   assert.deepEqual(
-    working.tools.map((tool: { name: string }) => tool.name),
+    working.tools?.map((tool) => tool.name),
     ['echo', 'wipe'],
   );
 });
@@ -189,7 +191,7 @@ test('a server that offers no tools lists none, and is not asked tools/list, whi
   const { status, body } = await served(repo);
   assert.equal(status, 200);
   assert.deepEqual([body.mcp[0].tools, body.mcp[0].error], [[], null]);
-  assert.ok(Date.parse(body.mcp[0].checkedAt) > 0, 'it was asked, and answered');
+  assert.ok(Date.parse(body.mcp[0].checkedAt ?? '') > 0, 'it was asked, and answered');
 });
 
 test('a server that exits before it answers is an error with what it printed on stderr', async () => {
@@ -201,7 +203,7 @@ test('a server that exits before it answers is an error with what it printed on 
   assert.equal(status, 200);
   assert.equal(body.mcp[0].tools, null);
   assert.match(
-    body.mcp[0].error,
+    body.mcp[0].error ?? '',
     /did not list its tools: .+\. Run it yourself to see why, or fix its entry in \.mcp\.json\.\nWhat it printed on stderr:\nfixture: no licence key in FIXTURE_KEY$/,
   );
 });
@@ -274,8 +276,10 @@ test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} 
     const [server] = body.mcp;
     assert.equal(server.error, null);
     assert.deepEqual(server.args, args, 'shown as written: expanded, a token would be on the page');
+    const [echoed] = server.tools ?? [];
+    assert.ok(echoed?.description, JSON.stringify(server));
     assert.deepEqual(
-      JSON.parse(server.tools[0].description),
+      JSON.parse(echoed.description),
       {
         argv: ['--token=s3cret'],
         HKB_TEST_NAMED: 's3cret',
@@ -353,7 +357,7 @@ test('a server .claude/settings.json does not enable is listed, and not started'
   const all = repoWith({ '.mcp.json': { mcpServers: { off } }, '.claude/settings.json': { enableAllProjectMcpServers: true } });
   const { body } = await served(all);
   assert.equal(body.mcp[0].enabled, true);
-  assert.equal(body.mcp[0].tools.length, 2);
+  assert.equal(body.mcp[0].tools?.length, 2);
 });
 
 test('a server that is not stdio, or whose entry does not read, is listed with why, and not started', async () => {
@@ -428,13 +432,14 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   delete process.env.HKB_REPO;
   const res = await app.request('/api/capabilities');
   assert.equal(res.status, 200);
-  const body = await res.json();
-  const playwright = body.mcp.find((server: { name: string }) => server.name === 'playwright');
+  const body = (await res.json()) as CapabilitiesWithSteps;
+  const playwright = body.mcp.find((server) => server.name === 'playwright');
+  assert.ok(playwright, JSON.stringify(body.mcp.map((server) => server.name)));
   assert.equal(playwright.enabled, true);
   assert.equal(playwright.error, null);
-  const unsafe = playwright.tools.find((tool: { name: string }) => tool.name === 'browser_run_code_unsafe');
-  assert.equal(unsafe.denied, 'mcp__playwright__browser_run_code_unsafe');
-  assert.ok(body.denied.some((d: { rule: string }) => d.rule === 'mcp__playwright__browser_run_code_unsafe'));
+  const unsafe = playwright.tools?.find((tool) => tool.name === 'browser_run_code_unsafe');
+  assert.equal(unsafe?.denied, 'mcp__playwright__browser_run_code_unsafe');
+  assert.ok(body.denied.some((d) => d.rule === 'mcp__playwright__browser_run_code_unsafe'));
 });
 
 // ─── what each step gets ─────────────────────────────────────────────────────
@@ -463,10 +468,30 @@ const stepsRepo = () =>
   });
 
 /** The steps GET /api/capabilities says each step gets, by `<workflow>/<step>`. */
-const stepsOf = async (repo: string): Promise<Record<string, any>> => {
+const stepsOf = async (repo: string): Promise<Record<string, StepReach>> => {
   const { status, body } = await served(repo);
   assert.equal(status, 200);
-  return Object.fromEntries(body.steps.map((s: { workflow: string; step: string }) => [`${s.workflow}/${s.step}`, s]));
+  return Object.fromEntries(body.steps.map((s) => [`${s.workflow}/${s.step}`, s]));
+};
+
+/** A Claude Code step's reach, with what was measured of it: a step on another harness has each of these null. */
+type Measured = StepReach & {
+  tools: NonNullable<StepReach['tools']>;
+  skills: NonNullable<StepReach['skills']>;
+  mcp: NonNullable<StepReach['mcp']>;
+  readOnly: NonNullable<StepReach['readOnly']>;
+};
+
+/** The Claude Code steps of `stepsOf`, by `<workflow>/<step>`, each asserted to carry what was measured of it. */
+const claudeStepsOf = async (repo: string): Promise<Record<string, Measured>> => {
+  const claude = Object.entries(await stepsOf(repo)).filter(([, step]) => step.claudeCode);
+  return Object.fromEntries(
+    claude.map(([name, step]) => {
+      const { tools, skills, mcp, readOnly } = step;
+      assert.ok(tools && skills && mcp && readOnly, `${name} is on Claude Code, whose set was measured: ${JSON.stringify(step)}`);
+      return [name, { ...step, tools, skills, mcp, readOnly }];
+    }),
+  );
 };
 
 const SETTINGS = '.claude/settings.json';
@@ -483,7 +508,7 @@ const bashRule = (rule: string, except: string[] = [], asks: string[] = []) => (
 const nothingElse = { takenBack: [], asked: [], unused: [], exceptions: [], why: null };
 
 test("a step with `tools:` gets exactly those — no skill without Skill, the tools of each server the checkout enables, and the settings' deny", async () => {
-  const { 'dev/review': review } = await stepsOf(stepsRepo());
+  const { 'dev/review': review } = await claudeStepsOf(stepsRepo());
   assert.deepEqual(
     review.fence,
     {
@@ -500,7 +525,7 @@ test("a step with `tools:` gets exactly those — no skill without Skill, the to
   assert.deepEqual(review.tools, { from: 'declared', names: ['Read', 'Grep', 'Glob', 'Bash'], inferred: [], removed: [] });
   assert.equal(review.claudeCode, true);
   assert.deepEqual(review.skills.names, []);
-  assert.match(review.skills.why, /^Its tools have no `Skill`, so it cannot load a skill/);
+  assert.match(review.skills.why ?? '', /^Its tools have no `Skill`, so it cannot load a skill/);
   assert.deepEqual(review.denied, [
     { rule: 'Bash(git push:*)', source: SETTINGS },
     { rule: 'mcp__fixture__wipe', source: SETTINGS },
@@ -519,7 +544,8 @@ test("a step without `tools:` gets the harness's own set — what was measured, 
   );
   assert.match(body.measured.source, /what a worker gets, measured/);
   for (const { name, why } of body.measured.inferred) assert.ok(why.length > 0, `${name} says why it is inferred`);
-  const implement = body.steps.find((s: { step: string }) => s.step === 'implement');
+  const implement = body.steps.find((s) => s.step === 'implement');
+  assert.ok(implement?.tools, JSON.stringify(implement));
   assert.equal(implement.tools.from, 'measured');
   const inferred = MEASURED_TOOLS.inferred.map((t: { name: string }) => t.name);
   // Its own set, less the one tool its `disallowedTools:` names whole; and which of what it has were inferred.
@@ -562,7 +588,7 @@ test("REFUSED: the measured set holds only what the ledger's measurement names, 
 });
 
 test("REFUSED: `disallow` takes away — a tool, one of a family, a server's tool — and a command it denies is not allowed, though the settings allow it", async () => {
-  const { 'dev/implement': implement, 'dev/review': review } = await stepsOf(stepsRepo());
+  const { 'dev/implement': implement, 'dev/review': review } = await claudeStepsOf(stepsRepo());
   assert.ok(!implement.tools.names.includes('SendMessage'), 'SendMessage is not among its tools');
   assert.deepEqual(implement.tools.removed, [
     { name: 'SendMessage', rule: 'SendMessage', source: DISALLOW, of: null },
@@ -592,11 +618,11 @@ test("REFUSED: `disallow` takes away — a tool, one of a family, a server's too
   );
   // And none of it reaches the step beside it, which denies nothing of its own.
   assert.ok(review.allowed.bash.some((b: { command: string }) => b.command === 'npm run build'));
-  assert.equal(review.mcp[0].tools[0].denied, null);
+  assert.equal(review.mcp[0].tools?.[0]?.denied, null);
 });
 
 test("a `dontAsk` step under the settings shows what Bash commands are allowed — and an allow of a tool it does not have is not among them — and a server's tool no rule allows runs no more than a denied one", async () => {
-  const { 'dev/review': review, 'dev/implement': implement } = await stepsOf(stepsRepo());
+  const { 'dev/review': review, 'dev/implement': implement } = await claudeStepsOf(stepsRepo());
   assert.deepEqual(review.allowed, {
     rules: ['Bash(npm test)', 'Bash(git diff:*)', 'Bash(npm run build)'],
     takenBack: [],
@@ -666,7 +692,7 @@ test('REFUSED: a deny takes back every allow whose commands it matches, however 
       '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(npm run:*)\n---\nReview it.\n',
     'workflows/dev/shut.md': '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
   });
-  const { 'dev/review': review, 'dev/shut': shut } = await stepsOf(repo);
+  const { 'dev/review': review, 'dev/shut': shut } = await claudeStepsOf(repo);
   const settings = (rule: string) => ({ rule, source: SETTINGS });
   assert.deepEqual(review.allowed.takenBack, [
     // A prefix deny of the step's own, over a narrower allow of the settings.
@@ -698,7 +724,7 @@ test('REFUSED: a deny takes back every allow whose commands it matches, however 
   assert.deepEqual(shut.tools.removed, [{ name: 'Bash', rule: 'Bash(*)', source: DISALLOW, of: null }]);
   assert.deepEqual(shut.allowed.bash, []);
   assert.equal(shut.allowed.takenBack.length, 7);
-  assert.ok(shut.allowed.takenBack.every((t: { by: { rule: string } }) => t.by.rule === 'Bash(*)' || t.by.source === SETTINGS));
+  assert.ok(shut.allowed.takenBack.every((t) => t.by.rule === 'Bash(*)' || t.by.source === SETTINGS));
   assert.equal(shut.allowed.why, '`Bash` is denied by Bash(*) (disallowedTools:), so it runs no command, whatever the settings allow.');
 });
 
@@ -708,7 +734,7 @@ test('REFUSED: a `dontAsk` step without Bash runs no command, whatever the setti
     'workflows/dev/reader.md': '---\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
     'workflows/dev/denied.md': '---\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash\n---\nRead it.\n',
   });
-  const { 'dev/reader': reader, 'dev/denied': denied } = await stepsOf(repo);
+  const { 'dev/reader': reader, 'dev/denied': denied } = await claudeStepsOf(repo);
   assert.deepEqual(reader.allowed, {
     rules: ['Read'],
     takenBack: [],
@@ -766,7 +792,7 @@ test('a workflow the loader refuses has no step on the page, and a repository wi
   assert.deepEqual(Object.keys(steps), ['lone/implement']);
   // No harness named: the engine's first, Claude Code. No settings: nothing denied or allowed; no `.mcp.json`: no server.
   assert.deepEqual(
-    [steps['lone/implement'].harness, steps['lone/implement'].tools.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed],
+    [steps['lone/implement'].harness, steps['lone/implement'].tools?.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed],
     ['claude', 'measured', [], { rules: [], bash: [], dontAsk: false, askDenier: 'a job', ...nothingElse }],
   );
 });
@@ -784,7 +810,7 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
     'workflows/dev/shut.md': '---\nharness: claude\ndisallowedTools: mcp__fixture\n---\nWork.\n',
     'workflows/dev/open.md': '---\nharness: claude\n---\nWork.\n',
   });
-  const { 'dev/shut': shut, 'dev/open': open } = await stepsOf(repo);
+  const { 'dev/shut': shut, 'dev/open': open } = await claudeStepsOf(repo);
   const settings = (rule: string) => ({ rule, source: SETTINGS });
   const disallowed = { rule: 'mcp__fixture', source: DISALLOW };
   assert.deepEqual(shut.allowed.takenBack, [
@@ -796,7 +822,7 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
   assert.deepEqual(shut.allowed.rules, ['mcp__third__*']);
   // Its tools row and its allow rules say the same of echo: denied, and not allowed.
   assert.deepEqual(
-    shut.mcp[0].tools.find((t: { name: string }) => t.name === 'echo'),
+    shut.mcp[0].tools?.find((t: { name: string }) => t.name === 'echo'),
     { name: 'echo', denied: disallowed, asks: null, allowed: false },
   );
   // A deny of one tool leaves an allow of the whole server standing, with that exception.
@@ -805,7 +831,7 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
   // The step beside it denies nothing of its own: echo is allowed on both, and only the settings' whole-server deny takes anything back.
   assert.deepEqual(open.allowed.takenBack, [{ rule: 'mcp__other__x', by: settings('mcp__other__*') }]);
   assert.deepEqual(
-    open.mcp[0].tools.find((t: { name: string }) => t.name === 'echo'),
+    open.mcp[0].tools?.find((t: { name: string }) => t.name === 'echo'),
     { name: 'echo', denied: null, asks: null, allowed: true },
   );
 });
@@ -822,7 +848,7 @@ test("a step with Bash runs Claude Code's read-only commands with no rule, in do
     { harness: body.readOnly.harness, version: body.readOnly.version, measuredAt: body.readOnly.measuredAt },
     { harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15' },
   );
-  const steps = Object.fromEntries(body.steps.map((s: { workflow: string; step: string }) => [`${s.workflow}/${s.step}`, s]));
+  const steps = Object.fromEntries(body.steps.map((s) => [`${s.workflow}/${s.step}`, s]));
   // The settings deny `git push:*`, which is not every `git` command: git's read-only forms still run.
   assert.deepEqual(steps['dev/review'].readOnly, readOnlyAll());
   assert.equal(steps['dev/review'].allowed.dontAsk, true);
@@ -832,7 +858,7 @@ test("a step with Bash runs Claude Code's read-only commands with no rule, in do
     'workflows/dev/reader.md': '---\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
     'workflows/dev/denied.md': '---\nharness: claude\npermissionMode: dontAsk\ndisallowedTools: Bash(*)\n---\nRead it.\n',
   });
-  const { 'dev/reader': reader, 'dev/denied': denied } = await stepsOf(repo);
+  const { 'dev/reader': reader, 'dev/denied': denied } = await claudeStepsOf(repo);
   assert.deepEqual(reader.readOnly, [], 'its tools have no Bash');
   assert.deepEqual(denied.readOnly, [], 'a deny takes Bash whole');
 });
@@ -843,7 +869,7 @@ test('REFUSED: a deny that covers a read-only command refuses it — a prefix, a
     'workflows/dev/review.md':
       '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallowedTools: Bash(find *), Bash(git:*), Bash(ls -la)\n---\nReview it.\n',
   });
-  const { 'dev/review': review } = await stepsOf(repo);
+  const { 'dev/review': review } = await claudeStepsOf(repo);
   const refused = Object.fromEntries(
     review.readOnly.filter((c: { denied: unknown }) => c.denied).map((c: { command: string; denied: unknown }) => [c.command, c.denied]),
   );
@@ -854,7 +880,7 @@ test('REFUSED: a deny that covers a read-only command refuses it — a prefix, a
   });
   // `head -c *`, `git push:*` and `ls -la` each refuse part of a command, which still runs the rest without a rule.
   for (const command of ['head', 'ls', 'grep'])
-    assert.equal(review.readOnly.find((c: { command: string }) => c.command === command).denied, null, command);
+    assert.equal(review.readOnly.find((c: { command: string }) => c.command === command)?.denied, null, command);
   assert.equal(review.readOnly.length, readOnlyAll().length, 'a command refused is marked, not dropped');
 });
 
@@ -888,7 +914,11 @@ const askingRepo = (permissions: object) =>
 
 test('REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job, asking on a background session — and a deny over it is still the deny', async () => {
   const cat = { rule: 'Bash(cat:*)', source: SETTINGS };
-  const { 'dev/review': review, 'dev/implement': implement, 'dev/watch': watch } = await stepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
+  const {
+    'dev/review': review,
+    'dev/implement': implement,
+    'dev/watch': watch,
+  } = await claudeStepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
   const of = (step: { readOnly: Array<{ command: string }> }, command: string) => step.readOnly.find((c) => c.command === command);
   // The finding: the page showed cat solid under "do not ask" on a dontAsk step, whose cat is denied.
   assert.deepEqual(of(review, 'cat'), { command: 'cat', measured: true, denied: cat, asks: cat });
@@ -907,13 +937,13 @@ test('REFUSED: an ask rule that covers a read-only command makes it ask — deni
   }
 
   // With no ask rule, nothing of it changes: every read-only command runs with no rule, on both steps.
-  const plain = await stepsOf(askingRepo({}));
+  const plain = await claudeStepsOf(askingRepo({}));
   assert.deepEqual(plain['dev/review'].readOnly, readOnlyAll());
   assert.deepEqual(plain['dev/implement'].readOnly, readOnlyAll());
   assert.deepEqual(plain['dev/review'].asked, []);
 
   // An ask rule naming Bash whole makes every command ask; one narrower than a command does not take all of it; a deny comes before an ask.
-  const whole = (await stepsOf(askingRepo({ ask: ['Bash'] })))['dev/review'];
+  const whole = (await claudeStepsOf(askingRepo({ ask: ['Bash'] })))['dev/review'];
   assert.ok(
     whole.readOnly.every(
       (c: { denied: { rule: string } | null; asks: { rule: string } | null }) => c.asks?.rule === 'Bash' && c.denied?.rule === 'Bash',
@@ -921,7 +951,7 @@ test('REFUSED: an ask rule that covers a read-only command makes it ask — deni
     JSON.stringify(whole.readOnly),
   );
   assert.ok(whole.tools.names.includes('Bash'), 'an ask rule removes no tool: only a deny does');
-  const mixed = (await stepsOf(askingRepo({ ask: ['Bash(head -c *)', 'Bash(git:*)'], deny: ['Bash(git:*)'] })))['dev/review'];
+  const mixed = (await claudeStepsOf(askingRepo({ ask: ['Bash(head -c *)', 'Bash(git:*)'], deny: ['Bash(git:*)'] })))['dev/review'];
   assert.deepEqual(of(mixed, 'head'), { command: 'head', measured: true, denied: null, asks: null });
   assert.deepEqual(of(mixed, 'git'), { command: 'git', measured: false, denied: { rule: 'Bash(git:*)', source: SETTINGS }, asks: null });
 });
@@ -956,7 +986,7 @@ test('REFUSED: an ask rule takes back every allow it matches the whole of, as a 
     deny: ['Bash(npm test)', 'Bash(npx turbo run test e2e)', 'Bash(npx turbo run test lint:*)'],
     allow: ['Bash(git diff:*)', 'Bash(npx turbo run test:*)', 'Bash(npm test)', 'Bash(node --version)'],
   });
-  const { 'dev/review': review, 'dev/implement': implement } = await stepsOf(repo);
+  const { 'dev/review': review, 'dev/implement': implement } = await claudeStepsOf(repo);
   for (const step of [review, implement]) {
     assert.deepEqual(
       step.allowed.takenBack,
@@ -988,7 +1018,7 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
     '.mcp.json': { mcpServers: { fixture: fixture() } },
     'workflows/dev/review.md': '---\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
   });
-  const { 'dev/review': review } = await stepsOf(repo);
+  const { 'dev/review': review } = await claudeStepsOf(repo);
   assert.deepEqual(review.mcp[0].tools, [
     { name: 'echo', denied: null, asks: { rule: 'mcp__fixture__echo', source: SETTINGS }, allowed: false },
     { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, asks: null, allowed: false },
@@ -1002,10 +1032,10 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
     '.mcp.json': { mcpServers: { fixture: fixture() } },
     'workflows/dev/review.md': '---\nharness: claude\npermissionMode: dontAsk\n---\nReview it.\n',
   });
-  const { 'dev/review': asked } = await stepsOf(whole);
+  const { 'dev/review': asked } = await claudeStepsOf(whole);
   assert.deepEqual(asked.allowed.asked, [{ rule: 'mcp__fixture__echo', by: { rule: 'mcp__fixture', source: SETTINGS } }]);
   assert.deepEqual(
-    asked.mcp[0].tools.map((t: { name: string; allowed: boolean }) => [t.name, t.allowed]),
+    asked.mcp[0].tools?.map((t: { name: string; allowed: boolean }) => [t.name, t.allowed]),
     [
       ['echo', false],
       ['wipe', false],
@@ -1028,18 +1058,20 @@ test("the read-only commands are data of the day they were measured: the list's 
   const repo = askingRepo({ allow: ['Bash(ls:*)', 'Bash(cat:*)'] });
   const { body } = await served(repo);
   assert.deepEqual(body.readOnly, READ_ONLY_COMMANDS);
-  const review = body.steps.find((s: { step: string }) => s.step === 'review');
+  const review = body.steps.find((s) => s.step === 'review');
+  assert.ok(review, JSON.stringify(body.steps.map((s) => s.step)));
   assert.deepEqual(review.readOnly, readOnlyAll());
   assert.deepEqual(review.allowed.bash, [bashRule('Bash(ls:*)'), bashRule('Bash(cat:*)')]);
 });
 
 test('REFUSED: a measurement without a date, or a version, is refused by name with the fix — and a day not on the calendar, a list naming a command twice, or docs with no day read', () => {
   /** The shipped list, with `key` set to `value` — or left out, for undefined. */
-  const edited = (of: object, key: string, value?: unknown): any => {
+  const edited = (of: object, key: string, value?: unknown): never => {
     const copy: Record<string, unknown> = { ...of };
     if (value === undefined) delete copy[key];
     else copy[key] = value;
-    return copy;
+    // On purpose not a measurement: the readers are handed what their type refuses, to prove they refuse it at run time too.
+    return copy as never;
   };
   const refuses = (run: () => unknown, pattern: RegExp) =>
     assert.throws(

@@ -11,6 +11,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunDecision } from '../src/decision.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its module loads: set first.
 const root = scratch('hkb-api-budget-');
@@ -202,19 +205,19 @@ refusedCheck('t-lint-check', 70);
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
-type Step = {
-  name: string;
-  status: string;
-  note: string | null;
-  used: Record<string, unknown> | null;
-  spent: unknown;
-  budget: unknown;
-  raise: unknown;
-  timeline: Array<{ used: Record<string, unknown> | null }>;
+const detail = async (id = R) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const summary = async (id = R) => {
+  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  assert.ok(run, `${id} is on the list`);
+  return run;
 };
-const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
-const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
-const stepOf = (run: { steps: Step[] }, name: string): Step => run.steps.find((s) => s.name === name)!;
+const stepOf = (run: RunDetail, name: string) => {
+  const step = run.steps.find((s) => s.name === name);
+  assert.ok(step, name);
+  return step;
+};
+const decision = async (id = R) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as RunDecision;
+type Refused = { error: string };
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -309,10 +312,11 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
 
   // What every try cost together, each session once, as `wf ls` puts it beside the step's word.
   assert.deepEqual(tokens.spent, { usd: 4.25, measured: 2, unmeasured: 0, said: '$4.25' });
-  assert.equal((stepOf(run, 'implement').spent as { said: string }).said, '$2.10');
+  assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
   // The run's: every step's tries, `≥` since two of review's sessions have no cost on them — as `wf ls` says it on the run's line.
   const words = await list(engine(), readRun(R));
+  assert.ok(run.cost);
   const { usd, ...total } = run.cost;
   assert.deepEqual(total, { measured: 4, unmeasured: 2, said: '≥$6.35' });
   assert.ok(Math.abs(usd - 6.35) < 1e-9, String(usd));
@@ -320,12 +324,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   assert.deepEqual((await summary()).cost, run.cost, 'the list carries it too');
   // On the timeline's totals: each round's sessions, and the run's.
   assert.deepEqual(
-    run.timeline.rounds.map((r: { round: number; cost: { said: string; measured: number; unmeasured: number } | null }) => [
-      r.round,
-      r.cost?.said,
-      r.cost?.measured,
-      r.cost?.unmeasured,
-    ]),
+    run.timeline.rounds.map((r) => [r.round, r.cost?.said, r.cost?.measured, r.cost?.unmeasured]),
     [
       [1, '≥$1.20', 1, 1],
       [2, '≥$0.90', 1, 1],
@@ -350,11 +349,11 @@ test("a step over its budget, on the list and on the detail, in `wf ls`'s words 
   const listed = await summary();
   const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
   assert.deepEqual(
-    listed.steps.map((s: Step) => s.status),
+    listed.steps.map((s) => s.status),
     statuses,
   );
   assert.deepEqual(
-    listed.steps.map(({ name, status, note }: Step) => ({ name, status, note })),
+    listed.steps.map(({ name, status, note }) => ({ name, status, note })),
     words.steps.map(({ name, status, note }) => ({ name, status, note: note ?? null })),
   );
   assert.deepEqual(listed.waitingOnYou, ['implement', 'review', 'tokens']);
@@ -363,28 +362,31 @@ test("a step over its budget, on the list and on the detail, in `wf ls`'s words 
 
   const run = await detail();
   assert.deepEqual(
-    run.steps.map((s: Step) => s.status),
+    run.steps.map((s) => s.status),
     statuses,
   );
   assert.deepEqual(run.waitingOnYou, listed.waitingOnYou);
   const [implement, review, tokens] = ['implement', 'review', 'tokens'].map((name) => stepOf(run, name));
-  assert.deepEqual(tokens!.budget, { usd: 3, said: '$3', of: '$4.25 of $3', over: true });
-  assert.deepEqual(implement!.budget, { usd: 2, said: '$2', of: '$2.10 of $2', over: true });
-  assert.equal(review!.budget, null, 'review has no `budget:`');
+  assert.deepEqual(tokens.budget, { usd: 3, said: '$3', of: '$4.25 of $3', over: true });
+  assert.deepEqual(implement.budget, { usd: 2, said: '$2', of: '$2.10 of $2', over: true });
+  assert.equal(review.budget, null, 'review has no `budget:`');
   // tokens is raised with its try; review's loop with its round, above what implement has cost; implement goes again only with that round.
   // With the ways the package takes tokens' try — its check again among them, which needs no raise — and how it ended on its own work.
-  assert.deepEqual(tokens!.raise, { by: 'retry', above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
-  const { above, ...byRound } = review!.raise as { above: number };
+  assert.deepEqual(tokens.raise, { by: 'retry', above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
+  assert.ok(review.raise);
+  const { above, ...byRound } = review.raise;
   assert.deepEqual(byRound, { by: 'round', said: '$2.10', modes: [], own: null });
   assert.ok(Math.abs(above - 2.1) < 1e-9, String(above));
-  assert.equal(implement!.raise, null);
+  assert.equal(implement.raise, null);
 });
 
 test("the decision says what `wf decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's", async () => {
   const said = await decide(engine(), R);
   const res = await app.request(`/api/runs/${R}/decision`);
   assert.equal(res.status, 200);
-  const body = await res.json();
+  const body = (await res.json()) as RunDecision;
+  assert.ok('overBudget' in body, JSON.stringify(body));
+  assert.ok(body.overBudget);
   assert.equal(body.overBudget, said.overBudgetLine);
   assert.ok(
     body.overBudget.startsWith(
@@ -394,13 +396,13 @@ test("the decision says what `wf decide` says of steps held on their budget — 
   );
   assert.equal(body.cost, said.runCost[0]!.replace(/^cost\s+/, ''));
   assert.equal(body.cost, 'run $6.35 measured · 2 attempts not measured');
-  const once = body.commands.filter((c: { label: string }) => c.label === 'once more');
+  const once = body.commands.filter((c) => c.label === 'once more');
   assert.deepEqual(
-    once.map((c: { said: string }) => c.said),
+    once.map((c) => c.said),
     said.offers,
   );
   assert.deepEqual(
-    once.map((c: { command: string }) => c.command),
+    once.map((c) => c.command),
     [`wf round ${R} review --budget <amount>`, `wf retry ${R} tokens --budget <amount>`],
   );
 });
@@ -412,7 +414,8 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
   write(marker, JSON.stringify(pruned));
   try {
     const said = await decide(engine(), R);
-    const body = await (await app.request(`/api/runs/${R}/decision`)).json();
+    const body = await decision();
+    assert.ok('overBudget' in body, JSON.stringify(body));
     assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `wf decide` and for the board');
     assert.equal(
       body.overBudget,
@@ -421,7 +424,7 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
     );
     assert.deepEqual(said.offers, []);
     assert.deepEqual(
-      body.commands.filter((c: { command: string }) => /^wf (retry|round|accept|approve) /.test(c.command)),
+      body.commands.filter((c) => /^wf (retry|round|accept|approve) /.test(c.command)),
       [],
       JSON.stringify(body.commands),
     );
@@ -430,8 +433,8 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
 
     const run = await detail();
     assert.deepEqual(run.pruned, { ...pruned, artifacts: null });
-    assert.deepEqual([run.waitingOnYou, run.steps.map((s: Step) => s.raise)], [[], [null, null, null]]);
-    assert.doesNotMatch(JSON.stringify(run.steps.map((s: Step) => s.note)), /wf (retry|round|accept|approve) /);
+    assert.deepEqual([run.waitingOnYou, run.steps.map((s) => s.raise)], [[], [null, null, null]]);
+    assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /wf (retry|round|accept|approve) /);
   } finally {
     fs.rmSync(marker);
   }
@@ -439,7 +442,7 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
 });
 
 test('REFUSED at shipped defaults: a raise another site could make — a page on another site, a name that is not this machine, a body not sent as JSON — on both routes, and nothing is written', async () => {
-  const cases: Array<[string, (body: unknown, headers: Record<string, string>) => Promise<Response>]> = [
+  const cases: Array<[string, (body: unknown, headers: Record<string, string>) => Response | Promise<Response>]> = [
     [`POST /api/runs/${R}/steps/tokens/retry`, (body, headers) => askTry('tokens', body, headers)],
     [`POST /api/runs/${R}/round`, (body, headers) => askRound(body, headers)],
   ];
@@ -448,15 +451,15 @@ test('REFUSED at shipped defaults: a raise another site could make — a page on
     for (const site of ['cross-site', 'same-site', 'none']) {
       const res = await ask(body, { ...BOARD, 'sec-fetch-site': site });
       assert.equal(res.status, 403, `${route} ${site}`);
-      const { error } = await res.json();
+      const { error } = (await res.json()) as Refused;
       assert.ok(error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`), error);
     }
     const named = await ask(body, { ...BOARD, host: 'evil.example:8787' });
     assert.equal(named.status, 403, route);
-    assert.ok((await named.json()).error.startsWith(`${route} refuses a request addressed to evil.example:8787:`));
+    assert.ok(((await named.json()) as Refused).error.startsWith(`${route} refuses a request addressed to evil.example:8787:`));
     const typed = await ask(body, { ...BOARD, 'content-type': 'text/plain;charset=UTF-8' });
     assert.equal(typed.status, 415, route);
-    assert.ok((await typed.json()).error.startsWith(`${route} takes its body as \`content-type: application/json\``));
+    assert.ok(((await typed.json()) as Refused).error.startsWith(`${route} takes its body as \`content-type: application/json\``));
   }
   nothingWritten('a request another site could make');
 });
@@ -467,7 +470,7 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
     const how: RetryHow = { mode: 'nudge', budget };
     const res = await askTry('tokens', how);
     assert.equal(res.status, 400, String(budget));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.equal(error, budgetRefusal(how, command));
     assert.equal(error, await retryRefuses('tokens', how), 'and the sentence `retry()` refuses it with');
     assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
@@ -475,7 +478,7 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
   for (const budget of ['five', '5', null]) {
     const res = await askTry('tokens', { mode: 'nudge', budget });
     assert.equal(res.status, 400, JSON.stringify(budget));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.ok(
       error.startsWith('`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it: dollars, as a JSON number above zero'),
       error,
@@ -486,7 +489,7 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
   const recheck: RetryHow = { mode: 'recheck', budget: 5 };
   const rechecked = await askTry('tokens', recheck);
   assert.equal(rechecked.status, 422);
-  const { error: noSession } = await rechecked.json();
+  const { error: noSession } = (await rechecked.json()) as Refused;
   assert.equal(noSession, budgetRefusal(recheck, command));
   assert.ok(noSession.startsWith("--budget raises a step's cap for the session a try files, and --recheck files none"), noSession);
 
@@ -502,26 +505,28 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
   for (const [how, start] of refusals) {
     const res = await askTry('tokens', how);
     assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.equal(error, await retryRefuses('tokens', how));
     assert.ok(error.startsWith(start), error);
   }
   // A raise of a step that is not held on its try: implement goes again with review's round.
   const implement = await askTry('implement', { mode: 'nudge', budget: 5 });
   assert.equal(implement.status, 409);
-  assert.equal((await implement.json()).error, await retryRefuses('implement', { mode: 'nudge', budget: 5 }));
+  assert.equal(((await implement.json()) as Refused).error, await retryRefuses('implement', { mode: 'nudge', budget: 5 }));
   nothingWritten('a raise the package refuses');
 });
 
 test("REFUSED at shipped defaults: a round's budget not above zero, or a word, is a 400; a raise not above what the loop's steps have cost, none, or a step with no loop, a 409 in `roundAsk`'s words — and nothing is written", async () => {
   const zero = await askRound({ budget: 0 });
   assert.equal(zero.status, 400);
-  const { error: notAnAmount } = await zero.json();
+  const { error: notAnAmount } = (await zero.json()) as Refused;
   assert.equal(notAnAmount, await roundRefuses(undefined, 0));
   assert.ok(notAnAmount.startsWith('--budget 0 is not an amount.'), notAnAmount);
   const word = await askRound({ step: 'review', budget: 'five' });
   assert.equal(word.status, 400);
-  assert.ok((await word.json()).error.startsWith(`\`budget\` is the cap to raise to, as \`wf round ${R} --budget <amount>\` takes it`));
+  assert.ok(
+    ((await word.json()) as Refused).error.startsWith(`\`budget\` is the cap to raise to, as \`wf round ${R} --budget <amount>\` takes it`),
+  );
   for (const body of [{ step: 42 }, { step: '' }, ['review']]) {
     const res = await askRound(body);
     assert.equal(res.status, 400, JSON.stringify(body));
@@ -535,16 +540,16 @@ test("REFUSED at shipped defaults: a round's budget not above zero, or a word, i
   for (const [step, budget, start] of refusals) {
     const res = await askRound({ ...(step ? { step } : {}), ...(budget !== undefined ? { budget } : {}) });
     assert.equal(res.status, 409, `${step} ${budget}`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.equal(error, await roundRefuses(step, budget));
     assert.ok(error.startsWith(start), error);
   }
   const noStep = await askRound({ step: 'deploy', budget: 5 });
   assert.equal(noStep.status, 404);
-  assert.match((await noStep.json()).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
+  assert.match(((await noStep.json()) as Refused).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
   const noRun = await post('/api/runs/r-nope/round', { budget: 5 });
   assert.equal(noRun.status, 404);
-  assert.match((await noRun.json()).error, /^No run 'r-nope' in this store/);
+  assert.match(((await noRun.json()) as Refused).error, /^No run 'r-nope' in this store/);
   nothingWritten('a round the package refuses');
 });
 
@@ -568,7 +573,7 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   const words = await list(engine(), readRun(R));
   const run = await detail();
   assert.deepEqual(
-    run.steps.map(({ name, note }: Step) => ({ name, note })),
+    run.steps.map(({ name, note }) => ({ name, note })),
     words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
   );
   assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--nudge, --budget 5) — the next tick files it');
@@ -580,7 +585,7 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
 
 test('a step past its budget on its own work is raised as `wf decide` offers it: one that signed off blocked, with its answer on the same ask — REFUSED without a raise, or below the spend — and one refused by its check, rechecked with neither', async () => {
   const run = await detail(R2);
-  const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name) as Step & { needs: string | null });
+  const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name));
   // Its word is `over budget` however it ended: how it ended on its own work is on the raise, the package's word, with the ways it takes a try.
   assert.deepEqual([palette!.status, lint!.status], ['over budget $1.50 of $1', 'over budget $1.20 of $1']);
   assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
@@ -605,7 +610,7 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
   for (const [how, start] of refusals) {
     const res = await askTry('palette', how, BOARD, R2);
     assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as Refused;
     assert.equal(error, await retryRefuses('palette', how, R2));
     assert.ok(error.startsWith(start), error);
   }
@@ -630,7 +635,7 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
   const words = await list(engine(), readRun(R2));
   const after = await detail(R2);
   assert.deepEqual(
-    after.steps.map(({ name, note }: Step) => ({ name, note })),
+    after.steps.map(({ name, note }) => ({ name, note })),
     words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
   );
   assert.deepEqual(after.waitingOnYou, []);

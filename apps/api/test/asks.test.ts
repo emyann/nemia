@@ -14,6 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { scratch } from './scratch.ts';
+import type { RunDetail } from '../src/detail.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 const tmp = (label: string) => scratch(`hkb-api-asks-${label}-`);
 
@@ -224,16 +226,9 @@ const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-type Needs = {
-  name: string;
-  needs: string | null;
-  blockedByHarness: boolean;
-  waitingFor: { words: string; advice: string } | null;
-  lastLine?: string | null;
-};
-const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
-const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
-const lastLineOf = async (step: string): Promise<string | null> => (await detail()).steps.find((s: Needs) => s.name === step).lastLine;
+const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
+const summary = async (id = R) => ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
+const lastLineOf = async (step: string): Promise<string | null> => (await detail()).steps.find((s) => s.name === step)!.lastLine;
 
 test("a step says what a person has to know to act — the question of one signed off blocked, and that the harness blocked a session — on both endpoints, and on the run's detail what the session said last", async () => {
   // What the harness says it waits for, where it says anything: held's word, in the package's words, naming the session to answer it in.
@@ -261,7 +256,7 @@ test("a step says what a person has to know to act — the question of one signe
   };
   const run = await detail();
   assert.deepEqual(
-    run.steps.map(({ name, needs, blockedByHarness, waitingFor, lastLine }: Needs) => ({
+    run.steps.map(({ name, needs, blockedByHarness, waitingFor, lastLine }) => ({
       name,
       needs,
       blockedByHarness,
@@ -272,23 +267,23 @@ test("a step says what a person has to know to act — the question of one signe
   );
   const listed = (await summary()).steps;
   assert.deepEqual(
-    listed.map(({ name, needs, blockedByHarness, waitingFor }: Needs) => ({ name, needs, blockedByHarness, waitingFor })),
+    listed.map(({ name, needs, blockedByHarness, waitingFor }) => ({ name, needs, blockedByHarness, waitingFor })),
     expected,
     'the list carries the word too: it is off the views the request already read, and costs no observation of its own',
   );
   assert.equal(
-    listed.some((step: object) => Object.hasOwn(step, 'lastLine')),
+    listed.some((step) => Object.hasOwn(step, 'lastLine')),
     false,
     'the list carries no last line: it reads no conversation',
   );
   // The engine's word, which is all the board had before: `needs-human`, and waiting on nobody the package names.
   assert.deepEqual(
-    run.steps.filter((s: Needs) => s.blockedByHarness).map((s: { status: string }) => s.status),
+    run.steps.filter((s) => s.blockedByHarness).map((s) => s.status),
     ['needs-human', 'needs-human', 'needs-human'],
   );
   assert.deepEqual(run.waitingOnYou, ['implement', 'theme']);
   assert.deepEqual(
-    run.steps.map((s: { asked: unknown }) => s.asked),
+    run.steps.map((s) => s.asked),
     [null, null, null, null, null, null, null, null],
   );
 });
@@ -318,7 +313,7 @@ test("what a blocked session's harness waits for is read afresh on every request
       }
     fs.writeFileSync(registry, JSON.stringify(rows));
   };
-  const heldStep = async (): Promise<Needs & { status: string }> => (await summary()).steps.find((s: Needs) => s.name === 'held');
+  const heldStep = async () => (await summary()).steps.find((s) => s.name === 'held')!;
 
   setWait('workspace trust dialog');
   assert.deepEqual(
@@ -377,7 +372,7 @@ test('REFUSED at shipped defaults: an ask another site could make — a page on 
   for (const site of ['cross-site', 'same-site', 'none']) {
     const res = await ask('implement', body, { ...BOARD, 'sec-fetch-site': site });
     assert.equal(res.status, 403, site);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith(
         `POST /api/runs/${R}/steps/implement/retry refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`,
@@ -388,13 +383,19 @@ test('REFUSED at shipped defaults: an ask another site could make — a page on 
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
     const res = await ask('implement', body, { ...BOARD, host });
     assert.equal(res.status, 403, host);
-    assert.ok((await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/retry refuses a request addressed to ${host}:`));
+    assert.ok(
+      ((await res.json()) as { error: string }).error.startsWith(
+        `POST /api/runs/${R}/steps/implement/retry refuses a request addressed to ${host}:`,
+      ),
+    );
   }
   for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
     const res = await ask('implement', body, { ...BOARD, 'content-type': type });
     assert.equal(res.status, 415, type);
     assert.ok(
-      (await res.json()).error.startsWith(`POST /api/runs/${R}/steps/implement/retry takes its body as \`content-type: application/json\``),
+      ((await res.json()) as { error: string }).error.startsWith(
+        `POST /api/runs/${R}/steps/implement/retry takes its body as \`content-type: application/json\``,
+      ),
     );
   }
   nothingWritten('a request another site could make');
@@ -408,7 +409,7 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
   ] as const) {
     const res = await ask(step, how);
     assert.equal(res.status, 422, JSON.stringify(how));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, messageRefusal(how, `wf retry ${R} ${step}`));
     // The package's own sentence, and the one `retry()` refuses with.
     assert.equal(error, await retryRefuses(step, how));
@@ -440,7 +441,7 @@ test("REFUSED at shipped defaults: a step not waiting on a person, a session sti
   for (const [step, how, words] of cases) {
     const res = await ask(step, how);
     assert.equal(res.status, 409, `${step} ${JSON.stringify(how)}`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, await retryRefuses(step, how));
     assert.match(error, words);
   }
@@ -461,14 +462,14 @@ test('REFUSED: a body that is not an ask (400), and a run or a step that does no
   for (const [body, words] of bodies) {
     const res = await ask('implement', body);
     assert.equal(res.status, 400, JSON.stringify(body));
-    assert.match((await res.json()).error, words);
+    assert.match(((await res.json()) as { error: string }).error, words);
   }
   const noRun = await ask('implement', { mode: 'nudge' }, BOARD, 'r-nope');
   assert.equal(noRun.status, 404);
-  assert.match((await noRun.json()).error, /^No run 'r-nope' in this store/);
+  assert.match(((await noRun.json()) as { error: string }).error, /^No run 'r-nope' in this store/);
   const noStep = await ask('deploy', { mode: 'nudge' });
   assert.equal(noStep.status, 404);
-  assert.match((await noStep.json()).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
+  assert.match(((await noStep.json()) as { error: string }).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
   nothingWritten('a body that is not an ask');
 });
 
@@ -485,7 +486,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   // As `wf ls` has it until the tick files the try: a note beside the step, and nobody waited on for it.
   const words = await list(engine(), readRun(R));
   const run = await detail();
-  const implement = run.steps.find((s: { name: string }) => s.name === 'implement');
+  const implement = run.steps.find((s) => s.name === 'implement')!;
   assert.equal(implement.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
   assert.equal(implement.note, words.steps.find((s) => s.name === 'implement')?.note);
   assert.deepEqual(implement.asked, {
@@ -501,7 +502,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
 
   const again = await ask('implement', { mode: 'fresh', message: 'MySQL.' });
   assert.equal(again.status, 409);
-  const { error } = await again.json();
+  const { error } = (await again.json()) as { error: string };
   assert.ok(error.startsWith('try 2 of implement is already asked for (--nudge, at '), error);
   assert.deepEqual(asked(), ['retry-implement-2']);
 
@@ -509,7 +510,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   const recheck = await ask('theme', { mode: 'recheck' });
   assert.equal(recheck.status, 202, await recheck.clone().text());
   assert.deepEqual(await recheck.json(), { try: 2, file: askFile(R, 'theme', 2), stopFirst: false });
-  assert.deepEqual((await detail()).steps.find((s: { name: string }) => s.name === 'theme').asked, {
+  assert.deepEqual((await detail()).steps.find((s) => s.name === 'theme')!.asked, {
     try: 2,
     mode: 'recheck',
     model: null,
@@ -546,18 +547,18 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   const words = await list(engine(), readRun(R));
   const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
   const run = await detail();
-  const held = run.steps.find((s: { name: string }) => s.name === 'held');
+  const held = run.steps.find((s) => s.name === 'held')!;
   assert.equal(held.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
   assert.equal(held.note, noteOf('held'));
   assert.deepEqual(held.asked, { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true });
   assert.deepEqual([held.status, held.blockedByHarness], ['needs-human', true], 'still blocked: no tick has stopped it');
-  const idle = run.steps.find((s: { name: string }) => s.name === 'idle');
+  const idle = run.steps.find((s) => s.name === 'idle')!;
   assert.equal(idle.note, 'try 2 asked (--fresh, with your answer) — stopping its blocked session, then the tick files it');
   assert.equal(idle.note, noteOf('idle'));
   assert.deepEqual(idle.asked, { try: 2, mode: 'fresh', model: null, message: 'Sign in again first.', stopFirst: true });
-  const listed = (await summary()).steps.filter((s: { name: string }) => s.name === 'held' || s.name === 'idle');
+  const listed = (await summary()).steps.filter((s) => s.name === 'held' || s.name === 'idle');
   assert.deepEqual(
-    listed.map((s: { note: string }) => s.note),
+    listed.map((s) => s.note),
     [noteOf('held'), noteOf('idle')],
     'the list says it too',
   );
@@ -566,7 +567,7 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   // Asked once: a second Continue is refused in the package's words, and still nothing is stopped.
   const again = await ask('held', { mode: 'nudge' });
   assert.equal(again.status, 409);
-  const { error } = await again.json();
+  const { error } = (await again.json()) as { error: string };
   assert.ok(error.startsWith('try 2 of held is already asked for (--nudge, at '), error);
   assert.equal(stops(), 0);
 });
@@ -625,16 +626,16 @@ test("a try a person answered carries the answer, as `wf decide` prints it — t
     ],
   );
   // The question the answer answers is on the try before's closeout.
-  assert.equal(implement.tries[0].closeout.needs, blocked.needs);
+  assert.equal(implement.tries[0].closeout!.needs, blocked.needs);
   assert.equal(implement.needs, null, 'the current try signed off done');
 
   const words = await list(engine(), readRun(A));
   for (const [where, said] of [
     ['detail', run],
     ['list', await summary(A)],
-  ]) {
+  ] as const) {
     assert.deepEqual(
-      said.steps.map(({ name, note }: { name: string; note: string | null }) => ({ name, note })),
+      said.steps.map(({ name, note }) => ({ name, note })),
       words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
       where,
     );

@@ -27,6 +27,9 @@ const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf
 const { app } = await import('../src/app.ts');
 const { diffFiles, DIFF_LINES } = await import('../src/decision.ts');
 type DecideCommand = import('../src/decision.ts').DecideCommand;
+type Decidable = import('../src/decision.ts').Decidable;
+type RunDecision = import('../src/decision.ts').RunDecision;
+type RunDetail = import('../src/detail.ts').RunDetail;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -124,8 +127,18 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
 
 const decisionOf = async (id: string) => {
   const res = await app.request(`/api/runs/${id}/decision`);
-  return { status: res.status, body: await res.json() };
+  return { status: res.status, body: (await res.json()) as RunDecision };
 };
+
+/** A decision there is to make: a 200 whose body is `wf decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
+const decidable = async (id: string): Promise<Decidable> => {
+  const { status, body } = await decisionOf(id);
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.ok('commands' in body, JSON.stringify(body));
+  return body;
+};
+
+const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
 
 const { repo, base } = aRepo();
 const branch = 'wf/r-d1/implement';
@@ -157,8 +170,7 @@ writeRun({
 });
 
 test('a finished run: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands', async () => {
-  const { status, body } = await decisionOf('r-d1');
-  assert.equal(status, 200);
+  const body = await decidable('r-d1');
   assert.deepEqual(Object.keys(body), [
     'standings',
     'touched',
@@ -192,6 +204,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.equal(body.touched.length, 1);
   const [touched] = body.touched;
   assert.equal(touched.branch, branch);
+  assert.ok(!('error' in touched.radius), JSON.stringify(touched.radius));
   assert.deepEqual(touched.radius.groups, [
     { name: '(root)', files: 2, added: 3, removed: 1, binary: 0 },
     { name: 'packages/x', files: 2, added: 453, removed: 1, binary: 0 },
@@ -267,7 +280,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.equal(git(repo, 'rev-parse', 'main').trim(), base);
 
   // The run's page carries the same words on each step, off the views it already reads.
-  const detail = await (await app.request('/api/runs/r-d1')).json();
+  const detail = await detailOf('r-d1');
   assert.deepEqual(Object.fromEntries(detail.steps.map((s: { name: string; used: unknown }) => [s.name, s.used])), body.used);
 });
 
@@ -290,7 +303,7 @@ test("the run's total reads its peak against the cap of the step that reached it
     workflow: [{ ...workflow[0], context: 1_000_000 }, workflow[1]],
     steps: { implement: { taskId: 't-dr-implement', branch }, review: { taskId: 't-dr-review', branch } },
   });
-  const { body } = await decisionOf('r-dr');
+  const body = await decidable('r-dr');
   assert.deepEqual([body.used.implement.read, body.used.implement.peak], ['read 9M · wrote 900k · peak 831k', null]);
   assert.deepEqual([body.total.read, body.total.peak], ['read 10M · wrote 1M · peak 831k', null]);
 });
@@ -299,7 +312,7 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   // On a branch git can read, so a route that asked would have had an answer.
   writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
-  const detail = await (await app.request('/api/runs/r-d2')).json();
+  const detail = await detailOf('r-d2');
   assert.deepEqual([detail.status, detail.waitingOnYou], ['running', []]);
   // A step not filed has consumed nothing, which is not `not measured`.
   assert.deepEqual(
@@ -360,8 +373,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
     },
   });
 
-  const { status, body } = await decisionOf('r-d9');
-  assert.equal(status, 200);
+  const body = await decidable('r-d9');
   // Both offers are parsed to the command a person runs. An offer this route's ONCE_MORE does not know is handed over whole, and the
   // board would give a person a paragraph of English to copy under a button that says `once more`.
   assert.deepEqual(
@@ -374,7 +386,8 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       { label: 'once more', command: 'wf retry r-d9 implement' },
     ],
   );
-  const accept = body.commands.find((c: { label: string }) => c.label === 'accept');
+  const accept = body.commands.find((c) => c.label === 'accept');
+  assert.ok(accept?.said, JSON.stringify(body.commands));
   assert.match(
     accept.said,
     /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept r-d9 review --message "<why>"$/,
@@ -382,8 +395,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
 
   // Before a person accepts, no step of the run says an acceptance; after, the looping step does — the try, when, and their words — and no
   // other step. The board's gate reads it: the closeout still says `again: true`, and without this it would say the loop asks another round.
-  const stepsOf = async () =>
-    ((await (await app.request('/api/runs/r-d9')).json()) as { steps: { name: string; accepted: unknown }[] }).steps;
+  const stepsOf = async () => (await detailOf('r-d9')).steps;
   assert.deepEqual(
     (await stepsOf()).map((s) => [s.name, s.accepted]),
     [
@@ -469,16 +481,17 @@ test('an ending whose check did not finish on the merge it staged is offered the
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
 
-  const { status, body } = await decisionOf('r-d20');
-  assert.equal(status, 200);
+  const body = await decidable('r-d20');
   const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
   assert.deepEqual(
     offered.map(({ command }: DecideCommand) => command),
     ['wf retry r-d20 ship'],
     JSON.stringify(body.commands),
   );
+  const [first] = offered;
+  assert.ok(first?.said, JSON.stringify(offered));
   assert.match(
-    offered[0].said,
+    first.said,
     /^ship: its check did not finish, so the run aborted the merge and nothing landed on main\. Merge and check again:  wf retry r-d20 ship$/,
   );
   assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
@@ -513,15 +526,15 @@ test('a step `denials: fail` stopped is offered the bare `wf retry <run> <step> 
     steps: { implement: { taskId: 't-d11-implement', branch }, review: { taskId: null } },
   });
 
-  const detail = await (await app.request('/api/runs/r-d11')).json();
+  const detail = await detailOf('r-d11');
   assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'waiting', ['implement']]);
-  const { status, body } = await decisionOf('r-d11');
-  assert.equal(status, 200);
+  const body = await decidable('r-d11');
   const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
   assert.deepEqual(
     once.map(({ label, command }: DecideCommand) => ({ label, command })),
     [{ label: 'once more', command: 'wf retry r-d11 implement --fresh' }],
   );
+  assert.ok(once[0]?.said, JSON.stringify(once));
   assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
 });
 
@@ -531,8 +544,7 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
   const gone = 'wf/r-d3/gone';
   writeRun({ id: 'r-d3', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } } });
 
-  const { status, body } = await decisionOf('r-d3');
-  assert.equal(status, 200);
+  const body = await decidable('r-d3');
   const unread = `git could not diff ${base.slice(0, 12)}...${gone}`;
   assert.deepEqual(body.touched, [{ branch: gone, radius: { error: unread } }]);
   assert.deepEqual(body.lesson, { said: `not known — ${gone} could not be read`, state: 'unknown' });
@@ -540,7 +552,9 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
   // No result branch to ship or drop; implement may be tried again, with the command `wf decide` prints for it.
   assert.equal(body.commands.length, 1);
   assert.deepEqual({ ...body.commands[0], said: undefined }, { label: 'once more', command: 'wf retry r-d3 implement', said: undefined });
-  assert.match(body.commands[0].said, /^implement: .*:  wf retry r-d3 implement {2}\(--fresh/);
+  const [retried] = body.commands;
+  assert.ok(retried?.said, JSON.stringify(retried));
+  assert.match(retried.said, /^implement: .*:  wf retry r-d3 implement {2}\(--fresh/);
 
   // And a repository that is not there at all.
   writeRun({
@@ -549,39 +563,37 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
     baseRef: base,
     steps: { implement: { taskId: 't-d3-implement', branch: gone }, review: { taskId: null } },
   });
-  const nowhere = await decisionOf('r-d3b');
-  assert.equal(nowhere.status, 200);
-  assert.deepEqual(nowhere.body.touched, [{ branch: gone, radius: { error: unread } }]);
-  assert.equal(nowhere.body.lesson.state, 'unknown');
+  const nowhere = await decidable('r-d3b');
+  assert.deepEqual(nowhere.touched, [{ branch: gone, radius: { error: unread } }]);
+  assert.equal(nowhere.lesson.state, 'unknown');
 });
 
 test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
   // As r-d3: implement signed off blocked, and may be tried again — until the run is pruned.
   writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
   assert.deepEqual(
-    (await decisionOf('r-d10')).body.commands.map((c: DecideCommand) => c.command),
+    (await decidable('r-d10')).commands.map((c: DecideCommand) => c.command),
     ['wf retry r-d10 implement'],
   );
-  assert.deepEqual((await (await app.request('/api/runs/r-d10')).json()).waitingOnYou, ['implement']);
+  assert.deepEqual((await detailOf('r-d10')).waitingOnYou, ['implement']);
   const pruned = { at: '2026-09-13T02:00:00.000Z', worktrees: [{ path: '/wt/r-d10/implement', bytes: 4096 }] };
   fs.writeFileSync(path.join(root, 'runs', 'r-d10.pruned'), JSON.stringify(pruned));
 
-  const { status, body } = await decisionOf('r-d10');
-  assert.equal(status, 200);
+  const body = await decidable('r-d10');
   assert.deepEqual(body.commands, []);
-  const page = await (await app.request('/api/runs/r-d10')).json();
+  const page = await detailOf('r-d10');
   assert.deepEqual(page.pruned, { ...pruned, artifacts: null }, 'its files are kept: a plain prune removes the worktrees alone');
   assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
   // A try asked by hand, beside the verb that refuses it, is no try coming: the board says nothing is on its way.
   const asks = path.join(root, 'runs', 'r-d10.asks');
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
-  const asked = await (await app.request('/api/runs/r-d10')).json();
-  assert.equal(asked.steps.find((s: { name: string }) => s.name === 'implement').asked, null);
+  const asked = await detailOf('r-d10');
+  assert.equal(asked.steps.find((s) => s.name === 'implement')?.asked, null);
   assert.equal(asked.moving, false);
   fs.rmSync(asks, { recursive: true });
   // And a run never pruned says so with a null, not a missing field.
-  assert.equal((await (await app.request('/api/runs/r-d1')).json()).pruned, null);
+  assert.equal((await detailOf('r-d1')).pruned, null);
 });
 
 test("a run called off, or whose branch is already on its base, has nothing to decide, in `wf decide`'s words", async () => {
@@ -615,9 +627,9 @@ test("a run called off, or whose branch is already on its base, has nothing to d
 });
 
 test('an unknown run is refused with a 404 that says where to look', async () => {
-  const { status, body } = await decisionOf('no-such-run');
-  assert.equal(status, 404);
-  assert.match(body.error, /No run 'no-such-run'/);
+  const res = await app.request('/api/runs/no-such-run/decision');
+  assert.equal(res.status, 404);
+  assert.match(((await res.json()) as { error: string }).error, /No run 'no-such-run'/);
   assert.equal((await app.request('/api/runs/..%2Fescape/decision')).status, 404);
 });
 
@@ -676,18 +688,19 @@ test("a run `assess` calls running while a step waits on a person is decided on:
       tokens: { taskId: 't-d6-tokens', branch: 'wf/r-d6/tokens' },
     },
   });
-  const detail = await (await app.request('/api/runs/r-d6')).json();
-  assert.deepEqual([detail.status, detail.waitingOnYou], ['running', ['implement']], detail.warning);
+  const detail = await detailOf('r-d6');
+  assert.deepEqual([detail.status, detail.waitingOnYou], ['running', ['implement']], detail.warning ?? undefined);
 
-  const { status, body } = await decisionOf('r-d6');
-  assert.equal(status, 200);
+  const body = await decidable('r-d6');
   assert.ok(!('running' in body), 'waiting on you is decidable, whatever `assess` calls the run');
   // The branch of the terminal step the tick judges, as `wf decide` reads a run once it stops — not implement's.
   assert.deepEqual(
     body.touched.map((t: { branch: string }) => t.branch),
     ['wf/r-d6/tokens'],
   );
-  assert.deepEqual(body.touched[0].radius.groups, [{ name: 'packages/x', files: 1, added: 1, removed: 0, binary: 0 }]);
+  const [tokens] = body.touched;
+  assert.ok(tokens && !('error' in tokens.radius), JSON.stringify(tokens));
+  assert.deepEqual(tokens.radius.groups, [{ name: 'packages/x', files: 1, added: 1, removed: 0, binary: 0 }]);
   assert.deepEqual(body.lesson, { said: 'packages/x/docs/notes.md +1 −0', state: 'written' });
   assert.deepEqual(body.sensitive, [{ branch: 'wf/r-d6/tokens', files: [], error: null }]);
   // `decision` is still `running`: no ship, drop or once more is offered while its steps move.
@@ -709,9 +722,9 @@ test("a run `assess` calls running while a step waits on a person is decided on:
       tokens: { taskId: 't-d6-tokens', branch: 'wf/r-d6/tokens' },
     },
   });
-  const fanOut = await (await app.request('/api/runs/r-d7')).json();
+  const fanOut = await detailOf('r-d7');
   assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['failed', true, ['implement']]);
-  const decided = (await decisionOf('r-d7')).body;
+  const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),
     ['wf/r-d6/implement', 'wf/r-d6/tokens'],

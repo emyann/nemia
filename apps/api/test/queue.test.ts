@@ -32,6 +32,7 @@ const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbo
   await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 type Ceilings = import('../src/ceilings.ts').Ceilings;
+type InboxQueueAnswer = import('../src/inbox.ts').InboxQueueAnswer;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };
@@ -53,7 +54,7 @@ const unqueue = (name: string, headers: Record<string, string> = JSON_TYPE, body
 const listed = async (): Promise<InboxEntry[]> => {
   const res = await app.request('/api/inbox');
   assert.equal(res.status, 200);
-  return res.json();
+  return (await res.json()) as InboxEntry[];
 };
 
 /** What the package refuses a queue of `name` with — or its taking back — asked of it directly, which writes nothing when it refuses. */
@@ -112,8 +113,8 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
 
   const queued = await queue(first.name);
   assert.equal(queued.status, 200, await queued.clone().text());
-  const answer = await queued.json();
-  assert.match(answer.queued, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  const answer = (await queued.json()) as InboxQueueAnswer;
+  assert.match(answer.queued!, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.deepEqual(answer, {
     name: first.name,
     file: path.join(inbox, `${first.name}.md`),
@@ -129,7 +130,7 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   );
 
   // A body of `{}` is no body.
-  const behind = await (await queue(second.name, JSON_TYPE, '{}')).json();
+  const behind = (await (await queue(second.name, JSON_TYPE, '{}')).json()) as InboxQueueAnswer;
   assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2]);
   const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
   assert.deepEqual(
@@ -157,7 +158,7 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   const before = inboxAsIs();
   const again = await unqueue(first.name);
   assert.equal(again.status, 200);
-  assert.equal((await again.json()).was, 'not queued');
+  assert.equal(((await again.json()) as InboxQueueAnswer).was, 'not queued');
   assert.deepEqual(inboxAsIs(), before);
 });
 
@@ -178,7 +179,7 @@ test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it wa
   assert.deepEqual(await filedAt(), before, 'queued, the older card keeps its filing time, and stays behind the newer one');
 
   const off = await unqueue(older.card.name);
-  assert.equal((await off.json()).was, 'taken back');
+  assert.equal(((await off.json()) as InboxQueueAnswer).was, 'taken back');
   assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
   assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
 
@@ -200,7 +201,7 @@ test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is
 
   const off = await unqueue(card.name);
   assert.equal(off.status, 200, await off.clone().text());
-  assert.equal((await off.json()).was, 'taken back');
+  assert.equal(((await off.json()) as InboxQueueAnswer).was, 'taken back');
   assert.equal((await listed()).find((e) => e.name === card.name)!.queued, undefined);
 });
 
@@ -230,7 +231,7 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   ] as const) {
     const res = off ? await unqueue(name) : await queue(name);
     assert.equal(res.status, status, `${off ? 'DELETE' : 'POST'} ${name}`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.equal(error, refusalOf(name, off), `${off ? 'DELETE' : 'POST'} ${name}`);
   }
   // The sentences are the ones a person reads at the command line: not there names the cards there are.
@@ -254,24 +255,26 @@ test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 4
     for (const send of [queue, unqueue]) {
       const res = await send(sent);
       assert.equal(res.status, 400, sent);
-      assert.equal((await res.json()).error, inboxNameRefusal(name), sent);
+      assert.equal(((await res.json()) as { error: string }).error, inboxNameRefusal(name), sent);
     }
   }
   const route = `POST /api/inbox/${card.name}/queue`;
   const withWorkflow = await queue(card.name, JSON_TYPE, JSON.stringify({ workflow: 'dev' }));
   assert.equal(withWorkflow.status, 400);
   assert.equal(
-    (await withWorkflow.json()).error,
+    ((await withWorkflow.json()) as { error: string }).error,
     `${route} takes no body, or \`{}\`: the card is named in the path, and queued on the workflow it names, and this request sent {"workflow":"dev"}. A card is queued on the workflow it names: file it with one, or queue it with \`wf inbox queue <name> --workflow <w>\`, which writes both.`,
   );
   for (const body of ['{"off":true}', '[]', '"dev"', 'not json']) {
     const res = await queue(card.name, JSON_TYPE, body);
     assert.equal(res.status, 400, body);
-    assert.ok((await res.json()).error.startsWith(`${route} takes no body, or \`{}\``), body);
+    assert.ok(((await res.json()) as { error: string }).error.startsWith(`${route} takes no body, or \`{}\``), body);
   }
   const offRoute = await unqueue(card.name, JSON_TYPE, '{"workflow":"dev"}');
   assert.equal(offRoute.status, 400);
-  assert.ok((await offRoute.json()).error.startsWith(`DELETE /api/inbox/${card.name}/queue takes no body, or \`{}\``));
+  assert.ok(
+    ((await offRoute.json()) as { error: string }).error.startsWith(`DELETE /api/inbox/${card.name}/queue takes no body, or \`{}\``),
+  );
   assert.deepEqual(inboxAsIs(), before);
 });
 
@@ -291,23 +294,27 @@ test('REFUSED at shipped defaults: a queue or its taking back another site could
       const res = await send({ 'content-type': type });
       assert.equal(res.status, 415, `${route} ${type}`);
       assert.ok(
-        (await res.json()).error.startsWith(
+        ((await res.json()) as { error: string }).error.startsWith(
           `${route} takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
         ),
       );
     }
     const none = await send({});
     assert.equal(none.status, 415, `${route} with no content-type`);
-    assert.ok((await none.json()).error.includes('this request sent no content-type'));
+    assert.ok(((await none.json()) as { error: string }).error.includes('this request sent no content-type'));
     for (const site of ['cross-site', 'same-site', 'none']) {
       const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': site });
       assert.equal(res.status, 403, `${route} ${site}`);
-      assert.ok((await res.json()).error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`));
+      assert.ok(
+        ((await res.json()) as { error: string }).error.startsWith(
+          `${route} refuses a request made by a page on another site (Sec-Fetch-Site: ${site})`,
+        ),
+      );
     }
     for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
       const res = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
       assert.equal(res.status, 403, `${route} ${host}`);
-      assert.ok((await res.json()).error.startsWith(`${route} refuses a request addressed to ${host}:`));
+      assert.ok(((await res.json()) as { error: string }).error.startsWith(`${route} refuses a request addressed to ${host}:`));
     }
   }
   assert.deepEqual(inboxAsIs(), before);
@@ -367,7 +374,7 @@ const tickWrote = (c: { sessions: number; runs: number }) => fs.writeFileSync(pa
 const ceilings = async (): Promise<Ceilings> => {
   const res = await app.request('/api/ceilings');
   assert.equal(res.status, 200, await res.clone().text());
-  return res.json();
+  return (await res.json()) as Ceilings;
 };
 
 /** The runs the package's own `runSlots` holds, on the same store, as the api answers them. */
@@ -456,7 +463,7 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
   const res = await app.request('/api/ceilings');
   assert.equal(res.status, 500);
   assert.equal(
-    (await res.json()).error,
+    ((await res.json()) as { error: string }).error,
     'WF_MAX_RUNS=two is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.',
   );
   // Once a pass has written its ceilings, the api's environment is not read at all.

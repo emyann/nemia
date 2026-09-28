@@ -47,7 +47,7 @@ const snapshot = (dir: string): Record<string, string> =>
   );
 
 /** A request refused with `status` and words `pattern` matches, and yours as it was. */
-async function refused(res: Promise<Response>, status: number, pattern: RegExp): Promise<{ error: string; users?: string[] }> {
+async function refused(res: Response | Promise<Response>, status: number, pattern: RegExp): Promise<{ error: string; users?: string[] }> {
   const before = snapshot(AGENTS);
   const answer = await res;
   const body = (await answer.json()) as { error: string; users?: string[] };

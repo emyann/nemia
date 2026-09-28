@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import type { RunSummary } from '../src/runs.ts';
 
 // agent-orchestrator locates its store as its modules load: set first.
 const root = scratch('hkb-api-resting-');
@@ -131,11 +132,10 @@ function writeRun(id: string, brief: string) {
   );
 }
 
-type Listed = { id: string; status: string; brief: string; moving: boolean; toDecide: { kind: string } | null; waitingOnYou: string[] };
 const list = async () => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200, await res.clone().text());
-  return (await res.json()) as Listed[];
+  return (await res.json()) as RunSummary[];
 };
 const listed = async (id: string) => (await list()).find((r) => r.id === id);
 
@@ -204,7 +204,7 @@ test("a journal changed with no line on the feed is not seen: the feed is what t
   await list();
   const was = resting.runs.get('r-unfed');
   assert.ok(was);
-  write(journal('r-unfed-implement'), jsonl([...started('r-unfed-implement'), { kind: 'settled', at, outcome: 'failed' }]));
+  write(journal('r-unfed-implement'), jsonl([...started(), { kind: 'settled', at, outcome: 'failed' }]));
   assert.equal((await unverified(() => listed('r-unfed')))?.status, 'succeeded', 'from memory');
   const res = await app.request('/api/runs');
   assert.equal(res.status, 500, 'and the check says the memo answered wrong');
@@ -277,18 +277,18 @@ test('two requests at once: one that read the feed before the other read on past
   const answer = await listed('r-raced');
   assert.ok(answer && resting.runs.has('r-raced'));
   resting.runs.delete('r-raced'); // not yet kept, as on the request that first judges it
-  const { startedAt: _, ...judged } = answer as Listed & { startedAt?: unknown };
+  const { startedAt: _, ...judged } = answer;
 
   const first = await restingRead(resting, false); // the first request reads the feed, then the run's journal, judged succeeded
   blocked('r-raced-implement');
   fed('r-raced-implement', 'settled'); // a line of its task, before the first request keeps what it judged
   await restingRead(resting, false); // the second reads the feed on past the line: the run is not kept, so nothing is taken out
-  first.keep(findRun('r-raced')!, judged as never, [], () => new Map());
+  first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(!resting.runs.has('r-raced'), 'kept nothing: the line is past where the first request read, and no request will read it again');
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
   const alone = await restingRead(resting, false);
-  alone.keep(findRun('r-raced')!, judged as never, [], () => new Map());
+  alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
 });

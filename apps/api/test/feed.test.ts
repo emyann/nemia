@@ -9,6 +9,7 @@ import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { scratch } from './scratch.ts';
@@ -200,7 +201,7 @@ test('REFUSED: a cursor the feed never gave is a 400 that names it and says what
     const where = `${query} ${JSON.stringify(headers)}`;
     assert.equal(res.status, 400, where);
     assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, pattern, where);
     assert.match(
       error,
@@ -299,7 +300,8 @@ test('a stream whose reader goes leaves no watcher behind: each open stream hold
 test('a client that closes its socket stops the watch too — the path `main.ts` serves, where nothing is being written when it goes', async () => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
-  const server = createAdaptorServer({ fetch: app.fetch });
+  // Given no `createServer`, the adaptor makes a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
+  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
     await until(
@@ -318,7 +320,7 @@ test('a client that closes its socket stops the watch too — the path `main.ts`
       () => `the watch outlived its client's socket: ${watchers()} left`,
     );
   } finally {
-    server.closeAllConnections?.();
+    server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
 });

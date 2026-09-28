@@ -153,7 +153,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
 test("GET /api/workflows/keys is the form a step is drawn in: every key in the package's order with its line of meaning, how it is set, and the words it may take", async () => {
   const res = await app.request('/api/workflows/keys');
   assert.equal(res.status, 200);
-  const form: KeyForm = await res.json();
+  const form = (await res.json()) as KeyForm;
   assert.deepEqual(
     form.keys.map((k) => k.key),
     [...STEP_KEYS],
@@ -271,7 +271,7 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
   assert.equal(steps.find((s) => s.name === 'ship')?.spec.workspace, 'main', "and ship's workspace, so a put does not drop that either");
   const res = await put('as-listed', { steps });
   assert.equal(res.status, 200, await res.clone().text());
-  const saved: WorkflowSaved = await res.json();
+  const saved = (await res.json()) as WorkflowSaved;
   assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md', 'ship.md'], []]);
   assert.deepEqual(snapshot(dir), before, 'byte for byte');
   assert.deepEqual(
@@ -548,13 +548,14 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     name: 'review',
     spec: spec({ after: ['build'], model: 'opus', output: 'build.schema.json', loop: 'build', rounds: 2 }),
     body: 'Review the build.',
+    own: null,
   };
   const res = await put('drawn', {
     steps: [plan, { ...build, spec: { ...build.spec, retries: 1 } }, review],
     readme: '# drawn\n\nPlan, build, review.\n',
   });
   assert.equal(res.status, 200, await res.clone().text());
-  const saved: WorkflowSaved = await res.json();
+  const saved = (await res.json()) as WorkflowSaved;
   assert.deepEqual([saved.written, saved.kept, saved.removed], [['README.md', 'build.md', 'review.md'], ['plan.md'], []]);
   assert.equal(
     fs.readFileSync(path.join(dir, 'plan.md'), 'utf8'),
@@ -609,7 +610,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   // An edge deleted takes its key; a step gone takes its file. A key the listing leaves out is unset.
   const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { check: 'npm test' }, body: 'Build it.' }] });
   assert.equal(gone.status, 200, await gone.clone().text());
-  const after: WorkflowSaved = await gone.json();
+  const after = (await gone.json()) as WorkflowSaved;
   assert.deepEqual([after.written, after.removed], [['build.md'], ['review.md']]);
   assert.equal(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), '---\ncheck: npm test\n---\nBuild it.\n');
   assert.deepEqual(after.workflow.graph, { roots: ['build', 'plan'], edges: [] });
@@ -640,7 +641,7 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
   for (const [what, steps, named] of cases) {
     const res = await put('refused', { steps });
     assert.equal(res.status, 422, `${what}: ${await res.clone().text()}`);
-    const { error, steps: said } = await res.json();
+    const { error, steps: said } = (await res.json()) as BuildRefused;
     // The package's sentence, word for word: what `writeWorkflow` throws for the same steps.
     const drafts = (steps as ListedStep[]).map((s) => ({
       ...Object.fromEntries(Object.entries(s.spec).filter(([, v]) => v !== null)),
@@ -672,7 +673,7 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
     [await post({ name: 'new', step, from: 'repo' }), 'POST /api/workflows/yours', 'new'],
   ] as const) {
     assert.equal(res.status, 403, route);
-    assert.equal((await res.json()).error, sentence(route, name), route);
+    assert.equal(((await res.json()) as { error: string }).error, sentence(route, name), route);
   }
   // Anywhere else is not a source at all.
   for (const res of [
@@ -682,7 +683,7 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
   ]) {
     assert.equal(res.status, 400);
     assert.match(
-      (await res.json()).error,
+      ((await res.json()) as { error: string }).error,
       /the builder writes yours, at \/api\/workflows\/yours\/…, and this request named "elsewhere"\.$/,
     );
   }
@@ -702,16 +703,24 @@ test('REFUSED at shipped defaults: a write another site could make — a body no
   for (const [route, send] of writes) {
     const type = await send({ 'content-type': 'text/plain;charset=UTF-8' });
     assert.equal(type.status, 415, route);
-    assert.ok((await type.json()).error.startsWith(`${route} takes its body as \`content-type: application/json\``), route);
+    assert.ok(
+      ((await type.json()) as { error: string }).error.startsWith(`${route} takes its body as \`content-type: application/json\``),
+      route,
+    );
     const site = await send({ 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
     assert.equal(site.status, 403, route);
     assert.ok(
-      (await site.json()).error.startsWith(`${route} refuses a request made by a page on another site (Sec-Fetch-Site: cross-site)`),
+      ((await site.json()) as { error: string }).error.startsWith(
+        `${route} refuses a request made by a page on another site (Sec-Fetch-Site: cross-site)`,
+      ),
       route,
     );
     const host = await send({ 'content-type': 'application/json', host: 'evil.example:8787' });
     assert.equal(host.status, 403, route);
-    assert.ok((await host.json()).error.startsWith(`${route} refuses a request addressed to evil.example:8787`), route);
+    assert.ok(
+      ((await host.json()) as { error: string }).error.startsWith(`${route} refuses a request addressed to evil.example:8787`),
+      route,
+    );
   }
   assert.deepEqual(snapshot(dir), before);
   assert.equal(fs.existsSync(path.join(STORE, 'guarded-2')), false);
@@ -769,7 +778,7 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
   for (const [body, said] of cases) {
     const res = await put('shaped', body);
     assert.equal(res.status, 400, JSON.stringify(body));
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.match(error, said, error);
     assert.ok(error.startsWith('PUT /api/workflows/yours/shaped'), error);
   }
@@ -784,7 +793,7 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
   ] as const) {
     const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
     assert.equal(res.status, 400, file);
-    assert.match((await res.json()).error, said, file);
+    assert.match(((await res.json()) as { error: string }).error, said, file);
   }
   assert.deepEqual(snapshot(dir), before);
   assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);
@@ -797,7 +806,7 @@ test('REFUSED at shipped defaults: a put to a folder yours does not have is a 40
   for (const name of ['nope', 'good', '.hidden', '..%2Fworkflows%2Fmine', '..%2F..%2Fworkflows']) {
     const res = await put(name, { steps: [step] });
     assert.equal(res.status, 404, name);
-    const { error } = await res.json();
+    const { error } = (await res.json()) as { error: string };
     assert.ok(
       error.startsWith(`No workflow '${decodeURIComponent(name)}' in ${STORE}.`) &&
         error.endsWith('To make a new one, POST /api/workflows/yours with its name and a first step.'),
@@ -816,7 +825,7 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
     readme: '# fresh\n\nA plan.\n',
   });
   assert.equal(res.status, 201, await res.clone().text());
-  const saved: WorkflowSaved = await res.json();
+  const saved = (await res.json()) as WorkflowSaved;
   const dir = path.join(STORE, 'fresh');
   assert.deepEqual(snapshot(dir), {
     'README.md': '# fresh\n\nA plan.\n',
@@ -860,17 +869,17 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   ] as const) {
     const res = await post({ name, step });
     assert.equal(res.status, 400, String(name));
-    assert.match((await res.json()).error, said, String(name));
+    assert.match(((await res.json()) as { error: string }).error, said, String(name));
   }
   const taken = await post({ name: 'taken', step });
   assert.equal(taken.status, 409);
   assert.equal(
-    (await taken.json()).error,
+    ((await taken.json()) as { error: string }).error,
     `Yours already has a workflow named 'taken' (${path.join(STORE, 'taken')}). PUT /api/workflows/yours/taken changes it, or name the new one otherwise.`,
   );
   const file = await post({ name: 'NOTES.txt', step });
   assert.equal(file.status, 409);
-  assert.match((await file.json()).error, /^Yours has a file named 'NOTES\.txt'/);
+  assert.match(((await file.json()) as { error: string }).error, /^Yours has a file named 'NOTES\.txt'/);
 
   for (const [first, named] of [
     [{ name: 'plan', spec: spec(), body: '' }, ['plan']],
@@ -880,7 +889,7 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   ] as const) {
     const res = await post({ name: 'unmade', step: first });
     assert.equal(res.status, 422, JSON.stringify(first));
-    const { error, steps } = await res.json();
+    const { error, steps } = (await res.json()) as BuildRefused;
     assert.deepEqual(steps, named, error);
   }
   assert.equal((await post({ name: 'unmade', step: 'plan' })).status, 400);
@@ -906,7 +915,7 @@ test('PUT /api/workflows/yours/:name writes the schemas pasted for it beside the
     schemas: [{ file: 'plan.schema.json', text: risks }],
   });
   assert.equal(res.status, 200, await res.clone().text());
-  const saved: WorkflowSaved = await res.json();
+  const saved = (await res.json()) as WorkflowSaved;
   assert.deepEqual([saved.written, saved.kept, saved.removed], [['build.md', 'plan.md', 'plan.schema.json'], [], []]);
   assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${risks}\n`, 'written ending in a line break');
   assert.deepEqual(
@@ -1010,7 +1019,7 @@ test("REFUSED at shipped defaults: a pasted schema is judged with the steps befo
   for (const [what, body, said, named, status] of cases) {
     const res = await put('pasted', body);
     assert.equal(res.status, status, `${what}: ${await res.clone().text()}`);
-    const { error, steps } = await res.json();
+    const { error, steps } = (await res.json()) as BuildRefused;
     if (typeof said === 'string') assert.equal(error, said, what);
     else assert.match(error, said, `${what}: ${error}`);
     assert.deepEqual(steps, named, `${what}: ${error}`);
@@ -1066,7 +1075,7 @@ test('REFUSED at shipped defaults: a save of a folder that changed since it was 
     assert.notEqual(now, read, `${what}: the folder's version moves`);
     const res = await put('edited', draft);
     assert.equal(res.status, 409, `${what}: ${await res.clone().text()}`);
-    const { error, steps } = await res.json();
+    const { error, steps } = (await res.json()) as BuildRefused;
     assert.equal(
       error,
       `${dir} has changed since it was read at version ${read}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
@@ -1112,7 +1121,7 @@ test('a write the package does not refuse but the disk does puts each pasted sch
     ],
   });
   assert.equal(res.status, 500, await res.clone().text());
-  assert.match((await res.json()).error, /EISDIR/);
+  assert.match(((await res.json()) as { error: string }).error, /EISDIR/);
   assert.deepEqual(snapshot(dir), before, 'the new schema removed, the replaced one written back');
 });
 
@@ -1139,7 +1148,7 @@ test(
         ],
       });
       assert.equal(res.status, 500, await res.clone().text());
-      assert.match((await res.json()).error, /EACCES/);
+      assert.match(((await res.json()) as { error: string }).error, /EACCES/);
       assert.deepEqual(snapshot(dir), before, 'the schema written before it removed, the read-only one as it was, and no step written');
     } finally {
       fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o644);

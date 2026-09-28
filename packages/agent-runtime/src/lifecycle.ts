@@ -379,7 +379,7 @@ const machineOf = (config: Config) =>
   // union of events through a table built from helpers.
   setup({ types: { events: {} as LifecycleEvent }, guards: GUARDS, actions: ACTIONS }).createMachine(config as any);
 
-export const MACHINE = machineOf(CONFIG as unknown as Config);
+export const MACHINE = machineOf(CONFIG);
 
 const moveOn =
   (machine: ReturnType<typeof machineOf>): Move =>

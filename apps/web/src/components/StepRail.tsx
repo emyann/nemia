@@ -78,7 +78,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
               data-live={pill.live || undefined}
               title={
                 pill.kind === 'step'
-                  ? stepTitle(byName.get(pill.names[0]!), pill.names[0]!, cancelled, held)
+                  ? stepTitle(byName.get(pill.names[0]), pill.names[0], cancelled, held)
                   : pill.names.map((name) => stepTitle(byName.get(name), name, cancelled, held)).join('\n')
               }
               style={at(pill)}
@@ -140,7 +140,7 @@ export function StepTiles({
       <div className="relative" style={{ width: flow.width, height: flow.height }}>
         <Arrows flow={flow} rounds />
         {flow.pills.map((pill) => {
-          const name = pill.names[0]!;
+          const name = pill.names[0];
           const step = byName.get(name);
           if (!step) return null;
           const state = stepState(step.status, cancelled, held);

@@ -374,7 +374,7 @@ test('read again with its cursor, a transcript gives only what was appended; a l
   assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 3));
 
   // Two more lines, and half of a third.
-  const third = lines[7]!;
+  const third = lines[7];
   fs.appendFileSync(claudeFile(sessionId), `${lines[5]}\n${lines[6]}\n${third.slice(0, 40)}`);
   const second = await claudeRead(sessionId, first.cursor);
   assert.deepEqual(second.events, CLAUDE_EVENTS.slice(3, 5), 'only the two appended lines; not the half-written one');
@@ -811,19 +811,19 @@ test("at shipped defaults, a Claude background session's transcript is its sessi
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
-    const lines = claudeLines(row!.sessionId);
-    writeClaude(row!.sessionId, jsonl(lines.slice(0, 7)));
+    const lines = claudeLines(row.sessionId);
+    writeClaude(row.sessionId, jsonl(lines.slice(0, 7)));
 
     const first = await engine.transcript(id, before.cursor);
     assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 5), 'from the start, with the cursor a read of nothing gave');
     datedWithRoles(first.events);
-    const started = Date.parse((await engine.view(id)).state.attempts[0]!.startedAt);
+    const started = Date.parse((await engine.view(id)).state.attempts[0].startedAt);
     assert.ok(
       first.events.every((e) => Date.parse(e.at) < started),
       'turns older than the attempt keep their own times: the caller decides what to show',
     );
 
-    fs.appendFileSync(claudeFile(row!.sessionId), jsonl(lines.slice(7)));
+    fs.appendFileSync(claudeFile(row.sessionId), jsonl(lines.slice(7)));
     const second = await engine.transcript(id, first.cursor);
     assert.deepEqual(second.events, CLAUDE_EVENTS.slice(5), 'only what was appended');
     assert.deepEqual(
@@ -971,7 +971,7 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
-    writeClaude(row!.sessionId, jsonl(claudeLines(row!.sessionId)));
+    writeClaude(row.sessionId, jsonl(claudeLines(row.sessionId)));
     const first = await engine.transcript(id);
     assert.deepEqual(first.events, CLAUDE_EVENTS, 'in flight, found by observing its harness');
 
@@ -984,10 +984,10 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
     assert.deepEqual((await engine.transcript(id)).events, [], 'and from the start, nothing observed either');
 
     claude.agentsFail(false);
-    claude.set(row!.name, { state: 'done' });
+    claude.set(row.name, { state: 'done' });
     await engine.tick();
-    const ended = (await engine.view(id)).state.attempts[0]!;
-    assert.equal(ended.nativeId, row!.sessionId, "the attempt ended, its session's id on the record");
+    const ended = (await engine.view(id)).state.attempts[0];
+    assert.equal(ended.nativeId, row.sessionId, "the attempt ended, its session's id on the record");
 
     claude.agentsFail(true);
     const before = claude.agentsCalls();

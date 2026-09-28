@@ -104,7 +104,7 @@ const settleThenCheck = async (
     }
     for (const v of Object.values(views)) {
       if (!v.sessionId) continue;
-      const short = v.sessionId.split('-')[0]!;
+      const short = v.sessionId.split('-')[0];
       for (const verb of ['stop', 'rm']) {
         try {
           execFileSync('claude', [verb, short], { stdio: 'ignore', timeout: 30_000 });
@@ -400,7 +400,7 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`,
   );
   t.diagnostic(
-    `the words arrived ${arrived[0]!.text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`,
+    `the words arrived ${arrived[0].text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`,
   );
 };
 
@@ -490,7 +490,7 @@ test(
       for (const s of sessions) {
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {
             /* released already */
           }
@@ -538,7 +538,7 @@ test(
       }),
     };
     await settleThenCheck(engine, ids, (views) => {
-      const { state } = views.capped!;
+      const { state } = views.capped;
       t.diagnostic(
         `settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`,
       );
@@ -599,7 +599,7 @@ test(
       if (session) {
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, session.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync('claude', [verb, session.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {
             /* released already */
           }
@@ -634,7 +634,7 @@ test(
     };
 
     await settleThenCheck(engine, ids, (views) => {
-      const v = views.unsigned!;
+      const v = views.unsigned;
       const [a] = v.state.attempts;
       t.diagnostic(
         `attempt 1 ended ${a?.ended} (${a?.reason}), stated ${a?.stated}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`,
@@ -717,7 +717,7 @@ test(
       for (const s of sessions) {
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {
             /* best effort */
           }
@@ -876,19 +876,19 @@ test(
       }),
     };
     await settleThenCheck(engine, ids, (views) => {
-      const [denied] = views.denied!.state.attempts;
-      const [control] = views.control!.state.attempts;
+      const [denied] = views.denied.state.attempts;
+      const [control] = views.control.state.attempts;
       t.diagnostic(
-        `denied: ${views.denied!.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control!.state.settled}, ${JSON.stringify(control?.denials)}`,
+        `denied: ${views.denied.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control.state.settled}, ${JSON.stringify(control?.denials)}`,
       );
-      assert.equal(views.denied!.state.settled, 'succeeded', `the denied job finished its work: ${views.denied!.phase}`);
+      assert.equal(views.denied.state.settled, 'succeeded', `the denied job finished its work: ${views.denied.phase}`);
       assert.equal(denied?.exitCode, 0, "it ran as a job: a process of the engine's, which exited — a background session has no exit code");
       assert.ok(
         (denied?.denials ?? []).some((d) => d.tool === 'Write'),
         'its attempt says the write outside its folder was denied',
       );
       assert.equal(fs.existsSync(path.join(probe, 'outside', 'x.txt')), false, 'and nothing was written there');
-      assert.equal(views.control!.state.settled, 'succeeded', `the control finished: ${views.control!.phase}`);
+      assert.equal(views.control.state.settled, 'succeeded', `the control finished: ${views.control.phase}`);
       assert.equal(control?.denials, undefined, 'and was denied nothing: a denial is not printed for every job');
     });
   },
@@ -949,17 +949,17 @@ test(
     assert.deepEqual(last(second)?.closeout, { word }, 'a job resumed from a job remembers');
     assert.ok(one !== undefined && one > 0 && two !== undefined && two > 0, 'and both were charged something');
     assert.ok(
-      two! < one!,
+      two < one,
       "the resume, a short question on a warm cache, was charged less than the job it continued: not that job's spend again",
     );
 
     // M5: a cap below the session's whole spend still lets a short resume finish — it caps the resume's own.
-    const cap = Math.max(0.01, Math.round((one! + two!) * 50) / 100);
+    const cap = Math.max(0.01, Math.round((one + two) * 50) / 100);
     const capped = await settled(
       await engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }),
     );
     t.diagnostic(
-      `a resume capped at $${cap}, under its session's $${(one! + two!).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`,
+      `a resume capped at $${cap}, under its session's $${(one + two).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`,
     );
     assert.equal(capped.state.settled, 'succeeded', `a resume under a cap below its session's whole cost finished: ${capped.phase}`);
   },
@@ -1043,7 +1043,7 @@ test(
         assert.notEqual(exit, 'running', `${signal}: it ended within twenty seconds`);
         assert.ok(session, `${signal}: its first line named its session`);
         const resumed = printed(
-          ['--resume', session!, '--permission-mode', 'dontAsk', 'What was the code word I told you? Reply with it alone.'],
+          ['--resume', session, '--permission-mode', 'dontAsk', 'What was the code word I told you? Reply with it alone.'],
           cwd,
         );
         assert.equal(resumed.exit, 0, `${signal}: the resume ran`);
@@ -1080,7 +1080,7 @@ test(
       t.diagnostic(`results: ${JSON.stringify(results.map((r) => ({ subtype: r.subtype, result: r.result, turns: r.num_turns })))}`);
       assert.ok(results.length >= 1, 'it answered');
       assert.match(
-        String(results[0]!.result ?? ''),
+        String(results[0].result ?? ''),
         new RegExp(word),
         'its first answer — the turn that was running — has the word said while it slept',
       );

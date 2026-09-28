@@ -136,7 +136,7 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
   fs.mkdirSync(inboxDir(), { recursive: true });
   for (;;) {
-    const name = runId(body.split('\n')[0]!);
+    const name = runId(body.split('\n')[0]);
     const file = path.join(inboxDir(), `${name}.md`);
     try {
       // `wx`: a name already taken is drawn again, never written over.

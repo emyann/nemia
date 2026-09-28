@@ -100,9 +100,9 @@ type Sources = Record<string, readonly string[]>;
 /** Every module a piece of source names: imports and re-exports, type-only included, and `import()`. */
 function importsIn(text: string): string[] {
   const found = new Set<string>();
-  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
-  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]!);
-  for (const m of text.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) found.add(m[1]!);
+  for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
+  for (const m of text.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
+  for (const m of text.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) found.add(m[1]);
   return [...found].sort();
 }
 
@@ -233,7 +233,7 @@ function cycles(sources: Sources): string[] {
         if (next === from) {
           const loop = [from];
           for (let step = at; step !== from; step = back.get(step)!) loop.splice(1, 0, step);
-          const least = loop.indexOf([...loop].sort()[0]!);
+          const least = loop.indexOf([...loop].sort()[0]);
           const turned = [...loop.slice(least), ...loop.slice(0, least)];
           found.add(`a cycle: ${[...turned, turned[0]].join(' → ')}`);
           queue.length = 0;

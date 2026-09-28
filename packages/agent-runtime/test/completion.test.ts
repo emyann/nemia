@@ -511,7 +511,7 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
     const args = fs.readFileSync(argsFile, 'utf8').trim().split('\n');
     const i = args.indexOf('--json-schema');
     assert.notEqual(i, -1);
-    assert.deepEqual(JSON.parse(args[i + 1]!), schema);
+    assert.deepEqual(JSON.parse(args[i + 1]), schema);
     assert.equal(args.at(-1), 'the prompt');
   } finally {
     process.env.PATH = prev;

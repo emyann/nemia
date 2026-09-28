@@ -77,15 +77,15 @@ test('the Effect door: signed, it waits with its session released; answered afte
     // A new process, reading only the store: the answer is on the record, so the turn is too.
     await run(tick());
     assert.equal(spawned.length, 2);
-    assert.equal(spawned[1]!.name, `ae/${id}/2`);
-    assert.equal(spawned[1]!.resumeFrom, 'fake-1', 'it continues the session that signed');
-    assert.equal(spawned[1]!.brief, 'shorter, please', 'told the answer, not the brief again');
+    assert.equal(spawned[1].name, `ae/${id}/2`);
+    assert.equal(spawned[1].resumeFrom, 'fake-1', 'it continues the session that signed');
+    assert.equal(spawned[1].brief, 'shorter, please', 'told the answer, not the brief again');
     assert.deepEqual(
-      spawned[1]!.config,
+      spawned[1].config,
       { model: 'opus', budgetUsd: 0.5 },
       "under the answer's budget, laid over the rest of the filing's configuration",
     );
-    assert.deepEqual(spawned[0]!.config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
+    assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
     assert.equal(await phase(id), 'running (working)');
 
     signed(sessions, `ae/${id}/2`, 'a shorter draft');

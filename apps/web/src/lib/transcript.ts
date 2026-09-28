@@ -143,7 +143,7 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
  */
 export function tailStart(turns: readonly Turn[]): number {
   for (let i = turns.length - 1; i >= 0; i--) {
-    const { kind } = turns[i]!;
+    const { kind } = turns[i];
     if (kind === 'said' || kind === 'closeout') return i + 1;
   }
   return 0;
@@ -156,7 +156,7 @@ const timeOf = (turn: Turn): number => {
     case 'closeout':
       return Date.parse(turn.call.at);
     case 'tools':
-      return timeOf(turn.turns[0]!);
+      return timeOf(turn.turns[0]);
     default:
       return Date.parse(turn.at);
   }
@@ -196,7 +196,7 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
       const i = events.findIndex((event, j) => !taken.has(j) && arrivalOf(event, s));
       if (i === -1) return { ...s, arrived: null };
       taken.add(i);
-      return { ...s, arrived: events[i]!.at };
+      return { ...s, arrived: events[i].at };
     });
   return { events: events.filter((_, i) => !taken.has(i)), said: heard };
 }
@@ -222,7 +222,7 @@ export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { ar
   const out: Turn[] = [];
   let next = 0;
   for (const turn of turns) {
-    while (next < told.length && placed(told[next]!) < timeOf(turn)) out.push(told[next++]!);
+    while (next < told.length && placed(told[next]) < timeOf(turn)) out.push(told[next++]);
     out.push(turn);
   }
   return [...out, ...told.slice(next)];
@@ -242,7 +242,7 @@ function drawn(stretch: FoldedTurn[]): Turn[] {
   const calls = folded.flatMap((turn) => (turn.kind === 'tool' ? [turn.call] : []));
   const tools: ToolsTurn = {
     kind: 'tools',
-    key: `tools:${calls[0]!.id}`,
+    key: `tools:${calls[0].id}`,
     summary: summaryOf(calls),
     turns: folded,
     calls: calls.length,
@@ -278,13 +278,13 @@ VERBS.NotebookEdit = VERBS.Edit!;
 VERBS.Agent = VERBS.Task!;
 VERBS.CommandExecution = VERBS.Bash!;
 VERBS.FileChange = {
-  ...VERBS.Edit!,
+  ...VERBS.Edit,
   subject: (input) => (input.changes && typeof input.changes === 'object' ? Object.keys(input.changes) : []),
 };
 
 /** An MCP tool by its server — `mcp__playwright__browser_click` is `playwright` — and any other by its name. */
 const verbOf = (name: string): Verb => {
-  if (Object.hasOwn(VERBS, name)) return VERBS[name]!;
+  if (Object.hasOwn(VERBS, name)) return VERBS[name];
   const used = /^mcp__(.+?)__/.exec(name)?.[1] ?? name;
   return { group: `use:${used}`, one: `used ${used}`, many: (n) => `used ${used} ${n} times` };
 };
@@ -321,7 +321,7 @@ export function detailOf(call: ToolCall): string | null {
   const said = [command, input.file_path, input.notebook_path, input.pattern, input.url, input.query, input.description, input.path].find(
     (value): value is string => typeof value === 'string' && value.trim() !== '',
   );
-  if (said !== undefined) return said.trim().split('\n')[0]!;
+  if (said !== undefined) return said.trim().split('\n')[0];
   if (call.name === 'FileChange' && input.changes && typeof input.changes === 'object')
     return Object.keys(input.changes).join(', ') || null;
   return null;

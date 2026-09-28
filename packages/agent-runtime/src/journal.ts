@@ -190,7 +190,7 @@ export const upgrade = (event: StoredEvent): Event => {
   const config: Record<string, unknown> = { ...lifted, ...given };
   const flags: Record<string, unknown> = {};
   for (const key of Object.keys(FORMER_ARGS)) {
-    if (config[key] === true) flags[FORMER_ARGS[key]!] = true;
+    if (config[key] === true) flags[FORMER_ARGS[key]] = true;
     delete config[key];
   }
   if (Object.keys(flags).length) config.claude = { ...flags, ...event.config?.claude };

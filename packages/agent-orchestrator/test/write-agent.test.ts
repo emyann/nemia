@@ -31,7 +31,8 @@ function fresh(): void {
 
 function snapshot(dir: string): Record<string, string> {
   return Object.fromEntries(
-    (fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[])
+    fs
+      .readdirSync(dir, { recursive: true, withFileTypes: true })
       .filter((e) => e.isFile() || e.isSymbolicLink())
       .map((e) => {
         const at = path.join(e.parentPath, e.name);
@@ -103,8 +104,7 @@ test('a render writes the description first, the keys in their order, and an uns
 });
 
 test('a render refuses a key no agent has, agent:, wiring, description among the keys and a line break, by name', () => {
-  const r = (keys: Record<string, string>, description?: string) => () =>
-    renderAgent({ name: 'a', description, keys: keys as AgentDraft['keys'], body: 'x' });
+  const r = (keys: Record<string, string>, description?: string) => () => renderAgent({ name: 'a', description, keys: keys, body: 'x' });
   assert.throws(r({ agent: 'b' }), (e: Error) => e.message.startsWith("agents/a.md: `agent` is a step's key"));
   assert.throws(r({ check: 'npm test' }), (e: Error) => e.message.startsWith('agents/a.md: `check` is wiring, and belongs on the step'));
   assert.throws(r({ modle: 'opus' }), (e: Error) => e.message.startsWith('agents/a.md: `modle` is not a key an agent has'));

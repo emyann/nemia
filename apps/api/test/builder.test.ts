@@ -246,13 +246,13 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   // A flag's words are the ones the parser takes, and gate's `false` is refused.
   const flags = Object.fromEntries(form.keys.filter((k) => k.kind === 'flag').map((k) => [k.key, k.choices]));
   assert.deepEqual(flags, { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] });
-  for (const [key, words] of Object.entries(flags)) for (const word of words!) assert.equal(refusedAs(key, word), null, `${key}: ${word}`);
+  for (const [key, words] of Object.entries(flags)) for (const word of words) assert.equal(refusedAs(key, word), null, `${key}: ${word}`);
   assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/);
   // The default harness is the parser's: a step that names none takes each of its modes, not a sandbox of codex's as a mode, and no sandbox.
   assert.equal(form.defaultHarness, DEFAULT_HARNESS);
-  for (const mode of PERMISSION_MODES[DEFAULT_HARNESS]!) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
+  for (const mode of PERMISSION_MODES[DEFAULT_HARNESS]) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
   assert.equal(Object.hasOwn(SANDBOXES, DEFAULT_HARNESS), false);
-  const codexOnly = SANDBOXES.codex!.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS]!.includes(m))!;
+  const codexOnly = SANDBOXES.codex.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS].includes(m))!;
   assert.throws(
     () => parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`),
     (e: Error) => e.message.startsWith('a: '),
@@ -306,9 +306,9 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
 
   // A key changed, which the board makes the node's own, and the note: written, and nothing else of the agent's.
   const edited = {
-    ...build!,
-    spec: { ...build!.spec, effort: 'low' },
-    own: { keys: [...build!.own!.keys, 'effort'], body: 'And mind the index.' },
+    ...build,
+    spec: { ...build.spec, effort: 'low' },
+    own: { keys: [...build.own.keys, 'effort'], body: 'And mind the index.' },
   };
   res = await put('with-agent', { steps: [edited] });
   assert.equal(res.status, 200, await res.clone().text());
@@ -317,7 +317,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     '---\nagent: coder\neffort: low\ncheck: npm test\n---\nAnd mind the index.\n',
   );
   const [read] = await listedSteps('with-agent');
-  assert.deepEqual([read!.spec.model, read!.spec.effort, read!.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
+  assert.deepEqual([read.spec.model, read.spec.effort, read.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
 
   // Sent without `own`, as a step drafted by hand: every key it sets is its own, and its body is its note.
   res = await put('with-agent', { steps: [{ name: 'build', spec: { agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }] });
@@ -529,7 +529,7 @@ test('the form offers each remote A2A agent the store declares as a harness, and
   const saved = await put('asked', { steps: [{ ...ask, spec: { ...ask.spec, harness: 'a2a:reviewer' } }] });
   assert.equal(saved.status, 200, await saved.clone().text());
   assert.equal(fs.readFileSync(path.join(dir, 'ask.md'), 'utf8'), '---\nworkspace: folder\nharness: a2a:reviewer\n---\nAsk it.\n');
-  assert.equal((await listedSteps('asked'))[0]!.spec.harness, 'a2a:reviewer');
+  assert.equal((await listedSteps('asked'))[0].spec.harness, 'a2a:reviewer');
 
   // A key a remote step may not set is refused in the package's words, and nothing is written.
   const before = fs.readFileSync(path.join(dir, 'ask.md'), 'utf8');
@@ -651,7 +651,7 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
       after: s.spec.after ?? [],
     }));
     assert.throws(
-      () => writeWorkflow(dir, drafts as never),
+      () => writeWorkflow(dir, drafts),
       (e: Error) => e.message === error,
       `${what}: ${error}`,
     );

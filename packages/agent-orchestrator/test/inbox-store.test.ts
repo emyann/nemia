@@ -90,7 +90,7 @@ test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `
   assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
   assert.deepEqual(readInbox(), []);
   assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with wf inbox add "<idea>"']);
-  assert.match((await printedBy(t, 'inbox', '--help'))[0]!, /^wf inbox$/);
+  assert.match((await printedBy(t, 'inbox', '--help'))[0], /^wf inbox$/);
   assert.ok(
     (await printedBy(t, 'help')).some((l) => l.startsWith('  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
     'on the general help',
@@ -102,15 +102,15 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const added = await printedBy(t, 'inbox', 'add', "Cache the engine's views between passes\n\nThe tick reads each task twice.");
   const [name] = inInbox();
-  assert.match(name!, /^cache-the-engine-s-views-bet-[a-z0-9]{4}\.md$/, 'the slug runId makes of the first line, suffix included');
-  const card = path.join(INBOX, name!);
+  assert.match(name, /^cache-the-engine-s-views-bet-[a-z0-9]{4}\.md$/, 'the slug runId makes of the first line, suffix included');
+  const card = path.join(INBOX, name);
   assert.equal(
     fs.readFileSync(card, 'utf8'),
     "Cache the engine's views between passes\n\nThe tick reads each task twice.\n",
     'no keys, no frontmatter',
   );
   assert.deepEqual(added, [
-    `${name!.slice(0, -3)}  Cache the engine's views between passes`,
+    `${name.slice(0, -3)}  Cache the engine's views between passes`,
     `filed: ${card} — start it with wf start ${card} --workflows <w>`,
   ]);
 
@@ -166,7 +166,7 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
     listed.map((l) => [l.name, l.startedAs, l.error === null]),
     [
       ['broken-a1b2', [], false],
-      [name!.slice(0, -3), [], true],
+      [name.slice(0, -3), [], true],
       [second.slice(0, -3), [], true],
       ['notes.txt', [], false],
       [third.slice(0, -3), ['show-the-flag-on-the-settin-zz99'], true],
@@ -318,7 +318,7 @@ test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `
   const repo = aRepoWith('dev', 'ui');
   const { card, file } = addToInbox({ text: 'Cache the views between passes\n\nThe tick reads each task twice.', workflow: 'dev', repo });
   const printed = await printedBy(t, 'start', file);
-  const id = printed[0]!.split(' ')[0]!;
+  const id = printed[0].split(' ')[0];
   assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
   const run = readRun(id);
   assert.deepEqual(
@@ -342,7 +342,7 @@ test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `
   // A plan's card: started by wf start, and never removed.
   const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
-  const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0]!.split(' ')[0]!);
+  const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
   assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined]);
   assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
 });
@@ -379,7 +379,7 @@ test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the car
   assert.equal(runsWritten(), before, 'no run written');
 
   const printed = await printedBy(t, 'start', path.join(INBOX, card.name));
-  const run = readRun(printed[0]!.split(' ')[0]!);
+  const run = readRun(printed[0].split(' ')[0]);
   assert.deepEqual(
     [run.brief, run.workflowDir, run.from],
     ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
@@ -403,10 +403,10 @@ test("`wf inbox add <file>` writes a path in the file's own `workflow:` absolute
     await printedBy(t, 'inbox', 'add', idea);
     const [filed] = inInbox();
     assert.equal(
-      fs.readFileSync(path.join(INBOX, filed!), 'utf8'),
+      fs.readFileSync(path.join(INBOX, filed), 'utf8'),
       `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`,
     );
-    const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed!)))[0]!.split(' ')[0]!);
+    const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed)))[0].split(' ')[0]);
     assert.equal(run.workflowDir, path.join(repo, 'workflows', 'dev'));
     assert.equal(fs.readFileSync(idea, 'utf8').includes('workflow: ../workflows/dev'), true, 'the file given is left as it was');
   } finally {
@@ -435,7 +435,7 @@ test("a start says what the card does not, over what it does: --workflows over `
         '--brief',
         'Show the flag on the settings page, beside the theme toggle.',
       )
-    )[0]!.split(' ')[0]!,
+    )[0].split(' ')[0],
   );
   assert.deepEqual(
     [run.workflowDir, run.repo, run.brief, run.from],
@@ -449,7 +449,7 @@ test("a start says what the card does not, over what it does: --workflows over `
   process.chdir(other);
   let here: Run;
   try {
-    here = readRun((await printedBy(t, 'start', bare.file))[0]!.split(' ')[0]!);
+    here = readRun((await printedBy(t, 'start', bare.file))[0].split(' ')[0]);
   } finally {
     process.chdir(cwd);
   }
@@ -462,7 +462,7 @@ test("a start says what the card does not, over what it does: --workflows over `
   const brief = path.join(mine, 'work.md');
   fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
   const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
-  const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0]!.split(' ')[0]!);
+  const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0]);
   assert.deepEqual([child.brief, child.after, child.from], ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }]);
 });
 
@@ -582,11 +582,11 @@ test(
     } finally {
       fs.chmodSync(INBOX, 0o755);
     }
-    const id = printed[0]!.split(' ')[0]!;
+    const id = printed[0].split(' ')[0];
     assert.equal(runsWritten(), before + 1, 'the run is written');
     assert.deepEqual(readRun(id).from, { inbox: card.name });
     assert.match(
-      printed[1]!,
+      printed[1],
       new RegExp(
         `^from inbox card ${escaped(card.name)} — still in the inbox: ${escaped(file)} could not be removed — .*\\. wf inbox lists it as started as ${escaped(id)}: drop it with wf inbox rm ${escaped(card.name)}$`,
       ),
@@ -596,7 +596,7 @@ test(
       [[card.name, [id]]],
     );
     assert.match(
-      (await printedBy(t, 'inbox'))[0]!,
+      (await printedBy(t, 'inbox'))[0],
       new RegExp(`^${escaped(card.name)}  Cache the views  workflow: dev  repo: ${escaped(repo)}  started as ${escaped(id)}$`),
     );
 

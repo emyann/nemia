@@ -117,7 +117,7 @@ export const codexMcpServerNames = (toml: string): Set<string> => {
   const names = new Set<string>();
   for (const raw of toml.split('\n')) {
     const table = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim());
-    if (table) names.add(table[1] ?? table[2]!);
+    if (table) names.add(table[1] ?? table[2]);
   }
   return names;
 };

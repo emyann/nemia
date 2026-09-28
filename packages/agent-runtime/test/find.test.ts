@@ -119,11 +119,11 @@ test("a session registered under its attempt's name is found by it: its conversa
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    register(row!);
-    wrote(row!.sessionId, 'working on it');
+    register(row);
+    wrote(row.sessionId, 'working on it');
 
     const before = claude.agents();
-    assert.deepEqual(await find(row!.name), { sessionId: row!.sessionId }, 'found by name, at shipped defaults');
+    assert.deepEqual(await find(row.name), { sessionId: row.sessionId }, 'found by name, at shipped defaults');
     assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it'], "the running attempt's conversation");
     assert.equal(claude.agents(), before, 'read with no `claude agents` call');
 
@@ -137,7 +137,7 @@ test("a session registered under its attempt's name is found by it: its conversa
     const settled = claude.agents();
     const v = await engine.view(id);
     assert.equal(v.phase, 'succeeded');
-    assert.equal(v.sessionId, row!.sessionId, 'the id its end was recorded with');
+    assert.equal(v.sessionId, row.sessionId, 'the id its end was recorded with');
     assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it']);
     assert.equal(claude.agents(), settled, 'a settled task is viewed, and read, with no `claude agents` call');
   });
@@ -150,28 +150,28 @@ test('a registration whose process has gone is not found, nor one whose pid anot
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!.sessionId, 'hello');
+    wrote(row.sessionId, 'hello');
 
-    const exited = spawnSync(process.execPath, ['-e', '']).pid!;
-    register(row!, exited);
-    assert.equal(await find(row!.name), undefined, 'its process has exited: not found');
+    const exited = spawnSync(process.execPath, ['-e', '']).pid;
+    register(row, exited);
+    assert.equal(await find(row.name), undefined, 'its process has exited: not found');
     const before = claude.agents();
     assert.deepEqual(texts((await engine.transcript(id)).events), ['hello'], 'the running session is still read');
     assert.equal(claude.agents(), before + 1, 'found through `claude agents` instead');
     fs.rmSync(path.join(sessions, `${exited}.json`));
 
     if (processStart(process.pid) !== undefined) {
-      register(row!, process.pid, { procStart: '1' });
-      assert.equal(await find(row!.name), undefined, 'a live pid whose process started other than the registration says: not the session');
-      register(row!, process.pid, { procStart: undefined });
+      register(row, process.pid, { procStart: '1' });
+      assert.equal(await find(row.name), undefined, 'a live pid whose process started other than the registration says: not the session');
+      register(row, process.pid, { procStart: undefined });
       assert.equal(
-        await find(row!.name),
+        await find(row.name),
         undefined,
         'a registration that does not say when its process started, where that can be checked: not taken',
       );
     }
-    register(row!);
-    assert.deepEqual(await find(row!.name), { sessionId: row!.sessionId }, 'the same registration, of its own live process: found');
+    register(row);
+    assert.deepEqual(await find(row.name), { sessionId: row.sessionId }, 'the same registration, of its own live process: found');
   });
 });
 
@@ -228,13 +228,13 @@ test("a registration and the registry that disagree: the registry's word is take
 
     // The registry has the session stopped. A registration still names its name, live, and as another session.
     const other = randomUUID();
-    register({ name: row!.name, sessionId: other });
-    claude.setRows([{ ...row!, state: 'stopped', status: 'idle' }]);
-    assert.deepEqual(await find(row!.name), { sessionId: other }, 'the registration says one runs under the name');
+    register({ name: row.name, sessionId: other });
+    claude.setRows([{ ...row, state: 'stopped', status: 'idle' }]);
+    assert.deepEqual(await find(row.name), { sessionId: other }, 'the registration says one runs under the name');
 
     const v = await engine.view(id);
     assert.equal(v.phase, 'running (stopped)', "its state is the registry's");
-    assert.equal(v.sessionId, row!.sessionId, 'and so is which session it is');
+    assert.equal(v.sessionId, row.sessionId, 'and so is which session it is');
     await assert.rejects(
       engine.say(id, 'hello'),
       (e: Error & { exitCode?: number }) => e.exitCode === 2 && /session is `stopped` on its harness, not running/.test(e.message),
@@ -243,7 +243,7 @@ test("a registration and the registry that disagree: the registry's word is take
     await engine.tick();
     const after = await engine.view(id);
     assert.equal(after.state.attempts[0]?.ended, 'stopped', 'the pass ended the attempt as the registry has it');
-    assert.equal(after.state.attempts[0]?.nativeId, row!.sessionId);
+    assert.equal(after.state.attempts[0]?.nativeId, row.sessionId);
     assert.equal(after.state.settled, 'stopped');
   });
 });

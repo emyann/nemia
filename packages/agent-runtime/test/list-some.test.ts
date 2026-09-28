@@ -45,7 +45,7 @@ const board = async () => {
 
 test('the views of some tasks are their views, each journal read once and the harness observed once for all those in flight', async () => {
   const { engine, counts, settled, flying, queued } = await board();
-  const asked = [flying[1]!, settled[0]!, queued, flying[0]!, settled[0]!];
+  const asked = [flying[1], settled[0], queued, flying[0], settled[0]];
   const one = async (id: string) => engine.view(id);
   const expected = await Promise.all([...new Set(asked)].map(one));
 

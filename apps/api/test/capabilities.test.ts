@@ -218,10 +218,10 @@ test('a server that never answers is an error once its time is up, and it is sto
   const {
     mcp: [server],
   } = await capabilitiesOf(repo, { deadlineMs: 500 });
-  assert.equal(server!.tools, null);
-  assert.match(server!.error!, /did not list its tools: it did not list its tools within 0\.5 s\./);
+  assert.equal(server.tools, null);
+  assert.match(server.error!, /did not list its tools: it did not list its tools within 0\.5 s\./);
   const [pid] = startsIn(starts);
-  assert.throws(() => process.kill(pid!, 0), { code: 'ESRCH' }, 'the server is not left running');
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
 });
 
 test('each server is asked once while the api runs: requests after the first, and requests at once, read that answer', async () => {
@@ -241,7 +241,7 @@ test('each server is asked once while the api runs: requests after the first, an
   });
   const edited = await capabilitiesOf(repo);
   assert.equal(startsIn(starts).length, 2, 'started again for the edited entry');
-  assert.deepEqual(edited.mcp[0]!.args, [FIXTURE_SERVER, '--edited']);
+  assert.deepEqual(edited.mcp[0].args, [FIXTURE_SERVER, '--edited']);
 });
 
 test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} expanded from the api's environment, which the server inherits — and shown as written", async () => {

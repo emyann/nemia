@@ -11,7 +11,7 @@ export const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
 export const TASK = 't-1';
 export const S = 1_000;
 
-export const filed = (extra: object = {}): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra }) as Event;
+export const filed = (extra: object = {}): Event => ({ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', queued: false, ...extra });
 export const starting = (n: number, ms = 0, extra: object = {}): Event => ({ kind: 'starting', at: at(ms), attempt: n, ...extra });
 export const spawned = (n: number, ms = S): Event => ({ kind: 'spawned', at: at(ms), attempt: n });
 export const ended = (

@@ -152,7 +152,7 @@ settledTask('t-implement');
 const heldTask = (taskId: string, after: object[]) => {
   const sessionId = randomUUID();
   writeTranscript(sessionId, conversation(sessionId));
-  journal(taskId, [{ ...filed, holdOpen: true }, ...started.slice(1), ending(taskId, sessionId)[0]!, ...after]);
+  journal(taskId, [{ ...filed, holdOpen: true }, ...started.slice(1), ending(taskId, sessionId)[0], ...after]);
 };
 heldTask('t-held', []);
 heldTask('t-closed', [{ kind: 'closed', at: at(20) }]);
@@ -401,7 +401,7 @@ test(
     const failing = (await readUntil(reader, text, (said) => said.some((b) => b.event === 'unreadable'))).filter(
       (b) => b.event === 'unreadable',
     );
-    const { error, retrying } = JSON.parse(failing[0]!.data!);
+    const { error, retrying } = JSON.parse(failing[0].data!);
     assert.equal(retrying, true, 'said as a read that will be tried again');
     assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
     const answered = await app.request(url('flaky'));

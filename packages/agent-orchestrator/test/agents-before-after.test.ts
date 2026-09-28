@@ -217,8 +217,7 @@ function lineDiff(before: string, after: string): string {
   const b = after.split('\n');
   const lcs: number[][] = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0));
   for (let i = a.length - 1; i >= 0; i--)
-    for (let j = b.length - 1; j >= 0; j--)
-      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+    for (let j = b.length - 1; j >= 0; j--) lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
   const out: string[] = [];
   let i = 0;
   let j = 0;
@@ -228,7 +227,7 @@ function lineDiff(before: string, after: string): string {
       j++;
       continue;
     }
-    if (j < b.length && (i === a.length || lcs[i]![j + 1]! >= lcs[i + 1]![j]!)) out.push(`+ ${b[j++]}`);
+    if (j < b.length && (i === a.length || lcs[i][j + 1] >= lcs[i + 1][j])) out.push(`+ ${b[j++]}`);
     else out.push(`- ${a[i++]}`);
   }
   return out.join('\n');
@@ -244,7 +243,7 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     const after = loaded.filter((s) => !Object.hasOwn(STEPS_ADDED, `${folder}/${String(s.name)}`));
     for (const step of loaded.filter((s) => !after.includes(s))) {
       const at = `${folder}/${String(step.name)}`;
-      const from = STEPS_ADDED[at]!;
+      const from = STEPS_ADDED[at];
       const copied = loadWorkflows(path.join(REPO, from.slice(0, from.lastIndexOf('/')))).find(
         (s) => s.name === step.name,
       ) as unknown as Record<string, unknown>;
@@ -260,7 +259,7 @@ test('every shipped folder resolves to the keys it had before agents, and only t
       `${folder}: the same steps, in the same order`,
     );
     for (const [i, step] of after.entries()) {
-      const was = before[i]!;
+      const was = before[i];
       assert.deepEqual(
         keysOf(step),
         { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`], ...KEYS_CHANGED[`${folder}/${String(step.name)}`] },
@@ -292,7 +291,7 @@ test('every shipped folder resolves to the keys it had before agents, and only t
   for (const at of Object.keys(STEPS_ADDED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
     assert.equal(
-      BEFORE[folder]!.some((s) => s.name === name),
+      BEFORE[folder].some((s) => s.name === name),
       false,
       `${at} was in the snapshot`,
     );
@@ -300,13 +299,13 @@ test('every shipped folder resolves to the keys it had before agents, and only t
   // Each key added is one the snapshot did not have: a key that moved is never passed off as one added.
   for (const [at, keys] of Object.entries(KEYS_ADDED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
-    const was = BEFORE[folder]!.find((s) => s.name === name)!;
+    const was = BEFORE[folder].find((s) => s.name === name)!;
     for (const key of Object.keys(keys)) assert.equal(Object.hasOwn(keysOf(was), key), false, `${at}: ${key} was in the snapshot`);
   }
   // Each key changed is one the snapshot had, with another value: a key added is never passed off as one changed.
   for (const [at, keys] of Object.entries(KEYS_CHANGED)) {
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
-    const was = keysOf(BEFORE[folder]!.find((s) => s.name === name)!);
+    const was = keysOf(BEFORE[folder].find((s) => s.name === name)!);
     for (const [key, value] of Object.entries(keys)) {
       assert.equal(Object.hasOwn(was, key), true, `${at}: ${key} was not in the snapshot`);
       assert.notDeepEqual(was[key], value, `${at}: ${key} is as the snapshot had it`);

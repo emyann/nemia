@@ -109,8 +109,8 @@ test('a loop past its first round says the round it is on, under the middle of i
   const back = tiles.arrows.find((a) => a.loop)!;
   assert.equal(back.round?.text, 'round 2 of 3');
   const [a, b] = tiles.pills;
-  assert.equal(back.round!.x, (a!.x + a!.width / 2 + b!.x + b!.width / 2) / 2);
-  assert.ok(back.round!.y > Math.max(...tiles.pills.map((p) => p.y + p.height)), 'under the tiles, where the curve is');
+  assert.equal(back.round.x, (a.x + a.width / 2 + b.x + b.width / 2) / 2);
+  assert.ok(back.round.y > Math.max(...tiles.pills.map((p) => p.y + p.height)), 'under the tiles, where the curve is');
   // On its first round, a loop says nothing of it; and an `after` arrow never does.
   const first = tilesOf(names, graph, stepsOf({ implement: 'working', review: 'waiting' }, { implement: 'round 1 of 3' }), false);
   assert.equal(first.arrows.find((a) => a.loop)!.round, null);
@@ -127,7 +127,7 @@ test('a run listed without its graph, by an api older than the board: its steps 
   assert.deepEqual(read(flow), [['implement'], ['review']]);
   assert.deepEqual(flow.arrows, []);
   assert.equal(flow.error, UNGRAPHED);
-  assert.match(flow.error!, /restart the api/);
+  assert.match(flow.error, /restart the api/);
   assert.equal(tilesOf(['implement'], { roots: [] } as unknown as RunGraph, stepsOf({ implement: 'working' }), false).error, UNGRAPHED);
 });
 
@@ -151,7 +151,7 @@ test('six columns fold around the one the run is at, and the arrows into a fold 
   // The run's order backwards, so a window taken off the order and not the layering fails.
   const chain = ['a', 'b', 'c', 'd', 'e', 'f'];
   const names = [...chain].reverse();
-  const graph = graphOf(...chain.slice(1).map((name, i) => after(chain[i]!, name)));
+  const graph = graphOf(...chain.slice(1).map((name, i) => after(chain[i], name)));
   const states = (at: number) =>
     stepsOf(Object.fromEntries(chain.map((name, i) => [name, i < at ? 'verified' : i === at ? 'working' : 'waiting'])));
   const middle = railOf(names, graph, states(3), false);
@@ -204,7 +204,7 @@ test("a cycle in the steps' after is the run's order, no arrows, and says why", 
 
 test('a run called off has nothing live, and the rail starts where nothing is done', () => {
   const chain = ['a', 'b', 'c', 'd', 'e', 'f'];
-  const graph = graphOf(...chain.slice(1).map((name, i) => after(chain[i]!, name)));
+  const graph = graphOf(...chain.slice(1).map((name, i) => after(chain[i], name)));
   const flow = railOf(
     chain,
     graph,
@@ -218,7 +218,7 @@ test('a run called off has nothing live, and the rail starts where nothing is do
 test('opened, every step is a tile, nothing folded or counted', () => {
   const chain = ['a', 'b', 'c', 'd', 'e', 'f'];
   const graph = graphOf(
-    ...chain.slice(1).map((name, i) => after(chain[i]!, name)),
+    ...chain.slice(1).map((name, i) => after(chain[i], name)),
     after('a', 'x'),
     after('a', 'y'),
     after('a', 'z'),

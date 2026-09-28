@@ -125,7 +125,7 @@ const said = (row: Row, payload: object) => {
   );
 };
 
-const short = (row: Row) => row.sessionId.split('-')[0]!;
+const short = (row: Row) => row.sessionId.split('-')[0];
 
 /** A transcript with no statement in it, last written `ago` milliseconds ago. */
 const wrote = (row: Row, ago: number) => {
@@ -160,15 +160,15 @@ test('a task that gave its closeout settles, and its session is stopped and remo
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
     // Made after the attempt began, as a statement of its own must be.
     await sleep(10);
-    said(row!, { outcome: 'done' });
+    said(row, { outcome: 'done' });
 
     await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');
     assert.deepEqual(
       claude.releases(),
       [
-        ['stop', short(row!)],
-        ['rm', short(row!)],
+        ['stop', short(row)],
+        ['rm', short(row)],
       ],
       'stopped, since it still ran, then removed',
     );
@@ -178,7 +178,7 @@ test('a task that gave its closeout settles, and its session is stopped and remo
     assert.equal(claude.releases().length, 2, 'the next tick does not see it, and asks nothing more');
     const v = await engine.view(id);
     assert.equal(v.phase, 'succeeded');
-    assert.equal(v.sessionId, row!.sessionId, 'its id, as recorded when its attempt ended');
+    assert.equal(v.sessionId, row.sessionId, 'its id, as recorded when its attempt ended');
     assert.match(await engine.logs(id), /the prompt/, "and its transcript still read, through the task's own harness");
   });
 });
@@ -200,7 +200,7 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
       await engine.tick();
       const [row] = claude.rows();
       await sleep(10);
-      said(row!, { outcome: 'done' });
+      said(row, { outcome: 'done' });
 
       for (let i = 0; i < 3; i++) await engine.tick();
       const at = `worktree: ${worktree}`;
@@ -242,7 +242,7 @@ test('a session listed done whose process still runs is stopped before it goes �
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!, 0);
+    wrote(row, 0);
     claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', pid: 424242 })));
 
     await engine.tick();
@@ -251,8 +251,8 @@ test('a session listed done whose process still runs is stopped before it goes �
     assert.deepEqual(
       claude.releases(),
       [
-        ['stop', short(row!)],
-        ['rm', short(row!)],
+        ['stop', short(row)],
+        ['rm', short(row)],
       ],
       'stopped, since its process ran, then removed',
     );
@@ -273,11 +273,11 @@ test('a task that asked for a worktree has its session stopped and never removed
     await engine.tick();
     const [row] = claude.rows();
     await sleep(10);
-    said(row!, { outcome: 'done' });
+    said(row, { outcome: 'done' });
 
     for (let i = 0; i < 3; i++) await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');
-    assert.deepEqual(claude.releases(), [['stop', short(row!)]], 'stopped once, and no rm on any pass');
+    assert.deepEqual(claude.releases(), [['stop', short(row)]], 'stopped once, and no rm on any pass');
     assert.deepEqual(
       claude.rows().map((r) => r.state),
       ['stopped'],
@@ -300,7 +300,7 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
       });
       await engine.tick();
       const [row] = claude.rows();
-      wrote(row!, 10 * 60_000);
+      wrote(row, 10 * 60_000);
       // Started before that, too: quiet is counted from the later of its last write and its own start.
       claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
 
@@ -310,10 +310,10 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
       assert.deepEqual(
         claude.releases(),
         worktree
-          ? [['stop', short(row!)]]
+          ? [['stop', short(row)]]
           : [
-              ['stop', short(row!)],
-              ['rm', short(row!)],
+              ['stop', short(row)],
+              ['rm', short(row)],
             ],
         `${at}: stopped first`,
       );
@@ -335,7 +335,7 @@ test('no session is released while its attempt runs; one a person stopped is rel
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row!, 0);
+    wrote(row, 0);
     for (let i = 0; i < 2; i++) await engine.tick();
     assert.equal((await engine.view(id)).phase, 'working (quiescent)');
     assert.deepEqual(claude.releases(), [], 'running: nothing stopped, nothing removed');
@@ -349,17 +349,17 @@ test('no session is released while its attempt runs; one a person stopped is rel
       ['stopped', 'operator'],
       'ended, saying why it has no statement',
     );
-    assert.equal(v.state.attempts[0]?.nativeId, row!.sessionId, 'its session id, recorded as it ended');
+    assert.equal(v.state.attempts[0]?.nativeId, row.sessionId, 'its session id, recorded as it ended');
     assert.deepEqual(
       claude.releases(),
       [
-        ['stop', short(row!)],
-        ['rm', short(row!)],
+        ['stop', short(row)],
+        ['rm', short(row)],
       ],
       "the person's stop, then — stopped by then — only rm",
     );
     assert.deepEqual(claude.rows(), []);
-    assert.equal(v.sessionId, row!.sessionId);
+    assert.equal(v.sessionId, row.sessionId);
     assert.match(await engine.logs(id), /the prompt/, 'and ae logs still reads it');
   });
 });
@@ -383,8 +383,8 @@ test('a session stopped at its deadline is released once its task settles, as on
     assert.deepEqual(
       claude.releases(),
       [
-        ['stop', short(row!)],
-        ['rm', short(row!)],
+        ['stop', short(row)],
+        ['rm', short(row)],
       ],
       'stopped by the deadline, then removed',
     );
@@ -429,7 +429,7 @@ test("a task settled before its session's id was recorded keeps that session lis
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root'), journal });
     for (let i = 0; i < 2; i++) await engine.tick();
-    assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]!]], 'the session whose id is on the record, and only it');
+    assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]]], 'the session whose id is on the record, and only it');
     assert.deepEqual(
       claude.rows().map((r) => r.name),
       ['ae/before/1'],

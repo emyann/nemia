@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { skillEntryOf, splitFrontmatter, type Agent, type Workflow } from '../src/workflow.ts';
+import { skillEntryOf, splitFrontmatter, type Agent } from '../src/workflow.ts';
 import { cardSkills, loadAgents, loadWorkflows, preloads, skillsFor } from '../src/workflow-store.ts';
 import { briefBody, pluginOf, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
@@ -169,8 +169,8 @@ test("each shipped agent's body names each of its skills and how it reaches it: 
     );
   }
 
-  const agents = new Map(agentsIn(PLACES[0]!).map((a) => [a.name, a]));
-  const shipped = preloadedIn(PLACES[0]!);
+  const agents = new Map(agentsIn(PLACES[0]).map((a) => [a.name, a]));
+  const shipped = preloadedIn(PLACES[0]);
   const reviewer = agents.get('reviewer')!;
   const planner = agents.get('planner')!;
   assert.deepEqual(reachProblems({ ...reviewer, body: reviewer.body.replaceAll('`send-work-round-again`', 'the other skill') }, shipped), [
@@ -203,7 +203,7 @@ test("a shipped agent renders as `wf start` renders it: skills to load named in 
   for (const [i, [folder, name]] of cases.entries()) {
     const dir = path.join(REPO, 'workflows', folder);
     const steps = loadWorkflows(dir);
-    const step = steps.find((s) => s.name === name)! as Workflow;
+    const step = steps.find((s) => s.name === name)!;
     const run = { id: `r-${i}` };
     writeAgentFiles(run, [step], skillsFor(dir));
     const at = agentFilesDir(run, name);

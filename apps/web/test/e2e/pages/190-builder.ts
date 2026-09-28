@@ -413,7 +413,7 @@ export default {
         throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);
       const stepPage = await page.request.get(new URL(`/api/workflows/yours/${name}/implement`, page.url()).href);
       const { source } = (await stepPage.json()) as { source?: string };
-      if (source !== files[0]![1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
+      if (source !== files[0][1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `builder-saved-${await themeOf(page)}.png`), fullPage: true });
     } finally {

@@ -21,7 +21,7 @@ import { TaskState, type Task } from '@a2a-js/sdk';
 import type { Client } from '@a2a-js/sdk/client';
 import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { clientOf } from '../src/a2a-client.ts';
-import { cardOf, type RuntimeExtensionParams } from '../src/a2a-handler.ts';
+import { cardOf } from '../src/a2a-handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a-map.ts';
 import { createEngine, nameFor } from '../src/facade.ts';
 import { Journal } from '../src/journal.ts';
@@ -208,10 +208,10 @@ test("a Codex session's closing statement is its Task's one Artifact: JSON off `
   const done = await ran(client, { name: 'ae/c-art/1', brief: 'b', cwd: workdir(), harness: 'codex', closeoutSchema: SCHEMA });
   assert.equal(done.artifacts.length, 1);
   const [artifact] = done.artifacts;
-  assert.equal(artifact!.artifactId, 'closeout');
-  assert.equal(artifact!.parts[0]!.content!.$case, 'data');
+  assert.equal(artifact.artifactId, 'closeout');
+  assert.equal(artifact.parts[0].content!.$case, 'data');
   assert.deepEqual(closeoutOf(done), { outcome: 'done', summary: 'turn 1' });
-  assert.equal(typeof artifact!.metadata?.at, 'number', "stamped with when Codex wrote it, the file's time");
+  assert.equal(typeof artifact.metadata?.at, 'number', "stamped with when Codex wrote it, the file's time");
 
   assert.deepEqual(
     (await list(client)).tasks.map((t) => [t.id, t.artifacts]),
@@ -232,13 +232,13 @@ test("a Codex session's closing statement is its Task's one Artifact: JSON off `
     closeoutSchema: SCHEMA,
   });
   assert.equal(prose.artifacts.length, 1);
-  assert.equal(prose.artifacts[0]!.parts[0]!.content!.$case, 'text');
-  assert.equal(prose.artifacts[0]!.parts[0]!.mediaType, 'text/plain');
+  assert.equal(prose.artifacts[0].parts[0].content!.$case, 'text');
+  assert.equal(prose.artifacts[0].parts[0].mediaType, 'text/plain');
   assert.equal(closeoutOf(prose), 'turn 1, in prose');
 
   const plain = workdir();
   const unasked = await ran(client, { name: 'ae/c-art/3', brief: 'b', cwd: plain, harness: 'codex' });
-  assert.equal(argvOf(plain)[0]!.includes('-o'), false, 'no statement asked for, no `-o`');
+  assert.equal(argvOf(plain)[0].includes('-o'), false, 'no statement asked for, no `-o`');
   assert.deepEqual(unasked.artifacts, [], 'and no Artifact');
 });
 
@@ -337,7 +337,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
 
   fs.writeFileSync(path.join(cwd, 'go2'), '');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
-  assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
+  assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
   await until(() => stateIs(client, nameFor(id, 2), TaskState.TASK_STATE_INPUT_REQUIRED), 'turn 1 waits on a person once Codex has exited');
   const second = await get(client, nameFor(id, 2));
   assert.equal(second.contextId, first.contextId, 'one context across both turns');
@@ -381,7 +381,7 @@ test('a held Codex attempt whose statement is on disk before its thread is read 
     await engine.tick();
     return argvOf(cwd).length === 2;
   }, 'the fake codex run again');
-  assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
+  assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
   await engine.close(id);
   await until(() => phase('succeeded'), 'closed and settled');
@@ -391,7 +391,7 @@ test('what `codex exec` cannot take while it runs: its card says no words, and a
   const root = tmp('store');
   const ops = detachedOps(codex, root);
   const extension = cardOf('codex', ops).capabilities!.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
-  assert.deepEqual(extension.params as RuntimeExtensionParams, { methods: ['sessionLogs', 'sessionTranscript'], say: false });
+  assert.deepEqual(extension.params, { methods: ['sessionLogs', 'sessionTranscript'], say: false });
 
   const cwd = workdir({ gate: 'go' });
   const client = agent(root);
@@ -427,7 +427,7 @@ test('what `codex exec` cannot take while it runs: its card says no words, and a
   const context = (await get(client, 'ae/c-say/1')).contextId;
   assert.equal(context, THREAD);
   const next = await ran(client, { name: 'ae/c-say/2', brief: 'hello', cwd, harness: 'codex', resumeFrom: context });
-  assert.deepEqual(argvOf(cwd)[1]!.slice(-3), ['resume', THREAD, 'hello'], 'the words reach the same thread, as a turn of its own');
+  assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'hello'], 'the words reach the same thread, as a turn of its own');
   assert.equal(next.contextId, THREAD, 'in the same context');
   assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id).sort(), ['ae/c-say/1', 'ae/c-say/2']);
 });

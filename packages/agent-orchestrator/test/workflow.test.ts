@@ -393,10 +393,7 @@ test("a step that works in the repository's checkout is the workflow's last: REF
   const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'main' } as Workflow;
   const chain: Workflow[] = [{ name: 'implement', after: [], body: 'x' }, { name: 'review', after: ['implement'], body: 'x' }, ship];
   assert.doesNotThrow(() => validate(chain), 'the last step may work in the checkout');
-  assert.doesNotThrow(
-    () => validate([{ name: 'ship', after: [], body: 'x', workspace: 'main' } as Workflow]),
-    'and so may a workflow of one step',
-  );
+  assert.doesNotThrow(() => validate([{ name: 'ship', after: [], body: 'x', workspace: 'main' }]), 'and so may a workflow of one step');
 
   const refused = (steps: Workflow[], pattern: RegExp) =>
     assert.throws(
@@ -419,8 +416,8 @@ test("a step that works in the repository's checkout is the workflow's last: REF
   // Two of them side by side: each is refused for the other.
   refused(
     [
-      { name: 'a', after: [], body: 'x', workspace: 'main' } as Workflow,
-      { name: 'b', after: [], body: 'x', workspace: 'main' } as Workflow,
+      { name: 'a', after: [], body: 'x', workspace: 'main' },
+      { name: 'b', after: [], body: 'x', workspace: 'main' },
     ],
     /^a: .* and b ends the workflow beside it/,
   );
@@ -441,7 +438,7 @@ test('the shipped examples are valid workflows too', () => {
     split.map((s) => s.name),
     ['split'],
   );
-  assert.deepEqual(split[0]!.after, [], 'nothing precedes it — splitting is the first thing');
+  assert.deepEqual(split[0].after, [], 'nothing precedes it — splitting is the first thing');
   assert.equal(fansOut(split), false);
 });
 
@@ -1001,11 +998,11 @@ test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are st
 test("a step on the former name beside an agent on the new one sets that one key, its own, over the agent's", () => {
   const agents = new Map([['writer', parseAgent('writer', '---\nallowedTools: Edit(**)\ndisallowedTools: SendMessage\n---\nWrite.\n')]]);
   const [step] = parseFolder([['write', '---\nagent: writer\nallow: Edit(notes/**)\n---\n']], undefined, agents);
-  assert.deepEqual(step!.allowedTools, ['Edit(notes/**)'], "the step's own, as a step's own key always is");
-  assert.deepEqual(step!.disallowedTools, ['SendMessage'], "and the agent's other key is the step's");
-  assert.deepEqual(step!.agent!.keys, ['allowedTools'], 'owned under the new name');
-  assert.equal(step!.agent!.given.disallowedTools, 'SendMessage');
-  assert.equal(Object.hasOwn(step!.agent!.given, 'allowedTools'), false, 'what the step sets is not given to it');
+  assert.deepEqual(step.allowedTools, ['Edit(notes/**)'], "the step's own, as a step's own key always is");
+  assert.deepEqual(step.disallowedTools, ['SendMessage'], "and the agent's other key is the step's");
+  assert.deepEqual(step.agent!.keys, ['allowedTools'], 'owned under the new name');
+  assert.equal(step.agent!.given.disallowedTools, 'SendMessage');
+  assert.equal(Object.hasOwn(step.agent!.given, 'allowedTools'), false, 'what the step sets is not given to it');
 });
 
 test('REFUSED: a former name handed to `renderStep` or `renderAgent`, which write the name a key has now — as a board page open since before sends it', () => {
@@ -1317,7 +1314,7 @@ test('REFUSED: `permissionMode:` on a codex step that names no sandbox, with wor
     (e: Error) => e.message.startsWith('review: `permissionMode: yolo` is not a key codex takes. ') && namesSandbox(e),
   );
   // Claude Code's own modes are no sandbox either — but `bypassPermissions`, which the engine took on codex as its widest sandbox, is read below.
-  for (const mode of PERMISSION_MODES.claude!.filter((m) => m !== 'bypassPermissions')) {
+  for (const mode of PERMISSION_MODES.claude.filter((m) => m !== 'bypassPermissions')) {
     assert.throws(
       () => fm('review', `permissionMode: ${mode}\nharness: codex`),
       (e: Error) => e.message.startsWith(`review: \`permissionMode: ${mode}\` is not a key codex takes. `) && namesSandbox(e),
@@ -1332,12 +1329,12 @@ test('REFUSED: `sandbox:` on a Claude Code step, with words naming `permissionMo
     ['claude', 'harness: claude\n', 'claude takes'],
     ['claude-detached', 'harness: claude-detached\n', 'claude-detached takes'],
   ] as const) {
-    for (const sandbox of SANDBOXES.codex!) {
+    for (const sandbox of SANDBOXES.codex) {
       assert.throws(
         () => fm('implement', `${line}sandbox: ${sandbox}`),
         (e: Error) =>
           e.message.startsWith(
-            `implement: \`sandbox: ${sandbox}\` is not a key ${said}. \`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${[...PERMISSION_MODES[harness]!].join(', ')}`,
+            `implement: \`sandbox: ${sandbox}\` is not a key ${said}. \`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${[...PERMISSION_MODES[harness]].join(', ')}`,
           ) && e.message.includes('Write `permissionMode:` instead, or run the step on codex.'),
         `${harness} ${sandbox}`,
       );
@@ -1357,7 +1354,7 @@ test("REFUSED: `sandbox: bypassPermissions`, Claude Code's word, naming Codex's 
 });
 
 test('a codex step that names its sandbox as `permissionMode:`, as every one did until 2026-09-23, still loads — read as `sandbox:`', () => {
-  for (const sandbox of SANDBOXES.codex!) {
+  for (const sandbox of SANDBOXES.codex) {
     const step = fm('review', `harness: codex\npermissionMode: ${sandbox}`);
     assert.equal(step.sandbox, sandbox);
     assert.equal(step.permissionMode, undefined, 'read as the one key, never as both');
@@ -1688,7 +1685,7 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
   const review = steps.find((s) => s.name === 'review')!;
   assert.deepEqual([review.loop, review.rounds, DEFAULT_ROUNDS], ['implement', 3, 3]);
   assert.equal(loadWorkflows(outputFolder(loopFiles('loop: implement\nrounds: 1'))).find((s) => s.name === 'review')!.rounds, 1);
-  assert.deepEqual([steps[0]!.loop, steps[0]!.rounds], [undefined, undefined], 'a step with no loop counts no rounds');
+  assert.deepEqual([steps[0].loop, steps[0].rounds], [undefined, undefined], 'a step with no loop counts no rounds');
 
   // A step between, a step after the loop — not in it — and a second loop that starts where the first ends.
   const chain = [
@@ -1699,9 +1696,9 @@ test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says
     looping('proof', ['docs'], 'docs'),
   ];
   validate(chain);
-  assert.deepEqual(loopSpan(chain, chain[2]!), ['implement', 'test', 'review']);
-  assert.deepEqual(loopSpan(chain, chain[4]!), ['docs', 'proof']);
-  assert.deepEqual(loopSpan(chain, chain[1]!), [], 'a step with no loop spans nothing');
+  assert.deepEqual(loopSpan(chain, chain[2]), ['implement', 'test', 'review']);
+  assert.deepEqual(loopSpan(chain, chain[4]), ['docs', 'proof']);
+  assert.deepEqual(loopSpan(chain, chain[1]), [], 'a step with no loop spans nothing');
 });
 
 test('REFUSED at load: `loop:` naming a step that is not an ancestor — one beside it, one after it, itself, one not here, or two', () => {
@@ -1803,16 +1800,13 @@ test('`workspace: folder` runs a step in a folder the run makes, with a check an
     refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\\. `));
 
   const team = (...words: Array<'folder' | 'main' | undefined>): Workflow[] =>
-    words.map(
-      (workspace, i) =>
-        ({
-          name: `s${i}`,
-          after: i ? [`s${i - 1}`] : [],
-          body: 'x',
-          permissionMode: 'dontAsk',
-          ...(workspace ? { workspace } : {}),
-        }) as Workflow,
-    );
+    words.map((workspace, i) => ({
+      name: `s${i}`,
+      after: i ? [`s${i - 1}`] : [],
+      body: 'x',
+      permissionMode: 'dontAsk',
+      ...(workspace ? { workspace } : {}),
+    }));
   assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
   assert.doesNotThrow(() => validate(team(undefined, undefined, 'main')), 'or none does');
   const refused = (steps: Workflow[], pattern: RegExp) =>
@@ -1844,17 +1838,14 @@ test('`workspace: folder` runs a step in a folder the run makes, with a check an
 
 test("REFUSED at load: a background step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine's `auto`; a job, on claude or claude-detached, and a codex step pass in every mode their harness takes", () => {
   const team = (...modes: Array<string | undefined>): Workflow[] =>
-    modes.map(
-      (permissionMode, i) =>
-        ({
-          name: `s${i}`,
-          after: i ? [`s${i - 1}`] : [],
-          body: 'x',
-          workspace: 'folder',
-          background: true,
-          ...(permissionMode ? { permissionMode } : {}),
-        }) as Workflow,
-    );
+    modes.map((permissionMode, i) => ({
+      name: `s${i}`,
+      after: i ? [`s${i - 1}`] : [],
+      body: 'x',
+      workspace: 'folder',
+      background: true,
+      ...(permissionMode ? { permissionMode } : {}),
+    }));
   const refused = (steps: Workflow[], pattern: RegExp) =>
     assert.throws(
       () => validate(steps),
@@ -1893,20 +1884,17 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
   // `codex exec` is not interactive, and has one shell fenced by its `sandbox:`. Judged on Claude's words, a codex folder team
   // in `workspace-write` was once refused and told to write `permissionMode: dontAsk`, which codex does not take.
   const on = (harness: string | undefined, background: boolean | undefined, ...modes: Array<string | undefined>): Workflow[] =>
-    modes.map(
-      (mode, i) =>
-        ({
-          name: `s${i}`,
-          after: i ? [`s${i - 1}`] : [],
-          body: 'x',
-          workspace: 'folder',
-          ...(harness ? { harness } : {}),
-          ...(background !== undefined ? { background } : {}),
-          ...(mode ? { [harness === 'codex' ? 'sandbox' : 'permissionMode']: mode } : {}),
-        }) as Workflow,
-    );
+    modes.map((mode, i) => ({
+      name: `s${i}`,
+      after: i ? [`s${i - 1}`] : [],
+      body: 'x',
+      workspace: 'folder',
+      ...(harness ? { harness } : {}),
+      ...(background !== undefined ? { background } : {}),
+      ...(mode ? { [harness === 'codex' ? 'sandbox' : 'permissionMode']: mode } : {}),
+    }));
   for (const harness of HARNESSES) {
-    for (const mode of [...(PERMISSION_MODES[harness] ?? SANDBOXES[harness]!), undefined]) {
+    for (const mode of [...(PERMISSION_MODES[harness] ?? SANDBOXES[harness]), undefined]) {
       assert.doesNotThrow(() => validate(on(harness, undefined, mode)), `${harness} ${mode ?? 'with no mode'}, a job`);
       if (harness !== 'codex')
         assert.doesNotThrow(() => validate(on(harness, false, mode)), `${harness} ${mode ?? 'with no mode'}, \`background: false\``);
@@ -1928,9 +1916,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
 
   // A team that is not a folder team is not judged on this at all: a git run's steps work in a checkout a person opened, with settings of
   // its own, and every mode has always been theirs to choose — a background session's too.
-  assert.doesNotThrow(() =>
-    validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' } as Workflow]),
-  );
+  assert.doesNotThrow(() => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]));
 
   // At load, from files: the same refusal reaches a person writing a folder of markdown.
   assert.throws(
@@ -2459,7 +2445,7 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   );
   assert.equal(review.model, 'opus', "and the step runs with the agent's keys all the same");
   assert.doesNotMatch(
-    renderStep(review).split('\n---\n')[0]!,
+    renderStep(review).split('\n---\n')[0],
     /^#/m,
     'the file has comments in its frontmatter, and the step does not carry them',
   );
@@ -2586,10 +2572,7 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
     said('review', 'bypassPermissions', 'danger-full-access'),
   );
   assert.throws(
-    () =>
-      renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'read-only' }, body: 'You review.' } as Parameters<
-        typeof renderAgent
-      >[0]),
+    () => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'read-only' }, body: 'You review.' }),
     said('agents/reviewer.md', 'read-only', 'read-only'),
   );
   // Written under its own name, each is taken; and a claude draft's `permissionMode` is its own.
@@ -2598,9 +2581,7 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
     /^sandbox: read-only$/m,
   );
   assert.match(
-    renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' } as Parameters<
-      typeof renderAgent
-    >[0]),
+    renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' }),
     /^sandbox: read-only$/m,
   );
   assert.match(renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft), /^permissionMode: dontAsk$/m);
@@ -2612,9 +2593,7 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
     (e: Error) =>
       e.message.startsWith('review: `permissionMode: dontAsk` is not a key codex takes.') && e.message.includes('Write `sandbox:` instead'),
   );
-  const agent = renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' } as Parameters<
-    typeof renderAgent
-  >[0]);
+  const agent = renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' });
   assert.match(agent, /^permissionMode: dontAsk$/m);
   assert.throws(
     () => parseAgent('reviewer', agent),

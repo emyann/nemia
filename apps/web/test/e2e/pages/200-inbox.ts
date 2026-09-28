@@ -55,7 +55,7 @@ export default {
         `and its first line opens its page (/inbox/${card.name})`,
       );
       await expectCount(
-        item.getByText(card.body.split('\n\n')[1]!),
+        item.getByText(card.body.split('\n\n')[1]),
         0,
         `and its first line alone: the rest of its body is the brief its start is prefilled with`,
       );
@@ -136,7 +136,7 @@ export default {
       await expectCount(listed(page), 4 + QUEUED.length, 'the card filed is listed');
       if ((await order(page))[0] !== name)
         throw new Refused(`the card filed is listed first, the newest — the list is ${(await order(page)).join(', ')}`);
-      await expectVisible(cardIn(page, name).locator('[data-title]', { hasText: FILED.split('\n')[0]! }), 'by its first line');
+      await expectVisible(cardIn(page, name).locator('[data-title]', { hasText: FILED.split('\n')[0] }), 'by its first line');
       if ((await idea.inputValue()) !== '') throw new Refused('the box is emptied once the card is filed');
 
       // Queued from its button, behind the three queued already, then taken off the queue with Unqueue, both through the proxy: the card

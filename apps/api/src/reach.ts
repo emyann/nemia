@@ -148,7 +148,7 @@ export type CapabilitiesWithSteps = Capabilities & {
 function ruleOf(rule: string): { tool: string; scope: string | null } | null {
   const m = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule);
   if (!m) return null;
-  return { tool: m[1]!, scope: m[2] === undefined || m[2] === '*' ? null : m[2] };
+  return { tool: m[1], scope: m[2] === undefined || m[2] === '*' ? null : m[2] };
 }
 
 /** A Bash rule's scope in one spelling: `:*` at its end is a trailing ` *`. Anywhere else a colon is a colon. */
@@ -184,7 +184,7 @@ export function bashCovers(outer: string, inner: string): boolean {
 /** A rule naming an MCP server's tools: the server, and one tool — null for every tool of it, as `mcp__<server>` and `mcp__<server>__*` both are. */
 function mcpRuleOf(rule: string): { server: string; tool: string | null } | null {
   const m = /^mcp__(.+?)(?:__(.+))?$/.exec(rule);
-  return m ? { server: m[1]!, tool: m[2] === undefined || m[2] === '*' ? null : m[2] } : null;
+  return m ? { server: m[1], tool: m[2] === undefined || m[2] === '*' ? null : m[2] } : null;
 }
 
 /**
@@ -242,7 +242,7 @@ function stepReach(
   step: string,
   spec: WorkflowStepSpec,
 ): StepReach {
-  const harness = spec.harness ?? Object.keys(HARNESSES)[0]!;
+  const harness = spec.harness ?? Object.keys(HARNESSES)[0];
   const dontAsk = spec.permissionMode === 'dontAsk';
   const askDenier = CLAUDE_CODE.has(harness) ? askDenierOf(harness, spec) : null;
   const reach = {

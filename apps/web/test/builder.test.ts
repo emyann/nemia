@@ -66,8 +66,8 @@ test('a folder as a draft is as it is listed, unsaved nowhere, and puts back as 
   assert.deepEqual(toPut(draft), folder.steps);
   // A copy: the draft changes, and the listing does not.
   setKey(draft, 'implement', 'model', 'opus');
-  draft[0]!.spec.after.push('x');
-  assert.deepEqual(folder.steps[0]!.spec.after, []);
+  draft[0].spec.after.push('x');
+  assert.deepEqual(folder.steps[0].spec.after, []);
 });
 
 test('an edge drawn from A to B writes `after: A` on B; drawn from the loop handle, `loop: B` on A with the default rounds; a second time, or to itself, nothing', () => {
@@ -154,8 +154,8 @@ test('a schema pasted names its file in `output:`, is a change until saved, and 
   const pasted = setSchema(draft, 'implement', { file: 'implement.schema.json', text: '{}' });
   assert.equal(specOf(pasted, 'implement').output, 'implement.schema.json');
   assert.deepEqual(unsavedSteps(pasted, folder), ['implement']);
-  assert.equal(toPut(pasted)[0]!.spec.output, 'implement.schema.json');
-  assert.equal('schema' in toPut(pasted)[0]!, false, 'a step put carries no paste: the save carries the schemas beside the steps');
+  assert.equal(toPut(pasted)[0].spec.output, 'implement.schema.json');
+  assert.equal('schema' in toPut(pasted)[0], false, 'a step put carries no paste: the save carries the schemas beside the steps');
   assert.deepEqual(
     schemasOf(pasted),
     [{ file: 'implement.schema.json', text: '{}' }],
@@ -164,7 +164,7 @@ test('a schema pasted names its file in `output:`, is a change until saved, and 
   assert.deepEqual(schemasOf(draft), [], 'none pasted, none carried');
   const back = setSchema(pasted, 'implement', null);
   assert.equal(specOf(back, 'implement').output, 'implement.schema.json');
-  assert.equal(setKey(back, 'implement', 'output', null)[0]!.spec.output, null);
+  assert.equal(setKey(back, 'implement', 'output', null)[0].spec.output, null);
 });
 
 test('the steps are placed left to right by after; steps that wait on each other, which the package refuses, in a row', () => {
@@ -252,32 +252,32 @@ test("a step with an agent: a key changed is its own, one unset is its agent's a
   assert.equal(unsaved(draft, attached), false);
 
   const lower = setKey(draft, 'build', 'effort', 'low');
-  assert.deepEqual(lower[0]!.own, { keys: ['check', 'effort'], body: 'Mind the cache.' });
+  assert.deepEqual(lower[0].own, { keys: ['check', 'effort'], body: 'Mind the cache.' });
   assert.deepEqual(unsavedSteps(lower, attached), ['build']);
   // Unset, the check is left to the agent — which sets none — and the effort changed back to the agent's is the agent's again.
   const back = setKey(setKey(lower, 'build', 'check', null), 'build', 'effort', null);
-  assert.deepEqual(back[0]!.own!.keys, []);
+  assert.deepEqual(back[0].own!.keys, []);
 
   const noted = setBody(draft, 'build', 'Mind the index.');
   assert.deepEqual(
-    [noted[0]!.body, noted[0]!.own!.body],
+    [noted[0].body, noted[0].own!.body],
     ['You write code.\n\nMind the cache.', 'Mind the index.'],
     "the note, not the agent's words",
   );
   assert.deepEqual(unsavedSteps(noted, attached), ['build']);
 
   const pasted = setSchema(draft, 'build', { file: 'build.schema.json', text: '{}' });
-  assert.ok(pasted[0]!.own!.keys.includes('output'), 'a schema pasted is its own output');
+  assert.ok(pasted[0].own!.keys.includes('output'), 'a schema pasted is its own output');
 });
 
 test('an agent attached to a step makes what it has its own; taken away, the step keeps what its agent gave it, words and all', () => {
   const plain = draftOf({ steps: [listed('build', { model: 'sonnet', check: 'npm test' }, 'Build it.')] });
   const given = setKey(plain, 'build', 'agent', 'coder');
-  assert.deepEqual([given[0]!.spec.agent, given[0]!.own], ['coder', { keys: ['model', 'check'], body: 'Build it.' }]);
+  assert.deepEqual([given[0].spec.agent, given[0].own], ['coder', { keys: ['model', 'check'], body: 'Build it.' }]);
 
   const taken = setKey(draftOf(attached), 'build', 'agent', null);
   assert.deepEqual(
-    [taken[0]!.spec.agent, taken[0]!.own, taken[0]!.body, taken[0]!.spec.model],
+    [taken[0].spec.agent, taken[0].own, taken[0].body, taken[0].spec.model],
     [null, null, 'You write code.\n\nMind the cache.', 'opus'],
   );
 });
@@ -303,22 +303,22 @@ const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
 test('a step moved to another agent shows what that agent gives it, and nothing the last one gave; its own keys stay its own', () => {
   const moved = setKey(draftOf(attached), 'build', 'agent', 'reviewer', agents);
   assert.deepEqual(
-    [moved[0]!.spec.model, moved[0]!.spec.effort, moved[0]!.spec.harness],
+    [moved[0].spec.model, moved[0].spec.effort, moved[0].spec.harness],
     ['sonnet', null, null],
     "reviewer's model, not coder's opus and high",
   );
-  assert.deepEqual([moved[0]!.spec.check, moved[0]!.own], ['npm test', { keys: ['check'], body: 'Mind the cache.' }]);
+  assert.deepEqual([moved[0].spec.check, moved[0].own], ['npm test', { keys: ['check'], body: 'Mind the cache.' }]);
 
   const plain = draftOf({ steps: [listed('build', { model: 'sonnet' }, 'Build it.')] });
   const given = setKey(plain, 'build', 'agent', 'coder', agents);
   assert.deepEqual(
-    [given[0]!.spec.model, given[0]!.spec.effort, given[0]!.spec.harness],
+    [given[0].spec.model, given[0].spec.effort, given[0].spec.harness],
     ['sonnet', 'high', 'claude'],
     "its own model, the rest the agent's",
   );
 
   const unset = setKey(setKey(draftOf(attached), 'build', 'effort', 'low', agents), 'build', 'effort', null, agents);
-  assert.deepEqual([unset[0]!.spec.effort, unset[0]!.own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
+  assert.deepEqual([unset[0].spec.effort, unset[0].own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
 });
 
 test("a step's form has its harness's fence alone: a permission mode on Claude Code, a sandbox on codex", () => {

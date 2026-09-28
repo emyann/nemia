@@ -111,7 +111,7 @@ export function globRegExp(glob: string): RegExp {
       i += 1;
     } else if (g[i] === '*') re += '[^/]*';
     else if (g[i] === '?') re += '[^/]';
-    else re += g[i]!.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    else re += g[i].replace(/[.+^${}()|[\]\\]/g, '\\$&');
   }
   return new RegExp(`^${re}$`);
 }
@@ -159,7 +159,7 @@ function renamed(spec: string): { path: string; from?: string } {
     return { from: tidy(`${before}${from}${after}`), path: tidy(`${before}${to}${after}`) };
   }
   const [from, to, ...more] = spec.split(' => ');
-  return to !== undefined && !more.length ? { from: unquote(from!), path: unquote(to) } : { path: unquote(spec) };
+  return to !== undefined && !more.length ? { from: unquote(from), path: unquote(to) } : { path: unquote(spec) };
 }
 
 /**
@@ -174,7 +174,7 @@ export function parseNumstat(numstat: string): Change[] {
       const m = /^(-|\d+)\t(-|\d+)\t(.+)$/.exec(line);
       if (!m) throw new Error(`not a line of git diff --numstat: ${JSON.stringify(line)}`);
       const count = (n: string) => (n === '-' ? null : Number(n));
-      return { ...renamed(m[3]!), added: count(m[1]!), removed: count(m[2]!) };
+      return { ...renamed(m[3]), added: count(m[1]), removed: count(m[2]) };
     });
 }
 
@@ -198,7 +198,7 @@ export function packageOf(file: string, workspaces: readonly string[]): string |
 export function groupOf(file: string, workspaces: readonly string[] = []): string {
   const dirs = file.split('/').slice(0, -1);
   if (!dirs.length) return ROOT_GROUP;
-  return packageOf(file, workspaces) ?? dirs[0]!;
+  return packageOf(file, workspaces) ?? dirs[0];
 }
 
 /**

@@ -150,7 +150,7 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
       ['c2', 'codex'],
       ['c3', 'codex'],
     ])
-      await file(id!, harness!);
+      await file(id, harness);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
@@ -189,7 +189,7 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
       ['d2', 'check'],
       ['d3', 'check'],
     ])
-      await file(id!, harness!);
+      await file(id, harness);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');

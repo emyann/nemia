@@ -57,7 +57,7 @@ test('a session its harness ended at a limit its configuration set ends as its h
       ...events,
       { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: end, reason: 'harness', nativeId: 'native-1', limit: 'budget' },
     ]);
-    assert.equal(ended.attempts[0]!.limit, 'budget', `${at_}: the fact is on the attempt, for the layer above`);
+    assert.equal(ended.attempts[0].limit, 'budget', `${at_}: the fact is on the attempt, for the layer above`);
     const settled =
       end === 'done' ? { do: 'settle', outcome: 'succeeded' } : { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' };
     assert.deepEqual(decide(ended, new Map(), now(7)), settled, `${at_}: settled as any such end is`);
@@ -67,7 +67,7 @@ test('a session its harness ended at a limit its configuration set ends as its h
     ...events,
     { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'native-1' },
   ]);
-  assert.equal('limit' in none.attempts[0]!, false);
+  assert.equal('limit' in none.attempts[0], false);
 });
 
 test('a filed task starts its first attempt', () => {
@@ -125,7 +125,7 @@ const inFlight = (schema: boolean, legacy = false): Event[] => [
     cwd: '/r',
     ...(legacy ? { maxAttempts: 3, resume: 'always' } : {}),
     ...(schema ? { closeoutSchema: { type: 'object' } } : {}),
-  } as Event,
+  },
   { kind: 'starting', at: at(1), attempt: 1 },
   { kind: 'spawned', at: at(2), attempt: 1 },
 ];
@@ -294,7 +294,7 @@ test('a nudge is on the attempt it started, from the journal', () => {
     s.attempts.map((a) => a.nudge),
     [undefined, 'finish'],
   );
-  assert.equal('nudge' in s.attempts[0]!, false, 'and no key on one that had none');
+  assert.equal('nudge' in s.attempts[0], false, 'and no key on one that had none');
 });
 
 test('a spawned session the harness has not registered yet is given a grace window', () => {
@@ -589,15 +589,15 @@ test('a continuation whose attempt ran and was lost settles failed too, its own 
     ]),
   );
   assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
-  assert.equal(s.attempts[0]!.nativeId, 'native-1');
+  assert.equal(s.attempts[0].nativeId, 'native-1');
 });
 
 // ─── when an attempt ended ──────────────────────────────────────────────────
 
 test('an ended attempt keeps the time it ended: the `at` of its `ended` entry', () => {
   const [a] = fold(TASK, ran('failed')).attempts;
-  assert.equal(a!.startedAt, at(1));
-  assert.equal(a!.endedAt, at(3));
+  assert.equal(a.startedAt, at(1));
+  assert.equal(a.endedAt, at(3));
 });
 
 test('an attempt in flight has no end time, and does not borrow the one before it', () => {
@@ -765,20 +765,20 @@ test('CONTRACT: every attempt a task settles over is ended — with the statemen
             }
             walked++;
             const [attempt] = fold(TASK, events).attempts;
-            assert.notEqual(attempt!.ended, null, `${at_}: settled over an open attempt — neither statement nor reason`);
-            assert.equal(attempt!.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
+            assert.notEqual(attempt.ended, null, `${at_}: settled over an open attempt — neither statement nor reason`);
+            assert.equal(attempt.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
             if (state === 'completed' || state === 'failed' || state === 'rejected')
               assert.ok(
-                !['operator', 'deadline'].includes(attempt!.reason!),
+                !['operator', 'deadline'].includes(attempt.reason!),
                 `${at_}: its harness ended it before the cut, and that end is recorded`,
               );
             // An end on record is judged by that end: a deadline read in the same pass does not overrule it (2026-09-24).
-            if (attempt!.ended === 'done' && cut !== 'operator')
+            if (attempt.ended === 'done' && cut !== 'operator')
               assert.equal(settled, 'succeeded', `${at_}: ended done, and settled ${settled}`);
             // Whether the statement came is on every end read off a sighting of a task that asked for one, and on no other.
-            if (!schema) assert.equal('stated' in attempt!, false, `${at_}: nothing asked, nothing reported`);
-            else if (attempt!.reason === 'harness')
-              assert.equal(attempt!.stated, attempt!.closeout !== undefined, `${at_}: stated is whether a statement came`);
+            if (!schema) assert.equal('stated' in attempt, false, `${at_}: nothing asked, nothing reported`);
+            else if (attempt.reason === 'harness')
+              assert.equal(attempt.stated, attempt.closeout !== undefined, `${at_}: stated is whether a statement came`);
           }
   assert.ok(walked > 100, `walked ${walked}`);
 });
@@ -870,7 +870,7 @@ test('HELD OPEN: an answer is a turn — an attempt continuing the session that 
     t.attempts.map((a) => a.turn),
     [undefined, 1],
   );
-  assert.equal('turn' in t.attempts[0]!, false);
+  assert.equal('turn' in t.attempts[0], false);
   assert.deepEqual(decide(t, seen([N2, 'working']), now(62_000)).do, 'nothing', 'running');
   // It signs, and waits again.
   const signed = fold(TASK, [...held(), answer(60_000), ...turn1(61_000, { observed: 'done' })]);
@@ -999,7 +999,7 @@ test('HELD OPEN: a later turn continues only the session that signed the turn be
   // Not the session the task was filed against, which never heard the plan; nor an earlier attempt that failed.
   assert.deepEqual(decide(fold(TASK, [...unrecorded({ resumeFrom: 'before-the-task' }), answer(60_000)]), seen(), now(61_000)), settled);
   const failedFirst: Event[] = [
-    held()[0]!,
+    held()[0],
     { kind: 'starting', at: at(500), attempt: 1 },
     { kind: 'ended', at: at(900), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'failed-one' },
     ...(unrecorded()

@@ -54,7 +54,7 @@ async function started(dir: string): Promise<string> {
   const cwd = process.cwd();
   process.chdir(ROOT);
   try {
-    return (await said(['start', 'a note on tides', '--workflows', dir])).out.split(/\s+/)[0]!;
+    return (await said(['start', 'a note on tides', '--workflows', dir])).out.split(/\s+/)[0];
   } finally {
     process.chdir(cwd);
   }

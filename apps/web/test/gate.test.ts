@@ -58,11 +58,11 @@ const summary = (over: Partial<RunSummary> = {}) =>
 test("the card's gate is the ending the to-decide names, held before it is filed: approving runs it on the base, and a send-back goes to what it waits on", () => {
   const gate = gateOfSummary(summary({ toDecide: ENDING_DECIDE, waitingOnYou: ['ship'] }));
   assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
-  assert.equal(gateCardLine(gate!), 'approve to run ship on main, or send review back');
-  assert.equal(gateNodeLine(gate!), 'approve ship to run it');
-  assert.equal(takenLine({ approved: true }, gate!), 'approved — the next pass files ship');
+  assert.equal(gateCardLine(gate), 'approve to run ship on main, or send review back');
+  assert.equal(gateNodeLine(gate), 'approve ship to run it');
+  assert.equal(takenLine({ approved: true }, gate), 'approved — the next pass files ship');
   assert.equal(
-    takenLine({ asked: { try: 2, stopFirst: false }, to: 'review' }, gate!),
+    takenLine({ asked: { try: 2, stopFirst: false }, to: 'review' }, gate),
     'sent back to review — try 2 asked — the next tick files it',
   );
 });
@@ -71,9 +71,9 @@ test('a to-decide gate whose send-back names the step itself is not an ending: i
   const decide = { ...ENDING_DECIDE, step: 'plan', back: ['plan'] } as NonNullable<RunSummary['toDecide']>;
   const gate = gateOfSummary(summary({ toDecide: decide }));
   assert.equal(gate?.ends, false, 'the step is where a send-back goes: it has a task, so it ran');
-  assert.equal(gateCardLine(gate!), 'approve what plan handed on, or send it back');
-  assert.equal(gateNodeLine(gate!), "approve plan's hand-off");
-  assert.equal(takenLine({ approved: true }, gate!), 'approved — the next pass files what waits on plan');
+  assert.equal(gateCardLine(gate), 'approve what plan handed on, or send it back');
+  assert.equal(gateNodeLine(gate), "approve plan's hand-off");
+  assert.equal(takenLine({ approved: true }, gate), 'approved — the next pass files what waits on plan');
 });
 
 test("a step waiting at its gate on you is the card's gate when no to-decide names one; a run called off, or a gate not waiting on you, has none", () => {
@@ -120,7 +120,7 @@ test("the inspector's gate is read off the step: an ending with no task runs on 
   const run = detail([ship]);
   const gate = gateOfStep(run, ship);
   assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
-  const brief = gateBrief(gate!, firstLine('\nMerge this run onto the base branch.\n\nMore.'), []);
+  const brief = gateBrief(gate, firstLine('\nMerge this run onto the base branch.\n\nMore.'), []);
   assert.equal(brief.waits, 'ship waits at its gate: it has not run, and it runs only on your approval.');
   assert.equal(
     brief.approving,
@@ -185,7 +185,7 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
   ]);
   // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the fact says whose word ended the loop, with
   // their words — not "asks another round", which would send whoever approves the ending looking for a round nobody will file.
-  const accepted = [{ ...findings[0]!, accepted: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } }];
+  const accepted = [{ ...findings[0], accepted: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } }];
   assert.deepEqual(gateFacts(detail(accepted, { cost: null }), null)[1], {
     label: 'last review',
     said: 'review left 2 findings; a person accepted the work as it stands, with them open: fan-in teams are follow-up work',
@@ -193,10 +193,10 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
     step: 'review',
   });
   const one = [
-    { ...accepted[0]!, closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] },
+    { ...accepted[0], closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] },
   ];
   assert.match(
-    gateFacts(detail(one, { cost: null }), null)[1]!.said,
+    gateFacts(detail(one, { cost: null }), null)[1].said,
     /^review left 1 finding; a person accepted the work as it stands, with it open: /,
   );
   const failed = [step('implement', { check: { verdict: 'failed' } as Step['check'] })];

@@ -64,7 +64,7 @@ export function Gate({
   const sendBack = useAsk(runId, step, () => setObjection(''));
   const busy = approval.isPending || sendBack.isPending;
   // What the send-back's words name: the one step it goes to, or the work where there are several and a person picks one.
-  const backName = back.length === 1 ? back[0]! : 'the work';
+  const backName = back.length === 1 ? back[0] : 'the work';
 
   // What the gate says the moment either word is taken (`takenOf`), until the run is read again and the step says it itself.
   const taken = approval.isSuccess

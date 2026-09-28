@@ -123,7 +123,7 @@ test('the closeout is its own turn, named, with its result — never folded, and
     result('c', 'Structured output provided successfully'),
   ]);
   assert.deepEqual(kinds(turns), ['tools', 'closeout', 'tool']);
-  const closeout = turns[1]!;
+  const closeout = turns[1];
   assert.ok(closeout.kind === 'closeout');
   assert.deepEqual(
     closeout.call.result,
@@ -143,7 +143,7 @@ test('a fold counts the calls that failed and the calls still waiting on a resul
   const tools = fold(turns);
   assert.equal(tools.failed, 1);
   assert.equal(tools.waiting, 1);
-  const orphan = tools.turns[0]!;
+  const orphan = tools.turns[0];
   assert.ok(orphan.kind === 'tool');
   assert.deepEqual([orphan.call.name, orphan.call.result?.text], ['unknown tool', 'from before the transcript was read']);
 });
@@ -159,7 +159,7 @@ test('words: nothing said breaks no fold; a person is said by the user; a though
     said('a', 'Went.'),
   ]);
   assert.deepEqual(kinds(turns), ['said', 'tools', 'thinking', 'thinking', 'said']);
-  assert.deepEqual(turns[0], { kind: 'said', key: 'said:u', at: turns[0]!.kind === 'said' ? turns[0]!.at : '', role: 'user', text: 'Go.' });
+  assert.deepEqual(turns[0], { kind: 'said', key: 'said:u', at: turns[0].kind === 'said' ? turns[0].at : '', role: 'user', text: 'Go.' });
   assert.deepEqual(
     turns.slice(2, 4).map((t) => (t.kind === 'thinking' ? t.text : undefined)),
     ['Hm.', null],
@@ -209,25 +209,25 @@ test("a call's detail is the one thing it was about, on one line", () => {
     ['TodoWrite', { todos: [] }],
   );
   assert.deepEqual(
-    [bash, codexBash, read, fetch, change, bare].map((c) => detailOf(c!)),
+    [bash, codexBash, read, fetch, change, bare].map((c) => detailOf(c)),
     ['npm test', 'git diff', '/repo/a.ts', 'https://example.com', '/repo/a', null],
   );
 });
 
 test('merged, an event sent again is kept once where it stood — a call and its result, which share an id, are two', () => {
   const [u, c, r] = [said('u', 'Go.', 'user'), use('x', 'Bash'), result('x', 'ok')];
-  const merged = mergeEvents([u!, c!], [c!, r!]);
+  const merged = mergeEvents([u, c], [c, r]);
   assert.deepEqual(
     merged.map((e) => `${e.kind} ${e.id}`),
     ['text u', 'tool_use x', 'tool_result x'],
   );
-  const edited = { ...u!, text: 'Go on.' };
+  const edited = { ...u, text: 'Go on.' };
   assert.deepEqual(
     mergeEvents(merged, [edited]).map((e) => (e.kind === 'text' ? e.text : e.kind)),
     ['Go on.', 'tool_use', 'tool_result'],
     'replaced in place',
   );
-  const known = [u!];
+  const known = [u];
   assert.notEqual(mergeEvents(known, []), known, 'a new list each time, so React sees a change only when there is one to see');
 });
 

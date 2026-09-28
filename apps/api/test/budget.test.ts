@@ -278,7 +278,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
     rebuilt: 0,
   });
   assert.equal(cost, '$2.50');
-  assert.match(used!, / · api 7m00s · tools 31s$/);
+  assert.match(used, / · api 7m00s · tools 31s$/);
   // Each try's session on the clock, with what it cost: the try before the current one too.
   assert.deepEqual(
     tokens.timeline.map((t) => [t.used?.costUsd, t.used?.cost]),
@@ -394,7 +394,7 @@ test("the decision says what `wf decide` says of steps held on their budget — 
     ),
     body.overBudget,
   );
-  assert.equal(body.cost, said.runCost[0]!.replace(/^cost\s+/, ''));
+  assert.equal(body.cost, said.runCost[0].replace(/^cost\s+/, ''));
   assert.equal(body.cost, 'run $6.35 measured · 2 attempts not measured');
   const once = body.commands.filter((c) => c.label === 'once more');
   assert.deepEqual(
@@ -593,12 +593,12 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
   const run = await detail(R2);
   const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name));
   // Its word is `over budget` however it ended: how it ended on its own work is on the raise, the package's word, with the ways it takes a try.
-  assert.deepEqual([palette!.status, lint!.status], ['over budget $1.50 of $1', 'over budget $1.20 of $1']);
+  assert.deepEqual([palette.status, lint.status], ['over budget $1.50 of $1', 'over budget $1.20 of $1']);
   assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
-  assert.deepEqual(palette!.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'], own: 'blocked' });
-  assert.deepEqual(lint!.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
+  assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'], own: 'blocked' });
+  assert.deepEqual(lint.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
   // Its question is still the closeout's, and `wf decide` answers it with the raise and the answer on one ask.
-  assert.equal(palette!.needs, PALETTE_NEEDS);
+  assert.equal(palette.needs, PALETTE_NEEDS);
   assert.equal(
     (await decide(engine(), R2)).answering.palette,
     `to answer it, its cap raised above $1.50:  wf retry ${R2} palette --budget <amount> --message "<answer>"`,

@@ -50,28 +50,28 @@ test("dev-planned loads, at shipped defaults, as plan → implement ⇄ review �
     "in the order the steps run, not the folder's",
   );
   assert.deepEqual(
-    [steps.plan!.after, steps.implement!.after, steps.review!.after, steps.ship!.after],
+    [steps.plan.after, steps.implement.after, steps.review.after, steps.ship.after],
     [[], ['plan'], ['implement'], ['review']],
   );
-  assert.deepEqual([steps.plan!.input, steps.implement!.input, steps.review!.input], [undefined, ['plan'], undefined]);
-  assert.deepEqual([steps.review!.loop, steps.review!.rounds], ['implement', 3]);
-  assert.deepEqual(loopSpan(planned, steps.review!), ['implement', 'review'], 'a round goes back to implement, not to planning');
+  assert.deepEqual([steps.plan.input, steps.implement.input, steps.review.input], [undefined, ['plan'], undefined]);
+  assert.deepEqual([steps.review.loop, steps.review.rounds], ['implement', 3]);
+  assert.deepEqual(loopSpan(planned, steps.review), ['implement', 'review'], 'a round goes back to implement, not to planning');
   assert.deepEqual(
     terminalSteps(planned).map((s) => s.name),
     ['ship'],
   );
   // A chain: implement works where the plan looked, and review where implement worked.
-  assert.deepEqual(workspacePlan(planned, steps.implement!), { kind: 'inherit', from: 'plan' });
-  assert.deepEqual(workspacePlan(planned, steps.review!), { kind: 'inherit', from: 'implement' });
+  assert.deepEqual(workspacePlan(planned, steps.implement), { kind: 'inherit', from: 'plan' });
+  assert.deepEqual(workspacePlan(planned, steps.review), { kind: 'inherit', from: 'implement' });
   assert.deepEqual(
-    [steps.plan!.check, steps.plan!.retries, steps.plan!.resume],
+    [steps.plan.check, steps.plan.retries, steps.plan.resume],
     [undefined, undefined, undefined],
     'a plan is its word, and a person reads it',
   );
 });
 
 test('REFUSED by machinery: plan has no tool that writes — read-only tools and Bash in dontAsk, denied the build and the e2e by name, as review is', () => {
-  const { harness, model, tools, permissionMode, disallowedTools, output } = steps.plan!;
+  const { harness, model, tools, permissionMode, disallowedTools, output } = steps.plan;
   assert.deepEqual(
     { harness, model, tools, permissionMode, disallowedTools, output: output?.file },
     {
@@ -83,22 +83,22 @@ test('REFUSED by machinery: plan has no tool that writes — read-only tools and
       output: 'plan.schema.json',
     },
   );
-  assert.deepEqual(writesBy(steps.plan!), []);
+  assert.deepEqual(writesBy(steps.plan), []);
   assert.deepEqual(
     [tools, permissionMode, disallowedTools],
-    [steps.review!.tools, steps.review!.permissionMode, steps.review!.disallowedTools],
+    [steps.review.tools, steps.review.permissionMode, steps.review.disallowedTools],
     "review's fence, word for word",
   );
 
   // The guard refuses: a plan given a tool that writes, every tool, or a mode that does not deny.
-  assert.deepEqual(writesBy({ ...steps.plan!, tools: [...tools!, 'Edit'] }), ['Edit writes']);
-  assert.deepEqual(writesBy({ ...steps.plan!, tools: undefined }), ['no tools: line, so every tool']);
-  assert.deepEqual(writesBy({ ...steps.plan!, permissionMode: 'acceptEdits' }), ['permissionMode: acceptEdits, not dontAsk']);
-  assert.deepEqual(writesBy(steps.implement!), ['no tools: line, so every tool'], 'implement writes, and is not a plan');
+  assert.deepEqual(writesBy({ ...steps.plan, tools: [...tools!, 'Edit'] }), ['Edit writes']);
+  assert.deepEqual(writesBy({ ...steps.plan, tools: undefined }), ['no tools: line, so every tool']);
+  assert.deepEqual(writesBy({ ...steps.plan, permissionMode: 'acceptEdits' }), ['permissionMode: acceptEdits, not dontAsk']);
+  assert.deepEqual(writesBy(steps.implement), ['no tools: line, so every tool'], 'implement writes, and is not a plan');
 });
 
 test("plan's closeout is the plan, strict — approach, files with a line each, steps, risks — whether it signs off done or blocked, and nothing short of it", () => {
-  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.plan!, Object.values(steps)));
+  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.plan, Object.values(steps)));
   const plan = {
     approach: 'Carry the answer on the ask file, and compose it into the try’s brief.',
     files: [{ path: 'packages/agent-orchestrator/src/cli.ts', change: 'parse --message' }],
@@ -118,7 +118,7 @@ test("plan's closeout is the plan, strict — approach, files with a line each, 
     true,
     'a question, beside the plan for the reading it would take',
   );
-  assert.deepEqual(closeoutSchemaOf(steps.plan!, Object.values(steps)).required, [
+  assert.deepEqual(closeoutSchemaOf(steps.plan, Object.values(steps)).required, [
     'outcome',
     'summary',
     'artifacts',
@@ -140,7 +140,7 @@ test("plan's closeout is the plan, strict — approach, files with a line each, 
 
 test("plan's brief says when to sign off done and when blocked with the question in needs, and that the answer comes back as `## Your answer`", () => {
   // Told by the planner's skill `ask-when-it-reads-two-ways`, given whole after its instructions (since agents card 1b).
-  const body = said(toldIn(PLANNED, steps.plan!));
+  const body = said(toldIn(PLANNED, steps.plan));
   for (const sentence of [
     'When what was asked for reads one way, sign off `done` with the plan.',
     'When it admits two materially different readings',
@@ -152,8 +152,8 @@ test("plan's brief says when to sign off done and when blocked with the question
 });
 
 test("implement is dev's, after the plan and reading it: the plan reaches it under `## From plan`, as data, and never plan's summary — review is dev's, file for file", () => {
-  const { after, input, body, agent, ...keys } = steps.implement!;
-  const { after: _after, input: _input, body: devBody, agent: devAgent, ...devKeys } = dev.implement!;
+  const { after, input, body, agent, ...keys } = steps.implement;
+  const { after: _after, input: _input, body: devBody, agent: devAgent, ...devKeys } = dev.implement;
   assert.deepEqual([after, input], [['plan'], ['plan']]);
   assert.deepEqual(keys, devKeys, "harness, model, check and disallowedTools as dev's");
   assert.deepEqual([agent?.name, devAgent?.name], ['implementer', 'implementer'], 'the same agent does the work');
@@ -181,14 +181,14 @@ test("implement is dev's, after the plan and reading it: the plan reaches it und
     risks: ['a legacy ask file'],
   };
   const signed: Closeout = { outcome: 'done', summary: 'PLANNER-ACCOUNT', artifacts: [], output };
-  const brief = composeBrief(steps.implement!, run, planned, (name) => (name === 'plan' ? signed : undefined));
+  const brief = composeBrief(steps.implement, run, planned, (name) => (name === 'plan' ? signed : undefined));
   assert.ok(
     brief.includes(
       '\n## From plan\n\nWhat plan declared in its closeout — `approach`, `files`, `steps`, `risks` — given to you because this step reads it (`input: plan`).',
     ),
     brief,
   );
-  assert.deepEqual(JSON.parse(/## From plan\n[\s\S]*?\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]!), output);
+  assert.deepEqual(JSON.parse(/## From plan\n[\s\S]*?\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]), output);
   assert.doesNotMatch(brief, /PLANNER-ACCOUNT/);
 });
 
@@ -206,7 +206,7 @@ test("dev-planned-build is dev-planned with dev-build's check on implement: the 
     loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).find((s) => s.name === 'implement')?.check,
   );
   assert.match(
-    byName.implement!.check!,
+    byName.implement.check!,
     /^npm test && npm run typecheck && npm run lint && npm run build && if \[ -n "\$\{WF_BASE_REF:-\}" \]; then .*; else npm run e2e; fi$/,
   );
   const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));

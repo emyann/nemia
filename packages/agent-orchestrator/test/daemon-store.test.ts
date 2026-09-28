@@ -43,7 +43,7 @@ after(() => {
 const LIVE = sleeper.pid!;
 
 /** A pid whose process has exited: a crashed daemon's. */
-const GONE = spawnSync(process.execPath, ['-e', '0']).pid!;
+const GONE = spawnSync(process.execPath, ['-e', '0']).pid;
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
@@ -144,7 +144,7 @@ test('a pass that runs long is heard from: the beat is written while the pass aw
   const { threw } = await typed(t, ['up', '10'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, 1);
-  assert.ok(Date.parse(beats[1]!) > Date.parse(beats[0]!), beats.join(' '));
+  assert.ok(Date.parse(beats[1]) > Date.parse(beats[0]), beats.join(' '));
   assert.deepEqual([...kinds], ['ticking']);
   assert.ok(read().stoppedAt, 'let go as it stopped');
 });
@@ -205,13 +205,13 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
     seen.map((f) => [f.pid, f.cwd, f.every, f.procStart]),
     Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]),
   );
-  assert.equal(typeof seen[0]!.procStart, 'number', 'its process named by its start, with /proc on this host');
-  assert.equal(seen[0]!.passedAt, null, 'no pass completed before the first');
-  assert.ok(Date.parse(seen[0]!.startedAt) >= before - 1);
-  assert.ok(Date.parse(seen[1]!.passedAt!) >= Date.parse(seen[0]!.startedAt), 'the first pass written down before the second');
-  assert.ok(Date.parse(seen[2]!.passedAt!) >= Date.parse(seen[1]!.passedAt!));
+  assert.equal(typeof seen[0].procStart, 'number', 'its process named by its start, with /proc on this host');
+  assert.equal(seen[0].passedAt, null, 'no pass completed before the first');
+  assert.ok(Date.parse(seen[0].startedAt) >= before - 1);
+  assert.ok(Date.parse(seen[1].passedAt!) >= Date.parse(seen[0].startedAt), 'the first pass written down before the second');
+  assert.ok(Date.parse(seen[2].passedAt!) >= Date.parse(seen[1].passedAt!));
   const stopped = read();
-  assert.equal(stopped.passedAt, seen[2]!.passedAt, 'the pass that threw completed nothing');
+  assert.equal(stopped.passedAt, seen[2].passedAt, 'the pass that threw completed nothing');
   assert.ok(stopped.stoppedAt && Date.parse(stopped.stoppedAt) >= Date.parse(stopped.passedAt!), 'let go as it stopped');
   assert.ok(
     printed.includes(
@@ -295,7 +295,7 @@ test('a holder stale, gone or stopped is taken over by `wf up` — and not refus
     assert.ok(Date.parse(during!.startedAt) >= before - 1, `${c.name}: a start of its own`);
     assert.equal(during!.stoppedAt, undefined, c.name);
     const took = printed.filter((l) => l.includes(' took '));
-    if (c.took) assert.ok(took.length === 1 && c.took.test(took[0]!), `${c.name}:\n${printed.join('\n')}`);
+    if (c.took) assert.ok(took.length === 1 && c.took.test(took[0]), `${c.name}:\n${printed.join('\n')}`);
     else assert.deepEqual(took, [], `${c.name}: a clean stop is nothing to report`);
   }
 });
@@ -310,7 +310,7 @@ test('a daemon whose store is taken over while it runs stops at its next pass, a
   const { threw } = await typed(t, ['up', '10'], e);
   assert.ok(threw instanceof Error && threw !== STOP, String(threw));
   assert.match(
-    (threw as Error).message,
+    threw.message,
     new RegExp(
       `^wf up: ${ROOT} was taken over by the wf up of pid ${LIVE}, started \\S+ in /elsewhere — this one stops rather than be a second writer\\.$`,
     ),
@@ -525,7 +525,7 @@ test('`wf up` says a move the runtime refused once while it lasts, and again onc
   e.tick = async () => {
     e.passes++;
     if (e.passes > byPass.length) throw STOP;
-    return pass({ tasks: 2, refused: byPass[e.passes - 1]! });
+    return pass({ tasks: 2, refused: byPass[e.passes - 1] });
   };
   const { printed, threw } = await typed(t, ['up', '1'], e);
   assert.equal(threw, STOP);
@@ -566,7 +566,7 @@ test('`wf up` says a task the runtime left out once while it lasts, and again on
   e.tick = async () => {
     e.passes++;
     if (e.passes > byPass.length) throw STOP;
-    return pass({ tasks: 2, unreadable: byPass[e.passes - 1]! });
+    return pass({ tasks: 2, unreadable: byPass[e.passes - 1] });
   };
   const errors: string[] = [];
   t.mock.method(console, 'error', (...args: unknown[]) => {

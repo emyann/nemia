@@ -348,7 +348,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
   const write = fs.writeFileSync;
   let held = false;
   // The marker's write, held until the worker has gone on and started its harness: the stop has read `pid: 0` by then.
-  (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = ((f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
+  (fs as { writeFileSync: typeof fs.writeFileSync }).writeFileSync = (f: fs.PathOrFileDescriptor, ...rest: unknown[]) => {
     if (typeof f === 'string' && f.endsWith('.stop') && !held) {
       held = true;
       process.kill(pid, 'SIGCONT');
@@ -359,7 +359,7 @@ test('a stop whose marker lands after the worker looked for it finds the pid it 
       }
     }
     return (write as (...a: unknown[]) => void)(f, ...rest);
-  }) as typeof fs.writeFileSync;
+  };
   let heard = false;
   try {
     try {
@@ -1205,7 +1205,7 @@ test('claude-detached is asked for JSON, and for the schema as --json-schema whe
   }).args;
   assert.deepEqual(args.slice(0, 2), ['-p', 'the prompt'], "the prompt is -p's own value");
   assert.equal(args[args.indexOf('--output-format') + 1], 'json');
-  assert.deepEqual(JSON.parse(args[args.indexOf('--json-schema') + 1]!), schema);
+  assert.deepEqual(JSON.parse(args[args.indexOf('--json-schema') + 1]), schema);
   assert.equal(args[args.indexOf('--worktree') + 1], 'ae-t-1', 'and the worktree is still named');
 
   const plain = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
@@ -1517,10 +1517,7 @@ test("a spec that reads its harness's output reports the answer found there, sta
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
   // A filesystem's clock, which some keep to the second: that much slack either side of the run.
-  assert.ok(
-    seen.closeout!.at >= before - 1_000 && seen.closeout!.at <= Date.now() + 1_000,
-    `stamped ${seen.closeout!.at}, spawned ${before}`,
-  );
+  assert.ok(seen.closeout.at >= before - 1_000 && seen.closeout.at <= Date.now() + 1_000, `stamped ${seen.closeout.at}, spawned ${before}`);
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 
@@ -1620,7 +1617,7 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
     assert.deepEqual(state.attempts[0]?.usage, { costUsd: 0.0123, apiMs: 850 }, 'and what it cost, from the same JSON');
     const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
-    assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]!), schema);
+    assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]), schema);
     assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
     assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
   } finally {
@@ -1662,7 +1659,7 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
     const i = argv.indexOf('--disallowedTools');
     assert.notEqual(i, -1, argv.join(' '));
     assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
-    assert.match(argv[i + 2]!, /^--/, 'a flag ends the variadic list');
+    assert.match(argv[i + 2], /^--/, 'a flag ends the variadic list');
     assert.deepEqual((await engine.view(id)).state.config?.allowedTools, allow, 'and the allow list beside it, on the record');
     const a = argv.indexOf('--allowedTools');
     assert.notEqual(a, -1, argv.join(' '));

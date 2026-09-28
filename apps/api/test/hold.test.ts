@@ -335,7 +335,7 @@ test('REFUSED while held: no step of a held run waits on you, none is offered an
     }
   }
   const page = await detail(BUDGET);
-  assert.equal(page.steps[0]!.status, 'over budget $1.50 of $1');
+  assert.equal(page.steps[0].status, 'over budget $1.50 of $1');
 });
 
 test("a held run's decision is `holding`, and nothing else: what `wf decide` prints for it, with no command — where the same run unheld is offered one", async () => {
@@ -381,7 +381,7 @@ test('a step over its budget on a held run is offered no raise, and `wf decide` 
   assert.doesNotMatch(said.overBudgetLine ?? '', /waiting on you/);
   assert.doesNotMatch(said.overBudgetLine ?? '', VERBS);
   const page = await detail(BUDGET);
-  assert.equal(page.steps[0]!.raise, null);
+  assert.equal(page.steps[0].raise, null);
   assert.deepEqual(page.waitingOnYou, []);
 });
 

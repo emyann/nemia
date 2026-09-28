@@ -146,7 +146,7 @@ test("words the session's transcript shows reaching it are drawn once, as what w
   assert.deepEqual(turns.at(-1), { kind: 'told', key: `told:1:${at(44)}`, at: at(44), attempt: 1, text: words, arrived: at(45) });
 
   // Handed over a moment before the engine journalled them, as it hands them over first: still their arrival.
-  assert.equal(heardIn([arrival('att-2', 11, words)], [told]).said[0]!.arrived, at(11));
+  assert.equal(heardIn([arrival('att-2', 11, words)], [told]).said[0].arrived, at(11));
 });
 
 test("REFUSED as an arrival: a line with other words, one that only mentions them, one written well before they were said, the session's own words, and a second line for words said once — each stays the session's, and words it has not shown have none", () => {

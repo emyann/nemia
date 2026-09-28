@@ -243,7 +243,7 @@ test('the SDK runner is made a Runner by Runner.layer, so it refuses the shared 
         return (yield* Runner).refuses?.(t);
       }).pipe(Effect.provide(sdkRunner())),
     );
-  for (const [bad, says] of UNUSABLE) assert.match(refuses({ ...task, ...bad } as never) ?? '', says, JSON.stringify(bad));
+  for (const [bad, says] of UNUSABLE) assert.match(refuses({ ...task, ...bad }) ?? '', says, JSON.stringify(bad));
   assert.equal(refuses({ ...task, config: { model: 'opus' } }), undefined);
 });
 
@@ -256,7 +256,7 @@ test('file refuses the shared checks over any runner, the SDK runner and one bui
   ];
   for (const [label, runner] of RUNNERS) {
     for (const [bad, says] of UNUSABLE) {
-      const { err, listed } = await filedOver(runner, { ...task, ...bad } as Filing);
+      const { err, listed } = await filedOver(runner, { ...task, ...bad });
       assert.equal(err._tag, 'FileRefused', `${label}, ${JSON.stringify(bad)}: failed with ${err._tag}`);
       assert.match(err.message, says, `${label}, ${JSON.stringify(bad)}`);
       assert.deepEqual(listed, [], `${label}: nothing journalled`);

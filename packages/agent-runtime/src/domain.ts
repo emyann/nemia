@@ -780,7 +780,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   //
   // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
   // forever, as far as every other rule here is concerned.
-  const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0]!.startedAt).getTime() : 0;
+  const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0].startedAt).getTime() : 0;
   const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
 
   // ---- an attempt is in flight.

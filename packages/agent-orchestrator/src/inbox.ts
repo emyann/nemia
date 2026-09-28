@@ -246,7 +246,7 @@ export function inboxListing(
         return {
           name,
           file,
-          title: card.body.split('\n')[0]!,
+          title: card.body.split('\n')[0],
           workflow: card.workflow ?? null,
           repo: card.repo ?? null,
           ...(card.gate !== undefined ? { gate: card.gate } : {}),

@@ -152,7 +152,7 @@ test("`wf start --gate <step>` freezes `gates` on the record, once per step; a s
     'plan',
     '--gate=implement',
   ]);
-  const id = printed[0]!.split(' ')[0]!;
+  const id = printed[0].split(' ')[0];
   assert.deepEqual(readRun(id).gates, ['plan', 'implement']);
   assert.ok(
     printed.includes(
@@ -241,7 +241,7 @@ test("REFUSED at shipped defaults, pass after pass: a gated step that signed off
     assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'failed'], `pass ${pass}`);
   }
   const l = await list(e, readRun(run.id));
-  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
   const printed = await printedBy(t, ['ls', run.id], e);
   assert.ok(printed.includes(`   → waiting on you: approve plan  —  wf decide ${run.id}`), printed.join('\n'));
 
@@ -290,10 +290,10 @@ test('a gated step with `check:` is checked before it is held: its check filed o
   settle(`${run.id}-plan`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['plan']);
   settle(`${run.id}-plan-check`, 'running');
-  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'checking');
+  assert.equal((await list(e, readRun(run.id))).steps[0].status, 'checking');
   settle(`${run.id}-plan-check`, 'succeeded', undefined, 0);
   assert.deepEqual((await advance(e, readRun(run.id))).filed, []);
-  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'awaiting approval');
+  assert.equal((await list(e, readRun(run.id))).steps[0].status, 'awaiting approval');
   assert.deepEqual(filings, [`${run.id}-plan`, `${run.id}-plan-check`]);
 });
 
@@ -304,7 +304,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   fs.writeFileSync(path.join(oneStep, 'implement.md'), 'implement it\n');
   const parent = start({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] });
   await advance(b.e, readRun(parent.id));
-  const wt = readRun(parent.id).steps.implement!.workspace!;
+  const wt = readRun(parent.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, 'parent.txt'), 'parent\n');
   gitIn(wt, 'add', '-A');
   gitIn(wt, 'commit', '-q', '-m', 'add parent.txt');
@@ -315,7 +315,7 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   const child = start({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] });
   assert.equal((await parentOf(b.e, parent.id)).shipped, false, 'merged, and at its gate');
   for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await advance(b.e, readRun(child.id))).filed, [], `pass ${pass}`);
-  assert.deepEqual((await list(b.e, readRun(child.id))).steps[0]!.status, `waiting on ${parent.id}`);
+  assert.deepEqual((await list(b.e, readRun(child.id))).steps[0].status, `waiting on ${parent.id}`);
 
   approveByHand(parent.id, 'implement', 1);
   assert.equal((await parentOf(b.e, parent.id)).shipped, true);
@@ -461,7 +461,7 @@ test("REFUSED at shipped defaults: a send-back spends the approval given before 
   const back = await advance(e, readRun(run.id));
   const try2 = `${run.id}-plan-try2`;
   assert.deepEqual([back.tried, back.filed], [['plan'], []], 'sent back, and nothing after it');
-  const brief = tasks.get(try2)!.spec.brief as string;
+  const brief = tasks.get(try2)!.spec.brief;
   assert.match(
     brief,
     /^## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on/,
@@ -473,8 +473,8 @@ test("REFUSED at shipped defaults: a send-back spends the approval given before 
   settle(try2, 'succeeded', { ...SIGNED, summary: 'stored, then parsed' });
   for (let pass = 1; pass <= 3; pass++) assert.deepEqual((await advance(e, readRun(run.id))).filed, [], `pass ${pass}: held again`);
   const l = await list(e, readRun(run.id));
-  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
-  assert.match(l.steps[0]!.note ?? '', /^try 2, nudged on your word, answered · approve it: wf approve /);
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.match(l.steps[0].note ?? '', /^try 2, nudged on your word, answered · approve it: wf approve /);
 
   // The approval moved into done/ opens nothing, put back by hand or not: it names try 1.
   fs.copyFileSync(path.join(asksDir(run.id), 'done', 'approve-plan-1'), path.join(asksDir(run.id), 'approve-plan-1'));
@@ -527,7 +527,7 @@ test('`wf decide` at a gate says AWAITING APPROVAL and, under the step, the appr
 
   const { approval } = await approve(e, run.id, 'plan', 'Ship the second reading.');
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['implement']);
-  const told = (id: string) => tasks.get(id)!.spec.brief as string;
+  const told = (id: string) => tasks.get(id)!.spec.brief;
   const words = `plan, try 1, approved at ${approval.at}:\n\n\`\`\`text\nShip the second reading.\n\`\`\``;
   assert.ok(
     told(`${run.id}-implement`).includes(`\n## Approved\n\n`) && told(`${run.id}-implement`).includes(words),
@@ -564,8 +564,8 @@ test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated ste
   assert.deepEqual([filings, stopped], [[`${run.id}-plan`], []], 'no try filed, no session stopped');
   assert.equal(tasks.has(`${run.id}-plan-try2`), false);
   const l = await list(e, readRun(run.id));
-  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
-  assert.match(l.steps[0]!.note ?? '', /^approve it: /, 'no try said to be due');
+  assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.match(l.steps[0].note ?? '', /^approve it: /, 'no try said to be due');
 
   const file = path.join(asksDir(run.id), 'retry-plan-2');
   await assert.rejects(

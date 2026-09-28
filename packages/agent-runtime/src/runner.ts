@@ -789,7 +789,7 @@ export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: S
   };
 };
 
-const short = (sessionId: string) => sessionId.split('-')[0]!;
+const short = (sessionId: string) => sessionId.split('-')[0];
 
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {

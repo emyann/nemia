@@ -73,7 +73,7 @@ const memoryJournal = (): PromiseJournal => {
       return [...tasks.keys()].sort();
     },
     async feed(after) {
-      return { entries: feed.slice(after as number | undefined), cursor: feed.length };
+      return { entries: feed.slice(after), cursor: feed.length };
     },
   };
 };
@@ -172,7 +172,7 @@ test('a Claude Code job is filed held open, and one on codex, a background sessi
       return file({ ...spec, config: { ...spec.config, background: undefined } });
     };
     assert.deepEqual((await h.pass(other.id)).filed, ['plan']);
-    assert.equal(Object.hasOwn(filed[0]!, 'holdOpen'), false, Object.values(keys)[0]);
+    assert.equal(Object.hasOwn(filed[0], 'holdOpen'), false, Object.values(keys)[0]);
   }
 });
 
@@ -185,7 +185,7 @@ test('an ungated step that signed off is closed on the pass that reads it waitin
   await pass(run.id);
   const settled = await stateOf(e, `${run.id}-plan`);
   assert.deepEqual([settled.phase, settled.state.settled], ['succeeded', 'succeeded'], 'the engine settles it as it signed');
-  assert.equal(readRun(run.id).steps.plan!.taskId, `${run.id}-plan`);
+  assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan`);
 });
 
 // ─── a blocked sign-off, answered ───────────────────────────────────────────
@@ -210,9 +210,9 @@ test("a step that signed off blocked stays open, and a person's answer — `wf r
   assert.deepEqual(answered.filed, []);
   const view = await stateOf(e, plan);
   assert.equal(view.state.inputs.length, 1, 'answered, once');
-  assert.match(view.state.inputs[0]!.text, /the --dry-run flag/, "the person's words, in the turn's brief");
-  assert.match(view.state.inputs[0]!.text, /This is the last try's session, continued/, 'the brief of a nudge that continues the session');
-  const record = readRun(run.id).steps.plan!;
+  assert.match(view.state.inputs[0].text, /the --dry-run flag/, "the person's words, in the turn's brief");
+  assert.match(view.state.inputs[0].text, /This is the last try's session, continued/, 'the brief of a nudge that continues the session');
+  const record = readRun(run.id).steps.plan;
   assert.equal(record.taskId, plan, 'the same task');
   assert.deepEqual(
     record.tries?.map((t) => [t.taskId, t.then]),
@@ -236,13 +236,13 @@ test('an answer carries what is left of the cap in force; over it, the task stay
   await retry(under.e, under.run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' });
   await under.pass(under.run.id);
   assert.equal(
-    (await stateOf(under.e, `${under.run.id}-plan`)).state.inputs[0]!.config?.budgetUsd,
+    (await stateOf(under.e, `${under.run.id}-plan`)).state.inputs[0].config?.budgetUsd,
     2.5,
     '$4 less the $1.50 its first turn cost',
   );
 
   const { run, e, pass } = await signedPlan({ plan: 'budget: 4' }, BLOCKED, undefined, { costUsd: 5 });
-  assert.match((await statuses(e, run.id)).plan!, /^over budget \$5\.00 of \$4/);
+  assert.match((await statuses(e, run.id)).plan, /^over budget \$5\.00 of \$4/);
   await pass(run.id);
   assert.equal(
     (await stateOf(e, `${run.id}-plan`)).phase,
@@ -251,7 +251,7 @@ test('an answer carries what is left of the cap in force; over it, the task stay
   );
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag', budget: 6 });
   assert.deepEqual((await pass(run.id)).tried, ['plan']);
-  assert.equal((await stateOf(e, `${run.id}-plan`)).state.inputs[0]!.config?.budgetUsd, 1, '$6 less the $5 spent');
+  assert.equal((await stateOf(e, `${run.id}-plan`)).state.inputs[0].config?.budgetUsd, 1, '$6 less the $5 spent');
 });
 
 test('a try of a waiting step that is not an answer — `--fresh`, `--model` — closes the task, and files a task of its own as every try was', async () => {
@@ -265,7 +265,7 @@ test('a try of a waiting step that is not an answer — `--fresh`, `--model` —
   assert.match(fresh.state.brief, /start again from the README/);
   assert.equal(fresh.state.resumeFrom, undefined, 'a new session');
   assert.equal(fresh.state.holdOpen, true, 'itself held open');
-  assert.equal(readRun(run.id).steps.plan!.taskId, `${run.id}-plan-try2`);
+  assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan-try2`);
 });
 
 test("a held task whose job ended `done` with no statement (`stated: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
@@ -293,7 +293,7 @@ test("a held task whose job ended `done` with no statement (`stated: false`) wai
     const next = await stateOf(e, `${plan}-try2`);
     assert.match(next.state.brief, /StructuredOutput/, `${JSON.stringify(keys)}: filed as a task of its own, told to sign off`);
     assert.equal(next.state.resumeFrom, 'native-1', `${JSON.stringify(keys)}: continuing the session that ended`);
-    assert.equal(readRun(run.id).steps.plan!.taskId, `${plan}-try2`);
+    assert.equal(readRun(run.id).steps.plan.taskId, `${plan}-try2`);
   }
 });
 
@@ -310,7 +310,7 @@ test('a pass that answered and died before writing the run down is adopted: the 
   const view = await stateOf(e, plan);
   assert.deepEqual([view.state.inputs.length, view.state.stopRequested], [1, false], 'answered once, and not asked to stop');
   assert.deepEqual(
-    readRun(run.id).steps.plan!.tries?.map((t) => t.taskId),
+    readRun(run.id).steps.plan.tries?.map((t) => t.taskId),
     [plan],
     'written down as the turn it was',
   );
@@ -362,7 +362,7 @@ const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: str
   assert.match(next.state.brief, /the --dry-run flag, again/, `${end}: a task of its own, with the answer in its brief`);
   assert.equal(next.state.holdOpen, true, `${end}: held open itself`);
   assert.equal(next.state.resumeFrom, from, `${end}: continuing ${from}`);
-  assert.equal(readRun(run.id).steps.plan!.taskId, `${plan}-try3`, `${end}: the step's try now`);
+  assert.equal(readRun(run.id).steps.plan.taskId, `${plan}-try3`, `${end}: the step's try now`);
   await pass(run.id);
   assert.deepEqual(
     [spawned.at(-1)!.name, spawned.at(-1)!.resumeFrom],
@@ -448,7 +448,7 @@ test('a gated step closed on its approval reads on `wf ls` as it signed, in the 
   await e.tick();
   assert.equal((await stateOf(e, plan)).state.settled, 'succeeded');
   assert.equal(between, (await statuses(e, run.id)).plan, 'the same line before the engine settles it and after');
-  assert.doesNotMatch(between!, /between attempts|running/);
+  assert.doesNotMatch(between, /between attempts|running/);
   const listed = await list(e, readRun(run.id));
   assert.deepEqual(listed.waitingOnYou, []);
 });
@@ -477,7 +477,7 @@ test("a send-back from a gate — `wf retry --message` on a signed gated step �
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' });
   const sent = await pass(run.id);
   assert.deepEqual([sent.tried, sent.filed], [['plan'], []]);
-  assert.match((await stateOf(e, plan)).state.inputs[0]!.text, /smaller steps, please/);
+  assert.match((await stateOf(e, plan)).state.inputs[0].text, /smaller steps, please/);
   await pass(run.id);
   sign(plan, 2, { ...SIGNED, summary: 'the plan, in smaller steps' });
   const again = await pass(run.id);
@@ -493,7 +493,7 @@ test("a send-back from a gate — `wf retry --message` on a signed gated step �
   );
 
   await approve(e, run.id, 'plan');
-  assert.equal(readRun(run.id).steps.plan!.tries?.length, 1);
+  assert.equal(readRun(run.id).steps.plan.tries?.length, 1);
   assert.deepEqual((await pass(run.id)).filed, ['implement']);
   assert.equal((await stateOf(e, plan)).state.closed, true);
 });
@@ -606,7 +606,7 @@ test("a step's closeout, its denials and whether its closeout was asked for are 
   assert.ok(read && !('error' in read), `the turn that signed is read while it waits: ${JSON.stringify(read)}`);
   assert.equal(read.outcome, 'blocked', 'the turn that signed, read while it waits');
   assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']);
-  assert.equal(phaseOfView(waiting.get('t')!), 'succeeded', 'waiting reads settled, as it signed');
+  assert.equal(phaseOfView(waiting.get('t')), 'succeeded', 'waiting reads settled, as it signed');
   assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true, "an unsigned attempt of the last turn is not this turn's");
   assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned', 'and of this turn, it is');
 });

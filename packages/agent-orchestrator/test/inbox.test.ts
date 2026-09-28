@@ -159,13 +159,13 @@ test("`gate:` names the step a card's run waits at for a person, carried by the 
     [],
     isDirectory,
   );
-  assert.equal(listed!.gate, 'plan');
+  assert.equal(listed.gate, 'plan');
   assert.equal(
-    Object.hasOwn(inboxListing([{ file: 'bare-a1b2.md', text: 'A bare idea.\n' }], [], isDirectory)[0]!, 'gate'),
+    Object.hasOwn(inboxListing([{ file: 'bare-a1b2.md', text: 'A bare idea.\n' }], [], isDirectory)[0], 'gate'),
     false,
     'a card with no gate lists none — the listing is what it was',
   );
-  assert.deepEqual(inboxLines([listed!]), ['cache-the-views-k2q9  Cache the views.  workflow: dev-planned  gate: plan']);
+  assert.deepEqual(inboxLines([listed]), ['cache-the-views-k2q9  Cache the views.  workflow: dev-planned  gate: plan']);
 
   // Queued, and taken back: the gate stays. Filed from a file whose frontmatter is a card's: the gate is kept.
   assert.equal(
@@ -262,7 +262,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
   assert.deepEqual(inboxListing([], runs, isDirectory), []);
   // A record naming a card no longer there lists nothing: that card was started, and removed.
   assert.deepEqual(
-    inboxListing([files[3]!], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' } }], isDirectory).map((l) => l.startedAs),
+    inboxListing([files[3]], [{ id: 'gone-1234', from: { inbox: 'parse-the-flag-1x2y' } }], isDirectory).map((l) => l.startedAs),
     [[]],
   );
 });
@@ -576,7 +576,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
       'd-first',
       {
         at: '2026-09-16T10:06:00.000Z',
-        text: files[3]!.text,
+        text: files[3].text,
         repo: app,
         why: 'd-first.md: `workflow: nope` — no workflow folder.',
         refused: true,
@@ -586,7 +586,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
       'b-late',
       { at: '2026-09-16T10:06:00.000Z', text: 'the card as it was before an edit', repo: app, why: 'refused once', refused: true },
     ],
-    ['a-tied', { at: '2026-09-16T10:07:00.000Z', text: files[1]!.text, repo: app, why: noGit, refused: false }],
+    ['a-tied', { at: '2026-09-16T10:07:00.000Z', text: files[1].text, repo: app, why: noGit, refused: false }],
   ]);
   const listing = inboxListing(files, [{ id: 'started-by-hand-ab12', from: { inbox: 'e-started' } }], isDirectory, tries);
   assert.deepEqual(

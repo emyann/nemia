@@ -28,7 +28,7 @@ const PAGE_FILE = /^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
 export const orderOf = (names: readonly string[]): string[] => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
 /** The page a file is: its name without its number. */
-const nameOf = (file: string): string => PAGE_FILE.exec(file)![2]!;
+const nameOf = (file: string): string => PAGE_FILE.exec(file)![2];
 
 /** The pages `dir`'s NAMES says there are: its lines, trimmed, the blank ones left out. */
 export function namesIn(dir = PAGES_DIR): Set<string> {

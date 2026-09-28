@@ -333,12 +333,12 @@ export function frontmatterOf(text: string): Record<string, string> | null {
   if (end < 0) return null;
   const fields: Record<string, string> = {};
   for (let i = 1; i < end; i++) {
-    const key = /^([A-Za-z0-9_][\w.-]*):(?:[ \t]+(.*))?$/.exec(lines[i]!);
+    const key = /^([A-Za-z0-9_][\w.-]*):(?:[ \t]+(.*))?$/.exec(lines[i]);
     if (!key) continue;
     const more: string[] = [];
-    while (i + 1 < end && /^(\s|$)/.test(lines[i + 1]!)) more.push(lines[++i]!);
+    while (i + 1 < end && /^(\s|$)/.test(lines[i + 1])) more.push(lines[++i]);
     const value = valueOf(key[2]?.trim() ?? '', more);
-    if (value !== null) fields[key[1]!] = value;
+    if (value !== null) fields[key[1]] = value;
   }
   return fields;
 }

@@ -1180,7 +1180,7 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
     const filed = new Date(now - card.filedMinutesAgo * 60_000);
     fs.utimesSync(file, filed, filed);
   }
-  const tried = { at: ago(refused.triedMinutesAgo), text: cards[1]!.text, repo, why: refusedWhy(root, repo), refused: true };
+  const tried = { at: ago(refused.triedMinutesAgo), text: cards[1].text, repo, why: refusedWhy(root, repo), refused: true };
   write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
   write(path.join(root, 'tick-stats.json'), JSON.stringify(PASS.cost(ago(1)), null, 2));
@@ -1272,7 +1272,7 @@ const PALETTE: ReadonlyArray<readonly [number, number, number]> = [
   [20, 184, 166],
   [244, 63, 94],
 ];
-const palette = (): Buffer => png(480, 96, (x, y) => (y < 8 || y >= 88 || x % 48 < 4 ? [250, 250, 250] : PALETTE[Math.floor(x / 48)]!));
+const palette = (): Buffer => png(480, 96, (x, y) => (y < 8 || y >= 88 || x % 48 < 4 ? [250, 250, 250] : PALETTE[Math.floor(x / 48)]));
 
 /**
  * FAKE's repository, at `repo`: a base on `main`, and `branch` off it with the work committed — a source file and a test

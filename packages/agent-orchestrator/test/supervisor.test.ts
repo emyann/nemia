@@ -139,7 +139,7 @@ test("the supervisor is one step that never ends: in the repository's checkout, 
     steps.map((s) => s.name),
     ['supervise'],
   );
-  const supervise = steps[0]!;
+  const supervise = steps[0];
   const {
     after,
     workspace,
@@ -192,7 +192,7 @@ test("the supervisor is one step that never ends: in the repository's checkout, 
 });
 
 test("the supervisor's brief is the loop: what it watches, how it reads a run to decide, how it asks and is answered, and that it never types git for a run", () => {
-  const body = said(loadWorkflows(FOLDER)[0]!.body);
+  const body = said(loadWorkflows(FOLDER)[0].body);
   for (const sentence of [
     // What it watches, and what it reads before it decides anything.
     '`wf ls` is the pass.',
@@ -230,23 +230,23 @@ test("the supervisor's brief is the loop: what it watches, how it reads a run to
 
   // The skill it is told to use is in the repository, under that name, and this step has every tool, so `Skill` loads it.
   assert.ok(fs.existsSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md')));
-  assert.equal(loadWorkflows(FOLDER)[0]!.tools, undefined, "the harness's own set: it reads the store, git, the registry and the browser");
+  assert.equal(loadWorkflows(FOLDER)[0].tools, undefined, "the harness's own set: it reads the store, git, the registry and the browser");
 });
 
 test("REFUSED by the shipped folder: the git a session in a person's checkout must never type is denied by name, and the bookkeeping it does need is not", () => {
-  const { disallowedTools } = loadWorkflows(FOLDER)[0]!;
+  const { disallowedTools } = loadWorkflows(FOLDER)[0];
   assert.ok(disallowedTools, 'the step carries a deny list');
 
   // Each one on its own, so a rule dropped from the folder fails here by name rather than in one deepEqual nobody reads.
   for (const verb of GIT_DENIED) {
-    assert.ok(disallowedTools!.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallowedTools!.join(', ')}`);
-    assert.ok(denies(disallowedTools!, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
+    assert.ok(disallowedTools.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallowedTools.join(', ')}`);
+    assert.ok(denies(disallowedTools, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
   }
   // The merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type — in either spelling.
-  assert.ok(denies(disallowedTools!, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'));
-  assert.ok(denies(disallowedTools!, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
+  assert.ok(denies(disallowedTools, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'));
+  assert.ok(denies(disallowedTools, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
   // And throwing away a person's uncommitted work, in either spelling.
-  assert.ok(denies(disallowedTools!, 'git checkout -- CLAUDE.md') && denies(disallowedTools!, 'git restore CLAUDE.md'));
+  assert.ok(denies(disallowedTools, 'git checkout -- CLAUDE.md') && denies(disallowedTools, 'git restore CLAUDE.md'));
 
   // And what its bookkeeping is told to do — write and commit by path, and read the world — is not denied by any of them.
   for (const command of [
@@ -257,14 +257,14 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
     'git diff main...wf/add-sub-8imz/implement',
     'git show HEAD',
   ])
-    assert.equal(denies(disallowedTools!, command), false, `${command} is denied, and the step is told to run it`);
+    assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
 
   // `git push` and `git branch -D` are the checkout's own refusal too (`.claude/settings.json`), which is why the step says nothing of
   // `git branch`: denying it by prefix would take `git branch --list` with it, and that is diagnosis.
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
   assert.ok(settings.permissions.deny.includes('Bash(git push:*)'));
   assert.ok(settings.permissions.deny.some((r) => r.startsWith('Bash(git branch -D')));
-  assert.equal(denies(disallowedTools!, 'git branch --list'), false);
+  assert.equal(denies(disallowedTools, 'git branch --list'), false);
 });
 
 // ─── a step that never ends ─────────────────────────────────────────────────

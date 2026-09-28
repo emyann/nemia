@@ -211,7 +211,7 @@ test('a spawn is a user Message: the name its task, the brief its one text part,
     extensions: [RUNTIME_EXTENSION],
     referenceTaskIds: [],
   });
-  assert.equal(m.metadata!.config, request.config, 'config is carried whole, never opened');
+  assert.equal(m.metadata.config, request.config, 'config is carried whole, never opened');
   assert.equal(messageRefusal(m), undefined);
   assert.deepEqual(spawnOf(m), request);
   assert.deepEqual(spawnOf(overTheWire(m)), request);
@@ -295,7 +295,7 @@ test('an attempt the harness no longer lists is answered from the journal', () =
     assert.equal((t.metadata!.attempt as Attempt).reason, change.reason ?? null);
     assert.deepEqual(overTheWire(t.metadata), t.metadata);
   }
-  assert.equal(wordsOf(taskOfAttempt('ae/t-1/1', { ...attempt, ...cases[2]![0] }, 'm')), 'fake: no binary');
+  assert.equal(wordsOf(taskOfAttempt('ae/t-1/1', { ...attempt, ...cases[2][0] }, 'm')), 'fake: no binary');
   assert.equal(taskOfAttempt('ae/t-1/1', attempt, 'm').contextId, '', 'no id recorded is no context');
   assert.equal(taskOfAttempt('ae/t-1/1', ended, 'm').contextId, 'conv-a');
 });
@@ -413,7 +413,7 @@ test('a spawn through the client reaches the driver as the engine asked for it, 
   };
   await Effect.runPromise(d.runner.spawn(bare));
   assert.deepEqual(d.acted()[1], ['spawn', bare]);
-  assert.deepEqual(Object.keys(d.acted()[1]![1] as object).sort(), Object.keys(bare).sort());
+  assert.deepEqual(Object.keys(d.acted()[1][1] as object).sort(), Object.keys(bare).sort());
 });
 
 test("a refused spawn is the harness's refusal, in its words, `refused`", async () => {
@@ -721,7 +721,7 @@ test("a driver's defect through find, logs, release, say and transcript is the s
     d.runner.transcriptOf!(request.name),
     d.runner.transcript!('s-1'),
   ]) {
-    await assert.rejects(Effect.runPromise(e as Effect.Effect<unknown, RunnerError>), (x) => x === boom);
+    await assert.rejects(Effect.runPromise(e), (x) => x === boom);
   }
 });
 
@@ -783,7 +783,7 @@ test('the Effect door takes the same seam: a2aRunner spawns, stops and settles t
   const id = await run(file({ brief: 'do the thing', cwd: '/repo' }));
   await run(tick());
   assert.equal(spawned.length, 1);
-  assert.equal(spawned[0]!.name, `ae/${id}/1`);
+  assert.equal(spawned[0].name, `ae/${id}/1`);
   assert.equal(sessions.get(`ae/${id}/1`)!.state, 'working');
 
   await run(requestStop(id));

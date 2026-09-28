@@ -189,7 +189,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
     command: `wf approve ${id} ship`,
   });
   // The whole of `wf ls`'s line ends with the command the board offers, so the two cannot drift apart.
-  assert.ok(detail.toDecide!.said.endsWith(detail.toDecide!.command), detail.toDecide!.said);
+  assert.ok(detail.toDecide.said.endsWith(detail.toDecide.command), detail.toDecide.said);
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
   // A gate says a run is one to decide on its own: the branch is the ending step's to merge, and nothing asks git about it.
   assert.equal(gitCount(), before, 'no git call for a run whose folder has an ending step');

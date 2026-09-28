@@ -9,7 +9,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
 import type { Workflow } from './workflow.ts';
-import { approvedFirst, branchFates, checkLogsOf, decision, filesPrunedWords, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruned, type Pruning, type Run } from './run.ts';
+import { approvedFirst, branchFates, checkLogsOf, decision, filesPrunedWords, forgetRefusal, heldWorktree, idRefusal, isGitRun, landsOnCheck, namesInOrder, parseWorktrees, pruneAgain, pruneRefusal, runWorktrees, type AskName, type BranchFate, type Decision, type ForgetHow, type Forgot, type MergeState, type Pruned, type Pruning, type Run } from './run.ts';
 import { HOME, askFile, asksDir, cancelFile, holdFile, listRuns, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runFile, runsDir, stepsOf } from './store.ts';
 import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
@@ -211,7 +211,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     // No other run is asked: one waiting on this run reads its record, which stays.
-    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps));
+    held = forgetRefusal(steps, run, phaseOf, [], reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings, 'prune', merging(run, steps), pruneAgain(id, { unmerged, artifacts }));
     owed = handOffOwed(steps, run, phaseOf);
   }
   // Each worktree as git has it: locked, on no branch with something a removal would leave on none (`heldWorktree`), or holding a change.
@@ -224,10 +224,8 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
     const unread = w.locked === undefined && status === undefined ? ['(git status could not read it)'] : [];
     return { path: w.path, ...(hold ?? {}), ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
   });
-  // A run once pruned was agreed to be pruned unmerged, or was merged: its merge is not asked again of its worktrees. Its
-  // files are asked again: that agreement was to lose the worktrees, and the files of a run still waiting on its decision
-  // go only under a --unmerged given for them.
-  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts }, { unmerged: unmerged || (Boolean(run.pruned) && !files) });
+  // A run once pruned is not asked its merge again for its worktrees; for its files it is (`pruneRefusal`).
+  const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts, files: Boolean(files) }, { unmerged, artifacts });
   if (refusal) return { id, kind: 'refused', refusal, ...none };
 
   const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
@@ -276,7 +274,7 @@ export async function prune(e: Engine, id: string, { unmerged = false, yes = fal
   } else {
     fs.writeFileSync(pruneFile(id), JSON.stringify(marker(removed, filesWent ? freed : undefined), null, 2));
   }
-  return { id, kind: 'pruned', worktrees: removed, ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}), left, at };
+  return { id, kind: 'pruned', worktrees: removed, ...(filesWent ? { artifacts: { path: kept!.path, bytes: freed! } } : {}), left, at, ...(unmerged ? { unmerged: true as const } : {}) };
 }
 
 /**

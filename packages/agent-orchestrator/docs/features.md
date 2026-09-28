@@ -2154,7 +2154,8 @@ What was built:
   `--unmerged` are refused (an in-place run, which never reads shipped, in words of its own); the mark is written first, and a prune that
   removed nothing puts back the mark the run had. A run whose worktrees are gone, or that cut none, may still have its files pruned. A
   `--unmerged` an earlier plain prune was given does not carry over to the files: a run still waiting on its decision loses them only to
-  a prune given `--unmerged` for them (review, round 2).
+  a prune given `--unmerged` for them (review, round 2). So every prune a refusal or a kept line offers repeats the flags it was given
+  (`pruneAgain`): `wf prune <id> --unmerged --artifacts`, never the plain `--unmerged` that has nothing left to prune (round 3).
 - **What stays, and why.** The record, the asks and the engine's journals are what `wf decide` and the board read. The inputs are a
   person's own files. The rendered prompts say what each step was told, and cost a megabyte. The check logs say why a check refused. A
   folder run's `work/` is its work, and a folder run is refused.

@@ -24,7 +24,8 @@ import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/jou
 import { Runner } from '../src/runner.ts';
 import { admit, answer, file, GRACE_MS, Lifecycle, LIVE, requestStop, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
-import { decide, fold, nameFor, type Event, type SessionState, type Sighting } from '../src/core/domain.ts';
+import { decide, fold, nameFor, type Event, type Sighting } from '../src/core/domain.ts';
+import type { SessionState } from '../src/core/session.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
 import { composite } from '../src/runner-composite.ts';

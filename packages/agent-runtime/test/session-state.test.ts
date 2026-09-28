@@ -16,20 +16,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import {
-  decide,
-  endOf,
-  fold,
-  formerStateOf,
-  isSessionState,
-  nameFor,
-  observe,
-  phaseWordOf,
-  SESSION_STATES,
-  type Action,
-  type SessionState,
-  type Sighting,
-} from '../src/core/domain.ts';
+import { decide, fold, nameFor, observe, type Action, type Sighting } from '../src/core/domain.ts';
+import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type SessionState } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/runner.ts';
 import { detachedStateOf } from '../src/runner-detached.ts';

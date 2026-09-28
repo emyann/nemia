@@ -23,7 +23,6 @@ import {
   followUpText,
   messageOf,
   messageRefusal,
-  nameParts,
   RUNTIME_EXTENSION,
   nameOf,
   sightingOf,
@@ -34,7 +33,9 @@ import {
   taskOfSighting,
   wordsOf,
 } from '../src/a2a-map.ts';
-import { SESSION_STATES, type Attempt, type Ended, type SessionState, type Sighting } from '../src/core/domain.ts';
+import { nameParts } from '../src/core/domain.ts';
+import { SESSION_STATES, type Ended, type SessionState } from '../src/core/session.ts';
+import type { Attempt, Sighting } from '../src/core/domain.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/runner.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */

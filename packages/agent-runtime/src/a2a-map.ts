@@ -18,16 +18,9 @@
  * (`a2a-handler.ts`), which is why a restarted runtime answers at once.
  */
 import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
-import { nameFor, type Attempt, type SessionState, type Sighting } from './core/domain.ts';
+import { nameParts, type Attempt, type Sighting } from './core/domain.ts';
+import type { SessionState } from './core/session.ts';
 import type { SpawnRequest } from './runner.ts';
-
-/** The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`. */
-export const nameParts = (name: string): { taskId: string; n: number } | undefined => {
-  const m = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name);
-  if (!m) return undefined;
-  const parts = { taskId: m[1], n: Number(m[2]) };
-  return nameFor(parts.taskId, parts.n) === name ? parts : undefined;
-};
 
 /**
  * The runtime's A2A extension. On a message, it marks a spawn: a session started under the name the message gives. On a

@@ -82,7 +82,8 @@ test('only src/core/lifecycle.ts imports XState, in any workspace', () => {
 });
 
 test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a type, a re-export, a dynamic import, another package', () => {
-  const why = "only agent-runtime's src/core/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there";
+  const why =
+    "only agent-runtime's src/core/lifecycle.ts knows XState — ask decide, or the lifecycle's transition, and keep the machine there";
   const planted: Array<[string, string, string]> = [
     ['packages/agent-runtime/src/core/engine/engine.ts', "import { transition } from 'xstate';", 'xstate'],
     ['packages/agent-runtime/src/core/domain.ts', "import type { AnyStateMachine } from 'xstate';", 'xstate'],

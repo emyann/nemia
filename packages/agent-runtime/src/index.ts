@@ -82,7 +82,8 @@ export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
 export { a2aRunner } from './a2a-client.ts';
 
-export type { Event, State, Attempt, SessionState, Ended, Outcome, Sighting, EndReason, Usage, Said, Denial, Input } from './core/domain.ts';
+export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/domain.ts';
+export type { SessionState, Ended, Outcome } from './core/session.ts';
 export { denialText, fold, nameFor } from './core/domain.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './runner-claude-vocabulary.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './runner-codex.ts';

@@ -4,7 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, fold, nameFor, turnOf, waitsForInput, type Ended, type Event, type SessionState, type Sighting } from '../src/core/domain.ts';
+import { decide, fold, nameFor, turnOf, waitsForInput, type Event, type Sighting } from '../src/core/domain.ts';
+import type { Ended, SessionState } from '../src/core/session.ts';
 import type { HarnessArgs } from '../src/harness-args.ts';
 
 const T0 = new Date('2026-01-01T00:00:00Z');

@@ -25,7 +25,8 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { SessionState, Sighting, Usage } from './core/domain.ts';
+import type { SessionState } from './core/session.ts';
+import type { Sighting, Usage } from './core/domain.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './runner-claude-inbox.ts';
 import {
   claudeTranscriptEvents,

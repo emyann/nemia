@@ -13,18 +13,8 @@
 import { Effect, Exit, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import {
-  fold,
-  isLive,
-  nameFor,
-  phaseWordOf,
-  waitsOnPerson,
-  type Event,
-  type Input,
-  type Said,
-  type Sighting,
-  type State,
-} from './core/domain.ts';
+import { fold, nameFor, type Event, type Input, type Said, type Sighting, type State } from './core/domain.ts';
+import { isLive, phaseWordOf, waitsOnPerson } from './core/session.ts';
 import { argsRefusalOf, type HarnessArgs } from './harness-args.ts';
 import { Journal, type Cursor, type FeedEntry, type FeedRefusal, JournalError } from './core/engine/journal.ts';
 import { claudeOps, Runner, RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from './runner.ts';
@@ -917,7 +907,8 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a-remote.t
 export { remoteConfigRefusal } from './a2a-remote.ts';
 export { denialText, nameFor } from './core/domain.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/engine.ts';
-export type { Event, SessionState, Ended, Outcome, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
+export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/domain.ts';
+export type { SessionState, Ended, Outcome } from './core/session.ts';
 export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness-args.ts';
 export type { ClaudeFlags } from './runner-claude-vocabulary.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';

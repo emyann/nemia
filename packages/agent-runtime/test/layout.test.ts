@@ -211,12 +211,9 @@ test('REFUSED: a cycle of value imports; a cycle through a type-only import is e
   ]);
 });
 
-/** The cycles the source has today, each until the card that breaks it. */
-const KNOWN_CYCLES: string[][] = [['src/core/domain.ts', 'src/core/lifecycle.ts']];
-
 test('no two source files need each other’s values', () => {
   const files = new Map(sourceFiles().map((f) => [f, read(f)]));
-  assert.deepEqual(cycles(valueGraph(files)), KNOWN_CYCLES);
+  assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
 test('REFUSED: a source file that imports a test; a barrel that re-exports a whole module', () => {

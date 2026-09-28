@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Role, TaskState, type Artifact, type Part, type Task } from '@a2a-js/sdk';
 import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_EXTENSION, sightingOfTask } from '../src/a2a-map.ts';
-import type { SessionState } from '../src/core/domain.ts';
+import type { SessionState } from '../src/core/session.ts';
 
 const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
 const data = (value: Record<string, unknown>): Part => ({

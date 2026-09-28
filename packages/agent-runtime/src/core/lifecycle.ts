@@ -42,7 +42,8 @@
  * where it was. A final state's snapshot is `status: 'done'` and `can` is false there for every event.
  */
 import { setup, transition as xTransition } from 'xstate';
-import { endOf, phaseWordOf, type Action, type Ended, type EndReason, type Outcome, type Sighting } from './domain.ts';
+import { endOf, phaseWordOf, type Ended, type Outcome } from './session.ts';
+import type { Action, EndReason, Sighting } from './domain.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
 export const STATES = [

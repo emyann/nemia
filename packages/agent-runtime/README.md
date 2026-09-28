@@ -115,7 +115,7 @@ machine's edges are what a pass does. The phases a person reads on `ae show`, `w
 and did not change.
 
 **A sighting speaks the same names** (since 2026-09-25). `Sighting.state` is `SessionState`, a literal union of A2A's
-eight `TaskState` names in `src/core/domain.ts`: the SDK stays out of the pure core. Each driver translates its harness's words
+eight `TaskState` names in `src/core/session.ts`: the SDK stays out of the pure core. Each driver translates its harness's words
 once, at its own edge, and says why there: Claude Code's registry in `claudeStateOf` (`done` is `completed`, `stopped`
 `canceled`, and `blocked` is `auth-required` when what it waits for names signing in, `AUTH_WAIT`, else `input-required`);
 the detached worker's run file, which keeps the worker's words, in `detachedStateOf`; a remote agent passes its Task's
@@ -1683,7 +1683,8 @@ selector, and it is why no attempt can ever run twice.
 
 | file | what |
 |---|---|
-| `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement |
+| `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
+| `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |

@@ -37,7 +37,8 @@ import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { RunnerError, testOps } from '../src/runner.ts';
-import type { SessionState, Sighting } from '../src/core/domain.ts';
+import type { SessionState } from '../src/core/session.ts';
+import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
 
 const root = () => scratch('ae-detached-');

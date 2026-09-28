@@ -1689,10 +1689,13 @@ const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, after: Eng
     overheadMs: t.overheadMs,
   });
 
+/** A run a task of which does not read (`unreadableJournal`), as a pass counts it: in flight, and asking the cap for nothing more. */
+const UNJUDGED = { inFlight: true, wants: false } as const;
+
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
  * passes — what `wf ls` and `wf decide` say. None, and nothing read, with no cap or no run that has nothing filed. A record whose workflow
- * no longer reads is left out, as nothing of it could be filed.
+ * no longer reads is left out, as nothing of it could be filed; a run a task of which does not read is counted in flight (`UNJUDGED`).
  *
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, the caller's own (`WF_MAX_RUNS`, refused by name when it is not a count).
@@ -1708,22 +1711,29 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
     } catch {
       continue;
     }
-    const { views, phaseOf } = await taskPhases(e, run);
-    const { asks, rounds } = readAsks(run.id);
-    const a = assess(
-      steps,
-      run,
-      phaseOf,
-      closeoutReader(views, run),
-      closeoutAsked(views),
-      exitVerdicts(views, run),
-      asks,
-      rounds,
-      harnessBlocked(views),
-      spendReader(views),
-    );
-    const parent = await parentsOf(e, run);
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps) });
+    let need: { inFlight: boolean; wants: boolean };
+    try {
+      const { views, phaseOf } = await taskPhases(e, run);
+      const { asks, rounds } = readAsks(run.id);
+      const a = assess(
+        steps,
+        run,
+        phaseOf,
+        closeoutReader(views, run),
+        closeoutAsked(views),
+        exitVerdicts(views, run),
+        asks,
+        rounds,
+        harnessBlocked(views),
+        spendReader(views),
+      );
+      const parent = await parentsOf(e, run);
+      need = slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps);
+    } catch (err) {
+      if (unreadableJournal(err) === undefined) throw err;
+      need = UNJUDGED;
+    }
+    needs.push({ id: run.id, createdAt: run.createdAt, ...need });
   }
   return heldRuns(needs, cap);
 }

@@ -67,6 +67,13 @@ export type Decidable = {
   /** `wf decide`'s OVER BUDGET line, saying why each step held on its budget is held (`overBudgetLine`); null when none is. */
   overBudget: string | null;
   commands: DecideCommand[];
+  /**
+   * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `wf prune` refuses without
+   * `--unmerged` (`pruneRefusal`): the result branches it waits on, and `direct` for a run that worked on its base branch itself, which has
+   * nothing to merge and still waits on you (its branch is the base branch). Null for a run still running with a step waiting on you. A run called off, or whose branches are
+   * on the base however they got there, is `nothing`, never this.
+   */
+  awaiting: { branches: string[]; direct: boolean } | null;
 };
 
 /**
@@ -274,6 +281,7 @@ export async function decisionOf(run: Run): Promise<RunDecision> {
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers, gates, merges(steps)),
+    awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
   };
 }
 

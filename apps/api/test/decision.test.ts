@@ -121,7 +121,9 @@ writeRun({
 test('a finished run: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands', async () => {
   const { status, body } = await decisionOf('r-d1');
   assert.equal(status, 200);
-  assert.deepEqual(Object.keys(body), ['standings', 'touched', 'lesson', 'sensitive', 'used', 'total', 'cost', 'overBudget', 'commands']);
+  assert.deepEqual(Object.keys(body), ['standings', 'touched', 'lesson', 'sensitive', 'used', 'total', 'cost', 'overBudget', 'commands', 'awaiting']);
+  // Finished, and nobody merged it: what `wf prune` refuses without `--unmerged`.
+  assert.deepEqual(body.awaiting, { branches: [branch], direct: false });
 
   // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run: git's own
   // `--shortstat`, trimmed.
@@ -444,6 +446,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
   assert.deepEqual(body.sensitive, [{ branch: 'wf/r-d6/tokens', files: [], error: null }]);
   // `decision` is still `running`: no ship, drop or once more is offered while its steps move.
   assert.deepEqual(body.commands, []);
+  assert.equal(body.awaiting, null, 'still running: not yet a run nobody decided');
 
   // The fan-out the same steps make when the run froze them is not this: implement blocked with tokens still spawned is
   // `failed` to `assess`, so the decision is `wf decide`'s own, its result branches both roots'.

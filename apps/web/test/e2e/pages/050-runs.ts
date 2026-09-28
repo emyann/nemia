@@ -69,6 +69,12 @@ export default {
     );
     await expectCount(finished.locator(`li a[href="/runs/${SHIPPED.id}"]`), 1, `the run whose ending merged it is among the finished (${SHIPPED.id})`);
     await expectCount(finished.locator('[data-to-decide]'), 0, 'and no finished row has anything to decide');
+    // Beside where a row says `cancelled`, the row of a run pruned says so, and what went and what stayed on hover.
+    await expectVisible(
+      finished.locator(`li a[href="/runs/${SHIPPED.id}"] [data-pruned]`, { hasText: /^pruned$/ }),
+      `the row of the run pruned with its files says pruned (${SHIPPED.id})`,
+    );
+    await expectCount(page.locator('[data-pruned]'), 1, 'on that row alone: no other run was pruned');
     const listed = await rows.evaluateAll((lis) => lis.map((li) => ({
       id: li.querySelector('a[href^="/runs/"]')?.getAttribute('href')?.slice('/runs/'.length) ?? '',
       inFlight: li.getAttribute('data-in-flight') === 'true',

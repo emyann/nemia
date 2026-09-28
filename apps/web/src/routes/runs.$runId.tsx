@@ -15,6 +15,7 @@ import { Timeline } from '../components/Timeline';
 import { StartedFrom } from '../components/TryTag';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
+import { PruneRun } from '../components/PruneRun';
 import { runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
@@ -141,6 +142,8 @@ function Run({ run }: { run: RunDetail }) {
           )}
           <StartedFrom run={run} />
           {run.try && <RemoveRun id={run.id} />}
+          {/* Once it is over, what it holds on disk given back, as `wf prune` gives it: nothing is offered of a run still moving. */}
+          <PruneRun run={run} />
         </div>
       </header>
 

@@ -225,6 +225,12 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
             {/* The hold lifted here, as `wf hold --off` lifts it: beside its chip, in the row the card already has. */}
             {run.holding && !cancelled && <CardLift id={run.id} />}
             {cancelled && <Badge variant="outline">cancelled</Badge>}
+            {/* In the footer the card already has, so a pruned card is no taller for it (`CELL_HEIGHT`). */}
+            {run.pruned && (
+              <Badge variant="outline" data-pruned title={run.pruned.said} className="text-neutral-500">
+                pruned
+              </Badge>
+            )}
           </span>
         </div>
       </div>

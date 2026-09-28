@@ -24,7 +24,7 @@ const LOOP_ROOM = 70;
 export function unstartedRun(workflow: WorkflowListing): RunDetail {
   return {
     id: `${workflow.from}:${workflow.name}`, brief: '', repo: '', place: workflow.folderTeam ? 'folder' : 'git', work: null, workflowDir: workflow.dir, try: null, baseRef: '', branch: '', isolate: true,
-    createdAt: '', startedAt: null, cancelledAt: null, pruned: null, after: [], waiting: null, heldUntil: [], holding: null, status: 'running', moving: false, cost: null, read: null, waitingOnYou: [], onYou: [], toDecide: null, gates: [], warning: null,
+    createdAt: '', startedAt: null, cancelledAt: null, pruned: null, onDisk: { worktrees: false, files: false }, after: [], waiting: null, heldUntil: [], holding: null, status: 'running', moving: false, cost: null, read: null, waitingOnYou: [], onYou: [], toDecide: null, gates: [], warning: null,
     graph: workflow.graph,
     steps: workflow.steps.map(({ name }) => ({
       name, spec: null, filed: null, body: null, told: null, taskId: null, workspace: null, files: [], filesError: null, branch: null, status: 'waiting', note: null,

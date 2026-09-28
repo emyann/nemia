@@ -117,6 +117,8 @@ export type RunDetail = {
    * while they are kept. Null on a run never pruned.
    */
   pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
+  /** What `wf prune` would still find of it on disk: its worktrees and its files. The Prune button offers only what is there. */
+  onDisk: { worktrees: boolean; files: boolean };
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */

@@ -9,9 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
+import { CHECK } from '../src/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-ship-');
@@ -37,7 +38,7 @@ const {
   start,
 } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
-const { abortMerge, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
+const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
 
 /** A run this file started on a repository, as `isShipped` reads one: a git run. */
 const gitRun = (run: Run): GitRun => {
@@ -185,18 +186,24 @@ const oneStep = (): string => {
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'the check refused', artifacts: [], needs: 'read the suite' };
 
+/** What implement does in its worktree, by default: add.ts gains `sub`. */
+const addSub = (workspace: string) => fs.appendFileSync(path.join(workspace, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
+
+/** A repository, a board, a folder and the work implement does, where a test gives its own. */
+type Given = { repo?: string; board?: ReturnType<typeof board>; dir?: string; work?: (workspace: string) => void };
+
 /**
  * A run of `implement → ship` with implement done and committed on its branch: the run at its result, waiting at the ending's gate.
  *
  * A repository and a board of its own, unless it is given them: two runs of one repository, on one board, are two endings for one checkout.
  */
-async function atTheGate(given: { repo?: string; board?: ReturnType<typeof board>; dir?: string } = {}) {
+async function atTheGate(given: Given = {}) {
   const repo = given.repo ?? aRepo();
   const run = start({ brief: 'add sub', repo, workflowDir: given.dir ?? folder() });
   const { e, tasks, filings, settle } = given.board ?? board();
   await advance(e, readRun(run.id));
   const work = readRun(run.id).steps.implement!;
-  fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
+  (given.work ?? addSub)(work.workspace!);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -481,7 +488,7 @@ const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch:
  * A run at its ending, approved and filed, whose shipper did as its recipe says: staged the merge of the result in the repository's checkout
  * and signed off `done` with the message — and the pass after, which files ship's check on that merge.
  */
-async function stagedAndSigned(given: { repo?: string; board?: ReturnType<typeof board>; message?: string; artifacts?: string[] } = {}) {
+async function stagedAndSigned(given: Given & { message?: string; artifacts?: string[] } = {}) {
   const at = await atTheGate(given);
   await approve(at.e, at.id, 'ship', 'Merge it.');
   assert.deepEqual((await advance(at.e, readRun(at.id))).filed, ['ship']);
@@ -613,6 +620,134 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(git(repo, 'rev-parse', 'HEAD'), head);
   assert.deepEqual(pngsIn(shot.dir), ['late.png']);
   assert.equal(fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'), note);
+});
+
+/** `npm`, offline, in a directory: a workspace-only tree needs no registry, and a test never reaches one. */
+const npm = (cwd: string, ...args: string[]) =>
+  execFileSync('npm', [...args, '--offline', '--no-audit', '--no-fund'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+/**
+ * A repository as npm workspaces leave it: `packages/a` a workspace package, the lockfile npm writes committed on main, and `node_modules`
+ * installed from it in the checkout — as a person's checkout is, by the `npm install` they last ran on main.
+ */
+const anNpmRepo = (): string => {
+  const repo = aRepo();
+  fs.writeFileSync(path.join(repo, 'package.json'), JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
+  fs.mkdirSync(path.join(repo, 'packages', 'a'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'packages', 'a', 'package.json'), JSON.stringify({ name: 'a', version: '1.0.0' }));
+  fs.writeFileSync(path.join(repo, 'packages', 'a', 'index.js'), "module.exports = 'a';\n");
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n');
+  npm(repo, 'install', '--package-lock-only');
+  npm(repo, 'install');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'workspaces');
+  return repo;
+};
+
+/** implement's work that brings a dependency: a workspace package `b`, and the lockfile npm writes for it, as a branch commits both. */
+const addB = (workspace: string) => {
+  fs.mkdirSync(path.join(workspace, 'packages', 'b'), { recursive: true });
+  fs.writeFileSync(path.join(workspace, 'packages', 'b', 'package.json'), JSON.stringify({ name: 'b', version: '1.0.0' }));
+  fs.writeFileSync(path.join(workspace, 'packages', 'b', 'index.js'), "module.exports = 'b';\n");
+  npm(workspace, 'install', '--package-lock-only');
+};
+
+/** The shipped folder, its ship's `check:` a line that needs package `b` installed where it runs — as a typecheck needs `@types/js-yaml`. */
+const requiringB = (): string => {
+  const dir = folder();
+  const ship = path.join(dir, 'ship.md');
+  const text = fs.readFileSync(ship, 'utf8');
+  assert.match(text, /^check: .+$/m);
+  fs.writeFileSync(ship, text.replace(/^check: .+$/m, `check: node -e "require('b')"`));
+  return dir;
+};
+
+/** The check the run filed, run as the engine's worker runs it, in the checkout, with `npm` offline and a `PATH` a test may put first. */
+const runCheck = (tasks: ReturnType<typeof board>['tasks'], checkId: string, repo: string, first?: string) => {
+  const { cmd, args } = CHECK.command({ brief: tasks.get(checkId)!.spec.brief });
+  const PATH = first ? `${first}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH;
+  return spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', env: { ...process.env, PATH, npm_config_offline: 'true' } });
+};
+
+/** Each entry under a `node_modules`, a level down, with what it is and when it changed: what an install would change. */
+const modulesOf = (repo: string): string[] =>
+  fs
+    .readdirSync(path.join(repo, 'node_modules'), { recursive: true, withFileTypes: false })
+    .map(String)
+    .sort()
+    .map((rel) => {
+      const st = fs.lstatSync(path.join(repo, 'node_modules', rel));
+      return `${rel} ${st.isSymbolicLink() ? 'link' : st.isDirectory() ? 'dir' : 'file'} ${st.mtimeMs}`;
+    });
+
+test("an ending's merge that brings a dependency: its check installs what the merged lockfile asks for in the checkout, first, says so, and lands — package.json and package-lock.json as the merge staged them", async () => {
+  const repo = anNpmRepo();
+  const { id, e, tasks, settle, signed, checkId, base } = await stagedAndSigned({ repo, dir: requiringB(), work: addB });
+  assert.throws(() => execFileSync('node', ['-e', "require('b')"], { cwd: repo, stdio: 'ignore' }), 'the checkout does not have b yet');
+
+  const { install, check } = JSON.parse(tasks.get(checkId)!.spec.brief);
+  assert.equal(check, `node -e "require('b')"`);
+  assert.equal(install, 'node_modules/b', "the check's record says why it installs");
+  assert.ok(
+    signed.notes.includes(
+      "ship: the merge's package-lock.json asks for node_modules/b, which the checkout's node_modules does not have: its check runs npm install there first",
+    ),
+    signed.notes.join('\n'),
+  );
+
+  const r = runCheck(tasks, checkId, repo);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
+  assert.match(r.stdout, /\n\[wf check\] exit 0\n$/);
+  assert.equal(fs.realpathSync(path.join(repo, 'node_modules', 'b')), fs.realpathSync(path.join(repo, 'packages', 'b')));
+  // The merge owns the manifests: the working tree still matches what it staged, and what it staged is the branch's lockfile.
+  git(repo, 'diff', '--quiet');
+  assert.match(git(repo, 'diff', '--cached', '--name-only'), /^package-lock\.json$/m);
+
+  settle(checkId, 'succeeded', undefined, 0);
+  await advance(e, readRun(id));
+  const landed = readRun(id).steps.ship!.landed;
+  assert.ok(landed && 'commit' in landed, JSON.stringify(landed));
+  assert.equal(git(repo, 'rev-parse', 'HEAD^1'), base);
+  assert.equal(git(repo, 'status', '--porcelain'), '', 'nothing left in the checkout');
+});
+
+test("an ending's merge whose lockfile is main's: its check installs nothing, and the checkout's node_modules is as it was", async () => {
+  const repo = anNpmRepo();
+  const before = modulesOf(repo);
+  const { tasks, signed, checkId } = await stagedAndSigned({ repo, dir: requiringB() });
+  assert.equal(JSON.parse(tasks.get(checkId)!.spec.brief).install, undefined);
+  assert.equal(
+    signed.notes.some((n) => n.includes('npm install')),
+    false,
+    signed.notes.join('\n'),
+  );
+
+  // An `npm` first on the PATH that leaves a mark: the check never calls it, and refuses on its own command, which needs b.
+  const bin = fs.mkdtempSync(path.join(ROOT, 'npm-'));
+  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\ntouch ${JSON.stringify(path.join(bin, 'called'))}\n`, { mode: 0o755 });
+  const r = runCheck(tasks, checkId, repo, bin);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.equal(fs.existsSync(path.join(bin, 'called')), false, 'npm was not called');
+  assert.deepEqual(modulesOf(repo), before);
+});
+
+test("a merge its check refused is aborted with the branch's packages left installed; the next `npm install` on main takes them out", async () => {
+  const repo = anNpmRepo();
+  const { id, e, tasks, settle, checkId } = await stagedAndSigned({ repo, dir: requiringB(), work: addB });
+  assert.equal(runCheck(tasks, checkId, repo).status, 0);
+  settle(checkId, 'failed', undefined, 1);
+  await advance(e, readRun(id));
+  assert.equal(mergeHead(repo), false, 'aborted');
+  assert.ok(readRun(id).steps.ship!.landed && 'aborted' in readRun(id).steps.ship!.landed!);
+  assert.equal(fs.existsSync(path.join(repo, 'packages', 'b')), false, 'the branch is gone from the checkout');
+  assert.ok(fs.lstatSync(path.join(repo, 'node_modules', 'b')).isSymbolicLink(), 'and its package is still installed');
+  assert.equal(checkoutParts(repo), null, 'a package the lockfile does not name is not looked for');
+
+  // Measured on npm 11.19: `npm install` on main removes what main's lockfile does not name.
+  assert.match(npm(repo, 'install'), /removed 1 package/);
+  assert.equal(fs.existsSync(path.join(repo, 'node_modules', 'b')), false);
+  assert.equal(git(repo, 'status', '--porcelain'), '');
 });
 
 test("REFUSED at shipped defaults: a landing removes only the check's pictures — a picture the ending's closeout names, a file that is no picture, one in a folder, and a link are kept, and nothing is removed through a link", async () => {

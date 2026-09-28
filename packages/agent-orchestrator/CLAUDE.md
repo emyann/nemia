@@ -65,8 +65,11 @@ pure, store, controller or the client (`test/boundary.test.ts`).
   none (`web-check.test.ts` runs each line both ways). A check starts at low priority (`CHECK_NICENESS`); sessions do not.
 - **A check logs its stdout; a person is shown the tail of its stderr**, whole at `WF_STDERR`.
 - **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's; a lockfile that differs from main's
-  costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one. `du` counts a hardlinked
-  file once per invocation (`diskBytes`).
+  costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a
+  hardlinked file once per invocation (`diskBytes`).
+- **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkScript`):
+  compared in place, never with `lockfileParts(repo, repo)`, which parts on every package nested in a workspace. A failed install is
+  ended by a signal: only the process's exit code is a verdict (`exitVerdicts`), not the log's trailer.
 - **`execFileSync` with no `stdio` copies the child's stderr onto yours**: pass `stdio: ['ignore', 'pipe', 'pipe']`.
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every write follows it**: refuse a link by name where a folder's files are
   its own (`writeWorkflow`).

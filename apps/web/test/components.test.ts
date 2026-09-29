@@ -4465,7 +4465,11 @@ test('REFUSED: the Debug panel is closed by default, and reads and draws nothing
   );
   assert.match(html, /<section aria-label="Debug"/);
   assert.match(html, /aria-expanded="false"[^>]*>▸ Debug<\/button>/);
-  assert.doesNotMatch(html, /data-path|data-machine|The path/, 'no path, graph or timeline drawn while closed');
+  assert.doesNotMatch(
+    html,
+    /data-path|data-machine|The path|Full width/,
+    'no path, graph, timeline or full-width button drawn while closed',
+  );
   assert.equal(client.getQueryCache().getAll().length, 0, 'and nothing read: no machine and no path');
 });
 
@@ -4484,6 +4488,7 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
       createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...drawing.states[0], lit } } as never)),
     );
   assert.match(node(true), /data-state="a"[^>]*data-lit="true"[^>]*class="[^"]*ring-amber-400/);
+  assert.match(node(false), /<p data-state-name="true"[^>]*>a<\/p>/, 'the name marked for the e2e to measure its size');
   assert.doesNotMatch(node(false), /data-lit|ring-amber/);
   const edge = (taken: boolean) =>
     renderToStaticMarkup(

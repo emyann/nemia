@@ -1,10 +1,10 @@
 /**
  * The package's boundary, as a test rather than a sentence in the README (`docs/architecture.md` says the same rules in prose).
  *
- * **Every file is of one of four kinds, named below.** `PURE` files hold the judgement — `assess` in `run.ts`, the verdict in `check.ts`,
- * the format in `workflow.ts` and the folders it re-exports — and import no runtime, read no disk and spawn nothing, which is what lets
- * them be tested as data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never the
- * client, and load as a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the
+ * **Every file is of one of four kinds, named below.** `PURE` files hold the judgement — `assess` in `tick/assess.ts`, the verdict in
+ * `check.ts`, the format in `workflow.ts` and the folders it re-exports — and import no runtime, read no disk and spawn nothing, which is
+ * what lets them be tested as data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never
+ * the client, and load as a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the
  * runtime through the client: `runner.ts`, the package's root, the six it re-exports, split by concern, and the CLI above them, which
  * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as `bin/wf.ts`
  * reaches it through the CLI. The client and the controllers import one another with no cycle. A file in `src/` or `bin/` that no kind

@@ -1076,7 +1076,7 @@ told. The tool's name is Claude Code's, and it is the only harness a nudge reach
 `claude --bg` runner reports it.
 
 **Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
-false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `run.ts`, filed by `retriesDue`),
+false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `brief/brief-sections.ts`, filed by `retriesDue` in `retry/retry.ts`),
 which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
 folds it and spawns with it.
 
@@ -1267,7 +1267,7 @@ again inside the task either. `file()` and `ae start` refuse `maxAttempts` and `
 `resumeFrom`, `retries:` and `wf retry` (`retiredKeyRefusal`, `test/refusal.test.ts`); a journal filed with them still
 folds, and one holding several attempts reads as it did. Trying again is the orchestrator's: `retries:` after a check
 refuses a step, `wf retry` for a try that failed, was lost or could not start, each a new `-tryN` task. Issue 5's case moved
-with it: the orchestrator's `continuesFrom` (`agent-orchestrator/src/retry.ts`) continues the `resumeFrom` of an attempt
+with it: the orchestrator's `continuesFrom` (`agent-orchestrator/src/retry/retry-ask.ts`) continues the `resumeFrom` of an attempt
 its harness never named — one that could not start, or was lost — since the runtime no longer does. A held turn's
 `-tryN` is proven in `agent-orchestrator/test/held.test.ts`, one test for each of the three ends.
 

@@ -1160,7 +1160,7 @@ screenshots were copied by hand, and their paths sent to the running session.
 What was built:
 
 - `wf start --input <file>`, once per file, also as `--input=<file>`. `start()` takes `inputs`, paths from where `wf start`
-  is typed. Before anything is written, it looks at each and asks the pure `inputRefusal` in `run.ts`, which refuses by name,
+  is typed. Before anything is written, it looks at each and asks the pure `inputRefusal` in `start/inputs.ts`, which refuses by name,
   with the fix:
   - a file that is not there;
   - a directory, or anything else that is not a regular file;
@@ -1417,7 +1417,8 @@ What was built:
 - `stepStatus` reads a task settled `failed` with no closeout whose answer is `unsigned` as `unsigned`, before it returns the
   engine's phase. It stays pure. Only `failed`: a task a person stopped while it was being nudged reads `stopped`, one not settled
   reads `running`, and a closeout that says `blocked` still reads `blocked` first.
-- Every `askedCloseout` parameter in run.ts, `status/status.ts` and `gate/gate.ts` takes the wider type. A caller with only a yes or a no still passes one.
+- Every `askedCloseout` parameter in `tick/assess.ts`, `brief/`, `cancel/`, `decide/`, `forget/`, `list/`, `retry/`, `round/`,
+  `status/status.ts` and `gate/gate.ts` takes the wider type. A caller with only a yes or a no still passes one.
 - The comment on `stepStatus` says what the engine does now. `StepStatus`'s doc and the README's table say an `unsigned` step
   *ended* without its closeout, where they said it *succeeded* without one: both ways still reach the word.
 
@@ -1852,7 +1853,7 @@ What was built:
 - **`wf rm <runId> [<runId> ...]`**, each run judged on its own, one line each (`forgetLine`). A run refused, or held by a worktree git
   would not remove, makes the verb exit 2 once every run has had its line. The CLI refuses `--force-unmerged` without `--delete-branches`,
   a flag it does not take, and flags with no run, before any run is read.
-- **The pure part, in run.ts.** `forgetRefusal` names every reason at once, each with what to do. It refuses a task in flight (a step or its
+- **The pure part, in forget/forget.ts.** `forgetRefusal` names every reason at once, each with what to do. It refuses a task in flight (a step or its
   check, pending or running), anything a pass would file (a step ready, a check, try or round due, roots waiting on runs), an ask no pass
   has spent, and a run another run waits on and has not started on (`gated`), naming the runs it would strand. The last two apply to a run
   nobody called off: a cancelled run whose tasks have settled is forgettable. `runWorktrees` takes only what git lists inside
@@ -1984,7 +1985,7 @@ writes it down as it changes. The README's *Following it: `wf watch` and `ae wat
 What was built:
 
 - **`$WF_ROOT/feed.jsonl`**, a line `{at, run, step?, word, note?}` per change: the run's status (`assess`'s, as `wf tick` prints it,
-  `(pruned)` beside it, and what waits on you as its note) and each step's word and note as `wf ls` says them (`feedWords` in run.ts,
+  `(pruned)` beside it, and what waits on you as its note) and each step's word and note as `wf ls` says them (`feedWords` in feed/feed.ts,
   off the `listing` the pass builds from the reads its judgement already made — the engine is asked nothing more). A run whose record
   is gone gets one `removed`. The tick is the one writer: last in the pass, after the queue, in one append, and a failure to write is the
   pass's `feedError`, which `wf tick` and `wf up` print and nothing else reads.
@@ -2806,7 +2807,7 @@ What it leaves:
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
 `POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate` and `atGate` in `status/status.ts`,
-`approvalRefusal` and `approvedSection` in `run.ts`, `approve` in `verbs.ts`, `readApprovals` in `record/record.store.ts`.
+`approvalRefusal` in `gate/gate.ts`, `approvedSection` in `brief/brief-sections.ts`, `approve` in `verbs.ts`, `readApprovals` in `record/record.store.ts`.
 
 What was built, four commits:
 
@@ -3983,7 +3984,7 @@ The folder is picked from a card's words before any work exists; what the work t
   `git diff` fails (a shallow clone, a missing base, an empty `WF_BASE_REF`) fails with words, never reads as nothing touched.
 - **The shipper runs the same line, mid-merge, with no `WF_BASE_REF`.** There the line reads what the merge brings, `HEAD...MERGE_HEAD`,
   so the build runs on the merged tree that needs it; with neither a base nor a merge in progress, `git diff` fails and so does the
-  check. The line is right in both places, so the ending's brief and `run.ts` did not change; `shipper.md` step 3 says to run it as
+  check. The line is right in both places, so the ending's brief and `brief/` did not change; `shipper.md` step 3 says to run it as
   written and set nothing for it.
 - **`dev-build`, `dev-planned-build` and `ui` keep their unconditional check**: a person who picks one asks for the build whatever the
   diff says. Nobody needs to pick `dev-build` for fear that `dev` will not build a web change.
@@ -4474,7 +4475,7 @@ next turn: the same task, the same id, in the session that signed.
   writes the try on the record as it always did — `tries` gains the same task id with `then: 'nudge'`. Every other try — `--fresh`,
   `--model`, `--recheck`, `retries:`, the run's sign-off nudge — and every round close the waiting task first and file a `-try<n>`
   task, as before.
-- **Turns are read, not recorded.** A turn is a try on the record whose task id is the current one (`turnsOf` in `retry.ts`); the
+- **Turns are read, not recorded.** A turn is a try on the record whose task id is the current one (`turnsOf` in `retry/retry-ask.ts`); the
   runtime counts the answers (`answersIn`). A pass that answered and died before writing the run down leaves more answers than turns,
   and the next pass adopts the answer as the try it was (`adoptTries`), as it adopts a filed try. A step's closeout, its denials and
   whether its closeout was asked for are its current turn's (`views.ts`), so an answered turn still running reads none of the last.

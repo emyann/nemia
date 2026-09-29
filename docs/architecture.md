@@ -9,7 +9,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | One agent session run to completion, durably, on one harness: the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `decide` is exported by neither. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess`, and the words a run is described in. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP and imports no package. | Its pages. |
 
@@ -24,7 +24,7 @@ core is `decide` (`packages/agent-runtime/src/core/domain.ts`) and the shell is 
 `decide` reads a state off the journal and an event off the pass's observation, and asks a statechart
 (`src/core/lifecycle.ts`, XState used as a pure transition function, never run) for the edge: an event with no edge is
 refused and reported on the pass, never guessed at. In the orchestrator, the
-core is `assess` (`packages/agent-orchestrator/src/run.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
+core is `assess` (`packages/agent-orchestrator/src/tick/assess.ts`) and the shell is the controllers `src/runner.ts` re-exports. The core is tested as
 data. The shell reads the world, asks the core, and applies one decision; an `if` that judges belongs in the core.
 
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the

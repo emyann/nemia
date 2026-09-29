@@ -2,9 +2,9 @@
  * The run store under `$WF_ROOT`: a run's id and its record, the files a person owns beside it — its cancellation, its pruning, each ask, approval
  * and acceptance — and the directories a step's check stderr, artifacts and inputs are kept in, outside every workspace.
  *
- * Beneath the controllers, as `retry.ts` is beneath `run.ts`: this file imports neither the engine nor a controller, `runner.ts` re-exports
- * what the package exports of it, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this file loads, which is when
- * the package loads, and a `WF_ROOT` that is not an absolute path is refused then (`wfRoot`).
+ * Beneath the controllers, as `retry/retry-ask.ts` is beneath `retry/retry.ts`: this file imports neither the engine nor a controller,
+ * `runner.ts` re-exports what the package exports of it, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this
+ * file loads, which is when the package loads, and a `WF_ROOT` that is not an absolute path is refused then (`wfRoot`).
  */
 import fs from 'node:fs';
 import path from 'node:path';

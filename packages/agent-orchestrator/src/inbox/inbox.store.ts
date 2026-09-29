@@ -23,6 +23,7 @@ import {
   type InboxListing,
   type QueueTry,
 } from './inbox.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
 import { isFolderTeam, WorkflowError, type Workflow } from '../workflow.ts';
 import { loadWorkflows, workflowFolder } from '../workflow-store.ts';
@@ -152,6 +153,10 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
 /** What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it. */
 export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
 
+/** A queue `queueRefusal` refused, by its kind: a card a run's record names, or one already queued, is a `Conflict`; the rest `Invalid`. */
+const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]): Conflict | WorkflowError =>
+  startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
+
 /**
  * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
  * takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The card's file
@@ -160,9 +165,9 @@ export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: 
  * cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea. When that time cannot be
  * set back, the queue is written all the same.
  *
- * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card — naming the cards
- * there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names, one already queued, and one with no
- * workflow and none given. A `workflow` given, queued or taken back, is written over the card's own, and refused onto a folder team for a
+ * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`) —
+ * naming the cards there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names and one already
+ * queued (`Conflict`), and one with no workflow and none given. A `workflow` given, queued or taken back, is written over the card's own, and refused onto a folder team for a
  * card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged. `off` on a card not queued writes
  * nothing, and says so.
  */
@@ -175,23 +180,18 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new WorkflowError(
-      `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
-    );
+    throw new Missing({
+      message: `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
+    });
   }
   const exists = how.off ? () => true : isDirectory;
   const card = parseInboxCard(`${name}.md`, text, exists);
   if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
   if (!how.off) {
-    const listing = readInbox();
-    const why = queueRefusal(
-      card,
-      file,
-      listing.find((l) => l.name === name)?.startedAs ?? [],
-      listing.find((l) => l.name === name)?.queued?.place ?? null,
-      how.workflow,
-    );
-    if (why) throw new WorkflowError(why);
+    const listed = readInbox().find((l) => l.name === name);
+    const startedAs = listed?.startedAs ?? [];
+    const why = queueRefusal(card, file, startedAs, listed?.queued?.place ?? null, how.workflow);
+    if (why) throw queueRefused(why, card, startedAs);
   }
   if (how.workflow !== undefined) {
     const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo });

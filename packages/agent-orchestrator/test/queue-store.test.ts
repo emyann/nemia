@@ -26,7 +26,7 @@ const INBOX = path.join(ROOT, 'inbox');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, cancel, decide, listRuns, readInbox, readRun, start, tick } = await import('../src/runner.ts');
+const { addToInbox, cancel, decide, listRuns, readInbox, readRun, start, startFromInbox, tick } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 const { queueTries } = await import('../src/inbox/inbox.store.ts');
 
@@ -34,6 +34,10 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+
+/** Refused by name, as `refusedWith`, and of the kind `tag` (`Missing`, `Conflict`, `Invalid`), which the api answers a status by. */
+const refusedAs = (tag: string, pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
+  err._tag === tag && refusedWith(pattern)(err);
 
 /**
  * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is settled
@@ -658,7 +662,8 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
 
   await assert.rejects(
     queue('no-such-card'),
-    refusedWith(
+    refusedAs(
+      'Missing',
       new RegExp(
         `^no card no-such-card in the inbox\\. Its cards are: ${bare.card.name}\\. Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>"\\.$`,
       ),
@@ -673,7 +678,8 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
   await assert.rejects(queue('../runs/x'), refusedWith(/^`\.\.\/runs\/x` is not a card's name/));
   await assert.rejects(
     queue(bare.card.name),
-    refusedWith(
+    refusedAs(
+      'Invalid',
       new RegExp(
         `^${bare.card.name}\\.md: no workflow — a queued card starts on its own, and nothing says what runs it\\. Queue it with its workflow: wf inbox queue ${bare.card.name} --workflow <w> writes both\\.$`,
       ),
@@ -698,7 +704,8 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
   );
   await assert.rejects(
     queue(bare.card.name),
-    refusedWith(
+    refusedAs(
+      'Conflict',
       new RegExp(
         `^${bare.card.name}\\.md: already queued, at \\S+, 1 in the queue's order: the tick starts it when its turn comes and a run slot is free\\. To queue it again, take it back first: wf inbox queue ${bare.card.name} --off\\.$`,
       ),
@@ -719,12 +726,18 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
     path.join(RUNS, 'started-already-zz99.json'),
     JSON.stringify({ ...readRun(started('x', at(1)).id), id: 'started-already-zz99', from: { inbox: 'kept-a1b2' } }),
   );
-  await assert.rejects(
-    queue('kept-a1b2'),
-    refusedWith(
-      /^kept-a1b2\.md: this card was started as started-already-zz99 — that run's record says so — and is still in the inbox because its removal failed\./,
-    ),
-    "a card a run's record names, its removal failed, is refused",
+  const startedAlready =
+    /^kept-a1b2\.md: this card was started as started-already-zz99 — that run's record says so — and is still in the inbox because its removal failed\./;
+  await assert.rejects(queue('kept-a1b2'), refusedAs('Conflict', startedAlready), "a card a run's record names, its removal failed, is refused");
+  assert.throws(
+    () => startFromInbox({ name: 'kept-a1b2', callerRepo: repo }),
+    refusedAs('Conflict', startedAlready),
+    'and so is its start, of the same kind',
+  );
+  assert.throws(
+    () => startFromInbox({ name: 'no-such-card', callerRepo: repo }),
+    refusedAs('Missing', /^no card no-such-card in the inbox\. Its cards are: .*\. Start one of those — wf start /),
+    'a start of a card not there',
   );
   assert.equal(fs.readFileSync(kept, 'utf8').includes('queued:'), false, 'and not queued');
 });

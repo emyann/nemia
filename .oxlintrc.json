@@ -294,7 +294,7 @@
     {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 311, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 297, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }]
       }
     },

@@ -15,7 +15,7 @@ process.env.WF_ROOT = ROOT;
 const { advance, readRun, start } = await import('../runner.ts');
 const { main } = await import('./main.ts');
 
-type Engine = Parameters<typeof main>[1];
+type Engine = NonNullable<Parameters<typeof main>[1]>;
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

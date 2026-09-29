@@ -98,9 +98,9 @@ What is held and let go by hand:
 | The daemon's claim on the store, `daemon.json` | `takeStore` `daemon-store.ts:171-201`, `releaseStore` `:243-251` | `finally` in `wf up` (`cli.ts:1169-1173`) and a signal handler | Two release paths: the handlers call `releaseStore` then `process.exit` (`cli.ts:1111-1113`), so on a signal the `finally` is skipped. Nothing is lost by it — the process ends, and a pass dropped mid-way is picked up by the next — but each new thing `wf up` holds has to be let go in both places |
 | The beat timer | `cli.ts:1120` (unref'd) | `clearInterval` in the same `finally` | as above |
 | `wf watch`'s fs watcher and 1 s timer | `feed-store.ts:275, 282`; `cli.ts:1188-1190` | `stop()` exists and is never called: the command returns a promise that never settles | ends only when the process is killed |
-| The api's feed stream | `apps/api/src/feed.ts:39-43, 83-88` | a hand-made deferred resolved by `stream.onAbort`, then `finally { watch.stop() }` | none known; `test/feed.test.ts:299-315` proves the stop |
-| `claude` for the usage quota | `apps/api/src/quota.ts:321-380` | 60 lines: a `done` flag, `settle()`, a SIGTERM timer (`:346`), a SIGKILL escalation (`:335`) | none known |
-| An MCP server asked for its tools | `apps/api/src/capabilities.ts:520-545` | `Promise.race` with a timer, `finally { clearTimeout; client.close() }` | the race's loser keeps running until `close` |
+| The api's feed stream | `apps/api/src/feed.ts:39-43, 83-88` (now `feedEvents` in `factory/feed.ts`) | a hand-made deferred resolved by `stream.onAbort`, then `finally { watch.stop() }` | none known; `test/feed.test.ts:299-315` proves the stop |
+| `claude` for the usage quota | `apps/api/src/quota.ts:321-380` (now `usageAsk` in `factory/quota.ts`) | 60 lines: a `done` flag, `settle()`, a SIGTERM timer (`:346`), a SIGKILL escalation (`:335`) | none known |
+| An MCP server asked for its tools | `apps/api/src/capabilities.ts:520-545` (now `serverAsk` in `capabilities/capabilities.ts`) | `Promise.race` with a timer, `finally { clearTimeout; client.close() }` | the race's loser keeps running until `close` |
 | File descriptors | `feed-store.ts:49/55, 99/103`, `views.ts:387/394`, `store.ts:604/613` | `try`/`finally` | none |
 | A worktree | `worktree.ts:357` | `wf rm` and prune only (`forget.ts:190-197, 388-396`) | on purpose, see below |
 
@@ -402,7 +402,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their
    routes; moving each `why` onto `Missing` or `Conflict` puts them in the table too.
 9. **The api's resources.** The feed as a `Stream` over the watch, `quota.ts`'s child and `capabilities.ts`'s MCP ask under
-   `acquireRelease` and `Effect.timeout`.
+   `acquireRelease` and `Effect.timeout`. Landed under B: `feedEvents`, `usageAsk` and `serverAsk`, each let go on one path and a test
+   of each that interrupts it or runs out its time. The asks requests share are still shared, and a request's going interrupts only
+   the feed's watch, which is its own.
 10. **The api's root and engine as layers.** The 29 dynamic imports become static, file by file.
 
 Not on the list: the store as Effects, the tick as a `Schedule`, `Effect.log`, `Schedule` retries, the meter, and the web app.

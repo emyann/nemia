@@ -421,6 +421,18 @@ test('a served card that does not decode: unstartable, naming its first wrong fi
   assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
 });
 
+test('a served card whose wrong field holds a huge value is refused in bounded words: its first 60 characters, cut marked', async () => {
+  const huge = Array.from({ length: 100_000 }, (_, i) => i);
+  const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: huge, protocolBinding: 'JSONRPC' }] }) });
+  const { e } = engineOn(s);
+  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  assert.equal(a.reason, 'unstartable');
+  assert.ok((a.error ?? '').includes(`its \`supportedInterfaces.0.url\` is ${JSON.stringify(huge).slice(0, 60)}…, where`), a.error);
+  assert.ok(JSON.stringify(huge).length > 500_000);
+  assert.ok((a.error ?? '').length < 1000, `${(a.error ?? '').length} characters`);
+  assert.equal(s.paths.length, 0, 'no A2A request was made');
+});
+
 test('a scheme of a kind A2A 1.0 does not define is kept: a requirement that names it is unmet, in either form, and another requirement is met', async () => {
   const future = { wire: { futureScheme: { flow: 'x' } }, sdk: { scheme: { $case: 'futureScheme', value: {} } } };
   for (const [form, scheme] of Object.entries(future)) {

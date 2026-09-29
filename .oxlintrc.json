@@ -829,7 +829,7 @@
     {
       "files": ["packages/agent-runtime/src/core/event-schema.ts"],
       "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
+        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

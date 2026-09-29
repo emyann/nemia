@@ -148,7 +148,7 @@ export function viewedOnce(e: Engine): Engine {
 }
 
 /** The engine's verbs that change no task. */
-const ENGINE_READS = new Set(['tick', 'list', 'logs', 'transcript', 'feed', 'watch', 'io', 'start']);
+const ENGINE_READS = new Set(['tick', 'list', 'logs', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names none the report could carry. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {

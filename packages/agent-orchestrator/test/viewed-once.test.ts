@@ -26,6 +26,9 @@ const counting = () => {
     async io() {
       return {};
     },
+    async path() {
+      return [];
+    },
     async answer() {},
     async stop() {},
     async tick() {
@@ -41,8 +44,9 @@ test('a task is viewed once for a command, however many times the command reads 
   await Promise.all([e.view('a'), e.view('a'), e.view('b')]);
   await e.view('a');
   await e.list();
+  await e.path('a');
   await e.view('a');
-  assert.deepEqual(Object.fromEntries(asked), { a: 1, b: 1 });
+  assert.deepEqual(Object.fromEntries(asked), { a: 1, b: 1 }, 'a list and a path read, and change nothing');
 });
 
 test('a verb that changes a task drops its view alone; a pass, and a verb the memo does not know, drop every view', async () => {

@@ -26,16 +26,9 @@ import {
   type AgentSchema,
 } from 'agent-orchestrator';
 import {
-  AGENT_KEYS,
-  AGENT_OWN_KEYS,
   AGENTS_FOLDER,
   agentCard,
   agentNameRefusal,
-  FORMER_KEYS,
-  formerSandbox,
-  frontmatterKey,
-  isCardFile,
-  splitFrontmatter,
   type AgentCardShape,
   type AgentDraft,
   type AgentSkill,
@@ -47,6 +40,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
+import { empty, unreadListing } from './listing.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
@@ -97,12 +91,6 @@ export type AgentListing = {
    */
   untried: Untried | null;
 };
-
-/**
- * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its role, description, skills and system prompt) are no step's, so the form
- * shows them apart (`RoleKey`).
- */
-const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 /**
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
@@ -165,41 +153,8 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
       return null;
     }
   };
-  if (agent === undefined || agent instanceof Error) {
-    const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
-    const keys = Object.fromEntries(
-      ROLE_KEYS.flatMap((key) => {
-        const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
-        return value === undefined ? [] : [[key, value]];
-      }),
-    ) as Partial<Record<RoleKey, string>>;
-    const former =
-      keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined
-        ? formerSandbox(keys.permissionMode)
-        : undefined;
-    if (former !== undefined) {
-      delete keys.permissionMode;
-      keys.sandbox = former;
-    }
-    let body = '';
-    try {
-      body = splitFrontmatter(file, source).body;
-    } catch {
-      body = source;
-    }
-    return {
-      ...empty(from, dir, file, name, version, usedBy),
-      role: frontmatterKey(source, 'role') ?? null,
-      description: frontmatterKey(source, 'description') ?? null,
-      keys,
-      body,
-      schema: sidecarOf(keys.output),
-      skills: skillsLineOf(source),
-      systemPrompt: frontmatterKey(source, 'systemPrompt') ?? null,
-      source,
-      error: agent ? agent.message : `${AGENTS_FOLDER}/${name}.md does not read.`,
-    };
-  }
+  if (agent === undefined || agent instanceof Error)
+    return unreadListing(empty(from, dir, file, name, version, usedBy), source, agent, sidecarOf);
   let card: AgentSkill[] | null = null;
   let cardError: string | null = null;
   try {
@@ -229,37 +184,6 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     untried: null,
   };
 }
-
-/**
- * A `skills:` line as written, for a file that does not read — none where it names a card file, a former line the package refuses: the
- * form's save then writes the agent without it, which is the fix its refusal names.
- */
-function skillsLineOf(source: string): string | null {
-  const line = frontmatterKey(source, 'skills');
-  return line === undefined || isCardFile(line) ? null : line;
-}
-
-const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing => ({
-  name,
-  from,
-  dir,
-  file,
-  role: null,
-  description: null,
-  keys: {},
-  body: '',
-  schema: null,
-  card: null,
-  cardError: null,
-  skills: null,
-  given: [],
-  systemPrompt: null,
-  source: '',
-  version,
-  usedBy,
-  error: null,
-  untried: null,
-});
 
 /**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why

@@ -292,9 +292,7 @@ export function renderAgent(draft: AgentDraft): string {
     if (key === 'name')
       refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
     if (isOwnKey(key))
-      refuse(
-        `${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${OWN_LINE[key]}, once.`,
-      );
+      refuse(`${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${OWN_LINE[key]}, once.`);
     if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);

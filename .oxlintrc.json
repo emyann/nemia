@@ -196,9 +196,6 @@
     {
       "files": ["apps/api/src/agents/agents.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 516, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 21 }],
         "sonarjs/cognitive-complexity": ["error", 18]
       }
     },
@@ -272,8 +269,7 @@
     {
       "files": ["apps/web/src/components/AgentForm.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 177, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 22 }]
+        "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -449,7 +445,7 @@
     {
       "files": ["apps/web/src/routes/agents_.$from.$agent.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 91, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -750,8 +746,7 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.ts"],
       "rules": {
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 29]
+        "sonarjs/cognitive-complexity": ["error", 22]
       }
     },
     {

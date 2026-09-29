@@ -119,7 +119,10 @@ test('a render refuses a key no agent has, agent:, wiring, the role or the descr
   assert.throws(r({ check: 'npm test' }), (e: Error) => e.message.startsWith('agents/a.md: `check` is wiring, and belongs on the step'));
   assert.throws(r({ modle: 'opus' }), (e: Error) => e.message.startsWith('agents/a.md: `modle` is not a key an agent has'));
   assert.throws(r({ description: 'x' }), (e: Error) => e.message.startsWith("agents/a.md: `description` is the agent's own line"));
-  assert.throws(r({ role: 'x' }), (e: Error) => e.message === "agents/a.md: `role` is the agent's own line, not one of its role keys — give it as the role, once.");
+  assert.throws(
+    r({ role: 'x' }),
+    (e: Error) => e.message === "agents/a.md: `role` is the agent's own line, not one of its role keys — give it as the role, once.",
+  );
   assert.throws(
     () => renderAgent({ name: 'a', role: 'one\ntwo', keys: {}, body: 'x' }),
     (e: Error) => e.message.startsWith('agents/a.md: `role` holds a line break'),

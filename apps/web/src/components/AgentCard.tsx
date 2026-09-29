@@ -19,7 +19,7 @@ export function AgentCard({ agent }: { agent: AgentListing }) {
       data-agent-card
       className="relative flex h-full flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-sm ring-1 ring-foreground/10 transition-shadow hover:shadow-md hover:ring-foreground/20"
     >
-      <div className="flex justify-center bg-neutral-100/70 pt-6 pb-4 dark:bg-neutral-900">
+      <div className="flex justify-center bg-neutral-100/70 pt-6 pb-4 dark:bg-white/5">
         <AgentFace name={agent.name} size={112} follows plate className="drop-shadow-sm" />
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 pt-3 pb-4">

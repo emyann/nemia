@@ -130,13 +130,16 @@ export const personOf = (name: string): string => {
 
 const FACE = 'shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800';
 
+const PLATE = 'shrink-0 dark:[&>path]:opacity-25';
+
 type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolean; className?: string };
 
 /**
  * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
  * design. Named as a person is, for a screen reader; `size` in pixels. Still, it is one image; with `follows`, it is an inline drawing whose
  * eyes turn toward the pointer and which comes alive while hovered — unless the person asked for reduced motion, or has no fine pointer
- * that hovers, where its eyes stay still. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours.
+ * that hovers, where its eyes stay still. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours,
+ * dimmed in the dark theme.
  */
 export function AgentFace({ name, size, follows, plate, className }: FaceProps) {
   if (follows) return <FollowingFace name={name} size={size} plate={plate} className={className} />;
@@ -147,7 +150,7 @@ export function AgentFace({ name, size, follows, plate, className }: FaceProps) 
       background={plate ? 'squircle' : false}
       title={personOf(name)}
       data-agent-face={name}
-      className={cn(plate ? 'shrink-0' : FACE, className)}
+      className={cn(plate ? PLATE : FACE, className)}
     />
   );
 }
@@ -164,7 +167,7 @@ function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follow
       background={plate ? 'squircle' : false}
       title={personOf(name)}
       data-agent-face={name}
-      className={cn(plate ? 'shrink-0' : FACE, className)}
+      className={cn(plate ? PLATE : FACE, className)}
     />
   );
 }

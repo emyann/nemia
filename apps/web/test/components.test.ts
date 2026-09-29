@@ -4537,6 +4537,11 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   const plated = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true, plate: true }));
   assert.match(plated, backdrop, 'a backdrop drawn under the face, in its own colours');
   assert.doesNotMatch(plated, /rounded-full|bg-neutral-100/, 'and no grey round behind it');
+  assert.match(
+    plated,
+    /^<svg [^>]*class="[^"]*dark:\[&amp;&gt;path\]:opacity-25/,
+    "its backdrop, the drawing's one path of its own, dimmed in the dark theme",
+  );
   const bare = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true }));
   assert.doesNotMatch(bare, backdrop);
   assert.match(bare, /class="[^"]*rounded-full bg-neutral-100/);

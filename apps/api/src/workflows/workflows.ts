@@ -506,8 +506,9 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
  *   Guarded (guard.ts); the body is refused as `startWords` and `startOf` say. 201 with the run's `Location` once its record is written.
  *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `wf start`'s refusal is an
  *   `Invalid`, 422: a folder that does not read as a workflow, a step named for another's check or try, a `.worktreeinclude` it cannot
- *   use, a repository git cannot read, or a run this one cannot wait on (`afterRefusal`); a failure that is not a refusal, a 500. With a
- *   card, the api's repository is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
+ *   use, or a run this one cannot wait on (`afterRefusal`). A failure that is not a refusal is a 500, git's on a repository it cannot
+ *   branch from among them — no git checkout, no commit — which the queue tries again on its next pass. With a card, the api's repository
+ *   is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
  *   `folderOf` found. `startFromInbox` refuses a card not there as a `Missing` (404), one a run's record already names as a
  *   `Conflict` (409), and the rest as an `Invalid` (422): a card that does not read, a workflow that does not load, a blank brief, and
  *   what `start()` refuses. A run started when the card could not be

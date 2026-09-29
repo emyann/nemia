@@ -9,12 +9,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Closeout } from './closeout/closeout.ts';
-import { inside } from './workspace/workspace.ts';
-import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts/artifacts.ts';
-import { isGitRun, type Run } from './record/record.ts';
-import { artifactsDir, checkStderr, lstatOf } from './record/record.store.ts';
-import { gitSays } from './workspace/worktree.store.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import { inside } from '../workspace/workspace.ts';
+import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
+import { isGitRun, type Run } from '../record/record.ts';
+import { artifactsDir, checkStderr, lstatOf } from '../record/record.store.ts';
+import { gitSays } from '../workspace/worktree.store.ts';
 
 /**
  * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`): a declared file written and never handed over is a

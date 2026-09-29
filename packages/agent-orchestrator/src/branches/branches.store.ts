@@ -8,15 +8,14 @@
  * engine nor a controller, and `runner.ts` re-exports most of what it exports. What asks the engine as well — `parentOf`, `decide` — is
  * the controllers' (`views.verb.ts`, `decide.verb.ts`).
  */
-import { execCounted } from './meter/tally.store.ts';
-import { resultSteps } from './branches/branches.ts';
-import { isGitRun, type GitRun, type Run } from './record/record.ts';
-import type { BranchStanding } from './status/status.ts';
-import type { ParentRun } from './wait/wait.ts';
-import type { Shipped } from './decide/decide.ts';
-import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
-import { readRun, stepsOf } from './record/record.store.ts';
-import { git, gitSays } from './workspace/worktree.store.ts';
+import { execCounted } from '../meter/tally.store.ts';
+import { resultSteps, radius, sensitivePaths, type Radius, type Touched } from './branches.ts';
+import { isGitRun, type GitRun, type Run } from '../record/record.ts';
+import type { BranchStanding } from '../status/status.ts';
+import type { ParentRun } from '../wait/wait.ts';
+import type { Shipped } from '../decide/decide.ts';
+import { readRun, stepsOf } from '../record/record.store.ts';
+import { git, gitSays } from '../workspace/worktree.store.ts';
 
 /**
  * Has this branch landed on the base branch? Git's answer, not ours — and which yes it is (`Shipped`).

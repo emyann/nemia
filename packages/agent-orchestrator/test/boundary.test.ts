@@ -28,13 +28,13 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement at the root of `src`: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['effect', 'radius', 'rendering', 'run', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['effect', 'run', 'workflow'].map((f) => `src/${f}.ts`);
 
 /**
- * The I/O beneath the controllers at the root of `src`: no runtime, never a controller or the client, and a tree (`STORE_BOTTOM`,
- * `STORE_SHARED`).
+ * The I/O beneath the controllers at the root of `src`: none, as every store sits in a feature folder under a `.store.ts` name. A store
+ * imports no runtime, never a controller or the client, and loads as a tree (`STORE_BOTTOM`, `STORE_SHARED`).
  */
-const STORE = ['branches', 'artifacts'].map((f) => `src/${f}.ts`);
+const STORE: readonly string[] = [];
 
 /**
  * What uses the runtime at the root of `src` and in `bin`, through the client: the root, the controllers it re-exports, and the CLI
@@ -326,8 +326,8 @@ test('REFUSED: a file of no kind, a file of two, and a kind naming a file that i
   assert.deepEqual(unsorted({ ...packageSources(), 'src/x.ts': [] }), [
     'src/x.ts is of no kind: put it in a feature folder under a name that says its kind, or name it in PURE, STORE, CONTROLLER or CLIENT in test/boundary.test.ts',
   ]);
-  const { 'src/radius.ts': _, ...gone } = packageSources();
-  assert.deepEqual(unsorted(gone), ['PURE names src/radius.ts, which is not there']);
+  const { 'src/effect.ts': _, ...gone } = packageSources();
+  assert.deepEqual(unsorted(gone), ['PURE names src/effect.ts, which is not there']);
   const { [CLIENT]: __, ...clientGone } = packageSources();
   assert.deepEqual(unsorted(clientGone), ['CLIENT names src/runtime-client.ts, which is not there']);
   const named = [...PURE, ...STORE, ...CONTROLLER, CLIENT];
@@ -388,14 +388,16 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/tick/assess.ts', 'src/record/record.store.ts')), [
     'src/tick/assess.ts is pure and imports src/record/record.store.ts',
   ]);
-  assert.deepEqual(impurities(adding('src/radius.ts', 'node:fs')), ['src/radius.ts is pure and imports node:fs']);
+  assert.ok('src/branches/branches.ts' in packageSources());
+  assert.deepEqual(impurities(adding('src/branches/branches.ts', 'node:fs')), ['src/branches/branches.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'fs')), ['src/workflow.ts is pure and imports fs']);
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [
     'src/check/check.ts is pure and imports node:child_process',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
-  assert.deepEqual(impurities(adding('src/rendering.ts', 'src/agents/agents.store.ts')), [
-    'src/rendering.ts is pure and imports src/agents/agents.store.ts',
+  assert.ok('src/agents/agents.ts' in packageSources());
+  assert.deepEqual(impurities(adding('src/agents/agents.ts', 'src/agents/agents.store.ts')), [
+    'src/agents/agents.ts is pure and imports src/agents/agents.store.ts',
   ]);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'src/folder/folder.store.ts')), [
     'src/workflow.ts is pure and imports src/folder/folder.store.ts',
@@ -425,8 +427,9 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', 'agent-runtime')), [
     'src/record/record.store.ts is a store file and imports agent-runtime',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/branches.ts', 'src/runner.ts')), [
-    'src/branches.ts is a store file and imports src/runner.ts, a controller: a cycle',
+  assert.ok('src/branches/branches.store.ts' in packageSources());
+  assert.deepEqual(treeBreaks(adding('src/branches/branches.store.ts', 'src/runner.ts')), [
+    'src/branches/branches.store.ts is a store file and imports src/runner.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/folder/folder.store.ts', 'src/record/record.store.ts')), [
     'src/folder/folder.store.ts imports src/record/record.store.ts, which the tree does not let it: it is the bottom, and imports no store file',
@@ -443,8 +446,9 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', 'src/workspace/worktree.store.ts')), [
     'src/record/record.store.ts imports src/workspace/worktree.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/artifacts.ts', 'src/branches.ts')), [
-    'src/artifacts.ts imports src/branches.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/record.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts',
+  assert.ok('src/artifacts/artifacts.store.ts' in packageSources());
+  assert.deepEqual(treeBreaks(adding('src/artifacts/artifacts.store.ts', 'src/branches/branches.store.ts')), [
+    'src/artifacts/artifacts.store.ts imports src/branches/branches.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/record.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/inbox/inbox.store.ts', 'src/decide/decide.verb.ts')), [
     'src/inbox/inbox.store.ts is a store file and imports src/decide/decide.verb.ts, a controller: a cycle',
@@ -464,8 +468,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(unimported('src/daemon/daemon.store.ts')), [
     "src/daemon/daemon.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
   ]);
-  assert.deepEqual(treeBreaks(adding('bin/wf.ts', 'src/branches.ts')), [
-    'bin/wf.ts imports src/branches.ts, a store file: only the client and the controllers beneath the CLI import the store',
+  assert.deepEqual(treeBreaks(adding('bin/wf.ts', 'src/branches/branches.store.ts')), [
+    'bin/wf.ts imports src/branches/branches.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
   ]);
   assert.deepEqual(treeBreaks(adding('src/cli/main.ts', 'src/record/record.store.ts')), [
     'src/cli/main.ts imports src/record/record.store.ts, a store file: only the client and the controllers beneath the CLI import the store',

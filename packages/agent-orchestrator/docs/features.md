@@ -529,8 +529,8 @@ What it leaves:
 
 Plan §4 G. On a run waiting on you, `wf decide` prints three things between the verdicts and the closeouts:
 what the result branch touched, the lesson line, and the whole diff of the check-affecting files. Beside
-each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy` and
-`sensitiveDiff` in `src/branches.ts` ask git, and `consumption` in `src/views/views.verb.ts` the engine. `decide` returns `used` off the
+each step's check it prints what the step's session consumed. `src/branches/branches.ts` and `src/status/status.ts` are the pure part. `touchedBy` and
+`sensitiveDiff` in `src/branches/branches.store.ts` ask git, and `consumption` in `src/views/views.verb.ts` the engine. `decide` returns `used` off the
 views it already read, so the screen still reads each task once (each view is a harness observe, plan §4b). The README section *What the
 screen puts in front of you* is the account.
 
@@ -1073,7 +1073,7 @@ regexp that no path git prints could match, so every package's changes fell into
 
 What was built:
 
-- `workspaceGlob` drops a leading `./` and a trailing `/`, and everything in `radius.ts` that reads a workspace goes through
+- `workspaceGlob` drops a leading `./` and a trailing `/`, and everything in `branches/branches.ts` that reads a workspace goes through
   it: `groupOf` (now `packageOf`, then a top-level directory), `lessonGlobs` and the new `isLesson`.
 - A glob with `**` is not refused, since the repository's `package.json` is not ours. `deepWorkspaces` names such globs as
   written, `radius` carries them, and `radiusLines` adds a `workspaces` line under the branch that names each one. Each file
@@ -1225,7 +1225,7 @@ What was built:
   - `escapes`: one that climbs out of it, such as `../notes.md`;
   - `files`: an absolute path in the step's directory;
   - `outside`: any other absolute path.
-- `collectArtifacts` in `artifacts.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
+- `collectArtifacts` in `artifacts/artifacts.store.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
   works in its workspace. It copies each `workspace` file into the step's directory at the same path, and the pass's note names
   what it copied. It is level-triggered, so a pass that dies halfway loses nothing: the next copies only what changed, by size
   and by time within a millisecond. Nothing is copied for:
@@ -2260,7 +2260,7 @@ and `wf decide`'s list. Ship's are taken after the ship's gate, so no person rea
 What was built: on the pass that writes a landing's `{ commit }` — the commit made on the check's exit 0, or found on HEAD after a restart
 — `landEnding` removes every regular `.png` directly in the ending's directory that its closeout does not name, never through a link, and
 writes `e2e-pictures.txt` in their place: why, where the check's output and stderr are, and each name with its size (`dropLandedPictures`
-in artifacts.ts). The note is written before anything is removed and left as it is after, so a pass that dies halfway leaves the whole list
+in artifacts/artifacts.store.ts). The note is written before anything is removed and left as it is after, so a pass that dies halfway leaves the whole list
 and the next removes the rest. An abort, an untouched landing, a refused check and one that did not finish keep every picture.
 
 Why not a hardlink of byte-identical files: once a landed ship keeps no pictures there is no pair across steps left on a pass, and within
@@ -3521,7 +3521,7 @@ What the board calls:
 
 - **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
   line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
-  branch standings last (`branchStandings(run, resultBranches(run))` in branches.ts, which reads git); without them only the gate says a run
+  branch standings last (`branchStandings(run, resultBranches(run))` in branches/branches.store.ts, which reads git); without them only the gate says a run
   is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
 - **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
@@ -4860,7 +4860,7 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
 
 - **A task's journal is read once for its view** (the runtime's `view`), and `wf ls` reads each run's views once (`viewedOnce`), where it
   read them for the slots and again for the listing.
-- **Git is asked once a repository** (`branchReader` in `src/branches.ts`): one `for-each-ref` with `%(ahead-behind:<base>)` for every
+- **Git is asked once a repository** (`branchReader` in `src/branches/branches.store.ts`): one `for-each-ref` with `%(ahead-behind:<base>)` for every
   base the runs name, listed on the first question about that repository, answers what `isShipped` and `branchStandings` asked one
   process at a time (`oneByOne`, kept as the reference its test compares with, shape by shape). Git refuses the whole listing for one base
   it cannot read — a commit it does not have, a branch it does not have — so the reader lists again without it and asks that one run's

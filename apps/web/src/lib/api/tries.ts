@@ -1,6 +1,6 @@
 /**
- * A step's tries, as a run's detail carries them (apps/api/src/detail/tries.ts), with the files a closeout named (artifacts.ts) and its
- * check's logs (logs.ts).
+ * A step's tries, as a run's detail carries them (apps/api/src/detail/tries.ts), with the files a closeout named (agent-orchestrator's
+ * artifacts/artifacts.store.ts) and its check's logs (logs.ts).
  */
 
 /**

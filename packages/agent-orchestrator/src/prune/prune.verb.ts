@@ -16,7 +16,7 @@ import { decision, type Decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from '../forget/forget.ts';
 import { HOME, askFile, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runsDir, stepsOf } from '../record/record.store.ts';
 import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
-import { resultTips, shippedOf, standingsOf } from '../branches.ts';
+import { resultTips, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';

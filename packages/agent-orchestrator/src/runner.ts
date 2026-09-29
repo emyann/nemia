@@ -13,11 +13,12 @@
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step
- * hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and `skills.store.ts` (an
- * agent and a skill written), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and
- * `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath
- * `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
+ * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
+ * `skills.store.ts` (an agent and a skill written), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on
+ * disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree:
+ * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
+ * (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
@@ -26,21 +27,14 @@ export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
-  LARGE_CONTEXT,
   LESSON,
   branchesToRead,
-  budgetWord,
-  dollars,
   inFullLines,
   lessonLine,
   parseGlobs,
-  peakMark,
-  readWords,
-  rebuiltCache,
-  sumUsage,
   touchedLines,
-  usedLines,
-} from './radius.ts';
+} from './branches/branches.ts';
+export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
 export { isGitRun, placeOf } from './run.ts';
 export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**
@@ -236,7 +230,7 @@ export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, 
 export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
-export { artifactFiles, missingArtifacts } from './artifacts.ts';
+export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export {
   artifacts,
   branchReader,
@@ -250,7 +244,7 @@ export {
   sensitiveDiff,
   touchedBy,
   type BranchReader,
-} from './branches.ts';
+} from './branches/branches.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, agentPlaces, agentSkillsFound, findAgent, listAgents, removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';

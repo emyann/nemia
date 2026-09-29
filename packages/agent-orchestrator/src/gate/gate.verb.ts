@@ -8,7 +8,7 @@ import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
 import { approvalFile, approvalIn, lstatOf, readAsks, readRun, runFile, stepsOf, writeAsk } from '../record/record.store.ts';
-import { standingsOf } from '../branches.ts';
+import { standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 

@@ -5253,6 +5253,14 @@ page of its own that lists who gives it and holds `preload:` as a switch with it
 on its listing when the try's fence does not reach it). Their commits: 3a `ef147a1` and 3b `c8145ca` (2026-09-25), 3c `60afb7b`
 (2026-09-26). Noted 2026-09-28; until then the line said 3c followed.
 
+## 13. `run.test.ts` beside the folders of `run.ts`
+
+**Deferred** from the feature-folders slices 4a and 4b, which cut `run.ts` into its folders and moved none of its cases: `test/run.test.ts`
+(about 9,400 lines) still tests `assess`, `retry/`, `round/`, `forget/`, `list/`, `start/inputs.ts`, `decide/`, `brief/`, `record/`,
+`status/`, `wait/` and the rest through the `agent-orchestrator/run` face. The design's *Tests beside the code* moves each case into the
+folder of what it tests (`src/<feature>/<feature>.test.ts`), and a case across features stays in `test/`. A mechanical move of its own,
+as a card: the cases unchanged but their imports, each folder's file under the limits, and `suite.test.ts` finding every one.
+
 ## Engine-side work
 
 Not agent-orchestrator features, listed so nothing is lost:

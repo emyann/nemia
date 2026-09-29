@@ -1,76 +1,24 @@
 /**
- * The verbs that answer a run — `wf decide`, `wf retry`, `wf approve`, `wf round` and `wf accept` — as their flags and help: what each takes,
- * read off the command line.
+ * The verbs that answer a run — `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — their flags, read off the command line, and
+ * what each prints.
  */
 import {
-  AGENT_FACING,
-  CHECK_AFFECTING,
-  LESSON,
+  accept,
   approvalWordsRefusal,
+  approve,
   budgetRefusal,
+  budgetWord,
   messageRefusal,
-  parseGlobs,
+  readRun,
+  retry,
+  round,
+  saidLines,
+  say,
+  stepsOf,
   type RetryHow,
   type RetryMode,
 } from '../runner.ts';
-import { usage, amountOf } from './flags.ts';
-
-export const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
-
-What the run produced, and the choice it leaves you. It reports facts and runs nothing. On a run waiting
-on you, after the run's verdicts and before each step's closeout:
-
-  touched   what each result branch changed against the run's base: files and lines by workspace
-            package or top-level directory, then, each only when true, the agent-facing files and
-            the check-affecting ones
-  lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
-  in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
-
-and beside each step's check, what its session consumed — used, cost — or that nobody measured it, then
-its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
-long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
-each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
-Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
-wf approve that lets what follows be filed and the wf retry --message that sends it back.
-
-Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
-and then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
-what happens when the work is done; that prose is printed with the wf approve that runs it and the wf
-retry --message that sends the work back. A workflow with no such step ends by handing you a branch, and
-the git commands are printed instead: ship it, drop it. Neither is run.
-
-  --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
-                       screen; the touched lines still say which files are check-affecting
-
-  check-affecting, the default --sensitive:  ${CHECK_AFFECTING.join(', ')}
-  agent-facing:                              ${AGENT_FACING.join(', ')}
-  where the next agent reads:                ${LESSON.join(', ')}, and <workspace>/docs/ for each
-                                             npm workspace in the base's package.json — not any docs/
-
-A workspace glob is read as npm reads it, ./packages/* as packages/*. One with ** is named on the screen,
-and a file still counts once: in the outermost package on its way, and as a lesson only in its docs/.
-
-A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
-them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
-
-/** `wf decide`'s one flag: `--sensitive`, once, with at least one glob. Anything else is refused before a run is read. */
-export function decideHow(argv: string[]): { sensitive?: string[] } {
-  let sensitive: string[] | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg !== '--sensitive')
-      usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
-    if (sensitive) usage('wf decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
-    const value = argv[++i];
-    const globs = value === undefined || value.startsWith('--') ? [] : parseGlobs(value);
-    if (!globs.length)
-      usage(
-        '--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".',
-      );
-    sensitive = globs;
-  }
-  return { sensitive };
-}
+import { HELP, usage, amountOf, type Engine } from './flags.ts';
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
 const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message', '--budget'];
@@ -202,4 +150,79 @@ export function acceptHow(argv: string[]): { stepName?: string; message?: string
     } else stepName = arg;
   }
   return { ...(stepName !== undefined ? { stepName } : {}), ...(message !== undefined ? { message } : {}) };
+}
+
+/** `wf retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
+export async function retryVerb(rest: string[], e: Engine): Promise<void> {
+  const [runId, stepName] = rest;
+  if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+  const { ask, file, stopFirst } = await retry(e, runId, stepName, retryHow(rest.slice(2)), { stopBlocked: true });
+  const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
+  const then = stopFirst
+    ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
+    : 'the next tick files it, once';
+  console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
+  console.log(`   ${file}`);
+  return;
+}
+
+/** `wf approve`: a step's try approved at its gate, what the next tick files because of it, and the file the approval is written to. */
+export async function approveVerb(rest: string[], e: Engine): Promise<void> {
+  const [runId, stepName, ...more] = rest;
+  if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+  const { approval, file } = await approve(e, runId, stepName, approveHow(more));
+  const after = readRun(runId);
+  const waited = stepsOf(after).some((s) => s.after.includes(stepName));
+  const files = !after.steps[stepName]?.taskId;
+  console.log(
+    `${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${files ? `the next tick files ${stepName}` : waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
+  );
+  console.log(`   ${file}`);
+  return;
+}
+
+/** `wf round`: another round of a loop out of rounds asked for, its cap raised with `--budget`, and the file the ask is written to. */
+export async function roundVerb(rest: string[], e: Engine): Promise<void> {
+  const [runId, ...more] = rest;
+  if (!runId || runId.startsWith('--')) return console.log(HELP);
+  const { stepName, budget } = roundHow(more);
+  const { ask, file } = await round(e, runId, stepName, budget);
+  console.log(
+    `${runId}  asked: round ${ask.round} of ${ask.step}'s loop${ask.budget !== undefined ? `, its cap raised to ${budgetWord(ask.budget)}` : ''} — the next tick files it, once`,
+  );
+  console.log(`   ${file}`);
+  return;
+}
+
+/** `wf accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to. */
+export async function acceptVerb(rest: string[], e: Engine): Promise<void> {
+  const [runId, ...more] = rest;
+  if (!runId || runId.startsWith('--')) return console.log(HELP);
+  const { stepName, message } = acceptHow(more);
+  const { acceptance, file } = await accept(e, runId, stepName, message);
+  const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(acceptance.step));
+  console.log(
+    `${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
+  );
+  console.log(`   ${file}`);
+  return;
+}
+
+/**
+ * `wf say`: words to a step's session, journalled on its task, and printed as `wf decide` prints them. It takes every word after the step
+ * as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
+ */
+export async function sayVerb(rest: string[], e: Engine): Promise<void> {
+  const [runId, stepName, ...words] = rest;
+  if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+  const told = await say(e, runId, stepName, words.join(' '));
+  const { at, attempt, text } = told.said;
+  console.log(
+    `${runId}  said to ${stepName}, try ${told.try}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${told.taskId}: wf decide ${runId} prints it under the step`,
+  );
+  for (const line of saidLines([{ at, attempt, text, try: told.try }])
+    .slice(1)
+    .flatMap((l) => l.split('\n')))
+    console.log(`   ${line}`);
+  return;
 }

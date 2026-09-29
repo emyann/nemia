@@ -85,6 +85,9 @@ holds what every change needs.
     one line, and edits nothing shared. The runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it.
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc. `oxfmt`
     rewraps no comment, so a line you join stays within its 140 columns; a `(` `)` it drops once a comment inside them goes is its own.
+- **A limit is met by cutting the function** (500 code lines a file, 80 a function, cyclomatic 20, cognitive 15), never by raising a
+  ceiling in `.oxlintrc.json`. The commit that shrinks a baselined file lowers its ceiling there and its count in
+  `packages/agent-orchestrator/test/limits.test.ts`, which refuses one left loose; a move renames both.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
 
 ## Git

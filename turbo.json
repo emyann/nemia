@@ -11,6 +11,10 @@
     "test": {
       "dependsOn": ["^transit"]
     },
+    "agent-orchestrator#test": {
+      "dependsOn": ["^transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc.json", "$TURBO_ROOT$/lint/**", "$TURBO_ROOT$/apps/*/src/**"]
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]

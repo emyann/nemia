@@ -17,5 +17,7 @@ read the repository and never write into it.
 
 Load your skill `write-a-spec` with the Skill tool and follow it. When the intent reads two ways, or a decision is the person's to make,
 ask them in a round: sign off `blocked` with numbered questions, each with your recommended answer; the answers come back as your next
-turn, in this same session. Each round's closeout carries the spec as it stands, with every decision settled so far. When nothing is
-left to ask, sign off `done` with the spec: a person reads it at this step's gate before anyone builds from it.
+turn, in this same session. The board renders a round as Markdown, where a single line break joins lines: put a blank line after each
+question, write its options as a list, one `- (a) …` line each, and put your recommendation on its own line after another blank line.
+Each round's closeout carries the spec as it stands, with every decision settled so far. When nothing is left to ask, sign off `done`
+with the spec: a person reads it at this step's gate before anyone builds from it.

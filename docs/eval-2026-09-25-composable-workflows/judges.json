@@ -285,7 +285,7 @@
   "critical_flaws": [
    {
     "shape": "skills-contracts (A)",
-    "flaw": "Its fence depends on steps being in allowlist modes, and the steps that most need fencing are not. 'No sending tool without a sending contract' is built by adding a result's tools to allowedTools on the step held to that result. The implementer runs `permissionMode: auto` (/home/yrnd1/projects/hkb-v2/workflows/agents/implementer.md), which is not an allowlist mode, so `gh pr create` stays reachable from implement. And A narrows the settings deny on `git push`. The fix is to inject denies on every other step (B's move), with the prefixes declared by the provider."
+    "flaw": "Its fence depends on steps being in allowlist modes, and the steps that most need fencing are not. 'No sending tool without a sending contract' is built by adding a result's tools to allowedTools on the step held to that result. The implementer runs `permissionMode: auto` (<repo>/workflows/agents/implementer.md), which is not an allowlist mode, so `gh pr create` stays reachable from implement. And A narrows the settings deny on `git push`. The fix is to inject denies on every other step (B's move), with the prefixes declared by the provider."
    },
    {
     "shape": "skills-contracts (A)",
@@ -293,7 +293,7 @@
    },
    {
     "shape": "skills-contracts (A)",
-    "flaw": "'Not yet' is polling through engine tasks. Every recheck: spawns and journals a check task in the check pool. A GTD item open for weeks at 5m is about 288 tasks a day, even when the answer is a local Done file. Exit 75 is also redefined inside refusedCheck (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/run.ts:1711) for every check: line, not only contract checks."
+    "flaw": "'Not yet' is polling through engine tasks. Every recheck: spawns and journals a check task in the check pool. A GTD item open for weeks at 5m is about 288 tasks a day, even when the answer is a local Done file. Exit 75 is also redefined inside refusedCheck (<repo>/packages/agent-orchestrator/src/run.ts:1711) for every check: line, not only contract checks."
    },
    {
     "shape": "integrations-sinks (B)",
@@ -309,11 +309,11 @@
    },
    {
     "shape": "blocks-library (C)",
-    "flaw": "The S1 loop as drawn breaks the loop contract. `comment` (a script) carries `loop: implement`, and the run hands the loop's target the looping step's declared output. So implement receives `{posted, again}`, not the findings, and LOOP_REPLIES (each reply paired with a finding) has nothing to pair with (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/workflow.ts:247-252 and loopOf)."
+    "flaw": "The S1 loop as drawn breaks the loop contract. `comment` (a script) carries `loop: implement`, and the run hands the loop's target the looping step's declared output. So implement receives `{posted, again}`, not the findings, and LOOP_REPLIES (each reply paired with a finding) has nothing to pair with (<repo>/packages/agent-orchestrator/src/workflow.ts:247-252 and loopOf)."
    },
    {
     "shape": "blocks-library (C)",
-    "flaw": "Script blocks 'on the check harness' have no output channel: the harness yields only an exit code and a log. Their credential path is also removed by readCheckBrief's /^WF_[A-Z_]+$/ filter (/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/check.ts). Putting GH_TOKEN in the brief instead would store it in the engine's journal, which breaks C's own rule 5."
+    "flaw": "Script blocks 'on the check harness' have no output channel: the harness yields only an exit code and a log. Their credential path is also removed by readCheckBrief's /^WF_[A-Z_]+$/ filter (<repo>/packages/agent-orchestrator/src/check.ts). Putting GH_TOKEN in the brief instead would store it in the engine's journal, which breaks C's own rule 5."
    },
    {
     "shape": "blocks-library (C)",

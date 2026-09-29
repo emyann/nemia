@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { files, textOf } from './repo-files.ts';
+import { files, NOT_OURS, ours, textOf } from './repo-files.ts';
 
 /** Each name, and the one tool-call prefix that names the kanban as well as its name does. */
 const NAMES = ['aGVybWVz', 'bm91c3Jlc2VhcmNo', 'Z29vZ2xlL2F4', 'c3Vic3RyYXRl', 'Y2xhdWRlLWEyYQ==', 'amN3YXRzb24=', 'a2FuYmFuXw=='].map(
@@ -23,11 +23,6 @@ const NAMES = ['aGVybWVz', 'bm91c3Jlc2VhcmNo', 'Z29vZ2xlL2F4', 'c3Vic3RyYXRl', '
 
 /** Any of them, in any case: a name spelled with a capital, in a link or inside a longer word is the same name. */
 const NAMED = new RegExp(NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|'), 'i');
-
-/** What is not ours to rewrite, by path from the root: the lockfile, and the vendored skill (a folder, `/` at its end). */
-const NOT_OURS = ['package-lock.json', '.claude/skills/shadcn/'];
-
-const ours = (file: string): boolean => !NOT_OURS.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));
 
 /** Each line of `text` that names another project, as `<line>: <text>`. */
 function othersNamed(text: string): string[] {

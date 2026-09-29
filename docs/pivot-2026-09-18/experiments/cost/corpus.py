@@ -3,8 +3,8 @@ from tx import analyze
 root=os.path.expanduser('~/.claude/projects')
 def ts(s):
     return datetime.datetime.fromisoformat(s.replace('Z','+00:00')).timestamp() if s else None
-files=glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl')
-sub=glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*/subagents/*.jsonl')+glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*/*.jsonl')
+files=glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl')
+sub=glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*/subagents/*.jsonl')+glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*/*.jsonl')
 print('worker transcripts',len(files),'subagent transcripts',len(set(sub)))
 T=collections.Counter()
 bucket=collections.Counter()   # cache_read by context-size bucket

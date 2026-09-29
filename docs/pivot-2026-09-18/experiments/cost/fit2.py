@@ -8,7 +8,7 @@ for f in glob.glob(tasks+'*.jsonl'):
         if e.get('kind') in('measured','ended') and (e.get('usage') or {}).get('costUsd') is not None:
             cost['ae/%s/%d'%(os.path.basename(f)[:-6],e['attempt'])]=e['usage']['costUsd']
 data=[]
-for p in glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl'):
+for p in glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl'):
     rows,names,_=analyze(p)
     names=list(dict.fromkeys(names)); rows=[r for r in rows if r['model']!='<synthetic>']
     if len(names)!=1 or names[0] not in cost or not rows: continue

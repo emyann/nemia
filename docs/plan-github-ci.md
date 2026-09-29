@@ -49,9 +49,11 @@ log, evaluation and experiment, and every commit's metadata. Audited on 2026-09-
   as they are; the history is not rewritten.** Rewriting the authors (`git filter-repo --mailmap`) would change every commit's hash
   after them, which is all of main, and the store's past runs judge "shipped" by whether their result branch is an ancestor of
   main: every finished run would read as not shipped, and every `--after` chain on one would wait for ever.
-- **Local paths.** 28 files at HEAD name `/home/yrnd1` or `/mnt/c/Users/renau` (the evaluation reports, `plan-hold-the-bar.md`,
-  the Jev experiments' scripts and datasets, one judge test). Harmless, but a username; they can be generalised in the rename.
-  With the Jev experiments out of the tree (below), 7 files are left, this one among them.
+- **Local paths.** 28 files at HEAD named `/home/<user>` or `/mnt/c/Users/<user>` with the owner's username (the evaluation
+  reports, `plan-hold-the-bar.md`, the Jev experiments' scripts and datasets, one judge test). Harmless, but a username. With the
+  Jev experiments out of the tree (below), 16 were left, the cost scripts' transcript globs and one test among them. **Generalised at
+  HEAD on 2026-09-29** (`~/…`, `<repo>/…`, `<user>`); the history is not rewritten, and
+  `packages/agent-orchestrator/test/local-paths.test.ts` refuses a new one.
 - **Recorded agent output.** The Jev experiments under `docs/pivot-2026-09-18/experiments/` keep real closeouts, needs and
   judgements from this repository's runs (`e5-closeouts.json`, `judge-runs-2026-09-19.json`, the design dataset, 0.6 MB). They
   describe this repository only. **Decided 2026-09-25: moved out of the tree** — `jev/`, `jev-design/` and `jev-split/` are kept
@@ -120,7 +122,7 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 
 1. ~~Rename the project in the repository (the name, the README, the root package, the board's title, the docs), with the names
    test taught the old project name the way it knows the old package names.~~ Done, 2026-09-29.
-2. Generalise local paths in the files that name them (the experiments' data is already out).
+2. ~~Generalise local paths in the files that name them (the experiments' data is already out).~~ Done, 2026-09-29.
 3. The owner, by hand: tag and branch the old main, rename the repository, push, protect main, CODEOWNERS.
 4. The Actions workflow with the e2e and the secret scan, proven on a first PR.
 5. The ship through a pull request and the merge queue, with the run reading CI's result.

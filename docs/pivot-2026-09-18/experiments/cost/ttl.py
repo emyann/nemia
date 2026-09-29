@@ -2,7 +2,7 @@ import json,glob,os,collections,re
 root=os.path.expanduser('~/.claude/projects')
 seg=collections.defaultdict(lambda:collections.Counter())
 first_meta={}
-for p in glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl'):
+for p in glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl'):
     name=None; seen=set()
     for line in open(p,errors='replace'):
         if '"agent-name"' in line:

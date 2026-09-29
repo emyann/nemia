@@ -103,7 +103,7 @@ because both harnesses load it from a worktree with no code change (REPORT G3, G
 **Must not touch.** `run.ts`, `runner.ts`, `cli.ts`, `README.md`, `workflows/` — those are C's.
 
 **Read first.** REPORT G4 (the reproduced traps: `afer:`, `5m`, `banana`), §3.1 (the key table),
-`hkb:src/templates.ts:291-298` for the message shape (`/home/yrnd1/projects/harness-kanban-board`).
+`hkb:src/templates.ts:291-298` for the message shape (`~/projects/harness-kanban-board`).
 
 **Commit 1, in the first hour — C branches from it.** The `Workflow` type gains `check?: string`
 and `retries?: number`; `parseWorkflow` reads both. Nothing else in that commit.
@@ -138,7 +138,7 @@ You own workflow.ts and test/workflow.test.ts only. First commit, before anythin
 Workflow type gains `check?: string` and `retries?: number` and parseWorkflow reads them — another
 session branches from that commit. Then the closed key list and the refusals in
 docs/plan-hold-the-bar.md §4 A, each with a test that makes it refuse. The message shape is
-hkb's (/home/yrnd1/projects/harness-kanban-board/src/templates.ts:291-298). Do not touch run.ts,
+hkb's (~/projects/harness-kanban-board/src/templates.ts:291-298). Do not touch run.ts,
 runner.ts, cli.ts or the README. Finish with npm test && npm run typecheck green from the root,
 commit on this branch, and close out in one paragraph: what changed, what you refused, what you learned.
 ```
@@ -284,7 +284,7 @@ lesson); `docs/eval-2026-09-12/shape-verify-first.md` for detail the report comp
 Give the run a fact it does not have to believe the agent for: a `check:` command the RUN
 executes after a step, whose exit code decides whether the next step files. Read CLAUDE.md, then
 docs/eval-2026-09-12/REPORT.md §1, G1, G2, G5, G8 and §3 in full, then packages/agent-workflows
-src/run.ts and src/runner.ts in full, then /home/yrnd1/projects/harness-kanban-board/src/check.ts:1-52
+src/run.ts and src/runner.ts in full, then ~/projects/harness-kanban-board/src/check.ts:1-52
 and src/brief.ts:155-243. You own packages/agent-workflows except src/workflow.ts and
 test/workflow.test.ts (another session's; branch from its first commit, which gives Workflow the
 `check` and `retries` fields). apps/api reads run.steps[name].taskId — keep its meaning. Do the

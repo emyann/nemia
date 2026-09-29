@@ -1,8 +1,8 @@
 /**
  * An agent written from a draft (`renderAgent`, `writeAgent`, `removeAgent`): what the board's Agents page saves.
  *
- * The render is the inverse of `parseAgent`, held over every shipped agent. Each refusal of the writer is made to refuse, at shipped
- * defaults, asserted on its message and with the folder as it was.
+ * The render is the inverse of `parseAgent`, held over every agent of the tests' team (`team.ts`). Each refusal of the writer is made
+ * to refuse, at shipped defaults, asserted on its message and with the folder as it was.
  *
  * `WF_ROOT` is set before the modules are imported, since they read it as they load. What the tests hold, beyond their names:
  * - with `repo`, a version read one way and checked the other is refused as stale though nothing changed, and an edit of the SKILL.md
@@ -16,21 +16,21 @@ import path from 'node:path';
 import { agentNameRefusal, parseAgent, renderAgent, WorkflowError, type Agent, type AgentDraft } from '../src/workflow.ts';
 import { agentUsers, agentVersion, loadAgents, loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-agent-');
 process.env.WF_ROOT = ROOT;
 const { AgentWriteError, agentSkillsFound, removeAgent, writeAgent } = await import('../src/runner.ts');
 
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const STORE = path.join(ROOT, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
 
-/** A store whose agents are the repository's, with `dev` beside them: its steps name them. */
+/** A store whose agents are the tests' team's, with `dev` beside them: its steps name them. */
 function fresh(): void {
   fs.rmSync(STORE, { recursive: true, force: true });
-  fs.cpSync(path.join(SHIPPED, 'agents'), AGENTS, { recursive: true });
-  fs.cpSync(path.join(SHIPPED, 'skills'), path.join(STORE, 'skills'), { recursive: true });
-  fs.cpSync(path.join(SHIPPED, 'dev'), path.join(STORE, 'dev'), { recursive: true });
+  fs.cpSync(path.join(TEAM, 'agents'), AGENTS, { recursive: true });
+  fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
+  fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 }
 
 function snapshot(dir: string): Record<string, string> {
@@ -86,9 +86,9 @@ const scribe: AgentDraft = {
   body: 'Write the notes.',
 };
 
-test('every shipped agent renders to a file that reads back as the same agent', () => {
-  const agents = loadAgents(path.join(SHIPPED, 'agents'));
-  assert.ok(agents.size >= 6);
+test("every agent of the tests' team renders to a file that reads back as the same agent", () => {
+  const agents = loadAgents(path.join(TEAM, 'agents'));
+  assert.ok(agents.size >= 3);
   for (const [name, agent] of agents) {
     assert.ok(!(agent instanceof Error), `${name} reads`);
     const text = renderAgent(draftOf(agent));

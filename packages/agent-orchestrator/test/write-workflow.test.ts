@@ -4,7 +4,7 @@
  * The write is the only way the board changes a folder, so what it refuses is refused before a byte is written — each refusal here is
  * asserted in its words and with the folder as it was — and what it writes is what `loadWorkflows` reads back.
  *
- * `WF_ROOT` is set before the modules are imported, since they read it as they load. The repository's agents and skills are copied
+ * `WF_ROOT` is set before the modules are imported, since they read it as they load. The tests' team's agents and skills are copied
  * beside the store's workflows, as beside its own: dev's steps name them.
  */
 import { test } from 'node:test';
@@ -14,22 +14,21 @@ import path from 'node:path';
 import { WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-write-');
 process.env.WF_ROOT = ROOT;
 const { writeWorkflow } = await import('../src/runner.ts');
 
 const STORE = path.join(ROOT, 'workflows');
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'dev');
+fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
 
-fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
-fs.cpSync(path.join(SHIPPED, '..', 'skills'), path.join(STORE, 'skills'), { recursive: true });
-
-/** A copy of the repository's `dev` — README, comments and all — as a workflow of the store's, named `name`. */
+/** A copy of the tests' team's `dev` — README, comments and all — as a workflow of the store's, named `name`. */
 function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
-  for (const file of fs.readdirSync(SHIPPED)) fs.copyFileSync(path.join(SHIPPED, file), path.join(dir, file));
+  for (const file of fs.readdirSync(TEAM_DEV)) fs.copyFileSync(path.join(TEAM_DEV, file), path.join(dir, file));
   return dir;
 }
 

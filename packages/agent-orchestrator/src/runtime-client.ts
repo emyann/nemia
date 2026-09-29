@@ -8,10 +8,11 @@
  * verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view one, tick, admit, stop one, read
  * its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it is
  * and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
- * and a place for behaviour to grow; this file holds none but that one.
+ * and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect program requires that same
+ * Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed.
  */
 import path from 'node:path';
-import { Effect, Layer } from 'effect';
+import { Context, Effect, Layer } from 'effect';
 import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import {
   claudeDetached,
@@ -101,6 +102,14 @@ export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine =>
       }),
     ).pipe(Layer.provide(layer)),
   );
+
+/**
+ * The engine a controller's program requires: the Promise `Engine` every controller takes, `engine()`'s or a test's (`engineOf`), as a
+ * service. `layer(e)` provides the one engine it is given.
+ */
+export class EngineService extends Context.Service<EngineService, Engine>()('agent-orchestrator/Engine') {
+  static readonly layer = (e: Engine): Layer.Layer<EngineService> => Layer.succeed(EngineService)(e);
+}
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
 const LEFT_OUT =

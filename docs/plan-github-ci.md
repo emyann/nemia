@@ -1,6 +1,6 @@
 # Moving to GitHub, with CI
 
-2026-09-25. A plan, not yet started: the first step waits on a name.
+2026-09-25. A plan under way: the name is chosen (Nemia, 2026-09-29) and the project renamed in the repository; step 3 is next.
 
 ## Why now
 
@@ -22,11 +22,12 @@ on top of main and the changes ahead of it, then merges. Nothing chases main.
 
 ## The order
 
-1. **Choose the project's new name.** Everything below waits on it.
-2. **Rename the project in the repository.** The packages were renamed on 2026-09-23 (`agent-runtime`, `agent-orchestrator`); the
-   project itself is still `hkb-v2`: the README's title, the root `package.json`'s `name`, the board's title and the docs that
-   call it that. What people type and what is on disk keeps its name, as with the package rename: the `wf` and `ae` commands,
-   `~/.agent-workflows` and `~/.agent-engine`. Dated writing keeps its words.
+1. ~~**Choose the project's new name.**~~ Done: Nemia, chosen by the owner on 2026-09-29.
+2. ~~**Rename the project in the repository.**~~ Done: the project was `hkb-v2` until it was named Nemia on 2026-09-29.
+   The README's title, the root `package.json`'s `name`, the board's title and the docs that called it that say Nemia, and so
+   do the machinery's names (a step's plugin, the api's MCP client, the board's storage keys); the names test refuses the old
+   name outside history and paths. What people type and what is on disk kept its name, as with the package rename: the `wf`
+   and `ae` commands, `~/.agent-workflows` and `~/.agent-engine`, and the checkout's folder. Dated writing keeps its words.
 3. **Settle what the history exposes** (below), before anything is pushed.
 4. **Put it on GitHub** by renaming the existing repository and replacing its code, keeping the old code reachable.
 5. **CI**: an Actions workflow, branch protection and a merge queue.
@@ -110,15 +111,15 @@ checkout" as CODEOWNERS), and every lesson about the ship's check.
 
 ## Decisions for the owner
 
-1. The project's new name.
+1. ~~The project's new name~~ — decided 2026-09-29: Nemia.
 2. ~~The 11 commits with the personal email~~ — decided: left as they are, no history rewrite.
 3. ~~The Jev experiments' recorded run data~~ — decided: moved out of the tree, history kept.
 4. Round checks: local (as now) or in CI on each push.
 
 ## Cards, once the name is chosen
 
-1. Rename the project in the repository (the name, the README, the root package, the board's title, the docs), with the names
-   test taught the old project name the way it knows the old package names.
+1. ~~Rename the project in the repository (the name, the README, the root package, the board's title, the docs), with the names
+   test taught the old project name the way it knows the old package names.~~ Done, 2026-09-29.
 2. Generalise local paths in the files that name them (the experiments' data is already out).
 3. The owner, by hand: tag and branch the old main, rename the repository, push, protect main, CODEOWNERS.
 4. The Actions workflow with the e2e and the secret scan, proven on a first PR.

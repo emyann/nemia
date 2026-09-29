@@ -1,6 +1,6 @@
 /**
- * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill HKB ships, so an agent of yours can give it.
- * And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
+ * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill Nemia ships, so an agent of yours can give
+ * it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
  * The copy is held byte for byte against the shipped folder, and each refusal is made to refuse at shipped defaults, asserted on its
  * message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they read it as they load.

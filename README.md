@@ -1,6 +1,13 @@
-# hkb v2
+# Nemia
 
-The harness kanban board, rebuilt on the two libraries that replaced its core.
+**Nemia — Recruit intelligence.** Said NEH-mee-ah.
+
+Nemia runs teams of agents. A runtime keeps each agent session alive to completion; an orchestrator sequences steps from folders of
+markdown; every harness is reached over A2A, as an agent of its own; and a board, behind an api, shows the runs and takes what a person
+decides.
+
+Where it is going: a persistent runtime that assembles agents, remembers what they learn, and gets better at deciding who should do the
+work.
 
 | | what it is | depends on |
 |---|---|---|
@@ -84,6 +91,9 @@ If you installed the statusline an earlier version of this board asked for, take
 `~/.claude/settings.json` and delete `~/.agent-workflows/quota.json`: nothing reads either now.
 
 ## History
+
+The project was hkb v2 until it was named Nemia on 2026-09-29: the harness kanban board, rebuilt on the two libraries that replaced
+its core. What is typed and what is on disk kept its name, as with the packages below, and so did the checkout's folder.
 
 Both packages keep their git history, imported from the standalone repositories at
 `agent-engine` master `102106b` and `agent-workflows` master `0c438ac`, the names they had until they were renamed on 2026-09-23.

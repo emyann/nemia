@@ -35,8 +35,10 @@ const busy = (ms: number) => {
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
  * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
- * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word.
- * `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a runtime that counts none.
+ * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word,
+ * and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the pass reads
+ * it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a
+ * runtime that counts none.
  */
 const fake = ({
   passMs = 0,
@@ -45,9 +47,11 @@ const fake = ({
   ioMs = 0,
   queued = [] as string[],
   admitMs = 0,
+  unphasedMs = 0,
   unread = undefined as number | undefined,
 } = {}) => {
   const admitted: string[][] = [];
+  const took = { admit: 0 };
   const io = {
     bytesRead: 0,
     reads: 0,
@@ -71,13 +75,18 @@ const fake = ({
       const views = queued.map((id) => ({
         id,
         phase: 'pending',
-        admission: 'queued',
+        get admission() {
+          busy(unphasedMs);
+          return 'queued';
+        },
         state: { harness: 'claude', filedAt: '2026-09-25T10:00:00.000Z' },
       }));
       return { tasks: queued.length, actions: 0, running: {}, views };
     },
     admit: async (ids: string[]) => {
+      const t0 = performance.now();
       busy(admitMs);
+      took.admit += performance.now() - t0;
       admitted.push(ids);
       return ids;
     },
@@ -100,7 +109,7 @@ const fake = ({
         }
       : {}),
   } as unknown as Engine;
-  return Object.assign(e, { admitted });
+  return Object.assign(e, { admitted, took });
 };
 
 const emptyStore = () => {
@@ -269,20 +278,36 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   assert.ok(outer.tallies!.kinds.act.ms >= 2);
 });
 
-test('the word that admits a queued task is charged to act, and `wf tick --stats` says so', async () => {
+test('the word that admits a queued task is charged to act, and `wf tick --stats` says so, however long the pass spends in no phase', async () => {
   emptyStore();
-  const e = fake({ queued: ['t-1'], admitMs: 25 });
-  const { cost } = await tick(e);
-  assert.deepEqual(e.admitted, [['t-1']], 'the pass admitted the task its runtime reported queued, once');
-  assert.ok(cost);
-  assert.ok(cost.phases.act.ms >= 25, `the admit's 25 ms are act's (act took ${cost.phases.act.ms} ms)`);
-  assert.ok(cost.phases.assess.ms < 25, `and not assess's, the time in no phase (${cost.phases.assess.ms} ms)`);
-  const row = breakdownLines(cost).find((l) => /^ {2}act /.test(l));
-  assert.ok(row, breakdownLines(cost).join('\n'));
-  const [, ms] = row.trim().split(/ +/);
-  assert.ok(Number(ms) >= 25, `the breakdown's act row carries it: ${row}`);
-
   const idle = fake({ admitMs: 25 });
-  await tick(idle);
+  const base = (await tick(idle)).cost!;
   assert.deepEqual(idle.admitted, [], 'nothing queued, no word said');
+  for (const unphasedMs of [0, 30]) {
+    emptyStore();
+    const e = fake({ queued: ['t-1'], admitMs: 25, unphasedMs });
+    const { cost } = await tick(e);
+    assert.deepEqual(e.admitted, [['t-1']], 'the pass admitted the task its runtime reported queued, once');
+    assert.ok(cost);
+    assert.equal(
+      cost.phases.act.calls,
+      base.phases.act.calls + 1,
+      `the admit is one more call of act than the same pass with nothing queued (${base.phases.act.calls})`,
+    );
+    assert.ok(e.took.admit >= 25, `the admit spun its 25 ms (${e.took.admit} ms)`);
+    assert.ok(
+      cost.phases.act.ms >= e.took.admit,
+      `act holds at least the ${e.took.admit} ms the admit measured inside itself (act took ${cost.phases.act.ms} ms)`,
+    );
+    assert.ok(
+      cost.phases.assess.ms >= unphasedMs,
+      `the ${unphasedMs} ms spent reading the queued view, in no phase, are assess's (${cost.phases.assess.ms} ms)`,
+    );
+    assert.ok(phaseSum(cost) <= cost.ms + 0.01, `the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
+    const row = breakdownLines(cost).find((l) => /^ {2}act /.test(l));
+    assert.ok(row, breakdownLines(cost).join('\n'));
+    const [, ms, calls] = row.trim().split(/ +/);
+    assert.ok(Number(ms) >= 25, `the breakdown's act row carries the admit's time: ${row}`);
+    assert.equal(Number(calls), cost.phases.act.calls, `the breakdown's act row carries act's calls: ${row}`);
+  }
 });

@@ -100,11 +100,13 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/skills/skills.store.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/branches.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/cap/cap.ts': { 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/cli/asks.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/cli/flags.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/cli/main.ts': {
     'max-lines': 1,
     'max-lines-per-function': 1,
-    complexity: 3,
-    'sonarjs/cognitive-complexity': 5,
+    complexity: 2,
+    'sonarjs/cognitive-complexity': 2,
   },
   'packages/agent-orchestrator/src/closeout/closeout.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/decide/decide.verb.ts': {

@@ -508,9 +508,22 @@
       }
     },
     {
+      "files": ["packages/agent-orchestrator/src/cli/asks.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 25 }],
+        "sonarjs/cognitive-complexity": ["error", 33]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/cli/flags.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 19]
+      }
+    },
+    {
       "files": ["packages/agent-orchestrator/src/cli/main.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1548, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1157, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 818, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 351 }],
         "sonarjs/cognitive-complexity": ["error", 677]

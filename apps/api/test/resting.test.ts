@@ -7,26 +7,21 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app, runtime } from '../src/app.ts';
+import { resting } from '../src/runs/runs.ts';
+import { Engine, findRun } from '../src/store.ts';
+import { verifiesRest } from 'agent-orchestrator';
+import { restingRead } from '../src/runs/resting.ts';
 
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = scratch('hkb-api-resting-');
-process.env.WF_ROOT = root;
-
-const { app, runtime } = await import('../src/app.ts');
-const { resting } = await import('../src/runs/runs.ts');
-const { Engine, findRun } = await import('../src/store.ts');
-const { verifiesRest } = await import('agent-orchestrator');
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
-const { restingRead } = await import('../src/runs/resting.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

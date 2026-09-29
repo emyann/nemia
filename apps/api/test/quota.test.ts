@@ -1,8 +1,7 @@
 /**
  * GET /api/quota: the plan's usage asked of Claude Code with its `get_usage` control request — here of the harness's `claude`, which answers
  * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
- * in a sentence; and the pure judgement under it (`quotaOf`). `WF_ROOT` is set before the orchestrator is imported, as it locates its store
- * as its module loads.
+ * in a sentence; and the pure judgement under it (`quotaOf`).
  */
 import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
@@ -11,11 +10,8 @@ import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineTempDir, scratch } from './scratch.ts';
-
-process.env.WF_ROOT = scratch('hkb-api-quota-');
-
-const { appOf, liveOf } = await import('../src/app.ts');
-const {
+import { appOf, liveOf } from '../src/app.ts';
+import {
   askUsage,
   backoffOf,
   QUOTA_BACKOFF_CEILING_MS,
@@ -28,7 +24,8 @@ const {
   QuotaAsker,
   usageAsk,
   usageEnv,
-} = await import('../src/factory/quota.ts');
+} from '../src/factory/quota.ts';
+
 type Quota = import('../src/factory/quota.ts').Quota;
 type Held = import('../src/factory/quota.ts').Held;
 type ReadQuota = import('../src/factory/quota.ts').ReadQuota;

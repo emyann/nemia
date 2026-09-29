@@ -39,8 +39,8 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   (`test/layer.test.ts`). An asker keeps what it asked in its closure, one per app: a test wanting a fresh one builds an app.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
   it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
-- **A test sets `WF_ROOT` (and `CLAUDE_CONFIG_DIR`) before it imports the api or the package**: the orchestrator reads them as its
-  modules load, so the imports after the assignment are dynamic (`test/app.test.ts`).
+- **A test imports the api and the package statically, after the harness**, which sets `WF_ROOT` and `CLAUDE_CONFIG_DIR` to scratch
+  folders as it loads (`root`, `config`): the package fixes its store as its modules load. `harness.test.ts` refuses an `import()`.
 - **A folder's face (`index.ts`) is the door `app.ts` mounts**: an import between folders names the file where the face would close a
   value cycle (`runs/` ↔ `agents/`), which tsc passes and the load fails on (`test/layout.test.ts`). `body.ts` stays at the root:
   every folder decodes its bodies there.

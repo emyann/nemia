@@ -1,7 +1,6 @@
 /**
  * GET /api/capabilities (capabilities.ts, reach.ts): the skills, agents, MCP servers and permission rules of a scratch checkout, and what
- * each step of its workflows gets of them. `WF_ROOT` is set to a scratch store before app.ts is imported: agent-orchestrator locates its
- * store when the module loads.
+ * each step of its workflows gets of them.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -10,11 +9,9 @@ import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-process.env.WF_ROOT = scratch('hkb-api-capabilities-');
-const { app, appOf, liveOf } = await import('../src/app.ts');
-const { ApiConfig } = await import('../src/layer.ts');
-const {
+import { app, appOf, liveOf } from '../src/app.ts';
+import { ApiConfig } from '../src/layer.ts';
+import {
   HOME_REPO,
   MEASURED_TOOLS,
   READ_ONLY_COMMANDS,
@@ -25,8 +22,9 @@ const {
   readOnlyCommands,
   repoOf,
   serverAsk,
-} = await import('../src/capabilities/capabilities.ts');
-const { DISALLOW, askDenierOf, bashCovers } = await import('../src/capabilities/reach.ts');
+} from '../src/capabilities/capabilities.ts';
+import { DISALLOW, askDenierOf, bashCovers } from '../src/capabilities/reach.ts';
+
 type CapabilitiesWithSteps = import('../src/capabilities/reach.ts').CapabilitiesWithSteps;
 type StepReach = import('../src/capabilities/reach.ts').StepReach;
 assert.equal(

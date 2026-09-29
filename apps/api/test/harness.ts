@@ -5,11 +5,11 @@
  * --bg`) — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's own tests hand
  * theirs. So the runner itself — the registry it observes, the transcripts it reads, the flags it spawns with — is what the api's tests
  * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
- * judged afresh too, and a difference fails the request.
+ * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  *
- * Installed as this module loads, so every api test file imports it first, before the api, the package or the engine, which read both as they
- * load and run; `harness.test.ts` refuses a file that does not (`unharnessed`). A file that keeps its sessions elsewhere points
- * `CLAUDE_CONFIG_DIR` there before it imports the api.
+ * Installed as this module loads, so every api test file imports it first, before the api, the package or the engine, which read all three
+ * as they load and run; `harness.test.ts` refuses a file that does not (`unharnessed`), and one that loads a module with `import()`: ESM
+ * evaluates a file's static imports in their order, so the api and the package, imported after this, load over its store.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,7 +64,12 @@ fs.writeFileSync(
   { mode: 0o755 },
 );
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
-process.env.CLAUDE_CONFIG_DIR = scratch('hkb-api-harness-claude-');
+/** Where Claude Code keeps its sessions and transcripts: `CLAUDE_CONFIG_DIR`, which the Claude runner reads as its module loads. */
+export const config = scratch('hkb-api-harness-claude-');
+process.env.CLAUDE_CONFIG_DIR = config;
+/** The store's root, `WF_ROOT`: the package fixes its root (`HOME`) as its modules load. */
+export const root = scratch('hkb-api-store-');
+process.env.WF_ROOT = root;
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

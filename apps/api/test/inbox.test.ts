@@ -2,25 +2,29 @@
  * GET, POST and DELETE /api/inbox (inbox.ts), and POST /api/runs with `card` (workflows.ts): the inbox listed, a card filed and dropped, and
  * a card started — in a scratch store and a scratch repository, through the package's own inbox.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store, and so its inbox, when the module loads. */
-const root = scratch('hkb-api-inbox-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import {
+  addToInbox,
+  fromNote,
+  INBOX_KEY_MEANINGS,
+  inboxDir,
+  inboxNameRefusal,
+  noCardLine,
+  readRun,
+  startFromInbox,
+} from 'agent-orchestrator';
 const repo = scratch('hkb-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
-const { app } = await import('../src/app.ts');
-const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } =
-  await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
 type InboxCardPage = import('../src/inbox/inbox.ts').InboxCardPage;
 type InboxFiled = import('../src/inbox/inbox.ts').InboxFiled;

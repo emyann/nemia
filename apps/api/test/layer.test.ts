@@ -10,12 +10,9 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { scratch } from './scratch.ts';
 import type { WorkflowListing } from '../src/workflows/workflows.ts';
-
-process.env.WF_ROOT = scratch('hkb-api-layer-');
-
-const { app, appOf, liveOf } = await import('../src/app.ts');
-const { Engine, StoreRoot } = await import('../src/store.ts');
-const { engine } = await import('agent-orchestrator');
+import { app, appOf, liveOf } from '../src/app.ts';
+import { Engine, StoreRoot } from '../src/store.ts';
+import { engine } from 'agent-orchestrator';
 
 /** The names of the workflows `GET /api/workflows` lists as yours, through `on`. */
 const yoursOn = async (on: typeof app): Promise<string[]> => {

@@ -7,16 +7,13 @@
  * repository at all: `repoOf` resolves a path and never asks git, so the api runs, the store's own workflows list, and a card for a
  * team that works in folders is filed with no `repo:` — and refused with one.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
-const root = scratch('hkb-api-folder-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
 /** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
 const notARepo = scratch('hkb-api-folder-here-');
 process.env.HKB_REPO = notARepo;
@@ -32,8 +29,6 @@ fs.writeFileSync(
 const onRepo = path.join(root, 'workflows', 'change');
 fs.mkdirSync(onRepo, { recursive: true });
 fs.writeFileSync(path.join(onRepo, 'implement.md'), '---\n---\nMake the change.\n');
-
-const { app } = await import('../src/app.ts');
 
 const at = '2026-09-19T00:10:00.000Z';
 const work = path.join(root, 'runs', 'f-notes', 'work');

@@ -3730,8 +3730,8 @@ Five things the reviews of §9's package half and of the checkout hold found and
   and `restore` from review's round 2: `git pull . <branch>` merges a run's branch, and `git restore <path>` throws work away as `git
   checkout -- <path>` does — and the folder calls it a named list of the ordinary commands, not everything git can write. It leaves
   what its bookkeeping needs — `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. `git branch` is left alone on
-  purpose: a prefix deny would take `git branch --list` with it, which is diagnosis, and `-D` is refused by `dontAsk`, which no allow of
-  it reaches. The folder's
+  purpose: a prefix deny would take `git branch --list` with it, which is diagnosis; `-D` and `--delete --force` are denied by
+  those spellings (*Shipped: each worker is told what it may not do*). The folder's
   README, the step's frontmatter comment and its prose say what the denies are and that a prefix is a fence, not a sandbox (`git -C <dir>
   merge` is not `git merge`). `supervisor.test.ts` reads the shipped folder: it fails by name when one of the rules is missing — measured
   by dropping `git reset` — asserts that a harness given the list would refuse `ship.md`'s own merge command, and that none of the
@@ -4934,14 +4934,21 @@ open a pull request.
 - **An agent in `auto` denies them itself.** `implementer`, `ui-implementer` and `shipper`, in both copies, and the package's own
   `workflows/implement.md`, which names no agent, carry the five in `disallowedTools:`, after the four no step needs. `auto` runs
   whatever no deny names, so the step's own line is the only thing that refuses.
-- **An agent in `dontAsk` needs no line.** `planner`, `reviewer`, `ui-reviewer`, `note-writer`, `note-reviewer` and the supervisor
-  run only what an allow reaches, and none does: the settings allow git's reads, `Bash(git branch)` exactly and `Bash(git branch
-  --list:*)`; no agent, settings file or skill's `allowed-tools` allows an `mcp__playwright__*` tool. Each says so beside its keys. The
-  supervisor keeps its own list, `Bash(git push:*)` in it.
+- **An agent in `dontAsk` needs no line.** `planner`, `reviewer`, `ui-reviewer`, `note-writer` and `note-reviewer` run only what an
+  allow reaches, and none does: the settings allow git's reads, `Bash(git branch)` exactly and `Bash(git branch --list:*)`; no agent,
+  settings file or skill's `allowed-tools` allows an `mcp__playwright__*` tool. Each says so beside its keys. They run as jobs in a
+  worktree or a folder the run made, which read only the settings shipped here (`--setting-sources project,local`, and no
+  `settings.local.json` is there).
+- **The supervisor denies them itself, though it runs `dontAsk`.** It is a `--bg` session in the person's own checkout, and reads their
+  user settings and that checkout's `settings.local.json`, where "don't ask again" writes an allow such as `Bash(git branch:*)`. So its
+  own list names `Bash(git push:*)`, `Bash(git branch -D:*)`, `Bash(git branch --delete --force:*)` and
+  `mcp__playwright__browser_run_code_unsafe`, and the test treats a background step, or a job in the checkout itself, as it treats one
+  in `auto`.
 - **`test/agent-fences.test.ts`** resolves every shipped folder as `wf start` freezes it and refuses a step that could run a push, a
   forced delete or the unsafe tool — by a missing deny in `auto`, by an allow in `dontAsk` (its own, the settings' or a skill's), by a
-  sandbox other than `read-only` on codex — and a settings file that denies any of them. It failed with the implementer's line cut back
-  to the four, and with a planner given `Bash(git push:*)`, `mcp__playwright` or `Bash(git branch:*)`. Its matcher throws on a wildcard
+  sandbox other than `read-only` on codex — and a settings file that denies any of them. It reads the folders off the disk. It failed
+  with the implementer's line cut back to the four, with the supervisor's forced-delete denies taken out, and with a planner given
+  `Bash(git push:*)`, `mcp__playwright` or `Bash(git branch:*)`. Its matcher throws on a wildcard
   it does not model. The api's capabilities test holds the same of `browser_run_code_unsafe` on every Claude step the page lists.
 - **Codex.** The settings never reached a Codex session. No shipped agent can run on Codex — each gives `skills:`, which
   `composedRefusal` refuses there — and the one shipped Codex step, the package's `review.md`, is `sandbox: read-only`: no write to
@@ -4950,7 +4957,8 @@ open a pull request.
   `filedDenies`), not from the agent's file, so a run started before this landed keeps the four denies. Its worktree steps read the
   settings of the branch as it was cut, which still deny the five, until that branch merges main. Its ending step, in the repository's
   own checkout (`workspace: main`), reads main's settings, which deny nothing: nothing refuses that one step a push, a forced delete
-  or the unsafe tool but its brief. Start such a run again rather than approve its ship unwatched.
+  or the unsafe tool but its brief. Start such a run again rather than approve its ship unwatched. A supervisor started before this
+  landed keeps its old list, without the forced delete: stop it and start it again.
 
 ## 1. A run that grows steps from a plan
 

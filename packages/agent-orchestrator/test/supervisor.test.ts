@@ -44,12 +44,18 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
  *
  * The checkout's `.claude/settings.json` denies no git, since a person's own session there may be asked to push, and it could not deny
  * `git merge` anyway — `ship.md` runs in the same checkout and merging is its whole job — so the step's own `disallowedTools:` is where
- * this refusal lives. `git branch -D` it need not name: in `dontAsk`, no allow reaches it (agent-fences.test.ts).
+ * this refusal lives.
  */
 const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
 
+/**
+ * What `dontAsk` alone would refuse a job, denied by name all the same: a background session reads the person's own user and local
+ * settings, where an allow of `Bash(git branch:*)` or `mcp__playwright` may stand (agent-fences.test.ts).
+ */
+const BACKGROUND_DENIED = ['Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)', 'mcp__playwright__browser_run_code_unsafe'];
+
 /** The rules the shipped step is given, in the order it writes them. */
-const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`)];
+const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`), ...BACKGROUND_DENIED];
 
 /** Whether a deny list refuses a command, as a harness reads a `Bash(<prefix>:*)` rule: the command is the prefix, or begins with it and a space. */
 const denies = (rules: readonly string[], command: string): boolean =>
@@ -261,10 +267,15 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
   ])
     assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
 
+  for (const command of ['git branch -D wf/add-sub-8imz/implement', 'git branch --delete --force wf/add-sub-8imz/implement'])
+    assert.ok(
+      denies(disallowedTools, command),
+      `${command}: a person's own settings may allow \`git branch\`, and this session reads them`,
+    );
   assert.equal(
     denies(disallowedTools, 'git branch --list'),
     false,
-    '`git branch -D` is refused by `dontAsk`, which no allow of it reaches, so the step says nothing of `git branch`: denying it by prefix would take `git branch --list`, which is diagnosis',
+    'the forced delete is denied by its own spellings, never by `git branch` as a prefix, which would take `git branch --list`, which is diagnosis',
   );
 });
 

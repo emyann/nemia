@@ -1925,7 +1925,8 @@ and `git pull`, which merges too, then `checkout`, `switch`, `restore`, `rebase`
 `cherry-pick`, `revert`, `clean` and `push`, as `Bash(git merge:*)` rules — a named list of the ordinary
 commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` denies no git, since a person's
 own session in the checkout may be asked to push, and it could not hold `git merge`: `ship.md` runs in the same checkout,
-and merging is its whole job. `git branch -D` needs no rule: in `dontAsk`, no allow reaches it. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
+and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
+`dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
 is not `git merge`): it stops a command that should not have been typed, and `supervisor.test.ts` fails when
 one of those rules leaves the folder.

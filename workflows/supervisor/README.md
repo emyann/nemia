@@ -16,11 +16,12 @@ what it reads is the store and the runs' own branches, and the little it writes 
 **Its `disallowedTools:` denies git by name.** "Never type git for a run" is a sentence in `supervise.md`, and prose
 is not a constraint. `.claude/settings.json` denies no git: a person's own session in this checkout may be
 asked to push, and the settings could not refuse `git merge` anyway, because `ship.md` runs in the same
-checkout and merging is its whole job. So the step's own fence is where the refusal lives. `git branch -D`
-needs no line of it: in `dontAsk`, no allow reaches it. It denies `git merge` and `git pull` — the merge a run's ending step owns, in both its spellings —
+checkout and merging is its whole job. So the step's own fence is where the refusal lives. It denies `git merge` and `git pull` — the merge a run's ending step owns, in both its spellings —
 and `git checkout`, `git switch`, `git restore`, `git rebase`, `git reset`, `git stash`, `git cherry-pick`,
 `git revert`, `git clean` and `git push`, the ordinary commands that move a person's checkout or throw away
-what is in it. It is a named list, not a complete one. What its bookkeeping needs is untouched:
+what is in it — and a forced `git branch -D` and the browser's `browser_run_code_unsafe`, which `dontAsk` alone
+does not refuse a background session: it reads the person's own user and local settings too, where an allow of
+`Bash(git branch:*)` or `mcp__playwright` may stand. It is a named list, not a complete one. What its bookkeeping needs is untouched:
 `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. It is a prefix fence and not a
 sandbox — `git -C <dir> merge` is not `git merge` — so it stops the command a session should not have typed,
 not a session that means to get round it.

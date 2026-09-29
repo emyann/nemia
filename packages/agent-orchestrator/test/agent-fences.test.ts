@@ -5,7 +5,9 @@
  *
  * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
  * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
- * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step on codex is fenced by a
+ * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step that reads settings the
+ * repository does not ship — a background session reads the person's user settings, and a job in the checkout itself its
+ * `settings.local.json` — may be allowed anything there, so it too must name each call itself. A step on codex is fenced by a
  * read-only sandbox. The matcher is Claude Code's rule shapes this suite relies on, and throws on a wildcard it does not model, so an
  * allow it cannot read fails the test rather than passing it.
  */
@@ -19,9 +21,12 @@ import { scratch } from './scratch.ts';
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
 
-/** Every shipped workflow folder: the repository's and the package's own. */
+/** Every shipped workflow folder, read off the disk: each folder of the repository's `workflows/` but its agents and skills, and the package's own. */
 const FOLDERS = [
-  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui', 'note', 'supervisor'].map((d) => path.join(REPO, 'workflows', d)),
+  ...fs
+    .readdirSync(path.join(REPO, 'workflows'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'agents' && entry.name !== 'skills')
+    .map((entry) => path.join(REPO, 'workflows', entry.name)),
   WORKFLOWS,
   path.join(WORKFLOWS, 'ui'),
 ];
@@ -102,7 +107,8 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
     return [`${step.name}: on ${harness}, which this test does not know how to fence`];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   const allows = [...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...SKILL_GRANTS];
-  const dontAsk = step.permissionMode === 'dontAsk';
+  const unshipped = step.background === true || step.workspace === 'main';
+  const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
   return FENCED.filter((call) => {
     if (denies.some((rule) => reaches(rule, call))) return false;
     return !dontAsk || allows.some((rule) => reaches(rule, call));
@@ -151,6 +157,10 @@ test('every shipped agent is named by a shipped step, so the fence below reads e
 test('every shipped step is refused git push, a forced branch delete and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
   const open = shipped().flatMap(({ dir, step }) => unfenced(step).map((what) => `${path.relative(REPO, dir)}/${what}`));
   assert.deepEqual(open, []);
+  const read = new Set(FOLDERS.map((dir) => path.relative(REPO, dir)));
+  for (const folder of ['workflows/dev', 'workflows/dev-planned', 'workflows/ui', 'workflows/note', 'workflows/supervisor'])
+    assert.ok(read.has(folder), `${folder} is read: ${[...read].join(', ')}`);
+  assert.ok(!read.has('workflows/agents') && !read.has('workflows/skills'), 'agents and skills are no workflow of their own');
 });
 
 test('the settings deny none of them: the refusal is each worker’s own, and a person’s session may push', () => {
@@ -192,6 +202,30 @@ test('REFUSED: an auto step without its own deny, and a dontAsk step an allow re
   assert.deepEqual(unfenced({ ...stepOf('reviewer'), harness: 'codex', permissionMode: undefined, sandbox: 'workspace-write' }), [
     'review: on codex in sandbox workspace-write, not read-only',
   ]);
+});
+
+test('REFUSED: the shipped supervisor without its own deny of the forced delete is open, though it runs dontAsk and the settings allow it none', () => {
+  const supervise = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!;
+  assert.equal(supervise.permissionMode, 'dontAsk');
+  assert.equal(supervise.background, true, "a background session, which reads the person's user settings as well as the checkout's");
+  const bare = {
+    ...supervise,
+    disallowedTools: supervise.disallowedTools?.filter((rule) => !rule.startsWith('Bash(git branch')),
+  };
+  assert.deepEqual(unfenced(bare), [
+    'supervise: Bash(git branch -D wf/r-1/implement)',
+    'supervise: Bash(git branch --delete --force wf/r-1/implement)',
+  ]);
+  assert.deepEqual(
+    unfenced({ ...bare, background: undefined, workspace: 'folder' }),
+    [],
+    'the same step as a job in a folder the run made reads only the settings shipped here, where no allow reaches a forced delete',
+  );
+  assert.deepEqual(
+    unfenced({ ...bare, background: undefined }),
+    ['supervise: Bash(git branch -D wf/r-1/implement)', 'supervise: Bash(git branch --delete --force wf/r-1/implement)'],
+    "a job in the checkout itself reads the person's settings.local.json there",
+  );
 });
 
 test('REFUSED: the shipped implementer with its deny line cut back to the four it had is open, read from its file as a run reads it', () => {

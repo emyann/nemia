@@ -34,10 +34,12 @@ const codexSandbox = (step: Workflow): Workflow => {
   const { permissionMode: sandbox, ...rest } = step;
   return { ...rest, sandbox };
 };
+const BEFORE_JSON = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<
+  string,
+  Workflow[]
+>;
 const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(
-  Object.entries(
-    JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Workflow[]>,
-  ).map(([folder, steps]) => [
+  Object.entries(BEFORE_JSON).map(([folder, steps]) => [
     atToday(folder),
     steps.map((step) => codexSandbox(asNamed(step))) as unknown as Array<Record<string, unknown>>,
   ]),
@@ -230,12 +232,25 @@ const DENIES_CHANGED = [
     .map(([at]) => at),
   'packages/agent-orchestrator/workflows/implement',
 ];
-const KEYS_CHANGED: Record<string, Record<string, unknown>> = Object.fromEntries(
-  [...new Set([...Object.keys(CHECKS_CHANGED), ...DENIES_CHANGED])].map((at) => [
-    at,
-    { ...CHECKS_CHANGED[at], ...(DENIES_CHANGED.includes(at) ? { disallowedTools: BUILDER_DENIED } : {}) },
-  ]),
-);
+/**
+ * What the supervisor is denied: its list in the snapshot, and a forced branch delete and the browser's unsafe tool, which its `dontAsk`
+ * does not refuse a background session that reads the person's own settings (agent-fences.test.ts).
+ */
+const SUPERVISOR_DENIED = [
+  ...(asNamed(BEFORE_JSON['workflows/supervisor'][0]).disallowedTools ?? []),
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete --force:*)',
+  'mcp__playwright__browser_run_code_unsafe',
+];
+const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
+  ...Object.fromEntries(
+    [...new Set([...Object.keys(CHECKS_CHANGED), ...DENIES_CHANGED])].map((at) => [
+      at,
+      { ...CHECKS_CHANGED[at], ...(DENIES_CHANGED.includes(at) ? { disallowedTools: BUILDER_DENIED } : {}) },
+    ]),
+  ),
+  'workflows/supervisor/supervise': { disallowedTools: SUPERVISOR_DENIED },
+};
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
 const keysOf = (step: Record<string, unknown>): Record<string, unknown> => {

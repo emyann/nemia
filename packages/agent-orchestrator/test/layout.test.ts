@@ -234,7 +234,7 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
   const wait = files.get('src/wait/wait.ts')!;
   files.set('src/wait/wait.ts', `${wait}\nimport { assess } from '../run.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/cap/cap.ts', 'src/prune/prune.ts', 'src/run.ts', 'src/say/say.ts', 'src/wait/wait.ts'],
+    ['src/brief/brief-sections.ts', 'src/cap/cap.ts', 'src/prune/prune.ts', 'src/run.ts', 'src/say/say.ts', 'src/wait/wait.ts'],
   ]);
   files.set('src/wait/wait.ts', `${wait}\nimport type { Assessment } from '../run.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), []);

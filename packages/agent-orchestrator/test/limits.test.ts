@@ -117,7 +117,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/plan/plan.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/radius.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/rest/rest.ts': { 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/run.ts': {
+  'packages/agent-orchestrator/src/brief/brief-sections.ts': {
     'max-lines': 1,
     'max-lines-per-function': 9,
     complexity: 16,

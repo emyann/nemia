@@ -508,7 +508,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli.ts"],
+      "files": ["packages/agent-orchestrator/src/cli/main.ts"],
       "rules": {
         "max-lines": ["error", { "max": 1548, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 818, "skipBlankLines": true, "skipComments": true }],

@@ -79,17 +79,28 @@ own ground (section 1), not Claude Code's.
 | **user** | Nemia's library `~/.agent-workflows/workflows/skills/`; Claude Code's `~/.claude/skills/` | the person, on the board or by hand | the library: a skill an agent names, as above. `~/.claude/skills`: nothing (`--setting-sources project,local`) |
 | **default** | what Nemia ships: `workflows/skills/` of Nemia's checkout (`SHIPPED_SKILLS`); `packages/agent-orchestrator/workflows/skills/` for the package's `ui` | Nemia | a skill an agent names, as above |
 
-**The rule: the nearest to the work wins.** For a name an agent gives, the lookup goes workspace, harness, user, default, and the first
-level that has the name gives it. A name that one repository has at both the workspace and the harness level stays refused
-(`sameRepository`), because a person reading either folder would take the one before them for the one that runs. `~/.claude/skills` is
-never resolved by name: no job reads it.
+**The rule: the nearest to the work wins, and the user level is near only to the person's own workflows.** For a name an agent gives,
+the first level that has the name gives it, in this order:
+
+- **a run of a repository's folder or a shipped folder**: workspace, harness, default, user. A library skill fills only a name that no
+  repository and no default has; it never replaces a default.
+- **a run of a store workflow** (the person's library, `~/.agent-workflows/workflows/`): workspace, harness, user, default. The library
+  is that workflow's own place, as it is today.
+
+A name that one repository has at both the workspace and the harness level stays refused (`sameRepository`), because a person reading
+either folder would take the one before them for the one that runs. `~/.claude/skills` is never resolved by name: no job reads it.
 
 Why the nearest to the work wins, and not the person's own as in Claude Code:
 
 - A run is a job, and a job should not depend on whose machine it runs on. That was 09-25 decision 1, and the reason jobs read no user
-  settings.
+  settings. So the library does not come before the defaults in a shipped or repository folder's run. The board's *Copy into your
+  library* (`copySkill`) keeps the shipped name: were the library above the defaults, one person's copy would shadow the default in every
+  run of every shipped folder on that machine, Nemia's own dev runs included, and a copy taken before section 4's merges (a
+  `review-a-change` with no `again` rule, say) would silently undo them there. Today a shipped folder's own root comes first, and this
+  order keeps that.
 - The people of a repository decide how work is done there, and anyone who clones it gets the same run.
-- The owner's library is where a person without a repository keeps their own agents. For them the user level is the nearest level there is.
+- The owner's library is where a person without a repository keeps their own agents. For them the user level is the nearest level there
+  is, and an edited copy of a default serves their own workflows, which is what the copy was for.
 
 **What changes against the code:**
 
@@ -97,8 +108,12 @@ Why the nearest to the work wins, and not the person's own as in Claude Code:
   passes `HOME_REPO/workflows`, and `wf` passes the same resolved from its own checkout. A folder is placed by where it is. On Nemia's
   checkout, `workflows/` is placed at the default level, so Nemia has no workspace level of its own. Its procedures live at the harness
   level, which is what section 4 wants.
-- **A shipped folder run on another repository** finds that repository's skills before the shipped ones. That repository can replace a
-  shipped skill by name.
+- **The repository's `workflows/` joins the roots.** Today `places.repo` adds only `<repo>/.claude` (`workflow-store.ts`,
+  `lookupRoots`); `<repo>/workflows` is read only when it is the running workflow's own root, that is, for a folder of that repository.
+  `lookupRoots` adds `<repo>/workflows` at the workspace level for `places.repo`, beside `<repo>/.claude` at the harness level, unless it
+  is the default root (Nemia's own checkout). Without this, a shipped `dev` run on repository X would never find `X/workflows/skills/`.
+- **A shipped folder run on another repository** finds that repository's skills, in either of its two places, before the shipped ones.
+  That repository can replace a shipped skill by name.
 - **A store workflow run on a repository** finds that repository's agents and skills before the store's own. Today it finds its own first,
   and the 09-25 note said so. This is a behaviour a person would notice, so it is put to the owner (question 2).
 - **A folder run with no repository** has two levels, user and default, as today.
@@ -146,6 +161,8 @@ Each row shows:
 - **a clash, shown as one**. A name at two levels is two rows. The nearer says *given*, and the farther says *shadowed by <level>*, with
   its folder. A name at both of one repository's places shows the refusal the load gives. A harness skill that an agent also names shows
   *the session sees both* (`effect` and `hkb-<agent>:effect`), until card 4 settles it.
+- **a library copy of a default's name**, marked for what it does under section 1's order: *shadows the default for your own workflows;
+  not read by a shipped or repository folder's run*. Where the default has changed since the copy (the versions differ), the row says so.
 - **a copy of a skill Nemia no longer ships**, for a library copy whose shipped original went in section 4's merge.
 
 **What `GET /api/skills` misses today.** `listSkills` (`apps/api/src/agents/skills.ts`) answers three places, `yours`, `repo` and
@@ -179,8 +196,18 @@ repository. Section 4 does that for the skills. For the bodies, it does this:
 - The command lists leave the planner, reviewer and ui-reviewer. The fence is `dontAsk` plus the repository's `.claude/settings.json`,
   and prose is not a constraint. The body says that a command the repository's settings do not allow is denied, and that it must run
   nothing that writes into the workspace.
-- `disallowedTools: Bash(npm run build), Bash(npm run e2e)` moves from the three agents onto the `plan` and `review` steps of this
-  repository's folders. A key a step sets wins over its agent's.
+- **But today that prose closes a hole in the fence, and it may not leave first.** The comments in `reviewer.md` and `ui-reviewer.md` say
+  so: this repository's settings allow `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, which still reach `npx turbo run test
+  build` and `node --test apps/web/test/e2e/run.ts`, and no deny closes an allow that runs any task or any file; "until then the brief
+  keeps review from them". A generic "run nothing that writes" is weaker than naming the two commands. So card 12 waits for card 11b,
+  which closes the hole at the harness level, where it is this repository's: narrow the two allows to the spellings the steps use (the
+  exact `npx turbo run test --force --continue`, and `node --test` over the packages' test files, if card 0 finds a rule can say so), or,
+  where they cannot be narrowed, write the two sentences into the root `CLAUDE.md`, which every job of this repository reads. Only then do
+  the bodies drop them.
+- `disallowedTools: Bash(npm run build), Bash(npm run e2e)` moves from the three agents onto the `plan` and `review` steps of the shipped
+  folders. A key a step sets wins over its agent's. That makes the agents generic and leaves the shipped **folders** as specific as they
+  are: every one's `check:` is this repository's `npm test && npm run typecheck && …` already. Folders a second repository can run as
+  they are wait for the eval's question 5 (where product presets live, question 1 below); this note does not claim them.
 
 **Extending one for a project** is left open by the owner. Here are the three ways, against the code, with what each costs. This note
 recommends none.
@@ -309,10 +336,10 @@ these:
 
 | # | card | proof | a run in flight |
 |---|---|---|---|
-| 0 | **Probe** on Claude Code, before cards 3–4 rely on the docs: a skill's `allowed-tools` in a `-p` `dontAsk` job; how a nested `.claude/skills` loads in a worktree; a plugin skill and a project skill of one name | a spike section, F26 on | untouched |
+| 0 | **Probe** on Claude Code, before cards 3–4 rely on the docs: a skill's `allowed-tools` in a `-p` `dontAsk` job; how a nested `.claude/skills` loads in a worktree; a plugin skill and a project skill of one name; whether a `Bash` allow rule can name a path glob after `node --test` (card 11b) | a spike section, F26 on | untouched |
 | 1 | **The api by level**, read-only: `GET /api/skills/levels` (section 2), `~/.claude/skills` read for display | api tests; a fixture whose clash is shown as one | untouched |
 | 2 | **The `/skills` page**, and Capabilities' list becomes a count and a link | an e2e page file, `390-skills-levels`, with a clash in the seed; the pictures read | untouched |
-| 3 | **Lookup by level**: `Places` gains the default root, and `lookupRoots` orders workspace, harness, user, default | a fixture that breaks the order (a shipped name shadowed by a repository's) and a test that fails without the rule; `sameRepository` still refuses | untouched: its steps and skills were frozen at start |
+| 3 | **Lookup by level**: `Places` gains the default root; `lookupRoots` adds `<repo>/workflows` for `places.repo` and orders by level, with default before user except for a store workflow (section 1) | fixtures that break the order, each with a test that fails without the rule: a shipped `dev` run on a fixture repository finds its `workflows/skills/<name>` over the default, and its `.claude/skills/<name>` over the default; a library copy of a shipped name does **not** shadow the default in a shipped folder's run, and does in a store workflow's; a name in both of the repository's places is still refused (`sameRepository`) | untouched: its steps and skills were frozen at start |
 | 4 | **A harness skill named, not copied**: a skill an agent names that is found at the harness level is named by its bare name in the prompt, and not copied into the plugin, so the session sees one | argv and prompt pins; card 0's probe | untouched |
 | 5 | **The `allowed-tools` refusal**, if card 0 shows the grant | a test that makes the load refuse at shipped defaults | untouched |
 | 6 | **Planner**: `plan-a-change` absorbs `ask-when-it-reads-two-ways`, preloaded | `planned-workflow.test.ts` sentences, `PRELOADED`, `BODIES_REWORDED`, argv re-recorded, the live check | a planner not yet rendered anew reads *not told* for the deleted name |
@@ -320,10 +347,11 @@ these:
 | 8 | **Reviewer**: `review-a-change` absorbs `send-work-round-again` | as 6 | as 6 |
 | 9 | **Shipper**: `trial-merge-a-branch` absorbs `say-why-it-aborted` | as 6, and the ship's sentences in `ui-workflow.test.ts` | as 6; a ship waiting at its gate was rendered at start |
 | 10 | **The screenshot trio and the web deltas**: `look-at-a-page` absorbs `read-a-screenshot`; `implement-a-web-change` and `review-a-web-change` fold into the general skills; ui-implementer and ui-reviewer name the general skills and `look-at-a-page`. The package's mirror and `ui-workflow.test.ts`'s list of its skill folders change in the same commit, as does `mcp-config.test.ts`'s pin | the copy test byte for byte; `toldIn` pins moved to `look` where their sentence moved | as 6 |
-| 11 | **Every sentence has a home**: each repository sentence that left a default is found in `.claude/skills` or a `CLAUDE.md`, and one that is not is written there | a list in the card, each sentence and its new line | untouched |
-| 12 | **Generic bodies**: command lists out of the planner, reviewer and ui-reviewer bodies, and the `npm` denies onto this repository's steps | `ui-workflow.test.ts`'s *every shipped Claude reviewer is denied* still holds, read off the resolved steps; `BODIES_REWORDED` | untouched |
+| 11 | **Every sentence has a home**: each repository sentence that left a default skill or an agent's body is found in `.claude/skills` or a `CLAUDE.md`, and one that is not is written there | a list in the card, each sentence and its new line | untouched |
+| 11b | **Close the fence at the harness level** (section 3): narrow `.claude/settings.json`'s `Bash(npx turbo run test:*)` and `Bash(node --test:*)` so no allow reaches a build or the e2e, or, where a rule cannot, write the two sentences into the root `CLAUDE.md` | a test over `.claude/settings.json` that refuses an allow reaching `npx turbo run test build` or `node --test apps/web/test/e2e/run.ts`, shown failing on today's file; a live `dontAsk` reviewer denied both | untouched |
+| 12 | **Generic bodies**, after 11b: command lists out of the planner, reviewer and ui-reviewer bodies, and the `npm` denies onto the shipped folders' `plan` and `review` steps | `ui-workflow.test.ts`'s *every shipped Claude reviewer is denied* still holds, read off the resolved steps; `BODIES_REWORDED` | untouched |
 
-Cards 6–10 each re-record the argv pin and read the diff. Cards 1–2 can ship before 3. Card 4 waits for card 0.
+Cards 6–10 each re-record the argv pin and read the diff. Cards 1–2 can ship before 3. Card 4 waits for card 0; card 12 for 11b.
 
 ## 7. Open questions for the owner
 
@@ -332,7 +360,8 @@ Cards 6–10 each re-record the argv pin and read the diff. Cards 1–2 can ship
    product presets live"). It touches every test that resolves `../../../workflows`, and fits the GitHub move better than this note.
 2. **Should a store workflow lose "its own agents and skills first"?** *Recommended:* yes. The nearest level to the work wins everywhere,
    so a run on a repository behaves the same whichever folder started it. The cost: a person's library team, run on a repository that has
-   an agent or skill of the same name, gets the repository's, and the Skills page shows it.
+   an agent or skill of the same name, gets the repository's, and the Skills page shows it. The library still comes before the defaults
+   for a store workflow, and after them for every other run (section 1).
 3. **Extending an agent (section 3).** Which of (a), (b) and (c), after the measurement that section proposes.
 4. **Claude Code's bundled skills on the page.** *Recommended:* one row saying they exist and are not listed, until the runtime reads the
    init line for another reason.

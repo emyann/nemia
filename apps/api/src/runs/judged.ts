@@ -216,7 +216,7 @@ export async function holdsIn(run: Run, reader: Engine['Service'], git: BranchRe
 
 /**
  * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never ships on its own — no such run, a
- * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli.ts). Not `neverShips` above, which reads any reason a `Wait`
+ * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli/main.ts). Not `neverShips` above, which reads any reason a `Wait`
  * carries as one it may never ship for: a hold's `shipped` is the opposite.
  */
 const holdNeedsYou = (holds: readonly Wait[]): boolean =>

@@ -56,7 +56,7 @@ In the order they block.
    whose tests are `pytest`, or `npm run test:integration`, has to allow them, or its reviewer never runs them.
 6. **`wf` lives in this checkout.** It is `packages/agent-orchestrator`'s `bin` (`bin/wf.ts`), reached with `npx wf` from here,
    on Node's type stripping (>= 22.18). A card that names no repository starts where `wf up` was started
-   (`cli.ts:657, 686`; `runner.ts:1773, 1837`).
+   (`cli/main.ts`; `runner.ts:1773, 1837`).
 7. **A worktree's dependencies are npm's.** `provisionDeps` links the checkout's `node_modules` or runs `npm ci` when the
    lockfile moved (`runner.ts:813-844`, `deps.ts`). With neither it does nothing, harmlessly; pnpm, yarn and a Python
    `.venv` get nothing unless `.worktreeinclude` lists them.

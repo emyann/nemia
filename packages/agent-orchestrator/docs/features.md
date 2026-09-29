@@ -326,7 +326,7 @@ What it leaves:
 - **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
   no exit code, so the missing exit code, not the phase, is what says it did not finish.
 - **`bin/wf.ts` exited 1 on every error**, including the verbs' refusals, which set `exitCode` 2. Since 2026-09-28 it exits with a
-  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli.ts`, `test/exit-code.test.ts` runs `wf` as a process).
+  refusal's code and 1 on a crash (`exitCodeOf` in `src/cli/exit.ts`, `test/exit-code.test.ts` runs `wf` as a process).
 - **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
 ## Shipped: going round again — `loop:`, `rounds:` and `wf round`
@@ -4162,7 +4162,7 @@ the git words are not renamed. No change to `packages/agent-runtime`: a task's `
 - **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
 - **The run** (`record/record.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
-- **Start** (`start.verb.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
+- **Start** (`start.verb.ts`, `cli/start.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
   refused — on a brief or an inbox card (`startFromInbox`, found by review); the cwd default, a card's own `repo:` (the board writes one on
   every card it files) and the repo a plan or the api pass are not looked at.

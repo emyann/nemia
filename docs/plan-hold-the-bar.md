@@ -78,8 +78,8 @@ wave 2   F     retries: + wf retry              after C
          G     the decider screen               after C
          H     wf round                          after C
          I     tools:/effort: pass-through       after A, B, C
-                │  F/G/H all touch cli.ts and runner.ts: one session in order,
-                │  or three sessions that expect small conflicts in cli.ts.
+                │  F/G/H all touch src/cli/ and runner.ts: one session in order,
+                │  or three sessions that expect small conflicts in src/cli/.
 ```
 
 Hour-one commits that unblock others: **A commit 1** (the `Workflow` type gains `check`/`retries`;
@@ -100,7 +100,7 @@ because both harnesses load it from a worktree with no code change (REPORT G3, G
 ### A — Close the workflow parser · wave 1 · ~½–1 day
 
 **Owns.** `packages/agent-workflows/src/workflow.ts`, `packages/agent-workflows/test/workflow.test.ts`.
-**Must not touch.** `run.ts`, `runner.ts`, `cli.ts`, `README.md`, `workflows/` — those are C's.
+**Must not touch.** `run.ts`, `runner.ts`, `src/cli/`, `README.md`, `workflows/` — those are C's.
 
 **Read first.** REPORT G4 (the reproduced traps: `afer:`, `5m`, `banana`), §3.1 (the key table),
 `hkb:src/templates.ts:291-298` for the message shape (`~/projects/harness-kanban-board`).
@@ -139,7 +139,7 @@ Workflow type gains `check?: string` and `retries?: number` and parseWorkflow re
 session branches from that commit. Then the closed key list and the refusals in
 docs/plan-hold-the-bar.md §4 A, each with a test that makes it refuse. The message shape is
 hkb's (~/projects/harness-kanban-board/src/templates.ts:291-298). Do not touch run.ts,
-runner.ts, cli.ts or the README. Finish with npm test && npm run typecheck green from the root,
+runner.ts, src/cli/ or the README. Finish with npm test && npm run typecheck green from the root,
 commit on this branch, and close out in one paragraph: what changed, what you refused, what you learned.
 ```
 
@@ -165,7 +165,7 @@ without enforcement.
 
 **Definition of done, in order.**
 
-1. `parseBrief` (`src/cli.ts:14-38`): a closed `BRIEF_KEYS`; unknown key, non-finite
+1. `parseBrief` (`packages/agent-runtime/src/cli/main.ts`): a closed `BRIEF_KEYS`; unknown key, non-finite
    `deadlineSeconds`/`maxAttempts`, `resume` outside `interrupted | always | never` refused with
    `Error` + `.exitCode = 2` and a message naming the fix. New `test/brief.test.ts` —
    `parseBrief` is imported by no test today.
@@ -216,7 +216,7 @@ paragraph: what changed, what you refused, what you learned.
 ### C — The check · wave 1 · ~2 days · branches from A commit 1
 
 **Owns.** `packages/agent-workflows/` **except** `src/workflow.ts` and `test/workflow.test.ts`:
-`src/run.ts`, `src/runner.ts`, `src/cli.ts`, new `src/check.ts`, `test/run.test.ts`,
+`src/run.ts`, `src/runner.ts`, `src/cli/`, new `src/check.ts`, `test/run.test.ts`,
 `test/store.test.ts`, new `test/check.test.ts`, new `test/boundary.test.ts`, `README.md`,
 `docs/features.md`, `workflows/*.md`, `wf-examples/**`.
 **Must not touch.** `workflow.ts` (A's), `packages/agent-engine/` (B's), `apps/`.
@@ -271,7 +271,7 @@ lesson); `docs/eval-2026-09-12/shape-verify-first.md` for detail the report comp
    section and the status table; `docs/features.md` records what shipped and points retries and
    rounds at wave 2.
 10. `test/boundary.test.ts`: only `runner.ts` imports `agent-engine`; `run.ts` and `check.ts`
-    import no `node:fs`/`node:child_process`; `cli.ts` imports only `runner.ts` and `workflow.ts`.
+    import no `node:fs`/`node:child_process`; `src/cli/` imports only `runner.ts` and `workflow.ts`.
 11. Refusal tests at shipped defaults: no `check:` → no check task is ever filed; a planted
     `check:` in the worktree's copy of the folder is ignored; a check that exits 1 leaves the
     follower unfiled and the step `failed (check)`; `unsigned` leaves the follower unfiled;
@@ -302,7 +302,7 @@ and close out in one paragraph: what changed, what you refused, what you learned
 refused check with the verdict in the brief as data (command, exit, both tails, "do not weaken
 it"); `wf retry <run> <step> --nudge | --fresh | --model m | --recheck` writes an ask file
 (`runs/<id>.asks/retry-<step>-<n>`, `wx`, honoured once by the next tick); `resumeFrom` = the
-last `nativeId` for `--nudge`. Owns `run.ts`, `runner.ts`, `cli.ts`, `check.ts`, tests, README.
+last `nativeId` for `--nudge`. Owns `run.ts`, `runner.ts`, `src/cli/`, `check.ts`, tests, README.
 Refusal tests: a retry past `retries` files nothing; an ask file is honoured once.
 
 ### G — The decider screen · wave 2 · after C
@@ -312,7 +312,7 @@ Refusal tests: a retry past `retries` files nothing; an ask file is honoured onc
 the full diff of `--sensitive` files (default `package.json, **/package.json, **/*.test.*,
 tsconfig*.json`); `cost: not measured` until a runner fills it, never `0`; the lesson line —
 `missingArtifacts` applied to `CLAUDE.md`: `lesson: CLAUDE.md +2 −0` or `lesson: nothing written
-where the next agent reads`; the four commands, none run. Owns `cli.ts`, `check.ts`, tests.
+where the next agent reads`; the four commands, none run. Owns `src/cli/`, `check.ts`, tests.
 
 ### R — Rounds: implement ⇄ review until the reviewer says done, at most N · after U1
 
@@ -352,7 +352,7 @@ A new run with `follows: { run, round, because }`, cut from the previous result 
 `baseRef` at the result tip; refused while the previous run is `running` or ends in several
 terminal branches; `composeBrief` adds *## Previous round* and the person's words; `wf ls` shows
 `round 2 of <id>`; `wf decide` offers `again wf round <run> "why"`. Owns `run.ts`, `runner.ts`,
-`cli.ts`, tests, README, `docs/features.md`. Refusal tests: round on a running run; round on a
+`src/cli/`, tests, README, `docs/features.md`. Refusal tests: round on a running run; round on a
 fan-out.
 
 ### J — The review as a closeout: declared outputs and inputs between steps · wave 2 · after C

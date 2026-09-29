@@ -607,7 +607,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/workflow.ts"],
+      "files": ["packages/agent-orchestrator/src/keys/keys.ts"],
       "rules": {
         "max-lines": ["error", { "max": 1945, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],

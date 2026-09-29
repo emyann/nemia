@@ -351,38 +351,43 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
   clear();
 });
 
-test("`wf up` stopped by a signal lets the store go on the way out, with the signal's exit code", async () => {
-  clear();
-  const cli = new URL('../cli.ts', import.meta.url).href;
-  const child = spawn(
-    process.execPath,
-    [
-      '--input-type=module',
-      '-e',
-      `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`,
-    ],
-    {
-      env: { ...process.env, WF_ROOT: ROOT },
-      stdio: 'ignore',
-    },
-  );
-  const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
-  try {
-    const until = Date.now() + 20_000;
-    while (!(fs.existsSync(FILE) && read().pid === child.pid && read().passedAt)) {
-      assert.ok(Date.now() < until, 'the daemon wrote a pass within 20s');
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    child.kill('SIGTERM');
-    assert.equal(await exited, 143, 'a real process, since a signal stops it; its engine a fake, so no harness is asked anything');
-    const file = read();
-    assert.equal(file.pid, child.pid);
-    assert.ok(file.stoppedAt, 'stoppedAt written as it stopped');
-  } finally {
-    child.kill('SIGKILL');
+for (const [signal, code] of [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+  ['SIGHUP', 129],
+] as const)
+  test(`\`wf up\` stopped by ${signal} lets the store go on the way out, with the signal's exit code, ${code}`, async () => {
     clear();
-  }
-});
+    const cli = new URL('../cli.ts', import.meta.url).href;
+    const child = spawn(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`,
+      ],
+      {
+        env: { ...process.env, WF_ROOT: ROOT },
+        stdio: 'ignore',
+      },
+    );
+    const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
+    try {
+      const until = Date.now() + 20_000;
+      while (!(fs.existsSync(FILE) && read().pid === child.pid && read().passedAt)) {
+        assert.ok(Date.now() < until, 'the daemon wrote a pass within 20s');
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      child.kill(signal);
+      assert.equal(await exited, code, 'a real process, since a signal stops it; its engine a fake, so no harness is asked anything');
+      const file = read();
+      assert.equal(file.pid, child.pid);
+      assert.ok(file.stoppedAt, 'stoppedAt written as it stopped');
+    } finally {
+      child.kill('SIGKILL');
+      clear();
+    }
+  });
 
 test("REFUSED NOT: a pid alive but another process's — reused after a kill -9 — holds nothing, and is never named as one to kill", async (t) => {
   assert.equal(typeof procStartOf(LIVE), 'number', 'this test needs /proc');

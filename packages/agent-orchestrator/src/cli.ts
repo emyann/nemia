@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
+import { Effect } from 'effect';
 import {
   addPass,
   breakdownLines,
@@ -143,6 +144,7 @@ import {
   workflowFolder,
 } from './runner.ts';
 import { agentCard, dollarsOf } from './workflow.ts';
+import { runMain } from './cli/run-main.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -842,6 +844,15 @@ export function watchPrinted(from: number): { stop(): void } {
 }
 
 /**
+ * `wf watch` as an Effect: `watchPrinted(from)` held in its scope until it is interrupted, and stopped as that scope closes, so an
+ * interrupted watch leaves no watcher and no timer behind. It never ends of itself; a cursor it cannot read from fails it.
+ */
+export const watching = (from: number): Effect.Effect<never, unknown> =>
+  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(from), catch: (err) => err }), (watch) =>
+    Effect.sync(() => watch.stop()),
+  ).pipe(Effect.andThen(Effect.never), Effect.scoped);
+
+/**
  * Runs the verb `argv` names and prints what it did, or prints the help for a verb it does not know. `e` is the engine the verbs talk to:
  * the board under `WF_ROOT`, unless a test hands it one of its own. Beside what the help and the functions each verb calls say:
  * - `wf start` of a file that is not a plan's card (`cardToStart`) takes the whole file as the brief, frontmatter and all, and a card's own
@@ -849,9 +860,10 @@ export function watchPrinted(from: number): { stop(): void } {
  *   write it absolute (`workflowAt`).
  * - `wf tick` beside a daemon that ticks the store is refused, with no way to force it. `wf tick` and `wf up` start a queued card that
  *   names no repository on the one they are typed in, as `wf start` takes `.`.
- * - `wf up` refuses its interval (`everyOf`) and its ceilings (`ceilings`) before it takes the store. It beats on a timer of its own,
- *   unref'd, so a long pass is not taken for stalled and taken over mid-pass; it stops at the first pass that finds the store taken over
- *   (`stillHeld`), and a signal that stops it lets the store go, so it reads free at once. It says each failure once while it lasts — a
+ * - `wf up` refuses its interval (`everyOf`) and its ceilings (`ceilings`) before it takes the store. It runs as an Effect (`runMain`):
+ *   the store is taken in its scope and let go as the scope closes, however it ends, so a signal that stops it leaves the store free at
+ *   once. It beats on a fiber forked in that scope, so a long pass is not taken for stalled and taken over mid-pass; it stops at the first
+ *   pass that finds the store taken over (`stillHeld`). It says each failure once while it lasts — a
  *   queued card's start, the feed's, a move the lifecycle refused, a journal left out — going by what it has printed, not by the store.
  * - `wf ls <run>` judges the cap on runs in flight over the whole store. A listing views each task once and asks git of each repository's
  *   branches once (`viewedOnce`, `branchReader`), and says an ending's gate once, on its `to decide` line, and what a run has cost so
@@ -1101,74 +1113,71 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const asked = everyOf(rest[0]);
       const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
       const ceiling = ceilings();
-      const { held, replaced } = takeStore({ every, cwd: path.resolve('.') });
       const store = HOME;
-      console.log(`up — every ${every}ms, ^C to stop`);
-      for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
-      console.log(
-        `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+      return runMain(
+        Effect.gen(function* () {
+          const { held, replaced } = yield* Effect.acquireRelease(
+            Effect.try({ try: () => takeStore({ every, cwd: path.resolve('.') }), catch: (err) => err }),
+            ({ held }) => Effect.sync(() => releaseStore(held)),
+          );
+          console.log(`up — every ${every}ms, ^C to stop`);
+          for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
+          console.log(
+            `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+          );
+          const took = takeoverLine(replaced, store, Date.now());
+          if (took) console.log(`   ${took}`);
+          yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(held))))));
+          let said: string | undefined;
+          let feedSaid: string | undefined;
+          let refusedSaid: ReadonlySet<string> = new Set();
+          let unreadableSaid: ReadonlySet<string> = new Set();
+          let interval: Interval | undefined;
+          for (;;) {
+            const by = stillHeld(held);
+            if (by) return yield* Effect.fail(new Error(takenFromLine(by, store)));
+            const {
+              runs: advanced,
+              queue,
+              feedError,
+              cost,
+              refused,
+              unreadable,
+            } = yield* Effect.tryPromise({
+              try: () => tick(e, { repo: path.resolve('.') }),
+              catch: (err) => err,
+            });
+            passed(held);
+            if (cost) interval = addPass(interval, cost, Date.now());
+            if (summaryDue(interval, Date.now())) {
+              console.log(`${new Date().toISOString().slice(11, 19)}  ${summaryLine(interval!, Date.now())}`);
+              interval = undefined;
+            }
+            if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
+            feedSaid = feedError;
+            const stalled = refusalLines(refused ?? [], refusedSaid);
+            for (const line of stalled.lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
+            refusedSaid = stalled.said;
+            for (const why of unreadable ?? [])
+              if (!unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
+            unreadableSaid = new Set(unreadable);
+            if (queue) {
+              const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
+              if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+              said = failure;
+            }
+            for (const r of advanced) {
+              for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
+              if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
+              if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
+              if (r.looped.length)
+                console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
+              if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
+            }
+            yield* Effect.sleep(every);
+          }
+        }).pipe(Effect.scoped),
       );
-      const took = takeoverLine(replaced, store, Date.now());
-      if (took) console.log(`   ${took}`);
-      const stops = (
-        [
-          ['SIGINT', 130],
-          ['SIGTERM', 143],
-          ['SIGHUP', 129],
-        ] as const
-      ).map(([signal, code]) => {
-        const stop = () => {
-          releaseStore(held);
-          process.exit(code);
-        };
-        process.once(signal, stop);
-        return [signal, stop] as const;
-      });
-      const beating = setInterval(() => beat(held), every);
-      beating.unref();
-      try {
-        let said: string | undefined;
-        let feedSaid: string | undefined;
-        let refusedSaid: ReadonlySet<string> = new Set();
-        let unreadableSaid: ReadonlySet<string> = new Set();
-        let interval: Interval | undefined;
-        for (;;) {
-          const by = stillHeld(held);
-          if (by) throw new Error(takenFromLine(by, store));
-          const { runs: advanced, queue, feedError, cost, refused, unreadable } = await tick(e, { repo: path.resolve('.') });
-          passed(held);
-          if (cost) interval = addPass(interval, cost, Date.now());
-          if (summaryDue(interval, Date.now())) {
-            console.log(`${new Date().toISOString().slice(11, 19)}  ${summaryLine(interval!, Date.now())}`);
-            interval = undefined;
-          }
-          if (feedError && feedError !== feedSaid) console.error(`${new Date().toISOString().slice(11, 19)}  ${feedError}`);
-          feedSaid = feedError;
-          const stalled = refusalLines(refused ?? [], refusedSaid);
-          for (const line of stalled.lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
-          refusedSaid = stalled.said;
-          for (const why of unreadable ?? [])
-            if (!unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
-          unreadableSaid = new Set(unreadable);
-          if (queue) {
-            const failure = 'failed' in queue ? `${queue.card}  ${queue.on ?? ''}  ${queue.failed}` : undefined;
-            if (failure === undefined || failure !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
-            said = failure;
-          }
-          for (const r of advanced) {
-            for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
-            if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
-            if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
-            if (r.looped.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
-            if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
-          }
-          await new Promise((r) => setTimeout(r, every));
-        }
-      } finally {
-        clearInterval(beating);
-        for (const [signal, stop] of stops) process.off(signal, stop);
-        releaseStore(held);
-      }
     }
 
     case 'feed': {
@@ -1181,9 +1190,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const from = feedCursor('watch', rest);
       const refusal = feedCursorRefusal(from);
       if (refusal) usage(refusal);
-      return new Promise<void>(() => {
-        watchPrinted(from);
-      });
+      return runMain(watching(from));
     }
 
     case 'ls': {

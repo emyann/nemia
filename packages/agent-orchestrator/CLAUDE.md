@@ -62,6 +62,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 
 ## The tick
 
+- **A command that lives as long as its process is an Effect run by `runMain`** (`src/cli/run-main.ts`): what it holds is taken with
+  `acquireRelease` in its scope, never let go in a signal handler, and a signal exits 128 + its number once the scope is closed.
 - **Admission reads the views the runtime's pass hands back** (`toAdmit`, `e.admit`), never a read of its own. A new engine verb goes
   into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its

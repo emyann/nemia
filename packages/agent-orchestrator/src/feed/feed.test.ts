@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
+import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import { feedPhase, feedWords, listing } from '../run.ts';
@@ -26,7 +27,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } =
   await import('../runner.ts');
-const { main, watchPrinted } = await import('../cli.ts');
+const { main, watchPrinted, watching } = await import('../cli.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -721,6 +722,76 @@ test('`wf watch` says it is watching only once it holds its cursor: a feed cut t
   } finally {
     watch.stop();
   }
+});
+
+test('`wf watch` interrupted in the process, as a signal interrupts it, leaves no watcher and no timer behind, and prints nothing more', async (t) => {
+  emptyStore();
+  const line = (run: string) => `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run, word: 'running' })}\n`;
+  fs.writeFileSync(FEED, line('r-before'));
+  const from = size();
+  const out: string[] = [];
+  let banner: () => void = () => {};
+  const bannered = new Promise<void>((resolve) => {
+    banner = resolve;
+  });
+  t.mock.method(console, 'log', (...a: unknown[]) => {
+    out.push(a.join(' '));
+    if (a.join(' ').startsWith('watching from')) banner();
+  });
+  t.mock.method(console, 'error', () => {});
+  const closes: { mock: { callCount(): number } }[] = [];
+  const watch = fs.watch;
+  t.mock.method(fs, 'watch', (...args: Parameters<typeof fs.watch>) => {
+    const made = watch(...args);
+    closes.push(t.mock.method(made, 'close'));
+    return made;
+  });
+  const timers: NodeJS.Timeout[] = [];
+  const every = setInterval;
+  t.mock.method(globalThis, 'setInterval', (...args: Parameters<typeof setInterval>) => {
+    const made = every(...args);
+    timers.push(made);
+    return made;
+  });
+  const cleared: unknown[] = [];
+  const clear = clearInterval;
+  t.mock.method(globalThis, 'clearInterval', (timer: NodeJS.Timeout) => {
+    cleared.push(timer);
+    clear(timer);
+  });
+  const fiber = Effect.runFork(watching(from));
+  await bannered;
+  assert.equal(closes.length, 1, 'the watch holds one watcher of the feed');
+  assert.equal(timers.length, 1, 'and one timer');
+  assert.equal(closes[0].mock.callCount(), 0);
+  await Effect.runPromise(Fiber.interrupt(fiber));
+  assert.equal(closes[0].mock.callCount(), 1, 'its watcher closed as it was interrupted');
+  assert.deepEqual(cleared, timers, 'and its timer cleared');
+  const exit = await Effect.runPromise(Fiber.await(fiber));
+  assert.ok(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause), 'interrupted, never ended of itself');
+
+  const printed = out.length;
+  const got: string[] = [];
+  let arrived: () => void = () => {};
+  const other = watchFeed({
+    from,
+    intervalMs: 20,
+    onLine: (l) => {
+      got.push(l.run);
+      arrived();
+    },
+  });
+  try {
+    const delivered = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    fs.appendFileSync(FEED, line('r-after'));
+    await delivered;
+  } finally {
+    other.stop();
+  }
+  assert.deepEqual(got, ['r-after'], 'a watch still running is handed the line');
+  assert.equal(out.length, printed, 'the interrupted watch printed nothing of it');
 });
 
 test('REFUSED: a watch not told what to do about a cut feed refuses to read it, on every beat — the api ends its stream on that', async () => {

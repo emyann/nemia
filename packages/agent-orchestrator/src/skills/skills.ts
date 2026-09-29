@@ -41,8 +41,8 @@ const ENTRY_LISTS: readonly EntryKey[] = ['tags', 'examples'];
  *
  * Read one line at a time, as the rest of the format is, and not by a YAML parser: each key the card reads is a plain value, one in double
  * quotes (read as JSON), one in single quotes, or a one-line JSON list. Any other form of those keys — a block scalar, a list over several
- * lines — is refused with the one-line form, rather than read as something else; `test/shipped-skills.test.ts` holds this reading to
- * js-yaml's on every shipped and vendored SKILL.md. Keys the card does not read are passed over, whatever their form.
+ * lines — is refused with the one-line form, rather than read as something else; `test/skills-rendered.test.ts` holds this reading to
+ * js-yaml's on every SKILL.md the repository has. Keys the card does not read are passed over, whatever their form.
  */
 export function skillEntryOf(file: string, id: string, text: string): AgentSkill {
   const { words, list } = entryValuesOf(file, text);

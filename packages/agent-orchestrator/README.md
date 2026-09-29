@@ -303,7 +303,7 @@ examples: ["Use this when a change is written and nobody has read it yet."]
 An agent that gives no skills has one entry, made from its own description: its name as id and name, the description, and its
 name as its tag. An agent with no description has no card. Each key is read off one line — a plain value, one in quotes, or a
 one-line JSON list — and any other form of those keys (a block scalar, a list over several lines, an empty list, a value YAML would
-read as a map) is refused with the one-line form; `shipped-skills.test.ts` holds this reading to js-yaml's on every SKILL.md the
+read as a map) is refused with the one-line form; `skills-rendered.test.ts` holds this reading to js-yaml's on every SKILL.md the
 repository has. A skill that no place has, or whose SKILL.md cannot be read, is refused where a card is asked for, never at load.
 
 The card was a hand-written `.json` beside the agent, named by `card:` (by `skills:` before 2026-09-25), until agents card 2. Both
@@ -399,7 +399,7 @@ which keeps no repository, finds none in the one it was started in — or says w
 
 The shipped agents give skills (since 2026-09-25): each entry of an agent's card is a skill in the repository's `workflows/skills/`,
 the procedure the entry describes, and the agent's body keeps its role and its limits and says when to load each
-(`workflows/agents/README.md`). `test/shipped-skills.test.ts` reads each SKILL.md's frontmatter as YAML and holds it to its card entry.
+(`workflows/agents/README.md`). `test/skills-rendered.test.ts` reads each SKILL.md's frontmatter as YAML and holds it to its card entry.
 
 ### What a step may have: `tools:` and `effort:`
 

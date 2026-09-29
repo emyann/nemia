@@ -245,7 +245,7 @@ test('REFUSED: a file beside history is live, and history is matched whole', () 
     'docs/eval-sqlite-store.md',
     'docs/eval-thin-runtime.md',
     'docs/design-2026-09-25-agents-and-skills.md.bak',
-    'packages/agent-orchestrator/test/fixtures/git-runs-before.json',
+    'packages/agent-orchestrator/test/fixtures/team/README.md',
     'CLAUDE.md',
   ])
     assert.equal(inHistory(live), false, live);

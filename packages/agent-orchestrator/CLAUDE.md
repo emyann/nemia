@@ -28,8 +28,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
   is written back in the form the file has (`contextText`). Code outside the package reads frontmatter as the parser does
   (`splitFrontmatter`, trimmed; `frontmatterValue`).
-- **`fixtures/argv-shipped.json` pins dev's implement argv**: after changing what a shipped agent gives, record it with `ARGV_RECORD=1`
-  and read the diff. `fixtures/git-runs-before.json` is refreshed with `everything()` of `git-runs-pin.ts`; read its diff line by line.
+- **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: Nemia
+  ships none, and a guard over what ships reads `shippedFolders()`.
 - **The api reads `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect`**, its tests with
   `await import`: the api's typecheck fails on a name a subpath no longer exports, so before moving a name out of `run.ts` or
   `workflow.ts`, re-export from `run.ts` what the api reads there.
@@ -46,7 +46,7 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **The runtime's phase is free text compared exactly** (`needs-human` in `harnessBlocked`, the api's `needsOf`, the web's `stepState`,
   `listing`): put a new word beside it (`waitingOf`), never into it. A new runtime phase is read in `listing` (`settledOf`) and in
   `phaseOfView`, and on the board.
-- **A new step status is `working` on the board until `stepState` knows it**, and `git-runs-before.json` pins every `Decision`.
+- **A new step status is `working` on the board until `stepState` knows it**.
 - **A word from outside is made one line before it is measured into a column** (`waitingWords`).
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
@@ -87,7 +87,7 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 ## Checks and worktrees
 
 - **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: the ship's check runs on the merged tree with
-  none (`web-check.test.ts` runs each line both ways). A check starts at low priority (`CHECK_NICENESS`); sessions do not.
+  none. A check starts at low priority (`CHECK_NICENESS`); sessions do not.
 - **A check logs its stdout; a person is shown the tail of its stderr**, whole at `WF_STDERR`.
 - **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's; a lockfile that differs from main's
   costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a

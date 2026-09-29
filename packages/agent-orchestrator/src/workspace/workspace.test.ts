@@ -24,11 +24,11 @@ const ROOT = scratch('wf-deps-');
 process.env.WF_ROOT = ROOT;
 const { provisionDeps } = await import('../runner.ts');
 
-test('workspace.ts reads no disk and spawns nothing: it imports path, and nothing else', () => {
+test("workspace.ts reads no disk and spawns nothing: it imports path, a step's shape and the record's, and nothing else", () => {
   const text = fs.readFileSync(path.join(import.meta.dirname, 'workspace.ts'), 'utf8');
   assert.deepEqual(
     [...text.matchAll(/^\s*(?:import|export)\b[^'";]*?\bfrom\s*['"]([^'"]+)['"]/gm)].map((m) => m[1]),
-    ['node:path'],
+    ['node:path', '../step/step.ts', '../record/record.ts'],
   );
 });
 

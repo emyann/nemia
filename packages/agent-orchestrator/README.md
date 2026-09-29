@@ -1398,53 +1398,44 @@ it files the step.
   workspace or the directory, a directory, a file that is not there, and a file in the workspace that was
   not collected. Then it lists the directory, each file by absolute path with its size.
 
-A file reaches a later step by its path, declared. `workflows/ui/implement.md` declares `screenshots`,
-the absolute paths of its PNGs, and `review` reads them with `input: implement`.
+A file reaches a later step by its path, declared: an `implement` that declares `screenshots`, the absolute paths
+of its PNGs, hands them to a `review` that reads them with `input: implement`.
 
-### `workflows/ui/`: a change a person will see
+### A change a person will see: pictures, declared and read
+
+A workflow for a change to a web app can hand its reviewer pictures of the change, as artifacts:
 
 ```
 implement ⇄ review → ship   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
-`implement` carries `check: npm test && npm run typecheck && npm run build`, and then `npm run e2e` only
-where no `WF_BASE_REF` is set, which a check the run executes never is: a round's check builds and runs no
-e2e, and the ship runs the line whole, on the merged tree (since 2026-09-25; the e2e was 3-4 minutes of
-every round). `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a
-seeded store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
-have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told by its skill `look-at-a-page`
-to run it into its own directory, after its last commit, and read the PNGs — those are the screenshots review reads —
-and to use the look skill on every page it changed. It declares
-`screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
-else of implement, and uses the look skill on the screenshots and the pages side by side, as its skill `read-a-screenshot`
-says — which names the look skill's file, `.claude/skills/look/SKILL.md`, too, for Read. Its schema is
-`workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
-`where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
-names neither does not fit the closeout the step is filed with. `again: true` sends the change round
-again, at most `rounds: 3`, as in `workflows/`. `ship` is `dev-build`'s: gated, the shipper in the repository's
-own checkout, which stages the merge of the run's branch and signs off its message; the run executes that line on it as
-ship's `check:`, with no `WF_BASE_REF`, and commits or aborts. Its agent,
-`shipper`, is copied into this package's `workflows/agents/` beside ui's two, and the six skills the three give into its
-`workflows/skills/`, each the repository's file for file.
-
-```bash
-wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/workflows/ui
+```md
+---
+check: npm test && npm run typecheck && npm run build && if [ -n "${WF_BASE_REF:-}" ]; then echo "no e2e in a round"; else npm run e2e; fi
+output: implement.schema.json   # screenshots, pages
+---
 ```
+
+- **The e2e runs once, on the merged tree.** `WF_BASE_REF` is set in every check the run executes on a step, so
+  a round's check builds and runs no e2e, and a gated ship, where it is not set, runs the line whole on the merged
+  tree. In this repository `npm run e2e` (`apps/web/test/e2e/`) builds the web app, serves it against a seeded store,
+  visits every page in headless Chromium in a light and a dark theme, asserts what each page must have, and
+  screenshots each into `WF_ARTIFACTS`.
+- **`implement` declares `screenshots` and `pages`**, and `review` reads the diff, is handed those and nothing else
+  of implement, and looks at the screenshots and the pages side by side. Its schema can say where a finding is as
+  `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that names
+  neither does not fit the closeout the step is filed with.
 
 **Looking is a skill, not a step.** `.claude/skills/look/SKILL.md`, in this repository, says how any step
 looks at the web app. It reads the e2e's PNGs. It serves the app on ports of its own and photographs every
-page with the browser's `browser_*` tools (`.mcp.json`), and never with `browser_run_code_unsafe`, which
-every shipped step that could reach it denies in its agent's `disallowedTools:`, and no allow reaches in `dontAsk`. And it judges the layout, both themes, and what a person notices first. It
-writes nothing into the workspace. `look` was a step of its own while the reviewer ran on codex, which
-reads no image and has no browser, and `respond` answered two reviewers while there was no loop. Neither
-reason holds now.
+page with the browser's `browser_*` tools (`.mcp.json`), and never with `browser_run_code_unsafe`, which a
+step that could reach it denies in its agent's `disallowedTools:`, and no allow reaches in `dontAsk`. And it judges
+the layout, both themes, and what a person notices first. It writes nothing into the workspace.
 
-`review` cannot edit, by machinery rather than by its brief: `tools: Read, Grep, Glob, Bash` has no Edit or
-Write, and in `permissionMode: dontAsk` a Bash command `.claude/settings.json` does not allow is denied
-without a prompt. The same settings allow no `browser_*` tool, so at this repository's settings `review`
-looks through the screenshots and opens no page (measured; `docs/features.md`, *Shipped: looking is a
-skill*). The repository's `workflows/ui/` is this folder, copied with a README of its own, and a test holds
-the copy to it.
+A `review` with `tools: Read, Grep, Glob, Bash` in `permissionMode: dontAsk` cannot edit, by machinery rather than by
+its brief: it has no Edit or Write, and a Bash command `.claude/settings.json` does not allow is denied without a
+prompt. The same settings allow no `browser_*` tool, so at this repository's settings such a review looks through the
+screenshots and opens no page (measured; `docs/features.md`, *Shipped: looking is a skill*).
 
 ## Deciding what ships
 
@@ -1578,7 +1569,7 @@ nothing counted it as anything: a card started from the Inbox finished and seeme
 policy in code — what a person does with a run's product varies, and merging is only one of them — so **the
 end of a run is the last step of its workflow, in prose**, like every other step.
 
-`workflows/dev/ship.md` is one:
+A step like this is one:
 
 ```md
 ---
@@ -1590,8 +1581,8 @@ check: npm test && npm run typecheck && …
 ---
 ```
 
-Its words are the shipper's (`workflows/agents/shipper.md`): *Ship it: stage the merge of this run's result onto the base
-branch, and sign off with the message to commit it with.*
+Its words are its agent's, a shipper's: *Ship it: stage the merge of this run's result onto the base branch, and sign off
+with the message to commit it with.*
 
 Another repository's says "open a pull request with the closeout as its body". A research workflow's last
 step is the study itself, gated, and approving it is the acceptance: nothing is merged, and nothing is
@@ -1719,8 +1710,8 @@ would wait for ever, since the approval that would release them is refused with 
 ## A run with no repository: `workspace: folder`
 
 A team whose work is not code needs no git repository, and a run of it runs no git. `workspace:` names a kind of
-workspace; `folder` is the first beside git's worktrees (and `main`, the checkout an ending runs in), and `workflows/note/` is
-the example team:
+workspace; `folder` is the first beside git's worktrees (and `main`, the checkout an ending runs in), and a team that writes a
+note is the example:
 
 ```md
 ---
@@ -1898,11 +1889,12 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
   `approve()`, refused in its words.
 
-## The supervisor: a session that watches the runs — `workflows/supervisor/` and `slot: none`
+## A supervisor: a session that watches the runs — `slot: none`
 
 The three sections above are the machinery a person needs to run this board by hand: the gate says when a
 run wants them, the ending step says what shipping means, and `→ to decide` counts the runs nobody has
-decided. The supervisor is that person's first reader. It is **a workflow of one step that never ends**:
+decided. A supervisor is that person's first reader: **a workflow of one step that never ends**, which a repository
+writes for itself, in a folder such as `<repo>/workflows/supervisor/`:
 
 ```md
 ---
@@ -1931,13 +1923,14 @@ own session in the checkout may be asked to push, and it could not hold `git mer
 and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
 `dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
-is not `git merge`): it stops a command that should not have been typed, and `supervisor.test.ts` fails when
-one of those rules leaves the folder.
+is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete and the
+unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
+the folder author's to keep.
 
 **How to start it**, once, and leave it running:
 
 ```bash
-wf start "supervise this repository" --workflows workflows/supervisor
+wf start "supervise this repository" --workflows supervisor
 ```
 
 **How to answer it.** Its questions are gates on its own run: it signs off `blocked` with the brief in
@@ -1962,8 +1955,8 @@ the work beside it would run outside the cap too. Nothing else about such a run 
 cancelled, listed and answered as any other.
 
 **It still takes a session slot, and holds it nearly all the time.** `WF_MAX_CONCURRENT` is 2 unless set,
-counted per harness pool, and the supervisor is on `claude` — the pool `dev`'s implement, review and ship
-share. A session that is watching is a session at work, so at the default a supervisor leaves one slot for
+counted per harness pool, and the supervisor is on `claude` — the pool every Claude step of the runs it watches
+shares. A session that is watching is a session at work, so at the default a supervisor leaves one slot for
 the work it watches, freeing its own only between signing off and being answered. Raise the ceiling before
 starting one: `WF_MAX_CONCURRENT=3 wf up`.
 
@@ -2374,7 +2367,7 @@ before the store is taken: `wf up -5` would write an interval the file does not 
 - **Stale is ten of the holder's own intervals of silence, never under fifteen minutes** (`staleAfterMs`), measured from the latest of its
   start, its last pass and its beat. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
   ten minutes — so the pass alone cannot say the daemon is alive; the beat, on a timer, is written while the pass awaits. What silences it
-  is the event loop held by synchronous work, or the process stopped (`^Z`); the floor leaves those room, and at the shipped 4000 ms it
+  is the event loop held by synchronous work, or the process stopped (`^Z`); the floor leaves those room, and at the default 4000 ms it
   decides. A daemon taken over while it lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops
   rather than be a second writer. A pass that awaits for ever keeps beating, and holds the store until it is killed: `wf ls` says so —
   `last pass 40m00s ago (…), a pass under way since — alive 3s ago (…)` — rather than letting a second daemon in beside it.
@@ -2693,10 +2686,10 @@ tools a step may use. Set `permissionMode:` on a step to choose.
 Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, `claude -p`, and **a job waits on
 nobody in any mode**: a call that would ask is denied, the session carries on, and the attempt records
 what was denied (agent-runtime's open issue 28, M1). So a mode no longer decides whether a step stalls,
-only what it may do. The shipped agents choose by role: the planner and the reviewers run `dontAsk`,
-fenced by this repository's `.claude/settings.json` allow list, which a job honours as a `--bg` session
-does (M11); the implementers and the shipper run `auto`; and the supervisor, the one background session,
-runs `dontAsk` with an `allowedTools:` of its own, since a `--bg` session in a mode that asks would wait.
+only what it may do. Choose by role: a step that only reads — a planner, a reviewer — runs `dontAsk`,
+fenced by the checkout's `.claude/settings.json` allow list, which a job honours as a `--bg` session
+does (M11); a step that edits and runs its own tests runs `auto`; and a background session runs `dontAsk`
+with an `allowedTools:` of its own, since a `--bg` session in a mode that asks would wait.
 
 Whichever you pick, the engine makes the consequence visible rather than mysterious: a session
 waiting on a person is reported as `needs-human`, and a step's `deadlineSeconds` is what stops one

@@ -26,10 +26,11 @@ import {
 import { parsePlan, planOrder, type Card, type Planned } from './plan/plan.ts';
 import { workRoot } from './record/places.store.ts';
 import { afterRefusal, gateRefusal, inputRefusal, isGitRun, type InputFile, type Run } from './run.ts';
-import { HOME, inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, writeAgentFiles, writeRun } from './record/record.store.ts';
+import { HOME, inputsDir, isDirectory, listRuns, runId, runsDir, writeRun } from './record/record.store.ts';
+import { writeAgentFiles } from './agents/agents.store.ts';
 import { makeWorkspace, readInclude } from './worktree.ts';
 import { parentRecord } from './branches.ts';
-import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox/inbox.store.ts';
+import { inboxCards, inboxDir, inboxFiles, queueDir, queueTries } from './inbox/inbox.store.ts';
 import { Conflict, Invalid, Missing } from './refusal/refusal.ts';
 
 /**

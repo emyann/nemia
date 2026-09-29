@@ -18,7 +18,7 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-shipped-skills-');
 process.env.WF_ROOT = ROOT;
-const { agentFilesDir, skillsAgain, writeAgentFiles } = await import('../src/record/record.store.ts');
+const { agentFilesDir, skillsAgain, writeAgentFiles } = await import('../src/agents/agents.store.ts');
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 /** The two places skills are shipped: the repository's workflows, and the package's own copy of ui's three agents' (ui-workflow.test.ts). */

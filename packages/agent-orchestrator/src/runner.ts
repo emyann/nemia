@@ -193,7 +193,6 @@ export {
   artifactsDir,
   askFile,
   checkStderr,
-  inboxDir,
   inputsDir,
   listRuns,
   markCancelled,
@@ -268,7 +267,7 @@ export type {
   SkillWritten,
   WorkflowWritten,
 } from './authoring.ts';
-export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';

@@ -27,7 +27,13 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
 import { isFolderTeam, WorkflowError, type Workflow } from '../workflow.ts';
 import { loadWorkflows, workflowFolder } from '../workflow-store.ts';
-import { HOME, inboxDir, isDirectory, listRuns, runId, runsDir } from '../record/record.store.ts';
+import { HOME, isDirectory, listRuns, runId, runsDir } from '../record/record.store.ts';
+
+/**
+ * The inbox: cards before they are started, one `<name>.md` per card (`parseInboxCard` in inbox.ts), in the store beside `runs/` — not in a
+ * repository, since a card's `repo:` says which one the idea is about.
+ */
+export const inboxDir = (): string => path.join(HOME, 'inbox');
 
 /** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */
 export function inboxFiles(): Array<{ file: string; text: string }> {

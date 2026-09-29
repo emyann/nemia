@@ -378,6 +378,9 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
     'src/check/check.ts is pure and imports node:child_process',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
+  assert.deepEqual(impurities(adding('src/rendering.ts', 'src/agents/agents.store.ts')), [
+    'src/rendering.ts is pure and imports src/agents/agents.store.ts',
+  ]);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'src/workflow-store.ts')), [
     'src/workflow.ts is pure and imports src/workflow-store.ts',
   ]);
@@ -413,6 +416,15 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   ]);
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', CLIENT)), [
     'src/record/record.store.ts is a store file and imports src/runtime-client.ts, the client: a cycle',
+  ]);
+  assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/tick.ts')), [
+    'src/agents/agents.store.ts is a store file and imports src/tick.ts, a controller: a cycle',
+  ]);
+  assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
+    'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/workflow-store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/record.store.ts, src/worktree.ts',
+  ]);
+  assert.deepEqual(treeBreaks(unimported('src/agents/agents.store.ts')), [
+    "src/agents/agents.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
   ]);
   assert.deepEqual(treeBreaks(unimported('src/daemon/daemon.store.ts')), [
     "src/daemon/daemon.store.ts is imported by no controller and not by the client: a store file is the controllers' I/O",
@@ -468,6 +480,9 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   ]);
   assert.deepEqual(clientBreaks(adding('src/runner.ts', 'agent-runtime')), [
     'src/runner.ts imports agent-runtime, and only src/runtime-client.ts may',
+  ]);
+  assert.deepEqual(clientBreaks(adding('src/agents/agents.store.ts', 'agent-runtime')), [
+    'src/agents/agents.store.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('src/record/record.store.ts', 'agent-runtime')), [
     'src/record/record.store.ts imports agent-runtime, and only src/runtime-client.ts may',

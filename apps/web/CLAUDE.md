@@ -62,6 +62,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   the floor (`fitClear`), and `expectClearOfPanels` refuses a card under one; read a size on a card in its own pixels (`offsetHeight`).
 - Something that mounts beside the floor after its first render narrows a floor already fitted: load what it draws in the route's loader
   (`prefetchQuery`), and fit again when it comes or goes.
+- A full-page screenshot can lay the page out a pixel wide for a moment, and the floor's frame then measures 0 tall: aim no view at a
+  frame without room (`revealView` in `lib/frame.ts`) and watch its size on both axes (`useFrameSize`); `factory-frame` forces it.
 - A line that `truncate`s in a node holds about thirty characters: say the short form there, the whole sentence in its `title`, and prove
   it is read whole with `expectUncut`.
 

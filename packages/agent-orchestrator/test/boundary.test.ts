@@ -372,6 +372,12 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data/internal')), ['src/run.ts is pure and imports effect/Data/internal']);
   assert.deepEqual(impurities(adding('src/run.ts', '@effect/Data')), ['src/run.ts is pure and imports @effect/Data']);
   assert.deepEqual(impurities(adding('src/run.ts', 'effect/Data')), [], 'effect/Data, and it alone, is let through');
+  assert.ok(
+    ['src/status/status.ts', 'src/record/record.ts'].every((f) => f in packageSources()),
+    'the plants go into files the scan reads',
+  );
+  assert.deepEqual(impurities(adding('src/status/status.ts', 'effect')), ['src/status/status.ts is pure and imports effect']);
+  assert.deepEqual(impurities(adding('src/record/record.ts', 'node:fs')), ['src/record/record.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/radius.ts', 'node:fs')), ['src/radius.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'fs')), ['src/workflow.ts is pure and imports fs']);
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [

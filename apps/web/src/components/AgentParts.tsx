@@ -117,9 +117,7 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-sm leading-snug">
       <span className="block font-semibold text-neutral-900 dark:text-neutral-100">{skill.name}</span>{' '}
-      <span className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
-        {skill.description}
-      </span>
+      <span className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{skill.description}</span>
     </li>
   );
 }

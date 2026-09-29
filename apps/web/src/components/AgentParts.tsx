@@ -67,8 +67,8 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
 
 /**
  * What an agent says it can do: each A2A skill on its card, generated from the skills it gives, in their order — the name a caller would read,
- * what it is for, and the tags it carries. `compact`, as a character card shows them: the name on its line, what it is for cut to two lines
- * with the whole of it in `title`, and no tags. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is
+ * what it is for, and the tags it carries. `compact`, as a character card shows them: the name on its line, what it is for cut to two lines,
+ * and no tags; the whole of it is on the agent's page, a click away. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is
  * drawn at all where `none` is left out.
  */
 export function Skills({
@@ -112,12 +112,12 @@ function FullSkill({ skill }: { skill: AgentSkill }) {
   );
 }
 
-/** One skill as a character card shows it: its name, and what it is for cut to two lines, the whole of it in `title`. */
+/** One skill as a character card shows it: its name, and what it is for cut to two lines. */
 function CompactSkill({ skill }: { skill: AgentSkill }) {
   return (
     <li data-agent-skill={skill.id} className="text-sm leading-snug">
       <span className="block font-semibold text-neutral-900 dark:text-neutral-100">{skill.name}</span>{' '}
-      <span title={skill.description} className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
+      <span className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">
         {skill.description}
       </span>
     </li>

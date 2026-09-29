@@ -4576,7 +4576,8 @@ test('REFUSED: a character card shows what its agent can do and its model, effor
   const html = await agentCard({});
   const stats = /<dl data-agent-stats[^>]*>([\s\S]*?)<\/dl>/.exec(html)?.[1] ?? '';
   for (const value of ['opus', 'high', 'claude']) assert.match(stats, new RegExp(`>${value}<`), `the stats hold ${value}: ${stats}`);
-  assert.match(html, /data-agent-skill="grilling"[\s\S]*>Grilling<[\s\S]*title="Asks until the plan holds\."/, 'its skills, in front');
+  assert.match(html, /data-agent-skill="grilling"[\s\S]*>Grilling<[\s\S]*line-clamp-2[^>]*>Asks until the plan holds\.</, 'its skills, in front');
+  assert.doesNotMatch(html, /title=/, 'no tooltip: the name link stretched over the card would take its hover');
   assert.match(html, /data-agent-role[^>]*>Product engineer · <span[^>]*>iris<\/span>/);
   for (const hidden of ['Bash(git push)', '>auto<', 'no-coding', 'Read, Grep', 'iris.schema.json', '>interview<', '>grilling<'])
     assert.ok(!html.includes(hidden), `the card leaves ${hidden} to the agent's page`);

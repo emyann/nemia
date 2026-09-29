@@ -31,7 +31,6 @@ import {
   formerKeysIn,
   parseAgent,
   renderAgent,
-  withFormerNames,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/workflow-store.ts';
 import { scratch } from './scratch.ts';
@@ -1177,7 +1176,7 @@ test('`wf start` is told which files still write a former name: the steps, then 
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
-test("a codex step frozen with its sandbox as `permissionMode` is read as `sandbox` (`asNamed`), a Claude Code step's mode is its own, and a record is written with both on codex (`withFormerNames`)", () => {
+test("a codex step frozen with its sandbox as `permissionMode` is read as `sandbox` (`asNamed`), and a Claude Code step's mode is its own", () => {
   const frozen = { name: 'review', after: [], body: 'Review.', harness: 'codex', permissionMode: 'read-only' } as Workflow;
   assert.deepEqual(asNamed(frozen), { name: 'review', after: [], body: 'Review.', harness: 'codex', sandbox: 'read-only' });
   assert.deepEqual(asNamed({ ...frozen, permissionMode: 'bypassPermissions' }), {
@@ -1202,17 +1201,9 @@ test("a codex step frozen with its sandbox as `permissionMode` is read as `sandb
     'resolved against an agent: the key among what the step set and what it was given',
   );
   const today = fm('review', 'harness: codex\nsandbox: read-only');
-  const written = JSON.parse(JSON.stringify(withFormerNames(today))) as Workflow;
-  assert.deepEqual(
-    [written.sandbox, written.permissionMode],
-    ['read-only', 'read-only'],
-    "a record is written with both, for an older daemon, and keeps sandbox's value",
-  );
-  assert.deepEqual(asNamed(written), JSON.parse(JSON.stringify(today)), 'read back off the record as it was written');
   assert.equal(asNamed(today), today, 'nothing to rename, nothing copied');
   const claude = fm('implement', 'permissionMode: dontAsk');
   assert.equal(asNamed(claude), claude, "Claude Code's permissionMode is its own key: not read as a sandbox");
-  assert.equal(withFormerNames(claude), claude, 'nor copied to one');
 });
 
 test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {

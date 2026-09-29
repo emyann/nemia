@@ -2943,9 +2943,9 @@ export const asRan = (step: Workflow): Workflow =>
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
- * a former name, and the next pass that writes the record back writes the new ones, with the former beside them (`withFormerNames`). A
- * field under both names keeps the new one's value. A step with no former name is returned as it is. A codex step's sandbox, frozen under
- * `permissionMode`, is read as `sandbox` the same way (`sandboxRead`). Pure.
+ * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
+ * value. A step with no former name is returned as it is. A codex step's sandbox, frozen under `permissionMode`, is read as `sandbox` the
+ * same way (`sandboxRead`). Pure.
  */
 export function asNamed(step: Workflow): Workflow {
   return sandboxRead(renamedKeys(step));
@@ -2984,7 +2984,7 @@ function renamedKeys(step: Workflow): Workflow {
  * A codex step frozen with its sandbox under the former key: its sandbox is the field `permissionMode` — the engine's task field,
  * which the step carried under that name — and the key `permissionMode` among its agent's `keys` and `given`. Read so, the tick would file
  * it with no sandbox, and Codex would run it in `workspace-write`: wider than a reviewer written `read-only`, and said nowhere. So the field
- * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a record written with both — `withFormerNames` — keeps `sandbox`'s.
+ * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a step that holds both keeps `sandbox`'s.
  * A step that does not run on codex is returned as it is: its `permissionMode` is Claude Code's. Pure.
  */
 function sandboxRead(step: Workflow): Workflow {
@@ -3006,24 +3006,6 @@ function sandboxRead(step: Workflow): Workflow {
         : {}),
     },
   };
-}
-
-/**
- * A step as a record is written: each renamed field under its name now and, with the same value, under its former one (`FORMER_KEYS`). A
- * `wf up` daemon runs the code it started with until it is restarted, and a tick on code that knows only the former names reads a step's
- * rule lists by them alone: a record with the new ones only would have it file every step with no rule list, and say nothing — a
- * reviewer's `Bash(npm run build)` deny and the supervisor's git denies gone. `asNamed` reads the record back under the new names alone,
- * so no reader of this code sees the copy. Only the step's own fields are copied: they are all such a tick files from. A codex step's
- * `sandbox` is copied to `permissionMode`, the field such a tick files Codex's sandbox from (`sandboxRead`): without it, a codex reviewer
- * written `sandbox: read-only` would be filed with no sandbox, and run in Codex's `workspace-write`. Pure.
- */
-export function withFormerNames(step: Workflow): Workflow {
-  const fields = step as unknown as Record<string, unknown>;
-  const copies = Object.entries(FORMER_KEYS)
-    .filter(([, now]) => fields[now] !== undefined)
-    .map(([former, now]) => [former, fields[now]]);
-  if (step.harness === 'codex' && step.sandbox !== undefined) copies.push(['permissionMode', step.sandbox]);
-  return copies.length ? { ...step, ...Object.fromEntries(copies) } : step;
 }
 
 /** Every step `name` waits on, directly or through another. */

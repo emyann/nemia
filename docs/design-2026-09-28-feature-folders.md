@@ -376,7 +376,7 @@ Each placement is checked by the declaration graph above; the card that makes th
 | 2203–2658 | agents: keys, parse, render, card | `agents/agents.ts`; `keepsAuto`, `DEFAULT_PERMISSION_MODE`, `composedRefusal` → `keys/keys.ts` |
 | 2658–2721 | former keys in text | `former/former.ts` |
 | 2737–2926 | validation | `workflow/validate.ts` |
-| 2926–3040 | order, former names on records | `orderSteps` → `workflow/validate.ts`; `asRan`, `asNamed`, `withFormerNames` → `former/former.ts` |
+| 2926–3040 | order, former names on records | `orderSteps` → `workflow/validate.ts`; `asRan`, `asNamed` → `former/former.ts` |
 | 3040–3160 | graph: `upstreamOf`, `validateLoops`, `fansOut`, `terminalSteps` | `workflow/validate.ts` |
 
 ### `cli.ts`, section by section

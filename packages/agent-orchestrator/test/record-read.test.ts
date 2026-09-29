@@ -177,7 +177,7 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
   rewriteRun(run);
   const written = JSON.parse(fs.readFileSync(runFile('r-renamed'), 'utf8')) as { workflow: Array<Record<string, unknown>> };
   assert.deepEqual(written.workflow[0].disallowedTools, ['SendMessage']);
-  assert.deepEqual(written.workflow[0].disallow, ['SendMessage'], 'and is written back under both names');
+  assert.equal(Object.hasOwn(written.workflow[0], 'disallow'), false, 'and is written back under that name alone');
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

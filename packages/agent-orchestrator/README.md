@@ -190,9 +190,8 @@ the runtime's own: the runtime makes one attempt at a session, and trying again 
 `disallowedTools:` and `allowedTools:` are Claude Code's names for its two rule lists, and the keys took them on 2026-09-23;
 until then they were `disallow:` and `allow:`. The former names are still read, in a step and in an agent, as the new ones —
 a folder written before goes on starting, and `wf start` prints a line naming each file and key to rename — and a run frozen
-with them is read under the new names (`asNamed`, on every read of a run record). A record is written with each list under both
-names (`withFormerNames`), so a `wf up` started before the rename, which reads the former ones, still files them. A list set under both
-names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
+with them is read under the new names (`asNamed`, on every read of a run record), and written back under them alone. A list set under
+both names is refused, saying which line to keep. Nothing rewrites a folder by itself: saving a step or an agent from the board writes
 the new name.
 
 `sandbox:` is Codex's name for its fence (`-s`, `sandbox_mode`), and a codex step took it on 2026-09-23; until then a codex step
@@ -201,8 +200,7 @@ own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is ref
 key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
 as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
 prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
-`sandbox:`. A run frozen before is read the same way (`asNamed`), and a record is written with a codex step's sandbox under both
-names (`withFormerNames`), so a `wf up` started before still files it. The engine's task still calls either fence `permissionMode`,
+`sandbox:`. A run frozen before is read the same way (`asNamed`), and written back under `sandbox` alone. The engine's task still calls either fence `permissionMode`,
 and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.

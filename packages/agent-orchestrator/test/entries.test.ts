@@ -526,7 +526,6 @@ const PINNED: Record<string, string[]> = {
     'tokensOf',
     'upstreamOf',
     'validate',
-    'withFormerNames',
     'withPreload',
   ],
 };

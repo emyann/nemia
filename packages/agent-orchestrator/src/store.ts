@@ -21,7 +21,7 @@ import {
   type Run,
 } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { asNamed, asRan, orderSteps, splitFrontmatter, withFormerNames, type SkillsFound, type Workflow } from './workflow.ts';
+import { asNamed, asRan, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from './workflow.ts';
 import { loadWorkflows, preloads } from './workflow-store.ts';
 import {
   noCodingStyle,
@@ -94,7 +94,7 @@ const frozenSteps = (steps: readonly (typeof FrozenStepSchema.Type)[]): Workflow
 /**
  * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
  * (`approvals`, `acceptances`, `pruned`, `hold`) left to their own readers. Every key it does not name is kept, so a key a newer or an
- * older `wf` wrote — a frozen step's former name (`withFormerNames`) among them — survives `rewriteRun`.
+ * older `wf` wrote survives `rewriteRun`.
  */
 const runBase = {
   id: Schema.String,
@@ -321,7 +321,7 @@ export const removeHold = (id: string, at: string): boolean => {
  * ever written into the record (`rewriteRun`), and whatever the record carries under their keys is dropped. Counted as one record read
  * (`countRecord`) under `records` while a pass is metered.
  *
- * The frozen steps are read under the names their keys have now (`asNamed`), and written back under both (`recordText`), in their place
+ * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
  * `wf ls`, for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
@@ -778,12 +778,8 @@ export const restStamps = (): Map<string, string> =>
     return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
   });
 
-/**
- * A record as it is written, by both writers: its frozen steps under each renamed key's name now and its former one (`withFormerNames`),
- * so a daemon that reads only the former names still files each step's rule lists.
- */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold'>): string =>
-  JSON.stringify(run.workflow ? { ...run, workflow: run.workflow.map(withFormerNames) } : run, null, 2);
+/** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold'>): string => JSON.stringify(run, null, 2);
 
 /** A new run's record: `start`'s, and the one writer that makes one. */
 export const writeRun = (run: Run) => {

@@ -586,7 +586,7 @@
     {
       "files": ["packages/agent-orchestrator/src/store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 618, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 617, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
@@ -609,7 +609,7 @@
     {
       "files": ["packages/agent-orchestrator/src/workflow.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1987, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1954, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 52]
       }

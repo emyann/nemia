@@ -28,6 +28,7 @@ import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import type { RetryHow } from '../src/retry/retry-ask.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 import { isGitRun, SIGNOFF } from '../src/run.ts';
 import { momentumOf, toAdmit } from '../src/cap/cap.ts';
 
@@ -5617,4 +5618,217 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
 
   assert.ok(!under('runs', run.id), 'no files directory without a record');
   assert.equal(gitIn(repo, 'status', '--porcelain'), '?? later.txt', "and nothing of a person's checkout committed under the step's name");
+});
+
+/** `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */
+const whole = (t: TestContext, e: Engine, run: GitRun): Promise<string[]> =>
+  decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
+
+test('the whole screen of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call', async (t) => {
+  const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
+  fs.writeFileSync(given, 'read me\n');
+  const run = gitRunOf(
+    start({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(), isolate: false, from: { inbox: 'card-7' }, inputs: [given] }),
+  );
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.tasks.get(taskId)!.phase = 'running';
+  b.waiting.set(taskId, 'a permission prompt: Bash(npm test)');
+  b.said.set(taskId, [{ at: '2026-09-14T16:01:00.000Z', attempt: 1, text: 'mind the lockfile' }]);
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '  from inbox card card-7',
+    '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
+    '',
+    '  still running: implement',
+    '  implement: waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
+    '  nothing to decide yet',
+  ]);
+  b.denials.set(taskId, [{ tool: 'Bash', what: 'npm test' }]);
+  b.settle(taskId, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-review`, 'succeeded', SIGNED);
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '  from inbox card card-7',
+    '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
+    '',
+    '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  master',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    harness  waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
+    '    denied: Bash(npm test)',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    said to try 1, at 2026-09-14T16:01:00.000Z:',
+    '    ```text',
+    '    mind the lockfile',
+    '    ```',
+    '    did it',
+    '',
+    '  review',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  master',
+    '',
+    '  worked directly on master; nothing to merge; the base was <base>',
+    '  read it    git -C <repo> diff <base>...master',
+  ]);
+});
+
+test('the whole screen of a step its harness ended at its budget', async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'failed', undefined, undefined, 'budget');
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '',
+    '  BUDGET EXHAUSTED, waiting on you: implement  — its harness ended its session at its budget:; nothing after it ran',
+    '',
+    '  once more, on the next tick:',
+    '    implement: budget exhausted. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  master',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+  ]);
+});
+
+test('the whole screen of a step that says `denials: fail`, denied a call', async (t) => {
+  const run = started(folder('denials: fail'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.denials.set(`${run.id}-implement`, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '',
+    '  DENIED, waiting on you: implement  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run',
+    '',
+    '  once more, on the next tick:',
+    "    implement: denied — its harness denied its try a call, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md) to the folder's allowedTools:, which allows it. This run's allowedTools: is frozen at wf start, so a try of it is denied the same again. A new session, told to do without it:  wf retry <id> implement --fresh  (or continue its session: wf retry <id> implement)",
+    '',
+    '  touched  master',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    denied: Write(/tmp/w/notes.md)',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+  ]);
+});
+
+test('the whole screen of a step whose closeout does not read, never nudged', async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.stated.set(`${run.id}-implement`, true);
+  b.settle(`${run.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '',
+    '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+    '',
+    '  once more, on the next tick:',
+    '    implement: unsigned. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  master',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    closeout unreadable — unparseable: Unexpected end of JSON input',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+  ]);
+});
+
+test('the whole screen of a run whose every step passed its check', async (t) => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: true\n---\nimplement it\n');
+  const run = started(dir);
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  b.logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(await whole(t, b.e, run), [
+    '<id>  add a flag',
+    '',
+    '  every step verified',
+    '',
+    '  touched  master',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  true  →  exit 0 ✓',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed not known  settled before it spawned  used not measured',
+    '              try 1 check  filed not known  settled before it spawned',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  master',
+    '',
+    '  worked directly on master; nothing to merge; the base was <base>',
+    '  read it    git -C <repo> diff <base>...master',
+  ]);
 });

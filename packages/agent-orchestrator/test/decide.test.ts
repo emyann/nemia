@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-decide-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -894,4 +895,574 @@ test("`wf decide`'s program says in its type that it needs the engine: run witho
     // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement
     Effect.runPromise(decideRun('x'));
   assert.equal(typeof unprovided, 'function');
+});
+
+/** `wf decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */
+const whole = (t: TestContext, e: Engine, id: string, ...flags: string[]): Promise<string[]> => {
+  const run = gitRun(readRun(id));
+  return decideScreen(t, e, [id, ...flags], { '<id>': id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
+};
+
+test('the whole screen of a run waiting on you: verdicts, touched, lesson, in full, each step, the totals, the branch and its notes, and ship and drop', async (t) => {
+  const { run, e } = await awaiting();
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  wf/<id>',
+    '    (root)      2 files  +2 −0 · 1 binary',
+    '    packages/x  2 files  +2 −1',
+    '    agent-facing     CLAUDE.md',
+    '    check-affecting  packages/x/test/add.test.ts',
+    '  lesson  CLAUDE.md +2 −0',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  diff --git a/packages/x/test/add.test.ts b/packages/x/test/add.test.ts',
+    '  index ae00847..2dc14f5 100644',
+    '  --- a/packages/x/test/add.test.ts',
+    '  +++ b/packages/x/test/add.test.ts',
+    '  @@ -1,2 +1,2 @@',
+    "   import assert from 'node:assert';",
+    '  -assert.equal(add(1, 1), 2);',
+    '  +assert.ok(true);',
+    '',
+    '  implement',
+    '    check  npm test  →  exit 0 ✓',
+    '    used  29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    cost  not measured',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  review',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
+    '',
+    '  wf/<id>  —4 files changed, 4 insertions(+), 1 deletion(-)',
+    '',
+    '  ── CLAUDE.md ───────────────────────────────────────────────────────',
+    '  lesson one',
+    '  lesson two',
+    '',
+    '  branch    wf/<id> is ahead of main by 1 commit',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>',
+    '  drop it   git -C <repo> branch -D wf/<id>',
+  ]);
+  assert.deepEqual(await whole(t, e, run.id, '--sensitive', 'nothing/**'), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  wf/<id>',
+    '    (root)      2 files  +2 −0 · 1 binary',
+    '    packages/x  2 files  +2 −1',
+    '    agent-facing     CLAUDE.md',
+    '    check-affecting  packages/x/test/add.test.ts',
+    '  lesson  CLAUDE.md +2 −0',
+    '',
+    '  ── in full: the files --sensitive names (nothing/**), in place of what decides a check ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  npm test  →  exit 0 ✓',
+    '    used  29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    cost  not measured',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  review',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
+    '',
+    '  wf/<id>  —4 files changed, 4 insertions(+), 1 deletion(-)',
+    '',
+    '  ── CLAUDE.md ───────────────────────────────────────────────────────',
+    '  lesson one',
+    '  lesson two',
+    '',
+    '  branch    wf/<id> is ahead of main by 1 commit',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>',
+    '  drop it   git -C <repo> branch -D wf/<id>',
+  ]);
+});
+
+test('the whole screen of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered', async (t) => {
+  const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), ['<id>  add sub', '', '  still running: implement', '  nothing to decide yet']);
+  settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  BLOCKED, waiting on you: implement',
+    '',
+    '  once more, on the next tick:',
+    '    implement: blocked. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement  BLOCKED',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '    two readings',
+    '    needs: Rename --flag?',
+    '    to answer it:  wf retry <id> implement --message "<answer>"',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
+    '',
+  ]);
+  await retry(e, run.id, 'implement', { mode: 'nudge', message: 'Keep it.\nThe flag is public.' });
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  still running: implement',
+    '  implement: try 2 asked (--nudge, with your answer) — the next tick files it',
+    '  nothing to decide yet',
+  ]);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try2`, 'succeeded', { outcome: 'blocked', summary: 'one reading', artifacts: [], needs: 'And the README?' });
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  BLOCKED, waiting on you: implement',
+    '',
+    '  once more, on the next tick:',
+    '    implement: blocked. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement  BLOCKED  (try 2, nudged on your word, answered)',
+    '    used  not measured',
+    '    cost  this try not measured · not measured over 2 tries',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '              try 2  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
+    '    try 1 needs: Rename --flag?',
+    '    your answer: Keep it.',
+    '    The flag is public.',
+    '    one reading',
+    '    needs: And the README?',
+    '    to answer it:  wf retry <id> implement --message "<answer>"',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
+    '',
+  ]);
+});
+
+test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and the offer', async (t) => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  const run = start({ brief: 'add sub, failed', repo: aRepo(), workflowDir: dir, isolate: false });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'failed', undefined, { costUsd: 3.4 });
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub, failed',
+    '',
+    '  FAILED: implement  (wf logs <id> <step>)',
+    '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran',
+    '',
+    '  once more, on the next tick:',
+    '    implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry <id> implement --budget <amount>  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+    '    cost  $3.40 · budget $3',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used turns not measured · tool calls not measured · tokens in not measured · tokens out not measured  cost $3.40',
+    '',
+    '  cost  run $3.40',
+    '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
+    '',
+  ]);
+});
+
+test('the whole screen of a run the run nudged to sign off, unsigned again, and of one whose cost was measured', async (t) => {
+  const run = start({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub, unsigned',
+    '',
+    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
+    '',
+    '  once more, on the next tick:',
+    '    implement: unsigned. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement  (try 2, nudged to sign off by the run)',
+    '    used  not measured',
+    '    cost  this try not measured · not measured over 2 tries',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '              try 2  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
+    '',
+  ]);
+
+  const measured = start({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const other = board();
+  await advance(other.e, readRun(measured.id));
+  other.settle(`${measured.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
+  await advance(other.e, readRun(measured.id));
+  other.settle(`${measured.id}-implement-check`, 'failed');
+  other.logs.set(`${measured.id}-implement-check`, '# pass 1\n\n[wf check] exit 1\n');
+  await advance(other.e, readRun(measured.id));
+  assert.deepEqual(await whole(t, other.e, measured.id), [
+    '<id>  add sub',
+    '',
+    '  FAILED CHECK: implement  — the run executed its check and it did not exit 0; nothing after it ran',
+    '',
+    '  once more, on the next tick:',
+    '    implement: failed (check). Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  npm test  →  exit 1 ✗',
+    '      stdout:',
+    '        # pass 1',
+    '    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s',
+    '    cost  $3.01',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s  cost $3.01',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  cost  run $3.01',
+    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
+    '',
+  ]);
+});
+
+test('the whole screen of a shipped run: the branch merged by hand', async (t) => {
+  const { run, repo, branch, e } = await awaiting();
+  git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
+  assert.deepEqual(await whole(t, e, run.id), ['<id>  add sub', '', '  shipped — wf/<id> is already on main']);
+});
+
+test("the whole screen of an ending at its gate: the folder's words, approve it and send it back", async (t) => {
+  const repo = aRepo();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(
+    path.join(dir, 'ship.md'),
+    "---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run's result branch onto main, run the check, and commit.\n\nAbort on any failure.\n",
+  );
+  const run = start({ brief: 'add sub', repo, workflowDir: dir });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement;
+  write(work.workspace!, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+    "  AWAITING APPROVAL, waiting on you: ship  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it",
+    '',
+    '  touched  wf/<id>/implement',
+    '    packages/x  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '',
+    "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:",
+    "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
+    '',
+    '  approve it    wf approve <id> ship [--message "<words>"]',
+    '  send it back  wf retry <id> implement --message "<objection>"',
+  ]);
+});
+
+test('the whole screen of a gate on a last step that merges nothing, before and after its approval', async (t) => {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement;
+  fs.appendFileSync(path.join(work.workspace!, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
+    '  AWAITING APPROVAL, waiting on you: review  — signed off at its gate; nothing after it is filed until you approve it, or send it back',
+    '',
+    '  touched  wf/<id>/implement',
+    '    packages/x  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  npm test  →  unfinished ✓',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  review',
+    '    gate  awaiting approval:  wf approve <id> review [--message "<words>"]  — or send it back:  wf retry <id> review --message "<objection>"',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '',
+    '  to decide  review has signed off and waits for your word:',
+    '',
+    '  approve it    wf approve <id> review [--message "<words>"]',
+    '  send it back  wf retry <id> review --message "<objection>"',
+  ]);
+  approveByHand(run.id, 'review', 1);
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  wf/<id>/implement',
+    '    packages/x  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  npm test  →  unfinished ✓',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  review',
+    '    gate  approved 10:00Z',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
+    '  drop it   git -C <repo> branch -D wf/<id>/implement',
+  ]);
+});
+
+test('the whole screen of a run that worked on the base branch itself', async (t) => {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub, directly',
+    '',
+    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
+    '  AWAITING APPROVAL, waiting on you: review  — signed off at its gate; nothing after it is filed until you approve it, or send it back',
+    '',
+    '  touched  main',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    check  npm test  →  unfinished ✓',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+    '    did it',
+    '',
+    '  review',
+    '    gate  awaiting approval:  wf approve <id> review [--message "<words>"]  — or send it back:  wf retry <id> review --message "<objection>"',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
+    '',
+    '  main',
+    '',
+    '  worked directly on main; nothing to merge; the base was <base>',
+    '  read it    git -C <repo> diff <base>...main',
+    '',
+    '  to decide  review has signed off and waits for your word:',
+    '',
+    '  approve it    wf approve <id> review [--message "<words>"]',
+    '  send it back  wf retry <id> review --message "<objection>"',
+  ]);
+});
+
+test('the whole screen of `wf decide --help`, of `wf decide` with no run, and the refusal of a flag before the run', async (t) => {
+  const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');
+  const { HELP } = await import('../src/cli/flags.ts');
+  const { e } = board();
+  assert.deepEqual(await decideScreen(t, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
+  assert.deepEqual(await decideScreen(t, e, [], {}), HELP.split('\n'));
+  await assert.rejects(decideScreen(t, e, ['--sensitive', 'x/**'], {}), (err: Error) => {
+    assert.equal(err.message, 'wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not --sensitive before it.');
+    return true;
+  });
+});
+
+test('the whole screen of a run on two branches, one with a note longer than the screen shows', async (t) => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'docs.md'), 'write it down\n');
+  const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: dir });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  const committed = (step: string, file: string, text: string) => {
+    const wt = readRun(run.id).steps[step].workspace!;
+    write(wt, file, text);
+    git(wt, 'add', '-A');
+    git(wt, 'commit', '-q', '-m', `add ${file}`);
+  };
+  committed('implement', 'sub.ts', 'export const sub = (a, b) => a - b;\n');
+  committed('docs', 'NOTES.md', Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join(''));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  settle(`${run.id}-docs`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await whole(t, e, run.id), [
+    '<id>  add sub',
+    '',
+    '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  wf/<id>/docs',
+    '    (root)  1 file   +123 −0',
+    '  touched  wf/<id>/implement',
+    '    (root)  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/docs ───',
+    '  none',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/implement ───',
+    '  none',
+    '',
+    '  docs',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
+    '    did it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
+    '',
+    '  wf/<id>/docs  —1 file changed, 123 insertions(+)',
+    '',
+    '  ── NOTES.md ────────────────────────────────────────────────────────',
+    ...Array.from({ length: 120 }, (_, i) => `  note ${i + 1}`),
+    '  … 3 more lines — git show wf/<id>/docs:NOTES.md',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/docs is ahead of main by 1 commit',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/docs',
+    '  drop it   git -C <repo> branch -D wf/<id>/docs wf/<id>/implement',
+  ]);
 });

@@ -11,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
@@ -839,4 +840,172 @@ test('REFUSED while held or pruned: wf say to a step that has settled offers no 
     say(b.e, done.id, 'implement', 'hello'),
     (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
   );
+});
+
+test('the whole screen of a run held by a person while its step runs, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const parent = await aRunning(b, repo);
+  const target = await aRunning(b, repo);
+  const ids = { '<parent>': parent.id, '<target>': target.id, '<root>': ROOT };
+
+  const going = await aRunning(b, repo);
+  await hold(b.e, going.id, [target.id]);
+  assert.deepEqual(await decideScreen(t, b.e, [going.id], { ...ids, '<id>': going.id }), [
+    '<id>  still going',
+    '',
+    '  held until <target> ships',
+    '  still running: implement',
+    '  nothing of <id> is filed, and nothing is asked of you, until wf decide says <target> has shipped; to go on before then: wf hold <id> --off',
+  ]);
+
+  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
+  assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id }), [
+    '<id>  after the parent',
+    '',
+    '  waiting on <parent>',
+    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
+  ]);
+  await hold(b.e, child.id, [target.id]);
+  assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id }), [
+    '<id>  after the parent',
+    '',
+    '  waiting on <parent>',
+    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
+    '  held until <target> ships as well — wf hold <id> --off lifts the hold, and not the wait above',
+  ]);
+
+  assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
+  const at = readRun(target.id).cancelledAt!;
+  assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id, '<at>': at }), [
+    '<id>  after the parent',
+    '',
+    '  waiting on <parent>',
+    '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
+    '  held until <target> (cancelled) ships as well — <target> was cancelled at <at>, and a cancelled run never ships — yours to resolve: wf hold <id> --off, or wf cancel <id>',
+  ]);
+  assert.deepEqual(await decideScreen(t, b.e, [target.id], { ...ids, '<at>': at }), [
+    '<target>  still going',
+    '',
+    '  cancelled at <at> — nothing to decide',
+  ]);
+});
+
+/** A loop run on `b` whose review asked for another round on the last one its `rounds:` allows. */
+async function outOfRounds(b: ReturnType<typeof board>) {
+  const loop = start({ brief: 'a loop', repo: aRepo(), workflowDir: looping() });
+  await advance(b.e, readRun(loop.id));
+  b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(loop.id));
+  b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(loop.id));
+  b.settle(readRun(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  await advance(b.e, readRun(loop.id));
+  b.settle(readRun(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(loop.id));
+  return loop;
+}
+
+test('the whole screen of a loop out of rounds, and of the round a person asks for', async (t) => {
+  const b = board();
+  const loop = await outOfRounds(b);
+  assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': readRun(loop.id).repo!, '<root>': ROOT }), [
+    '<id>  a loop',
+    '',
+    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+    '  ROUNDS EXHAUSTED, waiting on you: review  — asked for another round on the last one rounds: allows; its findings are below',
+    '',
+    '  once more, on the next tick:',
+    '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round <id> review',
+    '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept <id> review --message "<why>"',
+    '',
+    '  touched  wf/<id>/implement',
+    '    nothing — the branch changed no file against the base',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '',
+    '  review',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '    again: true',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  wf/<id>/implement',
+    '',
+    '  branch    wf/<id>/implement is on main',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
+    '  drop it   git -C <repo> branch -D wf/<id>/implement',
+  ]);
+  await round(b.e, loop.id, 'review');
+  assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<root>': ROOT }), [
+    '<id>  a loop',
+    '',
+    '  still running: review',
+    '  review: round 2 asked (wf round) — the next tick files implement',
+    '  nothing to decide yet',
+  ]);
+});
+
+test('the whole screen of a loop a person accepted as it stands', async (t) => {
+  const b = board();
+  const loop = await outOfRounds(b);
+  const wt = readRun(loop.id).steps.implement.workspace!;
+  fs.writeFileSync(path.join(wt, 'loop.ts'), 'export const looped = true;\n');
+  git(wt, 'add', '-A');
+  git(wt, 'commit', '-q', '-m', 'add loop.ts');
+  await accept(b.e, loop.id, 'review', 'as it stands');
+  const asks = path.join(ROOT, 'runs', `${loop.id}.asks`);
+  const [accepted] = fs.readdirSync(asks).filter((f) => f.startsWith('accept-review-'));
+  const file = path.join(asks, accepted);
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
+  await advance(b.e, readRun(loop.id));
+  assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': readRun(loop.id).repo!, '<root>': ROOT }), [
+    '<id>  a loop',
+    '',
+    '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
+    '',
+    '  touched  wf/<id>/implement',
+    '    (root)  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '',
+    '  review',
+    '    accepted  accepted as it stands 08:00Z, its findings open — "as it stands"',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did it',
+    '    again: true',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '',
+    '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
+    '  drop it   git -C <repo> branch -D wf/<id>/implement',
+  ]);
 });

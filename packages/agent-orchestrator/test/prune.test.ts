@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-prune-');
 process.env.WF_ROOT = ROOT;
@@ -836,5 +837,46 @@ test('pruneLines and sizeOf say what a person reads', () => {
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files] }).at(-1),
     '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; wf prune r-1 --artifacts removes it once it can be',
+  );
+});
+
+test('the whole screen of a pruned run over its budget', async (t) => {
+  const b = board();
+  const over = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
+  await prune(b.e, over.run.id, { yes: true, unmerged: true });
+  const overAt = readRun(over.run.id).pruned!.at;
+  assert.deepEqual(
+    await decideScreen(t, b.e, [over.run.id], { '<id>': over.run.id, '<root>': ROOT, '<repo>': over.repo, '<at>': overAt }),
+    [
+      '<id>  add a flag',
+      '  pruned at <at> — its worktrees were removed (wf prune); its branches, record and files are kept',
+      '',
+      '  BLOCKED: implement',
+      '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (wf prune); nothing after it ran',
+      '',
+      '  touched  wf/<id>/implement',
+      '    (root)  1 file   +1 −0',
+      '  lesson  nothing written where the next agent reads',
+      '',
+      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+      '  none',
+      '',
+      '  implement  BLOCKED',
+      '    used  not measured',
+      '    cost  not measured · budget $3',
+      '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+      '    did it',
+      '    needs: a word',
+      '',
+      '  cost  run $3.40',
+      '  timeline  run  queued —  ran —  wall not known',
+      '',
+      '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+      '',
+      '  branch    wf/<id>/implement is ahead of main by 1 commit',
+      '',
+      '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
+      '  drop it   git -C <repo> branch -D wf/<id>/implement',
+    ],
   );
 });

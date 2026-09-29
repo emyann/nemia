@@ -1,0 +1,83 @@
+import path from 'node:path';
+import type { Locator } from 'playwright';
+import { sidebar, themeOf } from '../board.ts';
+import { expectApart, expectCount, expectInside, expectUncut, expectVisible, Refused } from '../checks.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT } from '../world.ts';
+
+/** The graph the api serves for the task's lifecycle, as much of it as the page is held to. */
+type Served = { initial: string; states: string[]; final: string[]; edges: unknown[] };
+
+/** Every box matched holds what it draws: nothing inside spills past the room the layout gave it, across or down. */
+async function expectHeld(boxes: Locator, assertion: string): Promise<void> {
+  const spilled = await boxes.evaluateAll((all) =>
+    all.flatMap((box) =>
+      box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1
+        ? [
+            `${box.getAttribute('data-state') ?? box.getAttribute('data-route')} (${box.scrollWidth}×${box.scrollHeight} in ${box.clientWidth}×${box.clientHeight})`,
+          ]
+        : [],
+    ),
+  );
+  if (!(await boxes.count())) throw new Refused(`${assertion} — nothing to look at: 0 found`);
+  if (spilled.length) throw new Refused(`${assertion} — ${spilled.join(', ')} spill out`);
+}
+
+/** No two boxes matched meet: each pair is apart across or down. Fewer than two matched is refused: it proves nothing. */
+async function expectNoneMeet(boxes: Locator, assertion: string): Promise<void> {
+  const met = await boxes.evaluateAll((all) => {
+    const named = all.map((box) => ({
+      name: box.getAttribute('data-state') ?? box.getAttribute('data-route'),
+      r: box.getBoundingClientRect(),
+    }));
+    return named.flatMap((a, i) =>
+      named
+        .slice(i + 1)
+        .filter(({ r }) => a.r.left < r.right && r.left < a.r.right && a.r.top < r.bottom && r.top < a.r.bottom)
+        .map((b) => `${a.name} and ${b.name}`),
+    );
+  });
+  if ((await boxes.count()) < 2) throw new Refused(`${assertion} — fewer than two boxes to compare`);
+  if (met.length) throw new Refused(`${assertion} — ${met.join(', ')} overlap`);
+}
+
+export default {
+  /**
+   * The Machines page: the task's lifecycle drawn from the graph the api reads off the runtime's code, every state a box and every edge a
+   * line of a route's label or of its state's box, the first state and the final ones marked, and nothing drawn over anything else or cut
+   * short at 1280 wide.
+   */
+  name: 'machines',
+  route: '/machines',
+  expect: async (page) => {
+    await sidebar(page);
+    await expectVisible(
+      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Machines' }),
+      'the sidebar lights Machines on its page',
+    );
+    const served = (await (await page.request.get(new URL('/api/machines/lifecycle', page.url()).href)).json()) as Served;
+    const section = page.locator('section[aria-label="A task\'s lifecycle"]');
+    await expectVisible(
+      section.locator('h2', { hasText: 'packages/agent-runtime/src/core/lifecycle.ts' }),
+      'the lifecycle, said drawn from its code',
+    );
+    const frame = section.locator('[data-machine="lifecycle"]');
+    const states = frame.locator('[data-state]');
+    await expectCount(states, served.states.length, `a box for each of the lifecycle's ${served.states.length} states`);
+    await expectCount(frame.locator('[data-edge-line]'), served.edges.length, `a line for each of its ${served.edges.length} edges`);
+    await expectVisible(frame.locator(`[data-state="${served.initial}"][data-initial]`), `${served.initial} marked as where a task starts`);
+    await expectCount(frame.locator('[data-initial]'), 1, 'one state marked initial');
+    await expectCount(frame.locator('[data-final]'), served.final.length, `the ${served.final.length} final states marked`);
+    for (const name of served.final) await expectVisible(frame.locator(`[data-state="${name}"][data-final]`), `${name} marked final`);
+
+    const labels = frame.locator('[data-route]');
+    await expectApart(states, labels, 'no route label lies over a state');
+    await expectNoneMeet(frame.locator('[data-state], [data-route]'), 'no two boxes, states or labels, lie over each other');
+    await expectInside(states, frame, 'every state inside the drawing, none cut off at 1280 wide');
+    await expectInside(labels, frame, 'every route label inside the drawing');
+    await expectUncut(frame.locator('[data-edge-line]'), 'every event line read whole');
+    await expectHeld(states, 'each state holds its name and its lines');
+    await expectHeld(labels, 'each label holds its lines');
+    await frame.screenshot({ path: path.join(OUT, `machines-lifecycle-${await themeOf(page)}.png`) });
+  },
+} satisfies PageSpec;

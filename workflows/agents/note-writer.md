@@ -14,6 +14,8 @@ tools: Read, Write, Edit, Glob, Grep, Skill
 # (`validateFolderMode`). It asks nobody, so it allows nothing, not even a write here: `allowedTools:` gives the writing back, scoped by a
 # glob to the directory the session is started in. One rule covers Write and Edit both — Claude Code matches a file write against
 # `Edit` rules alone, and takes a `Write(…)` rule without ever matching it. Measured on Claude Code 2.1.278.
+# No Bash, and no allow reaches a `browser_*` tool, so `dontAsk` refuses `git push`, a forced branch delete and
+# `browser_run_code_unsafe` with no deny of its own (packages/agent-orchestrator/test/agent-fences.test.ts holds it so).
 permissionMode: dontAsk
 allowedTools: Edit(**)
 # The note's title and its one-sentence gist travel as this step's closeout, in the shape note.schema.json declares.

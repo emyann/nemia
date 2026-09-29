@@ -76,7 +76,8 @@ the light. Do not restyle a page from `browser_evaluate` to fake the dark: the c
 and you would be judging your own stylesheet.
 
 **Never `browser_run_code_unsafe`.** It runs code of your choosing in the browser server's own process,
-past every fence the other tools keep, and `.claude/settings.json` denies it by name.
+past every fence the other tools keep. Every shipped step that could reach it is denied it by name, in its
+agent's `disallowedTools:`; a job in `dontAsk` is refused it because no allow reaches it.
 
 **When the browser is denied.** A step in `permissionMode: dontAsk` runs only the commands and tools
 `.claude/settings.json` allows, and today that is no `browser_*` tool, no command that serves the app and

@@ -14,7 +14,9 @@ permissionMode: auto
 # Denied by name what no step needs and an unattended session otherwise has, as the implementer is: messaging other
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`. A step of it that lands on its `check:` is denied
 # `git commit` and `git merge --continue` beside these, by the run (`filedDenies`): the run commits that merge, on the check's word.
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger
+# And what an ending never does, which `auto` would otherwise run: `git push`, a forced branch delete, and the browser's
+# `browser_run_code_unsafe`. The checkout's settings deny none of them, since a person may ask their own session to push.
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), mcp__playwright__browser_run_code_unsafe
 # The commit message travels as this step's closeout — `message`, in the shape shipper.schema.json declares — and the run
 # commits the merge with it once the step's `check:` passes on the merged tree (`landingContract`).
 output: shipper.schema.json

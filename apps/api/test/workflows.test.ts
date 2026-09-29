@@ -593,6 +593,22 @@ const devCheck =
   '; else echo "wf check: nothing under apps/web/ or apps/api/, nor the root\'s package.json, package-lock.json or turbo.json, was touched: no build, no e2e"; fi';
 
 /**
+ * What a step that builds or ships is denied by its agent: what no step needs, and a push, a forced branch delete and the browser's unsafe
+ * tool, which its `auto` would otherwise run.
+ */
+const BUILDER_DENIED = [
+  'SendMessage',
+  'CronCreate',
+  'CronDelete',
+  'RemoteTrigger',
+  'Bash(git push)',
+  'Bash(git push:*)',
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete --force:*)',
+  'mcp__playwright__browser_run_code_unsafe',
+];
+
+/**
  * The run's ending, gated: it stages the merge in the repository's own checkout and signs off its message, and the run executes
  * implement's check on the merge and commits it on exit 0 — so ship's check is implement's, and its output the message. ui ends in it too.
  */
@@ -610,7 +626,7 @@ const ship = (check: string) => ({
     gate: true,
     check,
     output: 'shipper.schema.json',
-    disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'],
+    disallowedTools: BUILDER_DENIED,
   }),
 });
 
@@ -644,8 +660,8 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
         {
           name: 'implement',
           /**
-           * Denied by name what no step needs and an unattended session otherwise has; its mode, the engine's default, said by the role
-           * that builds.
+           * Denied by name what no step needs and an unattended session otherwise has, and what no step does; its mode, the engine's
+           * default, said by the role that builds.
            */
           spec: spec({
             agent: 'implementer',
@@ -655,7 +671,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
             context: 200_000,
             permissionMode: 'auto',
             check,
-            disallowedTools: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'],
+            disallowedTools: BUILDER_DENIED,
           }),
         },
         {

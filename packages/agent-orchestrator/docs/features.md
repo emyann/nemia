@@ -3724,13 +3724,15 @@ Five things the reviews of §9's package half and of the checkout hold found and
   `run.test.ts` composes the brief of the supervisor's fourth try as a new session and refuses the sha and the claim; the clause put back
   fails it.
 - **The supervisor denies by name the git it must never type.** "Never type git for a run" was prose, and prose is not a constraint.
-  `.claude/settings.json` refuses `git push` and `git branch -D` for every session in the checkout, and cannot refuse `git merge`, which
-  `ship.md` runs in the same checkout: the step's own `disallow:` is the only place that refusal can live. It denies `git merge`, `pull`,
+  `.claude/settings.json` then refused `git push` and `git branch -D` for every session in the checkout (each step refuses them itself
+  now: *Shipped: each worker is told what it may not do*), and cannot refuse `git merge`, which `ship.md` runs in the same checkout: the
+  step's own `disallow:` is the only place that refusal can live. It denies `git merge`, `pull`,
   `checkout`, `switch`, `restore`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push` as `Bash(git <verb>:*)` rules — `pull`
   and `restore` from review's round 2: `git pull . <branch>` merges a run's branch, and `git restore <path>` throws work away as `git
   checkout -- <path>` does — and the folder calls it a named list of the ordinary commands, not everything git can write. It leaves
   what its bookkeeping needs — `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. `git branch` is left alone on
-  purpose: a prefix deny would take `git branch --list` with it, which is diagnosis, and `-D` is the checkout's refusal. The folder's
+  purpose: a prefix deny would take `git branch --list` with it, which is diagnosis; `-D` and `--delete --force` are denied by
+  those spellings (*Shipped: each worker is told what it may not do*). The folder's
   README, the step's frontmatter comment and its prose say what the denies are and that a prefix is a fence, not a sandbox (`git -C <dir>
   merge` is not `git merge`). `supervisor.test.ts` reads the shipped folder: it fails by name when one of the rules is missing — measured
   by dropping `git reset` — asserts that a harness given the list would refuse `ship.md`'s own merge command, and that none of the
@@ -4693,7 +4695,7 @@ that can write, run a program or move a ref.
 
 - **`.claude/settings.json` allows** `merge-tree`, `merge-base`, `ls-tree`, `ls-files`, `rev-parse`, `rev-list`, `blame`, `shortlog`
   and `describe`, beside `diff`, `log`, `show`, `status` and `branch --list`. Left out: `git -C` (a prefix rule for it admits
-  `git -C <dir> push`, which the deny `Bash(git push:*)` does not match), `git grep` (`-O<cmd>` runs a program; the Grep tool searches)
+  `git -C <dir> push`, which no deny `Bash(git push:*)` matches), `git grep` (`-O<cmd>` runs a program; the Grep tool searches)
   and `git fetch`. `workflows/dev/README.md` says so, under *What git a fenced step may run*. The deny list did not change.
 - **`test/git-reads.test.ts`** holds every `Bash(git …)` allow to a named list of reads, and that list to no verb that writes, runs a
   program or moves a ref and no option before the verb; it failed with `Bash(git -C:*)` and with `Bash(git commit:*)` added.
@@ -4921,6 +4923,43 @@ permission mode and has none to say; `specOf` needed no change, since `harness` 
 Left for later: **a remote step's transcript** — the runtime has no `transcript` for another party's agent, so the board's session
 view is empty for it — and **`output:` on a remote step**, a declared shape sent as the reply's schema and read as the closeout's,
 which A2A has no field for yet.
+
+## Shipped: each worker is told what it may not do
+
+Shipped 2026-09-29. The owner decided that a worker is refused what it should not do on its own fence, and that the checkout's
+`.claude/settings.json`, which binds a person's own session there too, denies nothing: the person may ask their session to push and
+open a pull request.
+
+- **The settings deny nothing.** Their five denies — `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch -D:*)`, `Bash(git branch
+  --delete --force:*)` and `mcp__playwright__browser_run_code_unsafe` — are gone; the `allow` list and `attribution` are as they were.
+- **An agent in `auto` denies them itself.** `implementer`, `ui-implementer` and `shipper`, in both copies, and the package's own
+  `workflows/implement.md`, which names no agent, carry the five in `disallowedTools:`, after the four no step needs. `auto` runs
+  whatever no deny names, so the step's own line is the only thing that refuses.
+- **An agent in `dontAsk` needs no line.** `planner`, `reviewer`, `ui-reviewer`, `note-writer` and `note-reviewer` run only what an
+  allow reaches, and none does: the settings allow git's reads, `Bash(git branch)` exactly and `Bash(git branch --list:*)`; no agent,
+  settings file or skill's `allowed-tools` allows an `mcp__playwright__*` tool. Each says so beside its keys. They run as jobs in a
+  worktree or a folder the run made, which read only the settings shipped here (`--setting-sources project,local`, and no
+  `settings.local.json` is there).
+- **The supervisor denies them itself, though it runs `dontAsk`.** It is a `--bg` session in the person's own checkout, and reads their
+  user settings and that checkout's `settings.local.json`, where "don't ask again" writes an allow such as `Bash(git branch:*)`. So its
+  own list names `Bash(git push:*)`, `Bash(git branch -D:*)`, `Bash(git branch --delete --force:*)` and
+  `mcp__playwright__browser_run_code_unsafe`, and the test treats a background step, or a job in the checkout itself, as it treats one
+  in `auto`.
+- **`test/agent-fences.test.ts`** resolves every shipped folder as `wf start` freezes it and refuses a step that could run a push, a
+  forced delete or the unsafe tool — by a missing deny in `auto`, by an allow in `dontAsk` (its own, the settings' or a skill's), by a
+  sandbox other than `read-only` on codex — and a settings file that denies any of them. It reads the folders off the disk. It failed
+  with the implementer's line cut back to the four, with the supervisor's forced-delete denies taken out, and with a planner given
+  `Bash(git push:*)`, `mcp__playwright` or `Bash(git branch:*)`. Its matcher throws on a wildcard
+  it does not model. The api's capabilities test holds the same of `browser_run_code_unsafe` on every Claude step the page lists.
+- **Codex.** The settings never reached a Codex session. No shipped agent can run on Codex — each gives `skills:`, which
+  `composedRefusal` refuses there — and the one shipped Codex step, the package's `review.md`, is `sandbox: read-only`: no write to
+  `.git`, no network. `.codex/rules/git-commit.rules` lets only `git add` and `git commit` out of the sandbox. Nothing changed there.
+- **A run already in flight keeps what it froze.** A step is filed from the workflow frozen on the run at `wf start` (`stepsOf`,
+  `filedDenies`), not from the agent's file, so a run started before this landed keeps the four denies. Its worktree steps read the
+  settings of the branch as it was cut, which still deny the five, until that branch merges main. Its ending step, in the repository's
+  own checkout (`workspace: main`), reads main's settings, which deny nothing: nothing refuses that one step a push, a forced delete
+  or the unsafe tool but its brief. Start such a run again rather than approve its ship unwatched. A supervisor started before this
+  landed keeps its old list, without the forced delete: stop it and start it again.
 
 ## 1. A run that grows steps from a plan
 

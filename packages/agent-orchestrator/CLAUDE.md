@@ -57,8 +57,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
   `daemon.json`, `tick.json`, `tick-stats.json` and a queue try each have one, a `StructWithRest` where the file is written back (a
   `Struct` strips the keys it does not name, and a record written by a newer tick keeps them). `Struct({})` accepts an array; a struct
   with a key refuses one. A record that does not decode is refused by `readRun` with exit 2, naming the file and its first wrong field
-  (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. The frozen steps are the one
-  cast left on a record (`frozenSteps`), until phase 2 checks them with the parser's own words.
+  (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. A frozen step is decoded by
+  `FrozenStepSchema` (`workflow-store.ts`), a field per `StepKey` (a key added without one fails the typecheck): the shape, not the words.
 
 ## The tick
 

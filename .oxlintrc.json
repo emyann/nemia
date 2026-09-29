@@ -586,7 +586,7 @@
     {
       "files": ["packages/agent-orchestrator/src/store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 617, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 612, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },

@@ -92,12 +92,12 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/web/src/routes/inbox.tsx': { 'max-lines-per-function': 2, complexity: 2 },
   'apps/web/src/routes/runs.$runId.tsx': { 'max-lines-per-function': 1, complexity: 1 },
   'packages/agent-orchestrator/src/agents/agents.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/authoring.ts': {
-    'max-lines': 1,
+  'packages/agent-orchestrator/src/agents/agents.store.ts': {
     'max-lines-per-function': 1,
     complexity: 1,
-    'sonarjs/cognitive-complexity': 2,
+    'sonarjs/cognitive-complexity': 1,
   },
+  'packages/agent-orchestrator/src/skills/skills.store.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/branches.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/cap/cap.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/cli.ts': {
@@ -107,9 +107,18 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
     'sonarjs/cognitive-complexity': 5,
   },
   'packages/agent-orchestrator/src/closeout/closeout.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/decide.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/decide/decide.verb.ts': {
+    'max-lines-per-function': 1,
+    complexity: 1,
+    'sonarjs/cognitive-complexity': 1,
+  },
   'packages/agent-orchestrator/src/feed/feed.store.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/forget.ts': { 'max-lines-per-function': 2, complexity: 2, 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/forget/forget.verb.ts': {
+    'max-lines-per-function': 1,
+    complexity: 1,
+    'sonarjs/cognitive-complexity': 1,
+  },
+  'packages/agent-orchestrator/src/prune/prune.verb.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/former/former.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.store.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 3 },
@@ -136,7 +145,8 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/status/status.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/wait/wait.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/skills/skills.ts': { 'sonarjs/cognitive-complexity': 2 },
-  'packages/agent-orchestrator/src/start.ts': { 'max-lines-per-function': 1, complexity: 2, 'sonarjs/cognitive-complexity': 3 },
+  'packages/agent-orchestrator/src/start/start.verb.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/inbox/inbox.verb.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/tick.ts': {
     'max-lines': 1,
@@ -148,7 +158,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/workflow/step-file.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/workflow/validate.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { 'sonarjs/cognitive-complexity': 2 },
-  'packages/agent-orchestrator/src/worktree.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/workspace/worktree.store.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-runtime/src/a2a/client.ts': { 'max-lines-per-function': 1 },
   'packages/agent-runtime/src/a2a/map.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/a2a/remote.ts': {

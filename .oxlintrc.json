@@ -481,12 +481,17 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/authoring.ts"],
+      "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 504, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 41 }],
         "sonarjs/cognitive-complexity": ["error", 59]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/skills/skills.store.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {
@@ -512,7 +517,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/decide.ts"],
+      "files": ["packages/agent-orchestrator/src/decide/decide.verb.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 135, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 45 }],
@@ -527,7 +532,15 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/forget.ts"],
+      "files": ["packages/agent-orchestrator/src/forget/forget.verb.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 38 }],
+        "sonarjs/cognitive-complexity": ["error", 44]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/prune/prune.verb.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 52 }],
@@ -665,9 +678,16 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/start.ts"],
+      "files": ["packages/agent-orchestrator/src/start/start.verb.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 21 }],
+        "sonarjs/cognitive-complexity": ["error", 21]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/inbox/inbox.verb.ts"],
+      "rules": {
         "complexity": ["error", { "max": 24 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }
@@ -747,7 +767,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/worktree.ts"],
+      "files": ["packages/agent-orchestrator/src/workspace/worktree.store.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 30]

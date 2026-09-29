@@ -50,6 +50,8 @@ export type AgentListing = {
   from: 'repo' | 'yours';
   dir: string;
   file: string;
+  /** The job it holds, as its `role:` line writes it: `Product engineer`; null for none. */
+  role: string | null;
   description: string | null;
   keys: Partial<Record<AgentRoleKey, string>>;
   body: string;
@@ -99,6 +101,7 @@ export const agentQuery = (from: string, name: string) =>
  */
 export type AgentDraft = {
   name: string;
+  role: string | null;
   description: string | null;
   skills: string | null;
   systemPrompt: string | null;

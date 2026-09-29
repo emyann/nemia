@@ -208,7 +208,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   );
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  const agentOnly = ['description', 'skills', 'systemPrompt'];
+  const agentOnly = ['role', 'description', 'skills', 'systemPrompt'];
   assert.deepEqual(
     form.roleKeys,
     ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
@@ -217,7 +217,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(
     form.roleKeys,
     AGENT_KEYS.filter((k) => !agentOnly.includes(k)),
-    'the role keys are the agent keys but description, skills and systemPrompt',
+    'the role keys are the agent keys but role, description, skills and systemPrompt',
   );
   for (const own of agentOnly)
     assert.equal(

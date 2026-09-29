@@ -49,7 +49,7 @@ const EXEMPT = ['**/test/**', '**/*.test.ts', 'apps/web/src/components/ui/**', '
  * entry has a ceiling block in `.oxlintrc.json`.
  */
 const RECORD: Record<string, Partial<Record<Rule, number>>> = {
-  'apps/api/src/agents/agents.ts': { 'max-lines': 1, 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 2 },
+  'apps/api/src/agents/agents.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/capabilities/capabilities.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/capabilities/reach.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/decide/decision.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
@@ -60,7 +60,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/api/src/steps/steps.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/workflows/builder.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/workflows/workflows.ts': { complexity: 1 },
-  'apps/web/src/components/AgentForm.tsx': { 'max-lines-per-function': 1, complexity: 1 },
+  'apps/web/src/components/AgentForm.tsx': { 'max-lines-per-function': 1 },
   'apps/web/src/components/CardGate.tsx': { 'max-lines-per-function': 1 },
   'apps/web/src/components/Decide.tsx': { 'max-lines': 1, 'max-lines-per-function': 2, complexity: 2, 'sonarjs/cognitive-complexity': 2 },
   'apps/web/src/components/FactoryCanvas.tsx': { 'max-lines-per-function': 1, complexity: 1 },
@@ -91,7 +91,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/web/src/routes/capabilities.tsx': { 'max-lines-per-function': 2, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/web/src/routes/inbox.tsx': { 'max-lines-per-function': 2, complexity: 2 },
   'apps/web/src/routes/runs.$runId.tsx': { 'max-lines-per-function': 1, complexity: 1 },
-  'packages/agent-orchestrator/src/agents/agents.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/agents/agents.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/agents/agents.store.ts': {
     'max-lines-per-function': 1,
     complexity: 1,

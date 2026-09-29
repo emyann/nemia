@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { Radio, RadioGroup, TextField, Text } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,29 +110,7 @@ export function AgentForm({
     >
       {refusal}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Name"
-          hint={
-            listing
-              ? 'Its file is agents/<name>.md; a node names it with agent: <name>. Renamed only while no node names it.'
-              : 'Its file is agents/<name>.md; a node names it with agent: <name>.'
-          }
-          value={form.name}
-          onChange={(name) => setForm((f) => ({ ...f, name }))}
-          readOnly={readOnly}
-          mono
-          placeholder={listing ? undefined : 'scribe'}
-        />
-        <Field
-          label="Description"
-          hint="When to attach it to a node: “Use this when…”"
-          value={form.description}
-          onChange={(description) => setForm((f) => ({ ...f, description }))}
-          readOnly={readOnly}
-          placeholder={listing ? undefined : 'Use this when a change needs its notes written.'}
-        />
-      </div>
+      <Identity form={form} setForm={setForm} listing={listing} readOnly={readOnly} />
 
       <fieldset className="space-y-3">
         <legend className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">What it can do</legend>
@@ -257,6 +235,56 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
         <Skills skills={listing.card} none={listing.error !== null ? 'Nothing, while its file does not read.' : undefined} />
       )}
       <p className="text-xs text-muted-foreground">{how} To change it, change its skills.</p>
+    </div>
+  );
+}
+
+/**
+ * Who the agent is, at the head of its form: its name, which is its file's and what a node names it by, the job it holds, and when to attach
+ * it. Each field sets its line of `form` through `setForm`.
+ */
+function Identity({
+  form,
+  setForm,
+  listing,
+  readOnly,
+}: {
+  form: Form;
+  setForm: Dispatch<SetStateAction<Form>>;
+  listing: AgentListing | null;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field
+        label="Name"
+        hint={
+          listing
+            ? 'Its file is agents/<name>.md; a node names it with agent: <name>. Renamed only while no node names it.'
+            : 'Its file is agents/<name>.md; a node names it with agent: <name>.'
+        }
+        value={form.name}
+        onChange={(name) => setForm((f) => ({ ...f, name }))}
+        readOnly={readOnly}
+        mono
+        placeholder={listing ? undefined : 'scribe'}
+      />
+      <Field
+        label="Role"
+        hint="The job it holds: “Product engineer”. Its name is its own, and a node names it by that."
+        value={form.role}
+        onChange={(role) => setForm((f) => ({ ...f, role }))}
+        readOnly={readOnly}
+        placeholder={listing ? undefined : 'Note writer'}
+      />
+      <Field
+        label="Description"
+        hint="When to attach it to a node: “Use this when…”"
+        value={form.description}
+        onChange={(description) => setForm((f) => ({ ...f, description }))}
+        readOnly={readOnly}
+        placeholder={listing ? undefined : 'Use this when a change needs its notes written.'}
+      />
     </div>
   );
 }

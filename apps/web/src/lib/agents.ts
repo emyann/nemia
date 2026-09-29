@@ -1,7 +1,7 @@
 import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 import { remoteRefuses } from './builder.ts';
 
-/** The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: description, skills, systemPrompt): the order an agent's file writes them. */
+/** The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, systemPrompt): the order an agent's file writes them. */
 export const ROLE_KEYS: readonly AgentRoleKey[] = [
   'harness',
   'model',
@@ -39,6 +39,7 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
  */
 export type AgentForm = {
   name: string;
+  role: string;
   description: string;
   keys: Record<AgentRoleKey, string>;
   body: string;
@@ -53,6 +54,7 @@ export function formOf(listing: AgentListing | null): AgentForm {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, listing?.keys[key] ?? ''])) as Record<AgentRoleKey, string>;
   return {
     name: listing?.name ?? '',
+    role: listing?.role ?? '',
     description: listing?.description ?? '',
     keys,
     body: listing?.body ?? '',
@@ -80,6 +82,7 @@ export function draftOf(form: AgentForm): AgentDraft {
   const changed = text && keys.output && (form.schemaWas?.file !== keys.output || form.schemaWas.text.trim() !== text);
   return {
     name: form.name.trim(),
+    role: form.role.trim() || null,
     description: form.description.trim() || null,
     skills: form.skills.trim() || null,
     systemPrompt: form.systemPrompt.trim() || null,

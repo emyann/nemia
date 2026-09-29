@@ -870,6 +870,9 @@ export const WORKFLOWS = {
     /** Implement's agent, which gives it its harness and model: its node names it before them, and its step's page says what it can do. */
     agent: {
       name: 'implementer',
+      /** Its name as the board shows a person's, and the job its `role:` line says it holds. */
+      person: 'Implementer',
+      role: 'Software engineer',
       runsOn: 'implementer · claude · opus',
       /**
        * What it says it can do, as an A2A skill: the one skill its `skills:` gives, `skills/<id>/SKILL.md` beside `agents/`, whose frontmatter
@@ -965,7 +968,7 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
   write(
     path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`),
-    `---\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`,
+    `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`,
   );
   writeSkill(path.join(repo, 'workflows', 'skills'), good.agent.skill);
   write(

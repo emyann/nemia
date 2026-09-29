@@ -26,16 +26,9 @@ import {
   type AgentSchema,
 } from 'agent-orchestrator';
 import {
-  AGENT_KEYS,
-  AGENT_OWN_KEYS,
   AGENTS_FOLDER,
   agentCard,
   agentNameRefusal,
-  FORMER_KEYS,
-  formerSandbox,
-  frontmatterKey,
-  isCardFile,
-  splitFrontmatter,
   type AgentCardShape,
   type AgentDraft,
   type AgentSkill,
@@ -47,6 +40,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
+import { empty, unreadListing } from './listing.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
@@ -64,6 +58,8 @@ export type AgentListing = {
   from: WorkflowSource;
   dir: string;
   file: string;
+  /** The job it holds (`role:`), as its file writes it: `Product engineer`. Null when it says none. */
+  role: string | null;
   description: string | null;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
@@ -95,12 +91,6 @@ export type AgentListing = {
    */
   untried: Untried | null;
 };
-
-/**
- * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, skills and system prompt) are no step's, so the form
- * shows them apart (`RoleKey`).
- */
-const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
 /**
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
@@ -163,40 +153,8 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
       return null;
     }
   };
-  if (agent === undefined || agent instanceof Error) {
-    const formerOf = (key: RoleKey) => Object.keys(FORMER_KEYS).filter((former) => FORMER_KEYS[former] === key);
-    const keys = Object.fromEntries(
-      ROLE_KEYS.flatMap((key) => {
-        const value = [key, ...formerOf(key)].map((named) => frontmatterKey(source, named)).find((v) => v !== undefined);
-        return value === undefined ? [] : [[key, value]];
-      }),
-    ) as Partial<Record<RoleKey, string>>;
-    const former =
-      keys.harness === 'codex' && keys.sandbox === undefined && keys.permissionMode !== undefined
-        ? formerSandbox(keys.permissionMode)
-        : undefined;
-    if (former !== undefined) {
-      delete keys.permissionMode;
-      keys.sandbox = former;
-    }
-    let body = '';
-    try {
-      body = splitFrontmatter(file, source).body;
-    } catch {
-      body = source;
-    }
-    return {
-      ...empty(from, dir, file, name, version, usedBy),
-      description: frontmatterKey(source, 'description') ?? null,
-      keys,
-      body,
-      schema: sidecarOf(keys.output),
-      skills: skillsLineOf(source),
-      systemPrompt: frontmatterKey(source, 'systemPrompt') ?? null,
-      source,
-      error: agent ? agent.message : `${AGENTS_FOLDER}/${name}.md does not read.`,
-    };
-  }
+  if (agent === undefined || agent instanceof Error)
+    return unreadListing(empty(from, dir, file, name, version, usedBy), source, agent, sidecarOf);
   let card: AgentSkill[] | null = null;
   let cardError: string | null = null;
   try {
@@ -209,6 +167,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     from,
     dir,
     file,
+    role: agent.role ?? null,
     description: agent.description ?? null,
     keys: agent.keys,
     body: agent.body,
@@ -227,36 +186,6 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
 }
 
 /**
- * A `skills:` line as written, for a file that does not read — none where it names a card file, a former line the package refuses: the
- * form's save then writes the agent without it, which is the fix its refusal names.
- */
-function skillsLineOf(source: string): string | null {
-  const line = frontmatterKey(source, 'skills');
-  return line === undefined || isCardFile(line) ? null : line;
-}
-
-const empty = (from: WorkflowSource, dir: string, file: string, name: string, version: string, usedBy: AgentUser[]): AgentListing => ({
-  name,
-  from,
-  dir,
-  file,
-  description: null,
-  keys: {},
-  body: '',
-  schema: null,
-  card: null,
-  cardError: null,
-  skills: null,
-  given: [],
-  systemPrompt: null,
-  source: '',
-  version,
-  usedBy,
-  error: null,
-  untried: null,
-});
-
-/**
  * An agent as an A2A Agent Card, and the truth about it: `servedOverA2A` is always false, and `why` says what the shape leaves out and why
  * a client could not call it. The board shows the card with that sentence beside it, so nothing reads as an address.
  */
@@ -269,7 +198,7 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 export type AgentRefused = { error: string; users: string[] };
 
 const DRAFT =
-  '"description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -290,6 +219,7 @@ const DRAFT_FIELDS = {
   card: Schema.optionalKey(Schema.Never),
   cardText: Schema.optionalKey(Schema.Never),
   skillsText: Schema.optionalKey(Schema.Never),
+  role: Schema.optionalKey(Schema.NullOr(Schema.String)),
   description: Schema.optionalKey(Schema.NullOr(Schema.String)),
   skills: Schema.optionalKey(Schema.NullOr(Schema.String)),
   systemPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -315,6 +245,7 @@ function draftWords(route: string, shape: string): Words {
         `${sent.map((retired) => `\`${retired}\``).join(' and ')} named the card file beside the agent, which is retired: an agent's card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page that sends it is stale: reload it, and save again`,
       );
     }
+    if (key === 'role') return wrong('`role` is the job the agent holds, a line of text — `"Product engineer"` — or null');
     if (key === 'description') return wrong('`description` is a line of text, or null');
     if (key === 'skills')
       return wrong(
@@ -379,6 +310,7 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
   return {
     draft: {
       name,
+      role: line(body.role),
       description: line(body.description),
       skills: line(body.skills),
       systemPrompt: line(body.systemPrompt),

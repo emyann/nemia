@@ -67,6 +67,7 @@ function refused(fn: () => unknown, pattern: RegExp, why?: string): InstanceType
 /** An agent's draft: `skills:` is the agent's own line, carried as the file writes it; what the agent can do is generated from it. */
 const draftOf = (agent: Agent): AgentDraft => ({
   name: agent.name,
+  role: agent.role,
   description: agent.description,
   skills: agent.skills?.join(', '),
   keys: agent.keys,
@@ -74,6 +75,7 @@ const draftOf = (agent: Agent): AgentDraft => ({
 });
 const plain = (agent: Agent) => ({
   name: agent.name,
+  role: agent.role,
   description: agent.description,
   skills: agent.skills,
   keys: agent.keys,
@@ -97,9 +99,13 @@ test("every agent of the tests' team renders to a file that reads back as the sa
   }
 });
 
-test('a render writes the description first, the keys in their order, and an unset key not at all', () => {
+test('a render writes the role and the description first, the keys in their order, and an unset key not at all', () => {
   const text = renderAgent({ name: 'a', description: 'Use it.', keys: { tools: 'Read', model: 'opus', effort: null }, body: '  Do it.  ' });
   assert.equal(text, '---\ndescription: Use it.\nmodel: opus\ntools: Read\n---\nDo it.\n');
+  const held = renderAgent({ name: 'iris', role: 'Product engineer', description: 'Use it.', keys: { model: 'opus' }, body: 'Ask.' });
+  assert.equal(held, '---\nrole: Product engineer\ndescription: Use it.\nmodel: opus\n---\nAsk.\n');
+  assert.equal(parseAgent('iris', held).role, 'Product engineer');
+  assert.equal(parseAgent('iris', text.replace('description', 'role')).role, 'Use it.');
   assert.equal(renderAgent({ name: 'a', keys: {}, body: '---\nlooks like frontmatter' }), '---\n\n---\n---\nlooks like frontmatter\n');
   assert.deepEqual(
     parseAgent('a', renderAgent({ name: 'a', keys: {}, body: '---\nlooks like frontmatter' })).body,
@@ -107,12 +113,20 @@ test('a render writes the description first, the keys in their order, and an uns
   );
 });
 
-test('a render refuses a key no agent has, agent:, wiring, description among the keys and a line break, by name', () => {
+test('a render refuses a key no agent has, agent:, wiring, the role or the description among the keys and a line break, by name', () => {
   const r = (keys: Record<string, string>, description?: string) => () => renderAgent({ name: 'a', description, keys: keys, body: 'x' });
   assert.throws(r({ agent: 'b' }), (e: Error) => e.message.startsWith("agents/a.md: `agent` is a step's key"));
   assert.throws(r({ check: 'npm test' }), (e: Error) => e.message.startsWith('agents/a.md: `check` is wiring, and belongs on the step'));
   assert.throws(r({ modle: 'opus' }), (e: Error) => e.message.startsWith('agents/a.md: `modle` is not a key an agent has'));
   assert.throws(r({ description: 'x' }), (e: Error) => e.message.startsWith("agents/a.md: `description` is the agent's own line"));
+  assert.throws(
+    r({ role: 'x' }),
+    (e: Error) => e.message === "agents/a.md: `role` is the agent's own line, not one of its role keys — give it as the role, once.",
+  );
+  assert.throws(
+    () => renderAgent({ name: 'a', role: 'one\ntwo', keys: {}, body: 'x' }),
+    (e: Error) => e.message.startsWith('agents/a.md: `role` holds a line break'),
+  );
   assert.throws(r({ model: 'opus\ncheck: rm -rf /' }), (e: Error) => e.message.startsWith('agents/a.md: `model` holds a line break'));
   assert.throws(r({}, 'one\ntwo'), (e: Error) => e.message.startsWith('agents/a.md: `description` holds a line break'));
 });
@@ -141,6 +155,7 @@ test('a new agent is written, reads back, and changes no workflow beside it', ()
   assert.equal(done.version, agentVersion(AGENTS, 'scribe'));
   assert.deepEqual(plain(loadAgents(AGENTS).get('scribe') as Agent), {
     name: 'scribe',
+    role: undefined,
     description: scribe.description,
     skills: undefined,
     keys: scribe.keys,

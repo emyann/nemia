@@ -1,3 +1,4 @@
+import { Blobatar } from '@blobatar/react';
 import type { ReactNode } from 'react';
 import { Link as AriaLink } from 'react-aria-components';
 import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
@@ -102,12 +103,42 @@ export function Skills({
   );
 }
 
-/** A link to an agent's page, by name: what a node's form and a step's page link its agent with. */
+/** An agent's name as a person's: its file's name, first letter up and dashes as spaces — `iris` is Iris, `note-writer` Note writer. */
+export const personOf = (name: string): string => {
+  const spaced = name.replaceAll('-', ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+};
+
+/**
+ * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
+ * design. An image with the agent's name as its title; `size` in pixels.
+ */
+export function AgentFace({ name, size, className }: { name: string; size: number; className?: string }) {
+  return (
+    <Blobatar
+      name={name}
+      size={size}
+      title={personOf(name)}
+      data-agent-face={name}
+      className={cn('shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800', className)}
+    />
+  );
+}
+
+/** A link to an agent's page, by name, its face beside it: what a node's form and a step's page link its agent with. */
 export function AgentLink({ from, name, className }: { from: AgentListing['from']; name: string; className?: string }) {
   return (
-    <RouteLink to="/agents/$from/$agent" params={{ from, agent: name }} data-agent-link={name} className={cn('font-mono', LINK, className)}>
-      {name}
-    </RouteLink>
+    <span className="inline-flex items-center gap-1.5 align-middle">
+      <AgentFace name={name} size={16} />
+      <RouteLink
+        to="/agents/$from/$agent"
+        params={{ from, agent: name }}
+        data-agent-link={name}
+        className={cn('font-mono', LINK, className)}
+      >
+        {name}
+      </RouteLink>
+    </span>
   );
 }
 

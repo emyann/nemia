@@ -4048,6 +4048,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
     from: 'yours' as const,
     dir: '/store/agents',
     file: '/store/agents/scribe.md',
+    role: null,
     description: 'Writes notes.',
     keys: { tools: 'Read, Skill' },
     body: 'Write.\n',
@@ -4163,6 +4164,7 @@ const composing = {
   from: 'yours',
   dir: '/store/agents',
   file: '/store/agents/scribe.md',
+  role: null,
   description: 'Writes notes.',
   keys: { tools: 'Read' },
   body: 'Write.\n',
@@ -4496,4 +4498,19 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
     );
   assert.match(edge(true), /stroke:var\(--edge-taken\);stroke-width:3/);
   assert.match(edge(false), /stroke:var\(--edge-done\);stroke-width:1.5/);
+});
+
+test("an agent's face is drawn from its name: the same name the same face, another name another, named as a person is", async () => {
+  const { AgentFace, personOf } = await import('../src/components/AgentParts.tsx');
+  const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 36 }));
+  const srcOf = (html: string) => /src="([^"]+)"/.exec(html)?.[1];
+  const iris = face('iris');
+  assert.match(iris, /^<img /, 'one image, no script and no stylesheet to load');
+  assert.match(iris, /data-agent-face="iris"/);
+  assert.match(iris, /alt="Iris"/, 'a screen reader says its name as a person is named');
+  assert.ok(srcOf(iris), iris);
+  assert.equal(srcOf(face('iris')), srcOf(iris), 'the same name draws the same face');
+  assert.notEqual(srcOf(face('nora')), srcOf(iris), 'another name draws another face');
+  assert.equal(personOf('iris'), 'Iris');
+  assert.equal(personOf('note-writer'), 'Note writer');
 });

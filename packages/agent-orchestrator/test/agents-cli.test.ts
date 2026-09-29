@@ -14,7 +14,7 @@ import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-agents-cli-');
 process.env.WF_ROOT = ROOT;
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = {} as Engine;

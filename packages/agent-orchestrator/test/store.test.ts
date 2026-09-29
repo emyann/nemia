@@ -1433,7 +1433,7 @@ test("a step named for another step's try is refused at `wf start`, before anyth
 });
 
 test('`wf retry` takes one way to try, and `--model` with a name — anything else is refused before a run is read', async () => {
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
     [['--fresh', '--recheck'], /pick one of --nudge, --fresh, --model <m>, --recheck/],
     [['--model'], /--model takes the model/],
@@ -1805,7 +1805,7 @@ test('`wf round` refuses a round still running, a round the run files itself and
   await assert.rejects(round(b.e, run.id, 'review'), refusedWith(/was cancelled at /));
   assert.deepEqual(roundAsksOf(run.id), []);
 
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await assert.rejects(
     main(['round', 'no-such-run', 'review', 'again']),
     refusedWith(/^wf round takes the run and, when the run has more than one loop, the step/),
@@ -2914,7 +2914,7 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
     'a message to a step whose check did not finish is not refused: it did not sign off blocked, and a person may have something to say',
   );
 
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
     [['--message', ''], /^--message is empty/],
     [
@@ -2936,7 +2936,7 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
 
 test('`wf retry --message` takes the next argument as the answer whatever it starts with — an answer about a flag names it — and `--message=<answer>` too', async (t) => {
   t.mock.method(console, 'log', () => {});
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const asked = async (...flags: string[]) => {
     const { run, e } = await throughCheck('check: npm test', 'stopped');
     await main(['retry', run.id, 'implement', ...flags], e);
@@ -3271,7 +3271,7 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['ls', child.id], c.e);
   const ls = printed.join('\n');
   assert.match(ls, new RegExp(`^   implement +waiting on ${escaped(p.run.id)} \\(cancelled\\) *$`, 'm'));
@@ -3338,7 +3338,7 @@ test("REFUSED at `wf start`, before a run is written: --after an unknown run, a 
   gitIn(repo, 'checkout', '-q', p.run.branch);
   assert.equal(runsWritten(), before, 'no run written');
 
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const typed = (...flags: string[]) => main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags]);
   await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
   await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
@@ -3498,7 +3498,7 @@ test('REFUSED before, now accepted at shipped defaults: `wf retry` on a step who
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['retry', run.id, 'implement'], e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2'], '`wf retry`, as a person types it, asks');
   assert.equal(
@@ -3573,7 +3573,7 @@ test('a step whose harness blocked its session says what the harness waits for �
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const decided = async () => {
     printed.length = 0;
     await main(['decide', run.id], b.e);
@@ -3616,7 +3616,7 @@ test('a step whose job was denied a call says so — on `wf ls` beside its line 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const printedBy = async (...args: string[]) => {
     printed.length = 0;
     await main(args, b.e);
@@ -3660,7 +3660,7 @@ test('a step that says `denials: fail`, denied a call, is stopped: nothing after
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const printedBy = async (...args: string[]) => {
     printed.length = 0;
     await main(args, b.e);
@@ -3698,7 +3698,7 @@ test('REFUSED at shipped defaults: `wf retry` on a step whose session still work
   const run = started(folder());
   const b = board();
   await advance(b.e, readRun(run.id));
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   b.settle(`${run.id}-implement`, 'running');
   await assert.rejects(
     main(['retry', run.id, 'implement'], b.e),
@@ -3752,7 +3752,7 @@ test('`wf plan` on the diamond starts four runs, parents first, each `after` the
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['plan', plan, '--repo', repo], b.e);
 
   assert.equal(runsWritten(), before + 4, 'four runs, and no file of the plan');
@@ -3802,7 +3802,7 @@ test("REFUSED at shipped defaults, before the first `start()`: `wf plan` on a fo
     'b.md': cardText(`workflow: ${broken}\nafter: a`, 'the second card'),
   }));
   const before = runsWritten();
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const planned = () => main(['plan', plan, '--repo', repo], b.e);
   await assert.rejects(
     planned(),
@@ -3846,7 +3846,7 @@ test('REFUSED by name: `wf plan` with --after, --workflows or --no-worktree — 
   const b = board();
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   const before = runsWritten();
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const typed = (...flags: string[]) => main(['plan', plan, ...flags], b.e);
   await assert.rejects(
     typed('--repo', repo, '--after', 'r-xyz'),
@@ -3879,7 +3879,7 @@ test("`wf start --workflows <name>` starts the repository's workflow of that nam
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['start', 'a brief', '--workflows', 'flagship', '--repo', repo], b.e);
   assert.equal(readRun(printed[0].split(' ')[0]).workflowDir, dir);
   const before = runsWritten();
@@ -4002,7 +4002,7 @@ test("`wf say` hands the words to the step's current task through the engine's `
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const recordOf = () => fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
   const record = recordOf();
   const beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
@@ -4066,7 +4066,7 @@ test("REFUSED: `wf say` on a step the run does not have, a step not filed, a set
   const b = board();
   await advance(b.e, readRun(run.id));
   const taskId = `${run.id}-implement`;
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const asked: string[] = [];
   const e = {
     ...b.e,
@@ -4237,7 +4237,7 @@ test("REFUSED before, now in order: `wf start` on `plan → implement ⇄ review
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['start', 'plan the flag', '--workflows', plannedFolder(), '--repo', repo], b.e);
   const [id, said] = printed[0].split('  ');
   assert.equal(said, '3 step(s): plan → implement → review');
@@ -4308,7 +4308,7 @@ test("`wf decide` prints each step in the order the steps run — on a record ke
     );
     b.settle(`${run.id}-${name}`, 'succeeded', SIGNED);
   }
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const sections = async () => {
     const out: string[] = [];
     const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -4357,7 +4357,7 @@ test("`wf start --input` copies each file into the run's own inputs/, freezes th
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(
     [
       'start',
@@ -4444,7 +4444,7 @@ test('REFUSED at `wf start`, before a run is written: an --input that is not the
   );
   assert.equal(runsWritten(), before, 'no run written, and no inputs directory');
 
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const typed = (...flags: string[]) =>
     main(['start', 'a run with files', '--workflows', folder(), '--repo', repo, '--no-worktree', ...flags]);
   await assert.rejects(typed('--input'), refusedWith(/^--input takes a file to hand the run's steps: wf start <brief> --input <file>/));
@@ -4558,7 +4558,7 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.map(String).join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   try {
     await main(['decide', run.id], b.e);
   } finally {
@@ -4627,7 +4627,7 @@ test('REFUSED before, now honoured at shipped defaults: `wf retry` on a step who
   b.settle(taskId, 'needs-human' as TaskPhase);
   const e = recordingStops(b);
   t.mock.method(console, 'log', () => {});
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['retry', run.id, 'implement'], e);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
@@ -4690,7 +4690,7 @@ test("`wf start <card>.md` starts the card's body — its id from the body, its 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const startedBy = async (...argv: string[]) => {
     printed.length = 0;
     await main(['start', ...argv], b.e);
@@ -4913,7 +4913,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
 });
 
 test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `wf round` is refused without `--budget`, and with one files the round, the cap on implement's record", async (t) => {
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const run = started(looped('', 'budget: 3\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
@@ -4981,7 +4981,7 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
 });
 
 test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amount, a word, 0, a unit, twice, or with --recheck — and `--budget=<amount>` is read', async () => {
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   const { e } = board();
   const cases: Array<[string[], RegExp]> = [
     [
@@ -5068,7 +5068,7 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
     printed.push(a.join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   try {
     await main(['rm', ...args], e);
     return { printed, error: undefined };

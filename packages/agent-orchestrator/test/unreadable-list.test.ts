@@ -20,7 +20,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_RUNS = '4';
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {

@@ -455,7 +455,7 @@ await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/r
 The configuration is `{ url }` — the agent's base URL, whose card is read at `.well-known/agent-card.json` beneath its path
 (`https://agents.example/reviewer/.well-known/agent-card.json` above), or the URL itself when it names a `.json` file — or `{ card }`, the card as the JSON the agent would serve. Nothing else:
 `createEngine` refuses, with exit 2, another key, both or neither, an address that is not `http:` or `https:`, one that
-carries a user name or password, and a card that lists no interface to reach the agent by. A task on a remote agent
+carries a user name or password, and a card that does not decode (below). A task on a remote agent
 carries no `config`: the agent runs as its operator configured it, and `file` refuses every harness argument, naming it.
 Nothing of the task but its brief, the session it continues (`resumeFrom`, as the message's `contextId`) and its closeout
 schema (in the message's metadata, under the runtime's extension) is sent; `cwd` stays here.
@@ -507,7 +507,22 @@ is left of open issue 34 is the crash: a process that dies while a send is under
 call: JSON-RPC (`JSONRPC`) or REST (`HTTP+JSON`), at A2A 1.0. A card that offers only gRPC, or only a version before 1.0,
 ends the attempt `unstartable`, in words that name what is spoken; so does a card that cannot be read, since nothing was
 sent. A card served as A2A's JSON and one served as the SDK's own objects stringified are both read, security schemes
-included (`cardOfJson`). For an agent given by its URL, only an interface on that URL's origin is used: a card that names
+included (`cardOfJson` in `a2a/card.ts`).
+
+**The card is decoded where it enters**, served or configured, by one schema (`CardSchema`), before the SDK's parser, which
+coerces anything. What the runtime reads is held, in A2A's camelCase JSON: at least one interface, each with a string `url`
+and `protocolBinding` (and a string `protocolVersion` or `tenant` if given); the security schemes, each of the five kinds
+A2A 1.0 defines with the fields the runtime sends (`scheme` for HTTP, `location` and `name` for an API key); and the
+requirements, each naming schemes with their string scopes. Every other key is kept and not checked, so a card with no
+`name` or `skills` is still taken. A field the runtime reads spelled in snake_case (`supported_interfaces`,
+`protocol_binding`, `http_auth_security_scheme`, …) is refused, naming the camelCase key to write. A scheme of a kind
+A2A 1.0 does not define is kept and never sent: a requirement that names it is unmet, and the spawn is refused only when
+no requirement is met. A card that does not decode is refused in words that name its first wrong field by its path
+(`supportedInterfaces.0.url`) and what is there instead: served, the spawn ends `unstartable` with nothing sent, the card
+named by its origin and path; configured, `createEngine` refuses it with exit 2, and the orchestrator leaves the entry of
+`a2a-agents.json` out.
+
+For an agent given by its URL, only an interface on that URL's origin is used: a card that names
 its interfaces elsewhere ends the attempt `unstartable` with nothing sent, since the secret goes where the requests go.
 Give such an agent by its card, whose interfaces are the caller's own word.
 
@@ -1746,6 +1761,7 @@ of pure code sits beside it.
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
+| `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |

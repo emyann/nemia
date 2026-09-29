@@ -9,13 +9,13 @@
  * reach: `coder` on codex, `faraway`, a remote A2A agent, and `bridged`, bridged to claude.ai. The repository's own agents are `critic` and
  * `grader`, the second with a result schema beside it.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
 import { start } from 'agent-orchestrator';
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
@@ -65,9 +65,9 @@ fs.writeFileSync(
   '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n',
 );
 
-type RunSummary = import('../src/runs/runs.ts').RunSummary;
-type RunDetail = import('../src/detail/detail.ts').RunDetail;
-type AgentListing = import('../src/agents/agents.ts').AgentListing;
+type RunSummary = import('../runs/runs.ts').RunSummary;
+type RunDetail = import('../detail/detail.ts').RunDetail;
+type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>

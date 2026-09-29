@@ -1,11 +1,12 @@
 /**
- * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: every test file imports it first, and
- * the `claude` the api's engine runs is the harness's.
+ * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: the test script loads it with
+ * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
+ * api's engine runs is the harness's.
  */
-import { askEnded, bin, calls, observations, registry, unharnessed } from './harness.ts';
+import { askEnded, bin, calls, observations, registry, scriptUnharnessed, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
@@ -25,12 +26,32 @@ function importCalls(text: string): string[] {
   return found;
 }
 
-test('every api test file imports the harness first, before anything that could observe this machine', () => {
-  const dir = import.meta.dirname;
-  const files = fs.readdirSync(dir).filter((file) => file.endsWith('.test.ts'));
-  assert.ok(files.includes('app.test.ts') && files.includes('harness.test.ts'), "and this is looking at the api's tests");
+/** The api package's folder. */
+const API = path.join(import.meta.dirname, '..');
+
+/** Every test file of the api from the package's folder, `test/x.test.ts` and each beside the code, `src/<folder>/x.test.ts`. */
+const testFiles = (): string[] => [
+  ...fs
+    .readdirSync(path.join(API, 'test'))
+    .filter((f) => f.endsWith('.test.ts'))
+    .map((f) => `test/${f}`),
+  ...fs
+    .readdirSync(path.join(API, 'src'), { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.test.ts'))
+    .map((f) => `src/${f.split(path.sep).join('/')}`),
+];
+
+test('every api test file imports the harness first, by its path from the file, before anything that could observe this machine', () => {
+  const files = testFiles();
+  assert.ok(files.includes('test/app.test.ts') && files.includes('test/harness.test.ts'), "and this is looking at the api's tests");
+  assert.ok(files.includes('src/runs/graph.test.ts'), 'and at the ones beside the code');
   assert.deepEqual(
-    files.map((file) => [file, unharnessed(fs.readFileSync(path.join(dir, file), 'utf8'))]).filter(([, why]) => why !== null),
+    files
+      .map((file) => {
+        const harness = path.posix.relative(path.posix.dirname(file), 'test/harness.ts');
+        return [file, unharnessed(fs.readFileSync(path.join(API, file), 'utf8'), harness.startsWith('.') ? harness : `./${harness}`)];
+      })
+      .filter(([, why]) => why !== null),
     [],
   );
 });
@@ -55,15 +76,84 @@ test('REFUSED: a test file whose first import is not the harness — a builtin, 
     unharnessed("import {\n  observations,\n  registry,\n} from './harness.ts';\nconst { app } = await import('../src/app.ts');\n"),
     null,
   );
+  assert.equal(
+    unharnessed("import './harness.ts';\nimport { test } from 'node:test';\n", '../../test/harness.ts'),
+    "its first import is ./harness.ts. Make `import '../../test/harness.ts'` first, above it.",
+    'a test beside the code names the harness by its own path to it',
+  );
+  assert.equal(unharnessed("import { root } from '../../test/harness.ts';\n", '../../test/harness.ts'), null);
+});
+
+test("the api's test script loads the harness with --import before any test file", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(API, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+  assert.equal(scriptUnharnessed(pkg.scripts.test), null);
+});
+
+test('REFUSED: a test script that runs its files without the harness — no --import, another file, a near word, or after the files — is named, with the fix', () => {
+  const refused = (script: string) =>
+    assert.equal(
+      scriptUnharnessed(script),
+      `the test script (${script}) runs its test files without the harness. Make it \`node --import ./test/harness.ts --test …\`.`,
+    );
+  refused("node --test 'test/*.test.ts' 'src/**/*.test.ts'");
+  refused("node --import ./test/scratch.ts --test 'test/*.test.ts'");
+  refused("node --test --import-map ./test/harness.ts 'test/*.test.ts'");
+  refused("node --test 'test/*.test.ts' --import ./test/harness.ts");
+  refused("tsx --import ./test/harness.ts --test 'test/*.test.ts'");
+  assert.equal(scriptUnharnessed("node --import ./test/harness.ts --test 'test/*.test.ts' 'src/**/*.test.ts'"), null);
+  assert.equal(scriptUnharnessed("node --import=./test/harness.ts --test 'test/*.test.ts'"), null);
+  assert.equal(scriptUnharnessed("node --test --import ./test/harness.ts 'test/*.test.ts'"), null);
+});
+
+test('--import installs the harness once in a test file that imports nothing of it, and not in the runner of `node --test`', () => {
+  const dir = scratch('nemia-api-probe-');
+  const out = path.join(dir, 'probe.json');
+  fs.writeFileSync(
+    path.join(dir, 'probe.test.mjs'),
+    [
+      "import { execFileSync } from 'node:child_process';",
+      "import fs from 'node:fs';",
+      "import { test } from 'node:test';",
+      "test('probe', () => {",
+      "  const claude = execFileSync('sh', ['-c', 'command -v claude || true'], { encoding: 'utf8' }).trim();",
+      '  fs.writeFileSync(process.env.PROBE_OUT, JSON.stringify({ claude, path: process.env.PATH, wfRoot: process.env.WF_ROOT }));',
+      '});',
+      '',
+    ].join('\n'),
+  );
+  const env: Record<string, string | undefined> = { ...process.env, PROBE_OUT: out };
+  env.PATH = (process.env.PATH ?? '')
+    .split(path.delimiter)
+    .filter((p) => !p.includes('nemia-api-harness-'))
+    .join(path.delimiter);
+  for (const key of ['WF_ROOT', 'CLAUDE_CONFIG_DIR', 'WF_VERIFY_REST', 'NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  const ran = spawnSync(process.execPath, ['--import', path.join(API, 'test', 'harness.ts'), '--test', 'probe.test.mjs'], {
+    cwd: dir,
+    env,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+  const seen = JSON.parse(fs.readFileSync(out, 'utf8')) as { claude: string; path: string; wfRoot?: string };
+  const harnesses = seen.path.split(path.delimiter).filter((p) => path.basename(p).startsWith('nemia-api-harness-'));
+  assert.equal(harnesses.length, 1, `one harness on the test's PATH, none from the runner: ${harnesses.join(', ')}`);
+  assert.equal(seen.claude, path.join(harnesses[0], 'claude'), "the test's `claude` is the harness's");
+  assert.ok(path.basename(seen.wfRoot ?? '').startsWith('nemia-api-store-'), `the store is a scratch folder: ${seen.wfRoot}`);
 });
 
 test('no api test file loads a module with import(): the harness sets the store as it loads, so the api and the package are imported after it', () => {
-  const dir = import.meta.dirname;
-  const files = fs.readdirSync(dir).filter((file) => file.endsWith('.ts'));
-  assert.ok(files.includes('app.test.ts') && files.includes('harness.ts'), "and this is looking at the api's tests");
+  const files = [
+    ...fs
+      .readdirSync(path.join(API, 'test'))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => `test/${f}`),
+    ...testFiles().filter((f) => f.startsWith('src/')),
+  ];
+  assert.ok(files.includes('test/app.test.ts') && files.includes('test/harness.ts'), "and this is looking at the api's tests");
+  assert.ok(files.includes('src/runs/graph.test.ts'), 'and at the ones beside the code');
   assert.deepEqual(
     files.flatMap((file) =>
-      importCalls(fs.readFileSync(path.join(dir, file), 'utf8')).map(
+      importCalls(fs.readFileSync(path.join(API, file), 'utf8')).map(
         (call) => `${file} loads a module with ${call}: import it statically, after './harness.ts', which gives the store (\`root\`)`,
       ),
     ),

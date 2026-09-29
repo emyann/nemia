@@ -819,7 +819,7 @@
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 130, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 58 }],
+        "complexity": ["error", { "max": 53 }],
         "sonarjs/cognitive-complexity": ["error", 59]
       }
     },
@@ -863,14 +863,6 @@
       "rules": {
         "complexity": ["error", { "max": 31 }],
         "sonarjs/cognitive-complexity": ["error", 28]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/harness/claude/bg.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 243, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 23]
       }
     },
     {

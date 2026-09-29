@@ -5,14 +5,14 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app } from '../src/app.ts';
+import type { RunSummary } from './runs.ts';
+import { app } from '../app.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

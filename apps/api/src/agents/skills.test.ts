@@ -8,23 +8,23 @@
  * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
  * your library first: only the lookup does.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
-import { copyCommand, listSkills, SHIPPED_SKILLS, skillDetail } from '../src/agents/skills.ts';
-import { TEAM } from './team.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
+import { copyCommand, listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
+import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
-type SkillPlace = import('../src/agents/skills.ts').SkillPlace;
-type SkillRow = import('../src/agents/skills.ts').SkillRow;
+type SkillPlace = import('./skills.ts').SkillPlace;
+type SkillRow = import('./skills.ts').SkillRow;
 
 /** What Nemia ships: `workflows/skills` of the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
 const SHIPPED = SHIPPED_SKILLS;
@@ -229,7 +229,7 @@ test('an agent is listed with each skill it gives, where it is found and what it
   fs.writeFileSync(path.join(root, 'workflows', 'agents', 'lost.md'), '---\ndescription: Lost.\nskills: always, gone\n---\nLook.\n');
   try {
     const res = await app.request('/api/agents/yours/scribe');
-    const scribe = (await res.json()) as import('../src/agents/agents.ts').AgentListing;
+    const scribe = (await res.json()) as import('./agents.ts').AgentListing;
     assert.deepEqual(
       scribe.given.map((g) => [g.name, g.from, g.entry?.description ?? g.error]),
       [
@@ -238,7 +238,7 @@ test('an agent is listed with each skill it gives, where it is found and what it
         ['review', 'repo', 'Reviews a change.'],
       ],
     );
-    const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('../src/agents/agents.ts').AgentListing;
+    const lost = (await (await app.request('/api/agents/yours/lost')).json()) as import('./agents.ts').AgentListing;
     assert.equal(lost.given[0].preload, true);
     assert.equal(lost.given[0].cost!.perTurn, lost.given[0].cost!.listed + lost.given[0].cost!.body);
     assert.deepEqual([lost.given[1].from, lost.given[1].cost], [null, null]);
@@ -248,8 +248,8 @@ test('an agent is listed with each skill it gives, where it is found and what it
   }
 });
 
-type SkillDetail = import('../src/agents/skills.ts').SkillDetail;
-type SkillSaved = import('../src/agents/skills.ts').SkillSaved;
+type SkillDetail = import('./skills.ts').SkillDetail;
+type SkillSaved = import('./skills.ts').SkillSaved;
 
 const put = (url: string, body: unknown, headers: Record<string, string> = json) =>
   app.request(url, { method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });

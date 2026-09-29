@@ -58,8 +58,8 @@ import {
 } from '../record/record.store.ts';
 import { checkoutParts } from '../workspace/worktree.store.ts';
 import { gitSays, handOff, workspaceFor } from '../workspace/worktree.store.ts';
-import { collectArtifacts } from '../artifacts.ts';
-import { refsOf } from '../branches.ts';
+import { collectArtifacts } from '../artifacts/artifacts.store.ts';
+import { refsOf } from '../branches/branches.store.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,

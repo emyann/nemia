@@ -14,7 +14,7 @@ import { closeoutOf } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../start/start.verb.ts';
 import { skillsFor } from '../folder/folder.store.ts';
-import { renderedFlags, rendersAgent, unrendered } from '../rendering.ts';
+import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema — for a

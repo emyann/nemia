@@ -20,11 +20,11 @@ import {
   type Round,
   type RoundAsk,
   type SpendOf,
+  budgetWord,
 } from '../status/status.ts';
 import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
 import { refusalSection, type CheckRefusal, type Verdict } from '../check/check.ts';
 import type { Said } from '../say/say.ts';
-import { budgetWord } from '../radius.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
 import { neverApproved } from '../prune/prune.ts';

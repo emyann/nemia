@@ -1,8 +1,8 @@
 /**
- * The branch reader (`branchReader` in branches.ts): git's word on a run's result branches — on the base or not (`isShipped`), there or
- * gone, how far ahead — answered from one `for-each-ref` of a repository's branches, where `oneByOne` asks git a process for each
- * question. It must say what `oneByOne` says of every shape a branch can be in, whichever order the branches are asked in, and ask git
- * once for a repository where `oneByOne` asks it twice for each branch.
+ * The branch reader (`branchReader` in branches/branches.store.ts): git's word on a run's result branches — on the base or not
+ * (`isShipped`), there or gone, how far ahead — answered from one `for-each-ref` of a repository's branches, where `oneByOne` asks git a
+ * process for each question. It must say what `oneByOne` says of every shape a branch can be in, whichever order the branches are asked in,
+ * and ask git once for a repository where `oneByOne` asks it twice for each branch.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
-import { branchReader, branchStandings, headsOf, isShipped, oneByOne, type BranchReader } from '../src/branches.ts';
+import { branchReader, branchStandings, headsOf, isShipped, oneByOne, type BranchReader } from '../src/branches/branches.store.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import type { GitRun } from '../src/run.ts';
 

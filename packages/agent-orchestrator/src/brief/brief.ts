@@ -20,7 +20,7 @@ import {
 import { landsOnCheck, owesReplies } from '../status/status.ts';
 import { checkContract, landingContract } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
-import { briefBody } from '../rendering.ts';
+import { briefBody } from '../agents/agents.ts';
 import { inputsLine } from '../start/inputs.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
 

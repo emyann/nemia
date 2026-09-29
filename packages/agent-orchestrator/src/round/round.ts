@@ -34,11 +34,12 @@ import {
   type RoundAsk,
   type Spend,
   type SpendOf,
+  budgetWord,
+  dollars,
 } from '../status/status.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
-import { budgetWord, dollars } from '../radius.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision } from '../decide/decide.ts';
 

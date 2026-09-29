@@ -240,8 +240,8 @@ export function holdRefusal(
  * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `wf decide` never calls shipped, whatever git says of its
  * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. A
  * folder run is refused on either side, since it ships onto no branch: as the parent, and as this run, whatever the id names. Handed only
- * what the record and git say (`parentRecord` in branches.ts): nothing here needs the engine. The run itself cannot be named: it has no
- * id yet.
+ * what the record and git say (`parentRecord` in branches.store.ts): nothing here needs the engine. The run itself cannot be named: it has
+ * no id yet.
  */
 export function afterRefusal(
   after: readonly string[],

@@ -117,7 +117,7 @@ type RunBase = {
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in branches.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished.
+   * (`isShipped` in branches.store.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished.
    */
   tips?: Record<string, string>;
   /**

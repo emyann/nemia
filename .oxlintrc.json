@@ -491,7 +491,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/branches.ts"],
+      "files": ["packages/agent-orchestrator/src/branches/branches.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 113, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 28]
@@ -574,12 +574,6 @@
       "files": ["packages/agent-orchestrator/src/plan/plan.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 17]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/radius.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

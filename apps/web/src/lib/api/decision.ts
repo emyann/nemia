@@ -4,13 +4,16 @@ import { get } from './read.ts';
 import type { RunHolding, RunWaiting } from './judged.ts';
 import type { StepUsed } from './usage.ts';
 
-/** Mirrors `Change` in agent-orchestrator's radius.ts: a file a branch changed. A binary file has null counts, never 0. */
+/** Mirrors `Change` in agent-orchestrator's branches/branches.ts: a file a branch changed. A binary file has null counts, never 0. */
 export type Change = { path: string; from?: string; added: number | null; removed: number | null };
 
-/** Mirrors `Group` in agent-orchestrator's radius.ts: a workspace package, a top-level directory, or `(root)`. */
+/** Mirrors `Group` in agent-orchestrator's branches/branches.ts: a workspace package, a top-level directory, or `(root)`. */
 export type Group = { name: string; files: number; added: number; removed: number; binary: number };
 
-/** Mirrors `Radius` in agent-orchestrator's radius.ts: what a branch touched, and among it what an agent reads and what decides a check. */
+/**
+ * Mirrors `Radius` in agent-orchestrator's branches/branches.ts: what a branch touched, and among it what an agent reads and what decides
+ * a check.
+ */
 export type Radius = { changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[]; lessons: Change[] };
 
 /** Mirrors `Touched` in apps/api/src/decide/decision.ts: a branch, and its radius or why git could not read it. */

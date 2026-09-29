@@ -6,7 +6,7 @@
  * and a copy here would go stale the moment a task settles. Cancellation is the exception: "somebody called this off" is a fact about
  * no step's task, and the engine has never heard of the run, so `cancelledAt` lives on the run.
  */
-export { durationWord } from './radius.ts';
+export { durationWord } from './status/status.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
 export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */

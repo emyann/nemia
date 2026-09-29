@@ -58,6 +58,7 @@
     /* An edge by what it says (`edgeStroke`): its line, its arrow and its travelling dot. The running colour is the running step's. */
     --edge-to-come: var(--color-neutral-400);
     --edge-done: var(--color-neutral-500);
+    --edge-taken: var(--color-amber-500);
     --edge-running: var(--color-sky-500);
     --edge-loop: var(--color-violet-500);
   }
@@ -89,6 +90,7 @@
       --xy-edge-label-color: var(--color-neutral-300);
       --edge-to-come: var(--color-neutral-600);
       --edge-done: var(--color-neutral-400);
+      --edge-taken: var(--color-amber-400);
       --edge-running: var(--color-sky-400);
       --edge-loop: var(--color-violet-400);
     }

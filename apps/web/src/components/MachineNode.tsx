@@ -1,7 +1,8 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { ByAction, StateBox } from '../lib/machine';
 
-export type MachineFlowNode = Node<StateBox, 'state'>;
+/** A state's box, and whether it is lit: the state a task's path stands in (`DebugPanel`). */
+export type MachineFlowNode = Node<StateBox & { lit?: boolean }, 'state'>;
 
 /**
  * Edges listed by the action they take: each edge's event, with its guard, on a line of its own (`data-edge-line`), then the action
@@ -29,8 +30,8 @@ const kindOf = ({ initial, final }: StateBox) => (initial ? 'initial state' : fi
 
 /**
  * A state of a machine, in the box its layout gave it: its kind and its name, and under them the edges that come back to it. The first
- * state has a sky border and says it is the initial one; a final one has a double border and says so. Handles are hidden: nobody
- * draws an edge here.
+ * state has a sky border and says it is the initial one; a final one has a double border and says so. A lit one — where a task's path
+ * stands — is ringed and filled in amber, and says so as `data-lit`. Handles are hidden: nobody draws an edge here.
  */
 export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
   const edge = data.initial
@@ -43,7 +44,8 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
       data-state={data.id}
       data-initial={data.initial || undefined}
       data-final={data.final || undefined}
-      className={`size-full overflow-hidden rounded-md bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100 ${edge}`}
+      data-lit={data.lit || undefined}
+      className={`size-full overflow-hidden rounded-md text-neutral-900 shadow-sm dark:text-neutral-100 ${edge} ${data.lit ? 'bg-amber-50 ring-4 ring-amber-400 dark:bg-amber-950 dark:ring-amber-400' : 'bg-white dark:bg-neutral-900'}`}
     >
       <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
       <div className="px-2.5 pt-1.5">

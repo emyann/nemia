@@ -296,7 +296,7 @@ test("a hold takes a run out of the memo for as long as it holds: what it waits 
 test('an ask takes a run out, and the try it asks for is filed: a retry, and an approval at a gate', async () => {
   const [run] = started(1);
   touched.add(run.id);
-  const before = (await finish([run.id])).rested!;
+  const before = (await finish([run.id])).rested;
   assert.equal((await answered(run.id)).status, 'failed', 'its step signed blocked');
   await retry(h.e, run.id, 'work', { mode: 'fresh' });
   assert.equal(await rested(), before - 1, 'the ask read');

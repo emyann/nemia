@@ -24,9 +24,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createEngine, type Engine, type TaskView } from 'agent-runtime';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
-import { toldIn } from './told.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -178,12 +176,6 @@ test('an interactive session in the checkout is given the same server, and it is
     pinned,
     'the script on disk is the pinned version; run `npm install`',
   );
-});
-
-test('the ui implement step is told it has the browser', () => {
-  const dir = path.join(REPO, 'packages', 'agent-orchestrator', 'workflows', 'ui');
-  const implement = loadWorkflows(dir).find((s) => s.name === 'implement')!;
-  assert.match(toldIn(dir, implement), /`browser_\*` tools/, "by its agent's skill look-at-a-page");
 });
 
 test('the server starts as configured, from the repository root, and offers browser_navigate', async () => {

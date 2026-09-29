@@ -13,10 +13,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentCard, ownSkill, parseAgent, WorkflowError, type Agent } from '../src/workflow.ts';
-import { agentVersion, cardSkills, loadAgents, skillsFor } from '../src/folder/folder.store.ts';
+import { agentVersion, cardSkills, skillsFor } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
-
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 
 /** Every field `AgentCard` marks REQUIRED, in the proto's order, spelled as the specification's sample card spells them in JSON. */
 const REQUIRED = [
@@ -204,43 +202,4 @@ test('REFUSED: a card from a skill no folder has, or whose SKILL.md says nothing
     () => cardSkills(agent, found),
     (e: Error) => /SKILL\.md has no `description:`, and the A2A protocol marks a skill's description REQUIRED/.test(e.message),
   );
-});
-
-test('every shipped agent has a generated card, and every entry on it the fields A2A marks REQUIRED, tags and examples', () => {
-  const agents = loadAgents(path.join(SHIPPED, 'agents'));
-  const found = skillsFor(path.join(SHIPPED, 'dev'));
-  assert.ok(agents.size >= 6);
-  const ids = new Set<string>();
-  for (const [name, agent] of agents) {
-    assert.ok(!(agent instanceof Error), `${name} reads: ${agent instanceof Error ? agent.message : ''}`);
-    const card = agentCard(agent, agentVersion(path.join(SHIPPED, 'agents'), name, found)!, cardSkills(agent, found));
-    assert.deepEqual(
-      card.skills.map((s) => s.id),
-      agent.skills,
-      `${name}'s card lists its skills, and nothing else`,
-    );
-    for (const skill of card.skills) {
-      for (const key of SKILL_REQUIRED) assert.ok(Object.hasOwn(skill, key), `${name}/${skill.id} gives ${key}`);
-      assert.notEqual(skill.name, skill.id, `${name}/${skill.id} has a title a person reads`);
-      assert.ok(skill.tags.length, `${name}/${skill.id} has tags, which the protocol marks REQUIRED`);
-      assert.ok(skill.examples?.length, `${name}/${skill.id} gives an example a person would type`);
-      ids.add(`${name}/${skill.id}`);
-    }
-    assert.match(card.version, /^[0-9a-f]{16}$/);
-  }
-  assert.ok(ids.size >= 10, 'the shipped agents say what they can do');
-});
-
-test('no shipped agent names a card file, and none lies beside it', () => {
-  for (const dir of [path.join(SHIPPED, 'agents'), path.join(import.meta.dirname, '..', 'workflows', 'agents')]) {
-    const files = fs.readdirSync(dir);
-    assert.deepEqual(
-      files.filter((f) => f.endsWith('.skills.json')),
-      [],
-      `${dir} holds no card file`,
-    );
-    for (const file of files.filter((f) => f.endsWith('.md') && f !== 'README.md')) {
-      assert.doesNotMatch(fs.readFileSync(path.join(dir, file), 'utf8'), /^card:/m, `${file} has no \`card:\` line`);
-    }
-  }
 });

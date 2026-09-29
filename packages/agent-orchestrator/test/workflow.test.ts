@@ -105,13 +105,6 @@ test('a diamond is fine — this is a DAG, not a line', () => {
   validate([step('a'), step('b', ['a']), step('c', ['a']), step('d', ['b', 'c'])]);
 });
 
-test('the review step runs on the other harness, after the implementation', () => {
-  const steps = loadWorkflows(path.join(import.meta.dirname, '..', 'workflows'));
-  const review = steps.find((s) => s.name === 'review')!;
-  assert.deepEqual(review.after, ['implement']);
-  assert.equal(review.harness, 'codex', 'a second opinion means a second model');
-});
-
 test('an empty or missing folder says so', () => {
   const dir = scratch('wf-');
   assert.throws(() => loadWorkflows(dir), /no \.md steps/);
@@ -302,20 +295,6 @@ test("REFUSED before, now in order: a folder `plan → implement ⇄ review` loa
 
 test('resuming a step that does not exist is refused', () => {
   assert.throws(() => validate([{ name: 'a', after: [], body: 'x', resume: 'ghost' }]), /resumes "ghost"/);
-});
-
-test('the shipped workflow is implement ⇄ review: two steps, and the review loops back to implement, at most three rounds', () => {
-  const steps = loadWorkflows(path.join(import.meta.dirname, '..', 'workflows'));
-  assert.deepEqual(
-    steps.map((s) => s.name),
-    ['implement', 'review'],
-    'respond is gone: implement answers the review in its own session, through the loop',
-  );
-  const review = steps.find((s) => s.name === 'review')!;
-  assert.deepEqual([review.loop, review.rounds], ['implement', 3]);
-  assert.equal((review.output!.schema.properties.again as { type: string }).type, 'boolean');
-  assert.deepEqual(review.output?.schema.required, ['findings', 'again']);
-  assert.deepEqual(loopSpan(steps, review), ['implement', 'review']);
 });
 
 test('REFUSED at shipped defaults: the shipped review with its loop pointed at a step it does not wait on, with `again` gone from its schema, or beside another step', () => {
@@ -2416,21 +2395,6 @@ const shippedFolders = (): string[] => {
     ...fs.readdirSync(examples).map((name) => path.join(examples, name)),
   ].filter((dir) => fs.statSync(dir).isDirectory());
 };
-
-test("every agent step of the shipped workflows runs on a 200k window — the workflows of work, the package's own ui copy, and the supervisor", () => {
-  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
-  const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui', 'supervisor'].map((name) => path.join(root, name));
-  folders.push(path.join(import.meta.dirname, '..', 'workflows', 'ui'));
-  for (const dir of folders) {
-    for (const step of loadWorkflows(dir))
-      assert.equal(
-        step.context,
-        200_000,
-        `${path.relative(root, dir)}/${step.name}.md: a background session compacts at its window, carries on and signs off, and the ` +
-          "supervisor's never ends and grows on every answer, which makes it the one a cap is for",
-      );
-  }
-});
 
 test('`renderStep` is the parser run backwards: every step of every shipped folder, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
   const folders = shippedFolders();

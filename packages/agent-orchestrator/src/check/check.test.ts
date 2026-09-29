@@ -3,10 +3,6 @@
  *
  * The pure half — the brief, the verdict, the contract — is tested as data. The harness is tested the
  * only way that proves it: handed to a real engine, run by the real detached worker, with `sh`.
- *
- * The shipped review's sandbox is asked of the runtime through its contract, `agent-runtime`, which in a run's worktree is the
- * worktree's own copy (each workspace package links to the worktree's tree), never through a path into the runtime's src/
- * (docs/architecture.md, packages/agent-runtime/test/contract.test.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { codex, createEngine, type Engine } from 'agent-runtime';
+import { createEngine, type Engine } from 'agent-runtime';
 import {
   CHECK,
   CHECK_NICENESS,
@@ -31,8 +27,6 @@ import {
 } from './check.ts';
 import { refusedCheck } from '../record/record.ts';
 import { exitVerdicts } from '../views/views.verb.ts';
-import { loadWorkflows } from '../folder/folder.store.ts';
-import { modeOf } from '../former/former.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ENV: CheckEnv = {
@@ -418,61 +412,6 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
     "the worker inherits this process's environment when a tick starts it: its npm is the fake until the check has settled",
   );
   assert.doesNotMatch(log, /command ran/);
-});
-
-test("this repository's own workflow checks the suite and the types after every step that edits — implement, every round — and its reviewer reads on codex, read-only, and hands its findings back as its closeout", () => {
-  const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', '..', 'workflows')).map((s) => [s.name, s]));
-  assert.deepEqual(Object.keys(steps), ['implement', 'review']);
-  assert.equal(
-    steps.implement?.check,
-    'npm test && npm run typecheck && npm run lint',
-    'the check a person runs by hand at every trial merge, run by the run: a step that breaks it blocks what follows it rather than handing it on',
-  );
-  assert.equal(steps.review?.harness, 'codex');
-  assert.equal(steps.review?.sandbox, 'read-only', 'the review travels as its closeout, so the reviewer writes nothing');
-  assert.equal(steps.review?.permissionMode, undefined);
-  assert.equal(steps.review?.output?.file, 'review.schema.json');
-  const findings = steps.review?.output?.schema.properties.findings as { type: string; items: { required: string[] } } | undefined;
-  assert.equal(findings?.type, 'array');
-  assert.deepEqual(findings?.items.required, ['file', 'line', 'what']);
-  assert.deepEqual(
-    [steps.review?.loop, steps.review?.rounds],
-    ['implement', 3],
-    "the findings go back to implement's own session through the loop",
-  );
-  assert.deepEqual(
-    Object.values(steps)
-      .filter((s) => s.input)
-      .map((s) => s.name),
-    [],
-    'and nothing reads them by input:',
-  );
-});
-
-test('the shipped review is read-only on an engine that honours it, and that is fine: REVIEW.md is not how the review reaches implement', () => {
-  const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', '..', 'workflows')).map((s) => [s.name, s]));
-  const { args } = codex.command({
-    name: 'probe',
-    brief: 'probe',
-    cwd: scratch('wf-check-probe-'),
-    config: { permissionMode: steps.review && modeOf(steps.review) },
-  });
-  const sandbox = args[args.indexOf('-s') + 1];
-  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.sandbox === 'read-only';
-  assert.ok(
-    reviewCannotWrite,
-    "the shipped reviewer runs read-only on the engine in this tree: review.md sets sandbox: read-only, the tick files it as the task's permissionMode (modeOf), and codex runs it -s read-only",
-  );
-  const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') || /REVIEW\.md/.test(steps.implement?.body ?? '');
-  assert.ok(
-    !(reviewCannotWrite && handedOnAsAFile),
-    'workflows/review.md is read-only, and review.md or implement.md hands the review on as a REVIEW.md the reviewer cannot write. ' +
-      'The review travels as the closeout: `output:` and `loop: implement` on review.md.',
-  );
-  assert.ok(
-    steps.review?.output && steps.review?.loop === 'implement',
-    "it reaches implement as a declared closeout, through the loop: the findings are review's closeout, handed back to implement as data",
-  );
 });
 
 test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {

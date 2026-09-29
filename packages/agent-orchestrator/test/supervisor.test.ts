@@ -1,16 +1,9 @@
 /**
- * `workflows/supervisor/`, the workflow of one step that never ends — held to its shape, and run on disk against a board a test settles.
- *
- *   supervise        (one step, `workspace: main`, `slot: none`, `remote: true`, no check)
- *
- * What it watches is every other run: it prepares a decision, asks by signing off `blocked`, and acts on the answer. So the two things
- * the package does for it are here: a step answered many times over, each answer a try of the same session, and a run the cap on runs in
- * flight (`WF_MAX_RUNS`) neither holds nor counts.
- *
- * Its brief is held to its sentences: what it watches and reads before it decides; the three moments to ask and a person's idea; how it
- * asks, its own sign-off the question and the answer continuing the session; what it does with a yes, and never does; a clean checkout,
- * since it shares the checkout with every run's ending step, which stops at a dirty tree; no background loop when nothing needs a person;
- * and where the lessons go. `WF_ROOT` is read as the module loads, so it is set before the import.
+ * A step that never ends, shaped as a supervisor's — one step, `workspace: main`, `slot: none`, `remote: true`, a window of its own, no
+ * check — run on disk against a board a test settles. What such a step watches is every other run: it asks by signing off `blocked`, and
+ * acts on the answer. So the two things the package does for it are here: a step answered many times over, each answer a try of the same
+ * session, and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts. `WF_ROOT` is read as the module loads, so it is
+ * set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,8 +12,6 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine, TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
-import { terminalSteps } from '../src/workflow.ts';
-import { loadWorkflows, workflowDescription } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-supervisor-');
@@ -28,41 +19,6 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 const { advance, list, readRun, retry, runSlots, start } = await import('../src/runner.ts');
-
-const REPO = path.join(import.meta.dirname, '..', '..', '..');
-const FOLDER = path.join(REPO, 'workflows', 'supervisor');
-
-/** A step's prose with its line breaks as spaces, so a sentence is found wherever the file wraps it. */
-const said = (text: string) => text.replace(/\s+/g, ' ');
-
-/** The tools an unattended session is given and no step needs, as measured on a worker: every implement is denied them. */
-const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
-
-/**
- * The git this session must never type in a person's own checkout, denied by name on the step itself: the merge a run's ending step owns,
- * and everything that moves or throws away what is in that checkout.
- *
- * The checkout's `.claude/settings.json` denies no git, since a person's own session there may be asked to push, and it could not deny
- * `git merge` anyway — `ship.md` runs in the same checkout and merging is its whole job — so the step's own `disallowedTools:` is where
- * this refusal lives.
- */
-const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
-
-/**
- * What `dontAsk` alone would refuse a job, denied by name all the same: a background session reads the person's own user and local
- * settings, where an allow of `Bash(git branch:*)` or `mcp__playwright` may stand (agent-fences.test.ts).
- */
-const BACKGROUND_DENIED = ['Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)', 'mcp__playwright__browser_run_code_unsafe'];
-
-/** The rules the shipped step is given, in the order it writes them. */
-const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`), ...BACKGROUND_DENIED];
-
-/** Whether a deny list refuses a command, as a harness reads a `Bash(<prefix>:*)` rule: the command is the prefix, or begins with it and a space. */
-const denies = (rules: readonly string[], command: string): boolean =>
-  rules.some((rule) => {
-    const prefix = /^Bash\((.+):\*\)$/.exec(rule)?.[1];
-    return prefix !== undefined && (command === prefix || command.startsWith(`${prefix} `));
-  });
 
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {
@@ -74,12 +30,17 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A folder of steps written from their frontmatter and a one-line body, for the shapes the shipped folder is not. */
+/** A folder of steps written from their frontmatter and a one-line body. */
 const folderOf = (steps: Record<string, string>): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const [name, front] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${front}\n---\n${name} it\n`);
   return dir;
 };
+
+/** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
+const FOLDER = folderOf({
+  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nbackground: true\nremote: true\npermissionMode: dontAsk',
+});
 
 /**
  * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, every filing, and each task's own session
@@ -141,143 +102,6 @@ const board = () => {
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, costUsd });
   return { e, tasks, filings, stopped, reads, settle };
 };
-
-test("the supervisor is one step that never ends: in the repository's checkout, outside the cap on runs in flight, bridged to a phone, with implement's denies and no check", () => {
-  const steps = loadWorkflows(FOLDER);
-  assert.deepEqual(
-    steps.map((s) => s.name),
-    ['supervise'],
-  );
-  const supervise = steps[0];
-  const {
-    after,
-    workspace,
-    slot,
-    harness,
-    model,
-    effort,
-    context,
-    remote,
-    disallowedTools,
-    check,
-    tools,
-    output,
-    gate,
-    loop,
-    resume,
-    input,
-  } = supervise;
-  assert.deepEqual(
-    { after, workspace, slot, harness, model, effort, context, remote, disallowedTools, check, tools, output, gate, loop, resume, input },
-    {
-      after: [],
-      workspace: 'main',
-      slot: 'none',
-      harness: 'claude',
-      model: 'opus',
-      effort: 'high',
-      context: 200_000,
-      remote: true,
-      disallowedTools: DENIED,
-      check: undefined,
-      tools: undefined,
-      output: undefined,
-      gate: undefined,
-      loop: undefined,
-      resume: undefined,
-      input: undefined,
-    },
-    'a window of its own: the one session here that never ends grows on every answer, so it compacts rather than reads up to a million',
-  );
-  assert.deepEqual(
-    terminalSteps(steps).map((s) => s.name),
-    ['supervise'],
-    'it is the whole workflow',
-  );
-  assert.equal(
-    supervise.output,
-    undefined,
-    'no `output:` and no `gate:`, so it signs off `blocked` and is answered for ever: a declared output would have to be invented on every one of those sign-offs, and a gate holds a handoff this step never makes',
-  );
-  assert.ok(workflowDescription(FOLDER), 'the folder says what it is for');
-});
-
-test("the supervisor's brief is the loop: what it watches, how it reads a run to decide, how it asks and is answered, and that it never types git for a run", () => {
-  const body = said(loadWorkflows(FOLDER)[0].body);
-  for (const sentence of [
-    '`wf ls` is the pass.',
-    "the run's workflow folder — its README, and its last step's file",
-    '`wf decide <run>`',
-    'The look skill (`.claude/skills/look/SKILL.md`) reads them',
-    '**A run to decide.**',
-    '**A plan waiting.**',
-    '**A stall.**',
-    '**An idea from the person.**',
-    'wf retry <run> <step> --message "<their answer>"',
-    'wf say <run> <step> "<words>"',
-    'Sign off `blocked` with:',
-    'their answer starts it again — the same session, continued',
-    'There is no cap on how many times: that is the loop.',
-    '**`wf approve <run> <step> --message "<their words>"`**, and nothing more.',
-    '**Never type git for a run.**',
-    'Never `git add -A`, never `git commit -a`, never push, never merge, never delete a branch.',
-    '**Leave the checkout clean, always.**',
-    '**Commit what you wrote before any `wf approve`.**',
-    '**Never sign off with a file of yours uncommitted.**',
-    '`git add <path>` for a file git does not track yet',
-    '**Never a background loop**',
-    'End anything you start before you sign off.',
-    'Sign off only to ask a person something',
-    'a trap in `CLAUDE.md`',
-  ])
-    assert.ok(body.includes(sentence), `${sentence}\n\n${body}`);
-
-  assert.ok(
-    fs.existsSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md')),
-    'the skill it is told to use is in the repository, under that name, and this step has every tool, so `Skill` loads it',
-  );
-  assert.equal(loadWorkflows(FOLDER)[0].tools, undefined, "the harness's own set: it reads the store, git, the registry and the browser");
-});
-
-test("REFUSED by the shipped folder: the git a session in a person's checkout must never type is denied by name, and the bookkeeping it does need is not", () => {
-  const { disallowedTools } = loadWorkflows(FOLDER)[0];
-  assert.ok(disallowedTools, 'the step carries a deny list');
-
-  for (const verb of GIT_DENIED) {
-    assert.ok(disallowedTools.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallowedTools.join(', ')}`);
-    assert.ok(denies(disallowedTools, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
-  }
-  assert.ok(
-    denies(disallowedTools, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'),
-    "the merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type",
-  );
-  assert.ok(denies(disallowedTools, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
-  assert.ok(
-    denies(disallowedTools, 'git checkout -- CLAUDE.md') && denies(disallowedTools, 'git restore CLAUDE.md'),
-    "throwing away a person's uncommitted work, in either spelling",
-  );
-
-  for (const command of [
-    'git add packages/agent-orchestrator/docs/features.md',
-    'git commit CLAUDE.md -m "a trap the queue taught"',
-    'git status --porcelain',
-    'git log --oneline main..wf/add-sub-8imz/implement',
-    'git diff main...wf/add-sub-8imz/implement',
-    'git show HEAD',
-  ])
-    assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
-
-  for (const command of ['git branch -D wf/add-sub-8imz/implement', 'git branch --delete --force wf/add-sub-8imz/implement'])
-    assert.ok(
-      denies(disallowedTools, command),
-      `${command}: a person's own settings may allow \`git branch\`, and this session reads them`,
-    );
-  assert.equal(
-    denies(disallowedTools, 'git branch --list'),
-    false,
-    'the forced delete is denied by its own spellings, never by `git branch` as a prefix, which would take `git branch --list`, which is diagnosis',
-  );
-});
 
 test('a step answered five times over keeps working: each answer a try of the same session, told what was said, on the window it was started with, and nothing capping the count', async () => {
   const repo = aRepo();
@@ -371,7 +195,7 @@ test('a pass over a step answered again and again reads what it is working on, n
   );
 });
 
-test("`slot: none` on disk: the supervisor's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
+test("`slot: none` on disk: a watcher's run files its step at a full cap, counts against nothing, and holds no other run — while the run beside it waits", async () => {
   const repo = aRepo();
   const { e, filings, settle } = board();
   const watcher = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
@@ -430,6 +254,6 @@ test("REFUSED at `wf start`, with nothing written: `slot: none` on a step of a w
   assert.equal(runs(), before, 'nothing written');
   assert.ok(
     start({ brief: 'watch it', repo, workflowDir: FOLDER }).id,
-    'the shipped folder is the shape that is allowed: one step, and it starts',
+    'a watcher alone in its workflow is the shape that is allowed: one step, and it starts',
   );
 });

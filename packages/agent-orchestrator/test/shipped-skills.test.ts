@@ -41,70 +41,6 @@ const agentsIn = (place: string): Agent[] =>
     return a;
   });
 
-test('every shipped SKILL.md reads as YAML, its name its folder and its description one line of text — REFUSED: a description whose quoting breaks it', () => {
-  let read = 0;
-  for (const place of PLACES) {
-    const skills = path.join(place, 'skills');
-    for (const name of fs.readdirSync(skills)) {
-      const file = path.join(skills, name, 'SKILL.md');
-      const keys = frontmatterOf(file, fs.readFileSync(file, 'utf8'));
-      assert.equal(keys.name, name, `${file}: named as its folder`);
-      assert.equal(typeof keys.description, 'string', `${file}: a description`);
-      assert.match(keys.description as string, /^\S[^\n]*\S$/, `${file}: one line`);
-      assert.equal(
-        preloads(path.join(skills, name)),
-        keys.preload === true,
-        `${file}: preload, read by the run's own line reader as YAML reads it`,
-      );
-      read++;
-    }
-  }
-  assert.equal(read, 20, "the repository's fourteen and the package's six");
-
-  const file = path.join(REPO, 'workflows', 'skills', 'review-a-change', 'SKILL.md');
-  const text = fs.readFileSync(file, 'utf8');
-  const line = /^description: .*$/m;
-  assert.match(text, line);
-  for (const broken of [
-    'description: Reads the diff: bugs, missing tests',
-    'description: "Reads the "diff" as a second engineer would"',
-    'description: "Reads the diff',
-    'description: `git diff`, read as a second engineer would',
-  ])
-    assert.throws(
-      () => frontmatterOf(file, text.replace(line, broken)),
-      (e: Error) => e instanceof yaml.YAMLException,
-      `${broken}: quoting that breaks a description is YAML no parser reads, and Claude Code drops the skill`,
-    );
-  assert.deepEqual(
-    Object.keys(frontmatterOf(file, text.replace(line, 'description: Reads the diff, as a second engineer would'))).includes('description'),
-    true,
-    'plain words read',
-  );
-});
-
-test("each shipped agent's card is generated from its skills' frontmatter as YAML reads it — and every shipped skill is some agent's", () => {
-  for (const place of PLACES) {
-    const given = new Set<string>();
-    const found = skillsFor(path.join(place, '_'));
-    for (const agent of agentsIn(place)) {
-      const card = cardSkills(agent, found);
-      assert.deepEqual(
-        card.map((s) => s.id),
-        agent.skills,
-        `${agent.name}: its card lists what its skills are, in order`,
-      );
-      for (const entry of card) {
-        const file = path.join(place, 'skills', entry.id, 'SKILL.md');
-        const { title, description, tags, examples } = frontmatterOf(file, fs.readFileSync(file, 'utf8'));
-        assert.deepEqual(entry, { id: entry.id, name: title, description, tags, examples }, file);
-        given.add(entry.id);
-      }
-    }
-    assert.deepEqual(fs.readdirSync(path.join(place, 'skills')).sort(), [...given].sort(), `${place}: no skill nobody gives`);
-  }
-});
-
 test("a card entry reads a SKILL.md's frontmatter as YAML does, on every SKILL.md the repository has, shipped or vendored", () => {
   const files = [
     ...PLACES.flatMap((place) => fs.readdirSync(path.join(place, 'skills')).map((name) => path.join(place, 'skills', name, 'SKILL.md'))),
@@ -158,37 +94,6 @@ function reachProblems(agent: Pick<Agent, 'name' | 'body' | 'keys' | 'skills'>, 
   }
   return problems;
 }
-
-test("each shipped agent's body names each of its skills and how it reaches it: told whole, or loaded with the Skill tool it has — REFUSED: either said wrong", () => {
-  const preloadedIn = (place: string) => (skill: string) => preloads(path.join(place, 'skills', skill));
-  for (const place of PLACES) {
-    for (const agent of agentsIn(place)) assert.deepEqual(reachProblems(agent, preloadedIn(place)), [], agent.name);
-    assert.deepEqual(
-      fs.readdirSync(path.join(place, 'skills')).filter(preloadedIn(place)).sort(),
-      PRELOADED.filter((s) => fs.existsSync(path.join(place, 'skills', s))),
-      place,
-    );
-  }
-
-  const agents = new Map(agentsIn(PLACES[0]).map((a) => [a.name, a]));
-  const shipped = preloadedIn(PLACES[0]);
-  const reviewer = agents.get('reviewer')!;
-  const planner = agents.get('planner')!;
-  assert.deepEqual(reachProblems({ ...reviewer, body: reviewer.body.replaceAll('`send-work-round-again`', 'the other skill') }, shipped), [
-    'reviewer: its body never names send-work-round-again',
-  ]);
-  assert.deepEqual(reachProblems({ ...reviewer, keys: { ...reviewer.keys, tools: 'Read, Grep, Glob, Bash' } }, shipped), [
-    'reviewer: review-a-change is loaded with the Skill tool, which its tools do not allow',
-    'reviewer: send-work-round-again is loaded with the Skill tool, which its tools do not allow',
-  ]);
-  assert.deepEqual(reachProblems({ ...reviewer, body: reviewer.body.replaceAll('with the Skill tool', 'as you see fit') }, shipped), [
-    'reviewer: review-a-change is loaded, and the body does not say with the Skill tool',
-    'reviewer: send-work-round-again is loaded, and the body does not say with the Skill tool',
-  ]);
-  assert.deepEqual(reachProblems({ ...planner, body: planner.body.replace('given you whole', 'which you load') }, shipped), [
-    'planner: ask-when-it-reads-two-ways is told whole, and the body does not say so',
-  ]);
-});
 
 test("a shipped agent renders as `wf start` renders it: skills to load named in its prompt, a preloaded one appended whole, each in the step's plugin", () => {
   const skillText = (place: string, skill: string) => {

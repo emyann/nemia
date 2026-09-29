@@ -32,9 +32,7 @@ const FORMER = ['engine', 'workflows'].map((name) => `agent-${name}`);
 const NAME = new RegExp(`(?<![.\\w])(?:${FORMER.join('|')})(?!\\w)`, 'g');
 
 /**
- * Dated history, by path from the repository's root: a file, a folder (`/` at its end), or a file pattern (`*`). The fixture
- * `resolved-before.json` is never regenerated: what the loader read every shipped folder as before agents, keys and all
- * (agents-before-after.test.ts).
+ * Dated history, by path from the repository's root: a file, a folder (`/` at its end), or a file pattern (`*`).
  */
 const HISTORY = [
   'docs/design-2026-*.md',
@@ -46,7 +44,6 @@ const HISTORY = [
   'docs/pivot-2026-09-18/',
   'docs/plan-hold-the-bar.md',
   'docs/night-*.md',
-  'packages/agent-orchestrator/test/fixtures/resolved-before.json',
   'packages/agent-runtime/docs/hkb-migration.md',
 ];
 
@@ -192,7 +189,7 @@ test('REFUSED: history with no note, a note too far down, and a note that is not
   assert.equal(unnoted('# A plan\n\nnothing old here'), undefined, 'and history that names no former package needs none');
   assert.equal(asksForNote('docs/night-2026-09-22.md'), true);
   assert.equal(asksForNote('docs/pivot-2026-09-18/experiments/README.md'), true);
-  assert.equal(asksForNote('packages/agent-orchestrator/test/fixtures/resolved-before.json'), false);
+  assert.equal(asksForNote('docs/pivot-2026-09-18/experiments/cost/tx.py'), false, 'history that is not markdown carries no note');
   assert.equal(asksForNote('docs/plan-multi-repo.md'), false, 'a live file is held to no former name at all, not to a note');
 });
 
@@ -235,7 +232,6 @@ test('a store path, a new name and a marked line pass; a word that only contains
 test('REFUSED: a file beside history is live, and history is matched whole', () => {
   assert.equal(inHistory('docs/night-2026-09-22.md'), true);
   assert.equal(inHistory('docs/pivot-2026-09-18/experiments/cost/tx.py'), true);
-  assert.equal(inHistory('packages/agent-orchestrator/test/fixtures/resolved-before.json'), true);
   assert.equal(inHistory('docs/design-2026-09-25-agents-and-skills.md'), true);
   assert.equal(inHistory('docs/spike-2026-09-25-agents-skills.md'), true);
   assert.equal(inHistory('docs/eval-2026-09-25-composable-workflows/brief.md'), true);

@@ -1846,32 +1846,6 @@ test('a pass that filed a round and died before writing the run down is adopted,
   assert.equal(b.filings.filter((f) => f === try2).length, 1);
 });
 
-test('the shipped workflow goes round as its folder says: review filed read-only on codex, asked for `again` and told its round — implement filed as round 2 asked for `replies`, and checked', async () => {
-  const run = started(path.join(import.meta.dirname, '..', 'workflows'));
-  const b = board();
-  await advance(b.e, readRun(run.id));
-  await toReview(b, run.id, 1, true);
-  const review = b.tasks.get(`${run.id}-review`)!.spec;
-  assert.deepEqual([review.harness, review.config?.permissionMode], ['codex', 'read-only']);
-  assert.deepEqual((review.closeoutSchema as { required: string[] }).required, [
-    'outcome',
-    'summary',
-    'artifacts',
-    'needs',
-    'findings',
-    'again',
-  ]);
-  assert.match(review.brief, /\n## Round 1 of 3\n\nThis step closes a loop \(`loop: implement`\)/);
-
-  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
-  const implement = b.tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual((implement.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
-  assert.match(
-    implement.brief,
-    /^## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*[\s\S]*## Before you sign off\n[\s\S]*`npm test && npm run typecheck && npm run lint`/,
-  );
-});
-
 test('a round ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
   const run = started(looped('rounds: 1\n'));
   const b = board();

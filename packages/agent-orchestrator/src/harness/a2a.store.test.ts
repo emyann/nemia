@@ -110,7 +110,18 @@ test("an entry the runtime would refuse is left out of remoteAgents() and said b
     assert.ok(refused.startsWith(`${FILE}: \`reviewer\`: `), refused);
     assert.match(refused, /the `a2a:reviewer` harness/);
     declare({ reviewer: { card: { name: 'no interfaces' } } });
-    assert.match(readRemote().refused.get('reviewer')!, /`reviewer`: .*lists no interface to reach the agent by/);
+    assert.match(
+      readRemote().refused.get('reviewer')!,
+      /`reviewer`: .*`card` is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces` is missing/,
+    );
+    declare({
+      reviewer: { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
+      critic: { url: 'https://a.example/critic' },
+    });
+    const wrong = readRemote().refused.get('reviewer')!;
+    assert.ok(wrong.startsWith(`${FILE}: \`reviewer\`: `), wrong);
+    assert.match(wrong, /its `supportedInterfaces\.0\.url` is 3, where an A2A 1\.0 card holds string/);
+    assert.deepEqual([...remoteAgents().keys()], ['critic'], 'a card that does not decode is left out');
     declare({ reviewer: { url: 'https://a.example/reviewer' } });
     assert.deepEqual([...remoteAgents().keys()], ['reviewer']);
     assert.equal(readRemote().refused.size, 0);

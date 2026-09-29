@@ -3,5 +3,6 @@
  */
 export { a2aOps, a2aRunner } from './client.ts';
 export type { SeamOps } from './client.ts';
-export { remoteConfigRefusal, remoteOps, remoteRefuses } from './remote.ts';
+export { remoteConfigRefusal } from './card.ts';
+export { remoteOps, remoteRefuses } from './remote.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './remote.ts';

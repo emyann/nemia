@@ -801,10 +801,9 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 619, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 418, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 24]
+        "max-lines": ["error", { "max": 593, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 411, "skipBlankLines": true, "skipComments": true }],
+        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

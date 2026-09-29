@@ -71,6 +71,137 @@ const isDirectory = (p: string) => {
 };
 
 /**
+ * One frontmatter line, its comment cut: its key and its value, trimmed. Refuses a line that is not `key: value`, then a
+ * retired key, then a key not in `BRIEF_KEYS`.
+ */
+const metaEntry = (line: string): [BriefKey, string] => {
+  const i = line.indexOf(':');
+  if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
+  const key = line.slice(0, i).trim();
+  if (isRetiredBriefKey(key)) throw refuse(retiredKeyRefusal(key));
+  if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
+  return [key, line.slice(i + 1).trim()];
+};
+
+/**
+ * A brief's frontmatter, each key to its value, and its prompt. Refuses, in this order: frontmatter never closed, a line
+ * `metaEntry` refuses, a key given twice, a key with no value, and a brief with no prompt.
+ */
+const briefParts = (text: string): { meta: Map<BriefKey, string>; brief: string } => {
+  const source = text.replace(/\r\n/g, '\n');
+  const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
+  if (!m && source.startsWith('---\n'))
+    throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
+
+  const meta = new Map<BriefKey, string>();
+  for (const raw of m?.[1]?.split('\n') ?? []) {
+    const line = raw.replace(/(^|\s)#.*$/, '').trim();
+    if (!line) continue;
+    const [key, value] = metaEntry(line);
+    if (meta.has(key)) throw refuse(`\`${key}\` is given twice. Keep one.`);
+    if (!value) throw refuse(`\`${key}:\` has no value. Give it one, or delete the line.`);
+    meta.set(key, value);
+  }
+
+  const brief = (m ? source.slice(m[0].length) : source).trim();
+  if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
+  return { meta, brief };
+};
+
+/** A `deadlineSeconds` value as its seconds, or `undefined` when there is none. Refuses one that is not a number above 0. */
+const secondsOf = (deadlineSeconds: string | undefined): number | undefined => {
+  if (deadlineSeconds === undefined) return undefined;
+  if (!(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
+    throw refuse(
+      `\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`,
+    );
+  }
+  return Number(deadlineSeconds);
+};
+
+/** A `budgetUsd` value as its dollars, or `undefined` when there is none. Refuses one that is not digits and a point, above 0. */
+const dollarsOf = (budgetUsd: string | undefined): number | undefined => {
+  if (budgetUsd === undefined) return undefined;
+  if (!(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
+    throw refuse(
+      `\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`,
+    );
+  }
+  return Number(budgetUsd);
+};
+
+/**
+ * A `contextTokens` value as its tokens, or `undefined` when there is none. Refuses one that is not a whole number in
+ * digits, and writes `200k` or `1M` back as its digits in the refusal.
+ */
+const tokensOf = (contextTokens: string | undefined): number | undefined => {
+  if (contextTokens === undefined) return undefined;
+  if (/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens))) return Number(contextTokens);
+  const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
+  throw refuse(
+    `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2].toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
+  );
+};
+
+/**
+ * A `true` or `false` value of `key` as a boolean, or `undefined` when there is none. Refuses anything else, saying what
+ * `key: true` does in `use`.
+ */
+const trueOrFalse = (key: 'background' | 'queued' | 'holdOpen', value: string | undefined, use: string): boolean | undefined => {
+  if (value === undefined) return undefined;
+  if (value !== 'true' && value !== 'false') throw refuse(`\`${key}: ${value}\` is not true or false. Write \`${key}: true\` ${use}.`);
+  return value === 'true';
+};
+
+/** A `cwd` value as the directory it resolves to, or `undefined` when there is none. Refuses one that is not a directory. */
+const directoryOf = (cwd: string | undefined): string | undefined => {
+  if (cwd === undefined) return undefined;
+  if (!isDirectory(path.resolve(cwd))) {
+    throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
+  }
+  return path.resolve(cwd);
+};
+
+/**
+ * The JSON Schema a `closeoutSchema` value names, or `undefined` when there is none. Refuses a file that cannot be read, is
+ * not JSON, or is not a JSON object.
+ */
+const schemaAt = (schemaPath: string | undefined): object | undefined => {
+  if (schemaPath === undefined) return undefined;
+  let schemaText: string;
+  try {
+    schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8');
+  } catch (e) {
+    throw refuse(
+      `\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`,
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(schemaText);
+  } catch (e) {
+    throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`);
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw refuse(`\`closeoutSchema: ${schemaPath}\` is not a JSON Schema: a schema is a JSON object.`);
+  }
+  return parsed;
+};
+
+/** A `tools` value as its names, trimmed, or `undefined` when there is none. Refuses a list with an empty name in it. */
+const toolsOf = (tools: string | undefined): string[] | undefined => {
+  const toolList = tools?.split(',').map((t) => t.trim());
+  if (toolList?.some((t) => !t)) {
+    throw refuse(`\`tools: ${tools}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`);
+  }
+  return toolList;
+};
+
+/** A `worktree` value as the harness takes it: `true` to let it name one, a name, or `undefined` for none, which `false` also is. */
+const worktreeOf = (worktree: string | undefined): true | string | undefined =>
+  worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree;
+
+/**
  * A brief is a markdown file: optional `key: value` frontmatter, body is the prompt.
  *
  * It refuses rather than guesses: a key not in `BRIEF_KEYS`, a key given twice, a line that is not
@@ -96,126 +227,50 @@ const isDirectory = (p: string) => {
  * The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
  */
 export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
-  const source = text.replace(/\r\n/g, '\n');
-  const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
-  if (!m && source.startsWith('---\n'))
-    throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
+  const { meta, brief } = briefParts(text);
+  const deadlineSeconds = secondsOf(meta.get('deadlineSeconds'));
+  const budgetUsd = dollarsOf(meta.get('budgetUsd'));
+  const contextTokens = tokensOf(meta.get('contextTokens'));
+  const background = trueOrFalse(
+    'background',
+    meta.get('background'),
+    'to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job',
+  );
+  const queued = trueOrFalse(
+    'queued',
+    meta.get('queued'),
+    'to have the task wait for `ae admit <id>` before it starts, or leave it out to start it on the next tick',
+  );
+  const holdOpen = trueOrFalse(
+    'holdOpen',
+    meta.get('holdOpen'),
+    'to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then',
+  );
+  const cwd = directoryOf(meta.get('cwd'));
+  const closeoutSchema = schemaAt(meta.get('closeoutSchema'));
+  const tools = toolsOf(meta.get('tools'));
 
-  const meta = new Map<BriefKey, string>();
-  for (const raw of m?.[1]?.split('\n') ?? []) {
-    const line = raw.replace(/(^|\s)#.*$/, '').trim();
-    if (!line) continue;
-    const i = line.indexOf(':');
-    if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
-    const key = line.slice(0, i).trim();
-    const value = line.slice(i + 1).trim();
-    if (isRetiredBriefKey(key)) throw refuse(retiredKeyRefusal(key));
-    if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
-    if (meta.has(key)) throw refuse(`\`${key}\` is given twice. Keep one.`);
-    if (!value) throw refuse(`\`${key}:\` has no value. Give it one, or delete the line.`);
-    meta.set(key, value);
-  }
-
-  const brief = (m ? source.slice(m[0].length) : source).trim();
-  if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
-
-  const deadlineSeconds = meta.get('deadlineSeconds');
-  if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
-    throw refuse(
-      `\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`,
-    );
-  }
-  const budgetUsd = meta.get('budgetUsd');
-  if (budgetUsd !== undefined && !(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
-    throw refuse(
-      `\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`,
-    );
-  }
-  const contextTokens = meta.get('contextTokens');
-  if (contextTokens !== undefined && !(/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens)))) {
-    const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
-    throw refuse(
-      `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2].toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
-    );
-  }
-  const background = meta.get('background');
-  if (background !== undefined && background !== 'true' && background !== 'false') {
-    throw refuse(
-      `\`background: ${background}\` is not true or false. Write \`background: true\` to run the session as \`claude --bg\`, which a person can attach to, or leave it out to run it as a job.`,
-    );
-  }
-  const queued = meta.get('queued');
-  if (queued !== undefined && queued !== 'true' && queued !== 'false') {
-    throw refuse(
-      `\`queued: ${queued}\` is not true or false. Write \`queued: true\` to have the task wait for \`ae admit <id>\` before it starts, or leave it out to start it on the next tick.`,
-    );
-  }
-  const holdOpen = meta.get('holdOpen');
-  if (holdOpen !== undefined && holdOpen !== 'true' && holdOpen !== 'false') {
-    throw refuse(
-      `\`holdOpen: ${holdOpen}\` is not true or false. Write \`holdOpen: true\` to have the task wait for \`ae answer\` or \`ae close\` when an attempt signs, or leave it out to settle it then.`,
-    );
-  }
-  const cwd = meta.get('cwd');
-  if (cwd !== undefined && !isDirectory(path.resolve(cwd))) {
-    throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
-  }
-
-  let closeoutSchema: object | undefined;
-  const schemaPath = meta.get('closeoutSchema');
-  if (schemaPath !== undefined) {
-    let schemaText: string;
-    try {
-      schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8');
-    } catch (e) {
-      throw refuse(
-        `\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`,
-      );
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(schemaText);
-    } catch (e) {
-      throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`);
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw refuse(`\`closeoutSchema: ${schemaPath}\` is not a JSON Schema: a schema is a JSON object.`);
-    }
-    closeoutSchema = parsed;
-  }
-
-  const toolList = meta
-    .get('tools')
-    ?.split(',')
-    .map((t) => t.trim());
-  if (toolList?.some((t) => !t)) {
-    throw refuse(
-      `\`tools: ${meta.get('tools')}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`,
-    );
-  }
-
-  const worktree = meta.get('worktree');
   const config: HarnessArgs = Object.fromEntries(
     Object.entries({
       model: meta.get('model'),
       permissionMode: meta.get('permissionMode'),
-      worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
-      tools: toolList,
+      worktree: worktreeOf(meta.get('worktree')),
+      tools,
       effort: meta.get('effort'),
-      contextTokens: contextTokens !== undefined ? Number(contextTokens) : undefined,
-      background: background !== undefined ? background === 'true' : undefined,
-      budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
+      contextTokens,
+      background,
+      budgetUsd,
     }).filter(([, value]) => value !== undefined),
   );
   return {
     brief,
-    cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
+    cwd: cwd ?? fallbackCwd,
     harness: meta.get('harness'),
-    deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
+    deadlineSeconds,
     resumeFrom: meta.get('resumeFrom'),
     closeoutSchema,
-    ...(holdOpen === 'true' ? { holdOpen: true as const } : {}),
-    ...(queued !== undefined ? { queued: queued === 'true' } : {}),
+    ...(holdOpen === true ? { holdOpen: true as const } : {}),
+    ...(queued !== undefined ? { queued } : {}),
     ...(Object.keys(config).length ? { config } : {}),
   };
 }

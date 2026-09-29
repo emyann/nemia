@@ -22,7 +22,7 @@
  * hung suite ends at the task's deadline, and checks have a concurrency pool of their own, so a
  * suite that runs for minutes never holds an agent's slot or the tick itself.
  *
- * Pure: no disk, no process, no engine. `tick.ts` is the file that files these.
+ * Pure: no disk, no process, no engine. `advance.verb.ts` is the file that files these.
  */
 
 /**

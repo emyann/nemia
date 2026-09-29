@@ -1614,7 +1614,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
   `CHECK_DEADLINE_SECONDS`, `nice`d, its log and `WF_STDERR` where a check's go, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
-  `landEnding` in `tick.ts` acts), commits the merge with the message on exit 0 (`git commit -F -`) or runs
+  `landEnding` in `ending/ending.verb.ts` acts), commits the merge with the message on exit 0 (`git commit -F -`) or runs
   `git merge --abort` on anything else: a refusal, a check that did not finish, a message left blank, a merge that
   conflicts or leaves out a result branch, a run cancelled or held first, or the session ending any way but `done`.
   The step reads `checking` until then, `verified ✓` once the commit is made, and `failed ✗ check (…)` or `failed`
@@ -2742,7 +2742,7 @@ holding a concurrency slot forever.
 | `src/retry/retry-ask.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`, `retryRefusal`) is `retry/retry.ts`'s |
 | `src/retry/retry.ts` | a person's try from the run's side — pure: what may be asked (`retryable`, `retryRefusal`), the tries due now (`retriesDue`), and what `wf ls` and `wf decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`) |
 | `src/cap/cap.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`); **`runAdmitted`**, whether the cap on runs in flight leaves a run a slot, and which runs it holds (`heldRuns`), one run's step in a repository's own checkout at a time (`heldCheckouts`), and what is still in flight when a run is called off (`inFlight`) |
-| `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick.ts`'s |
+| `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick/tick.verb.ts`'s |
 | `src/check/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
@@ -2766,7 +2766,12 @@ holding a concurrency slot forever.
 | `src/start/start.verb.ts` | a run started (`start`), refused before a byte is written |
 | `src/plan/plan.verb.ts` | a plan's cards started (`startPlan`) |
 | `src/inbox/inbox.verb.ts` | an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
-| `src/tick.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first (`tick`, `advance`), the first steps given their parents' closeouts (`parentCloseouts`), and what a pass filed and never wrote down, adopted |
+| `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first (`tick`), and the memo of runs at rest (`RestMemo`) |
+| `src/tick/advance.verb.ts` | a pass over one run (`advance`), which writes its record, and what a pass filed and never wrote down, adopted |
+| `src/tick/file.verb.ts` | what a pass files a step with: the first steps given their parents' closeouts (`parentCloseouts`), and the step as it is told (`toldOf`) |
+| `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
+| `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
+| `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
 | `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: `cancel`, `retry`, `approve`, `say`, `hold` and `unhold`, `round` and `accept` |
 | `src/forget/forget.verb.ts` | a run forgotten (`forget`, `wf rm`) |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
@@ -2816,8 +2821,8 @@ no runtime, never a controller and not the client, and load as a tree — `recor
 `record/record.store.ts` on those, `workspace/worktree.store.ts` on `record.store.ts` and the two others,
 `folder/write.store.ts` on `record.store.ts` and `folder.store.ts` — and outside the store only the client and the
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which
-re-exports; `tick.ts` and the verbs, one feature each (`start/start.verb.ts`, `decide/decide.verb.ts` and the rest), which
-import one another one way, with no cycle; and `cli.ts` and
+re-exports; the tick (`tick/tick.verb.ts`, `tick/advance.verb.ts`) and the verbs, one feature each (`start/start.verb.ts`,
+`decide/decide.verb.ts` and the rest), which import one another one way, with no cycle; and `cli.ts` and
 `bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and `bin/wf.ts` only through
 `cli.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a

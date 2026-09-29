@@ -2,12 +2,12 @@
  * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`wf inbox queue`), judged by the tick
  * over every run and card in a store of its own.
  *
- * What the cap and the queue decide is pure, and lives in run.test.ts and inbox.test.ts. This is the part that is not: a pass over the whole
- * store, which advances the runs that have started first, admits the rest oldest first, then starts a queued card while a slot is free — and
- * the verbs that say what it did, as a person types them. A file of its own, since `tick` reads every run under `WF_ROOT`, and the runs of
- * the other store tests would be ticked with these. `WF_ROOT` is read as the module loads, so it is set before the import; `WF_MAX_RUNS` is
- * read on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a difference throws
- * (`verifyRest` in tick.ts).
+ * What the cap and the queue decide is pure, and lives in run.test.ts and inbox.test.ts. This is the part that is not: a pass over the
+ * whole store, which advances the runs that have started first, admits the rest oldest first, then starts a queued card while a slot is
+ * free — and the verbs that say what it did, as a person types them. A file of its own, since `tick` reads every run under `WF_ROOT`, and
+ * the runs of the other store tests would be ticked with these. `WF_ROOT` is read as the module loads, so it is set before the import;
+ * `WF_MAX_RUNS` is read on every pass. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of runs at rest, and a
+ * difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

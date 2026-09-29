@@ -1,7 +1,7 @@
 /**
  * `wf ls` (`list`), the pure listing over one read of each task, and the runs nobody judged (`unjudgedOf`). It reads the repository's own
- * checkout as the pass that would file into it reads it (`checkoutHold`, in `tick.ts`). A controller, reaching the runtime through the
- * client (`runtime-client.ts`).
+ * checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the runtime through
+ * the client (`runtime-client.ts`).
  */
 import { unreadableJournal, type Engine } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
@@ -23,7 +23,7 @@ import {
   waitingOf,
 } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
-import { checkoutHold } from '../tick.ts';
+import { checkoutHold } from '../ending/ending.verb.ts';
 
 /**
  * What `wf ls` shows for one run — the pure call, over one read of each task.

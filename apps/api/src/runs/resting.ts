@@ -3,10 +3,11 @@
  * poll of the Factory reads the journals of the runs still moving and not of every run the store has ever had.
  *
  * A cache of a pure function, never a source of truth, keyed by the facts the tick's own memo of runs at rest watches (`restMemo` in the
- * package's tick.ts): the run's files in the store — its record, the markers and asks a person writes beside it (`restStamps`) — and its record
- * as read; nothing of its tasks on the engine's feed since (`evictedBy`), every journal append being a line there; and the tips of the branches
- * git was asked about for it, with its base branch's, read in one `for-each-ref` a repository (`headsOf`). Anything else takes the run out,
- * and the next request judges it afresh. In memory alone: nothing is written for it, and a restarted api starts with none.
+ * package's tick/tick.verb.ts): the run's files in the store — its record, the markers and asks a person writes beside it (`restStamps`) —
+ * and its record as read; nothing of its tasks on the engine's feed since (`evictedBy`), every journal append being a line there; and the
+ * tips of the branches git was asked about for it, with its base branch's, read in one `for-each-ref` a repository (`headsOf`). Anything
+ * else takes the run out, and the next request judges it afresh. In memory alone: nothing is written for it, and a restarted api starts
+ * with none.
  *
  * `WF_VERIFY_REST=1`, which every api test sets (`test/harness.ts`), judges each run the memo answers in full too, and a request whose answer
  * differs fails: a change the memo missed is a bug in what it watches. Off in normal runs, since it spends all that the memo saves.

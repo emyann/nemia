@@ -112,7 +112,7 @@ export type Shipped = boolean | 'unchanged';
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too.
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person.
  * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
- *   tick.ts): what this run is still running for.
+ *   ending.verb.ts): what this run is still running for.
  */
 export function decision(
   steps: readonly Workflow[],

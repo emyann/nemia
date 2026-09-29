@@ -31,7 +31,7 @@ Both shells are level-triggered: a pass reads the world, decides and acts, and c
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,
 its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest/rest.ts`, `restMemo` in
-`src/tick.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
+`src/tick/tick.verb.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
 (`WF_VERIFY_REST`).
 
@@ -68,9 +68,10 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.
   Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
   each.
-- **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; tick.ts
-  and the verbs beneath it, one feature each (views.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb,
-  gate.verb, say.verb, wait.verb, round.verb, list.verb, decide.verb, forget.verb, prune.verb); and cli.ts and bin/wf.ts
+- **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick
+  (tick.verb, advance.verb) and the verbs beneath it, one feature each (views.verb, file.verb, ending.verb, cap.verb,
+  meter.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb, gate.verb, say.verb, wait.verb, round.verb,
+  list.verb, decide.verb, forget.verb, prune.verb); and cli.ts and bin/wf.ts
   above it. A verb reaches the client itself or through a controller it imports.
   cli.ts reaches the package only through runner.ts and workflow.ts, and bin/wf.ts only through cli.ts. The client and
   the controllers import one another with no cycle.

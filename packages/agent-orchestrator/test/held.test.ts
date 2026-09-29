@@ -8,7 +8,7 @@
  * is what the runtime says: its phase, its turns, its refusals. What `holdsOpen` judges is pure, and lives in run.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST` judges in full every run a pass answers
- * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.ts).
+ * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.verb.ts).
  */
 import { mock, test } from 'node:test';
 import assert from 'node:assert/strict';

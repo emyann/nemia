@@ -4,11 +4,11 @@
  * The runtime is reached through one client, `runtime-client.ts`, the only file that imports `agent-runtime`: it creates the runtime
  * (`engine()`, `HARNESSES`) and names its types. The controllers are a verb each, in its feature's folder, and each imports the client, or
  * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
- * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.ts` (a pass — `advance`, `tick` — and the filings it
- * adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`,
- * `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts` (what a person
- * reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the rest — so no
- * cycle forms among them (`test/boundary.test.ts`).
+ * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
+ * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
+ * `wait.verb.ts`, `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts`
+ * (what a person reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the
+ * rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),
@@ -286,8 +286,12 @@ export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';
 export type { PlanStarted } from './plan/plan.verb.ts';
-export { advance, checkoutHold, refusalLines, runSlots, tick } from './tick.ts';
-export type { Advanced, Pass } from './tick.ts';
+export { advance } from './tick/advance.verb.ts';
+export { refusalLines, tick } from './tick/tick.verb.ts';
+export { checkoutHold } from './ending/ending.verb.ts';
+export { runSlots } from './cap/cap.verb.ts';
+export type { Advanced } from './tick/advance.verb.ts';
+export type { Pass } from './tick/tick.verb.ts';
 export { accept, round } from './round/round.verb.ts';
 export { approve } from './gate/gate.verb.ts';
 export { cancel } from './cancel/cancel.verb.ts';

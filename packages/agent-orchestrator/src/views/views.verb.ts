@@ -3,7 +3,7 @@
  * for one, what its sessions cost, what its check exited with and said, what was said to it, what the runs it waits on concluded
  * (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the engine's word for it are `views-words.ts`'s.
  * A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and files nothing — the
- * tick (`tick.ts`), the verbs and the screens read through it.
+ * tick (`tick.verb.ts`), the verbs and the screens read through it.
  */
 import fs from 'node:fs';
 import { denialText, type Engine, type TaskView } from '../runtime-client.ts';

@@ -402,6 +402,15 @@ export function resultBranches(run: Run): string[] {
 }
 
 /**
+ * The commit each of a run's result branches is at, as git has it — or, for one git no longer has, the tip the run last saw (`tipsSeen`):
+ * what a merge in the repository's checkout is read as this run's by (`mergeState`).
+ */
+export function resultTips(run: GitRun): Record<string, string> {
+  const branches = resultBranches(run);
+  return { ...Object.fromEntries(Object.entries(run.tips ?? {}).filter(([b]) => branches.includes(b))), ...refsOf(run.repo, branches) };
+}
+
+/**
  * Every branch of a repository and the commit it is at, in one `for-each-ref` — the tips of every finished run of that repository at once,
  * for the tick's memo of runs at rest (`rest.ts`), which asks git once a pass for a repository rather than once for each of its runs.
  * Nothing, where git cannot read the repository.

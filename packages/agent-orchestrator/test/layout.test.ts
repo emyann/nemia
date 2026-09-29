@@ -259,6 +259,14 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
+test('REFUSED on the source: a value import of the tick from the cap it reads between passes closes a cycle', () => {
+  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
+  files.set('src/cap/cap.verb.ts', `${files.get('src/cap/cap.verb.ts')}\nimport { tick } from '../tick/tick.verb.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), [
+    ['src/cap/cap.verb.ts', 'src/ending/ending.verb.ts', 'src/tick/advance.verb.ts', 'src/tick/tick.verb.ts'],
+  ]);
+});
+
 test('REFUSED on the source: a value import from a part cut out of run.ts back to the assessment closes a cycle; the type is let through', () => {
   const files = new Map(sourceFiles().map((f) => [f, read(f)]));
   const round = files.get('src/round/round.ts')!;
@@ -320,13 +328,13 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
     'src/brief/brief-sections.ts': '',
     'src/cli/main.ts': "import { flags } from './flags.ts';",
     'src/cli/flags.ts': '',
-    'src/tick.ts': [
-      "import { retryable } from './retry/index.ts';",
-      "import { retry } from './retry/retry.verb.ts';",
-      "import { costOf } from './meter/meter.ts';",
-      "import { tally } from './meter/tally.store.ts';",
-      "import { answerOf } from './retry/retry-ask.ts';",
-      "import { composeBrief } from './brief/brief.ts';",
+    'src/tick/tick.verb.ts': [
+      "import { retryable } from '../retry/index.ts';",
+      "import { retry } from '../retry/retry.verb.ts';",
+      "import { costOf } from '../meter/meter.ts';",
+      "import { tally } from '../meter/tally.store.ts';",
+      "import { answerOf } from '../retry/retry-ask.ts';",
+      "import { composeBrief } from '../brief/brief.ts';",
     ].join('\n'),
     'src/run.ts': "import type { Retry } from './retry/retry.ts';",
     'bin/wf.ts': "import { main } from '../src/cli/main.ts';",
@@ -336,8 +344,8 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
     faceBreaks(files, (f) => importsIn(planted[f])),
     [
       'src/run.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
-      'src/tick.ts imports src/brief/brief.ts: src/brief/ has 2 pure files and no index.ts — write one that re-exports them by name, and import it',
-      'src/tick.ts imports src/retry/retry-ask.ts: import src/retry/index.ts, the face of src/retry/',
+      'src/tick/tick.verb.ts imports src/brief/brief.ts: src/brief/ has 2 pure files and no index.ts — write one that re-exports them by name, and import it',
+      'src/tick/tick.verb.ts imports src/retry/retry-ask.ts: import src/retry/index.ts, the face of src/retry/',
     ],
   );
 });
@@ -345,8 +353,10 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
 test('REFUSED on the source: a file outside keys/ importing its readers past keys/index.ts', () => {
   const files = sourceFiles();
   assert.deepEqual(
-    faceBreaks(files, (f) => importsIn(f === 'src/tick.ts' ? `${read(f)}\nimport { toolsOf } from './keys/tools.ts';` : read(f))),
-    ['src/tick.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
+    faceBreaks(files, (f) =>
+      importsIn(f === 'src/tick/tick.verb.ts' ? `${read(f)}\nimport { toolsOf } from '../keys/tools.ts';` : read(f)),
+    ),
+    ['src/tick/tick.verb.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
   );
 });
 

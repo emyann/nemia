@@ -1,10 +1,10 @@
 /**
  * The feed on disk (`wf feed`, `wf watch`): what the tick judged of each run and each step, a line each time it changed, in a store of its own.
  *
- * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would be
- * in it. The fold and the diff are pure, and are tested here beside the file, since what matters of them is what the file ends up saying.
- * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from
- * its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
+ * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would
+ * be in it. The fold and the diff are pure, and are tested here beside the file, since what matters of them is what the file ends up
+ * saying. `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers
+ * from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

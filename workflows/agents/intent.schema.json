@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "description": "The idea in a line, in the person's words." },
+    "problem": { "type": "string", "description": "What hurts today, and for whom, as the person described it." },
+    "proposedOutcome": { "type": "string", "description": "What is true once this is done: the end state, not the solution." },
+    "affected": {
+      "type": "array",
+      "description": "The people and the systems it touches, each with how.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "who": { "type": "string", "description": "A kind of person, or a system, by name." },
+          "how": { "type": "string", "description": "How the change touches them." }
+        },
+        "required": ["who", "how"],
+        "additionalProperties": false
+      }
+    },
+    "constraints": { "type": "array", "description": "What the work must respect: technical, policy, time. Empty when none was named.", "items": { "type": "string" } },
+    "decisions": {
+      "type": "array",
+      "description": "Every decision the interview settled, in the order it was settled.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "answeredBy": { "type": "string", "description": "`person`, or the name of whoever answered on their behalf." }
+        },
+        "required": ["question", "answer", "answeredBy"],
+        "additionalProperties": false
+      }
+    },
+    "open": { "type": "array", "description": "What is still undecided, each as a question. Empty only when nothing is.", "items": { "type": "string" } }
+  },
+  "required": ["title", "problem", "proposedOutcome", "affected", "constraints", "decisions", "open"],
+  "additionalProperties": false
+}

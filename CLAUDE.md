@@ -96,9 +96,12 @@ holds what every change needs.
 
 - Commit on your branch, in small coherent commits with plain messages: a short imperative subject, an optional body saying why. **No
   attribution trailers**, no session URLs.
-- **Never push, never merge, never `git branch -D`.** A person merges after a trial merge. The one exception is a run's ending step
-  (`workflows/*/ship.md`), filed only once a person approves it: it stages the merge of the run's own result branch, and the run executes
-  the ship's `check:` on the merged tree and commits on exit 0 or aborts the merge (`landingDue`).
+- **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
+  refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
+  `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
+  A person merges after a trial merge. The one exception is a run's ending step (`workflows/*/ship.md`), filed only once a person approves
+  it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged tree and commits on exit
+  0 or aborts the merge (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## When you miss

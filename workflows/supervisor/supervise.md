@@ -32,9 +32,9 @@ allowedTools: Bash(wf:*), Bash(npx wf:*), Bash(claude agents:*), Bash(ae ls:*), 
 # sessions, scheduling cron jobs, firing remote triggers. `--disallowedTools`.
 #
 # And the git this session must never type in a person's own checkout. "Never type git for a run" is prose below,
-# and prose is not a constraint. `.claude/settings.json` already refuses `git push` and `git branch -D`; it cannot
-# refuse `git merge`, because `ship.md` runs in this same checkout and merging is its whole job — so the step's own
-# fence is the only place that refusal can live. Denied by name: the merge a run's ending step owns, in both its
+# and prose is not a constraint. `.claude/settings.json` denies no git, since a person's own session here may be asked
+# to push, and could not deny `git merge`, because `ship.md` runs in this same checkout and merging is its whole job —
+# so the step's own fence is where that refusal lives. `git branch -D` needs no line: in `dontAsk` no allow reaches it. Denied by name: the merge a run's ending step owns, in both its
 # spellings (`git merge`, and `git pull`, which merges too — `git pull . <branch>` merges a run's branch), and the
 # ordinary commands that move the checkout or throw away what is in it. A named list, not a complete one: git has
 # more ways to write than any list of prefixes names. What the bookkeeping below needs is untouched — `git add

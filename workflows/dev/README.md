@@ -34,7 +34,10 @@ passed as `--disallowedTools`, which beats the settings' allow. Those two spelli
 `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still run the build and the e2e by other names
 (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), which only review's brief keeps it
 from, and narrowing those allows is the settings' to do. `implement` is denied `SendMessage`,
-`CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. `review`'s findings are its closeout
+`CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs, and `git push`, a forced branch delete
+and `browser_run_code_unsafe`, which no step does and its `auto` would otherwise run — as `ship` is. The
+settings deny none of them, since a person's own session may be asked to push; review and plan, in `dontAsk`,
+are refused them because no allow reaches them. `review`'s findings are its closeout
 (`review.schema.json`), and its `again: true` sends the change round again: implement's own session is
 continued with the findings, then a new review. After the third round, a person decides.
 
@@ -44,7 +47,7 @@ continued with the findings, then a new review. After the third round, a person 
 reaching for, a reviewer asking whether the branch still merges into main above all. `git merge-tree
 --write-tree` writes tree objects into the object store, and moves no ref, no index and no file. Left out on
 purpose: `git -C <dir>`, because an allow rule matches by prefix, so `Bash(git -C:*)` would admit `git -C <dir>
-commit` and `git -C <dir> push`, and the deny `Bash(git push:*)` does not match that spelling — git runs from the
+commit` and `git -C <dir> push`, and no deny `Bash(git push:*)` matches that spelling — git runs from the
 step's own directory; `git grep`, whose `-O<cmd>` (`--open-files-in-pager=<cmd>`) runs a program, and the Grep tool
 does the search; and `git fetch`, which changes refs and goes to the network. Nothing that writes, runs a program
 or moves a ref is on the list, and `packages/agent-orchestrator/test/git-reads.test.ts` fails on a `Bash(git …)`

@@ -16,10 +16,32 @@ import { taskSpend, type SpendOf } from './status/status.ts';
 import { gated, type ParentRun } from './wait/wait.ts';
 import { decision } from './decide/decide.ts';
 import { parseCloseout, type Closeout } from './closeout/closeout.ts';
-import { signedAndHeld, taskUsage } from './timeline/timeline.ts';
+import { signedAndHeld, taskUsage, type AttemptClock, type TaskClock } from './timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
 import { continuesFrom } from './retry/index.ts';
+
+/**
+ * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came (`stated`),
+ * and the closeout it carries, as the engine's `Attempt` keeps them.
+ */
+export type WordAttempt = AttemptClock & { ended: string | null; stated?: boolean; closeout?: unknown };
+
+/**
+ * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether it
+ * is held open or closed, and the closeout it was asked for. Written out here because a pure file imports no runtime, a type included, as
+ * `AdmissionView` in `cap/cap.ts` is.
+ */
+export type WordView = TaskClock & {
+  phase: string;
+  state: TaskClock['state'] & {
+    settled: 'succeeded' | 'failed' | 'stopped' | null;
+    attempts: readonly WordAttempt[];
+    inputs?: readonly unknown[];
+    holdOpen?: boolean;
+    closeoutSchema?: object;
+  };
+};
 
 /**
  * The engine's task phases, narrowed to what a run cares about.
@@ -38,7 +60,7 @@ import { continuesFrom } from './retry/index.ts';
  *
  * Exported, log-free, so a consumer narrows a view as the tick does. No view at all is `unknown` too.
  */
-export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
+export const phaseOfView = (v: WordView | undefined): TaskPhase => {
   if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
   if (signedAndHeld(v)) return 'succeeded';
@@ -59,7 +81,7 @@ const currentTurn = (state: TaskView['state']): TaskView['state']['attempts'] =>
  * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
  */
 export const waitsForWord =
-  (views: ReadonlyMap<string, TaskView>) =>
+  (views: ReadonlyMap<string, WordView>) =>
   (taskId: string): boolean =>
     views.get(taskId)?.phase === 'input-required';
 
@@ -193,7 +215,7 @@ export async function taskPhases(
  * may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `done` with no closeout on a
  * journal that says nothing of `stated` is not unsigned, and is never nudged.
  */
-const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][number] | undefined): boolean =>
+const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>
   state.closeoutSchema !== undefined &&
   a !== undefined &&
   a.closeout === undefined &&
@@ -220,10 +242,7 @@ export const closeoutAsked =
  * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
  * attempt's raw `reason` for `unsigned` or `budget`.
  */
-export const endWords = (
-  state: TaskView['state'],
-  a: TaskView['state']['attempts'][number],
-): { ended: string | null; reason: string | null } =>
+export const endWords = (state: WordView['state'], a: WordAttempt): { ended: string | null; reason: string | null } =>
   a.limit === 'budget'
     ? { ended: 'failed', reason: 'budget' }
     : unsignedEnd(state, a)
@@ -316,7 +335,7 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
  * prints beside a step, and what the feed words it from (`feedPhase`).
  */
 export const engineWord =
-  (views: ReadonlyMap<string, TaskView>) =>
+  (views: ReadonlyMap<string, WordView>) =>
   (taskId: string): string =>
     wordOfView(views.get(taskId));
 
@@ -325,7 +344,7 @@ export const engineWord =
  * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on it,
  * so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
  */
-export const wordOfView = (v: TaskView | undefined): string =>
+export const wordOfView = (v: WordView | undefined): string =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
 
 /**

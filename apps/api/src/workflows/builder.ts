@@ -63,7 +63,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
 
 /**
  * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`, which it
- * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
+ * does not export: `builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps',

@@ -7,14 +7,14 @@
  * The store is the harness's scratch one (`root`, test/harness.ts). A socket is served by the adaptor's server, which, given no
  * `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
  */
-import './harness.ts';
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
-import { app } from '../src/app.ts';
+import { app } from '../app.ts';
 import { feedFile, freshFeedMemo, readFeed, recordFeed } from 'agent-orchestrator';
 
 type FeedWords = import('agent-orchestrator').FeedWords;

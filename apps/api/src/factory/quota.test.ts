@@ -3,14 +3,14 @@
  * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
  * in a sentence; and the pure judgement under it (`quotaOf`).
  */
-import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
+import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { machineTempDir, scratch } from './scratch.ts';
-import { appOf, liveOf } from '../src/app.ts';
+import { machineTempDir, scratch } from '../../test/scratch.ts';
+import { appOf, liveOf } from '../app.ts';
 import {
   askUsage,
   backoffOf,
@@ -24,11 +24,11 @@ import {
   QuotaAsker,
   usageAsk,
   usageEnv,
-} from '../src/factory/quota.ts';
+} from './quota.ts';
 
-type Quota = import('../src/factory/quota.ts').Quota;
-type Held = import('../src/factory/quota.ts').Held;
-type ReadQuota = import('../src/factory/quota.ts').ReadQuota;
+type Quota = import('./quota.ts').Quota;
+type Held = import('./quota.ts').Held;
+type ReadQuota = import('./quota.ts').ReadQuota;
 
 /** An app over the live services but its quota asker, `read`: the one the test asks directly too. */
 const appAsking = (read: ReadQuota) => appOf(Layer.merge(liveOf(), QuotaAsker.layer(read))).app;

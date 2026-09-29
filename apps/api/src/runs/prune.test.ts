@@ -10,16 +10,16 @@
  * so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your decision all
  * the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
-import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app } from '../src/app.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import type { RunSummary } from './runs.ts';
+import { app } from '../app.ts';
 import { engine, prune, prunedKept, prunedWords, readRun } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>

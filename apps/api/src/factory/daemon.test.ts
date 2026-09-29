@@ -3,17 +3,17 @@
  * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it. In the harness's scratch store
  * (`root`).
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../src/app.ts';
-import { daemonOf } from '../src/factory/daemon.ts';
+import { app } from '../app.ts';
+import { daemonOf } from './daemon.ts';
 import { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
 const FILE = path.join(root, 'daemon.json');
 
-type Daemon = import('../src/factory/daemon.ts').Daemon;
+type Daemon = import('./daemon.ts').Daemon;
 type DaemonFile = import('agent-orchestrator').DaemonFile;
 
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */

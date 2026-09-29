@@ -5,15 +5,15 @@
  * Beside the scratch repository's workflows lie folders and files that are not one: `NOTES.txt`, not a folder; `.vscode` and `.draft`,
  * hidden, the second with a step in it; and `agents/`, the agents the workflows beside it name, whose files look like steps.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
-import { listWorkflows, versionOf as versionIn } from '../src/workflows/workflows.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
+import { listWorkflows, versionOf as versionIn } from './workflows.ts';
 import { loadWorkflows, parentRecord, readRun } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
@@ -26,11 +26,11 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 
-type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
-type WorkflowStepPage = import('../src/workflows/workflows.ts').WorkflowStepPage;
-type WorkflowListing = import('../src/workflows/workflows.ts').WorkflowListing;
-type RunSummary = import('../src/runs/runs.ts').RunSummary;
-type RunDetail = import('../src/detail/detail.ts').RunDetail;
+type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
+type WorkflowStepPage = import('./workflows.ts').WorkflowStepPage;
+type WorkflowListing = import('./workflows.ts').WorkflowListing;
+type RunSummary = import('../runs/runs.ts').RunSummary;
+type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

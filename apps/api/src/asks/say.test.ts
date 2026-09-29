@@ -12,18 +12,18 @@
  * `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work with its inbox listening: only the run's mark
  * refuses it.
  */
-import { config, registry, root } from './harness.ts';
+import { config, registry, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { scratch } from './scratch.ts';
+import { scratch } from '../../test/scratch.ts';
 import type { Said } from 'agent-orchestrator';
-import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app } from '../src/app.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import type { RunSummary } from '../runs/runs.ts';
+import { app } from '../app.ts';
 import { engine, list, readRun, say } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);

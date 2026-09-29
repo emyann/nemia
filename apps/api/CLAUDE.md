@@ -26,7 +26,7 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 - **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing; a page that must
-  agree with a verb's refusal reads `Decidable.awaiting`, which `test/prune.test.ts` holds to `wf prune`'s own answer.
+  agree with a verb's refusal reads `Decidable.awaiting`, which `src/runs/prune.test.ts` holds to `wf prune`'s own answer.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
 - **A route lets the package's refusal through and never picks its status**: `app.onError` answers it by kind (`answerError`,
@@ -51,5 +51,5 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `usageAsk`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
-- **A handle count is waited for, never read once after a close** (`watchers` and `until` in `test/feed.test.ts`): a stream's watch is
+- **A handle count is waited for, never read once after a close** (`watchers` and `until` in `src/factory/feed.test.ts`): a stream's watch is
   taken a few microtasks after its response, so a test waits for it before it breaks the feed.

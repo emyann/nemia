@@ -5,15 +5,15 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import { root, stops } from './harness.ts';
+import { root, stops } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Acceptance } from 'agent-orchestrator';
-import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
-import { app } from '../src/app.ts';
+import type { RunDecision } from '../decide/decision.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import { app } from '../app.ts';
 import { accept, acceptFile, engine, list, readRun, round } from 'agent-orchestrator';
 import { acceptWordsRefusal } from 'agent-orchestrator/run';
 

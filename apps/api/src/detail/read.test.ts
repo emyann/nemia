@@ -5,13 +5,13 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` first on PATH (test/harness.ts).
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunDetail } from '../src/detail/detail.ts';
-import { app } from '../src/app.ts';
+import type { RunDetail } from './detail.ts';
+import { app } from '../app.ts';
 
 const T0 = Date.parse('2026-09-19T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

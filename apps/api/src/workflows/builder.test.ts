@@ -3,17 +3,17 @@
  * and the form a step's keys are drawn in — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
  * refuse, with the folder asserted as it was.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { TEAM } from './team.ts';
-import { app } from '../src/app.ts';
-import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from '../src/workflows/builder.ts';
-import { listWorkflows, versionOf as versionIn } from '../src/workflows/workflows.ts';
+import { scratch } from '../../test/scratch.ts';
+import { TEAM } from '../../test/team.ts';
+import { app } from '../app.ts';
+import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
+import { listWorkflows, versionOf as versionIn } from './workflows.ts';
 import { loadWorkflows, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -35,11 +35,11 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 
-type KeyForm = import('../src/workflows/builder.ts').KeyForm;
-type WorkflowSaved = import('../src/workflows/builder.ts').WorkflowSaved;
-type BuildRefused = import('../src/workflows/builder.ts').BuildRefused;
-type ListedStep = import('../src/workflows/workflows.ts').ListedStep;
-type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
+type KeyForm = import('./builder.ts').KeyForm;
+type WorkflowSaved = import('./builder.ts').WorkflowSaved;
+type BuildRefused = import('./builder.ts').BuildRefused;
+type ListedStep = import('./workflows.ts').ListedStep;
+type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 
 const STORE = path.join(root, 'workflows');
 const TEAM_DEV = path.join(TEAM, 'dev');

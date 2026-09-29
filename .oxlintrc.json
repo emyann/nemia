@@ -614,14 +614,14 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 561, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 553, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
       "files": ["packages/agent-orchestrator/src/tick.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1219, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1211, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 463, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 136 }],
         "sonarjs/cognitive-complexity": ["error", 197]

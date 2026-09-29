@@ -16,7 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from './workspace.ts';
-import { composeBrief, type Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
+import { composeBrief } from '../run.ts';
 import type { Workflow } from '../step/step.ts';
 import { scratch } from '../../test/scratch.ts';
 

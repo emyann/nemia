@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { FrozenStepSchema, loadWorkflows, workflowsIn, type FrozenStepFields } from '../src/workflow-store.ts';
+import { FrozenStepSchema, loadWorkflows, workflowsIn, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');

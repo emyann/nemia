@@ -18,7 +18,7 @@ import { composeBrief, workspacePlan, type Run } from '../src/run.ts';
 import { landingContract } from '../src/check/check.ts';
 import { closeoutSchemaOf, outputLines, type Closeout } from '../src/closeout/closeout.ts';
 import { loopSpan, terminalSteps } from '../src/workflow.ts';
-import { loadWorkflows } from '../src/workflow-store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { toldIn } from './told.ts';
 

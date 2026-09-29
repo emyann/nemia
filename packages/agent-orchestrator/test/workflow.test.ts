@@ -15,10 +15,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { loadWorkflows, workflowDescription, workflowFolder } from '../src/workflow-store.ts';
+import { loadWorkflows, workflowDescription, workflowFolder } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
-import { loadAgents } from '../src/workflow-store.ts';
+import { loadAgents } from '../src/folder/folder.store.ts';
 import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES, SANDBOXES } from '../src/workflow.ts';
 import {
   asNamed,
@@ -32,7 +32,7 @@ import {
   parseAgent,
   renderAgent,
 } from '../src/workflow.ts';
-import { formerKeyLines } from '../src/workflow-store.ts';
+import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });

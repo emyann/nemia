@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Engine, TaskView } from 'agent-runtime';
-import { viewedOnce } from '../src/views.ts';
+import { viewedOnce } from './views.verb.ts';
 
 /** An engine that counts the views asked of it, and fails a view of `bad` the first time. */
 const counting = () => {

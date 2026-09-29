@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorkflows } from '../src/workflow-store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { asNamed, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');

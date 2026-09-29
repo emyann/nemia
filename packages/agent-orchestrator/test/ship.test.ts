@@ -39,7 +39,7 @@ const {
   start,
 } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
-const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/worktree.ts');
+const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
 
 /** A run this file started on a repository, as `isShipped` reads one: a git run. */
 const gitRun = (run: Run): GitRun => {

@@ -21,7 +21,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CHECK, checkBrief } from '../src/check/check.ts';
 import { composeBrief, type Run } from '../src/run.ts';
-import { loadWorkflows } from '../src/workflow-store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');

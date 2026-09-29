@@ -61,6 +61,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/handler.ts',
     'src/a2a/map.ts',
     'src/a2a/remote.ts',
+    'src/a2a/said.ts',
   ]);
   assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   assert.ok(

@@ -107,21 +107,22 @@ const RunRecordSchema = Schema.Union([GitRecordSchema, FolderRecordSchema]);
 
 const isRunRecord = Schema.is(RunRecordSchema);
 
-const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
-
 const fieldOf = (value: unknown, key: PropertyKey): unknown =>
   typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 
+/** `text` cut to its first 60 characters and marked `…` where it was cut, as the runtime quotes a value it refuses. */
+const shown = (text: string): string => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
+
 /** The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes. */
 function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
-  const [first] = formatter(error.issue).issues;
+  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
   const message = first?.message ?? 'is not what wf writes';
   const words =
     message === 'Missing key'
       ? 'is missing'
-      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, 'wf writes ').replace(/ \| undefined$/, '')}`;
+      : `is ${shown(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, 'wf writes ').replace(/ \| undefined$/, '')}`;
   return { path, words };
 }
 

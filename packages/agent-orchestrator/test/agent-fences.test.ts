@@ -3,6 +3,10 @@
  * checkout's `.claude/settings.json` refuses none of them: the settings bind a person's own session in this checkout too, and a person
  * may ask their session to push.
  *
+ * Nemia ships no team today, so the guard reads whatever is shipped (`shippedFolders`, none) and holds the tests' team (`team.ts`) to the
+ * same fence: each refusal below is made on the team, cut back, and on a watcher's step written here, so a team shipped again is held
+ * by a guard proven to refuse.
+ *
  * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
  * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
  * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step that reads settings the
@@ -17,25 +21,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
-const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
 
-/** Every shipped workflow folder, read off the disk: each folder of the repository's `workflows/` but its agents and skills, and the package's own. */
-const FOLDERS = [
-  ...fs
-    .readdirSync(path.join(REPO, 'workflows'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== 'agents' && entry.name !== 'skills')
-    .map((entry) => path.join(REPO, 'workflows', entry.name)),
-  WORKFLOWS,
-  path.join(WORKFLOWS, 'ui'),
-];
+/** Every shipped workflow folder, read off the disk: none today. */
+const FOLDERS = shippedFolders();
 
-/** Every shipped agents folder: each agent in it is named by a step of a shipped folder. */
-const AGENT_FOLDERS = [path.join(REPO, 'workflows', 'agents'), path.join(WORKFLOWS, 'agents')];
+/** Every shipped agents folder there is: each agent in it is named by a step of a shipped folder. */
+const AGENT_FOLDERS = SHIPPED_HOLDERS.map((holder) => path.join(holder, 'agents')).filter((dir) => fs.existsSync(dir));
 
-/** Every folder of skills a shipped step may load, whose `allowed-tools` a loaded skill grants the session. */
-const SKILL_FOLDERS = [path.join(REPO, '.claude', 'skills'), path.join(REPO, 'workflows', 'skills'), path.join(WORKFLOWS, 'skills')];
+/** Every folder of skills a step may load, whose `allowed-tools` a loaded skill grants the session: the repository's, shipped, the team's. */
+const SKILL_FOLDERS = [
+  path.join(REPO, '.claude', 'skills'),
+  ...SHIPPED_HOLDERS.map((holder) => path.join(holder, 'skills')),
+  path.join(TEAM, 'skills'),
+].filter((dir) => fs.existsSync(dir));
 
 type Settings = { permissions?: { allow?: string[]; deny?: string[] } };
 const SETTINGS = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as Settings;
@@ -118,8 +119,15 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
 /** Every step of every shipped folder, by its folder. */
 const shipped = (): { dir: string; step: Step }[] => FOLDERS.flatMap((dir) => loadWorkflows(dir).map((step) => ({ dir, step })));
 
-/** An agent's step as a folder resolves it, from the first shipped folder that names the agent. */
-const stepOf = (agent: string): Step => shipped().find(({ step }) => step.agent?.name === agent)!.step;
+/** The step of the tests' team that names an agent, as its folder resolves it. */
+const stepOf = (agent: string): Step => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)!;
+
+/** A folder of steps written from their frontmatter and a one-line body, beside no agents. */
+const folderOf = (steps: Record<string, string>): string => {
+  const dir = scratch('wf-fences-folder-');
+  for (const [name, front] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${name}.md`), `---\n${front}\n---\n${name} it\n`);
+  return dir;
+};
 
 test('the matcher reads the rule shapes the fences use, and throws on a wildcard it does not model', () => {
   const push = { tool: 'Bash', command: 'git push origin main' } as const;
@@ -157,10 +165,19 @@ test('every shipped agent is named by a shipped step, so the fence below reads e
 test('every shipped step is refused git push, a forced branch delete and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
   const open = shipped().flatMap(({ dir, step }) => unfenced(step).map((what) => `${path.relative(REPO, dir)}/${what}`));
   assert.deepEqual(open, []);
-  const read = new Set(FOLDERS.map((dir) => path.relative(REPO, dir)));
-  for (const folder of ['workflows/dev', 'workflows/dev-planned', 'workflows/ui', 'workflows/note', 'workflows/supervisor'])
-    assert.ok(read.has(folder), `${folder} is read: ${[...read].join(', ')}`);
-  assert.ok(!read.has('workflows/agents') && !read.has('workflows/skills'), 'agents and skills are no workflow of their own');
+  assert.ok(
+    FOLDERS.every((dir) => !['agents', 'skills'].includes(path.basename(dir))),
+    'agents and skills are no workflow of their own',
+  );
+});
+
+test("the tests' team is fenced as a shipped team must be: every step of its dev, auto and dontAsk", () => {
+  const steps = loadWorkflows(TEAM_DEV);
+  assert.deepEqual(
+    steps.flatMap((step) => unfenced(step)),
+    [],
+  );
+  assert.ok(steps.some((step) => step.permissionMode === 'auto') && steps.some((step) => step.permissionMode === 'dontAsk'), 'both modes');
 });
 
 test('the settings deny none of them: the refusal is each worker’s own, and a person’s session may push', () => {
@@ -187,25 +204,32 @@ test('REFUSED: an auto step without its own deny, and a dontAsk step an allow re
     'the same step is fenced from push by a deny in the settings, which is the refusal this test moves off the checkout',
   );
 
-  const planner = stepOf('planner');
-  assert.equal(planner.permissionMode, 'dontAsk');
-  assert.deepEqual(unfenced({ ...planner, allowedTools: [...(planner.allowedTools ?? []), 'Bash(git push:*)'] }), [
-    'plan: Bash(git push)',
-    'plan: Bash(git push origin main)',
-    'plan: Bash(git push --force origin wf/r-1/implement)',
+  const reviewer = stepOf('reviewer');
+  assert.equal(reviewer.permissionMode, 'dontAsk');
+  assert.deepEqual(unfenced({ ...reviewer, allowedTools: [...(reviewer.allowedTools ?? []), 'Bash(git push:*)'] }), [
+    'review: Bash(git push)',
+    'review: Bash(git push origin main)',
+    'review: Bash(git push --force origin wf/r-1/implement)',
   ]);
-  assert.deepEqual(unfenced({ ...planner, allowedTools: ['mcp__playwright'] }), ['plan: mcp__playwright__browser_run_code_unsafe']);
-  assert.deepEqual(unfenced(planner, { permissions: { allow: ['Bash(git branch:*)'] } }), [
-    'plan: Bash(git branch -D wf/r-1/implement)',
-    'plan: Bash(git branch --delete --force wf/r-1/implement)',
+  assert.deepEqual(unfenced({ ...reviewer, allowedTools: ['mcp__playwright'] }), ['review: mcp__playwright__browser_run_code_unsafe']);
+  assert.deepEqual(unfenced(reviewer, { permissions: { allow: ['Bash(git branch:*)'] } }), [
+    'review: Bash(git branch -D wf/r-1/implement)',
+    'review: Bash(git branch --delete --force wf/r-1/implement)',
   ]);
   assert.deepEqual(unfenced({ ...stepOf('reviewer'), harness: 'codex', permissionMode: undefined, sandbox: 'workspace-write' }), [
     'review: on codex in sandbox workspace-write, not read-only',
   ]);
 });
 
-test('REFUSED: the shipped supervisor without its own deny of the forced delete is open, though it runs dontAsk and the settings allow it none', () => {
-  const supervise = loadWorkflows(path.join(REPO, 'workflows', 'supervisor')).find((s) => s.name === 'supervise')!;
+test("REFUSED: a watcher's step without its own deny of the forced delete is open, though it runs dontAsk and the settings allow it none", () => {
+  const supervise = loadWorkflows(
+    folderOf({
+      supervise:
+        'workspace: main\nslot: none\nharness: claude\nbackground: true\npermissionMode: dontAsk\n' +
+        'disallowedTools: Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), mcp__playwright__browser_run_code_unsafe',
+    }),
+  ).find((s) => s.name === 'supervise')!;
+  assert.deepEqual(unfenced(supervise), [], 'fenced by its own list');
   assert.equal(supervise.permissionMode, 'dontAsk');
   assert.equal(supervise.background, true, "a background session, which reads the person's user settings as well as the checkout's");
   const bare = {
@@ -228,16 +252,14 @@ test('REFUSED: the shipped supervisor without its own deny of the forced delete 
   );
 });
 
-test('REFUSED: the shipped implementer with its deny line cut back to the four it had is open, read from its file as a run reads it', () => {
-  const root = scratch('wf-fences-');
-  fs.cpSync(path.join(REPO, 'workflows'), path.join(root, 'workflows'), { recursive: true });
-  fs.cpSync(path.join(REPO, '.claude'), path.join(root, '.claude'), { recursive: true });
-  const file = path.join(root, 'workflows', 'agents', 'implementer.md');
+test("REFUSED: the team's implementer with its deny line cut back to the four it had is open, read from its file as a run reads it", () => {
+  const root = teamCopy('wf-fences-');
+  const file = path.join(root, 'agents', 'implementer.md');
   const text = fs.readFileSync(file, 'utf8');
   const cut = text.replace(/^disallowedTools: .*$/m, 'disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger');
   assert.notEqual(cut, text, 'the implementer has a deny line to cut');
   fs.writeFileSync(file, cut);
-  const implement = loadWorkflows(path.join(root, 'workflows', 'dev')).find((s) => s.name === 'implement')!;
+  const implement = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'implement')!;
   assert.equal(implement.agent?.name, 'implementer');
   assert.equal(unfenced(implement).length, FENCED.length, unfenced(implement).join('\n'));
 });

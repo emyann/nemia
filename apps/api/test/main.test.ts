@@ -30,7 +30,7 @@ test('a PORT that is not a port is refused with the fix, not read as 8787', () =
 
 /** `node src/main.ts` with `PORT`, in a store of its own: what it printed, and how it ended if it did. */
 function startApi(port: string) {
-  const root = scratch('hkb-api-main-');
+  const root = scratch('nemia-api-main-');
   const child = spawn(process.execPath, ['src/main.ts'], { cwd: API, env: { ...process.env, PORT: port, WF_ROOT: root } });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));

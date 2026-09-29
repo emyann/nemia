@@ -11,7 +11,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
-const root = scratch('hkb-api-remote-');
+const root = scratch('nemia-api-remote-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
 const { needsOf } = await import('../src/runs/judged.ts');

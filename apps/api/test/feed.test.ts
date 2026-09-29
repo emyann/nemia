@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
 import { scratch } from './scratch.ts';
 
-const root = scratch('hkb-api-feed-');
+const root = scratch('nemia-api-feed-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

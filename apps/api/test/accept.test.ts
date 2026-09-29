@@ -16,7 +16,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = scratch('hkb-api-accept-');
+const root = scratch('nemia-api-accept-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

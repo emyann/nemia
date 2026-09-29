@@ -14,7 +14,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its module loads. */
-const root = scratch('hkb-api-read-');
+const root = scratch('nemia-api-read-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

@@ -22,7 +22,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 
-const root = scratch('hkb-api-after-');
+const root = scratch('nemia-api-after-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = scratch('hkb-api-daemon-');
+process.env.WF_ROOT = scratch('nemia-api-daemon-');
 const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
 
 const { app } = await import('../src/app.ts');

@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-const tmp = (label: string) => scratch(`hkb-api-gate-${label}-`);
+const tmp = (label: string) => scratch(`nemia-api-gate-${label}-`);
 
 const root = tmp('root');
 process.env.WF_ROOT = root;

@@ -13,7 +13,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = scratch('hkb-api-refusal-');
+process.env.WF_ROOT = scratch('nemia-api-refusal-');
 const { answerError, app, REFUSAL_STATUS } = await import('../src/app.ts');
 const { Conflict, Invalid, Missing } = await import('agent-orchestrator/effect');
 type Refusal = import('agent-orchestrator/effect').Refusal;

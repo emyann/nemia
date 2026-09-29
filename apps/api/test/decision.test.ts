@@ -12,7 +12,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
-const root = scratch('hkb-api-decision-');
+const root = scratch('nemia-api-decision-');
 process.env.WF_ROOT = root;
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -20,7 +20,7 @@ const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' 
  * A folder ahead of the real `git` on PATH, beside the harness's `claude`, holding a `git` that notes each call in `gitCalls` and runs
  * the real one, so a test counts what the route asked of git (`gitCount`).
  */
-const bin = scratch('hkb-api-decision-bin-');
+const bin = scratch('nemia-api-decision-bin-');
 const gitCalls = path.join(bin, 'git-calls');
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;

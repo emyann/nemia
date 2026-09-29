@@ -17,7 +17,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 
-const tmp = (label: string) => scratch(`hkb-api-asks-${label}-`);
+const tmp = (label: string) => scratch(`nemia-api-asks-${label}-`);
 
 /** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store as its module loads. */
 const root = tmp('root');

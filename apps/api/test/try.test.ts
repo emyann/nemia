@@ -17,10 +17,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-const root = scratch('hkb-api-try-');
+const root = scratch('nemia-api-try-');
 process.env.WF_ROOT = root;
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
-const repo = scratch('hkb-api-try-repo-');
+const repo = scratch('nemia-api-try-repo-');
 process.env.HKB_REPO = repo;
 
 const YOURS = path.join(root, 'workflows', 'agents');
@@ -345,7 +345,7 @@ test('a try is guarded as every write is', async () => {
 });
 
 test("a try's folder that is a link is refused, never written through", async () => {
-  const away = scratch('hkb-api-try-away-');
+  const away = scratch('nemia-api-try-away-');
   fs.renameSync(path.join(TRIES, 'scribe'), path.join(TRIES, 'scribe.kept'));
   fs.symlinkSync(away, path.join(TRIES, 'scribe'));
   try {

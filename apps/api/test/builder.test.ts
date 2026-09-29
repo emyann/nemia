@@ -12,9 +12,9 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** The scratch store, set as `WF_ROOT` before the app is imported: agent-orchestrator locates its store when the module loads. */
-const root = scratch('hkb-api-builder-');
+const root = scratch('nemia-api-builder-');
 process.env.WF_ROOT = root;
-const repo = scratch('hkb-api-builder-repo-');
+const repo = scratch('nemia-api-builder-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 

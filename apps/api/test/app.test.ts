@@ -7,9 +7,9 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 
-const root = scratch('hkb-api-');
+const root = scratch('nemia-api-');
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
-const NOWHERE = scratch('hkb-api-nowhere-');
+const NOWHERE = scratch('nemia-api-nowhere-');
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
 const { engine, list, readRun } = await import('agent-orchestrator');
@@ -73,7 +73,7 @@ const codexSession = (taskId: string, attempt: number, output: string | { unread
   detachedSession('codex', taskId, attempt, output);
 
 const workflowFolder = (files: Record<string, string>) => {
-  const dir = scratch('hkb-api-workflow-');
+  const dir = scratch('nemia-api-workflow-');
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
   return dir;
 };
@@ -1681,7 +1681,7 @@ test('a refused check whose output cannot be read still answers, and says how to
 });
 
 test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
-  const bin = scratch('hkb-api-bin-');
+  const bin = scratch('nemia-api-bin-');
   const calls = path.join(bin, 'calls');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
   const before = process.env.PATH;
@@ -1719,7 +1719,7 @@ test('the list of runs observes the engine at most once, however many runs and s
  * many times a request observed the harnesses.
  */
 function countingObservations(t: { after: (fn: () => void) => void }): () => number {
-  const bin = scratch('hkb-api-bin-');
+  const bin = scratch('nemia-api-bin-');
   const calls = path.join(bin, 'calls');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
   const before = process.env.PATH;
@@ -2105,7 +2105,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
 
   const { claudeOps } = await import('agent-runtime/effect');
   const { Effect } = await import('effect');
-  const bin = scratch('hkb-api-claude-');
+  const bin = scratch('nemia-api-claude-');
   const argsFile = path.join(bin, 'args');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
   const before = process.env.PATH;

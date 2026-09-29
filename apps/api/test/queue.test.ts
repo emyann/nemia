@@ -13,10 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-const root = scratch('hkb-api-queue-');
+const root = scratch('nemia-api-queue-');
 process.env.WF_ROOT = root;
 delete process.env.WF_MAX_RUNS;
-const repo = scratch('hkb-api-queue-repo-');
+const repo = scratch('nemia-api-queue-repo-');
 process.env.HKB_REPO = repo;
 const git = (...args: string[]) =>
   execFileSync(
@@ -206,7 +206,7 @@ test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it wa
 
 test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is gone, as `--off` does without the check — and the listing keeps its place until then', async () => {
   clear();
-  const about = scratch('hkb-api-queue-gone-');
+  const about = scratch('nemia-api-queue-gone-');
   const { card } = addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about });
   queueInInbox(card.name);
   fs.rmSync(about, { recursive: true, force: true });

@@ -45,7 +45,7 @@ export const answerError: ErrorHandler = (err, c) => {
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
  *   back or removed; three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent`.
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
- *   changed, or one HKB ships copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and
+ *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and
  *   `copySkill`.
  * - inbox/inbox.ts — the inbox: its cards listed, one filed, one dropped; two writes, guarded as a start is.
  * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.

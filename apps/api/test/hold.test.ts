@@ -23,7 +23,7 @@ import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunHolding } from '../src/runs/judged.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 
-const root = scratch('hkb-api-hold-');
+const root = scratch('nemia-api-hold-');
 process.env.WF_ROOT = root;
 
 const { app } = await import('../src/app.ts');

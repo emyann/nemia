@@ -15,10 +15,10 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
-const root = scratch('hkb-api-folder-');
+const root = scratch('nemia-api-folder-');
 process.env.WF_ROOT = root;
 /** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
-const notARepo = scratch('hkb-api-folder-here-');
+const notARepo = scratch('nemia-api-folder-here-');
 process.env.HKB_REPO = notARepo;
 
 /** A folder team of the store's own, as workflows/note is: every step says `workspace: folder`, so it looks at no repository. */

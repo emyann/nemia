@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = scratch('hkb-api-harness-root-');
+process.env.WF_ROOT = scratch('nemia-api-harness-root-');
 await import('../src/app.ts');
 const { engine } = await import('agent-orchestrator');
 
@@ -59,7 +59,7 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   fs.writeFileSync(registry, '[]');
 
   const e = engine();
-  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('hkb-api-cwd-'), harness: 'claude' });
+  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('nemia-api-cwd-'), harness: 'claude' });
   let before = observations();
   await e.list();
   assert.ok(

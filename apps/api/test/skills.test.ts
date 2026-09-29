@@ -1,8 +1,8 @@
 /**
- * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, what HKB ships
- * beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back from disk,
- * and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one of yours
- * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
+ * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, what Nemia
+ * ships beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back
+ * from disk, and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one
+ * of yours written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
  * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
  * your library first: only the lookup does.
@@ -17,9 +17,9 @@ import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 
 /** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
-const root = scratch('hkb-api-skills-');
+const root = scratch('nemia-api-skills-');
 process.env.WF_ROOT = root;
-const repo = scratch('hkb-api-skills-repo-');
+const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
@@ -28,7 +28,7 @@ type SkillPlace = import('../src/agents/skills.ts').SkillPlace;
 type SkillRow = import('../src/agents/skills.ts').SkillRow;
 type SkillAdded = import('../src/agents/skills.ts').SkillAdded;
 
-/** What HKB ships: the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
+/** What Nemia ships: the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
 const shipped = fs
   .readdirSync(SHIPPED)
@@ -96,7 +96,7 @@ async function listed(): Promise<SkillPlace[]> {
 const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined =>
   places.find((p) => p.from === from)?.skills.find((s) => s.name === name);
 
-test("the skills are listed by place — yours, the repository's, then what HKB ships — each name where an agent of yours finds it", async () => {
+test("the skills are listed by place — yours, the repository's, then what Nemia ships — each name where an agent of yours finds it", async () => {
   const places = await listed();
   assert.deepEqual(
     places.map((p) => [p.from, p.dir]),
@@ -148,7 +148,7 @@ test('a skill whose SKILL.md is no card entry is listed with the refusal, and a 
   const scratchRow = rowOf(await listed(), 'repo', 'scratch')!;
   assert.equal(scratchRow.entry, null);
   assert.match(scratchRow.error ?? '', /SKILL\.md has no frontmatter, and a skill's card entry is read from it/);
-  const outside = scratch('hkb-api-skills-outside-');
+  const outside = scratch('nemia-api-skills-outside-');
   skill(outside, 'far', '---\ndescription: Far away.\n---\nSecret.\n');
   fs.symlinkSync(path.join(outside, 'far'), path.join(LIBRARY, 'far'));
   try {
@@ -169,7 +169,7 @@ test('a shipped skill says where an agent of yours already finds its name: in yo
   assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every shipped skill reads');
   assert.ok(
     places[2].skills.every((s) => s.usedBy.length === 0),
-    'no agent of yours is given a skill from where HKB ships it',
+    'no agent of yours is given a skill from where Nemia ships it',
   );
 });
 
@@ -197,7 +197,7 @@ test('a shipped skill is copied into your library, byte for byte, and listed the
   );
 });
 
-test("REFUSED at shipped defaults: a skill HKB does not ship, a name that is not a skill's, and a body that names none", async () => {
+test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is not a skill's, and a body that names none", async () => {
   await refused(
     send('/api/skills/yours', { copy: 'no-such-skill' }),
     404,
@@ -205,7 +205,7 @@ test("REFUSED at shipped defaults: a skill HKB does not ship, a name that is not
   );
   await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the skill HKB ships to copy, a string/);
+  await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the skill Nemia ships to copy, a string/);
   await refused(send('/api/skills/yours', [toCopy]), 400, /takes a JSON object: .*`{ "copy"/);
   await refused(send('/api/skills/yours', '{'), 400, /takes a JSON body/);
 });
@@ -446,7 +446,7 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
 test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is a 400 in the api's words, word for word, a key no skill has only once the rest are read — and a body sending both or neither is refused as such before either is read", async () => {
   const route = 'POST /api/skills/yours';
   const shape =
-    '`{ "copy": "<the name of a skill HKB ships>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
+    '`{ "copy": "<the name of a skill Nemia ships>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
   const fresh = { ...NOTES, name: 'fresh' };
   for (const [skill, said] of [
     [null, "`skill` is the skill, an object, and this request's was null"],
@@ -488,7 +488,7 @@ test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is
 
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet, in a checkout whose path has a space and a quote", async () => {
   const { copyCommand } = await import('../src/agents/skills.ts');
-  const checkout = path.join(scratch('hkb-api-skills-copy-'), "Jo's work", 'repo');
+  const checkout = path.join(scratch('nemia-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');
   const run = () => execFileSync('sh', ['-c', copyCommand(path.join(LIBRARY, 'mine'), into)], { stdio: ['ignore', 'pipe', 'pipe'] });

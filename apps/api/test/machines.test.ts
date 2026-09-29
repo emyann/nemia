@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = scratch('hkb-api-machines-');
+process.env.WF_ROOT = scratch('nemia-api-machines-');
 const { app } = await import('../src/app.ts');
 const { lifecycleGraph } = await import('agent-orchestrator');
 type MachineGraph = import('../src/machines/machines.ts').MachineGraph;

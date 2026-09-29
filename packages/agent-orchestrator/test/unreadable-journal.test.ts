@@ -23,7 +23,7 @@ process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { readRun, start } = await import('../src/runner.ts');
-const { tick } = await import('../src/tick.ts');
+const { tick } = await import('../src/tick/tick.verb.ts');
 const { main } = await import('../src/cli.ts');
 const { readFeed } = await import('../src/feed/feed.store.ts');
 const { REMOVED } = await import('../src/feed/feed.ts');

@@ -135,7 +135,7 @@ test('a task already admitted or not queued is never admitted again', () => {
   assert.deepEqual(toAdmit({ views, momentum: none, ceiling: 5 }), []);
 });
 
-test('momentumOf: each task a run names reads as tick.ts filed it, and an id no run names is 0', () => {
+test('momentumOf: each task a run names reads as advance.verb.ts filed it, and an id no run names is 0', () => {
   const steps = [
     { name: 'plan', after: [] },
     { name: 'implement', after: ['plan'] },

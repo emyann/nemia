@@ -40,7 +40,7 @@ const STORE = ['branches', 'artifacts'].map((f) => `src/${f}.ts`);
  * What uses the runtime at the root of `src` and in `bin`, through the client: the root, the controllers it re-exports, and the CLI
  * above them.
  */
-const CONTROLLER = [...['runner', 'tick', 'cli'].map((f) => `src/${f}.ts`), 'bin/wf.ts'];
+const CONTROLLER = [...['runner', 'cli'].map((f) => `src/${f}.ts`), 'bin/wf.ts'];
 
 /** The CLI's folder: every file in it is a controller, and the CLI. */
 const CLI_FOLDER = 'src/cli/';
@@ -355,7 +355,7 @@ test('REFUSED: a pure file in a folder that reads the disk, a store in a folder 
   assert.deepEqual(impurities({ ...packageSources(), 'src/x/index.ts': ['src/x/x.store.ts'], 'src/x/x.store.ts': [] }), [
     'src/x/index.ts is pure and imports src/x/x.store.ts',
   ]);
-  const store = { ...adding('src/tick.ts', 'src/x/x.store.ts'), 'src/x/x.store.ts': ['agent-runtime'] };
+  const store = { ...adding('src/tick/tick.verb.ts', 'src/x/x.store.ts'), 'src/x/x.store.ts': ['agent-runtime'] };
   assert.deepEqual(treeBreaks(store), ['src/x/x.store.ts is a store file and imports agent-runtime']);
   assert.deepEqual(clientBreaks({ ...packageSources(), 'src/x/x.verb.ts': ['src/x/x.store.ts'] }), [
     'src/x/x.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
@@ -405,7 +405,7 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
     'src/workflow/step-file.ts is pure and imports src/folder/folder.store.ts',
   ]);
   assert.deepEqual(impurities(adding('src/feed/feed.ts', 'src/runner.ts')), ['src/feed/feed.ts is pure and imports src/runner.ts']);
-  assert.deepEqual(impurities(adding('src/run.ts', 'src/tick.ts')), ['src/run.ts is pure and imports src/tick.ts']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'src/tick/tick.verb.ts')), ['src/run.ts is pure and imports src/tick/tick.verb.ts']);
   assert.deepEqual(impurities(adding('src/timeline/timeline.ts', CLIENT)), [
     'src/timeline/timeline.ts is pure and imports src/runtime-client.ts',
   ]);
@@ -452,8 +452,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/record/record.store.ts', CLIENT)), [
     'src/record/record.store.ts is a store file and imports src/runtime-client.ts, the client: a cycle',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/tick.ts')), [
-    'src/agents/agents.store.ts is a store file and imports src/tick.ts, a controller: a cycle',
+  assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/tick/tick.verb.ts')), [
+    'src/agents/agents.store.ts is a store file and imports src/tick/tick.verb.ts, a controller: a cycle',
   ]);
   assert.deepEqual(treeBreaks(adding('src/agents/agents.store.ts', 'src/inbox/inbox.store.ts')), [
     'src/agents/agents.store.ts imports src/inbox/inbox.store.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/folder/folder.store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/record/record.store.ts, src/workspace/worktree.store.ts, src/folder/write.store.ts',
@@ -480,8 +480,8 @@ test('cli.ts reaches the package only through runner.ts and workflow.ts, and bin
     'REFUSED: the CLI reaching past runner.ts',
   );
   assert.deepEqual(
-    cliBreaks(adding('src/cli.ts', 'src/tick.ts')),
-    ['src/cli.ts imports src/tick.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
+    cliBreaks(adding('src/cli.ts', 'src/tick/tick.verb.ts')),
+    ['src/cli.ts imports src/tick/tick.verb.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
     'REFUSED: the CLI reaching a controller beneath the root',
   );
   assert.deepEqual(
@@ -515,8 +515,8 @@ test(`the runtime is reached through one client: only ${CLIENT} imports agent-ru
 });
 
 test('REFUSED: a type imported from the runtime by a controller, a store file, a pure file or the CLI, a client that imports none, a controller that goes round it, and a client above a controller', () => {
-  assert.deepEqual(clientBreaks(adding('src/tick.ts', 'agent-runtime')), [
-    'src/tick.ts imports agent-runtime, and only src/runtime-client.ts may',
+  assert.deepEqual(clientBreaks(adding('src/tick/tick.verb.ts', 'agent-runtime')), [
+    'src/tick/tick.verb.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('src/runner.ts', 'agent-runtime')), [
     'src/runner.ts imports agent-runtime, and only src/runtime-client.ts may',
@@ -542,8 +542,11 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   assert.deepEqual(clientBreaks(planted('src/views/views.verb.ts', (imports) => imports.filter((m) => m !== CLIENT))), [
     'src/views/views.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
   ]);
-  assert.deepEqual(clientBreaks(adding(CLIENT, 'src/tick.ts')), [
-    'src/runtime-client.ts imports src/tick.ts, a controller: the client is beneath every controller',
+  assert.deepEqual(clientBreaks(planted('src/meter/meter.verb.ts', (imports) => imports.filter((m) => m !== CLIENT))), [
+    'src/meter/meter.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
+  ]);
+  assert.deepEqual(clientBreaks(adding(CLIENT, 'src/tick/tick.verb.ts')), [
+    'src/runtime-client.ts imports src/tick/tick.verb.ts, a controller: the client is beneath every controller',
   ]);
 });
 
@@ -575,12 +578,12 @@ test('the client and the controllers import one another with no cycle', () => {
 });
 
 test('REFUSED: a cycle between two controllers, a longer one, and one through the client', () => {
-  assert.deepEqual(cycles(adding('src/views/views.verb.ts', 'src/tick.ts')), [
-    'a cycle: src/tick.ts → src/views/views.verb.ts → src/tick.ts',
+  assert.deepEqual(cycles(adding('src/meter/meter.verb.ts', 'src/tick/tick.verb.ts')), [
+    'a cycle: src/meter/meter.verb.ts → src/tick/tick.verb.ts → src/meter/meter.verb.ts',
   ]);
-  assert.deepEqual(cycles(adding('src/start/start.verb.ts', 'src/decide/decide.verb.ts')), [
-    'a cycle: src/decide/decide.verb.ts → src/tick.ts → src/inbox/inbox.verb.ts → src/start/start.verb.ts → src/decide/decide.verb.ts',
-    'a cycle: src/decide/decide.verb.ts → src/tick.ts → src/start/start.verb.ts → src/decide/decide.verb.ts',
+  assert.deepEqual(cycles(adding('src/start/start.verb.ts', 'src/tick/tick.verb.ts')), [
+    'a cycle: src/inbox/inbox.verb.ts → src/start/start.verb.ts → src/tick/tick.verb.ts → src/inbox/inbox.verb.ts',
+    'a cycle: src/start/start.verb.ts → src/tick/tick.verb.ts → src/tick/advance.verb.ts → src/tick/file.verb.ts → src/start/start.verb.ts',
   ]);
   assert.deepEqual(cycles(adding(CLIENT, 'src/views/views.verb.ts')), [
     'a cycle: src/runtime-client.ts → src/views/views.verb.ts → src/runtime-client.ts',

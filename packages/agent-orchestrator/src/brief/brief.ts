@@ -73,7 +73,7 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
- *   (`fromRunSection`), gathered by tick.ts. Given to no other step: a run without `after`, and every step after a root, is composed
+ *   (`fromRunSection`), gathered by file.verb.ts. Given to no other step: a run without `after`, and every step after a root, is composed
  *   without it.
  * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`, under
  *   what was asked for.
@@ -283,7 +283,7 @@ export type ParentStep = { step: Workflow; said: Closeout } | { name: string; un
 
 /**
  * A run this one waited on (`--after`), as the pass that files this run's roots read it off the store and the engine (`parentCloseouts` in
- * tick.ts): the first line of what it was asked and its terminal steps — or why the run itself cannot be read.
+ * file.verb.ts): the first line of what it was asked and its terminal steps — or why the run itself cannot be read.
  */
 export type ParentCloseout = { run: string; asked: string; steps: readonly ParentStep[] } | { run: string; unreadable: string };
 

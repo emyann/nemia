@@ -2,7 +2,7 @@
  * Pools by subscription, at shipped defaults, through the orchestrator's admission: the client's `engine()`, which files every task
  * `queued`, and `tick()`, which admits off the runtime's report. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass.
  * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers
- * from its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
+ * from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  *
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`

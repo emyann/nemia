@@ -7,7 +7,7 @@
  * the verb — so "what happens when they overlap" is a property worth pinning down.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads. `WF_VERIFY_REST=1` judges in full every run a
- * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.ts).
+ * pass answers from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

@@ -51,9 +51,9 @@ export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boo
 export type MomentumOf = { run: Pick<Run, 'steps'>; steps: ReadonlyArray<Pick<Workflow, 'name' | 'after'>> };
 
 /**
- * The momentum of each task a run names, by `tick.ts`'s filing rules: a step's first task
- * `stepMomentum(step)` (none, 0, for a run's first steps; `MOMENTUM` for a step after another); every later try, round and check `MOMENTUM`,
- * since none is a run's first filing. An id no run names — a store edited by hand, a run removed while its task waited — is 0.
+ * The momentum of each task a run names, by `advance.verb.ts`'s filing rules: a step's first task `stepMomentum(step)` (none, 0, for a
+ * run's first steps; `MOMENTUM` for a step after another); every later try, round and check `MOMENTUM`, since none is a run's first filing.
+ * An id no run names — a store edited by hand, a run removed while its task waited — is 0.
  */
 export function momentumOf(entries: Iterable<MomentumOf>): (taskId: string) => number {
   const of = new Map<string, number>();
@@ -113,9 +113,9 @@ export function toAdmit({
 export type CheckoutHold = { run: string; step: string };
 
 /**
- * A run's claim on a repository's own checkout on a pass (`checkoutHold` in tick.ts): the `workspace: main` step that works there, the
- * repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`, the
- * time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
+ * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: main` step that works there,
+ * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
+ * the time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
  */
 export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
 

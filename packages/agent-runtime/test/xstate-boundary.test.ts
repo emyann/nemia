@@ -65,7 +65,7 @@ test('the scan reads every workspace, and the lifecycle imports XState — or it
   const files = workspaceFiles();
   for (const f of [
     'packages/agent-runtime/src/core/engine/engine.ts',
-    'packages/agent-orchestrator/src/tick.ts',
+    'packages/agent-orchestrator/src/tick/tick.verb.ts',
     'apps/api/src/app.ts',
     'packages/agent-runtime/bin/ae.ts',
   ])
@@ -92,7 +92,7 @@ test('REFUSED: XState imported outside the lifecycle — the root, a subpath, a 
     ['packages/agent-runtime/src/index.ts', "export { setup } from 'xstate';", 'xstate'],
     ['packages/agent-runtime/bin/ae.ts', "const x = await import('xstate');", 'xstate'],
     ['packages/agent-runtime/test/engine.test.ts', "import { createActor } from 'xstate';", 'xstate'],
-    ['packages/agent-orchestrator/src/tick.ts', "import { setup } from 'xstate/guards';", 'xstate/guards'],
+    ['packages/agent-orchestrator/src/tick/tick.verb.ts', "import { setup } from 'xstate/guards';", 'xstate/guards'],
     ['apps/web/src/lib/status.ts', "import { useMachine } from '@xstate/react';", '@xstate/react'],
   ];
   for (const [file, line, spec] of planted) {

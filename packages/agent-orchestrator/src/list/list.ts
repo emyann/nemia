@@ -125,7 +125,7 @@ export type Listing = {
  * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts):
  *   what says a finished run is one nobody has decided.
  * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
- *   tick.ts): what this run's ending says where `waiting` would be.
+ *   ending.verb.ts): what this run's ending says where `waiting` would be.
  * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's
  *   `needs-human` on the step's line, and nowhere else. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly,
  *   here and by everything that reads a step's status — `harnessBlocked` in views.verb.ts, the api's `needsOf`, `stepState` on the board —

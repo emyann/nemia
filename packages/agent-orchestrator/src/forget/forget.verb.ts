@@ -1,8 +1,8 @@
 /**
  * Forgetting a run that is over (`forget`, `wf rm`): it reads a run as `cancel` does, adopting what a pass filed and never wrote down
- * (`tick.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime through the client
- * (`runtime-client.ts`); it never stops anything. `wf rm` closes a task held open that waits for a word, which runs nothing and is settled as
- * it signed: no pass reads the run again to close it.
+ * (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime through
+ * the client (`runtime-client.ts`); it never stops anything. `wf rm` closes a task held open that waits for a word, which runs nothing and
+ * is settled as it signed: no pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,7 @@ import { gitSays, handOff } from '../workspace/worktree.store.ts';
 import { standingsOf } from '../branches.ts';
 import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /**

@@ -1,7 +1,7 @@
 /**
  * What the tick's memo of runs at rest saves a pass, counted by the meter on a store of finished runs beside a few in flight, and that each
- * input of a run takes it out of the memo (`advanceResting` in tick.ts): its record, the files a person keeps beside it, its asks and what
- * is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
+ * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
+ * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
  * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
  * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in
@@ -15,9 +15,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import type { GitRun, Run } from '../src/run.ts';
-import type { PassCost } from '../src/meter/meter.ts';
-import { scratch } from './scratch.ts';
+import type { GitRun, Run } from '../run.ts';
+import type { PassCost } from '../meter/meter.ts';
+import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-rest-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -25,11 +25,11 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = await import('../src/runner.ts');
-const { tick, freshRestMemo } = await import('../src/tick.ts');
+const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = await import('../runner.ts');
+const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
-  await import('../src/record/record.store.ts');
-const { feedFile } = await import('../src/feed/feed.store.ts');
+  await import('../record/record.store.ts');
+const { feedFile } = await import('../feed/feed.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

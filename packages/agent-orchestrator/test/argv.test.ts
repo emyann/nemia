@@ -23,7 +23,7 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-argv-config-');
 const { engine, readRun, start, tick } = await import('../src/runner.ts');
-const { freshRestMemo } = await import('../src/tick.ts');
+const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 
 const SHIPPED = fileURLToPath(new URL('../../../workflows/', import.meta.url));
 const FIXTURE = fileURLToPath(new URL('./fixtures/argv-shipped.json', import.meta.url));

@@ -214,6 +214,21 @@ test('no two source files need each other’s values', () => {
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
+test("REFUSED on the source: a value import from the format's leaf back to a folder above it closes a cycle", () => {
+  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
+  files.set('src/step/step.ts', `${files.get('src/step/step.ts')}\nimport { countOf } from '../keys/index.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), [
+    [
+      'src/closeout/closeout.ts',
+      'src/harness/harness.ts',
+      'src/keys/index.ts',
+      'src/keys/keys.ts',
+      'src/keys/tools.ts',
+      'src/step/step.ts',
+    ],
+  ]);
+});
+
 test('REFUSED: a source file that imports a test or test support; a barrel that re-exports a whole module', () => {
   assert.deepEqual(testImports('src/check/check.ts', importsIn("import { corpus } from './check.test.ts';")), [
     'src/check/check.ts imports src/check/check.test.ts: nothing but a test imports a test — move what both need into the source',
@@ -285,6 +300,14 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
       'src/tick.ts imports src/brief/brief.ts: src/brief/ has 2 pure files and no index.ts — write one that re-exports them by name, and import it',
       'src/tick.ts imports src/retry/retry-ask.ts: import src/retry/index.ts, the face of src/retry/',
     ],
+  );
+});
+
+test('REFUSED on the source: a file outside keys/ importing its readers past keys/index.ts', () => {
+  const files = sourceFiles();
+  assert.deepEqual(
+    faceBreaks(files, (f) => importsIn(f === 'src/tick.ts' ? `${read(f)}\nimport { toolsOf } from './keys/tools.ts';` : read(f))),
+    ['src/tick.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
   );
 });
 

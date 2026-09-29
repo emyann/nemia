@@ -1,14 +1,14 @@
 /**
  * The package's boundary, as a test rather than a sentence in the README (`docs/architecture.md` says the same rules in prose).
  *
- * **Every file is of one of four kinds, named below.** `PURE` files hold the judgement — `assess` in `run.ts`, the verdict in
- * `check.ts`, the format in `workflow.ts` — and import no runtime, read no disk and spawn nothing, which is what lets them be tested as
- * data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never the client, and load as
- * a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the runtime through the
- * client: `runner.ts`, the package's root, the six it re-exports, split by concern, and the CLI above them, which parses, calls and
- * prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as `bin/wf.ts` reaches it through
- * the CLI. The client and the controllers import one another with no cycle. A file in `src/` or `bin/` that no kind names fails the
- * suite: a new file is sorted when it is written.
+ * **Every file is of one of four kinds, named below.** `PURE` files hold the judgement — `assess` in `run.ts`, the verdict in `check.ts`,
+ * the format in `workflow.ts` and the folders it re-exports — and import no runtime, read no disk and spawn nothing, which is what lets
+ * them be tested as data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never the
+ * client, and load as a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the
+ * runtime through the client: `runner.ts`, the package's root, the six it re-exports, split by concern, and the CLI above them, which
+ * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as `bin/wf.ts`
+ * reaches it through the CLI. The client and the controllers import one another with no cycle. A file in `src/` or `bin/` that no kind
+ * names fails the suite: a new file is sorted when it is written.
  *
  * **A file in a feature folder takes its kind from its name** (`kindOf`): `<name>.store.ts` is a store, `<name>.verb.ts` a controller,
  * any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in `bin` is named in a list
@@ -384,6 +384,10 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/workflow.ts', 'src/workflow-store.ts')), [
     'src/workflow.ts is pure and imports src/workflow-store.ts',
   ]);
+  assert.deepEqual(impurities(adding('src/keys/keys.ts', 'node:fs')), ['src/keys/keys.ts is pure and imports node:fs']);
+  assert.deepEqual(impurities(adding('src/workflow/step-file.ts', 'src/workflow-store.ts')), [
+    'src/workflow/step-file.ts is pure and imports src/workflow-store.ts',
+  ]);
   assert.deepEqual(impurities(adding('src/feed/feed.ts', 'src/runner.ts')), ['src/feed/feed.ts is pure and imports src/runner.ts']);
   assert.deepEqual(impurities(adding('src/run.ts', 'src/tick.ts')), ['src/run.ts is pure and imports src/tick.ts']);
   assert.deepEqual(impurities(adding('src/timeline/timeline.ts', CLIENT)), [
@@ -448,6 +452,11 @@ test('cli.ts reaches the package only through runner.ts and workflow.ts, and bin
     cliBreaks(adding('src/cli.ts', 'src/tick.ts')),
     ['src/cli.ts imports src/tick.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
     'REFUSED: the CLI reaching a controller beneath the root',
+  );
+  assert.deepEqual(
+    cliBreaks(adding('src/cli.ts', 'src/agents/agents.ts')),
+    ['src/cli.ts imports src/agents/agents.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
+    'REFUSED: the CLI reaching a part of the format past its entry',
   );
   assert.deepEqual(
     cliBreaks(adding('bin/wf.ts', 'src/runner.ts')),

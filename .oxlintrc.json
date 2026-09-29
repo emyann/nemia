@@ -526,14 +526,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/decide/decide.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 135, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 45 }],
-        "sonarjs/cognitive-complexity": ["error", 54]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/feed/feed.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 82, "skipBlankLines": true, "skipComments": true }],

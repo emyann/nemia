@@ -1,9 +1,11 @@
 /**
- * `wf decide` (`decide`): the pure call over one read of each task, with what a person needs to decide the run. It reads the repository's
+ * `wf decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the repository's
  * own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the runtime
- * through the client (`runtime-client.ts`).
+ * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), and `decide`, its
+ * plain face in a Promise, over the engine it is handed.
  */
-import { nameFor, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, nameFor, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
@@ -44,7 +46,13 @@ import { isRemoteHarness } from '../harness/harness.ts';
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
 
-/** What `wf decide` answers of one run (`decide`). */
+/** A synchronous read of the store or of git, failing with what it threw. */
+const tried = <A>(read: () => A): Effect.Effect<A, unknown> => Effect.try({ try: read, catch: (err) => err });
+
+/** A read of the engine, failing with what it rejected with. */
+const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, unknown> => Effect.tryPromise({ try: read, catch: (err) => err });
+
+/** What `wf decide` answers of one run (`decideRun`). */
 export type Decided = {
   run: Run;
   decision: Decision;
@@ -132,34 +140,36 @@ export type Decided = {
  * For each step whose current try a person answered, the answer beside the `needs` of the try before it, off `views` or, for a try
  * not among them, the engine's view of it (`e`, the call's `viewedOnce`).
  */
-async function answersOf(
+const answersOf = Effect.fn('answersOf')(function* (
   e: Engine,
   run: Run,
   views: ReadonlyMap<string, TaskView>,
   given: ReturnType<typeof readAnswers>,
-): Promise<Record<string, Answered>> {
+) {
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
     if (!answer) continue;
     const before = run.steps[name].tries!.at(-1)!.taskId;
-    const closeout = (views.get(before) ?? (await e.view(before))).state.attempts.at(-1)?.closeout;
+    const closeout = (views.get(before) ?? (yield* awaited(() => e.view(before)))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
   return answers;
-}
+});
 
 /** `views`, with the engine's view of every earlier try's task and check they do not hold (`e`, the call's `viewedOnce`). */
-async function everyTryOf(e: Engine, run: Run, views: ReadonlyMap<string, TaskView>): Promise<Map<string, TaskView>> {
+const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
   const everyTry = new Map(views);
   for (const record of Object.values(run.steps)) {
     for (const t of record.tries ?? []) {
-      for (const taskId of [t.taskId, t.check?.taskId]) if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, await e.view(taskId));
+      for (const taskId of [t.taskId, t.check?.taskId]) {
+        if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* awaited(() => e.view(taskId)));
+      }
     }
   }
   return everyTry;
-}
+});
 
 /** For each step, what a person said to its sessions, try by try, off `everyTry`; a task two tries share is read once. */
 function saidOf(run: Run, everyTry: ReadonlyMap<string, TaskView>): Record<string, SaidTo[]> {
@@ -223,38 +233,39 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
  */
-export async function decide(engine: Engine, id: string): Promise<Decided> {
-  const e = viewedOnce(engine);
-  const git = branchReader();
-  const run = readRun(id);
-  const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run);
+export const decideRun = Effect.fn('decide')(function* (id: string) {
+  const e = viewedOnce(yield* EngineService);
+  const git = yield* tried(() => branchReader());
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
-    await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'),
+    yield* awaited(() => checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped')),
   );
-  const { asks, rounds } = readAsks(id);
+  const { asks, rounds } = yield* tried(() => readAsks(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const checkout = await checkoutHold(e, run, steps);
-  const d = decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
-  const standings = standingsOf(run, git);
+  const checkout = yield* awaited(() => checkoutHold(e, run, steps));
+  const shipped = yield* tried(() => shippedOf(run, git));
+  const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+  const standings = yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
-  const answers = await answersOf(e, run, views, readAnswers(id));
-  const everyTry = await everyTryOf(e, run, views);
+  const answers = yield* answersOf(e, run, views, yield* tried(() => readAnswers(id)));
+  const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const used = consumption(views, run);
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
-  const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => runSlots(e))).get(id) : undefined;
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
-  const parent = await parentsOf(e, run, git);
-  return {
+  const parent = yield* awaited(() => parentsOf(e, run, git));
+  const answer: Decided = {
     run,
     decision: d,
     closeouts,
@@ -281,4 +292,9 @@ export async function decide(engine: Engine, id: string): Promise<Decided> {
     ...(checkout ? { checkout } : {}),
     ...(decide ? { toDecide: decide } : {}),
   };
-}
+  return answer;
+});
+
+/** `wf decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with what the program failed with. */
+export const decide = (engine: Engine, id: string): Promise<Decided> =>
+  Effect.runPromise(decideRun(id).pipe(Effect.provide(EngineService.layer(engine))));

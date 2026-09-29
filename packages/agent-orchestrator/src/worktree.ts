@@ -27,7 +27,9 @@ import {
   type WorktreeInclude,
 } from './workspace/workspace.ts';
 import { folderPlace } from './record/places.store.ts';
-import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
+import type { MergeState } from './ending/ending.ts';
+import { isGitRun, type Run } from './record/record.ts';
+import { workspacePlan } from './workspace/workspace.ts';
 import type { Workflow } from './step/step.ts';
 import { HOME, lstatOf, runsDir } from './record/record.store.ts';
 import { countSpawn, execCounted, readText } from './meter/tally.store.ts';

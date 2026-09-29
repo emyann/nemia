@@ -9,7 +9,11 @@
  * the controllers' (`views.ts`, `decide.ts`).
  */
 import { execCounted } from './meter/tally.store.ts';
-import { isGitRun, resultSteps, type BranchStanding, type GitRun, type ParentRun, type Run, type Shipped } from './run.ts';
+import { resultSteps } from './branches/branches.ts';
+import { isGitRun, type GitRun, type Run } from './record/record.ts';
+import type { BranchStanding } from './status/status.ts';
+import type { ParentRun } from './wait/wait.ts';
+import type { Shipped } from './run.ts';
 import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
 import { readRun, stepsOf } from './record/record.store.ts';
 import { git, gitSays } from './worktree.ts';

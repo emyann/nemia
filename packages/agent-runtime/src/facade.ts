@@ -11,7 +11,8 @@
  * imports Effect can never have two.
  *
  * This file names what the door gives, and holds nothing of its own: what a consumer writes and the adapters over it are
- * in `facade/consumer.ts`, the engine it gets in `facade/engine.ts`, and a harness written in Promises in `facade/promise.ts`.
+ * in `facade/consumer.ts`, the engine it gets in `facade/engine.ts` (the `Engine` service of `service/engine.ts`, each verb run as a
+ * Promise), and a harness written in Promises in `facade/promise.ts`.
  */
 export type {
   PromiseJournal,

@@ -40,6 +40,8 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
   journal (`upgrade`) and refused there at both doors (`FORMER_ARGS`). Pin the argv before a move and compare after.
 - **An optional verb renamed on its way through a seam is dropped by every door that takes the old type**: keep the old verb beside the
   new one, and test each door by calling the verb through it.
+- **A verb is written once, on the `Engine` service** (`src/service/engine.ts`), and reaches the Promise door through `promiseEngine`;
+  `test/doors.test.ts` refuses a verb one door lacks, and proves each verb and its refusals through both.
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`): declare the field and assign it.
 - **A journal is decoded before `upgrade`, as any store gives it back** (`Journal.layer`, `event-schema.ts`): an entry no runtime
   wrote fails that task's read with a `JournalError` naming the file, the entry and its first wrong field (`entryWords`); the pass

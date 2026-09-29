@@ -284,12 +284,27 @@ channels, the lot. Keep your `effect` version aligned with this package's if you
 tags are identity-based, and two copies in one tree do not see each other's services. A consumer
 who never imports Effect can never have that problem.
 
+The engine itself is a service there, `Engine`: `Engine.layer(options)` takes what `createEngine` takes, and each verb is an
+Effect whose refusal is a tagged error in the words the Promise door rejects with, without the verb in front. `createEngine` is
+that layer with each verb run as a Promise (`promiseEngine`), so both doors are one engine; `test/doors.test.ts` calls every verb
+through both.
+
+```ts
+import { Effect } from 'effect'
+import { Engine } from 'agent-runtime/effect'
+
+const id = await Effect.runPromise(
+  Engine.use((e) => e.file({ brief, cwd })).pipe(Effect.provide(Engine.layer({ root }))),
+)
+```
+
 Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — `refusalOf` in
 `src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness/args.ts` for the checks every harness shares
 of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built with `Runner.of`
 alone is no way round them; `test/refusal.test.ts` holds both doors to both — and fails
 with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
-ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6).
+ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6). `Engine`'s
+`file` has them, and refuses them as `createEngine().file()` does.
 
 ## Several harnesses, one board
 
@@ -726,7 +741,7 @@ its budget is the orchestrator's to decide:
 by up to one response. `claude --bg` took the same flag without a word, read the file 42 times, spent $0.19 and was listed
 `done`; neither the registry nor its transcript said anything of a budget, and the flag's help says it "only works with
 --print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget beside `background: true`, naming
-a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API, which refuses
+a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API's bare `file`, which refuses
 no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
@@ -1683,7 +1698,7 @@ selector, and it is why no attempt can ever run twice.
 
 Folders by feature, held by path in `test/layout.test.ts`: the two entries alone sit flat in `src/`; `core/` is the
 judgement and `core/engine/` its shell; `harness/` is the seam and each harness's driver; `a2a/` alone imports the A2A SDK;
-`facade/` is the Promise door and `cli/` the `ae` command. A folder another folder reads has a face, `index.ts`, and a test
+`service/` is the engine as an Effect service, `facade/` the Promise door over it, and `cli/` the `ae` command. A folder another folder reads has a face, `index.ts`, and a test
 of pure code sits beside it.
 
 | file | what |
@@ -1724,7 +1739,9 @@ of pure code sits beside it.
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
-| `src/facade/engine.ts` | `createEngine`: the engine in Promises |
+| `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/index.ts` | the face of `service/`, as the doors take it |
+| `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2; and `createEngine`, the Promise face of `Engine.layer` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |

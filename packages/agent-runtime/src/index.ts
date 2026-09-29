@@ -28,12 +28,19 @@
  *
  * The list, in groups:
  *
- * - filing work, asking about it and stopping it (`filing.ts`, `engine.ts`);
+ * - the engine as a service (`Engine`, `service/engine.ts`): a layer made from the engine's options, whose verbs are Effects with
+ *   typed errors, and `promiseEngine`, which runs each verb of a layer's `Engine` as a Promise, as `createEngine` does;
+ * - filing work, asking about it and stopping it, verb by verb (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
  *   that checks a task before filing it holds its own copy to.
  */
+
+export { Engine, EngineRefused, ListRefused, TranscriptRefused, SayRefused, SayUnsent } from './service/index.ts';
+export type { EngineShape } from './service/index.ts';
+export { promiseEngine } from './facade/engine.ts';
+export type { EngineOptions, TaskSpec, TickReport, EngineIo, ObserveCount } from './facade/consumer.ts';
 
 export { file, FileRefused, requestStop, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
 export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';

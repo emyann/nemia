@@ -9,7 +9,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | Layer | Owns | Public contract |
 |---|---|---|
 | `packages/agent-runtime` | One agent session run to completion, durably, on one harness: the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `decide` is exported by neither. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess`, and the words a run is described in. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess`, and the words a run is described in. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP and imports no package. | Its pages. |
 
@@ -40,9 +40,9 @@ restart, so it never decides what a full pass would not; the tests that tick jud
 **1. Between packages, only the public contract.** Code outside packages/agent-runtime reaches it through
 `agent-runtime` and `agent-runtime/effect` alone. That rules out its src/ by any route: a subpath not in its `exports`,
 a relative path, `import.meta.resolve`, or a path built with path.join. `decide` is exported by neither entry. The apps
-reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run` and
-`agent-orchestrator/workflow` alone. `./workflow` is the pure format, and what reads a folder from disk is exported
-from `agent-orchestrator`. XState is a dependency
+reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`,
+`agent-orchestrator/workflow` and `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the
+refusals by kind, and what reads a folder from disk is exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by.
 

@@ -83,8 +83,6 @@ export const SHIPPED_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
 /** Your library: the store's `workflows/skills/`, where the board copies a skill. */
 export const librarySkills = (home: string = HOME): string => path.join(home, 'workflows', SKILLS_FOLDER);
 
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
 /** Where an agent of yours finds its skills on `repo`: the same call a start makes for it, and `skillsOfPlace` in agents.ts. */
 const skillsOfYours = (repo: string, home: string) => skillsFor(path.join(home, 'workflows', '_'), placesOf(repo, home));
 
@@ -118,13 +116,13 @@ export function skillRow(name: string, dir: string, from: SkillSource, usedBy: s
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    return { ...row, error: `${file} cannot be read (${messageOf(err)}).` };
+    return { ...row, error: `${file} cannot be read (${err instanceof Error ? err.message : String(err)}).` };
   }
   const cost = skillTurnCost(name, text);
   try {
     return { ...row, entry: skillEntryOf(file, name, text), preload: cost.preload, cost };
   } catch (err) {
-    return { ...row, error: messageOf(err), preload: cost.preload, cost };
+    return { ...row, error: err instanceof Error ? err.message : String(err), preload: cost.preload, cost };
   }
 }
 
@@ -437,11 +435,13 @@ function skillDraftFrom(skill: typeof SKILL_DRAFT.Type, route: string, shape: st
   };
 }
 
-/** A refusal of the package's write, as the api answers it. */
-function writeRefused(err: unknown): Refusal | { status: 500; error: string } {
-  if (err instanceof SkillWriteError)
-    return { status: err.why === 'missing' ? 404 : err.why === 'exists' || err.why === 'stale' ? 409 : 422, error: err.message };
-  return { status: 500, error: messageOf(err) };
+/**
+ * A write of a skill the package refused, as the api answers it: one not there is 404; taken or stale is 409; the rest, 422. Throws any
+ * error that is not a `SkillWriteError` on to `app.onError` (app.ts), which answers a refusal by its kind and anything else a 500.
+ */
+function writeRefused(err: unknown): Refusal {
+  if (!(err instanceof SkillWriteError)) throw err;
+  return { status: err.why === 'missing' ? 404 : err.why === 'exists' || err.why === 'stale' ? 409 : 422, error: err.message };
 }
 
 /** A skill of yours written into the library, and answered as its page reads it now. */
@@ -469,7 +469,7 @@ const repoRefusal = (route: string, name: string | null, repo: string): string =
 
 /**
  * The skills' routes. Each write is guarded (guard.ts) and writes only your library: 403 for the repository's (`repoRefusal`), 400 for
- * any other place; the package's refusals are answered as `written` and `writeRefused` say.
+ * any other place; a write the package refuses is answered as `written` and `writeRefused` say, and any other refusal by its kind (`app.onError`).
  *
  * - `GET /api/skills` — every skill by place (`listSkills`), read from disk on each request, so a skill a person has just written lists as
  *   it is now.
@@ -482,13 +482,7 @@ const repoRefusal = (route: string, name: string | null, repo: string): string =
  *   otherwise: its name is its folder.
  */
 export const skills = new Hono()
-  .get('/api/skills', (c) => {
-    try {
-      return c.json(listSkills(repoOf()));
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
-  })
+  .get('/api/skills', (c) => c.json(listSkills(repoOf())))
   .get('/api/skills/:from/:name', (c) => {
     const { from, name } = c.req.param();
     if (from !== 'yours' && from !== 'repo' && from !== 'shipped')
@@ -500,19 +494,15 @@ export const skills = new Hono()
       );
     const wrong = skillNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    try {
-      const detail = skillDetail(from, name, repoOf());
-      if (detail === null)
-        return c.json(
-          {
-            error: `No skill named ${name} in ${from === 'yours' ? 'your library' : from === 'repo' ? "the repository's skills" : 'the skills HKB ships'}. GET /api/skills lists them.`,
-          },
-          404,
-        );
-      return c.json(detail);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
+    const detail = skillDetail(from, name, repoOf());
+    if (detail === null)
+      return c.json(
+        {
+          error: `No skill named ${name} in ${from === 'yours' ? 'your library' : from === 'repo' ? "the repository's skills" : 'the skills HKB ships'}. GET /api/skills lists them.`,
+        },
+        404,
+      );
+    return c.json(detail);
   })
   .post('/api/skills/:from', async (c) => {
     const { from } = c.req.param();

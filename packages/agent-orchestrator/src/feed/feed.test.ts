@@ -482,6 +482,20 @@ test('the cursor never passes a partial line: a line being written is not read, 
   assert.equal(second.cursor, size());
 });
 
+test('a line whose step or note is not text is read by nobody, and the lines after it are read', () => {
+  emptyStore();
+  const at = '2026-09-22T10:00:00.000Z';
+  const bad = [
+    { at, run: 'r-a', step: 3, word: 'running' },
+    { at, run: 'r-a', word: 'blocked', note: { needs: 'a key' } },
+  ];
+  const good = { at, run: 'r-a', step: 'plan', word: 'pending', note: 'waits on you' };
+  fs.writeFileSync(FEED, [...bad, good].map((l) => `${JSON.stringify(l)}\n`).join(''));
+  const read = readFeed(0);
+  assert.deepEqual(read.lines, [good]);
+  assert.equal(read.cursor, size());
+});
+
 test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
   emptyStore();
   const b = board();

@@ -82,6 +82,7 @@ import {
   retryLines,
   retryRefusal,
   roundAsk,
+  roundBudgetRefusal,
   roundFiled,
   roundLines,
   roundOf,
@@ -9417,4 +9418,15 @@ test("continuesFrom (open issue 5): the session a try continues is its last atte
   );
   assert.equal(continuesFrom([]), undefined);
   assert.equal(continuesFrom(undefined), undefined);
+});
+
+test("REFUSED: a round's budget that is not dollars above zero, in words naming wf round of the run; none given, or an amount, is let through", () => {
+  for (const budget of [0, -1, Number.NaN, Number.POSITIVE_INFINITY])
+    assert.equal(
+      roundBudgetRefusal('r-1', budget),
+      `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: wf round r-1 [<step>] --budget <amount>, like 5 or 2.50.`,
+      String(budget),
+    );
+  assert.equal(roundBudgetRefusal('r-1', undefined), null);
+  assert.equal(roundBudgetRefusal('r-1', 2.5), null);
 });

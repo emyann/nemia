@@ -30,7 +30,7 @@ import { HOME, inboxDir, inputsDir, isDirectory, listRuns, runId, runsDir, write
 import { makeWorkspace, readInclude } from './worktree.ts';
 import { parentRecord } from './branches.ts';
 import { inboxCards, inboxFiles, queueDir, queueTries } from './inbox/inbox.store.ts';
-import { Invalid } from './refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from './refusal/refusal.ts';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
@@ -399,8 +399,8 @@ export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run
  *
  * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card. It
  * says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is written,
- * exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there — naming the cards there are — a card that does not read, a card
- * already started, no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a
+ * exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card that does not
+ * read, a card already started (`Conflict`), no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a
  * `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a `--gate` — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
@@ -412,15 +412,15 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     text = fs.readFileSync(file, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new WorkflowError(
-      `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${path.join(inboxDir(), '<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
-    );
+    throw new Missing({
+      message: `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${path.join(inboxDir(), '<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
+    });
   }
   const card = parseInboxCard(`${opts.name}.md`, text, isDirectory);
   const started = listRuns()
     .filter((r) => r.from?.inbox === card.name)
     .map((r) => r.id);
-  if (started.length) throw new WorkflowError(startedRefusal(card, file, started));
+  if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
 
   const repo = opts.repo ?? card.repo ?? opts.callerRepo;
   let workflowDir: string;

@@ -41,6 +41,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const {
+  Conflict,
   HARNESSES,
   accept,
   advance,
@@ -56,6 +57,7 @@ const {
   list,
   listRuns,
   markCancelled,
+  Missing,
   missingArtifacts,
   parentOf,
   phaseOfView,
@@ -4059,7 +4061,7 @@ test("`wf say` hands the words to the step's current task through the engine's `
   assert.equal(recordOf(), record, 'and still nothing written');
 });
 
-test("REFUSED: `wf say` on a step the run does not have, a step not filed, a settled step and a cancelled run — exit 2 in the package's words, the engine never asked; the engine's own refusals pass through verbatim, exit 2 — a task not started, empty words — and words not delivered reject in its words with no exit code; nothing said, nothing written", async () => {
+test("REFUSED: `wf say` on a step the run does not have, a step not filed, a settled step and a cancelled run — exit 2 in the package's words, the engine never asked; the engine's own refusals are a Conflict in its words, exit 2 — a task not started, empty words — and words not delivered reject in its words with no exit code, no refusal; nothing said, nothing written", async () => {
   const run = started(folder());
   const b = board();
   await advance(b.e, readRun(run.id));
@@ -4075,7 +4077,7 @@ test("REFUSED: `wf say` on a step the run does not have, a step not filed, a set
   };
   const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
   const verbatim = (message: string, exitCode: number | undefined) => (err: Error & { exitCode?: number }) =>
-    err.exitCode === exitCode && err.message === message;
+    err.exitCode === exitCode && err.message === message && (exitCode === 2) === err instanceof Conflict;
 
   await assert.rejects(
     say(e, run.id, 'implement', 'Start with the parser.'),
@@ -4996,8 +4998,8 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
     await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedWith(pattern), argv.join(' '));
   await assert.rejects(
     main(['retry', 'no-such-run', 'implement', '--budget=5'], e),
-    /^Error: no such run: no-such-run/,
-    'read, and the run is looked for',
+    (err: unknown) => err instanceof Missing && err.message === "no such run: no-such-run  (try 'wf ls')",
+    'read, and the run is looked for: refused as Missing',
   );
 });
 

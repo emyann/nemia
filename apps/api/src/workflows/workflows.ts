@@ -24,9 +24,7 @@ import {
   agentVersion,
   cardSkills,
   HOME,
-  inboxDir,
   inboxNameRefusal,
-  listRuns,
   loadWorkflows,
   lookupRoots,
   skillsFor,
@@ -211,7 +209,18 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
   try {
     steps = loadWorkflows(dir, places);
   } catch (err) {
-    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, folderTeam: false, version, error: messageOf(err) };
+    return {
+      name,
+      from,
+      dir,
+      description,
+      steps: [],
+      graph: graphOf([]),
+      schemas,
+      folderTeam: false,
+      version,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
   return {
     name,
@@ -260,7 +269,7 @@ export function versionOf(dir: string, places: Places): string {
     try {
       return fs.readFileSync(file, 'utf8');
     } catch (err) {
-      return { unreadable: messageOf(err) };
+      return { unreadable: err instanceof Error ? err.message : String(err) };
     }
   };
   const files = names.map((name) => [name, read(path.join(dir, name))] as const);
@@ -356,9 +365,12 @@ export function foldersIn(dir: string): string[] {
     names = fs.readdirSync(dir);
   } catch (err) {
     if (['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException).code ?? '')) return [];
-    throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`, {
-      cause: err,
-    });
+    throw new Error(
+      `${dir} could not be listed (${err instanceof Error ? err.message : String(err)}), so no workflow in it is shown. Check its permissions.`,
+      {
+        cause: err,
+      },
+    );
   }
   return names
     .filter((name) => {
@@ -371,8 +383,6 @@ export function foldersIn(dir: string): string[] {
     })
     .sort();
 }
-
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 const SHAPE =
   '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
@@ -478,17 +488,6 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
 }
 
 /**
- * The status of a card's start that `startFromInbox` refused, in its words (`exitCode` 2): 404 for a card not there — its file gone, so no
- * other refusal can have read it — 409 for one a run's record already names, and 422 for the rest: a card that does not read, a workflow that
- * does not load, a blank brief, and what `start()` refuses.
- */
-function cardRefusalStatus(card: string): 404 | 409 | 422 {
-  if (!fs.existsSync(path.join(inboxDir(), `${card}.md`))) return 404;
-  if (listRuns().some((run) => run.from?.inbox === card)) return 409;
-  return 422;
-}
-
-/**
  * The workflows' routes, and the board's first write.
  *
  * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
@@ -496,7 +495,8 @@ function cardRefusalStatus(card: string): 404 | 409 | 422 {
  * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
  *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
  *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
- *   the loader's refusal, word for word, with which the folder is listed and has no step to show; 404 for a step the folder does not have.
+ *   the loader's refusal, word for word (an `Invalid`, answered by `app.onError`), with which the folder is listed and has no step to show;
+ *   404 for a step the folder does not have.
  *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
  *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
  *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
@@ -504,22 +504,20 @@ function cardRefusalStatus(card: string): 404 | 409 | 422 {
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder>
  *   --repo <repo> --after <runId>`, or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
  *   Guarded (guard.ts); the body is refused as `startWords` and `startOf` say. 201 with the run's `Location` once its record is written.
- *   Without a card, `wf start`'s refusal is 422, word for word: a folder that does not read as a workflow, a step named for another's check
- *   or try, a `.worktreeinclude` it cannot use, a repository git cannot read, or a run this one cannot wait on (`afterRefusal`). With a
- *   card, the api's repository is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
- *   `folderOf` found. `startFromInbox`'s refusals have `cardRefusalStatus`, anything else 422. A run started when the card could not be
+ *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `wf start`'s refusal is an
+ *   `Invalid`, 422: a folder that does not read as a workflow, a step named for another's check or try, a `.worktreeinclude` it cannot
+ *   use, or a run this one cannot wait on (`afterRefusal`). A failure that is not a refusal is a 500, git's on a repository it cannot
+ *   branch from among them — no git checkout, no commit — which the queue tries again on its next pass. With a card, the api's repository
+ *   is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
+ *   `folderOf` found. `startFromInbox` refuses a card not there as a `Missing` (404), one a run's record already names as a
+ *   `Conflict` (409), and the rest as an `Invalid` (422): a card that does not read, a workflow that does not load, a blank brief, and
+ *   what `start()` refuses. A run started when the card could not be
  *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
  *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
  */
 export const workflows = new Hono()
-  .get('/api/workflows', (c) => {
-    try {
-      return c.json(listWorkflows(repoOf()));
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
-  })
+  .get('/api/workflows', (c) => c.json(listWorkflows(repoOf())))
   .get('/api/workflows/:from/:name/:step', (c) => {
     const { from, name, step } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
@@ -530,46 +528,37 @@ export const workflows = new Hono()
         400,
       );
     }
-    try {
-      const folder = folderOf(name, from, repoOf(), HOME);
-      if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-      let steps: Workflow[];
-      try {
-        steps = loadWorkflows(folder.dir, placesOf(repoOf()));
-      } catch (err) {
-        return c.json({ error: messageOf(err) }, 422);
-      }
-      const found = steps.find((s) => s.name === step);
-      if (!found) {
-        return c.json(
-          { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
-          404,
-        );
-      }
-      const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      const places = placesOf(repoOf());
-      const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
-      let agentSkills: AgentSkill[] | null = null;
-      if (attached !== undefined && !(attached instanceof Error)) {
-        try {
-          agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
-        } catch {
-          agentSkills = null;
-        }
-      }
-      return c.json({
-        workflow: name,
-        from,
-        dir: folder.dir,
-        step: found.name,
-        body: found.body,
-        source,
-        keys: keyRows(found),
-        agentSkills,
-      } satisfies WorkflowStepPage);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
+    const folder = folderOf(name, from, repoOf(), HOME);
+    if ('status' in folder) return c.json({ error: folder.error }, folder.status);
+    const steps = loadWorkflows(folder.dir, placesOf(repoOf()));
+    const found = steps.find((s) => s.name === step);
+    if (!found) {
+      return c.json(
+        { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
+        404,
+      );
     }
+    const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
+    const places = placesOf(repoOf());
+    const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
+    let agentSkills: AgentSkill[] | null = null;
+    if (attached !== undefined && !(attached instanceof Error)) {
+      try {
+        agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
+      } catch {
+        agentSkills = null;
+      }
+    }
+    return c.json({
+      workflow: name,
+      from,
+      dir: folder.dir,
+      step: found.name,
+      body: found.body,
+      source,
+      keys: keyRows(found),
+      agentSkills,
+    } satisfies WorkflowStepPage);
   })
   .get('/api/repository', (c) => c.json({ repo: repoOf() }))
   .post('/api/runs', async (c) => {
@@ -581,35 +570,26 @@ export const workflows = new Hono()
     const asked = startOf(read.body, repo, HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     if (asked.card !== undefined) {
-      try {
-        const started = startFromInbox({
-          name: asked.card,
-          callerRepo: repo,
-          workflow: asked.dir,
-          ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
-          ...(asked.after ? { after: asked.after } : {}),
-        });
-        c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
-        return c.json(
-          {
-            id: started.run.id,
-            card: started.card.name,
-            removed: started.removed,
-            ...(started.removed ? {} : { why: started.why }),
-            ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-          },
-          201,
-        );
-      } catch (err) {
-        const status = (err as { exitCode?: unknown }).exitCode === 2 ? cardRefusalStatus(asked.card) : 422;
-        return c.json({ error: messageOf(err) }, status);
-      }
+      const started = startFromInbox({
+        name: asked.card,
+        callerRepo: repo,
+        workflow: asked.dir,
+        ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
+        ...(asked.after ? { after: asked.after } : {}),
+      });
+      c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
+      return c.json(
+        {
+          id: started.run.id,
+          card: started.card.name,
+          removed: started.removed,
+          ...(started.removed ? {} : { why: started.why }),
+          ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+        },
+        201,
+      );
     }
-    try {
-      const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
-      c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
-      return c.json({ id }, 201);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 422);
-    }
+    const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
+    c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
+    return c.json({ id }, 201);
   });

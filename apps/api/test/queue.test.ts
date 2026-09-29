@@ -498,7 +498,7 @@ test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last
 
   process.env.WF_MAX_RUNS = 'two';
   const res = await app.request('/api/ceilings');
-  assert.equal(res.status, 500);
+  assert.equal(res.status, 422, 'an Invalid, as every route answers one');
   assert.equal(
     ((await res.json()) as { error: string }).error,
     'WF_MAX_RUNS=two is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.',

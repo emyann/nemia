@@ -4535,8 +4535,9 @@ at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test
   step could not unset it — and the other way round. A save of `permissionMode:` on codex is refused as the former name only when it names
   a sandbox; a Claude Code mode a step kept when it was moved onto codex is written as sent and refused by the parser, naming `sandbox:`.
 - **A run frozen before loads** as it was frozen, a codex step's sandbox under `permissionMode`, and files that sandbox: the tick
-  hands the engine `sandbox ?? permissionMode` (`modeOf`), and the runtime reads `bypassPermissions` as `danger-full-access`. Only the
-  run's detail on the board shows no sandbox for such a step.
+  hands the engine `sandbox ?? permissionMode` (`modeOf`), and the runtime reads `bypassPermissions` as `danger-full-access`. The api's
+  run detail gives such a step its `permissionMode` and a null `sandbox`; the board's `sandbox` row shows the one it has
+  (`Facts.tsx`).
 - **The runtime is unchanged.** The engine's task still calls either fence `config.permissionMode`, and the tick files the one a step
   has (`modeOf`). `validateFolderMode`'s judgement is unchanged, read off `modeOf`: it judges a step that says `background: true`, which
   is refused on codex. Codex's approval policy is not a key: `codex exec` asks nobody, and the engine passes no `-a`.

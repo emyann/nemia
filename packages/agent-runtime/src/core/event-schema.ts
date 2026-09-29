@@ -165,16 +165,23 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
-/** The first thing a schema refused in `value`: where, and what is there instead of what it expected. */
-export const firstRefusal = (value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } => {
+/**
+ * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds
+ * there (`the runtime writes`, the default, for a journal).
+ */
+export const firstRefusal = (
+  value: unknown,
+  error: Schema.SchemaError,
+  holder = 'the runtime writes',
+): { path: readonly PropertyKey[]; words: string } => {
   const [first] = formatter(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);
-  const message = first?.message ?? 'is not what the runtime writes';
+  const message = first?.message ?? `is not what ${holder}`;
   const words =
     message === 'Missing key'
       ? 'is missing'
-      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, 'the runtime writes ').replace(/ \| undefined$/, '')}`;
+      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, `${holder} `).replace(/ \| undefined$/, '')}`;
   return { path, words };
 };
 

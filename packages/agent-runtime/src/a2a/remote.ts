@@ -43,7 +43,7 @@
  * read again: the registry is the record.
  */
 import { Effect } from 'effect';
-import { AgentCard, type AgentInterface, type Message, type SecurityScheme, type Task } from '@a2a-js/sdk';
+import type { AgentCard, AgentInterface, Message, SecurityScheme, Task } from '@a2a-js/sdk';
 import {
   Client,
   ClientFactory,
@@ -65,6 +65,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { formerStateOf, isSessionState, type SessionState, type Sighting } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
+import { cardOfJson, SCHEME_KINDS } from './card.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 
 /**
@@ -117,45 +118,6 @@ const shownUrl = (u: string | URL | Request): string => {
 const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
 const SPOKEN_WORDS = 'JSON-RPC (`JSONRPC`) and REST (`HTTP+JSON`), at A2A 1.0';
 
-/**
- * Why a remote agent's configuration cannot be taken, or `undefined`. Asked by `createEngine`, so an address that could
- * never be reached — or one that carries a secret in it, which the configuration is no place for — is refused before any
- * task is filed on it.
- */
-export const remoteConfigRefusal = (harness: string, agent: Record<string, unknown>): string | undefined => {
-  const keys = Object.keys(agent);
-  const extra = keys.filter((k) => k !== 'url' && k !== 'card');
-  if (extra.length) {
-    return `the \`${harness}\` harness is a remote A2A agent, which takes \`url\` or \`card\` and nothing else, and was given ${extra.map((k) => `\`${k}\``).join(', ')}. Take ${extra.length > 1 ? 'them' : 'it'} off: a secret goes in \`credentials\`, and what a task runs with is the agent's to decide.`;
-  }
-  if (keys.length !== 1) {
-    return `the \`${harness}\` harness is a remote A2A agent, which takes one of \`url\` (its base URL, where its card is served) or \`card\` (the card itself), and was given ${keys.length ? 'both' : 'neither'}.`;
-  }
-  if ('url' in agent) {
-    const url = typeof agent.url === 'string' && URL.canParse(agent.url) ? new URL(agent.url) : undefined;
-    if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
-      return `the \`${harness}\` harness's \`url\` is ${typeof agent.url === 'string' ? `\`${url ? `${url.protocol}…` : agent.url}\`` : `a ${typeof agent.url}`}, and a remote A2A agent is reached over HTTP: give its \`http://\` or \`https://\` address.`;
-    }
-    if (url.username || url.password) {
-      return `the \`${harness}\` harness's \`url\` carries a user name or password, which would be written wherever the address is: take it out of the URL, and give the secret through \`credentials\`, for the scheme the agent's card declares.`;
-    }
-    return undefined;
-  }
-  const card = agent.card;
-  if (typeof card !== 'object' || card === null || Array.isArray(card)) {
-    return `the \`${harness}\` harness's \`card\` is not an agent card: give the JSON object the agent serves at \`/.well-known/agent-card.json\`, or its \`url\`.`;
-  }
-  const interfaces = (card as { supportedInterfaces?: unknown }).supportedInterfaces;
-  if (
-    !Array.isArray(interfaces) ||
-    !interfaces.length ||
-    interfaces.some((i) => typeof i?.url !== 'string' || typeof i?.protocolBinding !== 'string')
-  ) {
-    return `the \`${harness}\` harness's \`card\` lists no interface to reach the agent by: its \`supportedInterfaces\` must give each a \`url\` and a \`protocolBinding\`.`;
-  }
-  return undefined;
-};
-
 /** Why a task cannot be filed on a remote agent, or `undefined`: a remote agent takes no harness arguments. */
 export const remoteRefuses =
   (harness: string) =>
@@ -165,19 +127,6 @@ export const remoteRefuses =
       ? `the \`${harness}\` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take ${keys.map((k) => `\`${k}\``).join(', ')} out of \`config\`.`
       : undefined;
   };
-
-/**
- * A card as JSON, read into the SDK's objects. A card that follows the specification is proto JSON (`AgentCard.toJSON`),
- * and is parsed. A card served by an agent built on this SDK's own card handler is its objects stringified, whose security
- * schemes are `{ scheme: { $case, value } }`: parsed as proto JSON, every scheme reads empty — the SDK's own resolver
- * drops them so — and a card that asks for a token would name a scheme with nothing in it. So those are kept as they are.
- */
-export const cardOfJson = (json: Record<string, unknown>): AgentCard => {
-  const parsed = AgentCard.fromJSON(json);
-  const schemes = json.securitySchemes as Record<string, unknown> | undefined;
-  const sdkForm = schemes && Object.values(schemes).some((s) => typeof (s as { scheme?: { $case?: unknown } })?.scheme?.$case === 'string');
-  return sdkForm ? { ...parsed, securitySchemes: schemes as Record<string, SecurityScheme> } : parsed;
-};
 
 /** The card's interfaces that this runtime speaks, in the card's order. */
 const spokenOf = (card: AgentCard): AgentInterface[] =>
@@ -198,8 +147,9 @@ const headerOf = (
   secret: () => string | undefined,
   missing: () => string | undefined,
 ): [string, string] | string => {
-  const s = scheme?.scheme;
-  if (!s) return `\`${name}\` is not a scheme the card declares`;
+  if (!scheme) return `\`${name}\` is not a scheme the card declares`;
+  const s = scheme.scheme;
+  if (!s || !SCHEME_KINDS.includes(s.$case)) return `\`${name}\` is a kind of scheme this runtime does not know, and cannot send`;
   const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
     const given = secret();
     return given === undefined || given === ''
@@ -284,6 +234,28 @@ const late = (e: unknown): boolean => e instanceof Late || (e instanceof Error &
 const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => e instanceof E);
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, and `then` goes before `nothing was sent`. */
+const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then = ''): AgentCard => {
+  if ('wrong' in read) throw new Refusal(`${what}: ${read.wrong}. ${then ? `${then} nothing` : 'Nothing'} was sent.`);
+  return read.card;
+};
+
+/** The card an agent answered for at `at`, or a refusal that names it by its origin and path: nothing is sent past one. */
+const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
+  if (!response.ok)
+    throw new Refusal(
+      `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`,
+    );
+  const json: unknown = await response.json().catch(() => undefined);
+  if (typeof json !== 'object' || json === null)
+    throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
+  return taken(
+    cardOfJson(json),
+    `what ${shownUrl(at)} serves is not an A2A 1.0 agent card this runtime reads`,
+    "The agent's operator serves the card;",
+  );
+};
 
 /** One session's entry in the registry. */
 type Entry = {
@@ -470,7 +442,7 @@ export const remoteOps = (
   };
 
   const readCard = async (): Promise<AgentCard> => {
-    if (!address) return cardOfJson((agent as { card: Record<string, unknown> }).card);
+    if (!address) return taken(cardOfJson((agent as { card: unknown }).card), 'its `card` is not an A2A 1.0 agent card this runtime reads');
     const at = cardUrlOf(address);
     let response: Response;
     try {
@@ -480,14 +452,7 @@ export const remoteOps = (
         `the agent's card could not be read at ${shownUrl(at)} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`,
       );
     }
-    if (!response.ok)
-      throw new Refusal(
-        `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`,
-      );
-    const json = await response.json().catch(() => undefined);
-    if (typeof json !== 'object' || json === null)
-      throw new Refusal(`what ${shownUrl(at)} serves is not an agent card, and nothing was sent.`);
-    return cardOfJson(json as Record<string, unknown>);
+    return servedCard(at, response);
   };
 
   const connect = async () => {

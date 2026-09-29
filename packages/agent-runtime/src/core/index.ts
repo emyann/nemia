@@ -9,4 +9,5 @@ export type { Ended, Outcome, PhaseWord, SessionState } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';
 export type { LifecycleEdge, LifecycleGraph, LifecycleState } from './lifecycle.ts';
 export { pathOf } from './path.ts';
+export { firstRefusal } from './event-schema.ts';
 export type { LifecycleStep } from './path.ts';

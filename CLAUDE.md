@@ -88,6 +88,8 @@ holds what every change needs.
 - **A limit is met by cutting the function** (500 code lines a file, 80 a function, cyclomatic 20, cognitive 15), never by raising a
   ceiling in `.oxlintrc.json`. The commit that shrinks a baselined file lowers its ceiling there and its count in
   `packages/agent-orchestrator/test/limits.test.ts`, which refuses one left loose; a move renames both.
+- **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
+  package's docs whose begin line names the command; never a drawing. `agent-orchestrator/test/diagrams.test.ts` refuses a drift.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
 
 ## Git

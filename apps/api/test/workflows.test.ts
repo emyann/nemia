@@ -14,10 +14,9 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { app } from '../src/app.ts';
 import { listWorkflows, versionOf as versionIn } from '../src/workflows/workflows.ts';
-import { HOME_REPO } from '../src/capabilities/capabilities.ts';
 import { loadWorkflows, parentRecord, readRun } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
-import { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
 process.env.HKB_REPO = repo;

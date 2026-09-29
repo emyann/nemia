@@ -1,7 +1,8 @@
 /**
- * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, what Nemia ships
- * beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back from disk,
- * and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one of yours
+ * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, and what
+ * Nemia ships beside them — nothing today, so what a shipped row says is read off the tests' team (`team.ts`) handed to `listSkills` as the
+ * shipped place — in a scratch store and a scratch repository. Every refusal is made to refuse, asserted on its words, with the library as
+ * it was. And one skill on its own page, and one of yours
  * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
  * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
@@ -16,22 +17,27 @@ import path from 'node:path';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
 import { app } from '../src/app.ts';
-import { copyCommand } from '../src/agents/skills.ts';
+import { copyCommand, listSkills, SHIPPED_SKILLS, skillDetail } from '../src/agents/skills.ts';
+import { TEAM } from './team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 type SkillPlace = import('../src/agents/skills.ts').SkillPlace;
 type SkillRow = import('../src/agents/skills.ts').SkillRow;
-type SkillAdded = import('../src/agents/skills.ts').SkillAdded;
 
-/** What Nemia ships: the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
-const shipped = fs
-  .readdirSync(SHIPPED)
-  .filter((name) => fs.existsSync(path.join(SHIPPED, name, 'SKILL.md')))
-  .sort();
-const [inLibrary, inRepo, toCopy] = shipped as [string, string, string];
+/** What Nemia ships: `workflows/skills` of the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
+const SHIPPED = SHIPPED_SKILLS;
+const shipped = fs.existsSync(SHIPPED)
+  ? fs
+      .readdirSync(SHIPPED)
+      .filter((name) => fs.existsSync(path.join(SHIPPED, name, 'SKILL.md')))
+      .sort()
+  : [];
+/** The tests' team's skills, standing in for a shipped place where a row's `found` is read. */
+const TEAM_SKILLS = path.join(TEAM, 'skills');
+/** A team skill your library has, one the repository has, and one neither has. */
+const [inLibrary, inRepo, toCopy] = ['ask-for-another-round', 'implement-a-change', 'review-a-change'];
 const LIBRARY = path.join(root, 'workflows', 'skills');
 const THEIRS = path.join(repo, '.claude', 'skills');
 
@@ -43,12 +49,12 @@ function skill(dir: string, name: string, text: string): void {
 skill(THEIRS, 'shared', "---\ndescription: The repository's.\n---\nTheirs.\n");
 skill(THEIRS, 'review', '---\nname: code-review\ndescription: Reviews a change.\n---\nReview it.\n');
 skill(THEIRS, 'scratch', '# Scratch\n\nNo frontmatter.\n');
-skill(THEIRS, inRepo, "---\ndescription: The repository's own of a shipped name.\n---\nTheirs.\n");
+skill(THEIRS, inRepo, "---\ndescription: The repository's own of a team's name.\n---\nTheirs.\n");
 skill(path.join(repo, 'workflows', 'skills'), 'beside', "---\ndescription: Beside the repository's agents.\n---\nNot for yours.\n");
 skill(LIBRARY, 'shared', '---\ndescription: Mine.\n---\nMine.\n');
 skill(LIBRARY, 'mine', '---\ndescription: "Writes a decision."\ntags: ["decision"]\n---\n# Mine\n\nWrite it down.\n');
 skill(LIBRARY, 'always', '---\ndescription: Asks when it reads two ways.\npreload: true\n---\nAsk before you guess, every time.\n');
-fs.cpSync(path.join(SHIPPED, inLibrary), path.join(LIBRARY, inLibrary), { recursive: true });
+fs.cpSync(path.join(TEAM_SKILLS, inLibrary), path.join(LIBRARY, inLibrary), { recursive: true });
 fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(
   path.join(root, 'workflows', 'agents', 'scribe.md'),
@@ -158,39 +164,15 @@ test('a skill whose SKILL.md is no card entry is listed with the refusal, and a 
   }
 });
 
-test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
-  const places = await listed();
+test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', () => {
+  const places = listSkills(repo, root, TEAM_SKILLS);
   assert.equal(rowOf(places, 'shipped', inLibrary)!.found, 'yours');
   assert.equal(rowOf(places, 'shipped', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'shipped', toCopy)!.found, null);
-  assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every shipped skill reads');
+  assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every skill of the place reads');
   assert.ok(
     places[2].skills.every((s) => s.usedBy.length === 0),
     'no agent of yours is given a skill from where Nemia ships it',
-  );
-});
-
-test('a shipped skill is copied into your library, byte for byte, and listed there at once', async () => {
-  const res = await send('/api/skills/yours', { copy: toCopy });
-  const body = (await res.json()) as SkillAdded;
-  assert.equal(res.status, 201, JSON.stringify(body));
-  assert.equal(body.skill.from, 'yours');
-  assert.equal(body.skill.dir, path.join(LIBRARY, toCopy));
-  assert.ok(body.written.includes('SKILL.md'));
-  for (const file of body.written) {
-    assert.equal(
-      fs.readFileSync(path.join(LIBRARY, toCopy, file), 'utf8'),
-      fs.readFileSync(path.join(SHIPPED, toCopy, file), 'utf8'),
-      file,
-    );
-  }
-  const places = await listed();
-  assert.ok(rowOf(places, 'yours', toCopy), 'in your library');
-  assert.equal(rowOf(places, 'shipped', toCopy)!.found, 'yours', 'and the shipped row says so');
-  await refused(
-    send('/api/skills/yours', { copy: toCopy }),
-    409,
-    new RegExp(`^skills/${toCopy} is there already, in .*, and a copy would write over it\\.`),
   );
 });
 
@@ -199,6 +181,11 @@ test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is n
     send('/api/skills/yours', { copy: 'no-such-skill' }),
     404,
     /has no skill named no-such-skill: a skill is a folder holding a SKILL\.md/,
+  );
+  await refused(
+    send('/api/skills/yours', { copy: toCopy }),
+    404,
+    new RegExp(`has no skill named ${toCopy}: a skill is a folder holding a SKILL\\.md`),
   );
   await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
@@ -219,7 +206,7 @@ test("REFUSED at shipped defaults: a copy into the repository's skills, or anywh
 });
 
 test('REFUSED at shipped defaults: a copy is guarded as every write of the board is — another site, another host, another content type', async () => {
-  const other = shipped.find((name) => ![inLibrary, inRepo, toCopy].includes(name))!;
+  const other = 'trial-merge-a-branch';
   await refused(
     send('/api/skills/yours', { copy: other }, { ...json, 'sec-fetch-site': 'cross-site' }),
     403,
@@ -323,7 +310,11 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.equal(broken.draft, null);
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
     assert.match(broken.skill.error ?? '', /has no frontmatter/);
-    assert.equal((await detail('shipped', toCopy)).copyHint, null);
+    assert.equal(
+      skillDetail('shipped', toCopy, repo, root, TEAM_SKILLS)?.copyHint,
+      null,
+      'a shipped skill is copied with the board, not by hand',
+    );
   } finally {
     fs.rmSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
   }

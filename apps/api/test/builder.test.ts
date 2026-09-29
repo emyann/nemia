@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 import { app } from '../src/app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from '../src/workflows/builder.ts';
 import { listWorkflows, versionOf as versionIn } from '../src/workflows/workflows.ts';
@@ -41,7 +42,7 @@ type ListedStep = import('../src/workflows/workflows.ts').ListedStep;
 type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
 
 const STORE = path.join(root, 'workflows');
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'dev');
+const TEAM_DEV = path.join(TEAM, 'dev');
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -66,13 +67,13 @@ const snapshot = (dir: string): Record<string, string> =>
       )
     : {};
 
-/** A copy of the repository's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names beside it. */
+/** A copy of the tests' team's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names beside it. */
 function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
-  fs.cpSync(path.join(SHIPPED, '..', 'skills'), path.join(STORE, 'skills'), { recursive: true });
-  for (const file of fs.readdirSync(SHIPPED)) fs.copyFileSync(path.join(SHIPPED, file), path.join(dir, file));
+  fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
+  fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
+  for (const file of fs.readdirSync(TEAM_DEV)) fs.copyFileSync(path.join(TEAM_DEV, file), path.join(dir, file));
   return dir;
 }
 

@@ -1,8 +1,8 @@
 /**
  * The board's agents (agents.ts): listed from both places with the nodes that name them, one read, and one of yours made, put back,
  * renamed and removed — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
- * refuse, asserted on its words, with the folder as it was. The repository holds the shipped agents and skills and `dev`, whose steps name
- * them; yours holds the same, `dev` beside them.
+ * refuse, asserted on its words, with the folder as it was. The repository holds the tests' team (`team.ts`) — its agents, its skills and
+ * `dev`, whose steps name them; yours holds the same, `dev` beside them.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -11,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 import { app } from '../src/app.ts';
 const repo = scratch('nemia-api-agents-repo-');
 process.env.HKB_REPO = repo;
@@ -19,16 +20,15 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 type AgentListing = import('../src/agents/agents.ts').AgentListing;
 type AgentSaved = import('../src/agents/agents.ts').AgentSaved;
 
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const STORE = path.join(root, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
 
-fs.cpSync(path.join(SHIPPED, 'agents'), path.join(repo, 'workflows', 'agents'), { recursive: true });
-fs.cpSync(path.join(SHIPPED, 'skills'), path.join(repo, 'workflows', 'skills'), { recursive: true });
-fs.cpSync(path.join(SHIPPED, 'dev'), path.join(repo, 'workflows', 'dev'), { recursive: true });
-fs.cpSync(path.join(SHIPPED, 'agents'), AGENTS, { recursive: true });
-fs.cpSync(path.join(SHIPPED, 'skills'), path.join(STORE, 'skills'), { recursive: true });
-fs.cpSync(path.join(SHIPPED, 'dev'), path.join(STORE, 'dev'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'agents'), path.join(repo, 'workflows', 'agents'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'skills'), path.join(repo, 'workflows', 'skills'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'dev'), path.join(repo, 'workflows', 'dev'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'agents'), AGENTS, { recursive: true });
+fs.cpSync(path.join(TEAM, 'skills'), path.join(STORE, 'skills'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'dev'), { recursive: true });
 
 const json = { 'content-type': 'application/json' };
 const send = (method: string, url: string, body: unknown, headers: Record<string, string> = json) =>
@@ -423,14 +423,13 @@ test('an agent is listed with what it says it can do: its card, generated from i
   assert.equal(reviewer.cardError, null);
   assert.deepEqual(
     reviewer.card?.map((s) => s.id),
-    ['review-a-change', 'send-work-round-again'],
+    ['review-a-change', 'ask-for-another-round'],
     'one entry for each skill the agent gives, in its order',
   );
   assert.deepEqual(reviewer.card?.[0], {
     id: 'review-a-change',
     name: 'Review a change',
-    description:
-      'Reads the diff read-only as a second engineer would and reports each finding by file and line, saying concretely what would go wrong.',
+    description: 'Reads a change against its base as a second engineer would, and says what is worth changing.',
     tags: ['code', 'review'],
     examples: ['Use this when a change is written and nobody has read it yet.'],
   });
@@ -583,20 +582,20 @@ test('an agent is written and listed with the skills it is given and its system 
   const made = await send('POST', '/api/agents/yours', {
     ...scribe,
     keys: { ...scribe.keys, tools: 'Read, Write, Skill' },
-    skills: ' review-a-change,write-a-note ',
+    skills: ' review-a-change,implement-a-change ',
     systemPrompt: 'no-coding',
   });
   const saved = (await made.json()) as AgentSaved;
   assert.equal(made.status, 201, JSON.stringify(saved));
   try {
     const text = fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8');
-    assert.match(text, /^skills: review-a-change,write-a-note$/m);
+    assert.match(text, /^skills: review-a-change,implement-a-change$/m);
     assert.match(text, /^systemPrompt: no-coding$/m);
-    assert.equal(saved.agent.skills, 'review-a-change, write-a-note', 'listed as the parser read it');
+    assert.equal(saved.agent.skills, 'review-a-change, implement-a-change', 'listed as the parser read it');
     assert.equal(saved.agent.systemPrompt, 'no-coding');
     assert.deepEqual(
       saved.agent.card?.map((s) => s.id),
-      ['review-a-change', 'write-a-note'],
+      ['review-a-change', 'implement-a-change'],
       'the card is the skills it gives',
     );
     assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false, 'not a role key: a step has no skills of its own');
@@ -642,7 +641,7 @@ test('an agent is answered as an A2A Agent Card, with what it leaves out said be
   assert.deepEqual(answer.card.skills, listing.card, 'the entries the page lists');
   assert.deepEqual(
     answer.card.skills.map((s) => s.id),
-    ['review-a-change', 'send-work-round-again'],
+    ['review-a-change', 'ask-for-another-round'],
   );
 });
 
@@ -709,7 +708,7 @@ test('an agent is listed with each skill it gives, found where a start finds it,
     theirs.given.map((g) => [g.name, g.from]),
     [
       ['review-a-change', 'repo'],
-      ['send-work-round-again', 'repo'],
+      ['ask-for-another-round', 'repo'],
     ],
     "the repository's agent, from the skills beside it",
   );
@@ -717,7 +716,7 @@ test('an agent is listed with each skill it gives, found where a start finds it,
     yours.given.map((g) => [g.name, g.from]),
     [
       ['review-a-change', 'yours'],
-      ['send-work-round-again', 'yours'],
+      ['ask-for-another-round', 'yours'],
     ],
     'yours, from your library',
   );

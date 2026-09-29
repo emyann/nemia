@@ -1,5 +1,9 @@
 # Features to build
 
+Since 2026-09-29 Nemia ships no workflows, agents or skills: the repository's `workflows/` and this package's own were removed, and
+the tests run the machinery on `test/fixtures/team/`. The sections below that name those folders are records of what shipped then,
+kept as they were written.
+
 The features agent-orchestrator is still missing, in the order I would take them. Each says what exists
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-runtime/docs/open-issues.md](../../agent-runtime/docs/open-issues.md).

@@ -1,10 +1,10 @@
 /** A step's try and the task that ran it, for the path of that task through the runtime's lifecycle (`engine.path`). */
 import type { Run } from 'agent-orchestrator/run';
 import { turnOfTry } from '../detail/tries.ts';
-import type { e } from '../store.ts';
+import type { Engine } from '../store.ts';
 
 /** One step of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */
-export type LifecycleStep = Awaited<ReturnType<typeof e.path>>[number];
+export type LifecycleStep = Awaited<ReturnType<Engine['Service']['path']>>[number];
 
 /**
  * The path of one try of a step: its task, the try's number counted from 1 as the step's tries count them (`triesOf`), and the task's

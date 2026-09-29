@@ -17,7 +17,6 @@ import {
   agentUsers,
   agentVersion,
   cardSkills,
-  HOME,
   listRuns,
   loadAgents,
   removeAgent,
@@ -44,8 +43,8 @@ import {
   type SkillsFound,
 } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
-import { repoOf } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
@@ -107,22 +106,22 @@ const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
  * `.claude/skills/`, then the store's. What its version digests and its card is read from.
  */
-const skillsOfPlace = (dir: string, repo: string, home: string = HOME): SkillsFound =>
+const skillsOfPlace = (dir: string, repo: string, home: string): SkillsFound =>
   skillsFor(path.join(path.dirname(dir), '_'), placesOf(repo, home));
 
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
-const agentPlaces = (repo: string, home: string = HOME): Array<{ from: WorkflowSource; dir: string }> =>
+const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
   sourcesOf(repo, home).map(({ from, dir }) => ({ from, dir: path.join(dir, AGENTS_FOLDER) }));
 
 /** Every agent of each place, by name, each read now from disk. */
-export function listAgents(repo: string, home: string = HOME): AgentListing[] {
+export function listAgents(repo: string, home: string): AgentListing[] {
   return agentPlaces(repo, home).flatMap(({ from, dir }) =>
     [...loadAgents(dir).keys()].sort().map((name) => listedAgent(from, dir, name, repo, home)!),
   );
 }
 
 /** One agent as the listing has it, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. */
-export function listedAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string = HOME): AgentListing | null {
+export function listedAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
   const read = readAgent(from, dir, name, repo, home);
   return read && { ...read, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
 }
@@ -357,9 +356,9 @@ const agentGuard = (route: string, shape: string): Guarded => ({
 });
 
 /** Why a write is not to yours: 403 for the repository's, with the copy to make by hand; 400 for anywhere else. */
-function yoursOnly(route: string, from: string, name: string | null, repo: string): Refusal | null {
+function yoursOnly(route: string, from: string, name: string | null, repo: string, home: string): Refusal | null {
   if (from === 'yours') return null;
-  const yours = path.join(HOME, 'workflows', AGENTS_FOLDER);
+  const yours = path.join(home, 'workflows', AGENTS_FOLDER);
   const theirs = path.join(repo, 'workflows', AGENTS_FOLDER);
   if (from === 'repo') {
     const copy = name ? ` — \`cp ${path.join(theirs, `${name}.md`)} ${yours}/\` starts from this one —` : '';
@@ -402,7 +401,7 @@ function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 
 }
 
 /** The name in a path, refused in the package's words before anything is read, or the agents folder of `from`. */
-function placeOf(from: string, name: string | null, route: string): { dir: string } | Refusal {
+function placeOf(from: string, name: string | null, route: string, repo: string, home: string): { dir: string } | Refusal {
   if (from !== 'repo' && from !== 'yours')
     return {
       status: 400,
@@ -412,8 +411,12 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
     const refused = agentNameRefusal(name);
     if (refused) return { status: 400, error: refused };
   }
-  return { dir: agentPlaces(repoOf()).find((p) => p.from === from)!.dir };
+  return { dir: agentPlaces(repo, home).find((p) => p.from === from)!.dir };
 }
+
+/** Why there is no agent to answer (404): `from`'s folder, `dir`, has none named `name`. */
+const noAgentWords = (from: string, name: string, dir: string): string =>
+  `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(dir, `${name}.md`)}). GET /api/agents lists the agents there are.`;
 
 /**
  * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
@@ -440,211 +443,205 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
  * - `DELETE /api/agents/:from/:name` — an agent of yours removed, against the `version` it was read at — refused while a step still names
  *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
  */
-export const agents = new Hono()
-  .get('/api/agents', (c) => c.json(listAgents(repoOf())))
-  .get('/api/agents/:from/:name', (c) => {
-    const { from, name } = c.req.param();
-    const place = placeOf(from, name, `GET /api/agents/${from}/${name}`);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const agent = listedAgent(from as WorkflowSource, place.dir, name, repoOf());
-    if (!agent)
-      return c.json(
-        {
-          error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
-        },
-        404,
+export const agents = new Hono<ApiEnv>()
+  .get('/api/agents', (c) => served(c, ({ repo, home }) => c.json(listAgents(repo, home))))
+  .get('/api/agents/:from/:name', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name } = c.req.param();
+      const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const agent = listedAgent(from as WorkflowSource, place.dir, name, repo, home);
+      if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
+      return c.json(agent);
+    }),
+  )
+  .get('/api/agents/:from/:name/card', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name } = c.req.param();
+      const route = `GET /api/agents/${from}/${name}/card`;
+      const place = placeOf(from, name, route, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const agent = loadAgents(place.dir).get(name);
+      if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
+      if (agent instanceof Error) return c.json({ error: agent.message }, 422);
+      const found = skillsOfPlace(place.dir, repo, home);
+      const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
+      return c.json({
+        card,
+        servedOverA2A: false,
+        why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`,
+      } satisfies AgentCardAnswer);
+    }),
+  )
+  .post('/api/agents/:from', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from } = c.req.param();
+      const route = `POST /api/agents/${from}`;
+      const refused = refusedBeforeReading(
+        agentGuard(route, POST_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    return c.json(agent);
-  })
-  .get('/api/agents/:from/:name/card', (c) => {
-    const { from, name } = c.req.param();
-    const route = `GET /api/agents/${from}/${name}/card`;
-    const place = placeOf(from, name, route);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const agent = loadAgents(place.dir).get(name);
-    if (agent === undefined)
-      return c.json(
-        {
-          error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
-        },
-        404,
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const where = yoursOnly(route, from, null, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, draftWords(route, POST_SHAPE));
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const place = placeOf(from, read.body.name, route, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const given = draftOf(read.body, read.body.name);
+      const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo }, home, 201);
+      return c.json(answer.body, answer.status);
+    }),
+  )
+  .put('/api/agents/:from/:name', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name } = c.req.param();
+      const route = `PUT /api/agents/${from}/${name}`;
+      const refused = refusedBeforeReading(
+        agentGuard(route, PUT_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-    const found = skillsOfPlace(place.dir, repoOf());
-    const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
-    return c.json({
-      card,
-      servedOverA2A: false,
-      why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`,
-    } satisfies AgentCardAnswer);
-  })
-  .post('/api/agents/:from', async (c) => {
-    const { from } = c.req.param();
-    const route = `POST /api/agents/${from}`;
-    const refused = refusedBeforeReading(
-      agentGuard(route, POST_SHAPE),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const where = yoursOnly(route, from, null, repoOf());
-    if (where) return c.json({ error: where.error }, where.status);
-    const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, draftWords(route, POST_SHAPE));
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const place = placeOf(from, read.body.name, route);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const given = draftOf(read.body, read.body.name);
-    const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo: repoOf() }, 201);
-    return c.json(answer.body, answer.status);
-  })
-  .put('/api/agents/:from/:name', async (c) => {
-    const { from, name } = c.req.param();
-    const route = `PUT /api/agents/${from}/${name}`;
-    const refused = refusedBeforeReading(
-      agentGuard(route, PUT_SHAPE),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const where = yoursOnly(route, from, name, repoOf());
-    if (where) return c.json({ error: where.error }, where.status);
-    const place = placeOf(from, name, route);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const drafted = draftWords(route, PUT_SHAPE);
-    const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, (issue, body) =>
-      issue.path[0] === 'version'
-        ? `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(issue.input)}.`
-        : drafted(issue, body),
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { version } = read.body;
-    const given = draftOf(read.body, read.body.name ?? name);
-    const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo: repoOf() }, 200);
-    return c.json(answer.body, answer.status);
-  })
-  .post('/api/agents/:from/:name/try', async (c) => {
-    const { from, name } = c.req.param();
-    const route = `POST /api/agents/${from}/${name}/try`;
-    const refused = refusedBeforeReading(
-      tryGuard(route),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const repo = repoOf();
-    if (from === 'repo') {
-      const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
-      const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo) : null;
-      const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null });
-      return c.json({ error: `${route}: ${untried!.why} \`${untried!.copy}\`` }, 403);
-    }
-    const where = yoursOnly(route, from, name, repo);
-    if (where) return c.json({ error: where.error }, where.status);
-    const place = placeOf(from, name, route);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const read = await readBody(
-      c.req,
-      TRY_BODY,
-      `${route} takes a JSON body: ${TRY_SHAPE}.`,
-      (_, body) =>
-        `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { brief } = read.body;
-    if (!brief.trim())
-      return c.json(
-        {
-          error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
-        },
-        422,
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const where = yoursOnly(route, from, name, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const place = placeOf(from, name, route, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const drafted = draftWords(route, PUT_SHAPE);
+      const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, (issue, body) =>
+        issue.path[0] === 'version'
+          ? `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so a save of an agent that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(issue.input)}.`
+          : drafted(issue, body),
       );
-    try {
-      const agent = listedAgent('yours', place.dir, name, repo);
-      if (!agent)
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { version } = read.body;
+      const given = draftOf(read.body, read.body.name ?? name);
+      const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo }, home, 200);
+      return c.json(answer.body, answer.status);
+    }),
+  )
+  .post('/api/agents/:from/:name/try', (c) =>
+    served(c, async ({ e, repo, home }) => {
+      const { from, name } = c.req.param();
+      const route = `POST /api/agents/${from}/${name}/try`;
+      const refused = refusedBeforeReading(
+        tryGuard(route),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      if (from === 'repo') {
+        const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
+        const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo, home) : null;
+        const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null }, home);
+        return c.json({ error: `${route}: ${untried!.why} \`${untried!.copy}\`` }, 403);
+      }
+      const where = yoursOnly(route, from, name, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const place = placeOf(from, name, route, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const read = await readBody(
+        c.req,
+        TRY_BODY,
+        `${route} takes a JSON body: ${TRY_SHAPE}.`,
+        (_, body) =>
+          `${route}: \`brief\` is what the agent is asked to do, a string: ${TRY_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['brief']))}.`,
+      );
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { brief } = read.body;
+      if (!brief.trim())
         return c.json(
           {
-            error: `Yours has no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
-          },
-          404,
-        );
-      if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
-      if (agent.untried) return c.json({ error: agent.untried.why }, 422);
-      const theirs = agent.given.filter((skill) => skill.from === 'repo');
-      if (theirs.length) {
-        const copies = theirs
-          .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills())}\``)
-          .join(', ');
-        return c.json(
-          {
-            error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
+            error: `${route}: the brief is empty, and a try asks the agent to do something. Write what it should do — a sentence is enough.`,
           },
           422,
         );
+      try {
+        const agent = listedAgent('yours', place.dir, name, repo, home);
+        if (!agent) return c.json({ error: noAgentWords('yours', name, place.dir) }, 404);
+        if (agent.error) return c.json({ error: `${name} cannot be tried while its file does not read: ${agent.error}` }, 422);
+        if (agent.untried) return c.json({ error: agent.untried.why }, 422);
+        const theirs = agent.given.filter((skill) => skill.from === 'repo');
+        if (theirs.length) {
+          const copies = theirs
+            .map((skill) => `\`${copyCommand(path.join(repo, '.claude', 'skills', skill.name), librarySkills(home))}\``)
+            .join(', ');
+          return c.json(
+            {
+              error: `${name} gives ${theirs.map((skill) => `\`${skill.name}\``).join(', ')}, which only the repository has, and a try runs with no repository. Copy ${theirs.length === 1 ? 'it' : 'them'} into your library to try it: ${copies}.`,
+            },
+            422,
+          );
+        }
+        const tries = listRuns().filter((run) => tryOf(run, home)?.agent === name);
+        const moving = (await judgedNow(e, home, tries)).find((run) => run.moving);
+        if (moving)
+          return c.json(
+            {
+              error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
+            },
+            409,
+          );
+        const workflowDir = writeTryFolder(name, agent.version, home);
+        const run = start({ brief: brief.trim(), repo: '', workflowDir });
+        return c.json({ id: run.id } satisfies AgentTried, 201);
+      } catch (err) {
+        const answer = refusalOf(err);
+        if (answer) return c.json(answer.body, answer.status);
+        throw err;
       }
-      const tries = listRuns().filter((run) => tryOf(run)?.agent === name);
-      const moving = (await judgedNow(tries)).find((run) => run.moving);
-      if (moving)
-        return c.json(
-          {
-            error: `A try of ${name} is still running (${moving.id}): one at a time. Wait for it to end — its page shows how it goes — then try again.`,
-          },
-          409,
-        );
-      const workflowDir = writeTryFolder(name, agent.version);
-      const run = start({ brief: brief.trim(), repo: '', workflowDir });
-      return c.json({ id: run.id } satisfies AgentTried, 201);
-    } catch (err) {
-      const answer = refusalOf(err);
-      if (answer) return c.json(answer.body, answer.status);
-      throw err;
-    }
-  })
-  .delete('/api/agents/:from/:name', async (c) => {
-    const { from, name } = c.req.param();
-    const route = `DELETE /api/agents/${from}/${name}`;
-    const refused = refusedBeforeReading(
-      agentGuard(route, DELETE_SHAPE),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const where = yoursOnly(route, from, name, repoOf());
-    if (where) return c.json({ error: where.error }, where.status);
-    const place = placeOf(from, name, route);
-    if ('status' in place) return c.json({ error: place.error }, place.status);
-    const read = await readBody(
-      c.req,
-      DELETE_BODY,
-      `${route} takes a JSON body: ${DELETE_SHAPE}.`,
-      (_, body) =>
-        `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['version']))}.`,
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { version } = read.body;
-    try {
-      return c.json(removeAgent(place.dir, name, { version, repo: repoOf() }));
-    } catch (err) {
-      const answer = refusalOf(err);
-      if (answer) return c.json(answer.body, answer.status);
-      throw err;
-    }
-  });
+    }),
+  )
+  .delete('/api/agents/:from/:name', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name } = c.req.param();
+      const route = `DELETE /api/agents/${from}/${name}`;
+      const refused = refusedBeforeReading(
+        agentGuard(route, DELETE_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const where = yoursOnly(route, from, name, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const place = placeOf(from, name, route, repo, home);
+      if ('status' in place) return c.json({ error: place.error }, place.status);
+      const read = await readBody(
+        c.req,
+        DELETE_BODY,
+        `${route} takes a JSON body: ${DELETE_SHAPE}.`,
+        (_, body) =>
+          `${route} takes the \`version\` the agent was read at, as GET /api/agents lists it, so an agent changed since is not removed unseen: ${DELETE_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['version']))}.`,
+      );
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { version } = read.body;
+      try {
+        return c.json(removeAgent(place.dir, name, { version, repo }));
+      } catch (err) {
+        const answer = refusalOf(err);
+        if (answer) return c.json(answer.body, answer.status);
+        throw err;
+      }
+    }),
+  );
 
 /** `writeAgent`, answered: the agent as it now reads, or its `AgentWriteError` with its status. Throws any other error. */
 function saved(
   dir: string,
   draft: AgentDraft,
-  how: Parameters<typeof writeAgent>[2],
+  how: Parameters<typeof writeAgent>[2] & { repo: string },
+  home: string,
   ok: 200 | 201,
 ): { body: AgentSaved | AgentRefused; status: 200 | 201 | 404 | 409 | 422 } {
   try {
     const done = writeAgent(dir, draft, how);
     return {
-      body: { agent: listedAgent('yours', done.dir, done.agent.name, repoOf())!, written: done.written, removed: done.removed },
+      body: { agent: listedAgent('yours', done.dir, done.agent.name, how.repo, home)!, written: done.written, removed: done.removed },
       status: ok,
     };
   } catch (err) {

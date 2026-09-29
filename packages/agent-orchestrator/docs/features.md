@@ -696,7 +696,7 @@ What was built:
   `after: string[]` on the record, the way the workflow is frozen. The field is written only when given, so
   a run without `--after` writes the record it always did. Every record from before reads as waiting on
   none.
-- `runReady(run, shipped)` in `run.ts` is pure and sits beside `assess`. It rests on `waitingOn`, which
+- `runReady(run, shipped)` in `wait/wait.ts` is pure, read by `assess`. It rests on `waitingOn`, which
   returns the runs in `after` that have not shipped. `shipped` is never called for a run that is not
   `gated`: one with no `after`, a cancelled run, or a run with any step filed on any try (`hasStarted`: a
   step a round moved behind counts). That is how a started run's parents are never read again.
@@ -1114,7 +1114,7 @@ What was built:
   Workflows page gets it too.
 - `stepsOf` orders what it reads back, so a record keyed alphabetically lists in run order, whether its workflow was frozen
   alphabetically or never frozen.
-- `namesInOrder(run, steps)` in `run.ts`, pure: the record's steps in that order, then any the workflow no longer has. `wf
+- `namesInOrder(run, steps)` in `record/record.ts`, pure: the record's steps in that order, then any the workflow no longer has. `wf
   decide` prints each step's section in it, and reads the branches steps worked on in it when no terminal step has one yet.
 
 What was measured:
@@ -1417,7 +1417,7 @@ What was built:
 - `stepStatus` reads a task settled `failed` with no closeout whose answer is `unsigned` as `unsigned`, before it returns the
   engine's phase. It stays pure. Only `failed`: a task a person stopped while it was being nudged reads `stopped`, one not settled
   reads `running`, and a closeout that says `blocked` still reads `blocked` first.
-- Every `askedCloseout` parameter in run.ts takes the wider type. A caller with only a yes or a no still passes one.
+- Every `askedCloseout` parameter in run.ts, `status/status.ts` and `gate/gate.ts` takes the wider type. A caller with only a yes or a no still passes one.
 - The comment on `stepStatus` says what the engine does now. `StepStatus`'s doc and the README's table say an `unsigned` step
   *ended* without its closeout, where they said it *succeeded* without one: both ways still reach the word.
 
@@ -2146,7 +2146,7 @@ What was built:
 - **`wf prune [<runId> ...] [--unmerged] [--yes]`.** It lists each run with each worktree's size (`du -sk`, which counts a link as a link)
   and the total, then removes only on `--yes` or a `y` at a terminal. With no run named it reads the whole store; the runs not over are
   one line, and a run with nothing to prune is not said. The tick never prunes.
-- **The pure part, in run.ts.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished
+- **The pure part, in `prune/prune.ts`.** `pruneRefusal` names each reason with its fix: a folder run; a run not over (`wf cancel` first); a finished
   run not merged, unless `--unmerged`; a hand-off owed (`handOffDue`); a worktree locked, detached on a commit no branch holds, or holding
   changes no commit has. It also refuses whatever `forgetRefusal` refuses, with `wf prune` in its fixes. `prunedRefusal` is the one wording of why
   `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run.
@@ -2805,7 +2805,7 @@ What it leaves:
 §6 below, in full. `dev-planned`'s plan paused by prose: a brief that said to wait made it sign off `blocked`, a person answered with
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
-`POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate`, `atGate`,
+`POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate` and `atGate` in `status/status.ts`,
 `approvalRefusal` and `approvedSection` in `run.ts`, `approve` in `verbs.ts`, `readApprovals` in `record/record.store.ts`.
 
 What was built, four commits:
@@ -3266,8 +3266,8 @@ What the base does not offer, named rather than worked around:
 
 §8 below, the package half. A run that finished went quiet: its branch sat there, `wf decide` printed two git commands, and nothing on
 the board counted a result nobody had decided. The shape §8 chose held, with one thing it did not say in so many words, which building it
-settled: **where an ending step's gate holds**. Read first: the README's *The end of a run is a step*, `approvedFirst`, `waitsAtGate`,
-`toDecide` and `resultSteps` in run.ts, and `workflows/dev/ship.md`.
+settled: **where an ending step's gate holds**. Read first: the README's *The end of a run is a step*, `approvedFirst` and `waitsAtGate` in
+`status/status.ts`, `toDecide` in `ending/ending.ts`, `resultSteps` in `branches/branches.ts`, and `workflows/dev/ship.md`.
 
 What was built, four commits:
 
@@ -3532,7 +3532,7 @@ What the board calls:
 
 §9 below, the package half: the folder, what the package lacked for a step that does not end, and the tests that hold both. The board
 half, and the first run itself, are what is left — and the first run is where §9's one measurement is. Read first:
-`workflows/supervisor/README.md` and `supervise.md`, `takesNoSlot`, `slotNeed` and `runAdmitted` in run.ts, and
+`workflows/supervisor/README.md` and `supervise.md`, `takesNoSlot`, `slotNeed` and `runAdmitted` in `cap/cap.ts`, and
 `test/supervisor.test.ts`.
 
 The operator's session spent two days doing by hand what the last three sections made a state on the board: reading a run at its
@@ -4157,7 +4157,7 @@ folder`, the first of a family of kinds; the record freezes `place: { kind: 'fol
 the git words are not renamed. No change to `packages/agent-runtime`: a task's `cwd` was all a folder needed.
 
 - **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
-- **The run** (`run.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
+- **The run** (`record/record.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`start.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
@@ -4240,7 +4240,7 @@ path under *"Read what you need there"*, and `runs/<id>/inputs`, named by `input
 
 The fix is a copy, and the brief names the copy.
 
-- **`givenPlan` (`run.ts`) is the one writer** of what a folder step is given and what it is called: `given/inputs`, and
+- **`givenPlan` (`workspace/workspace.ts`) is the one writer** of what a folder step is given and what it is called: `given/inputs`, and
   `given/from/<step>` for each folder this step waits on. `folderPlace.make` copies exactly what it names as it makes the folder,
   and `composeBrief` words exactly what it names — one function, because the brief naming a path the fence denies is the defect
   this closes.
@@ -4439,7 +4439,7 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
 - **A status of its own, `denied`, not a failure.** §10 asked for a denied try to settle the step failed and spend `retries:`. The run's
   `allowedTools:` is frozen on its record at `wf start`, so a try of the same run is denied the same call again: a retry the tick files by
   itself would spend every try on it and learn nothing. So a signed try that was denied anything reads `denied` (`ownStatus` in
-  `run.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
+  `status/status.ts`, read off `TaskSpend.denied`, which `spendReader` fills from the runtime's attempts): nothing after it is filed, its check
   is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
   'blocked'`).
 - **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allowedTools:` for a new run, worded as Claude Code
@@ -4463,7 +4463,7 @@ Shipped 2026-09-24, on part 4a's held task (the runtime's `holdOpen`, `answer` a
 off blocked, or to a gated step sent back, was a try of its own: a `-try2` task that `--resume`d the session. It is now the task's
 next turn: the same task, the same id, in the session that signed.
 
-- **What is filed held open** (`holdsOpenOn` in `run.ts`): a Claude Code job — `claude`, without `background: true`. The one harness the
+- **What is filed held open** (`holdsOpenOn` in `status/status.ts`): a Claude Code job — `claude`, without `background: true`. The one harness the
   runtime's held task was measured on (M12); codex, `claude-detached`, a background session and a check are filed as before.
 - **When it stays open** (`holdsOpen`, pure): while a person's word is what moves the step — it signed off `blocked`, or it is gated and
   checking or `awaiting approval`. Anything else is closed (`e.close`) on the pass that reads it waiting, and what waits on it is filed
@@ -4568,12 +4568,12 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   closeout's `message` (`workflows/agents/shipper.schema.json`); its brief says so under *The run checks and lands your merge*
   (`landingContract` in `check.ts`). The tick files the check on the `check` harness in the checkout, with `CHECK_DEADLINE_SECONDS`,
   niced, its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue`
-  (pure, `run.ts`) says what the settled check calls for, and `landEnding` (`tick.ts`) applies it: `git commit -F -` with the message
+  (pure, `ending/ending.ts`) says what the settled check calls for, and `landEnding` (`tick.ts`) applies it: `git commit -F -` with the message
   on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check (…)` /
   `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and `wf ls` words it on the step's line
   (`landedWords`), which the api carries to the board as the step's `note`. The daemon's log has the tick's note; the feed does not.
 - **The session cannot commit what the run commits.** A landing ending is filed with `Bash(git commit:*)` and
-  `Bash(git merge --continue:*)` beside its own `disallowedTools:` (`filedDenies` in `run.ts`), each try and each round, so the folder
+  `Bash(git merge --continue:*)` beside its own `disallowedTools:` (`filedDenies` in `ending/ending.ts`), each try and each round, so the folder
   need not repeat the agent's list. A deny is a prefix, not a sandbox: `git merge` without `--no-commit` still commits a clean merge, and
   the pass after records that as committed before its check ran. On codex, which takes no deny list, the parser refuses `check:` beside
   `workspace: main` (review round 1).
@@ -5268,7 +5268,7 @@ Not agent-orchestrator features, listed so nothing is lost:
 - ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
   pool with its own name as the default. The workflow layer's README, banner and `wf --help` say pools since `00d4c06`'s follow-up;
 - ~~**admission in filing order, and a task's priority.**~~ *done, engine `92d6783`; and in the workflow layer: every filing after a run's
-  first steps — a step after another, a try, a round, a check — carries `priority: 1` (`MOMENTUM`, `priorityOf` — `stepMomentum` since stage 4c part 2 — in `run.ts`), its first
+  first steps — a step after another, a try, a round, a check — carries `priority: 1` (`MOMENTUM`, `priorityOf` — `stepMomentum` since stage 4c part 2 — in `status/status.ts`), its first
   steps none, and the run cap unchanged.* The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is

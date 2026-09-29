@@ -17,6 +17,7 @@
  */
 import { HARNESSES } from 'agent-orchestrator';
 import {
+  type AskServer,
   capabilitiesOf,
   denyingRule,
   MEASURED_TOOLS,
@@ -410,14 +411,17 @@ function stepReach(
 }
 
 /**
- * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`), and what each step of each workflow
- * gets. A workflows directory that cannot be listed is a warning, and no step is shown; the rest is served.
+ * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`, its servers asked through `asker` with
+ * `env`), and what each step of each workflow listed from it and from `home` gets. A workflows directory that cannot be listed is a warning, and no step is shown; the rest is served.
  */
-export async function capabilitiesWithSteps(repo: string): Promise<CapabilitiesWithSteps> {
-  const capabilities = await capabilitiesOf(repo);
+export async function capabilitiesWithSteps(
+  repo: string,
+  { env, home, asker }: { env: NodeJS.ProcessEnv; home: string; asker: AskServer },
+): Promise<CapabilitiesWithSteps> {
+  const capabilities = await capabilitiesOf(repo, { env, asker });
   let workflows: WorkflowListing[] = [];
   try {
-    workflows = listWorkflows(repo);
+    workflows = listWorkflows(repo, home);
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }

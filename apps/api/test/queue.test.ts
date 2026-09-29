@@ -1,20 +1,18 @@
 /**
  * The queue, as the board reads and writes it: GET /api/inbox's `queued` and `tried`; POST and DELETE /api/inbox/:name/queue (inbox.ts), a card
  * queued and taken off the queue through the package's `queueInInbox`; and GET /api/ceilings (app.ts), the cap the daemon's last pass ran with
- * and the runs it counts and holds, held to the package's `runSlots` — in a scratch store and a scratch repository. `WF_ROOT` is set before
- * the orchestrator is imported, as it locates its store, and so its inbox, when it loads; and the shell's `WF_MAX_RUNS` is dropped, so no
- * cap comes from it.
+ * and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository; and
+ * the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
  */
-import { observations } from './harness.ts';
+import { observations, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-const root = scratch('hkb-api-queue-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } from 'agent-orchestrator';
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('hkb-api-queue-repo-');
 process.env.HKB_REPO = repo;
@@ -28,9 +26,6 @@ git('init', '-q', '-b', 'main');
 git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
-const { app } = await import('../src/app.ts');
-const { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } =
-  await import('agent-orchestrator');
 type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
 type Ceilings = import('../src/factory/ceilings.ts').Ceilings;
 type InboxQueueAnswer = import('../src/inbox/inbox.ts').InboxQueueAnswer;

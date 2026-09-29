@@ -29,7 +29,7 @@
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import type { Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
 export type InboxCard = {

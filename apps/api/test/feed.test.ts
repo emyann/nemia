@@ -4,8 +4,8 @@
  * At shipped defaults: a store of the file's own, whose feed is written by the package's own writer (`recordFeed`), as the tick writes
  * it. What the stream sends is held to what the feed says: each line, named by what it is about, its id the cursor just after it. The
  * watchers it holds are counted as the process counts them (`FSEventWrap`), so a stream whose reader went and left one behind fails here.
- * `WF_ROOT` is set before the orchestrator is imported, as it locates its store as it loads. A socket is served by the adaptor's server,
- * which, given no `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
+ * The store is the harness's scratch one (`root`, test/harness.ts). A socket is served by the adaptor's server, which, given no
+ * `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -14,13 +14,9 @@ import fs from 'node:fs';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createAdaptorServer } from '@hono/node-server';
-import { scratch } from './scratch.ts';
+import { app } from '../src/app.ts';
+import { feedFile, freshFeedMemo, readFeed, recordFeed } from 'agent-orchestrator';
 
-const root = scratch('hkb-api-feed-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { feedFile, freshFeedMemo, readFeed, recordFeed } = await import('agent-orchestrator');
 type FeedWords = import('agent-orchestrator').FeedWords;
 
 const STREAM = '/api/feed/stream';

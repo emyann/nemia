@@ -29,7 +29,7 @@ import {
   stdoutTail,
   type CheckEnv,
 } from './check.ts';
-import { refusedCheck } from '../run.ts';
+import { refusedCheck } from '../record/record.ts';
 import { exitVerdicts } from '../views.ts';
 import { loadWorkflows } from '../workflow-store.ts';
 import { modeOf } from '../former/former.ts';

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Run } from '../run.ts';
+import type { Run } from './record.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-record-read-');

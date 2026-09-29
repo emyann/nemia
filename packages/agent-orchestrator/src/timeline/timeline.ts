@@ -6,7 +6,9 @@
  * them here, `cli.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
  */
 import { dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../radius.ts';
-import { hasStarted, roundIn, type Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
+import { roundIn } from '../status/status.ts';
+import { hasStarted } from '../wait/wait.ts';
 import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 

@@ -196,7 +196,7 @@
     {
       "files": ["apps/api/src/agents/agents.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 521, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 516, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 92, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 21 }],
         "sonarjs/cognitive-complexity": ["error", 18]
@@ -259,7 +259,7 @@
     {
       "files": ["apps/api/src/workflows/builder.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 523, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 520, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }
     },
@@ -569,10 +569,38 @@
     {
       "files": ["packages/agent-orchestrator/src/run.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 3596, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 2636, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 183, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 91 }],
         "sonarjs/cognitive-complexity": ["error", 156]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/ending/ending.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 36 }],
+        "sonarjs/cognitive-complexity": ["error", 36]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/prune/prune.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 30 }],
+        "sonarjs/cognitive-complexity": ["error", 31]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/status/status.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 39 }],
+        "sonarjs/cognitive-complexity": ["error", 28]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/wait/wait.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 30 }],
+        "sonarjs/cognitive-complexity": ["error", 53]
       }
     },
     {
@@ -586,14 +614,14 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 561, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 553, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {
       "files": ["packages/agent-orchestrator/src/tick.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1219, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1211, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 463, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 136 }],
         "sonarjs/cognitive-complexity": ["error", 197]

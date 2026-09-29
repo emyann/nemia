@@ -2,22 +2,16 @@
  * A step's task's path through the runtime's lifecycle over HTTP: GET /api/runs/:id/steps/:step/path, the current try's by default and
  * an earlier try's by number, held to the journal this file seeds.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
+ * At shipped defaults: the api's own engine over the harness's store (`root`), which this file seeds, and its fake `claude` first on PATH.
  * The path is read off the journal alone, so no harness is asked.
  */
-import { observations } from './harness.ts';
+import { observations, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { app } from '../src/app.ts';
 import type { StepPath } from '../src/steps/path.ts';
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = scratch('hkb-api-path-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
 
 const T0 = Date.parse('2026-09-29T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

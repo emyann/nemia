@@ -4,22 +4,18 @@
  * refuse, asserted on its words, with the folder as it was. The repository holds the shipped agents and skills and `dev`, whose steps name
  * them; yours holds the same, `dev` beside them.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
-const root = scratch('hkb-api-agents-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
 const repo = scratch('hkb-api-agents-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
-const { app } = await import('../src/app.ts');
 type AgentListing = import('../src/agents/agents.ts').AgentListing;
 type AgentSaved = import('../src/agents/agents.ts').AgentSaved;
 

@@ -13,9 +13,9 @@
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { evictedBy, headsOf, restStamps, verifiesRest } from 'agent-orchestrator';
+import { evictedBy, headsOf, restStamps } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
-import { e } from '../store.ts';
+import type { Engine } from '../store.ts';
 
 /** One run's answer and what it was judged on. */
 type Kept<T> = { stamp: string; record: string; tips: Readonly<Record<string, string | null>>; answer: T };
@@ -52,9 +52,10 @@ export type RestingRead<T> = {
  * request reads a record, so what changes between the two is read as changed on the next request, never missed. A memo that has read
  * nothing reads the feed from its end, and holds nothing a line before could concern; a feed that went back — a journal replaced or cut — or
  * that cannot be read empties the memo, and a read made while it cannot be read keeps nothing. The read keeps where it read the feed to: a
- * line past it is read by the next request, unless another request reads it first, and then its `keep` keeps nothing.
+ * line past it is read by the next request, unless another request reads it first, and then its `keep` keeps nothing. The feed is read
+ * through `e`, and `verify` is `WF_VERIFY_REST` as the app's environment gives it (`verifiesRest`).
  */
-export async function restingRead<T>(memo: RestingMemo<T>, verify = verifiesRest()): Promise<RestingRead<T>> {
+export async function restingRead<T>(e: Engine['Service'], memo: RestingMemo<T>, verify: boolean): Promise<RestingRead<T>> {
   let fed = true;
   try {
     if (memo.cursor === undefined) {

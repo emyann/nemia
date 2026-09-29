@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { agentsFor, HOME, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
+import { agentsFor, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -46,8 +46,8 @@ import {
   type StepKey,
 } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
-import { repoOf } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
@@ -180,7 +180,7 @@ function harnessChoices(): readonly string[] {
   return [...HARNESSES, ...names.map((name) => `${REMOTE_PREFIX}${name}`)];
 }
 
-export const keyForm = (home: string = HOME): KeyForm => ({
+export const keyForm = (home: string): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
@@ -294,10 +294,11 @@ const readmeWords = (readme: unknown, route: string, shape: string): string =>
   `${route}: \`readme\` is the README's text, a string, or left out to leave it as it is — this request's was ${JSON.stringify(readme)}. Send ${shape}.`;
 
 /** Why a POST's body is not a new folder: another place (`yoursOnly`), a name that is not a folder's, its step, its readme. */
-function postWords(route: string, repo: string): Words {
+function postWords(route: string, repo: string, home: string): Words {
   return ({ path: [key, ...rest], input }: BodyIssue, body: unknown) => {
     const name = valueAt(body, ['name']);
-    if (key === 'from') return yoursOnly(route, input, typeof name === 'string' ? name : null, repo) ?? `${route}: \`from\` is yours.`;
+    if (key === 'from')
+      return yoursOnly(route, input, typeof name === 'string' ? name : null, repo, home) ?? `${route}: \`from\` is yours.`;
     if (key === 'name') return workflowNameRefusal(input) ?? `${route} takes a JSON object: ${POST_SHAPE}.`;
     if (key === 'step') return stepWords('`step`', valueAt(body, ['step']), rest, route, POST_SHAPE);
     if (key === 'readme') return readmeWords(input, route, POST_SHAPE);
@@ -306,9 +307,9 @@ function postWords(route: string, repo: string): Words {
 }
 
 /** Why a PUT's body is not a folder's steps: another place (`yoursOnly`), no version, its steps, its schemas, its readme. */
-function putWords(route: string, name: string, repo: string): Words {
+function putWords(route: string, name: string, repo: string, home: string): Words {
   return ({ path: [key, i, ...rest], input }: BodyIssue, body: unknown) => {
-    if (key === 'from') return yoursOnly(route, input, name, repo) ?? `${route}: \`from\` is yours.`;
+    if (key === 'from') return yoursOnly(route, input, name, repo, home) ?? `${route}: \`from\` is yours.`;
     if (key === 'version')
       return `${route} takes the \`version\` the folder was read at, as GET /api/workflows lists it, so a save of a folder that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(input)}: read the folder, then send ${PUT_SHAPE}.`;
     if (key === 'steps' && typeof i === 'number') return stepWords(`step ${i + 1}`, valueAt(body, ['steps', i]), rest, route, PUT_SHAPE);
@@ -342,9 +343,9 @@ const buildGuard = (route: string, does: string, shape: string): Guarded => ({
  * Why a write is not one of yours (403 for the repository's, with the copy to make by hand; 400 for anywhere else), or null. The api writes
  * nothing into a checkout: git would show a change nobody typed there, and a run started from the checkout would run it.
  */
-export function yoursOnly(route: string, from: unknown, name: string | null, repo: string): Refusal | null {
+export function yoursOnly(route: string, from: unknown, name: string | null, repo: string, home: string): Refusal | null {
   if (from === 'yours') return null;
-  const yours = path.join(HOME, 'workflows');
+  const yours = path.join(home, 'workflows');
   const theirs = path.join(repo, 'workflows');
   if (from === 'repo') {
     const start = name ? ` — \`cp -r ${path.join(theirs, name)} ${yours}/\` starts from this one —` : '';
@@ -614,6 +615,10 @@ function write(
   };
 }
 
+/** Why a save of a folder read at `version`, and at `now` since, writes nothing (409). */
+const staleWords = (dir: string, version: string, now: string): string =>
+  `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`;
+
 /**
  * The builder's routes. Each write is guarded (guard.ts) and writes only yours (`yoursOnly`: 403 for the repository's, with the copy to
  * make by hand); the body is refused as `postWords`, `putWords` and `draftOf` say (400), the package's refusal is a 422 with the steps it
@@ -626,82 +631,76 @@ function write(
  *   the schemas pasted for them. 404 or 409 as `folderOf` says; 409 when the `version` the draft was read at is not what the folder holds
  *   now, since a step edited, added or removed since would be written over — nothing is written. 200 with the folder read back.
  */
-export const builder = new Hono()
-  .get('/api/workflows/keys', (c) => c.json(keyForm()))
-  .post('/api/workflows/:from', async (c) => {
-    const { from } = c.req.param();
-    const route = `POST /api/workflows/${from}`;
-    const refused = refusedBeforeReading(
-      buildGuard(route, 'writes a workflow', POST_SHAPE),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const repo = repoOf();
-    const where = yoursOnly(route, from, null, repo);
-    if (where) return c.json({ error: where.error }, where.status);
-    const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, postWords(route, repo));
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { name, readme } = read.body;
-    const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
-    if ('status' in step) return c.json({ error: step.error }, step.status);
-    const dir = path.join(HOME, 'workflows', name);
-    if (fs.lstatSync(dir, { throwIfNoEntry: false })) {
-      const folder = foldersIn(path.dirname(dir)).includes(name);
-      return c.json(
-        {
-          error: folder
-            ? `Yours already has a workflow named '${name}' (${dir}). PUT /api/workflows/yours/${name} changes it, or name the new one otherwise.`
-            : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
-        },
-        409,
+export const builder = new Hono<ApiEnv>()
+  .get('/api/workflows/keys', (c) => served(c, ({ home }) => c.json(keyForm(home))))
+  .post('/api/workflows/:from', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from } = c.req.param();
+      const route = `POST /api/workflows/${from}`;
+      const refused = refusedBeforeReading(
+        buildGuard(route, 'writes a workflow', POST_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    }
-    const saved = write(name, dir, placesOf(repo), [step], readme);
-    if ('error' in saved) return c.json(saved, 422);
-    return c.json(saved, 201);
-  })
-  .put('/api/workflows/:from/:name', async (c) => {
-    const { from, name } = c.req.param();
-    const route = `PUT /api/workflows/${from}/${name}`;
-    const refused = refusedBeforeReading(
-      buildGuard(route, 'writes a workflow', PUT_SHAPE),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const repo = repoOf();
-    const where = yoursOnly(route, from, name, repo);
-    if (where) return c.json({ error: where.error }, where.status);
-    const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, putWords(route, name, repo));
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { body } = read;
-    const steps: StepDraft[] = [];
-    for (const [i, step] of body.steps.entries()) {
-      const draft = draftOf(step, `step ${i + 1}`, route, PUT_SHAPE);
-      if ('status' in draft) return c.json({ error: draft.error }, draft.status);
-      steps.push(draft);
-    }
-    const schemas = schemasOf(body.schemas, route);
-    if ('status' in schemas) return c.json({ error: schemas.error }, schemas.status);
-    const folder = folderOf(name, 'yours', repo, HOME);
-    if ('status' in folder) {
-      const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
-      return c.json({ error: `${folder.error}${make}` }, folder.status);
-    }
-    const now = versionOf(folder.dir, placesOf(repo));
-    if (now !== body.version) {
-      return c.json(
-        {
-          error: `${folder.dir} has changed since it was read at version ${body.version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
-          steps: [],
-        },
-        409,
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const where = yoursOnly(route, from, null, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const read = await readBody(c.req, POST_BODY, `${route} takes a JSON body: ${POST_SHAPE}.`, postWords(route, repo, home));
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { name, readme } = read.body;
+      const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
+      if ('status' in step) return c.json({ error: step.error }, step.status);
+      const dir = path.join(home, 'workflows', name);
+      if (fs.lstatSync(dir, { throwIfNoEntry: false })) {
+        const folder = foldersIn(path.dirname(dir)).includes(name);
+        return c.json(
+          {
+            error: folder
+              ? `Yours already has a workflow named '${name}' (${dir}). PUT /api/workflows/yours/${name} changes it, or name the new one otherwise.`
+              : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
+          },
+          409,
+        );
+      }
+      const saved = write(name, dir, placesOf(repo, home), [step], readme);
+      if ('error' in saved) return c.json(saved, 422);
+      return c.json(saved, 201);
+    }),
+  )
+  .put('/api/workflows/:from/:name', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name } = c.req.param();
+      const route = `PUT /api/workflows/${from}/${name}`;
+      const refused = refusedBeforeReading(
+        buildGuard(route, 'writes a workflow', PUT_SHAPE),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    }
-    const saved = write(name, folder.dir, placesOf(repo), steps, body.readme, schemas);
-    if ('error' in saved) return c.json(saved, 422);
-    return c.json(saved, 200);
-  });
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const where = yoursOnly(route, from, name, repo, home);
+      if (where) return c.json({ error: where.error }, where.status);
+      const read = await readBody(c.req, PUT_BODY, `${route} takes a JSON body: ${PUT_SHAPE}.`, putWords(route, name, repo, home));
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { body } = read;
+      const steps: StepDraft[] = [];
+      for (const [i, step] of body.steps.entries()) {
+        const draft = draftOf(step, `step ${i + 1}`, route, PUT_SHAPE);
+        if ('status' in draft) return c.json({ error: draft.error }, draft.status);
+        steps.push(draft);
+      }
+      const schemas = schemasOf(body.schemas, route);
+      if ('status' in schemas) return c.json({ error: schemas.error }, schemas.status);
+      const folder = folderOf(name, 'yours', repo, home);
+      if ('status' in folder) {
+        const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
+        return c.json({ error: `${folder.error}${make}` }, folder.status);
+      }
+      const now = versionOf(folder.dir, placesOf(repo, home));
+      if (now !== body.version) return c.json({ error: staleWords(folder.dir, body.version, now), steps: [] }, 409);
+      const saved = write(name, folder.dir, placesOf(repo, home), steps, body.readme, schemas);
+      if ('error' in saved) return c.json(saved, 422);
+      return c.json(saved, 200);
+    }),
+  );

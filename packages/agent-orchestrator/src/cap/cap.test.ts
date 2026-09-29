@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { holdsSlot, momentumOf, poolOf, POOLS, toAdmit, type AdmissionView } from './cap.ts';
-import { MOMENTUM } from '../run.ts';
+import { MOMENTUM } from '../status/status.ts';
 
 const T0 = Date.parse('2026-09-25T10:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

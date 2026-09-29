@@ -10,23 +10,17 @@
  * so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your decision all
  * the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { Pruning } from 'agent-orchestrator';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = scratch('hkb-api-prune-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { engine, prune, prunedKept, prunedWords, readRun } = await import('agent-orchestrator');
+import { app } from '../src/app.ts';
+import { engine, prune, prunedKept, prunedWords, readRun } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(

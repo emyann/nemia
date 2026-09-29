@@ -8,7 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
 import { splitFrontmatter, type Workflow } from '../step/step.ts';
 import type { SkillsFound } from './agents.ts';
 import { preloads } from '../workflow-store.ts';

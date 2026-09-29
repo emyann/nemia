@@ -8,7 +8,8 @@
  * journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and judges every run afresh. Nothing
  * is written for it, and no verb, `wf ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.
  */
-import type { Assessment, Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
+import type { Assessment } from '../run.ts';
 
 /**
  * What one pass of a run read and did, as `advance` knows it once it has decided — every fact that says the next pass, with the same inputs,

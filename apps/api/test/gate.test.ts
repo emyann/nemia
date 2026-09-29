@@ -4,10 +4,10 @@
  * through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST …/retry with words, as
  * `wf retry --message` is.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
- * `WF_ROOT` is set before the api loads: agent-orchestrator locates its store as its modules load.
+ * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
+ * (test/harness.ts) first on PATH.
  */
-import { stops } from './harness.ts';
+import { root, stops } from './harness.ts';
 import type { DecideCommand, Decidable } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
@@ -15,16 +15,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-
-const tmp = (label: string) => scratch(`hkb-api-gate-${label}-`);
-
-const root = tmp('root');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { approvalFile, approve, askFile, engine, list, readRun, retry } = await import('agent-orchestrator');
-const { approvalWordsRefusal, onYouWords } = await import('agent-orchestrator/run');
+import { app } from '../src/app.ts';
+import { approvalFile, approve, askFile, engine, list, readRun, retry } from 'agent-orchestrator';
+import { approvalWordsRefusal, onYouWords } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

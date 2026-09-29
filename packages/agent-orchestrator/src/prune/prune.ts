@@ -1,0 +1,197 @@
+/**
+ * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
+ * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`). Pure.
+ */
+import { andList, isGitRun, prunedWords, type Pruned, type Run } from '../record/record.ts';
+import { holdWord } from '../wait/wait.ts';
+import { sizeOf } from '../artifacts/artifacts.ts';
+import type { Decision } from '../run.ts';
+
+/** What is kept of a pruned run, after `prunedWords`: its files too, unless `wf prune --artifacts` removed them. */
+export const prunedKept = (pruned: Pruned): string =>
+  pruned.artifacts ? 'its branches and record are kept' : 'its branches, record and files are kept';
+
+/** A step at its gate on a pruned run, as `wf ls` and `wf decide` both say it: no approval is left to give (`prunedRefusal`). */
+export const neverApproved = (pruned: Pruned): string => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
+
+/**
+ * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
+ * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
+ * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A run
+ * whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
+ */
+export function prunedRefusal(run: Run, what: string): string | null {
+  if (!run.pruned) return null;
+  const { at, worktrees, artifacts } = run.pruned;
+  if (artifacts && !worktrees.length) {
+    return `${run.id} was pruned at ${artifacts.at}: its files were removed (wf prune --artifacts), and ${what} would file work on a run whose files the steps after it read are gone. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
+  }
+  const files = artifacts ? `, its files at ${artifacts.at} (wf prune --artifacts)` : '';
+  return `${run.id} was pruned at ${at}: its worktrees were removed (wf prune)${files}, and ${what} would file work into one of them. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
+}
+
+/**
+ * Why a verb that would release work on a held run is refused — or null, for a run nobody holds. Pure. The hold is a person's word that
+ * nothing more of the run is filed until other runs ship (`Run.hold`); an approval, a try, a round or an acceptance each file work, or
+ * release it, and taking one now would be a second word against the first. The question a step asked stays on its record, and is asked
+ * again once the hold lifts; a person who wants to answer it now lifts the hold first, which is the one way the refusal names.
+ */
+export function heldRefusal(run: Run, what: string): string | null {
+  if (!run.hold) return null;
+  return `${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}), and ${what} would release work the hold keeps back. What the step asks stays on its record, and is asked again once the hold lifts; to answer it now, lift the hold first: wf hold ${run.id} --off.`;
+}
+
+/**
+ * What `wf prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `wf decide` says
+ * (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `wf rm` would not
+ * forget it (`forgetRefusal`, worded for `wf prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in tick.ts); and each worktree git
+ * lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch (`heldWorktree`), and each
+ * change `git status --porcelain` lists in it.
+ */
+export type PruneFacts = {
+  decided: Decision['kind'] | undefined;
+  held: string | null;
+  owed: readonly string[];
+  worktrees: ReadonlyArray<{ path: string; locked?: string; detached?: string; changes?: readonly string[] }>;
+  /** Whether this prune would remove the run's files directory (`--artifacts`, and one is there). */
+  files?: boolean;
+};
+
+/**
+ * The `wf prune` a person is told to run for one run: the flags they gave repeated, so what they run next is not refused for a flag it
+ * left out — a files directory asked for is asked for again, and a run nobody has decided keeps its `--unmerged`. Pure.
+ */
+export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {}): string =>
+  `wf prune ${id}${unmerged ? ' --unmerged' : ''}${artifacts ? ' --artifacts' : ''}`;
+
+/**
+ * Why `wf prune` will not remove this run's worktrees, in words that say what to do instead — or null, when it may. Pure. Every reason
+ * is named at once, so a person clears them in one go.
+ *
+ * `wf prune` removes a run's worktrees and nothing else: they are most of the space a run holds (a `node_modules` per workspace package),
+ * and nothing that reads a run that is over reads them — `wf decide`, the board and a run that waits on this one read its branches, its
+ * files directory and the engine's record. So it takes only what is rebuildable, and refuses where a worktree still holds anything else:
+ *
+ * - **a folder run**: its steps' folders are its work, not a checkout of a branch, and they are kept until `wf rm` forgets the run.
+ * - **a run that is not over** (`decision` says running), or whose workflow no longer reads, so that nobody can say.
+ * - **whatever holds `wf rm`** (`held`): a task in flight, anything due, an ask no pass has spent, a step at its gate. A run waiting on
+ *   this one is no reason here, since the record it reads stays.
+ * - **a run finished and not merged**, unless `unmerged` — or already pruned, whose merge is not asked again of its worktrees; its files,
+ *   when this prune would remove them (`files`), are asked again, since that word was for the worktrees — and said only once nothing
+ *   above holds it, since `--unmerged` clears none of that: pruned, none of its steps can be tried again, sent round or approved
+ *   (`prunedRefusal`), and its branch is the one place its work is left. A run that worked in the repository itself has no branch to
+ *   merge, and is refused so only for its files, which are part of what a person reads to decide it.
+ * - **a hand-off still owed** (`owed`): what a pass would commit, and the files it would collect, are only in the worktree.
+ * - **a worktree git would not remove, or that holds what no branch has**: locked; on no branch; or with changes no commit holds — where
+ *   `wf rm` would commit them under a step's name, `wf prune` leaves that to a person, since the run is not being forgotten.
+ *
+ * `unmerged` and `artifacts` are the flags the person gave, and every command offered repeats them (`pruneAgain`).
+ */
+export function pruneRefusal(
+  run: Run,
+  facts: PruneFacts,
+  { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {},
+): string | null {
+  const id = run.id;
+  const again = pruneAgain(id, { unmerged, artifacts });
+  const agreed = unmerged || (Boolean(run.pruned) && !facts.files);
+  if (!isGitRun(run)) {
+    return `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. wf rm ${id} forgets it with them.`;
+  }
+  const said: string[] = [];
+  if (facts.decided === undefined) {
+    said.push(`its workflow no longer reads, so whether it is over cannot be told — wf rm ${id} forgets it whole`);
+  } else if (facts.decided === 'running') {
+    said.push(
+      `it is not over — wf decide ${id} says it is still running. Pruning is not cancelling: wf cancel ${id} files nothing more, then ${again} once what was in flight has settled`,
+    );
+  } else if (facts.held) {
+    said.push(facts.held.replace(/\.$/, ''));
+  }
+  if (facts.decided === 'awaiting' && !agreed && !facts.held && !run.isolate) {
+    said.push(
+      `it finished on ${run.branch} itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: ${pruneAgain(id, { unmerged: true, artifacts })}`,
+    );
+  } else if (facts.decided === 'awaiting' && !agreed && !facts.held) {
+    said.push(
+      `it finished and is not merged into ${run.branch}: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: ${pruneAgain(id, { unmerged: true, artifacts })}`,
+    );
+  }
+  if (facts.owed.length) {
+    const one = facts.owed.length === 1;
+    said.push(
+      `${andList(facts.owed)} ${one ? 'is' : 'are'} still to be handed off — a pass commits what ${one ? 'it' : 'they'} left, and collects ${one ? 'its' : 'their'} files, from the worktree: let a tick run (wf tick), then ${again}`,
+    );
+  }
+  for (const w of facts.worktrees) {
+    if (w.locked !== undefined) {
+      said.push(
+        `${w.path} is locked${w.locked ? ` (${w.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${run.repo} worktree unlock ${w.path}`,
+      );
+    } else if (w.detached !== undefined) {
+      said.push(
+        `${w.path} is on no branch — its HEAD is detached${w.detached ? ` at ${w.detached.slice(0, 7)}` : ''} — and removing it would leave what it holds on none: put it on one (git -C ${w.path} switch -c <branch>), then ${again}`,
+      );
+    } else if (w.changes?.length) {
+      const shown = w.changes.slice(0, 3).join(', ');
+      const more = w.changes.length > 3 ? ` and ${w.changes.length - 3} more` : '';
+      said.push(
+        `${w.path} holds changes no commit has (${shown}${more}), and they would be lost with it: commit them on its branch, or discard them (git -C ${w.path} status), then ${again}`,
+      );
+    }
+  }
+  return said.length ? `${said.join('; ')}.` : null;
+}
+
+/**
+ * What `wf prune` found, or did, with one run, for `pruneLines` to say.
+ *
+ *   refused   `pruneRefusal` said why, and nothing was touched
+ *   nothing   no worktree of it is left to remove — nor, under `--artifacts`, a files directory — and `nothing` says why
+ *   prunable  what `wf prune --yes` would remove: each worktree, with what it holds on disk, and under `--artifacts` its files directory
+ *   pruned    those removed, and the run marked pruned; `left`, each git would not remove when asked, in its words, and the files
+ *             directory when what was in it did not all go
+ */
+export type Pruning = {
+  id: string;
+  kind: 'refused' | 'nothing' | 'prunable' | 'pruned';
+  refusal?: string;
+  nothing?: string;
+  worktrees: Array<{ path: string; bytes: number }>;
+  /** The run's files directory (`runs/<id>/artifacts/`), under `--artifacts`: what it holds, or on `pruned` what its removal freed. */
+  artifacts?: { path: string; bytes: number };
+  left: Array<{ path: string; git: string } | { path: string; files: string }>;
+  /** When the run was pruned, on `pruned`. */
+  at?: string;
+  /** Given `--unmerged`: the command a kept line offers repeats it (`pruneAgain`), since a run nobody has decided is refused its files without it. */
+  unmerged?: true;
+};
+
+/** The bytes a list of worktrees holds, together. */
+export const prunedBytes = (worktrees: ReadonlyArray<{ bytes: number }>): number => worktrees.reduce((sum, w) => sum + w.bytes, 0);
+
+/** The bytes one run's prune frees, or would: its worktrees and, under `--artifacts`, its files. */
+export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): number => prunedBytes(p.worktrees) + (p.artifacts?.bytes ?? 0);
+
+/**
+ * What `wf prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
+ * `--artifacts`. Pure. A prune of the worktrees alone says that the files are kept.
+ */
+export function pruneLines(p: Pruning): string[] {
+  const n = p.worktrees.length;
+  const worktrees = `${n} worktree${n === 1 ? '' : 's'}`;
+  const what = !p.artifacts ? worktrees : n ? `${worktrees} and its files` : 'its files';
+  const each = [...p.worktrees, ...(p.artifacts ? [p.artifacts] : [])].map((w) => `   ${w.path}  ${sizeOf(w.bytes)}`);
+  if (p.kind === 'refused') return [`${p.id}  not pruned: ${p.refusal}`];
+  if (p.kind === 'nothing') return [`${p.id}  nothing to prune: ${p.nothing}`];
+  if (p.kind === 'prunable') return [`${p.id}  would remove ${what}, ${sizeOf(pruningBytes(p))}`, ...each];
+  return [
+    `${p.id}  pruned: removed ${what}, ${sizeOf(pruningBytes(p))} freed; ${p.artifacts ? 'its record and branches are kept' : 'its record, branches and files are kept'}`,
+    ...each,
+    ...p.left.map((l) =>
+      'git' in l
+        ? `   kept ${l.path}: git would not remove it — ${l.git}; look in it before anything is forced: git -C ${l.path} status`
+        : `   kept what is left in ${l.path}: ${l.files} — what is still there is kept, and read as it is; ${pruneAgain(p.id, { unmerged: p.unmerged, artifacts: true })} removes it once it can be`,
+    ),
+  ];
+}

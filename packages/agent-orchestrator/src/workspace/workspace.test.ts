@@ -16,7 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from './workspace.ts';
-import { composeBrief, type Run } from '../run.ts';
+import type { Run } from '../record/record.ts';
+import { composeBrief } from '../run.ts';
 import type { Workflow } from '../step/step.ts';
 import { scratch } from '../../test/scratch.ts';
 
@@ -24,11 +25,11 @@ const ROOT = scratch('wf-deps-');
 process.env.WF_ROOT = ROOT;
 const { provisionDeps } = await import('../runner.ts');
 
-test('workspace.ts reads no disk and spawns nothing: it imports path, and nothing else', () => {
+test("workspace.ts reads no disk and spawns nothing: it imports path, a step's shape and the record's, and nothing else", () => {
   const text = fs.readFileSync(path.join(import.meta.dirname, 'workspace.ts'), 'utf8');
   assert.deepEqual(
     [...text.matchAll(/^\s*(?:import|export)\b[^'";]*?\bfrom\s*['"]([^'"]+)['"]/gm)].map((m) => m[1]),
-    ['node:path'],
+    ['node:path', '../step/step.ts', '../record/record.ts'],
   );
 });
 

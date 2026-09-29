@@ -3,20 +3,19 @@
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
  * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText` and `refusedText`), which they import from here and never from the runtime.
  *
- * It passes the runtime's surface through, and wraps one method of it: `file`, so that every task the orchestrator files is `queued` and
- * starts only once the tick admits it (`cap.ts`). What the orchestrator does with the runtime — file a task, view one, tick, admit,
- * stop one, read its logs, say something to it, read the feed — are the methods of the runtime's `Engine`, which every controller
- * takes as it is and every test hands a fake of. A wrapper would be a second surface to keep in step with the first, and a place for
- * behaviour to grow; this file holds none but that one.
- *
- * It uses `agent-runtime` — the Promise API — not `agent-runtime/effect`. Nothing here imports Effect, which is the point: a consumer of
- * the engine should need to learn three functions, not a library.
+ * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every task
+ * the orchestrator files is `queued` and starts only once the tick admits it (`cap.ts`). The controllers take the engine in Promises, each
+ * verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view one, tick, admit, stop one, read
+ * its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it is
+ * and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
+ * and a place for behaviour to grow; this file holds none but that one.
  */
 import path from 'node:path';
+import { Effect, Layer } from 'effect';
+import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import {
   claudeDetached,
   codex,
-  createEngine,
   remoteConfigRefusal,
   type Credentials,
   type Engine,
@@ -80,9 +79,26 @@ export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
-  const e = createEngine({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential });
-  return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+  return engineOf(
+    RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential }),
+  );
 };
+
+/**
+ * The engine the controllers use over `layer`'s `Engine` service, in Promises (`promiseEngine`), with every filing `queued`: `engine()`
+ * over the store's runtime, a test over a layer of its own (`test/engine-board.ts`). Builds the layer at the call, and throws what the
+ * runtime throws for a layer that does not build.
+ */
+export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine =>
+  promiseEngine(
+    Layer.effect(
+      RuntimeEngine,
+      Effect.gen(function* () {
+        const e = yield* RuntimeEngine;
+        return RuntimeEngine.of({ ...e, file: (spec) => e.file({ ...spec, queued: true }) });
+      }),
+    ).pipe(Layer.provide(layer)),
+  );
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
 const LEFT_OUT =

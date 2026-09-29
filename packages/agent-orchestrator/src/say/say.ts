@@ -8,8 +8,8 @@ import { holdWord } from '../wait/wait.ts';
 
 /**
  * A person's words, said to a step's session while it ran (`wf say`), as the engine journalled them: when, to which attempt of the step's
- * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.ts reads it off
- * the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
+ * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.verb.ts reads it
+ * off the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
  */
 export type Said = { at: string; attempt: number; text: string };
 

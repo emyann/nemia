@@ -2,10 +2,10 @@
  * The workflow builder, for the board: a folder of yours put back from its steps as the Workflows page lists them, a new folder with a first
  * step, a schema beside the steps, and what a step's form is drawn from.
  *
- * A folder is written by the package's `writeWorkflow` (agent-orchestrator's authoring.ts), which judges the whole folder before a byte is written:
- * each refusal is the parser's sentence, naming the step, and the api answers it with a 422 carrying the steps it names (`stepsNamed`), so
- * the board shows it by them. The body's shape is the api's own to refuse (400), and what was written is answered read back from disk
- * (`listed`), never echoed from the request.
+ * A folder is written by the package's `writeWorkflow` (agent-orchestrator's folder/write.store.ts), which judges the whole folder before a
+ * byte is written: each refusal is the parser's sentence, naming the step, and the api answers it with a 422 carrying the steps it names
+ * (`stepsNamed`), so the board shows it by them. The body's shape is the api's own to refuse (400), and what was written is answered read
+ * back from disk (`listed`), never echoed from the request.
  *
  * A schema pasted for an `output:` is the one file `writeWorkflow` never writes, so it travels in the same PUT (`schemas`) and is judged
  * with the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`): a refused folder

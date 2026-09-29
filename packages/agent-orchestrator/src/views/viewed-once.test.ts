@@ -1,11 +1,12 @@
 /**
- * `viewedOnce` (views.ts): the engine `wf ls` and `wf decide` read, whose `view` of a task is read once for the whole command. A verb that
- * changes a task drops what was read of that task, a pass or a verb it does not know drops everything, and a view that failed is asked again.
+ * `viewedOnce` (views.verb.ts): the engine `wf ls` and `wf decide` read, whose `view` of a task is read once for the whole command. A verb
+ * that changes a task drops what was read of that task, a pass or a verb it does not know drops everything, and a view that failed is asked
+ * again.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Engine, TaskView } from 'agent-runtime';
-import { viewedOnce } from '../src/views.ts';
+import { viewedOnce } from './views.verb.ts';
 
 /** An engine that counts the views asked of it, and fails a view of `bad` the first time. */
 const counting = () => {

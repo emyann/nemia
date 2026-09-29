@@ -457,7 +457,7 @@ export type Spend = { usd: number; measured: number; unmeasured: number };
 
 /**
  * What one task's sessions cost (`Spend`), whether its harness ended its last attempt at its budget — the runtime's `limit: 'budget'` — and
- * what its sessions were denied, in the runtime's words (`deniedOf` in views.ts, which `spendReader` fills it from: this file reads no
+ * what its sessions were denied, in the runtime's words (`deniedOf` in views.verb.ts, which `spendReader` fills it from: this file reads no
  * runtime). Not money, and here all the same: every reader of a step's standing is handed a `SpendOf` already, and a reader handed a
  * parameter of its own could leave it out and read no denial. Absent where nobody read them, as `taskSpend` alone leaves it.
  */

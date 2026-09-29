@@ -24,7 +24,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createEngine, type Engine, type TaskView } from 'agent-runtime';
-import { loadWorkflows } from '../src/workflow-store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { toldIn } from './told.ts';
 

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { WorkflowError, type StepDraft, type Workflow } from '../src/workflow.ts';
-import { loadWorkflows } from '../src/workflow-store.ts';
+import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-write-');

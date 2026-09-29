@@ -69,7 +69,7 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *
  * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
  * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in record.store.ts).
- * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.ts).
+ * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts).
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded

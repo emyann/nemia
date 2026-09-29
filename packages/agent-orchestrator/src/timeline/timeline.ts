@@ -2,8 +2,8 @@
  * Where a run's time went: the timeline of its tries, their checks, the queue waits and the wall time, off the engine's views of
  * their tasks and the filing times on its feed.
  *
- * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.ts` reads the views and the feed (`readFilings`) and hands
- * them here, `cli.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
+ * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.verb.ts` reads the views and the feed (`readFilings`) and
+ * hands them here, `cli.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
  */
 import { dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../radius.ts';
 import type { Run } from '../record/record.ts';
@@ -14,7 +14,7 @@ import { loopSpan } from '../workflow/index.ts';
 
 /**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
- * engine. decide.ts hands `timeline` the engine's views, which have this shape.
+ * engine. decide.verb.ts hands `timeline` the engine's views, which have this shape.
  */
 export type AttemptClock = {
   startedAt: string;
@@ -145,8 +145,8 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * Where a run's time went, per try and per check of every step, off the engine's views of their tasks and the run's `tries`. Pure.
  *
  * `views` must hold every task of every try — the tries behind the current one too, and each try's check; a task it does not hold reads as
- * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in views.ts) or each view's
- * `State.filedAt` (`decide`); a task without one has its queue time `not known`. A step not filed has no try on the clock.
+ * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in views.verb.ts) or each
+ * view's `State.filedAt` (`decide`); a task without one has its queue time `not known`. A step not filed has no try on the clock.
  *
  * `steps` are the workflow the run is judged by — the one it froze, by default — whose loops its rounds are of. Without them no round is totalled.
  * A round counts the steps its loop files again (`loopSpan`), and a step before the loop or after it is in no round. The rounds go by loop,

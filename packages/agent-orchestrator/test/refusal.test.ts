@@ -184,6 +184,6 @@ test('no file under src sets exitCode: 2 by hand: each refusal is thrown as Miss
     .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
     .map((f) => `src/${f.split(path.sep).join('/')}`)
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
-  assert.ok(files.includes('src/verbs.ts') && files.includes('src/refusal/refusal.ts'), 'the walk reads src');
+  assert.ok(files.includes('src/cancel/cancel.verb.ts') && files.includes('src/refusal/refusal.ts'), 'the walk reads src');
   assert.deepEqual(untaggedRefusals(Object.fromEntries(files.map((f) => [f, fs.readFileSync(path.join(PKG, f), 'utf8')]))), []);
 });

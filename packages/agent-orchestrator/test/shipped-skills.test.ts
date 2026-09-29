@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter, type Agent } from '../src/workflow.ts';
-import { cardSkills, loadAgents, loadWorkflows, preloads, skillsFor } from '../src/workflow-store.ts';
+import { cardSkills, loadAgents, loadWorkflows, preloads, skillsFor } from '../src/folder/folder.store.ts';
 import { briefBody, pluginOf, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
 

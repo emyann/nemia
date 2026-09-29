@@ -1,0 +1,149 @@
+/**
+ * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves; where a folder's runs look for agents and
+ * skills (`placesAround`); and whether a folder holds the workflows the board lists (`isWorkflowsHolder`). A store beside `folder.store.ts`:
+ * it imports neither the engine nor a controller. A run is changed by none of it: it froze its folder at `wf start`.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
+import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
+import { codexModeWritten, formerSandbox } from '../former/former.ts';
+import { parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
+import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal } from './folder.ts';
+import { agentsFor, skillsFor, type Places } from './folder.store.ts';
+import { HOME, isDirectory } from '../record/record.store.ts';
+
+/** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */
+export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
+
+/**
+ * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.
+ *
+ * Judged whole before a byte is written, so a folder refused is the folder it was: where it is (`workflowPlaceRefusal`), each step's name as
+ * a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory as
+ * `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So every
+ * refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a cycle, a
+ * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
+ * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
+ *
+ * Then the `.md` of each step not in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
+ * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
+ * its old name, which is the same file. After that each step's `<name>.md` is written, but for one whose file already reads as the step,
+ * which is left as it is, comments and all, since a render has none. A `*.schema.json` is left as it is: a step names one, and the builder
+ * writes none. The README is written only when `readme` is given, to the name the folder's README already has.
+ *
+ * A `.md` in the folder that is a link is refused by name, before any of it: a write follows a link, so a step would be rendered into
+ * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
+ * linked README is refused only when a `readme` is given, since that is when it would be written.
+ *
+ * A draft on codex by its agent's `harness:` alone that sends its sandbox as `permissionMode` is refused (`codexModeWritten`), as
+ * `renderStep` refuses one that says `harness: codex`: it would be written under the former name, which the parser still reads.
+ *
+ * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
+ * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. Its
+ * agents and skills are found where a run of it would look (`lookupRoots`): in `places`, or else the repository its folder is in and the
+ * store (`placesAround`). A run is not changed by any of it: it froze its folder at `wf start`.
+ */
+export function writeWorkflow(
+  dir: string,
+  steps: readonly StepDraft[],
+  readme?: string,
+  { anywhere = false, places }: { anywhere?: boolean; places?: Places } = {},
+): WorkflowWritten {
+  const at = path.resolve(dir);
+  const refuse = (why: string | undefined) => {
+    if (why) throw new WorkflowError(why);
+  };
+  refuse(agentsFolderRefusal(at));
+  if (!anywhere) refuse(workflowPlaceRefusal(at));
+  if (fs.existsSync(at) && !isDirectory(at))
+    refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = fs.readdirSync(at, { withFileTypes: true });
+  } catch {}
+  const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
+  if (linked) {
+    refuse(
+      linkRefusal(
+        path.join(at, linked.name),
+        "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes.",
+      ),
+    );
+  }
+  if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
+  for (const step of steps) refuse(stepNameRefusal(step?.name));
+  const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
+  if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
+  const texts = steps.map((step) => [step.name, renderStep(step)] as const);
+  const read = (file: string): string | undefined => {
+    try {
+      return fs.readFileSync(path.resolve(at, file), 'utf8');
+    } catch {
+      return undefined;
+    }
+  };
+  const where = places ?? placesAround(at);
+  const agents = agentsFor(at, where);
+  const parsed = parseFolder(texts, read, agents, skillsFor(at, where));
+  const onCodex = steps.find(
+    (step) =>
+      step.permissionMode != null &&
+      formerSandbox(step.permissionMode) !== undefined &&
+      parsed.find((s) => s.name === step.name)?.harness === 'codex',
+  );
+  if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
+
+  fs.mkdirSync(at, { recursive: true });
+  const written: string[] = [];
+  const kept: string[] = [];
+  const put = (file: string, text: string, same: (there: string) => boolean) => {
+    const there = read(file);
+    if (there !== undefined && same(there)) return kept.push(file);
+    fs.writeFileSync(path.join(at, file), text);
+    return written.push(file);
+  };
+  const names = new Set(texts.map(([name]) => `${name}.md`));
+  const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
+  for (const file of removed) fs.rmSync(path.join(at, file));
+  for (const [name, text] of texts) {
+    const step = parsed.find((s) => s.name === name);
+    put(`${name}.md`, text, (there) => {
+      try {
+        return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step);
+      } catch {
+        return false;
+      }
+    });
+  }
+  if (readme !== undefined)
+    put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
+  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/**
+ * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the store's
+ * `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below it, nor
+ * the `workflows/` that holds it: those are the folders the board lists as workflows.
+ */
+function workflowPlaceRefusal(at: string): string | undefined {
+  const holder = path.dirname(at);
+  const store = path.resolve(HOME, 'workflows');
+  if (isWorkflowsHolder(holder)) return undefined;
+  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
+}
+
+/** Whether `dir` holds the workflows the board lists: the store's `workflows/`, or a repository's, beside its `.git`. */
+export function isWorkflowsHolder(dir: string): boolean {
+  if (dir === path.resolve(HOME, 'workflows')) return true;
+  return path.basename(dir) === 'workflows' && fs.existsSync(path.join(path.dirname(dir), '.git'));
+}
+
+/**
+ * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository it is in — `<repo>/workflows/<name>`,
+ * a checkout by its `.git` — and the store. A folder of the store's is only the store's.
+ */
+export function placesAround(workflowDir: string): Places {
+  const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
+  return { ...(fs.existsSync(path.join(repo, '.git')) ? { repo } : {}), home: HOME };
+}

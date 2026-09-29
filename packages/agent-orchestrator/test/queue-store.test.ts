@@ -728,7 +728,11 @@ test('REFUSED by name at shipped defaults: `wf inbox queue` of a name with no ca
   );
   const startedAlready =
     /^kept-a1b2\.md: this card was started as started-already-zz99 — that run's record says so — and is still in the inbox because its removal failed\./;
-  await assert.rejects(queue('kept-a1b2'), refusedAs('Conflict', startedAlready), "a card a run's record names, its removal failed, is refused");
+  await assert.rejects(
+    queue('kept-a1b2'),
+    refusedAs('Conflict', startedAlready),
+    "a card a run's record names, its removal failed, is refused",
+  );
   assert.throws(
     () => startFromInbox({ name: 'kept-a1b2', callerRepo: repo }),
     refusedAs('Conflict', startedAlready),

@@ -35,7 +35,7 @@ test('a refusal exits 2 and prints its sentence: wf approve of a run that does n
   assert.equal(stderr, 'no such run: r-nope. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.\n');
 });
 
-test('REFUSED: wf retry and wf say of a run that does not exist exit 2, with the store\'s sentence naming wf ls', () => {
+test("REFUSED: wf retry and wf say of a run that does not exist exit 2, with the store's sentence naming wf ls", () => {
   for (const argv of [
     ['retry', 'r-nope', 'implement'],
     ['say', 'r-nope', 'implement', 'the words'],

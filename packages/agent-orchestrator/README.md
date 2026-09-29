@@ -1431,7 +1431,7 @@ wf start "Give the Factory a legend" --workflows packages/agent-orchestrator/wor
 **Looking is a skill, not a step.** `.claude/skills/look/SKILL.md`, in this repository, says how any step
 looks at the web app. It reads the e2e's PNGs. It serves the app on ports of its own and photographs every
 page with the browser's `browser_*` tools (`.mcp.json`), and never with `browser_run_code_unsafe`, which
-`.claude/settings.json` denies. And it judges the layout, both themes, and what a person notices first. It
+every shipped step that could reach it denies in its agent's `disallowedTools:`, and no allow reaches in `dontAsk`. And it judges the layout, both themes, and what a person notices first. It
 writes nothing into the workspace. `look` was a step of its own while the reviewer ran on codex, which
 reads no image and has no browser, and `respond` answered two reviewers while there was no loop. Neither
 reason holds now.
@@ -1923,9 +1923,10 @@ ending step does the shipping, in its folder's words, with the person's words on
 **Its `disallowedTools:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`
 and `git pull`, which merges too, then `checkout`, `switch`, `restore`, `rebase`, `reset`, `stash`,
 `cherry-pick`, `revert`, `clean` and `push`, as `Bash(git merge:*)` rules — a named list of the ordinary
-commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` holds `git push` and `git branch
--D` for every session in the checkout, but it cannot hold `git merge`: `ship.md` runs in the same checkout,
-and merging is its whole job. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
+commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` denies no git, since a person's
+own session in the checkout may be asked to push, and it could not hold `git merge`: `ship.md` runs in the same checkout,
+and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
+`dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
 is not `git merge`): it stops a command that should not have been typed, and `supervisor.test.ts` fails when
 one of those rules leaves the folder.

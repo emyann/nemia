@@ -42,13 +42,20 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
  * The git this session must never type in a person's own checkout, denied by name on the step itself: the merge a run's ending step owns,
  * and everything that moves or throws away what is in that checkout.
  *
- * `.claude/settings.json` holds `git push` and `git branch -D` for every session here, but it cannot hold `git merge` — `ship.md` runs in
- * the same checkout and merging is its whole job — so the step's own `disallowedTools:` is the only place this refusal can live.
+ * The checkout's `.claude/settings.json` denies no git, since a person's own session there may be asked to push, and it could not deny
+ * `git merge` anyway — `ship.md` runs in the same checkout and merging is its whole job — so the step's own `disallowedTools:` is where
+ * this refusal lives.
  */
 const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
 
+/**
+ * What `dontAsk` alone would refuse a job, denied by name all the same: a background session reads the person's own user and local
+ * settings, where an allow of `Bash(git branch:*)` or `mcp__playwright` may stand (agent-fences.test.ts).
+ */
+const BACKGROUND_DENIED = ['Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)', 'mcp__playwright__browser_run_code_unsafe'];
+
 /** The rules the shipped step is given, in the order it writes them. */
-const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`)];
+const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`), ...BACKGROUND_DENIED];
 
 /** Whether a deny list refuses a command, as a harness reads a `Bash(<prefix>:*)` rule: the command is the prefix, or begins with it and a space. */
 const denies = (rules: readonly string[], command: string): boolean =>
@@ -260,13 +267,15 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
   ])
     assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
 
-  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
-  assert.ok(settings.permissions.deny.includes('Bash(git push:*)'));
-  assert.ok(settings.permissions.deny.some((r) => r.startsWith('Bash(git branch -D')));
+  for (const command of ['git branch -D wf/add-sub-8imz/implement', 'git branch --delete --force wf/add-sub-8imz/implement'])
+    assert.ok(
+      denies(disallowedTools, command),
+      `${command}: a person's own settings may allow \`git branch\`, and this session reads them`,
+    );
   assert.equal(
     denies(disallowedTools, 'git branch --list'),
     false,
-    "`git branch -D` is the checkout's own refusal, so the step says nothing of `git branch`: denying it by prefix would take `git branch --list`, which is diagnosis",
+    'the forced delete is denied by its own spellings, never by `git branch` as a prefix, which would take `git branch --list`, which is diagnosis',
   );
 });
 

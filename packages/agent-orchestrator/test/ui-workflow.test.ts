@@ -103,11 +103,11 @@ test('look and respond are gone: both steps use the look skill, which the reposi
   const skill = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md'), 'utf8');
   assert.match(skill, /^---\nname: look\ndescription: \S/, 'the skill the two briefs name is there, under that name');
   assert.match(skill, /never `browser_run_code_unsafe`/i, 'the skill forbids one browser tool');
-  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
-  assert.ok(
-    settings.permissions.deny.includes('mcp__playwright__browser_run_code_unsafe'),
-    'the one browser tool the skill forbids is denied by the settings too, by name',
-  );
+  for (const step of [steps.implement, steps.ship])
+    assert.ok(
+      step.disallowedTools?.includes('mcp__playwright__browser_run_code_unsafe'),
+      `${step.name}: the one browser tool the skill forbids is denied by the step too, by name`,
+    );
 });
 
 test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
@@ -189,8 +189,21 @@ test('review writes nothing by machinery: on Claude, tools that read and Bash, i
 
 /** What the settings allow for implement's check, and write into the workspace: a reviewer is denied both by name. */
 const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
-/** What an unattended session has and no step needs, as measured of what a worker gets. */
-const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
+/**
+ * What an unattended session has and no step needs, as measured of what a worker gets, and what a step never does, which its `auto`
+ * would otherwise run: `git push`, a forced branch delete, and the browser's one tool the look skill forbids.
+ */
+const IMPLEMENT_DENIED = [
+  'SendMessage',
+  'CronCreate',
+  'CronDelete',
+  'RemoteTrigger',
+  'Bash(git push)',
+  'Bash(git push:*)',
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete --force:*)',
+  'mcp__playwright__browser_run_code_unsafe',
+];
 
 test("every dev* folder, and ui, ends in `ship`: gated, in the repository's checkout, with implement's denies and that folder's check, which the run executes on the merge — and its prose stages the merge and signs off the message, and neither runs the check nor commits", () => {
   const CHECKS: Record<string, string> = {

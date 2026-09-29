@@ -14,8 +14,8 @@
  * whichever binding it came: what the tests assert of the runtime's traffic.
  *
  * What an agent elsewhere may do is an option too: live under a path (`prefix`), serve its card at a path of its own
- * (`cardAt`), serve a card of its own making (`cardJson`), name interfaces on another origin (`interfacesAt`), answer every A2A request with a redirect (`redirectTo`),
- * or hold a request with no answer (`hanging`, switched on and off as the test goes).
+ * (`cardAt`), serve a card of its own making (`cardJson`), name interfaces on another origin (`interfacesAt`), answer every A2A
+ * request with a redirect (`redirectTo`), or hold a request with no answer (`hanging`, switched on and off as the test goes).
  */
 import express from 'express';
 import http from 'node:http';
@@ -42,7 +42,10 @@ import { jsonRpcHandler, restHandler, UserBuilder } from '@a2a-js/sdk/server/exp
 
 export type Binding = 'JSONRPC' | 'HTTP+JSON' | 'GRPC';
 
-/** A state the script moves a task to, in A2A's words. `input-required` and `auth-required` interrupt a turn; the last four end the task. */
+/**
+ * A state the script moves a task to, in A2A's words. `input-required` and `auth-required` interrupt a turn; the last four end the
+ * task.
+ */
 export type StateWord = 'working' | 'input-required' | 'auth-required' | 'completed' | 'failed' | 'rejected' | 'canceled';
 
 /**

@@ -1,0 +1,14 @@
+---
+description: Reads a change as a second engineer would, and sends it round again while a finding is worth it.
+skills: review-a-change
+harness: claude
+model: opus
+effort: high
+context: 200k
+tools: Read, Grep, Glob, Bash, Skill
+permissionMode: dontAsk
+output: review.schema.json
+---
+Review the change in this workspace. Write nothing into it.
+
+Before you read the diff, load your skill `review-a-change` with the Skill tool and follow it.

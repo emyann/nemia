@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "The commit message for the staged merge: a subject, a blank line, then the body. Empty when you sign off blocked."
+    }
+  },
+  "required": ["message"],
+  "additionalProperties": false
+}

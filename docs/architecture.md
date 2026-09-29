@@ -58,16 +58,20 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
   kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
   check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
-  rest, say, skills, status, step, timeline, wait, workflow, workspace.
+  rest, say, skills, status, step, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
-  workflow-store, worktree, branches, artifacts and authoring at the top, and record.store, agents.store, daemon.store,
-  feed.store, inbox.store, tally.store, places.store and a2a.store in the folders. They load as a tree. At the bottom are
-  record/places.store.ts, workflow-store.ts and meter/tally.store.ts (the pass's meter), which import no store file.
-  record/record.store.ts imports only those three, and worktree.ts imports only record.store.ts and the two others. No other store file is
-  imported by another. Outside the store, only the client and the controllers beneath the CLI import a store file, and
-  one of them imports each.
-- **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; views.ts,
-  start.ts, tick.ts, verbs.ts, forget.ts and decide.ts beneath it, split by concern; and cli.ts and bin/wf.ts above it.
+  branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
+  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store and a2a.store in
+  the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
+  (the pass's meter) and config/config.store.ts, which import no store file. record/record.store.ts imports only those
+  four; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
+  imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.
+  Outside the store, only the client and the controllers beneath the CLI import a store file, and one of them imports
+  each.
+- **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; tick.ts
+  and the verbs beneath it, one feature each (views.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb,
+  gate.verb, say.verb, wait.verb, round.verb, list.verb, decide.verb, forget.verb, prune.verb); and cli.ts and bin/wf.ts
+  above it. A verb reaches the client itself or through a controller it imports.
   cli.ts reaches the package only through runner.ts and workflow.ts, and bin/wf.ts only through cli.ts. The client and
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.

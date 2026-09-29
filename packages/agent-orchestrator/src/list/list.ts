@@ -128,13 +128,13 @@ export type Listing = {
  *   tick.ts): what this run's ending says where `waiting` would be.
  * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's
  *   `needs-human` on the step's line, and nowhere else. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly,
- *   here and by everything that reads a step's status — `harnessBlocked` in views.ts, the api's `needsOf`, `stepState` on the board — so
- *   the phase a decision is made on stays the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in decide.ts
- *   passes this; the api does not, and its step's `status` reaches the board's chip unchanged.
- * @param deniedOf What each task's sessions were denied, as permission rules name them (`deniedOf` in views.ts): said as
+ *   here and by everything that reads a step's status — `harnessBlocked` in views.verb.ts, the api's `needsOf`, `stepState` on the board —
+ *   so the phase a decision is made on stays the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in
+ *   list.verb.ts passes this; the api does not, and its step's `status` reaches the board's chip unchanged.
+ * @param deniedOf What each task's sessions were denied, as permission rules name them (`deniedOf` in views.verb.ts): said as
  *   `denied: Skill(look), Bash(pytest)` (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its
- *   status — which stays the word every reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field
- *   of its own (`StepNeeds.denied`).
+ *   status — which stays the word every reader compares exactly. `list` in list.verb.ts passes this; the api does not, and carries the list
+ *   as a field of its own (`StepNeeds.denied`).
  * @param holds The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
  *   the runs the hold names, each taken as one that may still ship.
  */

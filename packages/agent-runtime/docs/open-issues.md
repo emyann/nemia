@@ -1255,7 +1255,7 @@ own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
 reason `harness` — with `stated: false` beside it, written on every end read off a sighting of a task that asked for a
 statement (`true` when one came). The engine settles such a task `succeeded`, continues nothing and nudges nothing, whatever
 attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked`, `endWords` in its
-`views.ts`), and files its sign-off nudge on it; `wf` and the board say what they said. An end with no `stated` key — any
+`views/views-words.ts`), and files its sign-off nudge on it; `wf` and the board say what they said. An end with no `stated` key — any
 journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles `failed` with its
 note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`; retiring them
 is part 2 of stage 4a.

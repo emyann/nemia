@@ -203,7 +203,7 @@ nothing allows is denied with no prompt. A worktree's `node_modules` linked each
 Code allows a path through a symlink only when the link and its target both match: a read of `node_modules/hono/package.json`
 was a read of `/home/…/hkb-v2/node_modules/hono/package.json`, outside the step's working directory, and denied. Main's
 packages are now made again in the worktree, each directory the worktree's own and each file hardlinked to main's
-(`{ kind: 'tree' }` in `depsPlan`, `hardlinkTree` in `worktree.ts`), so every path under `node_modules` is inside the
+(`{ kind: 'tree' }` in `depsPlan`, `hardlinkTree` in `worktree.store.ts`), so every path under `node_modules` is inside the
 worktree, for every harness and every tool. Workspace packages keep their links to the worktree's copies; `.bin` keeps the
 relative links npm wrote, which now resolve in the worktree; npm's dot files are still left out, and a lockfile main has not
 installed still gets `npm ci`. A package is made under `.wf-making-<name>` and renamed into place whole, so a pass that died
@@ -526,7 +526,7 @@ What it leaves:
 Plan §4 G. On a run waiting on you, `wf decide` prints three things between the verdicts and the closeouts:
 what the result branch touched, the lesson line, and the whole diff of the check-affecting files. Beside
 each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy` and
-`sensitiveDiff` in `src/branches.ts` ask git, and `consumption` in `src/views.ts` the engine. `decide` returns `used` off the
+`sensitiveDiff` in `src/branches.ts` ask git, and `consumption` in `src/views/views.verb.ts` the engine. `decide` returns `used` off the
 views it already read, so the screen still reads each task once (each view is a harness observe, plan §4b). The README section *What the
 screen puts in front of you* is the account.
 
@@ -700,7 +700,7 @@ What was built:
   returns the runs in `after` that have not shipped. `shipped` is never called for a run that is not
   `gated`: one with no `after`, a cancelled run, or a run with any step filed on any try (`hasStarted`: a
   step a round moved behind counts). That is how a started run's parents are never read again.
-- `parentOf(e, id)` in `views.ts` reads a parent on every pass that asks, once per pass (`parentsOf`). It
+- `parentOf(e, id)` in `views.verb.ts` reads a parent on every pass that asks, once per pass (`parentsOf`). It
   counts the parent shipped exactly when `decision`, the function behind the parent's own `wf decide`, says
   `shipped`: not running, not cancelled, and every result branch on the base branch. Git is asked first;
   the engine's view of the parent's tasks is read only once its branches are on the base. A result branch
@@ -961,11 +961,11 @@ What was built:
 - **`planOrder(cards)`**, pure, puts parents first, and goes by name among the cards that may go next. It refuses an
   `after:` naming a card the plan does not have or the card itself, and a cycle, named round:
   `a.md, d.md, b.md wait on each other — a after d, d after b, b after a`.
-- **`workflowFolder(given, from, repo)`** in `workflow-store.ts` finds a workflow by a path from where it is written, or,
+- **`workflowFolder(given, from, repo)`** in `folder.store.ts` finds a workflow by a path from where it is written, or,
   when nothing is there and the value is a bare name, under `<repo>/workflows/`. `wf start --workflows` used to take
   only a path. It now takes a name too (`--workflows dev`), and a card's `workflow:` is read the same way, from the
   plan folder. A name found nowhere is refused, naming both places and the workflows the repository has.
-- **`wf plan <folder> --repo <r>`** calls `startPlan` in `start.ts`:
+- **`wf plan <folder> --repo <r>`** calls `startPlan` in `plan.verb.ts`:
   - It reads the folder (`readPlan`).
   - Before the first `start()`, it finds every card's workflow and asks of it what `start` refuses (`stepsToStart`,
     split out of `start`). A refusal comes back behind the card: `b.md: \`workflow: deb\` — no workflow folder at …`.
@@ -1410,7 +1410,7 @@ one thing it has to fix.
 
 What was built:
 
-- `closeoutAsked` in views.ts now answers `CloseoutAsked`: `false` for a task never asked for a closeout, `true` for one asked,
+- `closeoutAsked` in views.verb.ts now answers `CloseoutAsked`: `false` for a task never asked for a closeout, `true` for one asked,
   and `unsigned` for one asked whose last attempt ended with that reason. It is still the one reading of the engine's view, so the
   tick, `wf ls`, `wf decide` and apps/api, which hands `closeoutAsked(views)` to `listing`, `assess` and `decision`, all get the
   third answer with no change of their own. The type is exported beside the package's other types.
@@ -1590,7 +1590,7 @@ An idea about the project had nowhere to be parked. The unit for one already exi
 in a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb parked such a note with
 `hkb new --triage` and listed them with `hkb ls --phase triage`, and its ADR-015 records that triage became a phase in the machinery
 because a person needed an inbox. Here an unstarted card is a file in a folder, and a run is what it was. Read first: CLAUDE.md, the
-README's plan and inputs sections, `plan.ts`, and `start`, `readPlan` and `startPlan` in `start.ts`.
+README's plan and inputs sections, `plan.ts`, and `start`, `readPlan` and `startPlan` (`start.verb.ts`, `plan.store.ts`, `plan.verb.ts`).
 
 What was built:
 
@@ -1613,7 +1613,7 @@ What was built:
 - **`wf inbox rm <name>`** drops a card through `dropFromInbox`. A name with no card exits 0 and names the cards there are (`noCardLine`).
   The request lists this among the refusals, but also says a name with no card is normal. The more specific sentence was kept, as
   `wf cancel` says "already finished" and exits 0.
-- **Starting a card.** `startFromInbox` in `start.ts` is the one function the CLI calls and the board will call. It takes the card's name,
+- **Starting a card.** `startFromInbox` in `inbox.verb.ts` is the one function the CLI calls and the board will call. It takes the card's name,
   a brief to replace the body, the workflow (the given one, else the card's `workflow:`, else refused naming the repository's workflows),
   the repository (the given one, else `repo:`, else the caller's), and `after`, `isolate` and `inputs`. It calls `start()`, which now
   takes `from` and writes `from: { inbox: <name> }` on the record. Then it removes the card. `wf start` on any path under the inbox goes
@@ -1861,7 +1861,7 @@ What was built:
   name. `branchFates` takes only `wf/<id>/…` branches. `checkLogsOf` takes `<id>-<step>[-try<n>]-check.stderr` for the record's steps,
   or, with no record, any under the id that could be no other stored run's, whose id is longer or shorter. `idRefusal` takes only what
   `runId` mints: lowercase letters, digits and dashes.
-- **`forget` in forget.ts**, in an order a `wf rm` that dies can finish when run again. It reads the run as `cancel` does, adopting a check,
+- **`forget` in forget.verb.ts**, in an order a `wf rm` that dies can finish when run again. It reads the run as `cancel` does, adopting a check,
   try or round a pass filed and never wrote down, and a step too (`unrecordedSteps`), on a cancelled run as well. Then the worktrees: each
   handed off (`handOff`, now answering with the commit it made, or git's words when it could not make one) and removed with
   `git worktree remove`, never `--force`, then `git worktree prune`. What holds the run, with nothing else removed: a worktree locked or on
@@ -2151,7 +2151,7 @@ What was built:
   run not merged, unless `--unmerged`; a hand-off owed (`handOffDue`); a worktree locked, detached on a commit no branch holds, or holding
   changes no commit has. It also refuses whatever `forgetRefusal` refuses, with `wf prune` in its fixes. `prunedRefusal` is the one wording of why
   `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run.
-- **`prune` in forget.ts** reads the run as `forget` does, finds the worktrees with `runWorktrees`, and removes them with
+- **`prune` in prune.verb.ts** reads the run as `forget` does, finds the worktrees with `runWorktrees`, and removes them with
   `git worktree remove`, never `--force`, then `git worktree prune`. It commits nothing, since a dirty worktree is refused.
 - **The mark, `runs/<id>.pruned`**, is a person's fact beside the record, composed on read as `.cancelled` is (`readRun`), stripped by
   `rewriteRun`, and removed by `wf rm`. `mayFile` reads it before each filing, and `advance` skips the hand-off of a pruned run. `assess` drops
@@ -2807,7 +2807,7 @@ What it leaves:
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
 `POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate` and `atGate` in `status/status.ts`,
-`approvalRefusal` in `gate/gate.ts`, `approvedSection` in `brief/brief-sections.ts`, `approve` in `verbs.ts`, `readApprovals` in `record/record.store.ts`.
+`approvalRefusal` in `gate/gate.ts`, `approvedSection` in `brief/brief-sections.ts`, `approve` in `gate/gate.verb.ts`, `readApprovals` in `record/record.store.ts`.
 
 What was built, four commits:
 
@@ -2830,7 +2830,7 @@ What was built, four commits:
   everything handed a run — `assess`, `listing`, `decision`, `composeBrief`, and the api, which reads runs through `listRuns` — sees
   them with no new parameter. An approval is never consumed while it opens the gate; one a later try spent (`spentApprovals`) moves
   into `done/` with the spent asks. A file named as one that does not read as one opens nothing, and the pass notes it.
-- **`wf approve <run> <step> [--message "<words>"]`** (`approve` in verbs.ts): writes the file whole and exclusively (`writeAsk`) and
+- **`wf approve <run> <step> [--message "<words>"]`** (`approve` in gate.verb.ts): writes the file whole and exclusively (`writeAsk`) and
   nothing else. Refused by name, exit 2, nothing written (`approvalRefusal`, pure): a run not there, a step the run does not have, a
   cancelled run, a step not gated, one not signed off yet — waiting, running, checking, blocked, unsigned, its check refused, failed,
   stopped, out of rounds, or asking for a round — the try already approved, empty words (`approvalWordsRefusal`, which the CLI asks
@@ -3011,7 +3011,7 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
   `dev-planned`, `dev-planned-build` and `ui`, the package's `workflows/` and `workflows/ui`, and the examples. It renders each step,
   parses it again and gets the same step back, and a second render gives the same text. Another test does this for a step that sets
   every key.
-- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in authoring.ts. The whole folder is judged before a byte is written:
+- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in write.store.ts. The whole folder is judged before a byte is written:
   - where the folder is;
   - each name as a file's name (`stepNameRefusal`: no slash, no leading dot, no comma, no spaces around it, no `.md`, not the
     README's, a file name of at most 255 bytes);
@@ -3661,7 +3661,7 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
   Tested on the store (`test/queue-store.test.ts`): a card filed at 08:00, queued and taken back through `wf inbox queue` and its `--off`,
   keeps 08:00 across both writes, while `wf inbox add` still writes a card at the time it is filed. Without the two lines, the test fails.
-- **Git's stderr is no longer the daemon's.** `worktree.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
+- **Git's stderr is no longer the daemon's.** `worktree.store.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
   *and* writes it to this process's own. A queued card whose `repo:` is a directory with no git in it is tried on every pass — that is the
   rule, since a failure is no verdict on the card — so `wf up` printed git's `fatal: not a git repository` every four seconds, beside the one
   line it says about the card. The helper now passes `['ignore', 'pipe', 'pipe']`, which changes nothing else: the words are still on the
@@ -4160,7 +4160,7 @@ the git words are not renamed. No change to `packages/agent-runtime`: a task's `
 - **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
 - **The run** (`record/record.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
-- **Start** (`start.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
+- **Start** (`start.verb.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
   refused — on a brief or an inbox card (`startFromInbox`, found by review); the cwd default, a card's own `repo:` (the board writes one on
   every card it files) and the repo a plan or the api pass are not looked at.
@@ -4292,7 +4292,7 @@ cannot be edited from the board. And the comment above `UNASKING`/`DEFAULT_MODE`
 
 The slice named "a folder's lifetime — kept, cleaned, or none at all" was laid out at a plan gate on 22 September, and the owner
 chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exactly as long as its record, until `wf rm`
-(`removeKeyed` in `forget.ts`, `workRoot` in `places.store.ts`). Nothing was built but a test.
+(`removeKeyed` in `forget.verb.ts`, `workRoot` in `places.store.ts`). Nothing was built but a test.
 
 - **Measured** (home store, 2026-09-22): two folder runs, both of the shipped `note` team. The finished one has one folder, not
   two, since review continues write's session and so its folder (`workspacePlan`'s `inherit`): `note.md`, 2,741 bytes, the same
@@ -4397,7 +4397,7 @@ types). When P3's reach keys are built they want a name that is not `capabilitie
 **Superseded 2026-09-25 by agents card 2: the card is generated, and the `.skills.json` files are gone.** An agent's card lists one entry
 per skill its `skills:` composes, read off that skill's SKILL.md frontmatter — the folder's name as `id`, `title:` as `name` (else the
 frontmatter's `name`, else the id), `description` (required), `tags` (`[id]` when it gives none) and `examples` — and an agent with no
-skills gets one entry made from its own description (`cardSkills` in `workflow-store.ts`). Nobody writes a card: a `card:` line, and a
+skills gets one entry made from its own description (`cardSkills` in `folder.store.ts`). Nobody writes a card: a `card:` line, and a
 `skills:` line naming a `.json`, are refused at load with a message saying what replaced them, and so is a board page that still sends
 the card's file (`card`, `cardText`, `skillsText`, a 400). An edit of a composed SKILL.md moves the agent's version, so a stale save is
 refused. The board shows the generated entries read-only where the form used to write the file, and says a card that does not read in
@@ -4478,7 +4478,7 @@ next turn: the same task, the same id, in the session that signed.
 - **Turns are read, not recorded.** A turn is a try on the record whose task id is the current one (`turnsOf` in `retry/retry-ask.ts`); the
   runtime counts the answers (`answersIn`). A pass that answered and died before writing the run down leaves more answers than turns,
   and the next pass adopts the answer as the try it was (`adoptTries`), as it adopts a filed try. A step's closeout, its denials and
-  whether its closeout was asked for are its current turn's (`views.ts`), so an answered turn still running reads none of the last.
+  whether its closeout was asked for are its current turn's (`views.verb.ts`), so an answered turn still running reads none of the last.
 - **A refusal is a note.** A close or an answer the runtime refuses (exit 2) is said on the pass, in its words, and asked again by
   the next.
 - **The engine's word, beside the run's.** `input-required` is read as a session that signed (`phaseOfView`, and `listing`'s
@@ -4950,7 +4950,7 @@ which A2A has no field for yet.
   target's — and never on its check, which is the run's own. `remote: false` is kept as written and filed as it is: the engine takes
   false on any harness. Any other word is refused at load by name (`remote: yes`), as are an empty value and the line twice.
 - **Refused at `wf start`, with nothing written, in the engine's words**: `remote: true` on `codex` or `claude-detached`, which run a
-  prompt and exit. `wf plan` refuses the card before its first run is started. `remoteRefusal` in start.ts judges by `HARNESSES` as the
+  prompt and exit. `wf plan` refuses the card before its first run is started. `remoteRefusal` in start.verb.ts judges by `HARNESSES` as the
   engine's `file()` does (only `'claude-bg'` bridged then; since thin runtime stage 2 part 2, `claude` with `background: true`,
   and a `claude` step without it is refused in the engine's words too). Its sentence is a copy, since `start` is synchronous and `file()` is not; a store
   test asks an engine built on the same `HARNESSES` and fails when the two differ. Not at load, as a codex `budget:` is: the request put it at
@@ -5009,7 +5009,7 @@ the packages renders a step back to markdown.
 **What it needs.**
 
 - **Package, small.** A pure `renderStep(step)` — frontmatter in `STEP_KEYS` order, then the body — the inverse of the
-  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in authoring.ts:
+  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in write.store.ts:
   renders every step, parses the rendered folder in memory before a byte is written, so every parser refusal surfaces
   first (a key it does not have, `after:` naming no step, a cycle, a loop that is not a back edge), then writes the
   files, removes a step's file that is no longer in the set, and leaves `output:` schema files and the README as they

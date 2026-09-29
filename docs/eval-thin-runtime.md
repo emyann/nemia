@@ -354,7 +354,7 @@ orchestrator's calls to the runtime change.
    judges nothing about it: an attempt of a task that asked for a closing statement records `stated: true | false` on its
    `ended` event, and a quiet session that gave none ends `done`, `stated: false`, and settles `succeeded` under every
    resume policy. `NUDGE` is gone, a resume carries the caller's words alone (`turn.words`), and `ae` prints
-   `done (no statement)`. The orchestrator reads the fact: `closeoutAsked` and `endWords` (`agent-orchestrator/src/views.ts`)
+   `done (no statement)`. The orchestrator reads the fact: `closeoutAsked` and `endWords` (`agent-orchestrator/src/views/`)
    read an end without its statement as `unsigned`, the words `wf` and the board have always said, `retriesDue` files its
    one sign-off nudge (`SIGNOFF`) per step per round as before, and the api's attempt lines go through `endWords`. A journal
    written before keeps its words: an end recorded `reason: 'unsigned'` settles `failed` with its old note, attempts left or

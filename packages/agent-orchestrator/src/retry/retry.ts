@@ -104,7 +104,7 @@ import { heldLater } from '../round/round.ts';
  * ending has no way back but a new run (`retryRefusal` says so).
  *
  * @param harnessBlocked Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human`
- *   (`harnessBlocked` in views.ts).
+ *   (`harnessBlocked` in views.verb.ts).
  * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`.
  * @param verdictOf What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that
  *   did not finish does not.

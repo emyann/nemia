@@ -38,10 +38,10 @@ export type Unreadable = ReadonlyMap<string, string>;
 
 /**
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
- * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the package's views.ts).
- * A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness — a scan of the detached
- * runs' files for a job, a `claude agents` call for a background session. Read through `reader`, a request's own (`viewsFor`), a task two
- * runs read is viewed once.
+ * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the
+ * package's views.verb.ts). A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness
+ * — a scan of the detached runs' files for a job, a `claude agents` call for a background session. Read through `reader`, a request's own
+ * (`viewsFor`), a task two runs read is viewed once.
  */
 export async function viewsOf(run: Run, reader: Reader): Promise<Views> {
   const views = new Map<string, TaskView>();

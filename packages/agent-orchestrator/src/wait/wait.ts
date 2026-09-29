@@ -33,7 +33,7 @@ export function waitingOn(run: Run, shipped: (runId: string) => boolean): string
 export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean => waitingOn(run, shipped).length === 0;
 
 /**
- * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in views.ts): its record, when the store has one;
+ * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in views.verb.ts): its record, when the store has one;
  * whether it shipped, as its own `wf decide` would say; and the result branches it recorded that git no longer has, when there are any.
  */
 export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };

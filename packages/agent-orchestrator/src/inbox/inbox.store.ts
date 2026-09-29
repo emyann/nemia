@@ -4,7 +4,8 @@
  * (`queueDir`, `queueTries`). The judgement is `inbox.ts`'s; this reads and writes.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
- * exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and is `start.ts`'s, beside `start`.
+ * exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
+ * is `inbox.verb.ts`'s, through `start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

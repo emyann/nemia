@@ -5,7 +5,8 @@
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
  * exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.ts`'s, and a step's artifacts
- * `artifacts.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it; `wf rm`'s removal is `forget.ts`'s.
+ * `artifacts.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it; `wf rm`'s
+ * removal is `forget.verb.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';

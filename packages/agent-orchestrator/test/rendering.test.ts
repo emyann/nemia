@@ -17,7 +17,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-render-');
 process.env.WF_ROOT = ROOT;
 const { advance, readRun, start } = await import('../src/runner.ts');
-const { agentFilesDir } = await import('../src/store.ts');
+const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
 type Engine = Parameters<typeof advance>[0];
 type Filed = {

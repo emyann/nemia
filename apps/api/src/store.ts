@@ -140,7 +140,7 @@ export function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { 
  *
  * Every step on the record, in the record's order — the workflow's order when the run started —
  * because the record is the truth about what ran, whatever the folder says now; `wf decide` reads
- * the record too. Then any step the workflow the tick reads (`stepsOf` in store.ts) has and the record
+ * the record too. Then any step the workflow the tick reads (`stepsOf` in the orchestrator's record.store.ts) has and the record
  * does not. On a run that froze its workflow that is the frozen one, so a step the folder gained since is
  * not shown: the tick never files it, and drawn, it would wait for ever and make a root of the graph the
  * run froze — `driftOf` names it instead. On a record that froze none, the folder, whose added steps the
@@ -153,7 +153,7 @@ export function stepNames(run: Run, workflows: readonly Workflow[] | null): stri
 
 /**
  * The steps a run is judged by: the workflow it froze at `wf start`, which the tick reads (`stepsOf` in
- * store.ts), and for a record that froze none, the folder. A record whose folder does not read is
+ * the orchestrator's record.store.ts), and for a record that froze none, the folder. A record whose folder does not read is
  * judged from the record alone, a `bare` step each.
  */
 export const judgedSteps = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] =>

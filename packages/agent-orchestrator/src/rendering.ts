@@ -1,6 +1,6 @@
 /**
  * An agent rendered for Claude Code: what `wf start` writes for a step whose agent has instructions, skills or a system prompt of its own,
- * and what the tick hands Claude Code to read it. Pure: the layout, the prompt's text and the flags; `writeAgentFiles` in store.ts writes it.
+ * and what the tick hands Claude Code to read it. Pure: the layout, the prompt's text and the flags; `writeAgentFiles` in agents.store.ts writes it.
  *
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *

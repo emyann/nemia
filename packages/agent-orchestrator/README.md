@@ -350,7 +350,7 @@ You write notes. Load `write-a-note` before you start.
 ```
 
 A Claude Code step whose agent has instructions, skills or a system prompt of its own is *rendered* at `wf start`, under
-`runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`rendering.ts`, `writeAgentFiles` in `store.ts`), and filed with
+`runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`rendering.ts`, `writeAgentFiles` in `agents/agents.store.ts`), and filed with
 Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
 
 - `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
@@ -2716,7 +2716,8 @@ holding a concurrency slot forever.
 | `src/check/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
+| `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
+| `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), and a skill read again once its rendered folder is gone (`skillsAgain`) |
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
@@ -2726,7 +2727,7 @@ holding a concurrency slot forever.
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), and a landed ending's check pictures removed (`dropLandedPictures`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
-| `src/inbox/inbox.store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
+| `src/inbox/inbox.store.ts` | the inbox on disk (`inboxDir`): read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `test/engine-board.ts` gives one), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
 | `src/views.ts` | what the engine's views of a run's tasks say: a step's phase (`phaseOfView`), whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/start.ts` | a run started (`start`), a plan's cards started (`readPlan`, `startPlan`), an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
@@ -2774,7 +2775,7 @@ other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is 
 `CLIENT`. **Pure** files (`run.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`,
-`meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the bottom, `store.ts` on those, `worktree.ts` on `store.ts` and
+`meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the bottom, `record/record.store.ts` on those, `worktree.ts` on `record.store.ts` and
 the two others — and outside the store only the client and the controllers beneath the CLI import them.
 **Controllers** use the runtime through the client: `runner.ts`, the root, which re-exports; `views.ts`, `start.ts`,
 `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts`, which import one another one way, with no cycle; and `cli.ts` and

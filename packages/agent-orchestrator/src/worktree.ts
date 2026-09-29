@@ -3,9 +3,9 @@
  * into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
  * uncommitted.
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
  * exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.ts`'s, and a step's artifacts
- * `artifacts.ts`'s, both through the `git` helpers here, so this file imports `store.ts` alone of those beside it; `wf rm`'s removal is `forget.ts`'s.
+ * `artifacts.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it; `wf rm`'s removal is `forget.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +29,7 @@ import {
 import { folderPlace } from './record/places.store.ts';
 import { isGitRun, workspacePlan, type MergeState, type Run } from './run.ts';
 import type { Workflow } from './workflow.ts';
-import { HOME, lstatOf, runsDir } from './store.ts';
+import { HOME, lstatOf, runsDir } from './record/record.store.ts';
 import { countSpawn, execCounted, readText } from './meter/tally.store.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */

@@ -26,7 +26,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
 const { start, writeWorkflow } = await import('../src/runner.ts');
-const { agentFilesDir } = await import('../src/store.ts');
+const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
 function workflows(files: Record<string, string>): string {

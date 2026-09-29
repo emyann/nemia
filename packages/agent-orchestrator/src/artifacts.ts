@@ -3,7 +3,7 @@
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`), and what that directory holds
  * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`).
  *
- * Beneath the controllers, beside `store.ts` and `worktree.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports
+ * Beneath the controllers, beside `record.store.ts` and `worktree.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports
  * `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is `views.ts`'s.
  */
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import type { Closeout } from './closeout/closeout.ts';
 import { inside } from './workspace/workspace.ts';
 import { artifactPlace, isGitRun, sizeOf, type ArtifactFile, type MissingArtifact, type Run } from './run.ts';
-import { artifactsDir, checkStderr, lstatOf } from './store.ts';
+import { artifactsDir, checkStderr, lstatOf } from './record/record.store.ts';
 import { gitSays } from './worktree.ts';
 
 /**

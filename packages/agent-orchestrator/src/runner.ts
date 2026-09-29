@@ -8,12 +8,12 @@
  * `decide.ts` (what a person reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick
  * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
- * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them: `store.ts` (the run store —
+ * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them: `record.store.ts` (the run store —
  * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon.store.ts` (`tick.json` and who
  * ticks the store), `feed.store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
  * `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step hands over), `authoring.ts` (a workflow
- * folder and an agent written), `inbox.store.ts` (the inbox and the queue on disk) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller,
- * and `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree
+ * folder and an agent written), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller,
+ * and `record.store.ts` and `worktree.ts` — which imports `record.store.ts` alone of them — are the only ones the others import, so they load as a tree
  * and no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
@@ -193,7 +193,6 @@ export {
   artifactsDir,
   askFile,
   checkStderr,
-  inboxDir,
   inputsDir,
   listRuns,
   markCancelled,
@@ -206,7 +205,7 @@ export {
   roundAskFile,
   runId,
   stepsOf,
-} from './store.ts';
+} from './record/record.store.ts';
 export {
   alive,
   beat,
@@ -268,7 +267,7 @@ export type {
   SkillWritten,
   WorkflowWritten,
 } from './authoring.ts';
-export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';

@@ -120,7 +120,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
     'sonarjs/cognitive-complexity': 22,
   },
   'packages/agent-orchestrator/src/start.ts': { 'max-lines-per-function': 1, complexity: 2, 'sonarjs/cognitive-complexity': 3 },
-  'packages/agent-orchestrator/src/store.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/tick.ts': {
     'max-lines': 1,
     'max-lines-per-function': 1,

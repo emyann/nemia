@@ -622,10 +622,9 @@
     {
       "files": ["packages/agent-orchestrator/src/retry/retry.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 531, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 183, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 80 }],
-        "sonarjs/cognitive-complexity": ["error", 83]
+        "max-lines-per-function": ["error", { "max": 83, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 46 }],
+        "sonarjs/cognitive-complexity": ["error", 45]
       }
     },
     {

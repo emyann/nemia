@@ -1,7 +1,7 @@
 /**
- * A person's try of a step, from the run's side: what may be asked (`retryable`, `retryRefusal`), the tries due now (`retriesDue`), and
- * what `wf ls` and `wf decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`). Pure; the ask
- * itself, and the record of a try, are `retry-ask.ts`'s.
+ * A person's try of a step, from the run's side: what may be asked (`retryable`), the tries due now (`retriesDue`), and what `wf ls` and
+ * `wf decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`). Pure; the ask itself, and the
+ * record of a try, are `retry-ask.ts`'s, and what `wf retry` refuses (`retryRefusal`) is `retry-refusal.ts`'s.
  */
 import type { Workflow } from '../step/step.ts';
 import {
@@ -22,11 +22,8 @@ import type { Closeout } from '../closeout/closeout.ts';
 import {
   aboveWord,
   approvalOf,
-  budgetOf,
-  budgetRefusal,
   capOf,
   endingStopped,
-  gateWords,
   hasGate,
   landsOnCheck,
   loopOf,
@@ -34,33 +31,18 @@ import {
   overBudget,
   ownStatus,
   raiseOf,
-  raiseWords,
   roundIn,
   roundWord,
-  sendBackTo,
   spentWord,
   standing,
-  stepSpend,
   waitsAtGate,
   type Raise,
   type SpendOf,
   budgetWord,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
-import {
-  messageRefusal,
-  modeWord,
-  retriesSpent,
-  signoffsSpent,
-  type Retry,
-  type RetryAsk,
-  type RetryHow,
-  type RetryMode,
-} from './retry-ask.ts';
-import { isRemoteHarness, remoteRetryRefusal } from '../harness/harness.ts';
-import { autoDropped } from '../workflow/index.ts';
-import { modeOf } from '../former/former.ts';
-import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import { retriesSpent, signoffsSpent, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
 import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';
@@ -171,7 +153,7 @@ export function retryable(
 }
 
 /** Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a session. */
-const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined): boolean =>
+export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined): boolean =>
   !raise || a.mode === 'recheck' || (a.budget !== undefined && a.budget > raise.above);
 
 /**
@@ -281,222 +263,6 @@ export function retriesDue(
 
 /** The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked. */
 const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
-
-/**
- * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
- *
- * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
- * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
- * nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let
- * what waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run
- * aborted; and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a
- * person.
- *
- * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
- * other: shipping again would act on the work being changed, and a send-back would take back the try a person asked to ship again on.
- * A send-back from it goes through the folder's loop, to the looping step it waits on, and a folder with none is told it has no such way.
- * An ending at its gate with nothing of it filed has no try to replace: it is offered its approval, and the send-back of the work it would
- * act on (`sendBackTo`).
- *
- * A send-back is an objection, refused with no words: a try with nothing to change would sign off as it did, and wait there again. At an
- * ending's gate held before it is filed (`waitsAtGate`), the refusal names that gate and the ending's approval, never the step's own,
- * which would be refused itself.
- *
- * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
- * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
- *
- * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at it,
- * asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step, whose
- * cap is not what stops it; and an ask already waiting that no tick will honour, for want of one. A step over its budget whose check did
- * not finish is offered the recheck first, which costs nothing and needs no `--budget`.
- *
- * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
- *   running, and refused.
- * @param spendOf What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one.
- */
-export function retryRefusal(
-  steps: readonly Workflow[],
-  run: Run,
-  name: string,
-  how: RetryHow,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  harnessBlocked: (taskId: string) => boolean = () => false,
-  spendOf: SpendOf = () => undefined,
-): string | null {
-  const command = `wf retry ${run.id} ${name}`;
-  const wrong = messageRefusal(how, command) ?? budgetRefusal(how, command);
-  if (wrong) return wrong;
-  const step = steps.find((s) => s.name === name);
-  if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
-  const remote =
-    (how.model === undefined ? undefined : remoteRetryRefusal(step, 'model', how.model, command)) ??
-    (how.budget === undefined ? undefined : remoteRetryRefusal(step, 'budget', how.budget, command));
-  if (remote) return remote;
-  const dropped = how.model === undefined ? undefined : autoDropped(step.harness, how.model, modeOf(step));
-  if (dropped) {
-    return (
-      `\`--model ${how.model}\`: ${name} ${dropped}. The step's mode is frozen with the run, so ask for a model that keeps \`auto\` — ${command} --model sonnet, or opus, or fable — ` +
-      `or, to run it on ${how.model}, start a run of a folder whose step names a mode the model keeps: \`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules.`
-    );
-  }
-  if (run.cancelledAt) {
-    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
-  }
-  const pruned = prunedRefusal(run, 'a retry');
-  if (pruned) return pruned;
-  const holding = heldRefusal(run, 'a retry');
-  if (holding) return holding;
-  const next = tryOf(run, name) + 1;
-  const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(
-    step,
-    run,
-    phaseOf,
-    closeoutOf,
-    askedCloseout,
-    steps,
-    harnessBlocked,
-    spendOf,
-    verdictOf,
-  );
-  const pending = asks.find((a) => a.step === name && a.try === next);
-  const stoppedAt = steps.find((s) => endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
-  const again = stoppedAt ? `wf retry ${run.id} ${stoppedAt.name}` : '';
-  const stoppedWords = (ending: Workflow): string =>
-    `${ending.name} stopped on the base branch (${ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for`;
-  if (pending && !carries(pending, raise)) {
-    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
-  }
-  if (pending && !heard(pending, sendsBack)) {
-    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${back ? `sends the work back from ${back.join(', ')}` : gateWords(run, name)}, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --message "<objection>".`;
-  }
-  if (pending) {
-    return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
-  }
-  const shipping = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
-  if (shipping) {
-    return (
-      `try ${shipping.try} of ${shipping.step} is asked for (${modeWord(shipping)}, at ${shipping.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
-      `Wait for it: wf ls ${run.id} — or, if the work is what must change, delete that ask — retry-${shipping.step}-${shipping.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
-    );
-  }
-  if (stoppedAt?.name === name) {
-    const sending = stoppedAt.after.map((a) => asks.find((x) => x.step === a && x.try === tryOf(run, a) + 1)).find(Boolean);
-    if (sending) {
-      return `the work is being sent back from ${name} (wf retry ${run.id} ${sending.step}, at ${sending.at}): ${name} returns to its gate once it settles, and a try of ${name} now would act on work that is being changed. Wait for it: wf ls ${run.id}.`;
-    }
-  }
-  if (!modes.length) {
-    if (stoppedAt && satisfiesAfter(status)) {
-      const through = stoppedAt.after.filter((a) => steps.find((s) => s.name === a)?.loop);
-      if (through.length) {
-        return (
-          `${stoppedWords(stoppedAt)}, and the work goes back through the folder's loop, not to ${name}: send it back to ${through.join(' or ')}, which is filed again with your objection and what ${stoppedAt.name} said, and may ask for a round of the work — ` +
-          `${through.map((t) => `wf retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or ship again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
-        );
-      }
-      return (
-        `${stoppedWords(stoppedAt)}, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose \`again: true\` gives the work a round, and ${stoppedAt.after.join(', ') || 'nothing'} ${stoppedAt.after.length > 1 ? 'do' : 'does'} not loop. ` +
-        `Ship again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (wf cancel ${run.id}) and start one for the work on the base branch as it is now (wf start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
-      );
-    }
-    if (status === 'awaiting approval' && !run.steps[name].taskId) {
-      const back = sendBackTo(step, run)
-        .map((s) => `wf retry ${run.id} ${s} --message "<objection>"`)
-        .join(' or ');
-      return (
-        `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. ` +
-        `Approve it: wf approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
-      );
-    }
-    const why: Partial<Record<StepStatus, string>> = {
-      waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
-      running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
-      checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: wf ls ${run.id}.`,
-      verified: `${name} is verified: its check passed, and there is nothing to try again.`,
-      unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
-      blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: wf ls ${run.id}.`,
-      exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — wf round ${run.id} ${name} — or take the work as it stands, its findings open: wf accept ${run.id} ${name} --message "<why>".`,
-      'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: wf round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
-    };
-    return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
-  }
-  if (!modes.includes(how.mode) && landsOnCheck(step, run) && status === 'failed (check)') {
-    const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
-      ? 'refused it'
-      : 'did not finish';
-    return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
-  }
-  if (!modes.includes(how.mode)) {
-    const is = blockedByHarness
-      ? 'is running, its session blocked by its harness with nothing signed off'
-      : status === 'denied'
-        ? 'was denied a call by its harness, and its check was never run'
-        : `is ${status}`;
-    return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${
-      sendsBack
-        ? `To send it back from its gate, say what to change: wf retry ${run.id} ${name} --message "<objection>".`
-        : `Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`
-    }`;
-  }
-  if (sendsBack && how.message === undefined) {
-    const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
-    if (back) {
-      const ending = steps.find((s) => s.name === back[0])!;
-      return (
-        `${name}'s work went on to ${ending.name}, and ${stoppedWords(ending)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
-        `${say} — or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${run.id} ${ending.name}.`
-      );
-    }
-    const ending = steps.find(
-      (s) => s.after.includes(name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf),
-    );
-    if (ending) {
-      return (
-        `${ending.name} is at its gate, not ${name}: ${ending.name} ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to ${name}, the work it would act on. ` +
-        `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: wf approve ${run.id} ${ending.name}.`
-      );
-    }
-    const given = approvalOf(run, name);
-    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
-  }
-  if (raise && how.mode !== 'recheck' && how.budget === undefined) {
-    const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
-    if (status === 'failed (check)' && modes.includes('recheck')) {
-      return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
-    }
-    return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
-  }
-  if (raise && how.budget !== undefined && how.budget <= raise.above) {
-    const what =
-      raise.above > raise.spent.usd
-        ? `the ${budgetWord(raise.cap)} budget ${name}'s session was ended at`
-        : `what ${name}'s tries have cost`;
-    return `--budget ${how.budget} is not above ${aboveWord(raise)}, ${what}: a try under it would read ${status === 'budget exhausted' ? status : 'over budget'} again as soon as it ended. Give more than ${aboveWord(raise)}: ${command} --budget <amount>.`;
-  }
-  if (!raise && how.budget !== undefined) {
-    const cap = budgetOf(step, run.steps[name]);
-    const spent =
-      cap === undefined
-        ? `, and has no \`budget:\` to raise`
-        : `: its tries have cost ${spentWord(stepSpend(run, name, spendOf))} of its ${budgetWord(cap)} budget, which is not what stops it`;
-    return `--budget raises the cap of a step over its budget, or ended at it, and ${name} is ${status}${spent}. Try it without --budget: ${command}.`;
-  }
-  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).find(
-    (r) => r.step === name,
-  );
-  if (itself?.by === 'signoff') {
-    return `the run nudges ${name} itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
-  }
-  if (itself) {
-    const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
-    return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
-  }
-  return null;
-}
 
 /**
  * How a step's record reached the try it is on, for `wf ls` and `wf decide`: `try 2, by retries: 2` — and for a step of a loop past its

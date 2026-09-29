@@ -12,7 +12,6 @@ import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { AGENTS_FOLDER, splitFrontmatter, WorkflowError, type Workflow } from '../step/step.ts';
 import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft, type SkillsFound } from './agents.ts';
-import { preloads } from '../folder/folder.store.ts';
 import {
   noCodingStyle,
   NO_CODING_STYLE,
@@ -26,7 +25,7 @@ import {
 } from '../rendering.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
-import { agentUsers, agentVersion, loadAgents, skillsFor } from '../folder/folder.store.ts';
+import { agentUsers, agentVersion, loadAgents, preloads, skillsFor } from '../folder/folder.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
 

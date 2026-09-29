@@ -21,8 +21,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
   checked with the places it was listed with (`skillsAt`). Who names an agent is read in every place that falls back to it (`repoUsers`),
   and a guard added at load goes on every verb that sets the same thing (`autoDropped`).
 - **A key one function refuses is refused by every function that writes it**: grep for the key before trusting "one writer" in a comment.
-- **A shipped folder is whole with `workflows/agents/` and `workflows/skills/`**: a test that copies a folder copies both; the ui agents
-  and skills are copied into the package's `workflows/`, held byte for byte; a sentence a step is told is read with `toldIn`.
+- **A team is whole with its `agents/` and `skills/`**: a test that copies a workflow folder copies both, as `teamCopy` copies the
+  tests' team (`test/fixtures/team/`); a sentence a step is told is read with `toldIn`.
 - **A Claude Code step's instructions are in `runs/<id>/agents/<step>/prompt.md`** and its brief is its own note (`briefBody`); a step
   whose rendered folder is gone is told its skills whole in the brief (`unrendered`, `skillsAgain`).
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts

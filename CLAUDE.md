@@ -23,8 +23,8 @@ holds what every change needs.
 - `npm run build`, then `npm run e2e`, when you touch `apps/web`, and read the pictures the e2e writes (`apps/web/CLAUDE.md`).
 - Run them before you commit. Green is the floor, not the bar: a change that makes the suite pass by weakening a test is a finding to
   report, not a fix.
-- Turbo does not see `workflows/`: after touching a shipped folder, run `npx turbo run test --force --continue`, and copy a
-  `workflows/ui` change into `packages/agent-orchestrator/workflows/ui`. The same goes for a change only to a doc: some tests read docs.
+- Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a
+  change only to a doc: some tests read docs.
 
 ## How to test
 
@@ -99,9 +99,9 @@ holds what every change needs.
 - **A workflow step never pushes, never merges into the base branch, never force-deletes a branch**, and its agent's `disallowedTools:`
   refuses the push and the delete (a `dontAsk` agent's: no allow reaches them; `packages/agent-orchestrator/test/agent-fences.test.ts`).
   `.claude/settings.json` denies none of it: pushing and opening a pull request are the person's, or done by their session when they ask.
-  A person merges after a trial merge. The one exception is a run's ending step (`workflows/*/ship.md`), filed only once a person approves
-  it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged tree and commits on exit
-  0 or aborts the merge (`landingDue`).
+  A person merges after a trial merge. The one exception is a run's ending step (a workflow's last step, `workspace: main`), filed only
+  once a person approves it: it stages the merge of the run's own result branch, and the run executes the ship's `check:` on the merged
+  tree and commits on exit 0 or aborts the merge (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## When you miss

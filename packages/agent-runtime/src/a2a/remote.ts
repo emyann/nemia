@@ -51,22 +51,15 @@ import {
   JsonRpcTransportFactory,
   RestTransportFactory,
 } from '@a2a-js/sdk/client';
-import {
-  ContentTypeNotSupportedError,
-  ExtensionSupportRequiredError,
-  RequestMalformedError,
-  TaskNotCancelableError,
-  TaskNotFoundError,
-  UnsupportedOperationError,
-  VersionNotSupportedError,
-} from '@a2a-js/sdk/errors';
+import { TaskNotCancelableError, TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { formerStateOf, isSessionState, type SessionState, type Sighting } from '../core/index.ts';
+import { firstOf, formerStateOf, isSessionState, quote, type SessionState, type Sighting, WORDS_QUOTE } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
 import { cardOfJson, SCHEME_KINDS } from './card.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
+import { AuthRefused, Doubt, Late, late, messageOf, Redirected, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
 
 /**
  * A remote A2A agent, as a harness is configured: the agent's base URL, whose card is read from
@@ -147,6 +140,7 @@ const headerOf = (
   secret: () => string | undefined,
   missing: () => string | undefined,
 ): [string, string] | string => {
+  name = quote(name);
   if (!scheme) return `\`${name}\` is not a scheme the card declares`;
   const s = scheme.scheme;
   if (!s || !SCHEME_KINDS.includes(s.$case)) return `\`${name}\` is a kind of scheme this runtime does not know, and cannot send`;
@@ -161,7 +155,7 @@ const headerOf = (
       const kind = s.value.scheme.toLowerCase();
       if (kind === 'bearer') return needed('authorization', (t) => `Bearer ${t}`);
       if (kind === 'basic') return needed('authorization', (t) => `Basic ${Buffer.from(t).toString('base64')}`);
-      return `\`${name}\` is HTTP \`${s.value.scheme}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\``;
+      return `\`${name}\` is HTTP \`${quote(s.value.scheme)}\` authentication, and this runtime sends only \`Bearer\` and \`Basic\``;
     }
     case 'oauth2SecurityScheme':
     case 'openIdConnectSecurityScheme':
@@ -169,7 +163,7 @@ const headerOf = (
     case 'apiKeySecurityScheme':
       return s.value.location.toLowerCase() === 'header'
         ? needed(s.value.name.toLowerCase(), (t) => t)
-        : `\`${name}\` is an API key in a ${s.value.location || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`;
+        : `\`${name}\` is an API key in a ${quote(s.value.location) || 'place the card does not name'}, and this runtime sends a key only in a header, where no log of the address holds it`;
     case 'mtlsSecurityScheme':
       return `\`${name}\` is mutual TLS, and this runtime holds no client certificate`;
   }
@@ -199,41 +193,12 @@ const authOf = (
       else headers[h[0]] = h[1];
     }
     if (!unmet.length) return { headers };
-    why.push(unmet.join(', and '));
+    why.push(firstOf(unmet, ', and '));
   }
-  return { refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${why.join('; or ')}. Nothing was sent.` };
+  return {
+    refusal: `the agent at ${agentUrl} asks for authentication this runtime cannot give: ${firstOf(why, '; or ')}. Nothing was sent.`,
+  };
 };
-
-/** The agent answered a request without taking it: nothing it was asked was done. */
-class Untaken extends Error {}
-
-/** The agent refused a request's authentication (HTTP 401 or 403). */
-class AuthRefused extends Untaken {}
-
-/** The agent answered with a redirect, which is not followed. */
-class Redirected extends Untaken {}
-
-/** A spawn that nothing started, in words: the attempt ends `unstartable`. */
-class Refusal extends Error {}
-
-/** A request the agent did not answer within its bound: whether it was taken is not known. */
-class Late extends Error {}
-
-/** An A2A error an agent answers before it has done anything with a message: the send was refused, not lost. */
-const REFUSALS = [
-  ContentTypeNotSupportedError,
-  ExtensionSupportRequiredError,
-  RequestMalformedError,
-  UnsupportedOperationError,
-  VersionNotSupportedError,
-  TaskNotFoundError,
-];
-
-const untaken = (e: unknown): boolean => e instanceof Untaken || (e instanceof Error && e.cause instanceof Untaken);
-const late = (e: unknown): boolean => e instanceof Late || (e instanceof Error && e.cause instanceof Late);
-const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => e instanceof E);
-
-const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
  * The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, then `then`, and that nothing
@@ -248,7 +213,7 @@ const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then
 const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
   if (!response.ok)
     throw new Refusal(
-      `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${response.statusText}, and nothing was sent.`,
+      `the agent's card could not be read at ${shownUrl(at)}: it answered ${response.status} ${quote(response.statusText, WORDS_QUOTE)}, and nothing was sent.`,
     );
   const json: unknown = await response.json().catch(() => undefined);
   if (typeof json !== 'object' || json === null)
@@ -452,7 +417,7 @@ export const remoteOps = (
       response = await bounded(at, { headers: { accept: 'application/json' } });
     } catch (e) {
       throw new Refusal(
-        `the agent's card could not be read at ${shownUrl(at)} (${messageOf((e as Error).cause ?? e)}): the agent is not reachable, and nothing was sent.`,
+        `the agent's card could not be read at ${shownUrl(at)} (${quote(messageOf((e as Error).cause ?? e), WORDS_QUOTE)}): the agent is not reachable, and nothing was sent.`,
       );
     }
     return servedCard(at, response);
@@ -464,13 +429,13 @@ export const remoteOps = (
     const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
     if (!chosen && spoken.length) {
       throw new Refusal(
-        `the agent's card names ${spoken.map((i) => i.url).join(', ')}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
+        `the agent's card names ${quote(spoken.map((i) => i.url).join(', '), WORDS_QUOTE)}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
       );
     }
     if (!chosen) {
       const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);
       throw new Refusal(
-        `the agent's card offers ${offered.length ? offered.join(', ') : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`,
+        `the agent's card offers ${offered.length ? quote(offered.join(', '), WORDS_QUOTE) : 'no interface'}, and this runtime speaks ${SPOKEN_WORDS}; gRPC is not spoken yet. Serve one of those on the agent. Nothing was sent.`,
       );
     }
     const agentUrl = address ?? chosen.url;
@@ -479,12 +444,12 @@ export const remoteOps = (
         const response = await bounded(input, { ...init, redirect: 'manual' });
         if (response.status >= 300 && response.status < 400) {
           throw new Redirected(
-            `the agent answered ${response.status} to ${response.headers.get('location') ?? 'nowhere it named'}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`,
+            `the agent answered ${response.status} to ${quote(response.headers.get('location') ?? 'nowhere it named', WORDS_QUOTE)}, and a redirect is not followed, since the secret a request carries would go with it: give the harness the address it names. Nothing it was asked was done.`,
           );
         }
         if (response.status === 401 || response.status === 403) {
           throw new AuthRefused(
-            `the agent refused the request's authentication (${response.status} ${response.statusText}): check what \`credentials\` gives for the schemes its card declares.`,
+            `the agent refused the request's authentication (${response.status} ${quote(response.statusText, WORDS_QUOTE)}): check what \`credentials\` gives for the schemes its card declares.`,
           );
         }
         return response;
@@ -531,7 +496,7 @@ export const remoteOps = (
         ? cause
         : cause instanceof Refusal
           ? new RunnerError({ verb, message: `the \`${harness}\` harness: ${cause.message}`, refused: true })
-          : new RunnerError({ verb, message: `the \`${harness}\` harness: ${messageOf(cause)}` });
+          : new RunnerError({ verb, message: `the \`${harness}\` harness: ${wordsOf(cause)}` });
 
   const sendOf = async (r: SpawnRequest, intent: Entry, stop: AbortSignal): Promise<Answer> => {
     const signal = AbortSignal.any([stop]);
@@ -551,7 +516,7 @@ export const remoteOps = (
       return 'status' in answer ? { task: answer } : { message: answer };
     } catch (e) {
       if (stop.aborted) return { canceled: true };
-      if (sendRefused(e)) return { refused: `${messageOf(e)}${untaken(e) ? '' : ' Nothing was started.'}` };
+      if (sendRefused(e)) return { refused: `${wordsOf(e)}${untaken(e) ? '' : ' Nothing was started.'}` };
       return { failed: e };
     }
   };
@@ -559,7 +524,7 @@ export const remoteOps = (
   const doubtOf = (name: string, e: unknown): string =>
     late(e)
       ? `the agent did not answer the send of \`${name}\` within ${sendMs / 1000} s`
-      : `the send of \`${name}\` failed on the way (${messageOf(e)})`;
+      : `the send of \`${name}\` failed on the way (${wordsOf(e)})`;
   const NOT_TWICE = 'whether the agent made a Task of it is not known, and it is not sent twice.';
 
   const record = (intent: Entry, answer: Answer, inPass: boolean): void => {
@@ -616,7 +581,7 @@ export const remoteOps = (
     }
     const doubt = doubtOf(intent.name, answer.failed);
     write({ ...sent, doubt });
-    if (inPass) throw new Error(`${doubt}: ${NOT_TWICE}`, { cause: answer.failed });
+    if (inPass) throw new Doubt(`${doubt}: ${NOT_TWICE}`, { cause: answer.failed });
   };
 
   const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
@@ -627,7 +592,7 @@ export const remoteOps = (
         if (recorded?.taskId) return;
         if (recorded && sendingLive(recorded)) return;
         if (recorded) {
-          throw new Error(
+          throw new Doubt(
             `\`${r.name}\` was sent at ${recorded.sentAt} and its answer was never recorded, since ${recorded.doubt ?? 'the process sending it stopped first'}: ${NOT_TWICE}`,
           );
         }

@@ -91,7 +91,7 @@ function refusalOf(rule: string): string | undefined {
 }
 
 const refusals = (allow: string[]) => allow.map(refusalOf).filter((r): r is string => r !== undefined);
-const shipped = () => (JSON.parse(fs.readFileSync(SETTINGS, 'utf8')) as { permissions: { allow: string[]; deny: string[] } }).permissions;
+const shipped = () => (JSON.parse(fs.readFileSync(SETTINGS, 'utf8')) as { permissions: { allow: string[]; deny?: string[] } }).permissions;
 
 test('every git allow in the shipped settings is a read on the named list, and the list names no verb that writes', () => {
   const { allow } = shipped();
@@ -103,9 +103,9 @@ test('every git allow in the shipped settings is a read on the named list, and t
       `${rule}: a read the steps' recorded denials asked for, word for word: whether the branch still merges, and where`,
     );
   assert.deepEqual(
-    shipped().deny.filter((r) => r.startsWith('Bash(git')),
-    ['Bash(git push)', 'Bash(git push:*)', 'Bash(git branch -D:*)', 'Bash(git branch --delete --force:*)'],
-    'the deny list: a push, and a branch deleted by force',
+    (shipped().deny ?? []).filter((r) => r.startsWith('Bash(git')),
+    [],
+    "no git deny: a push and a forced branch delete are refused by each step's own fence (agent-fences.test.ts), and a person's session may push",
   );
 });
 

@@ -8,6 +8,8 @@ effort: medium
 context: 200k
 # Fenced by machinery: only these tools — no Write, no Edit, no Bash, no web — and in dontAsk anything else is denied without a prompt.
 tools: Read, Glob, Grep, Skill
+# No Bash, and no allow reaches a `browser_*` tool, so `dontAsk` refuses `git push`, a forced branch delete and
+# `browser_run_code_unsafe` with no deny of its own (packages/agent-orchestrator/test/agent-fences.test.ts holds it so).
 permissionMode: dontAsk
 # The review travels as this step's closeout — `verdict` and `findings`, in the shape note-review.schema.json declares.
 output: note-review.schema.json

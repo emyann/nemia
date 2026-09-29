@@ -197,7 +197,7 @@ const BUILD_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev-build')).fin
 const PACKAGE_CHECK = loadWorkflows(path.join(REPO, 'packages', 'agent-orchestrator', 'workflows')).find(
   (s) => s.name === 'implement',
 )!.check!;
-const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
+const CHECKS_CHANGED: Record<string, Record<string, unknown>> = {
   'workflows/dev/implement': { check: DEV_CHECK },
   'workflows/dev-planned/implement': { check: DEV_CHECK },
   'packages/agent-orchestrator/workflows/implement': { check: PACKAGE_CHECK },
@@ -208,6 +208,34 @@ const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
     ]),
   ),
 };
+/**
+ * What a step that builds or ships is denied: what no step needs, as in the snapshot, and a push, a forced branch delete and the browser's
+ * unsafe tool, which the checkout's settings denied every session before each step denied them itself (agent-fences.test.ts). Held on
+ * every step that names implementer, ui-implementer or shipper, and on the package's own implement, which names no agent.
+ */
+const BUILDER_DENIED = [
+  'SendMessage',
+  'CronCreate',
+  'CronDelete',
+  'RemoteTrigger',
+  'Bash(git push)',
+  'Bash(git push:*)',
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete --force:*)',
+  'mcp__playwright__browser_run_code_unsafe',
+];
+const DENIES_CHANGED = [
+  ...Object.entries(AGENTS)
+    .filter(([at, agent]) => !Object.hasOwn(STEPS_ADDED, at) && ['implementer', 'ui-implementer', 'shipper'].includes(agent))
+    .map(([at]) => at),
+  'packages/agent-orchestrator/workflows/implement',
+];
+const KEYS_CHANGED: Record<string, Record<string, unknown>> = Object.fromEntries(
+  [...new Set([...Object.keys(CHECKS_CHANGED), ...DENIES_CHANGED])].map((at) => [
+    at,
+    { ...CHECKS_CHANGED[at], ...(DENIES_CHANGED.includes(at) ? { disallowedTools: BUILDER_DENIED } : {}) },
+  ]),
+);
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
 const keysOf = (step: Record<string, unknown>): Record<string, unknown> => {

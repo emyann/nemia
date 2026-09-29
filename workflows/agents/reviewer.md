@@ -11,6 +11,8 @@ context: 200k
 # Fenced by machinery: only these tools — no Edit, no Write — and in dontAsk every Bash command .claude/settings.json does
 # not allow is denied without a prompt. The suite and git reads are allowed.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
+# No allow, here or in the settings, reaches `git push`, a forced branch delete or a `browser_*` tool, so `dontAsk` refuses
+# them with no deny of its own (packages/agent-orchestrator/test/agent-fences.test.ts holds it so).
 permissionMode: dontAsk
 # The settings allow `npm run build` and `npm run e2e` too, for implement's sake, and both write into the workspace — the
 # route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow — those two spellings

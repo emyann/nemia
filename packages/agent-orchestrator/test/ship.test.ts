@@ -54,6 +54,19 @@ const gitRun = (run: Run): GitRun => {
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
 fs.cpSync(path.join(REPO_ROOT, 'workflows', 'agents'), path.join(ROOT, 'agents'), { recursive: true });
 fs.cpSync(path.join(REPO_ROOT, 'workflows', 'skills'), path.join(ROOT, 'skills'), { recursive: true });
+
+/** What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete and the browser's unsafe tool. */
+const SHIPPER_DENIED = [
+  'SendMessage',
+  'CronCreate',
+  'CronDelete',
+  'RemoteTrigger',
+  'Bash(git push)',
+  'Bash(git push:*)',
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete --force:*)',
+  'mcp__playwright__browser_run_code_unsafe',
+];
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
     cwd,
@@ -402,7 +415,7 @@ test("an approved ending with no check of its own is filed, in the repository's 
   );
   assert.deepEqual(
     (spec.config as { disallowedTools?: string[] }).disallowedTools,
-    ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'],
+    SHIPPER_DENIED,
     "its recipe's fallback is its own: it commits the merge itself, and is denied only what its agent denies",
   );
 
@@ -568,7 +581,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   );
   assert.deepEqual(
     (spec.config as { disallowedTools?: string[] }).disallowedTools,
-    ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger', 'Bash(git commit:*)', 'Bash(git merge --continue:*)'],
+    [...SHIPPER_DENIED, 'Bash(git commit:*)', 'Bash(git merge --continue:*)'],
     "the session may not commit the merge it stages — the run does, on the check's word — beside what the shipper's own disallowedTools denies (filedDenies)",
   );
 

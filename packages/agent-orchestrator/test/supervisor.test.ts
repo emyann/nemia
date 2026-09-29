@@ -42,8 +42,9 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
  * The git this session must never type in a person's own checkout, denied by name on the step itself: the merge a run's ending step owns,
  * and everything that moves or throws away what is in that checkout.
  *
- * `.claude/settings.json` holds `git push` and `git branch -D` for every session here, but it cannot hold `git merge` — `ship.md` runs in
- * the same checkout and merging is its whole job — so the step's own `disallowedTools:` is the only place this refusal can live.
+ * The checkout's `.claude/settings.json` denies no git, since a person's own session there may be asked to push, and it could not deny
+ * `git merge` anyway — `ship.md` runs in the same checkout and merging is its whole job — so the step's own `disallowedTools:` is where
+ * this refusal lives. `git branch -D` it need not name: in `dontAsk`, no allow reaches it (agent-fences.test.ts).
  */
 const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
 
@@ -260,13 +261,10 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
   ])
     assert.equal(denies(disallowedTools, command), false, `${command} is denied, and the step is told to run it`);
 
-  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
-  assert.ok(settings.permissions.deny.includes('Bash(git push:*)'));
-  assert.ok(settings.permissions.deny.some((r) => r.startsWith('Bash(git branch -D')));
   assert.equal(
     denies(disallowedTools, 'git branch --list'),
     false,
-    "`git branch -D` is the checkout's own refusal, so the step says nothing of `git branch`: denying it by prefix would take `git branch --list`, which is diagnosis",
+    '`git branch -D` is refused by `dontAsk`, which no allow of it reaches, so the step says nothing of `git branch`: denying it by prefix would take `git branch --list`, which is diagnosis',
   );
 });
 

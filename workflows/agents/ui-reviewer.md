@@ -16,6 +16,8 @@ context: 200k
 # are not on this line. Skill is, so the step can load its own skills and the look skill; read-a-screenshot names the
 # look skill's file too, for Read.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
+# No allow, here or in the settings, reaches `git push`, a forced branch delete or a `browser_*` tool — the look skill's
+# included — so `dontAsk` refuses them with no deny of its own (packages/agent-orchestrator/test/agent-fences.test.ts holds it so).
 permissionMode: dontAsk
 # The settings allow `npm run build` and `npm run e2e` too, for implement's sake, and both write into the workspace — the
 # route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow — those two spellings

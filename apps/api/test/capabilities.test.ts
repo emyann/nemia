@@ -479,7 +479,7 @@ test("HOME_REPO, built from capabilities.ts's own place, is the checkout: a `..`
   );
 });
 
-test("unset, the api serves its own checkout: Playwright's server lists browser_run_code_unsafe, and the rule that denies it", async () => {
+test("unset, the api serves its own checkout: Playwright's server lists browser_run_code_unsafe, which the settings deny no session, and every shipped Claude step is refused it — by its own deny, or in dontAsk by no allow", async () => {
   assert.equal(repoOf({}), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: '  ' }), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }), path.resolve('elsewhere'));
@@ -494,8 +494,21 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   assert.equal(playwright.enabled, true);
   assert.equal(playwright.error, null);
   const unsafe = playwright.tools?.find((tool) => tool.name === 'browser_run_code_unsafe');
-  assert.equal(unsafe?.denied, 'mcp__playwright__browser_run_code_unsafe');
-  assert.ok(body.denied.some((d) => d.rule === 'mcp__playwright__browser_run_code_unsafe'));
+  assert.ok(unsafe, 'the server lists it');
+  assert.equal(unsafe.denied, null, "the settings bind a person's own session too, and deny it nobody");
+  assert.deepEqual(body.denied, [], 'the settings deny nothing: each step is fenced by its own keys');
+  const claude = body.steps.filter((s) => s.claudeCode);
+  assert.ok(
+    claude.some((s) => s.fence.permissionMode === 'dontAsk') && claude.some((s) => s.fence.permissionMode === 'auto'),
+    'both modes',
+  );
+  for (const step of claude) {
+    const reached = step.mcp?.find((m) => m.server === 'playwright')?.tools?.find((tool) => tool.name === 'browser_run_code_unsafe');
+    assert.ok(reached, `${step.workflow}/${step.step}: ${JSON.stringify(step.mcp)}`);
+    const refused =
+      reached.denied?.rule === 'mcp__playwright__browser_run_code_unsafe' || (step.fence.permissionMode === 'dontAsk' && !reached.allowed);
+    assert.ok(refused, `${step.workflow}/${step.step} could run browser_run_code_unsafe: ${JSON.stringify(reached)}`);
+  }
 });
 
 /**

@@ -102,6 +102,67 @@ test('a frozen step with no name, a step record with no task, and a folder run w
   );
 });
 
+/** A frozen step with the agent it names, as the parser resolves one: what each refusal below breaks one field of. */
+const withAgent = (id: string): Record<string, unknown> => {
+  const record = aRecord(id);
+  (record.workflow as Array<Record<string, unknown>>)[1] = {
+    name: 'review',
+    after: ['implement'],
+    body: 'read it',
+    harness: 'claude',
+    tools: ['Read'],
+    retries: 2,
+    gate: true,
+    workspace: 'main',
+    output: {
+      file: 'review.json',
+      schema: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false },
+    },
+    agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], systemPrompt: 'default' },
+  };
+  return record;
+};
+
+/** Each frozen step key the parser types, broken as a person's edit would break it: where it is, and what `readRun` says is there. */
+const BROKEN: ReadonlyArray<[string, (step: Record<string, unknown>) => void, string]> = [
+  ['retries', (step) => (step.retries = '2'), 'its `workflow.1.retries` is "2", where wf writes number'],
+  ['workspace', (step) => (step.workspace = 'shelf'), 'its `workflow.1.workspace` is "shelf", where wf writes "main" | "folder"'],
+  ['gate', (step) => (step.gate = 'yes'), 'its `workflow.1.gate` is "yes", where wf writes true'],
+  ['tools', (step) => (step.tools = 'Read'), 'its `workflow.1.tools` is "Read", where wf writes array'],
+  [
+    'agent.keys',
+    (step) => ((step.agent as { keys: string[] }).keys = ['gates']),
+    'its `workflow.1.agent.keys.0` is "gates", where wf writes "after" |',
+  ],
+  [
+    'output.schema',
+    (step) => ((step.output as { schema: Record<string, unknown> }).schema.additionalProperties = true),
+    'its `workflow.1.output.schema.additionalProperties` is true, where wf writes false',
+  ],
+];
+
+test("a frozen step's key of the wrong type is refused at its path, in wf's words, and the step with every key right reads", () => {
+  put('r-agent', withAgent('r-agent'));
+  const run = readRun('r-agent');
+  assert.deepEqual(run.workflow![1], (withAgent('r-agent').workflow as unknown[])[1], 'read as it was frozen');
+  for (const [key, breaks, words] of BROKEN) {
+    const id = `r-bad-${key.replace('.', '-')}`;
+    const record = withAgent(id);
+    breaks((record.workflow as Array<Record<string, unknown>>)[1]);
+    put(id, record);
+    const said = refusalOf(id);
+    assert.ok(said.includes(words), `${key}: ${said}`);
+    assert.ok(!said.includes('Expected'), `in wf's words: ${said}`);
+  }
+  const listed = listRuns(() => undefined).map((r) => r.id);
+  assert.ok(listed.includes('r-agent'));
+  for (const [key] of BROKEN) {
+    const id = `r-bad-${key.replace('.', '-')}`;
+    assert.ok(!listed.includes(id), `${id} left out of listRuns`);
+    fs.rmSync(runFile(id));
+  }
+});
+
 test('a record that is not JSON, or holds no object, is refused saying so', () => {
   put('r-half', '{"id": "r-half", "repo"');
   assert.ok(refusalOf('r-half').includes('is not JSON ('));
@@ -178,6 +239,60 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
   const written = JSON.parse(fs.readFileSync(runFile('r-renamed'), 'utf8')) as { workflow: Array<Record<string, unknown>> };
   assert.deepEqual(written.workflow[0].disallowedTools, ['SendMessage']);
   assert.equal(Object.hasOwn(written.workflow[0], 'disallow'), false, 'and is written back under that name alone');
+
+  const both = aRecord('r-both');
+  (both.workflow as Array<Record<string, unknown>>)[0] = {
+    name: 'implement',
+    after: [],
+    body: 'do it',
+    disallowedTools: ['SendMessage'],
+    disallow: ['SendMessage'],
+    agent: { name: 'implementer', keys: ['disallowedTools'], body: '', given: { disallowedTools: 'SendMessage', disallow: 'SendMessage' } },
+  };
+  put('r-both', both);
+  const step = readRun('r-both').workflow![0];
+  assert.deepEqual(
+    step,
+    {
+      name: 'implement',
+      after: [],
+      body: 'do it',
+      disallowedTools: ['SendMessage'],
+      agent: { name: 'implementer', keys: ['disallowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
+    },
+    "a step a wf before 4612aa2a froze, the former name beside the new one on the step and in its agent's `given`, reads under the new",
+  );
+
+  const allowed = aRecord('r-allow');
+  (allowed.workflow as Array<Record<string, unknown>>)[0] = {
+    name: 'implement',
+    after: [],
+    body: 'do it',
+    allow: ['Edit(**)'],
+    agent: { name: 'implementer', keys: ['allow'], body: '', given: { allow: 'Edit(**)' } },
+  };
+  put('r-allow', allowed);
+  assert.deepEqual(
+    readRun('r-allow').workflow![0],
+    {
+      name: 'implement',
+      after: [],
+      body: 'do it',
+      allowedTools: ['Edit(**)'],
+      agent: { name: 'implementer', keys: ['allowedTools'], body: '', given: { allowedTools: 'Edit(**)' } },
+    },
+    'an agent that gave a key under its former name reads with the new one among its `keys`, and is listed',
+  );
+  assert.ok(listRuns(() => undefined).some((r) => r.id === 'r-allow'));
+
+  const text = aRecord('r-disallow-text');
+  (text.workflow as Array<Record<string, unknown>>)[0].disallow = 'SendMessage';
+  put('r-disallow-text', text);
+  assert.ok(
+    refusalOf('r-disallow-text').includes('its `workflow.0.disallow` is "SendMessage", where wf writes array'),
+    'a field under a former name is checked as the key it is now',
+  );
+  fs.rmSync(runFile('r-disallow-text'));
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

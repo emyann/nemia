@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import {
   AGENTS_FOLDER,
   agentsDir,
@@ -27,12 +28,15 @@ import {
   skillEntryOf,
   SKILLS_FOLDER,
   splitFrontmatter,
+  STEP_KEYS,
   stepFiles,
+  SYSTEM_PROMPTS,
   WorkflowError,
   type Agent,
   type Agents,
   type AgentSkill,
   type SkillsFound,
+  type StepKey,
   type Workflow,
 } from './workflow.ts';
 
@@ -461,3 +465,80 @@ export function workflowDescription(dir: string): string | null {
   }
   return readmeDescription(text);
 }
+
+const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
+
+const Strings = Schema.mutable(Schema.Array(Schema.String));
+
+/** An `output:` schema as the parser writes it (`OutputSchema`): strict, of an object, and every other key it has kept. */
+const OutputSchemaSchema = Schema.StructWithRest(
+  Schema.Struct({
+    type: Schema.Literal('object'),
+    properties: Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown)),
+    required: Strings,
+    additionalProperties: Schema.Literal(false),
+  }),
+  Rest,
+);
+
+/**
+ * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
+ * every other key kept.
+ */
+const StepAgentSchema = Schema.StructWithRest(
+  Schema.Struct({
+    name: Schema.String,
+    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, 'disallow', 'allow']))),
+    body: Schema.String,
+    given: Schema.Record(Schema.String, Schema.String),
+    instructions: Schema.optionalKey(Schema.String),
+    skills: Schema.optionalKey(Strings),
+    systemPrompt: Schema.optionalKey(Schema.Literals(SYSTEM_PROMPTS)),
+  }),
+  Rest,
+);
+
+/** A field for every key a step has (`STEP_KEYS`), with its name and body: a key added there and not here fails the typecheck. */
+export type FrozenStepFields = { readonly [K in StepKey | 'name' | 'body']: Schema.Top };
+
+const frozenStepFields = {
+  name: Schema.String,
+  body: Schema.String,
+  after: Strings,
+  resume: Schema.optionalKey(Schema.String),
+  input: Schema.optionalKey(Strings),
+  workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
+  slot: Schema.optionalKey(Schema.Literal('none')),
+  agent: Schema.optionalKey(StepAgentSchema),
+  harness: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  effort: Schema.optionalKey(Schema.String),
+  context: Schema.optionalKey(Schema.Finite),
+  permissionMode: Schema.optionalKey(Schema.String),
+  sandbox: Schema.optionalKey(Schema.String),
+  tools: Schema.optionalKey(Strings),
+  disallowedTools: Schema.optionalKey(Strings),
+  allowedTools: Schema.optionalKey(Strings),
+  denials: Schema.optionalKey(Schema.Literal('fail')),
+  background: Schema.optionalKey(Schema.Boolean),
+  remote: Schema.optionalKey(Schema.Boolean),
+  deadlineSeconds: Schema.optionalKey(Schema.Finite),
+  budget: Schema.optionalKey(Schema.Finite),
+  check: Schema.optionalKey(Schema.String),
+  retries: Schema.optionalKey(Schema.Finite),
+  gate: Schema.optionalKey(Schema.Literal(true)),
+  output: Schema.optionalKey(Schema.StructWithRest(Schema.Struct({ file: Schema.String, schema: OutputSchemaSchema }), Rest)),
+  loop: Schema.optionalKey(Schema.String),
+  rounds: Schema.optionalKey(Schema.Finite),
+} satisfies FrozenStepFields;
+
+/** A field under each former name of a key (`FORMER_KEYS`), checked as the key it is now: what `asNamed` moves onto that key. */
+const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: frozenStepFields.allowedTools };
+
+/**
+ * A step as the run froze it at `wf start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, and each under its former name
+ * (`FORMER_KEYS`), checked for the type the parser gives it. It checks the shape, not the vocabulary: a harness, a model or a mode is any
+ * text, a count any number, judged when the step is filed, so a word retired since the run started does not lose the run. Every key it
+ * does not name is kept, as a record a newer `wf` wrote keeps it. Read under the names its keys have now by `asNamed`.
+ */
+export const FrozenStepSchema = Schema.StructWithRest(Schema.Struct({ ...frozenStepFields, ...formerStepFields }), Rest);

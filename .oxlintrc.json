@@ -70,8 +70,8 @@
   "overrides": [
     {
       // The two rules left off above, on where what comes from outside is decoded by a schema before it is typed (Effect Schema: a
-      // journal, a detached run file, a run record and a person's asks, daemon.json and tick stats, a queue try, the api's request
-      // bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
+      // journal, a detached run file, a run record and a person's asks, daemon.json and tick stats, a queue try, a line of the feed, the
+      // api's request bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
       // value such a file still takes by a cast keeps its guard with an `oxlint-disable-next-line` saying why.
       "files": [
         "packages/agent-runtime/src/core/event-schema.ts",
@@ -80,6 +80,7 @@
         "packages/agent-orchestrator/src/store.ts",
         "packages/agent-orchestrator/src/daemon/daemon.store.ts",
         "packages/agent-orchestrator/src/inbox/inbox.store.ts",
+        "packages/agent-orchestrator/src/feed/feed.store.ts",
         "apps/api/src/body.ts",
         "apps/api/src/agents/agents.ts",
         "apps/api/src/asks/asks.ts",
@@ -585,7 +586,7 @@
     {
       "files": ["packages/agent-orchestrator/src/store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 617, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 612, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
@@ -608,7 +609,7 @@
     {
       "files": ["packages/agent-orchestrator/src/workflow.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1954, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1945, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 52]
       }

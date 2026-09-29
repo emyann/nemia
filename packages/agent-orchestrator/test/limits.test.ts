@@ -179,7 +179,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-runtime/src/core/event-schema.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/facade/consumer.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/args.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-runtime/src/harness/claude/bg.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/claude/code.ts': { complexity: 1 },
   'packages/agent-runtime/src/harness/claude/inbox.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/claude/transcript.ts': {

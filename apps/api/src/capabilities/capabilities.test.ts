@@ -2,15 +2,15 @@
  * GET /api/capabilities (capabilities.ts, reach.ts): the skills, agents, MCP servers and permission rules of a scratch checkout, and what
  * each step of its workflows gets of them.
  */
-import './harness.ts';
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app, appOf, liveOf } from '../src/app.ts';
-import { ApiConfig } from '../src/layer.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app, appOf, liveOf } from '../app.ts';
+import { ApiConfig } from '../layer.ts';
 import {
   HOME_REPO,
   MEASURED_TOOLS,
@@ -22,18 +22,18 @@ import {
   readOnlyCommands,
   repoOf,
   serverAsk,
-} from '../src/capabilities/capabilities.ts';
-import { DISALLOW, askDenierOf, bashCovers } from '../src/capabilities/reach.ts';
+} from './capabilities.ts';
+import { DISALLOW, askDenierOf, bashCovers } from './reach.ts';
 
-type CapabilitiesWithSteps = import('../src/capabilities/reach.ts').CapabilitiesWithSteps;
-type StepReach = import('../src/capabilities/reach.ts').StepReach;
+type CapabilitiesWithSteps = import('./reach.ts').CapabilitiesWithSteps;
+type StepReach = import('./reach.ts').StepReach;
 assert.equal(
   DISALLOW,
   'disallowedTools:',
   "a step's own deny rules come from its line, as the step writes it: every assertion below reads the constant, so this one reads the words",
 );
 
-const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts');
+const FIXTURE_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'mcp-server.ts');
 
 /** A checkout with only these files in it. An object is written as JSON. */
 const repoWith = (files: Record<string, string | object>): string => {

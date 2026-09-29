@@ -1,8 +1,8 @@
 /**
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
- * a call of `os.tmpdir` anywhere else under `test/` is refused, and each package's copy of the helper is this one. A test
- * of where the code under test runs a process names the temp directory with `machineTempDir()`, which the scan refuses
- * only on a line that makes a root with `mkdtempSync`.
+ * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code in `src/`, is refused, and each
+ * package's copy of the helper is this one. A test of where the code under test runs a process names the temp directory
+ * with `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`.
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -13,8 +13,10 @@ import path from 'node:path';
 const TEST = import.meta.dirname;
 /** The one copy the others are held to. */
 const RUNTIME = path.join(TEST, '..', '..', '..', 'packages', 'agent-runtime', 'test', 'scratch.ts');
-/** The one file under `test/` that may make a root by hand: the helper. */
-const ALLOWED = ['scratch.ts'];
+/** The tests beside the code are held as the ones under `test/` are. */
+const SRC = path.join(TEST, '..', 'src');
+/** The one file that may make a root by hand: the helper. */
+const ALLOWED = ['test/scratch.ts'];
 
 /** Each line of `text` that calls the temp directory by name, or makes a root with `mkdtempSync` in `machineTempDir()`. */
 const tmpdirCalls = (text: string) =>
@@ -41,14 +43,21 @@ test('REFUSED: a line that makes a root under the temp directory by hand is foun
   assert.equal(tmpdirCalls(`const dir = fs.mkdtempSync(path.join(${named}(), 'ae-x-'));`).length, 1, 'but never made a root in');
 });
 
-test('no test makes a root but through scratch', () => {
-  const files = fs
-    .readdirSync(TEST, { recursive: true, encoding: 'utf8' })
-    .filter((f) => /\.(ts|tsx)$/.test(f) && !f.split(path.sep).includes('node_modules'));
+test('no test makes a root but through scratch, under test/ or beside the code in src/', () => {
+  const files = [
+    ...fs
+      .readdirSync(TEST, { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !f.split(path.sep).includes('node_modules'))
+      .map((f) => path.join('test', f)),
+    ...fs
+      .readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.test\.tsx?$/.test(f))
+      .map((f) => path.join('src', f)),
+  ];
   assert.ok(files.length > 1, 'the scan reads the tests');
   const refused = files
     .filter((f) => !ALLOWED.includes(f.split(path.sep).join('/')))
-    .flatMap((f) => tmpdirCalls(fs.readFileSync(path.join(TEST, f), 'utf8')).map((l) => `${f}:${l}`));
+    .flatMap((f) => tmpdirCalls(fs.readFileSync(path.join(TEST, '..', f), 'utf8')).map((l) => `${f}:${l}`));
   assert.deepEqual(refused, [], 'make the root with scratch(prefix) from ./scratch.ts, which takes it away with what runs in it');
 });
 

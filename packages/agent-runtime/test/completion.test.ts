@@ -808,3 +808,168 @@ test('claude that could not even be launched says nothing started; one that ran 
     process.env.PATH = prev;
   }
 });
+
+test('with every option set, Claude Code is given each flag in its one order, the MCP flags after the permission mode and the prompt last', async () => {
+  const dir = scratch('fake-claude-');
+  const root = scratch('ae-root-');
+  const argsFile = path.join(dir, 'args');
+  fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, '.mcp.json'), '{"mcpServers":{}}');
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const schema = { type: 'object' };
+    await Effect.runPromise(
+      claudeOps({ root }).spawn({
+        name: 'ae/t/1',
+        brief: 'the prompt',
+        cwd: dir,
+        resumeFrom: 's-0',
+        closeoutSchema: schema,
+        config: {
+          tools: ['Read', 'Edit'],
+          disallowedTools: ['SendMessage', 'Bash(npm run build)'],
+          allowedTools: ['Edit(**)'],
+          claude: { remoteControl: true },
+          permissionMode: 'dontAsk',
+          mcp: { docs: { command: 'docs-server' } },
+          model: 'opus',
+          effort: 'high',
+          contextTokens: 200000,
+          worktree: true,
+          budgetUsd: 0.5,
+        },
+      }),
+    );
+    assert.deepEqual(fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n'), [
+      '--bg',
+      '--name',
+      'ae/t/1',
+      '--tools',
+      'Read,Edit',
+      '--disallowedTools',
+      'SendMessage,Bash(npm run build)',
+      '--allowedTools',
+      'Edit(**)',
+      '--remote-control',
+      '--permission-mode',
+      'dontAsk',
+      '--mcp-config',
+      path.join(dir, '.mcp.json'),
+      path.join(root, 'mcp', 'ae_t_1.json'),
+      '--strict-mcp-config',
+      '--no-chrome',
+      '--model',
+      'opus',
+      '--effort',
+      'high',
+      '--autocompact',
+      '200000',
+      '--resume',
+      's-0',
+      '--worktree',
+      'ae-t-1',
+      '--json-schema',
+      JSON.stringify(schema),
+      '--max-budget-usd',
+      '0.5',
+      'the prompt',
+    ]);
+  } finally {
+    process.env.PATH = prev;
+  }
+});
+
+test('at shipped defaults Claude Code is given its name, the permission mode auto, the MCP flags and the prompt, and nothing else', async () => {
+  assert.deepEqual(await argvOf({}), [
+    '--bg',
+    '--name',
+    'ae/t/1',
+    '--permission-mode',
+    'auto',
+    '--strict-mcp-config',
+    '--no-chrome',
+    'the prompt',
+  ]);
+});
+
+test('a registry row is ours only when named `ae/`, with a session id and a non-empty state; its wait is trimmed, and a blank one is none', async () => {
+  const restore = withFakeClaude(
+    JSON.stringify([
+      { name: 'other/a/1', sessionId: 's-a', state: 'working', status: 'idle' },
+      { name: 'ae/b/1', sessionId: 's-b', status: 'idle' },
+      { name: 'ae/c/1', sessionId: 's-c', state: '', status: 'idle' },
+      { name: 'ae/d/1', state: 'working', status: 'idle' },
+      { name: 'ae/e/1', sessionId: 's-e', state: 'blocked', status: 'waiting', waitingFor: '   ' },
+      { name: 'ae/f/1', sessionId: 's-f', state: 'blocked', status: 'waiting', waitingFor: '  authentication  ' },
+      { name: 'ae/g/1', sessionId: 's-g', state: 'working', status: 'busy', waitingFor: 7 },
+      { sessionId: 's-h', state: 'working', status: 'idle' },
+    ]),
+  );
+  try {
+    const ops = claudeOps({
+      now: () => 0,
+      transcriptTime: async () => undefined,
+      closeoutFrom: async () => undefined,
+      usageFrom: async () => undefined,
+    });
+    assert.deepEqual(
+      [...(await Effect.runPromise(ops.observe))],
+      [
+        ['ae/e/1', { sessionId: 's-e', state: 'input-required', busy: false, nativeId: 's-e' }],
+        ['ae/f/1', { sessionId: 's-f', state: 'auth-required', busy: false, nativeId: 's-f', waitingFor: 'authentication' }],
+        ['ae/g/1', { sessionId: 's-g', state: 'working', busy: true, nativeId: 's-g' }],
+      ],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("a row's process is a positive integer and its start a number, or neither is kept: `say` finds no process, `release` reads no usage", async () => {
+  const rows = [
+    { name: 'ae/a/1', sessionId: 's-a', pid: 0, startedAt: '5' },
+    { name: 'ae/b/1', sessionId: 's-b', pid: 1.5, startedAt: null },
+    { name: 'ae/c/1', sessionId: 's-c', pid: '7' },
+    { name: 'ae/d/1', sessionId: 's-d', pid: -3 },
+    { name: 'ae/e/1', sessionId: 's-e', pid: 999_999_999, startedAt: 5 },
+    { name: 'ae/f/1', sessionId: 's-f', pid: 999_999_998, startedAt: '5' },
+  ].map((r) => ({ ...r, state: 'done', status: 'idle' }));
+  const restore = withFakeClaude(JSON.stringify(rows));
+  try {
+    const since: number[] = [];
+    const ops = claudeOps({
+      sessionsDir: scratch('ae-sessions-'),
+      transcriptTime: async () => 0,
+      closeoutFrom: async () => undefined,
+      usageFrom: async (_id, from) => {
+        since.push(from);
+        return { turns: 1, toolCalls: 0 };
+      },
+    });
+    await Effect.runPromise(ops.observe);
+    const said = await Promise.all(
+      rows.map((r) =>
+        Effect.runPromise(
+          ops.say!(r, 'hello').pipe(
+            Effect.as(''),
+            Effect.catchTag('RunnerError', (e) => Effect.succeed(e.message)),
+          ),
+        ),
+      ),
+    );
+    assert.deepEqual(
+      said.map((m) => /`claude agents` lists no process for/.test(m)),
+      [true, true, true, true, false, false],
+      said.join('\n'),
+    );
+    since.length = 0;
+    const released = [];
+    for (const r of rows)
+      released.push(await Effect.runPromise(ops.release!({ sessionId: r.sessionId, state: 'completed' }, { worktree: true })));
+    assert.deepEqual(released, [undefined, undefined, undefined, undefined, { turns: 1, toolCalls: 0 }, undefined]);
+    assert.deepEqual(since, [5], 'only the row with a numeric start, and a process, is read again');
+  } finally {
+    restore();
+  }
+});

@@ -7,9 +7,12 @@
  * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  *
- * Installed as this module loads, so every api test file imports it first, before the api, the package or the engine, which read all three
- * as they load and run; `harness.test.ts` refuses a file that does not (`unharnessed`), and one that loads a module with `import()`: ESM
- * evaluates a file's static imports in their order, so the api and the package, imported after this, load over its store.
+ * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
+ * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
+ * with a bare `node --test` observes no more of this machine. The api, the package and the engine read all three as they load and run;
+ * `harness.test.ts` refuses a script without the `--import` (`scriptUnharnessed`), a test file whose first import is not this
+ * (`unharnessed`), and one that loads a module with `import()`: ESM evaluates a file's static imports in their order, so the api and the
+ * package, imported after this, load over its store.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -116,15 +119,28 @@ export function usageAnswer(text: string, how: 'answer' | 'silent' | 'exit' = 'a
 }
 
 /**
- * Why a test file's text may observe this machine, or null when it may not: its first import is not this harness — a node builtin, the api,
- * the package — or it has none, or it imports something with `import()` before it.
+ * Why a test file's text may observe this machine, or null when it may not: its first import is not this harness, named `harness` as the
+ * file reaches it (`./harness.ts` from `test/`, `../../test/harness.ts` from a folder of `src/`) — a node builtin, the api, the package —
+ * or it has none, or it imports something with `import()` before it.
  */
-export function unharnessed(text: string): string | null {
-  const fix = "Make `import './harness.ts'` first";
+export function unharnessed(text: string, harness = './harness.ts'): string | null {
+  const fix = `Make \`import '${harness}'\` first`;
   const first = /^\s*import\b[^;]*?['"]([^'"]+)['"]/m.exec(text);
   const dynamic = /\bimport\s*\(\s*['"`]/.exec(text);
   if (!first) return `it imports no harness. ${fix}.`;
   if (dynamic && dynamic.index < first.index) return `it imports a module with import() before any static import. ${fix}, above it.`;
-  if (first[1] !== './harness.ts') return `its first import is ${first[1]}. ${fix}, above it.`;
+  if (first[1] !== harness) return `its first import is ${first[1]}. ${fix}, above it.`;
   return null;
+}
+
+/**
+ * Why the api's `test` script may run a test file before this harness is installed, or null when it may not: it loads
+ * `./test/harness.ts` with `--import` (`--import ./test/harness.ts` or `--import=./test/harness.ts`) before the first test file it names.
+ */
+export function scriptUnharnessed(script: string): string | null {
+  const words = script.trim().split(/\s+/);
+  const at = words.findIndex((w, i) => w === '--import=./test/harness.ts' || (w === '--import' && words[i + 1] === './test/harness.ts'));
+  const firstFile = words.findIndex((w, i) => i > 0 && !w.startsWith('-') && words[i - 1] !== '--import');
+  if (words[0] === 'node' && at > 0 && (firstFile < 0 || at < firstFile)) return null;
+  return `the test script (${script}) runs its test files without the harness. Make it \`node --import ./test/harness.ts --test …\`.`;
 }

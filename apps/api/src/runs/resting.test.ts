@@ -7,18 +7,18 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app, runtime } from '../src/app.ts';
-import { ReadMemo } from '../src/layer.ts';
-import { Engine, findRun } from '../src/store.ts';
+import type { RunSummary } from './runs.ts';
+import { app, runtime } from '../app.ts';
+import { ReadMemo } from '../layer.ts';
+import { Engine, findRun } from '../store.ts';
 import { verifiesRest } from 'agent-orchestrator';
-import { restingRead } from '../src/runs/resting.ts';
+import { restingRead } from './resting.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));

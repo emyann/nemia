@@ -2,14 +2,14 @@
  * GET, POST and DELETE /api/inbox (inbox.ts), and POST /api/runs with `card` (workflows.ts): the inbox listed, a card filed and dropped, and
  * a card started — in a scratch store and a scratch repository, through the package's own inbox.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
 import {
   addToInbox,
   fromNote,
@@ -25,10 +25,10 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
-type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
-type InboxCardPage = import('../src/inbox/inbox.ts').InboxCardPage;
-type InboxFiled = import('../src/inbox/inbox.ts').InboxFiled;
-type RunDetail = import('../src/detail/detail.ts').RunDetail;
+type InboxEntry = import('./inbox.ts').InboxEntry;
+type InboxCardPage = import('./inbox.ts').InboxCardPage;
+type InboxFiled = import('./inbox.ts').InboxFiled;
+type RunDetail = import('../detail/detail.ts').RunDetail;
 /** What POST /api/runs answers a card it started (201): the run, the card, and whether the card left the inbox — and why not. */
 type CardStarted = { id: string; card: string; removed: boolean; why?: string; ignoredRepo?: string };
 type Refused = { error: string };

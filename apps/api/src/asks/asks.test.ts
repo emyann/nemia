@@ -7,15 +7,15 @@
  * (CLAUDE_CONFIG_DIR). The harness's fake `claude` (test/harness.ts) is first on PATH, listing the sessions this file says are running
  * and noting every call, so the registry of the sessions on this machine is never asked, and a test can count what a request costs.
  */
-import { config, observations, registry, root, stops } from './harness.ts';
+import { config, observations, registry, root, stops } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app } from '../src/app.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import type { RunSummary } from '../runs/runs.ts';
+import { app } from '../app.ts';
 import { askFile, engine, list, readRun, retry } from 'agent-orchestrator';
 import { messageRefusal } from 'agent-orchestrator/run';
 

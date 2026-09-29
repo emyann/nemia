@@ -7,15 +7,15 @@
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
  * (test/harness.ts) first on PATH.
  */
-import { root, stops } from './harness.ts';
-import type { DecideCommand, Decidable } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
+import { root, stops } from '../../test/harness.ts';
+import type { DecideCommand, Decidable } from '../decide/decision.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import type { RunSummary } from '../runs/runs.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../src/app.ts';
+import { app } from '../app.ts';
 import { approvalFile, approve, askFile, engine, list, readRun, retry } from 'agent-orchestrator';
 import { approvalWordsRefusal, onYouWords } from 'agent-orchestrator/run';
 

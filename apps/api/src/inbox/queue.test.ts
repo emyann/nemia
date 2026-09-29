@@ -4,14 +4,14 @@
  * and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository; and
  * the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
  */
-import { observations, root } from './harness.ts';
+import { observations, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
 import { addToInbox, engine, inboxNameRefusal, noCardLine, queueInInbox, readInbox, runSlots, slotWord } from 'agent-orchestrator';
 delete process.env.WF_MAX_RUNS;
 const repo = scratch('nemia-api-queue-repo-');
@@ -26,9 +26,9 @@ git('init', '-q', '-b', 'main');
 git('commit', '-q', '--allow-empty', '-m', 'init');
 const base = git('rev-parse', 'HEAD').trim();
 
-type InboxEntry = import('../src/inbox/inbox.ts').InboxEntry;
-type Ceilings = import('../src/factory/ceilings.ts').Ceilings;
-type InboxQueueAnswer = import('../src/inbox/inbox.ts').InboxQueueAnswer;
+type InboxEntry = import('./inbox.ts').InboxEntry;
+type Ceilings = import('../factory/ceilings.ts').Ceilings;
+type InboxQueueAnswer = import('./inbox.ts').InboxQueueAnswer;
 
 const inbox = path.join(root, 'inbox');
 const JSON_TYPE = { 'content-type': 'application/json' };

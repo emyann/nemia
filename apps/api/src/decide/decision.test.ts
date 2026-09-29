@@ -3,15 +3,15 @@
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { app } from '../src/app.ts';
-import { diffFiles, DIFF_LINES } from '../src/decide/decision.ts';
+import { scratch } from '../../test/scratch.ts';
+import { app } from '../app.ts';
+import { diffFiles, DIFF_LINES } from './decision.ts';
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 /**
@@ -24,10 +24,10 @@ fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\n
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
-type DecideCommand = import('../src/decide/decision.ts').DecideCommand;
-type Decidable = import('../src/decide/decision.ts').Decidable;
-type RunDecision = import('../src/decide/decision.ts').RunDecision;
-type RunDetail = import('../src/detail/detail.ts').RunDetail;
+type DecideCommand = import('./decision.ts').DecideCommand;
+type Decidable = import('./decision.ts').Decidable;
+type RunDecision = import('./decision.ts').RunDecision;
+type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

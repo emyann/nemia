@@ -42,12 +42,13 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `background`, `budgetUsd`, and Claude Code's own flags under `claude` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
 
-**No named field per harness flag** (the owner, 2026-09-25). A flag only Claude Code has goes under `claude`; a key is named
+**No named field per harness flag** (the owner, 2026-09-25). A flag only Claude Code has goes under `claude`, and one only Codex has
+under `codex` (`trustFrom`, below); a key is named
 on `HarnessArgs` only when more than one harness is given it (the model, the effort, the tools, the fence, `mcp`, the budget),
 another harness translates it (`worktree`, which Codex turns into a worktree of its own and the A2A release carries), a spec
 declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
@@ -1626,10 +1627,12 @@ lets exactly `git add` and `git commit` run outside the sandbox. `git push`, `gi
 trusted, and the one configuration measured to let a step commit from a worktree had the repository
 **and** the worktree trusted.
 
-So the Codex spec **extends trust and never grants it.** When a worktree's repository is already
-trusted in your own `~/.codex/config.toml`, the worktree is trusted for that run too
-(`codex.prepare`). A repository you have not trusted gets nothing, because trusting it would also
-load whatever other Codex settings it ships — not a decision an engine gets to make for you.
+So the Codex spec **extends trust and never grants it.** When the directory a task extends trust from
+is already trusted in your own `~/.codex/config.toml`, the task's `cwd` is trusted for that run too
+(`codex.prepare`). That directory is the task's `config.codex.trustFrom` when it names one, and then
+no git is asked; else it is the repository behind the `cwd`, asked of `git rev-parse --git-common-dir`.
+A directory you have not trusted gets nothing, because trusting it would also load whatever other
+Codex settings it ships — not a decision an engine gets to make for you.
 
 A step that still cannot commit is not stuck. Committing is the workflow layer's job: it commits
 what a step leaves behind. The rule is what lets Codex do it itself.

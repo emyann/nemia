@@ -95,7 +95,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - The api runs its handlers on one `ManagedRuntime`, built from its layer (`appOf` in `apps/api/src/app.ts`), as
   `ai-docs/src/04_integration/10_managed-runtime.ts` does for Hono: a middleware puts it on each request (`c.var.runtime`), and
   `served` (`apps/api/src/layer.ts`) runs a handler over the services — the environment, the engine, the store's root, the MCP asker,
-  the quota asker (`ApiConfig`, `Engine`, `StoreRoot`, `McpAsker`, `QuotaAsker`).
+  the quota asker, and what its reads keep between requests (`ApiConfig`, `Engine`, `StoreRoot`, `McpAsker`, `QuotaAsker`, `ReadMemo`).
+- What an app keeps between requests is a service built with its runtime (`Layer.sync`), never module state: each `ManagedRuntime`
+  builds its layer afresh, so an app over another engine keeps nothing of another's.
 - A test builds an app over `Layer.merge(liveOf(), …)`, the service it replaces given last: `Layer.merge` keeps the later of two.
 - A handler's body stays a plain `async` function: a failure yielded inside `Effect.gen` never reaches a `try` around the `yield*`,
   and the routes catch what they word themselves. `runPromise` rejects with the failure itself, so a refusal reaches `app.onError`

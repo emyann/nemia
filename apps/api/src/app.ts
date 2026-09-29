@@ -8,7 +8,7 @@ import { asks } from './asks/asks.ts';
 import { capabilitiesWithSteps, McpAsker, repoOf } from './capabilities/index.ts';
 import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
-import { ApiConfig, type ApiEnv, type ApiRuntime, served, type Services } from './layer.ts';
+import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { runs } from './runs/index.ts';
 import { steps } from './steps/index.ts';
 import { Engine, StoreRoot } from './store.ts';
@@ -37,10 +37,11 @@ export const answerError: ErrorHandler = (err, c) => {
 
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
- * (`Engine`) and root (`StoreRoot`), and an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`).
+ * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), and reads that have
+ * kept nothing yet (`ReadMemo`).
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
-  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live);
+  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live, ReadMemo.live);
 
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or

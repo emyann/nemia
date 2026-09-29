@@ -10,7 +10,8 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { scratch } from './scratch.ts';
 import type { WorkflowListing } from '../src/workflows/workflows.ts';
-import { app, appOf, liveOf } from '../src/app.ts';
+import { app, appOf, liveOf, runtime } from '../src/app.ts';
+import { ReadMemo } from '../src/layer.ts';
 import { Engine, StoreRoot } from '../src/store.ts';
 import { engine } from 'agent-orchestrator';
 
@@ -46,4 +47,19 @@ test("a mounted router's route reads the store's root of the app it was asked th
   const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
   assert.deepEqual(await yoursOn(own), ['elsewhere'], "yours, read under the layer's root");
   assert.deepEqual(await yoursOn(app), [], "the process's app reads yours under WF_ROOT, which has none");
+});
+
+test('an app keeps what its reads keep of its own: one over another engine starts with none, and reads the feed from its start', async () => {
+  await engine().file({ id: 't-layer-filed', brief: 'Read me.', cwd: scratch('hkb-api-layer-cwd-'), harness: 'claude' });
+  const memoOf = (on: typeof runtime) => on.runPromise(ReadMemo.useSync((memo) => memo));
+  assert.equal((await app.request('/api/runs')).status, 200);
+  const theProcess = await memoOf(runtime);
+  assert.ok(theProcess.filings.filed.has('t-layer-filed'), "the process's app read the filing off the feed");
+  assert.ok(theProcess.filings.cursor > 0, 'and holds where it stopped');
+  const { app: own, runtime: ownRuntime } = appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(engine())));
+  const mine = await memoOf(ownRuntime);
+  assert.notEqual(mine, theProcess, "an app's memo is its own");
+  assert.deepEqual([mine.filings.cursor, mine.filings.filed.size, mine.resting.runs.size, mine.said.size], [0, 0, 0, 0]);
+  assert.equal((await own.request('/api/runs')).status, 200);
+  assert.ok(mine.filings.filed.has('t-layer-filed'), "read from the feed's start, not from where the process's app stopped");
 });

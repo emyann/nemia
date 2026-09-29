@@ -1,12 +1,17 @@
 /**
  * What the api's handlers run on: the services every route may read, the runtime an app builds from their layer (`appOf` in app.ts), and
- * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root or asker by
- * building an app over a layer of its own; nothing a handler reads is fixed when a module loads, the orchestrator's `HOME` aside.
+ * `served`, which runs a handler on the request's runtime over them. A test gives the api another environment, engine, root, asker or
+ * memo by building an app over a layer of its own, and what the app keeps between requests is its own (`ReadMemo`, the askers). What the
+ * package's own verbs read is not a service: the runs, the inbox and the daemon's file are under the package's `HOME`, fixed as it loads
+ * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
 import { McpAsker, repoOf } from './capabilities/capabilities.ts';
+import type { LastSaid } from './detail/detail.ts';
 import { QuotaAsker } from './factory/quota.ts';
-import { Engine, StoreRoot } from './store.ts';
+import { type RestingMemo, restingMemo } from './runs/resting.ts';
+import type { RunSummary } from './runs/runs.ts';
+import { Engine, type Filings, StoreRoot } from './store.ts';
 
 /**
  * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`
@@ -17,8 +22,24 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
   static readonly layer = (env: NodeJS.ProcessEnv): Layer.Layer<ApiConfig> => Layer.succeed(ApiConfig)({ env });
 }
 
+/**
+ * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, runs/resting.ts),
+ * the feed's filing times (`filings`, `filedTimes`), and where each blocked session's conversation was last read (`said`). One for an app,
+ * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
+ */
+export class ReadMemo extends Context.Service<
+  ReadMemo,
+  { readonly resting: RestingMemo<Omit<RunSummary, 'startedAt'>>; readonly filings: Filings; readonly said: LastSaid }
+>()('api/ReadMemo') {
+  static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
+    resting: restingMemo(),
+    filings: { filed: new Map(), cursor: 0 },
+    said: new Map(),
+  }));
+}
+
 /** Every service a handler may read: what an app's layer provides whole. */
-export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker;
+export type Services = ApiConfig | Engine | StoreRoot | McpAsker | QuotaAsker | ReadMemo;
 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
@@ -37,6 +58,7 @@ export type Served = {
   home: string;
   mcp: McpAsker['Service'];
   quota: QuotaAsker['Service'];
+  memo: ReadMemo['Service'];
 };
 
 /**
@@ -55,6 +77,7 @@ export const served = <A>(c: { var: ApiEnv['Variables'] }, handle: (s: Served) =
         home: yield* StoreRoot,
         mcp: yield* McpAsker,
         quota: yield* QuotaAsker,
+        memo: yield* ReadMemo,
       };
       return yield* Effect.promise(async () => handle(s));
     }),

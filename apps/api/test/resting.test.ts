@@ -15,13 +15,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app, runtime } from '../src/app.ts';
-import { resting } from '../src/runs/runs.ts';
+import { ReadMemo } from '../src/layer.ts';
 import { Engine, findRun } from '../src/store.ts';
 import { verifiesRest } from 'agent-orchestrator';
 import { restingRead } from '../src/runs/resting.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
+/** The list's memo of runs at rest, the app's own (`ReadMemo`). */
+const { resting } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

@@ -33,7 +33,7 @@ import {
   waitsIn,
 } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { restingMemo, restingRead } from './resting.ts';
+import { restingRead } from './resting.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { tryOf } from '../agents/try.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
@@ -319,18 +319,15 @@ async function atRest(run: Run, judged: Judged, reader: Engine['Service']): Prom
   return [...(await viewsOf(run, reader)).values()].every((view) => view.state.settled);
 }
 
-/** The list's memo of runs at rest, for as long as the api runs. */
-export const resting = restingMemo<Omit<RunSummary, 'startedAt'>>();
-
 /**
- * Every run's summary, in the store's order, as `GET /api/runs` answers it: through the app's engine and root, the memo verified as its
- * environment says (`WF_VERIFY_REST`).
+ * Every run's summary, in the store's order, as `GET /api/runs` answers it: through the app's engine and root, off its memo of runs at
+ * rest (`ReadMemo`), verified as its environment says (`WF_VERIFY_REST`).
  */
-async function listed({ e, env, home }: Served): Promise<RunSummary[]> {
-  const read = await restingRead(e, resting, verifiesRest(env));
+async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
+  const read = await restingRead(e, memo.resting, verifiesRest(env));
   const runs = listRuns();
   read.only(runs.map((run) => run.id));
-  const filed = await filedTimes(e);
+  const filed = await filedTimes(e, memo.filings);
   const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
   const toJudge: Run[] = [];
   for (const run of runs) {
@@ -408,11 +405,11 @@ async function listed({ e, env, home }: Served): Promise<RunSummary[]> {
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) => served(c, async (s) => c.json(await listed(s))))
   .get('/api/runs/:id', (c) =>
-    served(c, async ({ e, home }) => {
+    served(c, async (s) => {
       const id = c.req.param('id');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const full = await detail(run, e, home);
+      const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
       return c.json(full);
     }),

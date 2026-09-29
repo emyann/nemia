@@ -86,6 +86,7 @@ import {
   unreadableIn,
 } from './tries.ts';
 import { tryOf } from '../agents/try.ts';
+import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
 /**
@@ -486,8 +487,11 @@ function acceptedOf(run: Run, step: string): StepAcceptance | null {
   return given ? { try: given.try, at: given.at, message: given.message } : null;
 }
 
-/** Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. */
-const lastSaid = new Map<string, { cursor: string; line: string | null }>();
+/**
+ * Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. One for an app,
+ * of its engine's sessions (`ReadMemo`, layer.ts).
+ */
+export type LastSaid = Map<string, { cursor: string; line: string | null }>;
 
 /**
  * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
@@ -499,13 +503,13 @@ const lastSaid = new Map<string, { cursor: string; line: string | null }>();
  * is, and never on the list.
  *
  * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
- * not its whole conversation again; a cursor the engine refuses, of a transcript replaced since, is read again from the start. A read's
- * cache, and nothing is decided by it: a fresh process reads from the start.
+ * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A
+ * read's cache, and nothing is decided by it: a fresh app reads from the start.
  */
-async function lastLineOf(e: Engine['Service'], view: TaskView): Promise<string | null> {
+async function lastLineOf(e: Engine['Service'], view: TaskView, said: LastSaid): Promise<string | null> {
   const key = `${view.id}#${view.state.attempts.length}`;
   const read = (after?: string) => e.transcript(view.id, after).catch(() => undefined);
-  let from = lastSaid.get(key);
+  let from = said.get(key);
   let got = from ? await read(from.cursor) : undefined;
   if (!got) {
     from = undefined;
@@ -516,7 +520,7 @@ async function lastLineOf(e: Engine['Service'], view: TaskView): Promise<string 
     .filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim())
     .at(-1);
   const line = last?.text?.trim() ?? from?.line ?? null;
-  lastSaid.set(key, { cursor: got.cursor, line });
+  said.set(key, { cursor: got.cursor, line });
   return line;
 }
 
@@ -565,9 +569,10 @@ const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly W
  * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own.
  * One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
  * run's own detail reads. What its tries consumed and cost, and its timeline, come off the same views and the feed's filing times
- * (`filedTimes`), with no observation of their own; the timeline's rounds are of the loops of the steps the run is judged by.
+ * (`filedTimes`), with no observation of their own; the timeline's rounds are of the loops of the steps the run is judged by. Read through
+ * the app's engine and root, what it read before kept in its `memo`.
  */
-export async function detail(run: Run, e: Engine['Service'], home: string): Promise<RunDetail | { unjudged: string }> {
+export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'home' | 'memo'>): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
@@ -583,7 +588,7 @@ export async function detail(run: Run, e: Engine['Service'], home: string): Prom
   const checks = await checksOf(e, run, steps, views);
   const source = shownWorkflow(run, workflows);
   const used = consumption(views, run);
-  const filed = await filedTimes(e);
+  const filed = await filedTimes(e, memo.filings);
   const clock = timeline(run, views, filed, steps);
   return {
     id: run.id,
@@ -652,7 +657,7 @@ export async function detail(run: Run, e: Engine['Service'], home: string): Prom
           branch: run.steps[name]?.branch ?? null,
           note: judged.notes.get(name) ?? null,
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!) : null,
+          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

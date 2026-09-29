@@ -20,8 +20,10 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
 }
 
 /**
- * The store's root, where the api reads and writes what is not a run's: your workflows, agents and skills, the inbox, a try's folder, a
- * run's worktrees. Live, the package's `HOME`, which it fixes as it loads (`WF_ROOT`), and which every verb of it reads.
+ * The store's root as the api's own reads and writes take it: your workflows, agents and skills, and a try's folder, looked for and written
+ * under it. Live, the package's `HOME`, which it fixes as it loads (`WF_ROOT`). What the package reads by itself is under its `HOME`
+ * whatever this says: the runs (`listRuns`, `findRun`), the inbox and the queue, the daemon's file, and every verb a route calls. So a
+ * test that gives another root moves where the api looks for yours, and nothing of the package's.
  */
 export class StoreRoot extends Context.Service<StoreRoot, string>()('api/StoreRoot') {
   static readonly live: Layer.Layer<StoreRoot> = Layer.succeed(StoreRoot)(HOME);
@@ -181,15 +183,15 @@ export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
  * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
  * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor on
  * each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
- * since. A read's cache: a fresh process reads the feed from the start.
+ * since. A read's cache, one for an app, of its engine's feed (`ReadMemo`, layer.ts): a fresh app reads the feed from the start.
  */
-const filings = { filed: new Map<string, string>(), cursor: 0 };
+export type Filings = { filed: Map<string, string>; cursor: number };
 
 /**
- * Every task's filing time the feed has, read on from where the last read stopped. A feed that cannot be read this time leaves what was
- * read before: the queue times of tasks filed since say `not known` until a read works.
+ * Every task's filing time `e`'s feed has, read on from where the last read into `filings` stopped. A feed that cannot be read this time
+ * leaves what was read before: the queue times of tasks filed since say `not known` until a read works.
  */
-export async function filedTimes(e: Reader): Promise<ReadonlyMap<string, string>> {
+export async function filedTimes(e: Reader, filings: Filings): Promise<ReadonlyMap<string, string>> {
   try {
     filings.cursor = (await readFilings(e, filings.cursor, filings.filed)).cursor;
   } catch {}

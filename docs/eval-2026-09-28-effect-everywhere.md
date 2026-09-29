@@ -405,7 +405,12 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    `acquireRelease` and `Effect.timeout`. Landed under B: `feedEvents`, `usageAsk` and `serverAsk`, each let go on one path and a test
    of each that interrupts it or runs out its time. The asks requests share are still shared, and a request's going interrupts only
    the feed's watch, which is its own.
-10. **The api's root and engine as layers.** The 29 dynamic imports become static, file by file.
+10. **The api's root and engine as layers.** The 29 dynamic imports become static, file by file. Landed in part: the api runs
+   its handlers on one `ManagedRuntime` built from its layer (`appOf`, `served`), and the environment, the engine, the store's
+   root and the two askers are services a test replaces (`ApiConfig`, `Engine`, `StoreRoot`, `McpAsker`, `QuotaAsker`). The
+   environment is still read on each request, so a bad `WF_MAX_RUNS` or `WF_VERIFY_REST` is still the 422 of the route that reads
+   it. The tests' dynamic imports stay, for a card of their own: the orchestrator fixes its root as its modules load, so each test
+   must set `WF_ROOT` before it imports the package.
 
 Not on the list: the store as Effects, the tick as a `Schedule`, `Effect.log`, `Schedule` retries, the meter, and the web app.
 

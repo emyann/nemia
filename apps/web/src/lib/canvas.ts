@@ -207,7 +207,7 @@ export function parseLayout(raw: string | null): Map<string, Point> | null {
  *
  * `v2`, the key of an arrangement on the left-to-right layering: one under the key without it, made for a top-to-bottom one, is never read.
  */
-const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
+const layoutKey = (runId: string) => `nemia:canvas-layout:v2:${runId}`;
 
 /**
  * The Factory's arrangement, one per browser: where each run's card was left, by run id.
@@ -215,17 +215,17 @@ const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
  * `v2`, the key of an arrangement whose cells are wide enough to hold a card's rail. One under the key without it puts its cards a narrower
  * cell apart: it is read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2` one is.
  */
-const FACTORY_KEY = 'hkb:factory-layout:v2';
-const NARROW_FACTORY_KEY = 'hkb:factory-layout';
+const FACTORY_KEY = 'nemia:factory-layout:v2';
+const NARROW_FACTORY_KEY = 'nemia:factory-layout';
 
 /** The Factory's open runs, one list per browser, beside its arrangement: whose cards are open on their steps, in the order opened. */
-const FACTORY_OPEN_KEY = 'hkb:factory-open';
+const FACTORY_OPEN_KEY = 'nemia:factory-open';
 
 /**
  * Where a browser may keep an arrangement of the steps of a graph unfolded beside a Factory card, which nothing reads: forgotten when the
  * floor opens, so it does not sit in a browser for ever.
  */
-const FACTORY_STEPS_KEY = 'hkb:factory-steps';
+const FACTORY_STEPS_KEY = 'nemia:factory-steps';
 
 export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId), parseLayout, null);
 export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), Object.fromEntries(at));

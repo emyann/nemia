@@ -35,7 +35,7 @@ const places = (yours: SkillRow[], repo: SkillRow[] = [], shipped: SkillRow[] = 
 ];
 
 test('the places are named as the picker groups them', () => {
-  assert.deepEqual(PLACE_LABELS, { yours: 'Your library', repo: 'This repository', shipped: 'Shipped with HKB' });
+  assert.deepEqual(PLACE_LABELS, { yours: 'Your library', repo: 'This repository', shipped: 'Shipped with Nemia' });
 });
 
 test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {

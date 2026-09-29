@@ -13,10 +13,10 @@
  * - a line that says `MARK`: an alias kept on purpose, or the history the README gives.
  *
  * The project was named Nemia on 2026-09-29 (`PROJECT_MARK`); its former name is refused as the packages' are, outside history and a line
- * that says `PROJECT_MARK`, in three forms (`projectNames`): the upper-case word; the name with its version, spaced or hyphenated, but in a
+ * that says `PROJECT_MARK`, in these forms (`projectNames`): the upper-case word; the name with its version, spaced or hyphenated, but in a
  * path, since a path that names the checkout names a folder on disk; and the lower-case word as a prefix of the machinery — a plugin, a
- * storage key, a client's name, a scratch folder — but for the folder's own name and the earlier project's migration notes. The brand is
- * the name alone: `BRAND` is refused too.
+ * storage key, a client's name, a scratch folder — but for the folder's own name and the earlier project's migration notes; and, in the
+ * board's own files (`BOARD`), the word alone. The brand is the name alone: `BRAND` is refused too.
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
@@ -112,16 +112,26 @@ const PROJECT_FORMS: readonly RegExp[] = [
 ];
 const PATHED = new RegExp(`[/\\\\-]${OLD_V}|path\\.join\\([^)]*['"\`]${OLD_V}['"\`]`, 'i');
 
-/** Whether one line calls the project by its former name where it is not allowed. */
-function namesOldProject(line: string): boolean {
+/**
+ * The board's own files, by path from the repository's root: what it shows is its name, so the lower-case word alone (`BARE`) is refused
+ * there too. Elsewhere it is the earlier project, whose migration and ADRs the docs cite.
+ */
+const BOARD = ['apps/web/index.html', 'apps/web/src/'];
+const BARE = new RegExp(`(?<![\\w/.-])${OLD}(?![\\w:-])`, 'i');
+const onBoard = (file: string): boolean => BOARD.some((entry) => under(entry, file));
+
+/** Whether one line calls the project by its former name where it is not allowed, `board` for a line of the board's own files. */
+function namesOldProject(line: string, board: boolean): boolean {
   if (line.includes(PROJECT_MARK)) return false;
   const [word, versioned, prefix, brand] = PROJECT_FORMS as [RegExp, RegExp, RegExp, RegExp];
-  return word.test(line) || (versioned.test(line) && !PATHED.test(line)) || prefix.test(line) || brand.test(line);
+  return (
+    word.test(line) || (versioned.test(line) && !PATHED.test(line)) || prefix.test(line) || brand.test(line) || (board && BARE.test(line))
+  );
 }
 
 /** Each line of `text` that calls the project by its former name where it is not allowed, as `<line>: <text>`. */
-function projectNames(text: string): string[] {
-  return text.split('\n').flatMap((line, i) => (namesOldProject(line) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
+function projectNames(text: string, board = false): string[] {
+  return text.split('\n').flatMap((line, i) => (namesOldProject(line, board) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 
 test('no live file names a package by its former name', () => {
@@ -242,7 +252,7 @@ test('no live file calls the project by its former name', () => {
     .filter((f) => !inHistory(f))
     .flatMap((f) => {
       const text = textOf(f);
-      return text === undefined ? [] : projectNames(text).map((l) => `${f}:${l}`);
+      return text === undefined ? [] : projectNames(text, onBoard(f)).map((l) => `${f}:${l}`);
     });
   assert.deepEqual(found, [], `these call the project by the name it had until it was ${PROJECT_MARK}:\n${found.join('\n')}`);
 });
@@ -269,7 +279,7 @@ test('REFUSED: the former project name in a title, a package, a label, a plugin,
   assert.deepEqual(projectNames(`one\ntwo ${OLD}-v2\nthree`), [`2: two ${OLD}-v2`], 'the line is named');
 });
 
-test("a path that names the checkout, the earlier project, a store and the marked line pass; a word that only contains the name is not it", () => {
+test('a path that names the checkout, the earlier project, a store and the marked line pass; a word that only contains the name is not it', () => {
   for (const line of [
     `cwd: '/code/${OLD}-v2',`,
     `path.join('claude', 'projects', '-home-yrnd1-projects-${OLD}-v2', 'x.jsonl')`,
@@ -285,4 +295,22 @@ test("a path that names the checkout, the earlier project, a store and the marke
     'Nemia — the name alone',
   ])
     assert.deepEqual(projectNames(line), [], line);
+});
+
+test("REFUSED: the board showing the former name alone, which elsewhere is the earlier project's", () => {
+  for (const line of [`    <title>${OLD}</title>`, `<NavLink to="/" size="lg" tooltip="${OLD}" onPress={picked}>`])
+    assert.deepEqual(projectNames(line, true), [`1: ${line.trim()}`], line);
+  assert.deepEqual(projectNames(`    <title>${OLD}</title>`), [], 'outside the board, the word alone is the earlier project');
+  assert.deepEqual(projectNames(`the old ${OLD} filed such a note`, true), [`1: the old ${OLD} filed such a note`]);
+  assert.deepEqual(projectNames(`{ dir: '/${OLD}/workflows/skills' }`, true), [], 'a path is not the name');
+  assert.equal(onBoard('apps/web/index.html'), true);
+  assert.equal(onBoard('apps/web/src/routes/__root.tsx'), true);
+  assert.equal(onBoard('apps/web/test/e2e/seed.ts'), false);
+  assert.equal(onBoard('apps/web/index.html.bak'), false);
+  const all = files();
+  for (const entry of BOARD)
+    assert.ok(
+      all.some((f) => under(entry, f)),
+      `${entry} is on the board's list and holds no file`,
+    );
 });

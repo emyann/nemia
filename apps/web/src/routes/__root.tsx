@@ -79,11 +79,11 @@ function AppSidebar({ path }: { path: string }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <NavLink to="/" size="lg" tooltip="hkb" onPress={picked}>
+            <NavLink to="/" size="lg" tooltip="Nemia" onPress={picked}>
               <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground text-sidebar">
                 <Workflow className="size-4" />
               </span>
-              <span className="font-semibold tracking-tight">hkb</span>
+              <span className="font-semibold tracking-tight">Nemia</span>
             </NavLink>
           </SidebarMenuItem>
         </SidebarMenu>

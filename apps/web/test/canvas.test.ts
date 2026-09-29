@@ -351,7 +351,7 @@ function stubStorage(t: { after: (fn: () => void) => void }, storage: object) {
 }
 
 test('a layout saved before the graph read left to right is not read', (t) => {
-  const kept = new Map([['hkb:canvas-layout:r-1', JSON.stringify({ implement: { x: 0, y: 300 } })]]);
+  const kept = new Map([['nemia:canvas-layout:r-1', JSON.stringify({ implement: { x: 0, y: 300 } })]]);
   stubStorage(t, memory(kept));
   assert.equal(readLayout('r-1'), null);
   saveLayout('r-1', new Map([['implement', { x: 300, y: 0 }]]));
@@ -373,14 +373,14 @@ test("the Factory's arrangement is kept apart from every run's, until it is forg
 
 test("the Factory's arrangement saved at the old cell width is read apart, until one is saved or it is forgotten", (t) => {
   const narrow = JSON.stringify({ 'r-1': { x: 320, y: 0 } });
-  const kept = new Map([['hkb:factory-layout', narrow]]);
+  const kept = new Map([['nemia:factory-layout', narrow]]);
   stubStorage(t, memory(kept));
   assert.equal(readFactoryLayout(), null, "not read as the arrangement at today's width: its cards are a narrower cell apart");
   assert.deepEqual(Object.fromEntries(readNarrowFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
   saveFactoryLayout(new Map([['r-1', { x: 384, y: 0 }]]));
   assert.equal(readNarrowFactoryLayout(), null, "the first arrangement saved at today's width is the one read from then on");
   assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 384, y: 0 } });
-  kept.set('hkb:factory-layout', narrow);
+  kept.set('nemia:factory-layout', narrow);
   forgetFactoryLayout();
   assert.equal(readFactoryLayout(), null, 'Reset layout forgets both');
   assert.equal(readNarrowFactoryLayout(), null, 'Reset layout forgets both');
@@ -409,12 +409,12 @@ test("the Factory's open runs are kept in the order opened, apart from its arran
 });
 
 test("the Factory's dragged steps, kept by a floor that drew them, are forgotten, and nothing else with them", (t) => {
-  const kept = new Map([['hkb:factory-steps', JSON.stringify({ 'r-1/review': { x: 40, y: -10 } })]]);
+  const kept = new Map([['nemia:factory-steps', JSON.stringify({ 'r-1/review': { x: 40, y: -10 } })]]);
   stubStorage(t, memory(kept));
   saveFactoryOpen(['r-1']);
   saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
   forgetFactorySteps();
-  assert.equal(kept.has('hkb:factory-steps'), false);
+  assert.equal(kept.has('nemia:factory-steps'), false);
   assert.deepEqual(readFactoryOpen(), ['r-1'], 'the open runs stay');
   assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } }, 'and the arrangement');
 });

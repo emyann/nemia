@@ -175,7 +175,10 @@ export function SkillLink({ from, name, className }: { from: SkillSource; name: 
   );
 }
 
-/** Where a skill an agent is given is found: your library, the repository, what HKB ships — or nowhere, which the package refuses on save. */
+/**
+ * Where a skill an agent is given is found: your library, the repository, what Nemia ships — or nowhere, which the package refuses on
+ * save.
+ */
 export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
   return (
     <span

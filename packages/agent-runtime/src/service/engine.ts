@@ -5,7 +5,19 @@
 import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, isLive, phaseWordOf, waitsOnPerson, type Input, type Said, type Sighting, type State } from '../core/index.ts';
+import {
+  fold,
+  nameFor,
+  isLive,
+  pathOf,
+  phaseWordOf,
+  waitsOnPerson,
+  type Input,
+  type LifecycleStep,
+  type Said,
+  type Sighting,
+  type State,
+} from '../core/index.ts';
 import {
   argsRefusalOf,
   Runner,
@@ -115,6 +127,7 @@ export type EngineShape = {
   readonly tick: () => Effect.Effect<TickReport, TickRefused | JournalError | RunnerError>;
   readonly admit: (taskIds: readonly string[]) => Effect.Effect<string[], AdmitRefused | JournalError>;
   readonly view: (taskId: string) => Effect.Effect<TaskView, JournalError>;
+  readonly path: (taskId: string) => Effect.Effect<LifecycleStep[], JournalError>;
   readonly list: (taskIds?: readonly string[]) => Effect.Effect<TaskList, ListRefused | JournalError | RunnerError>;
   readonly stop: (taskId: string) => Effect.Effect<void, JournalError>;
   readonly logs: (taskId: string) => Effect.Effect<string, JournalError | RunnerError>;
@@ -145,6 +158,36 @@ const NONE: ObserveCount = { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 }
 
 /** What failed, in words, off a cause: its error's message, or the value itself. */
 const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * `start` over `tick`, a pass: one pass every `intervalMs` (3 s by default), none while the last still runs, each report handed to
+ * `onTick` and each failure to `onError`, until the handle's `stop`.
+ */
+const startOf =
+  (tick: EngineShape['tick']): EngineShape['start'] =>
+  (o = {}) =>
+    Effect.sync(() => {
+      const every = o.intervalMs ?? 3_000;
+      let running = false;
+      let stopped = false;
+      const timer = setInterval(async () => {
+        if (running || stopped) return;
+        running = true;
+        try {
+          o.onTick?.(await Effect.runPromise(tick()));
+        } catch (e) {
+          o.onError?.(e);
+        } finally {
+          running = false;
+        }
+      }, every);
+      return {
+        stop: () => {
+          stopped = true;
+          clearInterval(timer);
+        },
+      };
+    });
 
 /**
  * The engine over `options`, as `createEngine` describes it: the file-backed store under `root` (`~/.agent-engine` by default) or the
@@ -451,35 +494,12 @@ const make = (options: EngineOptions) =>
         };
       });
 
-    const start: EngineShape['start'] = (o = {}) =>
-      Effect.sync(() => {
-        const every = o.intervalMs ?? 3_000;
-        let running = false;
-        let stopped = false;
-        const timer = setInterval(async () => {
-          if (running || stopped) return;
-          running = true;
-          try {
-            o.onTick?.(await Effect.runPromise(tickVerb()));
-          } catch (e) {
-            o.onError?.(e);
-          } finally {
-            running = false;
-          }
-        }, every);
-        return {
-          stop: () => {
-            stopped = true;
-            clearInterval(timer);
-          },
-        };
-      });
-
     return Engine.of({
       file: fileVerb,
       tick: tickVerb,
       admit: (taskIds) => go(admit(taskIds)),
       view: (taskId) => go(viewOf(taskId)),
+      path: (taskId) => read(taskId).pipe(Effect.map((events) => pathOf(taskId, events))),
       list: listVerb,
       stop: (taskId) => go(requestStop(taskId)),
       logs: (taskId) =>
@@ -497,7 +517,7 @@ const make = (options: EngineOptions) =>
       feed: feedVerb,
       watch,
       io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
-      start,
+      start: startOf(tickVerb),
     });
   });
 

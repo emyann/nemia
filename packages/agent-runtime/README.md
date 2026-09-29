@@ -205,6 +205,13 @@ is a dependency of this package alone, imported by `src/core/lifecycle.ts` alone
 entry exports the machine or its move, as none exports `decide`. `agent-runtime` exports its graph as plain data
 (`lifecycleGraph`: the states, the edges, the first and the final states), which the board draws on its `/machines` page.
 
+**A task's path through it is read, never kept.** `engine.path(taskId)` replays the journal entry by entry (`pathOf`,
+`src/core/path.ts`): for each, the state `lifecycleOf` reads off the journal up to it, the entry's kind and its `at`, from the
+filing to now. It writes nothing and asks no harness. The event is the journal's word — `spawned`, `ended`, `input` — and never
+the machine's, which a pass computes from its sightings and does not journal; a person's verbs (`stop-requested`, `input`,
+`closed`) move a task where no edge goes, and the path shows the move all the same. A task this engine has no record of has an
+empty path.
+
 ### Letting a finished session go
 
 Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that
@@ -1710,6 +1717,7 @@ of pure code sits beside it.
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
+| `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |

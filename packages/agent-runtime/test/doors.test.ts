@@ -141,7 +141,15 @@ test('each verb gives the same answer through either door, over one store', asyn
     assert.equal(view.phase, 'running (working)', id);
     assert.deepEqual(await effect((e) => e.view(id)), view, id);
     assert.equal(await effect((e) => e.logs(id)), await promise.logs(id));
+    const path = await promise.path(id);
+    assert.deepEqual(
+      path.map((s) => `${s.state} <- ${s.event}`),
+      ['submitted <- filed', 'submitted <- admitted', 'starting <- starting', 'working <- spawned'],
+      id,
+    );
+    assert.deepEqual(await effect((e) => e.path(id)), path, id);
   }
+  assert.deepEqual([await effect((e) => e.path('ghost')), await promise.path('ghost')], [[], []]);
 
   const toOne = await effect((e) => e.say('one', 'from the service'));
   const toTwo = await promise.say('two', 'from the promise');

@@ -802,7 +802,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 323, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 301, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }],
         "sonarjs/cognitive-complexity": ["error", 23]
       }

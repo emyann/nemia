@@ -52,6 +52,7 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
     tick: (...args: unknown[]) => run('tick', Reflect.apply(service.tick, service, args) as ReturnType<EngineShape['tick']>),
     admit: (taskIds) => run('admit', service.admit(taskIds)),
     view: (taskId) => run('view', service.view(taskId)),
+    path: (taskId) => run('path', service.path(taskId)),
     list: (...args: unknown[]) => {
       const refused = listRefusalOf(args);
       if (refused) throw Object.assign(new Error(`list: ${refused}`), { exitCode: 2 });

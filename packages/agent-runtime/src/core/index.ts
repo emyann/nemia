@@ -8,3 +8,5 @@ export { SESSION_STATES, formerStateOf, isLive, isSessionState, phaseWordOf, wai
 export type { Ended, Outcome, PhaseWord, SessionState } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';
 export type { LifecycleEdge, LifecycleGraph, LifecycleState } from './lifecycle.ts';
+export { pathOf } from './path.ts';
+export type { LifecycleStep } from './path.ts';

@@ -1,5 +1,5 @@
 /**
- * The repository's files as a test that reads all of them sees them: `names.test.ts` and `others.test.ts`.
+ * The repository's files as a test that reads all of them sees them: `names.test.ts`, `others.test.ts` and `local-paths.test.ts`.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -28,3 +28,9 @@ export const textOf = (file: string): string | undefined => {
   const bytes = fs.readFileSync(at);
   return bytes.subarray(0, 8000).includes(0) ? undefined : bytes.toString('utf8');
 };
+
+/** What is not ours to rewrite, by path from the root: the lockfile, and the vendored skill (a folder, `/` at its end). */
+export const NOT_OURS = ['package-lock.json', '.claude/skills/shadcn/'];
+
+/** Whether `file`, a path from the root, is ours to read and rewrite: not the lockfile, nor under the vendored skill. */
+export const ours = (file: string): boolean => !NOT_OURS.some((entry) => (entry.endsWith('/') ? file.startsWith(entry) : file === entry));

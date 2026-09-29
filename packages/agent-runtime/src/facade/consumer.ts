@@ -3,7 +3,7 @@
  * options, the task it files and the engine it gets — each adapted to the engine's services here, and what the door
  * refuses of them.
  */
-import type { Event, Input, Said } from '../core/index.ts';
+import type { Event, Input, LifecycleStep, Said } from '../core/index.ts';
 import type { HarnessArgs, RunnerOps, Transcript, TranscriptCursor } from '../harness/index.ts';
 import {
   Journal,
@@ -231,6 +231,12 @@ export type Engine = {
    * asked. `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view: (taskId: string) => Promise<TaskView>;
+  /**
+   * The task's path through its lifecycle, replayed off its journal alone: for each entry, from its filing to now, the state the journal
+   * says once the entry is on it, the entry's kind and its `at` (`LifecycleStep`). Writes nothing and asks no harness. A task this engine
+   * has no record of has an empty path; a journal that does not read rejects with its `JournalError`.
+   */
+  path: (taskId: string) => Promise<LifecycleStep[]>;
   /**
    * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
    * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions

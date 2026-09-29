@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Conversation } from '@/components/conversation/Conversation';
+import { DebugPanel } from '@/components/DebugPanel';
 import { PromptBox } from '@/components/conversation/PromptBox';
 import { RunGone } from '@/components/RunGone';
 import { StatusChip, StepNote } from '@/components/StatusChip';
@@ -66,7 +67,7 @@ function SessionPage() {
 }
 
 /**
- * The session of `step` in `run`: its header, its conversation, and the box to say more. The transcript is told whether the step waits on a
+ * The session of `step` in `run`: its header, its Debug panel, its conversation, and the box to say more. The transcript is told whether the step waits on a
  * person's word — its session over, nothing of it running — and never whether the run is held: a hold (`wf hold`) answers nothing, and the
  * session runs or rests as it did. What this page said that the run, as last read, does not have yet is kept with the task it was said to,
  * so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what was said, where they reached it
@@ -100,6 +101,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <StepNote note={step.note} />
         {following.error && <p className="text-sm text-red-600">{following.error}</p>}
       </header>
+      <DebugPanel run={run} step={step} />
       <div className="flex min-h-0 flex-1 flex-col">
         {!step.taskId ? (
           quiet('Not filed yet, so there is no session to show.')

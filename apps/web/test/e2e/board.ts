@@ -138,3 +138,11 @@ export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): s
   const file = path.join(API, 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
   return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 }
+
+/** A step's Debug panel on `page`, opened: its trigger pressed and the path of `taskId` drawn, with the lifecycle it is drawn on. */
+export async function openDebug(page: Page, taskId: string): Promise<{ panel: Locator; lifecycle: Locator }> {
+  const panel = page.getByRole('region', { name: 'Debug' });
+  await panel.getByRole('button', { name: /Debug$/ }).click();
+  await expectVisible(panel.locator(`[data-path="${taskId}"]`), `opened, the Debug panel draws the path of ${taskId}`);
+  return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') };
+}

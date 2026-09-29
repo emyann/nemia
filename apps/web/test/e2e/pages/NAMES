@@ -38,3 +38,6 @@ lift
 prune
 unreadable
 machines
+debug-path
+debug-polled
+debug-live

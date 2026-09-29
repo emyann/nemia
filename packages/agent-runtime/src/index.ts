@@ -77,6 +77,7 @@ export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';
 export type { SessionState, Ended, Outcome } from './core/index.ts';
+export type { LifecycleStep, LifecycleState } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';

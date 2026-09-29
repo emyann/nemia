@@ -153,6 +153,13 @@ function replyOf(item: unknown): StepReply {
 }
 
 /**
+ * The turn of its task the earlier try `i` (from 0) of a step was: how many tries before it share its task and were no recheck. A task held
+ * open and answered keeps each try a person answered under its one id, one turn each; a recheck replaces only the check, on the same turn.
+ */
+export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
+  earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
+
+/**
  * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose
  * word, check, closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its
  * own: an earlier refused check's stderr is a file, and its output is not read. What a person said to each try is off the
@@ -175,7 +182,7 @@ export function triesOf(
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
-  const turnAt = (i: number): number => earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
+  const turnAt = (i: number): number => turnOfTry(earlier, i);
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   const answerAt = (n: number): string | null =>
     answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;

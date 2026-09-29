@@ -1,10 +1,10 @@
 /**
  * The Debug panel's reading of a task's path (`lib/lifecyclePath.ts`): when it is read again, the stamp that keys it by the step's state,
- * the state lit at a step of the path and the routes taken to reach it.
+ * the state lit at a step of the path and the routes taken to reach it, and where the graph full width scrolls to show the lit state.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
+import { centredScroll, litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
 import type { MachineEdge } from '../src/lib/api/machines.ts';
 import type { LifecycleStep, StepPath } from '../src/lib/api/steps.ts';
 
@@ -75,4 +75,15 @@ test("a person's move, which no edge makes, is lit as a state and taken as no ro
   ];
   assert.equal(litAt(stopped, 3), 'stopping');
   assert.deepEqual(takenRoutes(stopped, 5, EDGES), ['submitted->starting', 'starting->working', 'stopping->canceled']);
+});
+
+test('REFUSED: the graph full width scrolls only to a lit state drawn out of view, and then centres it', () => {
+  const view = { top: 100, height: 600 };
+  assert.equal(centredScroll(view, { top: 300, height: 80 }, 0), null, 'whole in view: no scroll');
+  assert.equal(centredScroll(view, { top: 100, height: 600 }, 50), null, 'filling the view exactly: no scroll');
+  assert.equal(centredScroll(view, { top: 300, height: 0 }, 0), undefined, 'not laid out yet: nothing to scroll to');
+  assert.equal(centredScroll(view, { top: 1200, height: 80 }, 0), 1240 - 400, 'below the view: its middle to the view’s');
+  assert.equal(centredScroll(view, { top: 660, height: 80 }, 20), 20 + 700 - 400, 'cut by the bottom edge: scrolled too');
+  assert.equal(centredScroll(view, { top: 60, height: 80 }, 300), 300 + 100 - 400, 'cut by the top edge: scrolled back');
+  assert.equal(centredScroll(view, { top: -500, height: 80 }, 100), 0, 'never above the top');
 });

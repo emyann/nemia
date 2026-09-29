@@ -44,3 +44,16 @@ export function takenRoutes(path: readonly LifecycleStep[], at: number, edges: r
   }
   return [...taken];
 }
+
+/** A box on the page, as `getBoundingClientRect` gives one. */
+type Box = { readonly top: number; readonly height: number };
+
+/**
+ * Where a scrolling `view` scrolled `scrollTop` down must scroll to show `box` centred: `null` when the box already lies whole inside the
+ * view, and `undefined` when the box is not laid out yet (no height), so there is nothing to scroll to.
+ */
+export function centredScroll(view: Box, box: Box, scrollTop: number): number | null | undefined {
+  if (box.height === 0) return undefined;
+  if (box.top >= view.top && box.top + box.height <= view.top + view.height) return null;
+  return Math.max(0, scrollTop + box.top + box.height / 2 - (view.top + view.height / 2));
+}

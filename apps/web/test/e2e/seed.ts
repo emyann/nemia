@@ -386,7 +386,7 @@ export const GATED = {
   /** What plan handed on, which a person approves: its summary, as the markdown it is. */
   plan: { heading: 'The plan', items: ['Parse the --flag option in cli.ts', 'Store it on the run record'] },
   /**
-   * And its declared output, as the shipped planner's schema has it (`workflows/agents/plan.schema.json`): an approach, drawn whole at the
+   * And its declared output, as a planner signs one off: an approach, drawn whole at the
    * gate; four files, which the gate folds; two steps and one risk, which it does not.
    */
   output: {

@@ -5,12 +5,12 @@ import { fed, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, REPO, store } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 /**
  * A run of seven steps, each ending another way, written for this page's visit and taken back before it ends: every page shares the
- * store, and a run seeded for all of them would move their counts. Its schemas are the shipped agents' (`workflows/agents`), read as
- * they are, so the tab is shown what a real run of them would give it.
+ * store, and a run seeded for all of them would move their counts. Its schemas are the shapes a planner, an implementer and a reviewer
+ * sign off with (`SCHEMAS`), written here, so the tab is shown what a real run of such steps would give it.
  */
 const OUTCOME = {
   id: 'draw-each-outcome-e2e',
@@ -40,8 +40,42 @@ const OUTCOME = {
 /** The repository the seeded runs say they are of: none on disk, as theirs is not. */
 const REPO_SAID = '/code/hkb-v2';
 
-const schemaOf = (name: string): Record<string, unknown> =>
-  JSON.parse(fs.readFileSync(path.join(REPO, 'workflows', 'agents', `${name}.schema.json`), 'utf8'));
+/** A schema of fields: each property required, and nothing else. */
+const strict = (properties: Record<string, object>) => ({
+  type: 'object',
+  properties,
+  required: Object.keys(properties),
+  additionalProperties: false,
+});
+
+/** What a plan, an implementation and a review sign off with, each field saying what it means, as the tab shows it beside the value. */
+const SCHEMAS = {
+  plan: strict({
+    approach: { type: 'string', description: 'The change in a paragraph: what it does, and why this way rather than another.' },
+    files: {
+      type: 'array',
+      description: 'Every path the change would touch, each with one line on what changes in it.',
+      items: strict({ path: { type: 'string' }, change: { type: 'string' } }),
+    },
+    steps: { type: 'array', description: 'The work, in order.', items: { type: 'string' } },
+    risks: { type: 'array', description: 'What could go wrong, and what the tests would not catch.', items: { type: 'string' } },
+  }),
+  implement: strict({
+    screenshots: { type: 'array', description: 'The absolute paths of the PNGs you looked at.', items: { type: 'string' } },
+    pages: { type: 'array', description: 'The routes the screenshots show.', items: { type: 'string' } },
+  }),
+  review: strict({
+    findings: {
+      type: 'array',
+      description: 'What is worth changing, one finding each.',
+      items: strict({ file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } }),
+    },
+    again: {
+      type: 'boolean',
+      description: 'true when a finding is worth another round of implement; false when the change is done as far as this review goes.',
+    },
+  }),
+};
 const lines = (events: readonly object[]) => `${events.map((e) => JSON.stringify(e)).join('\n')}\n`;
 const write = (file: string, text: string | Buffer) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -66,15 +100,7 @@ function writeRun(root: string): string[] {
     png(480, 200, (x, y) => (y < 24 ? [30, 30, 30] : x < 96 ? [228, 228, 231] : [250, 250, 250])),
   );
 
-  const plan = schemaOf('plan');
-  const review = schemaOf('review');
-  const implement = schemaOf('implement');
-  const strict = (properties: Record<string, object>) => ({
-    type: 'object',
-    properties,
-    required: Object.keys(properties),
-    additionalProperties: false,
-  });
+  const { plan, review, implement } = SCHEMAS;
   const odd = strict({
     matrix: { type: 'array', items: { type: 'array', items: { type: 'integer' } } },
     weights: strict({ plan: { type: 'number' }, review: strict({ findings: { type: 'number' } }) }),

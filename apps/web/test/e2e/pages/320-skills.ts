@@ -4,52 +4,31 @@ import { themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, REPO, store } from '../world.ts';
-
-/** Every file under `dir`, by its path in it, with what it holds: what a copy is held to, byte for byte. */
-function tree(dir: string): Array<[string, string]> {
-  return fs
-    .readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry): [string, string] => [
-      path.relative(dir, path.join(entry.parentPath, entry.name)),
-      fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8'),
-    ])
-    .sort(([a], [b]) => a.localeCompare(b));
-}
+import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, is given a
-   * skill Nemia ships, the first on disk your library and the repository do not have. Its file first names that skill, as one copied from a
-   * repository would, so its row reads not found, and its description is edited and left unsaved. The sheet lists your library, this
-   * repository's and Nemia's in that order, the repository's `scratch` refused with its reason and nothing to press. The skill is copied
-   * into your library from the sheet's third group, a write of its own, on disk byte for byte before any save. The copy moves the agent's
-   * version, since the version digests the skills its file names; the form keeps the edit, the sheet stays open, and the save sends the
-   * version the copy moved to and is not refused as stale. Its tools, which leave out Skill, are put right from the note that says so, and
-   * Doesn't write code is picked, with Only my instructions behind For experts. Saved, the file gives the skill and says
-   * systemPrompt: no-coding. The page takes the agent and the copy back, so each visit, in either theme, reads the store as seeded.
+   * An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, first names a
+   * skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
+   * description is edited and left unsaved. The sheet lists your library, this repository's and Nemia's in that order, the repository's
+   * `scratch` refused with its reason and nothing to press, and Nemia's saying none: Nemia ships no skill. A skill of your library is added
+   * from the sheet's first group, a change of the form alone: nothing is written until Save, and the edit is kept. Its tools, which leave
+   * out Skill, are put right from the note that says so, and Doesn't write code is picked, with Only my instructions behind For experts.
+   * Saved, the file gives the skill and says systemPrompt: no-coding. The page takes the agent back, so each visit, in either theme, reads
+   * the store as seeded.
    */
   name: 'skills',
   route: `/agents/yours/${AGENTS.seeded.name}`,
   expect: async (page) => {
-    const { seeded } = AGENTS;
-    const shippedDir = path.join(REPO, 'workflows', 'skills');
+    const { seeded, made } = AGENTS;
     const library = path.join(store!, 'workflows', 'skills');
     const agentFile = path.join(store!, 'workflows', 'agents', `${seeded.name}.md`);
     const had = fs.readdirSync(library).sort();
-    const repoHas = fs.readdirSync(path.join(store!, 'checkout', '.claude', 'skills'));
-    const shipped = fs
-      .readdirSync(shippedDir)
-      .sort()
-      .find((name) => !had.includes(name) && !repoHas.includes(name));
-    if (!shipped)
-      throw new Refused(
-        `Nemia ships a skill neither your library nor the repository has — ${shippedDir} holds ${fs.readdirSync(shippedDir).join(', ')}`,
-      );
-    const copied = path.join(library, shipped);
+    const mine = made.skill.id;
+    if (!had.includes(mine)) throw new Refused(`your library holds ${mine}, as seeded — it holds ${had.join(', ')}`);
+    const nowhere = 'pass-a-note';
     const was = fs.readFileSync(agentFile, 'utf8');
-    const naming = was.replace(/^---\n/, `---\nskills: ${shipped}\n`);
+    const naming = was.replace(/^---\n/, `---\nskills: ${nowhere}\n`);
     const drafted = 'Use this when a change needs its notes written, drafted and not yet saved.';
 
     const form = page.locator(`form[data-agent-form="${seeded.name}"]`);
@@ -60,9 +39,14 @@ export default {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectVisible(
-        form.locator(`[data-given-skill="${shipped}"] [data-given-error]`, { hasText: 'No skills folder has' }),
-        `${shipped}, named and found nowhere an agent of yours looks, is said not found`,
+        form.locator(`[data-given-skill="${nowhere}"] [data-given-error]`, { hasText: 'No skills folder has' }),
+        `${nowhere}, named and found nowhere an agent of yours looks, is said not found`,
       );
+      fs.writeFileSync(agentFile, was);
+      await page.reload({ waitUntil: 'load' });
+      await idle(page);
+      await expectVisible(form.locator('[data-given-none]'), `${seeded.name} gives no skills once its file is put back`);
+
       const description = form.getByRole('textbox', { name: 'Description', exact: true });
       await description.fill(drafted);
 
@@ -97,47 +81,28 @@ export default {
       );
       await expectCount(scratch.getByRole('button'), 0, 'and nothing to press');
       await expectVisible(
-        sheet.locator('[data-copy-note]', { hasText: 'a write of its own' }),
-        'the shipped group says a copy is a write of its own',
+        sheet.locator('section[aria-label="Shipped with Nemia"]', { hasText: 'None here.' }),
+        'Nemia ships no skill, and its group says so',
       );
-      const offered = sheet.locator(`section[aria-label="Shipped with Nemia"] [data-offered-skill="${shipped}"]`);
-      await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${shipped} says what it costs a turn`);
+      const offered = sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${mine}"]`);
+      await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${mine} says what it costs a turn`);
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `skills-sheet-${await themeOf(page)}.png`) });
 
-      const [answered] = await Promise.all([
-        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/skills/yours', {
-          timeout: WAIT_MS,
-        }),
-        offered.getByRole('button', { name: `Copy ${shipped} to my library and add` }).click(),
-      ]);
-      if (answered.status() !== 201)
-        throw new Refused(`the api copies the skill — it answered ${answered.status()}: ${await answered.text()}`);
-      if (JSON.stringify(tree(copied)) !== JSON.stringify(tree(path.join(shippedDir, shipped))))
-        throw new Refused(`skills/${shipped} is copied into your library at once, byte for byte, before any save`);
-      await expectVisible(
-        offered.locator('[data-skill-from="yours"]'),
-        `the shipped ${shipped} now says it is in your library, and offers no second copy`,
-      );
-      await expectCount(offered.getByRole('button'), 0, 'nothing to press on it');
-      await expectVisible(
-        sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${shipped}"]`, { hasText: 'given' }),
-        'and your library lists it, given',
-      );
-      if (fs.readFileSync(agentFile, 'utf8') !== naming)
-        throw new Refused(`the copy writes no agent: agents/${seeded.name}.md is as it was until Save`);
-      await expectVisible(
-        sheet.getByRole('heading', { name: 'Add a skill' }),
-        "the copy moved the agent's version, and the sheet stays open",
-      );
+      await offered.getByRole('button', { name: `Add ${mine}` }).click();
+      await expectVisible(offered, `${mine} is still listed`);
+      await expectCount(offered.getByRole('button'), 0, `${mine} is given now, and offers nothing to press`);
+      if (fs.readFileSync(agentFile, 'utf8') !== was)
+        throw new Refused(`adding a skill writes nothing: agents/${seeded.name}.md is as it was until Save`);
       await sheet.getByRole('button', { name: 'Close', exact: true }).click();
       await expectCount(sheet, 0, 'the sheet closes');
       if ((await description.inputValue()) !== drafted)
-        throw new Refused(`the description edited before the copy is kept — it reads ${JSON.stringify(await description.inputValue())}`);
-      await expectCount(form.locator(`[data-given-skill="${shipped}"] [data-given-error]`), 0, `${shipped} is found now`);
+        throw new Refused(
+          `the description edited before the skill was added is kept — it reads ${JSON.stringify(await description.inputValue())}`,
+        );
 
-      const given = form.locator(`[data-given-skill="${shipped}"]`);
-      await expectVisible(given.locator('[data-skill-from="yours"]'), `${shipped} is given, from your library`);
+      const given = form.locator(`[data-given-skill="${mine}"]`);
+      await expectVisible(given.locator('[data-skill-from="yours"]'), `${mine} is given, from your library`);
       await expectVisible(given.locator('[data-skill-cost]', { hasText: /tokens/ }), 'with what it costs a turn');
 
       await form.getByRole('textbox', { name: 'Tools', exact: true }).fill('Read');
@@ -164,20 +129,19 @@ export default {
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
       const written = fs.readFileSync(agentFile, 'utf8');
-      for (const line of [`skills: ${shipped}`, 'systemPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
+      for (const line of [`skills: ${mine}`, 'systemPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
         if (!written.split('\n').includes(line))
           throw new Refused(`agents/${seeded.name}.md says ${line} — it holds ${JSON.stringify(written)}`);
       }
-      await expectVisible(form.locator(`[data-card] [data-agent-skill="${shipped}"]`), `saved, its card is generated from ${shipped}`);
+      await expectVisible(form.locator(`[data-card] [data-agent-skill="${mine}"]`), `saved, its card is generated from ${mine}`);
       await expectVisible(form.getByRole('button', { name: 'Save', disabled: true }), 'and Save waits again');
     } finally {
       fs.writeFileSync(agentFile, was);
-      fs.rmSync(copied, { recursive: true, force: true });
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);
     await expectVisible(form.locator('[data-given-none]'), `${seeded.name} gives no skills again`);
     if (JSON.stringify(fs.readdirSync(library).sort()) !== JSON.stringify(had))
-      throw new Refused(`the page takes the copy back — ${library} holds ${fs.readdirSync(library).join(', ')}`);
+      throw new Refused(`the page writes nothing into your library — ${library} holds ${fs.readdirSync(library).join(', ')}`);
   },
 } satisfies PageSpec;

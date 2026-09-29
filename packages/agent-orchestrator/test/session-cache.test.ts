@@ -10,8 +10,9 @@
  * Code's copy of a `--bg` session keeps the flags it was started with and no others, so a continuation filed without the window runs on the
  * model's whole window, and one filed with another compacts where the session it continues did not.
  *
- * Walked at shipped defaults, over every shipped folder with a loop: a first try, a nudge, an answer to a blocked step (`wf retry
- * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own. And the run's own nudge
+ * Walked at shipped defaults, over the tests' team's `dev` (`team.ts`), whose review loops back to implement: a first try, a nudge, an
+ * answer to a blocked step (`wf retry --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:`
+ * of its own. And the run's own nudge
  * to sign off, filed with no person's word when a session ends `unsigned`. `WF_ROOT` is read as the module loads, so it is set before the
  * import.
  */
@@ -25,14 +26,14 @@ import type { TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.ts');
 
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
-const LOOPED = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'];
+const LOOPED = ['dev'];
 
 /** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself — and the window the session keeps. */
 const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode', 'contextTokens'] as const;
@@ -196,7 +197,7 @@ async function walk(
 
 for (const name of LOOPED) {
   test(`${name}, at shipped defaults: every continued session is filed with what the session it continues was — schema, model, effort, tools — through a nudge, an answer, round 2 and round 3`, async () => {
-    const { id, filed, target, looping, steps } = await walk(path.join(SHIPPED, name));
+    const { id, filed, target, looping, steps } = await walk(path.join(TEAM, name));
     const resumed = filed.filter((f) => f.resumeFrom).map((f) => f.id.slice(id.length + 1));
     assert.deepEqual(
       resumed,
@@ -225,7 +226,7 @@ for (const name of LOOPED) {
 }
 
 test("REFUSED before the fix, now kept: a `wf retry --model` session is continued on its model — by the answer to it, and by the round after — not on the step's", async () => {
-  const { id, filed, target } = await walk(path.join(SHIPPED, 'dev'), { mode: 'fresh', model: 'sonnet' });
+  const { id, filed, target } = await walk(path.join(TEAM, 'dev'), { mode: 'fresh', model: 'sonnet' });
   const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
   assert.deepEqual(
     [2, 3, 4, 5].map((n) => [of(n).config?.model, Boolean(of(n).resumeFrom)]),
@@ -366,7 +367,7 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
 
 for (const name of LOOPED) {
   test(`${name}, at shipped defaults: the run's own nudge to sign off continues an unsigned session filed as that session was — schema, model, effort, tools, window`, async () => {
-    const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(SHIPPED, name) });
+    const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) });
     const target = stepsOf(run).find((s) => s.loop)!.loop!;
     const b = board();
     const order: string[] = [];

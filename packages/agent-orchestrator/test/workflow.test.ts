@@ -34,6 +34,7 @@ import {
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -297,12 +298,10 @@ test('resuming a step that does not exist is refused', () => {
   assert.throws(() => validate([{ name: 'a', after: [], body: 'x', resume: 'ghost' }]), /resumes "ghost"/);
 });
 
-test('REFUSED at shipped defaults: the shipped review with its loop pointed at a step it does not wait on, with `again` gone from its schema, or beside another step', () => {
-  const shipped = path.join(import.meta.dirname, '..', 'workflows');
+test("REFUSED at shipped defaults: the team's review with its loop pointed at a step it does not wait on, with `again` gone from its schema, or beside another step", () => {
   const copy = () => {
-    const dir = scratch('wf-shipped-');
-    for (const f of fs.readdirSync(shipped).filter((f) => /\.(md|json)$/.test(f)))
-      fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
+    const dir = path.join(teamCopy('wf-loop-'), 'dev');
+    fs.rmSync(path.join(dir, 'ship.md'));
     return dir;
   };
   const refused = (dir: string): string => {
@@ -318,7 +317,7 @@ test('REFUSED at shipped defaults: the shipped review with its loop pointed at a
   assert.deepEqual(
     loadWorkflows(copy()).map((s) => s.name),
     ['implement', 'review'],
-    'the copy, untouched, loads',
+    'the copy, its ending taken off and nothing else, loads',
   );
   const docs = '---\nafter: implement\n---\ndocument it\n';
 
@@ -332,10 +331,11 @@ test('REFUSED at shipped defaults: the shipped review with its loop pointed at a
   assert.match(refused(elsewhere), /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between/);
 
   const lacks = copy();
-  const schema = JSON.parse(fs.readFileSync(path.join(lacks, 'review.schema.json'), 'utf8'));
+  const schemaFile = path.join(lacks, '..', 'agents', 'review.schema.json');
+  const schema = JSON.parse(fs.readFileSync(schemaFile, 'utf8'));
   delete schema.properties.again;
   schema.required = schema.required.filter((f: string) => f !== 'again');
-  fs.writeFileSync(path.join(lacks, 'review.schema.json'), JSON.stringify(schema));
+  fs.writeFileSync(schemaFile, JSON.stringify(schema));
   assert.match(
     refused(lacks),
     /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`/,
@@ -575,9 +575,7 @@ test('a key a step does not have is refused by name, with the keys it does have'
 });
 
 test('`afer: implement` is refused — accepted, it made the reviewer a root that starts beside the implementer', () => {
-  const shipped = path.join(import.meta.dirname, '..', 'workflows');
-  const dir = scratch('wf-');
-  for (const f of fs.readdirSync(shipped).filter((f) => f.endsWith('.md'))) fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
+  const dir = path.join(teamCopy('wf-afer-'), 'dev');
   const review = path.join(dir, 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace(/^after:/m, 'afer:'));
   assert.match(fs.readFileSync(review, 'utf8'), /^afer: implement$/m, 'the typo is really in the file');
@@ -2380,28 +2378,23 @@ const readIn =
     }
   };
 
-/** Every workflow folder this repository ships: its `workflows/`, this package's own and its `ui`, and the examples. */
-const shippedFolders = (): string[] => {
-  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
-  const pkg = path.join(import.meta.dirname, '..');
-  const examples = path.join(pkg, 'wf-examples');
+/** Every workflow folder there is to read: whatever is shipped (`team.ts`), the tests' team's `dev`, and the examples. */
+const everyFolder = (): string[] => {
+  const examples = path.join(import.meta.dirname, '..', 'wf-examples');
   return [
+    ...shippedFolders(),
+    TEAM_DEV,
     ...fs
-      .readdirSync(root)
-      .filter((name) => name !== 'agents' && name !== 'skills')
-      .map((name) => path.join(root, name)),
-    path.join(pkg, 'workflows'),
-    path.join(pkg, 'workflows', 'ui'),
-    ...fs.readdirSync(examples).map((name) => path.join(examples, name)),
-  ].filter((dir) => fs.statSync(dir).isDirectory());
+      .readdirSync(examples)
+      .map((name) => path.join(examples, name))
+      .filter((dir) => fs.statSync(dir).isDirectory()),
+  ];
 };
 
-test('`renderStep` is the parser run backwards: every step of every shipped folder, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
-  const folders = shippedFolders();
-  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
-  for (const name of ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'])
-    assert.ok(folders.includes(path.join(root, name)), `${name} is among them`);
-  assert.ok(folders.includes(path.join(import.meta.dirname, '..', 'workflows')), "and the package's own");
+test('`renderStep` is the parser run backwards: every step of every folder there is, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
+  const folders = everyFolder();
+  const root = path.dirname(TEAM_DEV);
+  assert.ok(folders.length > 1, `the team and the examples are read: ${folders.join(', ')}`);
   for (const dir of folders) {
     const steps = loadWorkflows(dir);
     const read = readIn(dir);
@@ -2425,11 +2418,11 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
       dir,
     );
   }
-  const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
+  const review = loadWorkflows(TEAM_DEV).find((s) => s.name === 'review')!;
   assert.equal(
     renderStep(review),
     ['---', 'after: implement', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'),
-    "a shipped step rendered: the keys it sets in the keys' order, no comments, then its own note, none; the keys its agent gives it " +
+    "a step of the team rendered: the keys it sets in the keys' order, no comments, then its own note, none; the keys its agent gives it " +
       "are the agent's file's, and are not written into the step's",
   );
   assert.equal(review.model, 'opus', "and the step runs with the agent's keys all the same");

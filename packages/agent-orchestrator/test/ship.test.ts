@@ -16,6 +16,7 @@ import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import { CHECK } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-ship-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -48,12 +49,12 @@ const gitRun = (run: Run): GitRun => {
 };
 
 /**
- * The repository's root, whose shipped agents and skills are copied beside every folder this file makes under `ROOT`: the shipped
- * ship.md names `agent: shipper`, and its recipe is there.
+ * The ending of the tests' team's `dev` (`team.ts`): the file a person reads, its keys and its agent. It names `agent: shipper`, so the
+ * team's agents and skills are copied beside every folder this file makes under `ROOT`.
  */
-const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
-fs.cpSync(path.join(REPO_ROOT, 'workflows', 'agents'), path.join(ROOT, 'agents'), { recursive: true });
-fs.cpSync(path.join(REPO_ROOT, 'workflows', 'skills'), path.join(ROOT, 'skills'), { recursive: true });
+const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
+fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: true });
+fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 
 /** What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete and the browser's unsafe tool. */
 const SHIPPER_DENIED = [
@@ -85,15 +86,14 @@ const aRepo = (): string => {
 };
 
 /**
- * `implement → ship`, with the shipped `workflows/dev/ship.md` as its ending — the file a person reads, its prose and its keys — with
- * only its `after:` changed, since this folder has no review. A folder written here would not test what the repository ships.
+ * `implement → ship`, with the team's `dev/ship.md` as its ending — its keys and its agent — with only its `after:` changed, since this
+ * folder has no review.
  */
 const folder = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-  const shipped = fs.readFileSync(path.join(REPO_ROOT, 'workflows', 'dev', 'ship.md'), 'utf8');
-  assert.match(shipped, /^after: review$/m);
-  fs.writeFileSync(path.join(dir, 'ship.md'), shipped.replace(/^after: review$/m, 'after: implement'));
+  assert.match(SHIP_MD, /^after: review$/m);
+  fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD.replace(/^after: review$/m, 'after: implement'));
   return dir;
 };
 
@@ -143,7 +143,7 @@ const board = () => {
 };
 
 /**
- * `implement ⇄ review → ship`, as the dev folders are, with the shipped `workflows/dev/ship.md` as its ending, whose `after: review` is
+ * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
  * what this folder has: what a person types `wf round` at once the loop has handed on.
  */
 const loopingFolder = (rounds = 3): string => {
@@ -166,24 +166,23 @@ const loopingFolder = (rounds = 3): string => {
       2,
     ),
   );
-  fs.writeFileSync(path.join(dir, 'ship.md'), fs.readFileSync(path.join(REPO_ROOT, 'workflows', 'dev', 'ship.md'), 'utf8'));
+  fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD);
   return dir;
 };
 
 /**
- * A folder whose ONE step merges: the shipped `workflows/dev/ship.md` with its `after:` dropped, which `validateMainWorkspace` allows —
+ * A folder whose ONE step merges: the team's `dev/ship.md` with its `after:` dropped, which `validateMainWorkspace` allows —
  * nothing waits on it, and nothing ends the workflow beside it. Its ending is also its root, which is the one way a run with nothing filed
  * can be the run that wants the checkout.
  */
 const mergeOnly = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-merge-'));
-  const shipped = fs.readFileSync(path.join(REPO_ROOT, 'workflows', 'dev', 'ship.md'), 'utf8');
-  fs.writeFileSync(path.join(dir, 'ship.md'), shipped.replace(/^after: review\n/m, ''));
+  fs.writeFileSync(path.join(dir, 'ship.md'), SHIP_MD.replace(/^after: review\n/m, ''));
   return dir;
 };
 
 /**
- * `implement → ship` with the shipped ship.md's `check:` line taken out: an ending with no check of its own, whose own session runs the
+ * `implement → ship` with the team's ship.md's `check:` line taken out: an ending with no check of its own, whose own session runs the
  * check and commits, in its prose. Nothing of the run lands such a merge (`landsOnCheck`).
  */
 const uncheckedFolder = (): string => {
@@ -242,7 +241,7 @@ test('`wf start` on a folder with an ending says so: nothing of that step runs u
     log.mock.restore();
   }
   const id = printed[0].split(' ')[0];
-  assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, 'the shipped ship.md names its agent');
+  assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, "the team's ship.md names its agent");
   assert.ok(printed.includes(`ends at: ship — nothing of it runs until wf approve ${id} ship, which is what files it`), printed.join('\n'));
   assert.ok(!printed.some((l) => l.startsWith('gated at:')), 'an ending is not a handoff waiting to be let through');
 });
@@ -260,7 +259,7 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   assert.deepEqual(listed.toDecide, {
     kind: 'approve',
     step: 'ship',
-    says: "Ship it: stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
+    says: "Stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
   });
   const again = await advance(e, readRun(id));
   assert.deepEqual(
@@ -699,7 +698,7 @@ const addB = (workspace: string) => {
   npm(workspace, 'install', '--package-lock-only');
 };
 
-/** The shipped folder, its ship's `check:` a line that needs package `b` installed where it runs, as a typecheck needs `@types/js-yaml`. */
+/** The team's folder, its ship's `check:` a line that needs package `b` installed where it runs, as a typecheck needs `@types/js-yaml`. */
 const requiringB = (): string => {
   const dir = folder();
   const ship = path.join(dir, 'ship.md');

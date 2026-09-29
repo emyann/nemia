@@ -1,31 +1,25 @@
 /**
- * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of every shipped
- * folder, as `wf start` freezes it, reads back as it was; the decoded type and `Workflow` are each the other; and a key of `STEP_KEYS` the
+ * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of every folder
+ * shipped and of the tests' team, as `wf start` freezes it, reads back as it was; the decoded type and `Workflow` are each the other; and a key of `STEP_KEYS` the
  * schema has no field for fails the typecheck.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { FrozenStepSchema, loadWorkflows, workflowsIn, type FrozenStepFields } from '../src/folder/folder.store.ts';
+import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
+import { shippedFolders, TEAM_DEV } from './team.ts';
 
-const REPO = path.join(import.meta.dirname, '..', '..', '..');
-
-/** Every shipped folder: the repository's, and the package's own with its `ui`. */
-const FOLDERS = [
-  ...workflowsIn(path.join(REPO, 'workflows')).map((name) => path.join(REPO, 'workflows', name)),
-  path.join(import.meta.dirname, '..', 'workflows'),
-  path.join(import.meta.dirname, '..', 'workflows', 'ui'),
-];
+/** Every folder shipped (`team.ts`), and the tests' team's `dev`. */
+const FOLDERS = [...shippedFolders(), TEAM_DEV];
 
 const decode = Schema.decodeUnknownResult(FrozenStepSchema);
 
 /** A step as a record holds it: through JSON, as `wf start` writes it and `readRun` reads it. */
 const frozen = (step: Workflow): unknown => JSON.parse(JSON.stringify(step));
 
-test('every step of every shipped folder, frozen, reads back by the schema as it was frozen', () => {
-  assert.ok(FOLDERS.length >= 8, `the shipped folders are found: ${FOLDERS.join(', ')}`);
+test("every step of every folder shipped and of the tests' team, frozen, reads back by the schema as it was frozen", () => {
+  assert.ok(FOLDERS.includes(TEAM_DEV), `the team is read: ${FOLDERS.join(', ')}`);
   let agents = 0;
   for (const dir of FOLDERS) {
     const steps = loadWorkflows(dir);
@@ -37,7 +31,7 @@ test('every step of every shipped folder, frozen, reads back by the schema as it
       if (step.agent) agents += 1;
     }
   }
-  assert.ok(agents > 0, 'a shipped step names an agent, so the agent is read too');
+  assert.ok(agents > 0, 'a step names an agent, so the agent is read too');
 });
 
 test('a step with every key the parser types, its agent and its output reads as it was frozen; one key off, it is refused', () => {

@@ -1,9 +1,9 @@
 /**
- * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill Nemia ships, so an agent of yours can give
- * it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
+ * A skill copied into a library (`copySkill`): what the board's skill picker does with a skill from another place, so an agent of yours
+ * can give it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
- * The copy is held byte for byte against the shipped folder, and each refusal is made to refuse at shipped defaults, asserted on its
- * message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each refusal is made to refuse at shipped
+ * defaults, asserted on its message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,12 +12,13 @@ import path from 'node:path';
 import { skillNameRefusal, skillTurnCost, tokensAbout } from '../src/workflow.ts';
 import { preloads, skillsFor } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 
 const ROOT = scratch('wf-skill-copy-');
 process.env.WF_ROOT = ROOT;
 const { copySkill, SkillWriteError } = await import('../src/runner.ts');
 
-const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'skills');
+const SHIPPED = path.join(TEAM, 'skills');
 const LIBRARY = path.join(ROOT, 'workflows', 'skills');
 
 /** Every file under `dir`, by its path in it, with what it holds. */
@@ -61,7 +62,7 @@ function source(skills: Record<string, string>): string {
   return dir;
 }
 
-test('a shipped skill is copied whole into the library, and the store finds it there', () => {
+test('a skill is copied whole into the library, and the store finds it there', () => {
   fs.rmSync(LIBRARY, { recursive: true, force: true });
   const name = fs.readdirSync(SHIPPED).sort()[0];
   const copied = copySkill(SHIPPED, LIBRARY, name);
@@ -163,7 +164,7 @@ test('a skill costs a turn its listing, and its body too when it is preloaded', 
     assert.equal(
       skillTurnCost(name, fs.readFileSync(path.join(SHIPPED, name, 'SKILL.md'), 'utf8')).preload,
       preloads(path.join(SHIPPED, name)),
-      `${name}: every shipped skill is read the same way the render reads it`,
+      `${name}: every skill of the team is read the same way the render reads it`,
     );
   }
 });

@@ -130,8 +130,8 @@ import {
   agentVersion,
   viewedOnce,
   workflowFolder,
-} from './runner.ts';
-import { agentCard } from './workflow.ts';
+} from '../runner.ts';
+import { agentCard } from '../workflow.ts';
 import { usage, confirmed } from './flags.ts';
 import { PLAN_HELP, INBOX_HELP, startHow, planHow, inboxQueueHow, inboxAddHow } from './start.ts';
 import { rmHow, pruneHow, holdHow, agentsHow } from './runs.ts';

@@ -515,6 +515,7 @@ const PASS = {
   bytes: 812_000,
   spawned: 1,
   overheadMs: 0.4,
+  rested: 0,
   phases: Object.fromEntries(
     ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'].map((p, k) => [
       p,

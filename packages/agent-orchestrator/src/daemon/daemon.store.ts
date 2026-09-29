@@ -98,7 +98,7 @@ const HarnessCostSchema = Schema.StructWithRest(
 );
 
 /**
- * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase there; `rested` may be absent.
+ * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase and `rested` there.
  * A key it does not name is kept, as a newer `wf` may write one.
  */
 const isPassCost = Schema.is(
@@ -112,7 +112,7 @@ const isPassCost = Schema.is(
       bytes: Count,
       spawned: Count,
       overheadMs: Count,
-      rested: Schema.optionalKey(Count),
+      rested: Count,
     }),
     Rest,
   ),

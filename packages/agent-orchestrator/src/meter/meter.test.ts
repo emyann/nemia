@@ -33,6 +33,7 @@ const COST: PassCost = passCost({
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0 } },
   records: 12,
   overheadMs: 0.4,
+  rested: 0,
 });
 
 test("a pass's totals are its phases' bytes and processes, summed", () => {

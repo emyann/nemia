@@ -612,6 +612,7 @@ const COST = passCost({
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0, unread: 1 } },
   records: 12,
   overheadMs: 0.4,
+  rested: 3,
 });
 
 test('a cost reads back as written, and REFUSED: half a file, another shape, a phase missing, a count that is not one', () => {
@@ -637,8 +638,9 @@ test('a cost reads back as written, and REFUSED: half a file, another shape, a p
     { ...COST, later: 1 },
     'a key a newer meter writes is kept, as the file is read whole',
   );
-  assert.deepEqual(parsePassCost(JSON.stringify({ ...COST, rested: 3 })), { ...COST, rested: 3 }, 'the runs answered from memory');
-  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and REFUSED, a count of them that is not one');
+  const { rested: _rested, ...unrested } = COST;
+  assert.equal(parsePassCost(JSON.stringify(unrested)), undefined, 'REFUSED: no count of the runs answered from memory');
+  assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: 'some' })), undefined, 'and a count of them that is not one');
   assert.equal(parsePassCost(JSON.stringify({ ...COST, rested: -1 })), undefined);
 });
 

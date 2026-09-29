@@ -1,15 +1,18 @@
+import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
 import { asks } from './asks/asks.ts';
-import { capabilitiesWithSteps, repoOf } from './capabilities/index.ts';
-import { ceilingsOf, feed, readDaemon, readQuota } from './factory/index.ts';
+import { capabilitiesWithSteps, McpAsker, repoOf } from './capabilities/index.ts';
+import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
+import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
 import { runs } from './runs/index.ts';
 import { steps } from './steps/index.ts';
+import { Engine, StoreRoot } from './store.ts';
 import { builder, workflows } from './workflows/index.ts';
 
 /**
@@ -34,12 +37,24 @@ export const answerError: ErrorHandler = (err, c) => {
 };
 
 /**
- * The api: every route the board reads and writes, its groups each in a router of their own.
+ * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
+ * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), and reads that have
+ * kept nothing yet (`ReadMemo`).
+ */
+export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
+  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live, ReadMemo.live);
+
+/**
+ * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or
+ * `runtime.context()` needs it, and put on every request before any router is reached (`served`, layer.ts). A service the layer gives
+ * twice is the one given last (`Layer.merge`): how a test gives the api an engine, a root or an asker of its own.
+ *
+ * The api's routes: every one the board reads and writes, its groups each in a router of their own.
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
- *   tools once while the api runs; one that fails is an `error` on its entry, never a failed request.
+ *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
  * - workflows/workflows.ts — a repository's workflows, listed, and a run of one started, the board's first write, or of an inbox card.
  * - workflows/builder.ts — a folder of yours built on the board: made with a first step, and put back from its steps with the schemas
  *   pasted for them; two writes, guarded as a start is, each through the package's `writeWorkflow`.
@@ -58,7 +73,7 @@ export const answerError: ErrorHandler = (err, c) => {
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
  *   it free.
  * - `GET /api/quota` — the subscription's quota, as Claude Code answers its get_usage request, asked at most once a keep however many
- *   boards read (factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's failures
+ *   boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's failures
  *   included.
  * - asks/asks.ts — a person's asks of a run: a try, a round, words for a running session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
@@ -70,20 +85,33 @@ export const answerError: ErrorHandler = (err, c) => {
  * `AgentWriteError`, with the steps that name the agent (`refusalOf`, agents/agents.ts), and a `SkillWriteError` (`writeRefused`,
  * agents/skills.ts). Any other error is a 500 there: a route that has better words for one, or a truer status, answers it itself.
  */
-export const app = new Hono()
-  .get('/api/health', (c) => c.json({ ok: true }))
-  .get('/api/capabilities', async (c) => c.json(await capabilitiesWithSteps(repoOf())))
-  .route('/', workflows)
-  .route('/', builder)
-  .route('/', agents)
-  .route('/', skills)
-  .route('/', inbox)
-  .route('/', runs)
-  .get('/api/ceilings', async (c) => c.json(await ceilingsOf()))
-  .get('/api/daemon', (c) => c.json(readDaemon()))
-  .get('/api/quota', async (c) => c.json(await readQuota()))
-  .route('/', asks)
-  .route('/', steps)
-  .route('/', feed)
-  .route('/', machines)
-  .onError(answerError);
+export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
+  const runtime = ManagedRuntime.make(layer);
+  const app = new Hono<ApiEnv>()
+    .use(async (c, next) => {
+      c.set('runtime', runtime);
+      await next();
+    })
+    .get('/api/health', (c) => c.json({ ok: true }))
+    .get('/api/capabilities', (c) =>
+      served(c, async ({ env, home, mcp }) => c.json(await capabilitiesWithSteps(repoOf(env), { env, home, asker: mcp }))),
+    )
+    .route('/', workflows)
+    .route('/', builder)
+    .route('/', agents)
+    .route('/', skills)
+    .route('/', inbox)
+    .route('/', runs)
+    .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
+    .get('/api/daemon', (c) => c.json(readDaemon()))
+    .get('/api/quota', (c) => served(c, async ({ env, quota }) => c.json(await quota({ env }))))
+    .route('/', asks)
+    .route('/', steps)
+    .route('/', feed)
+    .route('/', machines)
+    .onError(answerError);
+  return { app, runtime };
+}
+
+/** The api the process serves (main.ts), over the live services and `process.env`, and its runtime. */
+export const { app, runtime } = appOf(liveOf());

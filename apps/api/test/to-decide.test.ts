@@ -6,10 +6,10 @@
  * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `diffStat`), and the branches are read off a real repository.
  * Every `git` the api runs is noted, so a test can say which runs one is asked about: the list is polled every five seconds.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, `WF_ROOT` set before the orchestrator is imported, as it locates
- * its store as its modules load, and the harness's fake `claude` (test/harness.ts) first on PATH.
+ * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
+ * `claude` (test/harness.ts) first on PATH.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -19,9 +19,8 @@ import { scratch } from './scratch.ts';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
-
-const root = scratch('nemia-api-to-decide-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import { mergesOnto } from '../src/decide/merge.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -30,9 +29,6 @@ const gitCalls = path.join(bin, 'git-calls');
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
-
-const { app } = await import('../src/app.ts');
-const { mergesOnto } = await import('../src/decide/merge.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

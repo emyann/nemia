@@ -5,31 +5,28 @@
  * Beside the scratch repository's workflows lie folders and files that are not one: `NOTES.txt`, not a folder; `.vscode` and `.draft`,
  * hidden, the second with a step in it; and `agents/`, the agents the workflows beside it name, whose files look like steps.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-/** The scratch store, set as `WF_ROOT` before the app is imported: agent-orchestrator locates its store when the module loads. */
-const root = scratch('nemia-api-workflows-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import { listWorkflows, versionOf as versionIn } from '../src/workflows/workflows.ts';
+import { HOME_REPO } from '../src/capabilities/capabilities.ts';
+import { loadWorkflows, parentRecord, readRun } from 'agent-orchestrator';
+import { afterRefusal } from 'agent-orchestrator/run';
+import { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
-const { app } = await import('../src/app.ts');
-const { listWorkflows, versionOf: versionIn } = await import('../src/workflows/workflows.ts');
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
-const { HOME_REPO } = await import('../src/capabilities/capabilities.ts');
-const { loadWorkflows, parentRecord, readRun } = await import('agent-orchestrator');
-const { afterRefusal } = await import('agent-orchestrator/run');
-const { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-orchestrator/workflow');
+
 type WorkflowStepSpec = import('../src/workflows/workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../src/workflows/workflows.ts').WorkflowStepPage;
 type WorkflowListing = import('../src/workflows/workflows.ts').WorkflowListing;

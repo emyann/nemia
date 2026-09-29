@@ -3,17 +3,15 @@
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store when the module loads. */
-const root = scratch('nemia-api-decision-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import { diffFiles, DIFF_LINES } from '../src/decide/decision.ts';
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 /**
@@ -26,8 +24,6 @@ fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\n
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
-const { app } = await import('../src/app.ts');
-const { diffFiles, DIFF_LINES } = await import('../src/decide/decision.ts');
 type DecideCommand = import('../src/decide/decision.ts').DecideCommand;
 type Decidable = import('../src/decide/decision.ts').Decidable;
 type RunDecision = import('../src/decide/decision.ts').RunDecision;

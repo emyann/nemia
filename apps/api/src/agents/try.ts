@@ -9,17 +9,16 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME } from 'agent-orchestrator';
 import { AGENTS_FOLDER, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import type { Run } from 'agent-orchestrator/run';
 import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
 
 /** Where every try's folder is: `tries/` in the store, beside `workflows/`. */
-export const triesDir = (home: string = HOME): string => path.join(home, 'tries');
+export const triesDir = (home: string): string => path.join(home, 'tries');
 
 /** The folder an agent's try is started from. */
-export const tryDir = (name: string, home: string = HOME): string => path.join(triesDir(home), name);
+export const tryDir = (name: string, home: string): string => path.join(triesDir(home), name);
 
 /** The step a try's folder has, and so the one step of its run. */
 export const TRY_STEP = 'try';
@@ -50,13 +49,13 @@ export const tryText = (name: string, version: string): string =>
  * start looks for `agents/` and `skills/` before the store's (`lookupRoots`): a folder named either is no workflow (`agentsFolderRefusal`), and
  * one agent's try would stand where every other try looks for agents or skills.
  */
-export function tryNameRefusal(name: string, home: string = HOME): string | null {
+export function tryNameRefusal(name: string, home: string): string | null {
   if (name !== AGENTS_FOLDER && name !== SKILLS_FOLDER) return null;
   return `An agent named \`${name}\` cannot be tried from the board: its try's folder would be ${tryDir(name, home)}, where every try looks for its ${name} first, and a folder named \`${name}\` is not a workflow. Rename the agent to try it.`;
 }
 
 /** Where your agents are, in the store the api reads: what a copy into yours copies into. */
-export const yourAgentsDir = (home: string = HOME): string => path.join(home, 'workflows', AGENTS_FOLDER);
+export const yourAgentsDir = (home: string): string => path.join(home, 'workflows', AGENTS_FOLDER);
 
 /** The harnesses a try's fence is written for: Claude Code's `permissionMode:`, which no other takes. No `harness:` line is `claude`. */
 const FENCED_HARNESSES: readonly string[] = ['claude', 'claude-detached'];
@@ -71,7 +70,7 @@ export type Untried = { why: string; copy: string | null };
 
 export function untriedOf(
   agent: { from: 'repo' | 'yours'; name: string; file: string; keys: { harness?: string; remote?: string }; schemaFile: string | null },
-  home: string = HOME,
+  home: string,
 ): Untried | null {
   if (agent.from === 'repo') {
     const into = yourAgentsDir(home);
@@ -109,7 +108,7 @@ export function untriedOf(
  * The agent's try folder, written when its step file does not read or was written at another version of the agent, and left as it is
  * otherwise. A folder or a step file that is a link is refused (`Invalid`): written through, it would change whatever it points at.
  */
-export function writeTryFolder(name: string, version: string, home: string = HOME): string {
+export function writeTryFolder(name: string, version: string, home: string): string {
   const dir = tryDir(name, home);
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
@@ -131,7 +130,7 @@ export function writeTryFolder(name: string, version: string, home: string = HOM
 }
 
 /** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
-export function tryOf(run: Pick<Run, 'workflowDir'>, home: string = HOME): { agent: string } | null {
+export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {
   const dir = path.resolve(run.workflowDir);
   return path.dirname(dir) === path.resolve(triesDir(home)) ? { agent: path.basename(dir) } : null;
 }

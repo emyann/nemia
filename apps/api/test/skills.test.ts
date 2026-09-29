@@ -1,13 +1,13 @@
 /**
- * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, what Nemia
- * ships beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back
- * from disk, and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one
- * of yours written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
+ * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, what Nemia ships
+ * beside them, and one shipped skill copied into your library — in a scratch store and a scratch repository. The copy is read back from disk,
+ * and every refusal is made to refuse, asserted on its words, with the library as it was. And one skill on its own page, and one of yours
+ * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
  * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
  * your library first: only the lookup does.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -15,15 +15,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from './scratch.ts';
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
-const root = scratch('nemia-api-skills-');
-process.env.WF_ROOT = root;
+import { app } from '../src/app.ts';
+import { copyCommand } from '../src/agents/skills.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
-const { app } = await import('../src/app.ts');
 type SkillPlace = import('../src/agents/skills.ts').SkillPlace;
 type SkillRow = import('../src/agents/skills.ts').SkillRow;
 type SkillAdded = import('../src/agents/skills.ts').SkillAdded;
@@ -487,7 +484,6 @@ test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is
 });
 
 test("a skill's copy command, run as the page gives it, puts the folder under its name where the skills folder is not there yet, in a checkout whose path has a space and a quote", async () => {
-  const { copyCommand } = await import('../src/agents/skills.ts');
   const checkout = path.join(scratch('nemia-api-skills-copy-'), "Jo's work", 'repo');
   fs.mkdirSync(path.join(checkout, '.claude'), { recursive: true });
   const into = path.join(checkout, '.claude', 'skills');

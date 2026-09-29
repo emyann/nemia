@@ -7,28 +7,18 @@
  * (CLAUDE_CONFIG_DIR). The harness's fake `claude` (test/harness.ts) is first on PATH, listing the sessions this file says are running
  * and noting every call, so the registry of the sessions on this machine is never asked, and a test can count what a request costs.
  */
-import { observations, registry, stops } from './harness.ts';
+import { config, observations, registry, root, stops } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app } from '../src/app.ts';
+import { askFile, engine, list, readRun, retry } from 'agent-orchestrator';
+import { messageRefusal } from 'agent-orchestrator/run';
 
-const tmp = (label: string) => scratch(`nemia-api-asks-${label}-`);
-
-/** The store's root, set as `WF_ROOT` before agent-orchestrator loads: it locates its store as its module loads. */
-const root = tmp('root');
-process.env.WF_ROOT = root;
-/** Where Claude Code keeps transcripts, set as `CLAUDE_CONFIG_DIR` before the Claude runner loads: it locates them as its module loads. */
-const config = tmp('claude');
-process.env.CLAUDE_CONFIG_DIR = config;
-
-const { app } = await import('../src/app.ts');
-const { askFile, engine, list, readRun, retry } = await import('agent-orchestrator');
-const { messageRefusal } = await import('agent-orchestrator/run');
 type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');

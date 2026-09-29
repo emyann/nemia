@@ -4,28 +4,19 @@
  * At shipped defaults: the api's own engine over a store this file seeds, reading a transcript file where Claude Code keeps
  * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The harness's fake `claude`
  * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running, and notes
- * every call, so a test can count what the stream costs. `WF_ROOT` and `CLAUDE_CONFIG_DIR` are set before the orchestrator is imported, as
- * it locates its store, and the Claude runner where transcripts are, as their modules load.
+ * every call, so a test can count what the stream costs. The store and CLAUDE_CONFIG_DIR are the harness's
+ * scratch ones (`root`, `config`).
  */
-import { observations, registry } from './harness.ts';
+import { config, observations, registry, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { scratch } from './scratch.ts';
 import type { StepTranscript } from '../src/steps/steps.ts';
-
-const tmp = (label: string) => scratch(`nemia-api-transcript-${label}-`);
-
-const root = tmp('root');
-process.env.WF_ROOT = root;
-const config = tmp('claude');
-process.env.CLAUDE_CONFIG_DIR = config;
-
-const { app } = await import('../src/app.ts');
-const { engine } = await import('agent-orchestrator');
+import { app } from '../src/app.ts';
+import { engine } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

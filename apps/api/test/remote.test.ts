@@ -3,18 +3,14 @@
  * where, as the store's `a2a-agents.json` gives it — never a query string, which can carry a key — and, for a step whose Task waits on its
  * caller, where it is answered: `wf say`, not a Claude Code session the agent is not in. In a scratch store, with journals written by hand.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { app } from '../src/app.ts';
+import { needsOf } from '../src/runs/judged.ts';
 
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store when the module loads. */
-const root = scratch('nemia-api-remote-');
-process.env.WF_ROOT = root;
-const { app } = await import('../src/app.ts');
-const { needsOf } = await import('../src/runs/judged.ts');
 type TaskView = import('../src/store.ts').TaskView;
 type Run = import('agent-orchestrator/run').Run;
 type RunDetail = import('../src/detail/detail.ts').RunDetail;

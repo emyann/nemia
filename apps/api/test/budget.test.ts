@@ -3,24 +3,20 @@
  * `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `wf ls` and `wf decide` say of a step
  * past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the package's words.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, `WF_ROOT` set before the orchestrator is imported, as it locates
- * its store as its module loads, and the harness's fake `claude` first on PATH (test/harness.ts).
+ * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
+ * `claude` first on PATH (test/harness.ts).
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app } from '../src/app.ts';
+import { askFile, budgetRefusal, decide, engine, list, readRun, retry, round, roundAskFile, usedLines } from 'agent-orchestrator';
 
-const root = scratch('nemia-api-budget-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { askFile, budgetRefusal, decide, engine, list, readRun, retry, round, roundAskFile, usedLines } = await import('agent-orchestrator');
 type RetryHow = import('agent-orchestrator').RetryHow;
 
 const T0 = Date.parse('2026-09-15T06:00:00.000Z');

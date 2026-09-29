@@ -22,7 +22,6 @@ import { Hono, type Context } from 'hono';
 import {
   addToInbox,
   dropFromInbox,
-  HOME,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxDir,
@@ -34,8 +33,8 @@ import {
   type InboxListing,
 } from 'agent-orchestrator';
 import { decodeBody, readBody, valueAt, type BodyIssue } from '../body.ts';
-import { repoOf } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
 
 /**
@@ -247,7 +246,7 @@ const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e)
  * - `POST` and `DELETE /api/inbox/:name/queue` — `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names;
  *   and `--off`, the mark taken back (`queueRoute`).
  */
-export const inbox = new Hono()
+export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) => c.json(listInbox()))
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
@@ -272,23 +271,25 @@ export const inbox = new Hono()
         : null;
     return c.json({ ...entry, source, keys } satisfies InboxCardPage);
   })
-  .post('/api/inbox', async (c) => {
-    const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const asked = filingOf(read.body, repoOf(), HOME);
-    if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-    const { card, file } = addToInbox({
-      text: asked.text,
-      ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
-      ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
-    });
-    return c.json(
-      { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
-      201,
-    );
-  })
+  .post('/api/inbox', (c) =>
+    served(c, async ({ repo, home }) => {
+      const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const asked = filingOf(read.body, repo, home);
+      if ('status' in asked) return c.json({ error: asked.error }, asked.status);
+      const { card, file } = addToInbox({
+        text: asked.text,
+        ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
+        ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
+      });
+      return c.json(
+        { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
+        201,
+      );
+    }),
+  )
   .delete('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const refused = refusedBeforeReading(

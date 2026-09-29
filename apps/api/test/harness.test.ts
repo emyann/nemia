@@ -5,14 +5,25 @@
 import { askEnded, bin, calls, observations, registry, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import { scratch } from './scratch.ts';
+import { runtime } from '../src/app.ts';
+import { Engine } from '../src/store.ts';
+import { engine } from 'agent-orchestrator';
 
-process.env.WF_ROOT = scratch('nemia-api-harness-root-');
-await import('../src/app.ts');
-const { engine } = await import('agent-orchestrator');
+/** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
+function importCalls(text: string): string[] {
+  const found: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) found.push(node.getText());
+    ts.forEachChild(node, visit);
+  };
+  visit(ts.createSourceFile('test.ts', text, ts.ScriptTarget.Latest, true));
+  return found;
+}
 
 test('every api test file imports the harness first, before anything that could observe this machine', () => {
   const dir = import.meta.dirname;
@@ -46,6 +57,26 @@ test('REFUSED: a test file whose first import is not the harness — a builtin, 
   );
 });
 
+test('no api test file loads a module with import(): the harness sets the store as it loads, so the api and the package are imported after it', () => {
+  const dir = import.meta.dirname;
+  const files = fs.readdirSync(dir).filter((file) => file.endsWith('.ts'));
+  assert.ok(files.includes('app.test.ts') && files.includes('harness.ts'), "and this is looking at the api's tests");
+  assert.deepEqual(
+    files.flatMap((file) =>
+      importCalls(fs.readFileSync(path.join(dir, file), 'utf8')).map(
+        (call) => `${file} loads a module with ${call}: import it statically, after './harness.ts', which gives the store (\`root\`)`,
+      ),
+    ),
+    [],
+  );
+});
+
+test('REFUSED: a file that loads the api or the package with import() is named; a type import and a string are not', () => {
+  assert.deepEqual(importCalls("import './harness.ts';\nconst { app } = await import('../src/app.ts');\n"), ["import('../src/app.ts')"]);
+  assert.deepEqual(importCalls("test('t', async () => {\n  await import('agent-orchestrator');\n});\n"), ["import('agent-orchestrator')"]);
+  assert.deepEqual(importCalls("type Run = import('agent-orchestrator').Run;\nconst said = \"await import('x')\";\n"), []);
+});
+
 test("the `claude` the api's engine runs is the harness's: it resolves there, answers with the harness's registry, and each observation is noted", async () => {
   assert.equal(execFileSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).trim(), path.join(bin, 'claude'));
   fs.writeFileSync(
@@ -67,13 +98,12 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
     "the package's engine, listing a task filed on its Claude harness, observed the harness's `claude`: a list observes every harness, where a view of a task with no attempt in flight reads its record alone",
   );
   before = observations();
-  await (await import('../src/store.ts')).e.list();
+  await (await runtime.runPromise(Engine.useSync((e) => e))).list();
   assert.ok(observations() > before, "and so did the api's");
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });
 
 test("the harness's `claude` answers a get_usage request with the request's own id, and ends only once its stdin is closed", async () => {
-  const { spawn } = await import('node:child_process');
   const child = spawn('claude', ['-p', '--input-format', 'stream-json'], { stdio: ['pipe', 'pipe', 'ignore'] });
   let out = '';
   const line = new Promise<string>((resolve) =>

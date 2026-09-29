@@ -200,7 +200,7 @@ test('every api path .oxlintrc.json names is there', () => {
 });
 
 /** What the root of `src` holds: the process, the mount, the port, the guard every route passes, the shared store, the body reader. */
-const ROOT_FILES = ['src/app.ts', 'src/body.ts', 'src/guard.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
+const ROOT_FILES = ['src/app.ts', 'src/body.ts', 'src/guard.ts', 'src/layer.ts', 'src/main.ts', 'src/port.ts', 'src/store.ts'];
 
 /** The most source files a feature folder holds, its face included: a folder that needs another holds two features. */
 const FOLDER_MAX = 6;

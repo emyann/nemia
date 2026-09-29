@@ -1,19 +1,17 @@
 /**
  * GET /api/capabilities (capabilities.ts, reach.ts): the skills, agents, MCP servers and permission rules of a scratch checkout, and what
- * each step of its workflows gets of them. `WF_ROOT` is set to a scratch store before app.ts is imported: agent-orchestrator locates its
- * store when the module loads.
+ * each step of its workflows gets of them.
  */
 import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Exit } from 'effect';
+import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-
-process.env.WF_ROOT = scratch('nemia-api-capabilities-');
-const { app } = await import('../src/app.ts');
-const {
+import { app, appOf, liveOf } from '../src/app.ts';
+import { ApiConfig } from '../src/layer.ts';
+import {
   HOME_REPO,
   MEASURED_TOOLS,
   READ_ONLY_COMMANDS,
@@ -24,8 +22,9 @@ const {
   readOnlyCommands,
   repoOf,
   serverAsk,
-} = await import('../src/capabilities/capabilities.ts');
-const { DISALLOW, askDenierOf, bashCovers } = await import('../src/capabilities/reach.ts');
+} from '../src/capabilities/capabilities.ts';
+import { DISALLOW, askDenierOf, bashCovers } from '../src/capabilities/reach.ts';
+
 type CapabilitiesWithSteps = import('../src/capabilities/reach.ts').CapabilitiesWithSteps;
 type StepReach = import('../src/capabilities/reach.ts').StepReach;
 assert.equal(
@@ -261,21 +260,28 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
 });
 
-test('each server is asked once while the api runs: requests after the first, and requests at once, read that answer', async () => {
+test("each server is asked once while an app runs: requests after the first, and requests at once, read that answer, the app's environment naming the repository", async () => {
   const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { fixture: fixture({ HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
   });
-  const [first, second] = await Promise.all([capabilitiesOf(repo), capabilitiesOf(repo)]);
-  const third = await capabilitiesOf(repo);
+  const { app: own } = appOf(Layer.merge(liveOf(), ApiConfig.layer({ ...process.env, HKB_REPO: repo })));
+  const capabilitiesOf = async (): Promise<CapabilitiesWithSteps> => {
+    const res = await own.request('/api/capabilities');
+    assert.equal(res.status, 200);
+    return (await res.json()) as CapabilitiesWithSteps;
+  };
+  const [first, second] = await Promise.all([capabilitiesOf(), capabilitiesOf()]);
+  const third = await capabilitiesOf();
+  assert.equal(first.repo, repo, "the repository the app's environment names, not the process's");
   assert.equal(startsIn(starts).length, 1, 'started once');
   for (const answer of [second, third]) assert.deepEqual(answer.mcp, first.mcp);
 
   write(path.join(repo, '.mcp.json'), {
     mcpServers: { fixture: { ...fixture({ HKB_TEST_STARTS: starts }), args: [FIXTURE_SERVER, '--edited'] } },
   });
-  const edited = await capabilitiesOf(repo);
+  const edited = await capabilitiesOf();
   assert.equal(startsIn(starts).length, 2, 'a server started otherwise is another server: started again for the edited entry');
   assert.deepEqual(edited.mcp[0].args, [FIXTURE_SERVER, '--edited']);
 });

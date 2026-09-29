@@ -55,7 +55,7 @@ import {
   waitsOf,
 } from 'agent-orchestrator/run';
 import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
-import { bare, e, judgedSteps, type Views } from '../store.ts';
+import { bare, type Engine, judgedSteps, type Views } from '../store.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
@@ -177,7 +177,7 @@ export type StepNeeds = {
  * The runs a run's roots wait on (`waitsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
  * none, without a look, for a run the gate no longer applies to (`gated`): one started without `--after`, called off, or already started.
  */
-export async function waitsIn(run: Run, reader: typeof e, git: BranchReader = branchReader()): Promise<Wait[]> {
+export async function waitsIn(run: Run, reader: Engine['Service'], git: BranchReader = branchReader()): Promise<Wait[]> {
   if (!gated(run)) return [];
   const read = new Map<string, ParentRun>();
   for (const id of new Set(run.after)) read.set(id, await parentOf(reader, id, git));
@@ -207,7 +207,7 @@ export function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
  * The runs a held run waits on to ship (`holdsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
  * none, without a look, for a run nobody holds or one called off, of which the package says no hold (`listing`, `decide`).
  */
-export async function holdsIn(run: Run, reader: typeof e, git: BranchReader = branchReader()): Promise<Wait[]> {
+export async function holdsIn(run: Run, reader: Engine['Service'], git: BranchReader = branchReader()): Promise<Wait[]> {
   if (!run.hold || run.cancelledAt) return [];
   const read = new Map<string, ParentRun>();
   for (const id of new Set(run.hold.until)) read.set(id, await parentOf(reader, id, git));

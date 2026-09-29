@@ -5,13 +5,14 @@ import { phaseOfView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
-import { e, taskOfStep, type TaskView, workFolderOf } from '../store.ts';
+import { type ApiEnv, served } from '../layer.ts';
+import { type Engine, taskOfStep, type TaskView, workFolderOf } from '../store.ts';
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;
 
 /** How a file a step wrote is served: never cached, never sniffed, and — an agent's text on the board's origin — never run. */
-const served = (type: string) => ({
+const servedAs = (type: string) => ({
   'Content-Type': type,
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
@@ -20,7 +21,7 @@ const served = (type: string) => ({
 });
 
 /** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-runtime). */
-export type TranscriptEvent = Awaited<ReturnType<typeof e.transcript>>['events'][number];
+export type TranscriptEvent = Awaited<ReturnType<Engine['Service']['transcript']>>['events'][number];
 
 /** A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, and whether more may come. */
 export type StepTranscript = {
@@ -58,7 +59,7 @@ class Unread extends Error {
  * refused read from a cursor is asked again from the start, which refuses only the harness: the words of the engine's refusal are the
  * engine's to change, and are never parsed.
  */
-async function readTranscript(id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
+async function readTranscript(e: Engine['Service'], id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
   let view: TaskView;
   try {
     view = await e.view(taskId);
@@ -148,140 +149,150 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  *   false`, and ends it. Any other failure is of that read, not the conversation: it is said once as `unreadable` with `retrying: true`,
  *   read again on the next beat from the same cursor, and cleared with `readable` by the first read that works.
  */
-export const steps = new Hono()
-  .get('/api/runs/:id/steps/:step/log', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const { taskId } = found;
-    if (!taskId) return c.json({ lines: [], truncated: false } satisfies StepLog);
-    try {
-      return c.json(tailOf(await e.logs(taskId), LOG_LINES));
-    } catch (err) {
-      const why = err instanceof Error ? err.message : String(err);
-      return c.json(
-        {
-          error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
-        },
-        502,
-      );
-    }
-  })
-  .get('/api/runs/:id/steps/:step/artifacts/:name', (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const name = c.req.param('name');
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const refused = refusedName(name);
-    if (refused) return c.json({ error: refused }, 400);
-    const file = readArtifactFile(found.run, step, name);
-    const pruned = found.run.pruned?.artifacts;
-    if (!file && pruned) {
-      return c.json(
-        {
-          error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
-          pruned: pruned.at,
-        },
-        410,
-      );
-    }
-    if (!file) {
-      return c.json(
-        {
-          error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
-        },
-        404,
-      );
-    }
-    return c.body(new Uint8Array(file.body), 200, served(file.type));
-  })
-  .get('/api/runs/:id/steps/:step/files/:name', (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const name = c.req.param('name');
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const refused = refusedName(name);
-    if (refused) return c.json({ error: refused }, 400);
-    const dir = workFolderOf(found.run, step);
-    if (!dir) {
-      return c.json(
-        {
-          error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
-        },
-        404,
-      );
-    }
-    const file = readFolderFile(dir, name);
-    if (!file) {
-      return c.json(
-        {
-          error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
-        },
-        404,
-      );
-    }
-    return c.body(new Uint8Array(file.body), 200, served(file.type));
-  })
-  .get('/api/runs/:id/steps/:step/transcript', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    if (!found.taskId) return c.json({ events: [], cursor: null, live: false } satisfies StepTranscript);
-    try {
-      return c.json((await readTranscript(id, step, found.taskId, c.req.query('after') || undefined)) satisfies StepTranscript);
-    } catch (err) {
-      if (err instanceof Unread) return c.json({ error: err.message }, err.status);
-      throw err;
-    }
-  })
-  .get('/api/runs/:id/steps/:step/transcript/stream', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const { taskId } = found;
-    if (!taskId) {
-      return c.json(
-        {
-          error: `Step '${step}' of run '${id}' is not filed yet, so it has no session to follow. GET /api/runs/${id} gives its task once a tick files it.`,
-        },
-        404,
-      );
-    }
-    const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
-    let read: Read;
-    try {
-      read = await readTranscript(id, step, taskId, after);
-    } catch (err) {
-      if (err instanceof Unread) return c.json({ error: err.message }, err.status);
-      throw err;
-    }
-    return streamSSE(c, async (stream) => {
-      await send(stream, read);
-      let failing = false;
-      while (read.live) {
-        await stream.sleep(STREAM_EVERY_MS);
-        if (stream.aborted) return;
-        try {
-          read = await readTranscript(id, step, taskId, read.cursor);
-        } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
-          if (err instanceof Unread && err.status !== 502) {
-            await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
-            return;
-          }
-          if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
-          failing = true;
-          continue;
-        }
-        if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
-        failing = false;
-        await send(stream, read);
+export const steps = new Hono<ApiEnv>()
+  .get('/api/runs/:id/steps/:step/log', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const { taskId } = found;
+      if (!taskId) return c.json({ lines: [], truncated: false } satisfies StepLog);
+      try {
+        return c.json(tailOf(await e.logs(taskId), LOG_LINES));
+      } catch (err) {
+        const why = err instanceof Error ? err.message : String(err);
+        return c.json(
+          {
+            error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
+          },
+          502,
+        );
       }
-      if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });
-    });
-  });
+    }),
+  )
+  .get('/api/runs/:id/steps/:step/artifacts/:name', (c) =>
+    served(c, async ({ home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const name = c.req.param('name');
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const refused = refusedName(name);
+      if (refused) return c.json({ error: refused }, 400);
+      const file = readArtifactFile(found.run, step, name);
+      const pruned = found.run.pruned?.artifacts;
+      if (!file && pruned) {
+        return c.json(
+          {
+            error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
+            pruned: pruned.at,
+          },
+          410,
+        );
+      }
+      if (!file) {
+        return c.json(
+          {
+            error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
+          },
+          404,
+        );
+      }
+      return c.body(new Uint8Array(file.body), 200, servedAs(file.type));
+    }),
+  )
+  .get('/api/runs/:id/steps/:step/files/:name', (c) =>
+    served(c, async ({ home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const name = c.req.param('name');
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const refused = refusedName(name);
+      if (refused) return c.json({ error: refused }, 400);
+      const dir = workFolderOf(found.run, step);
+      if (!dir) {
+        return c.json(
+          {
+            error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
+          },
+          404,
+        );
+      }
+      const file = readFolderFile(dir, name);
+      if (!file) {
+        return c.json(
+          {
+            error: `Step '${step}' of run '${id}' has no file '${name}' in its folder. GET /api/runs/${id} gives the \`url\` of every file the step's folder holds, under \`files\`.`,
+          },
+          404,
+        );
+      }
+      return c.body(new Uint8Array(file.body), 200, servedAs(file.type));
+    }),
+  )
+  .get('/api/runs/:id/steps/:step/transcript', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      if (!found.taskId) return c.json({ events: [], cursor: null, live: false } satisfies StepTranscript);
+      try {
+        return c.json((await readTranscript(e, id, step, found.taskId, c.req.query('after') || undefined)) satisfies StepTranscript);
+      } catch (err) {
+        if (err instanceof Unread) return c.json({ error: err.message }, err.status);
+        throw err;
+      }
+    }),
+  )
+  .get('/api/runs/:id/steps/:step/transcript/stream', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const { taskId } = found;
+      if (!taskId) {
+        return c.json(
+          {
+            error: `Step '${step}' of run '${id}' is not filed yet, so it has no session to follow. GET /api/runs/${id} gives its task once a tick files it.`,
+          },
+          404,
+        );
+      }
+      const after = c.req.header('Last-Event-ID') || c.req.query('after') || undefined;
+      let read: Read;
+      try {
+        read = await readTranscript(e, id, step, taskId, after);
+      } catch (err) {
+        if (err instanceof Unread) return c.json({ error: err.message }, err.status);
+        throw err;
+      }
+      return streamSSE(c, async (stream) => {
+        await send(stream, read);
+        let failing = false;
+        while (read.live) {
+          await stream.sleep(STREAM_EVERY_MS);
+          if (stream.aborted) return;
+          try {
+            read = await readTranscript(e, id, step, taskId, read.cursor);
+          } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            if (err instanceof Unread && err.status !== 502) {
+              await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
+              return;
+            }
+            if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
+            failing = true;
+            continue;
+          }
+          if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
+          failing = false;
+          await send(stream, read);
+        }
+        if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });
+      });
+    }),
+  );

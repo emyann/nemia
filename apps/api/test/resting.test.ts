@@ -7,23 +7,23 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app, runtime } from '../src/app.ts';
+import { ReadMemo } from '../src/layer.ts';
+import { Engine, findRun } from '../src/store.ts';
+import { verifiesRest } from 'agent-orchestrator';
+import { restingRead } from '../src/runs/resting.ts';
 
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = scratch('nemia-api-resting-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { resting } = await import('../src/runs/runs.ts');
-const { e, findRun } = await import('../src/store.ts');
-const { restingRead } = await import('../src/runs/resting.ts');
+/** The engine the app's requests read through: its reads are what a poll costs. */
+const e = await runtime.runPromise(Engine.useSync((engine) => engine));
+/** The list's memo of runs at rest, the app's own (`ReadMemo`). */
+const { resting } = await runtime.runPromise(ReadMemo.useSync((memo) => memo));
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -282,10 +282,10 @@ test('two requests at once: the first reads the feed and judges the run succeede
   resting.runs.delete('r-raced');
   const { startedAt: _, ...judged } = answer;
 
-  const first = await restingRead(resting, false);
+  const first = await restingRead(e, resting, false);
   blocked('r-raced-implement');
   fed('r-raced-implement');
-  await restingRead(resting, false);
+  await restingRead(e, resting, false);
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -293,7 +293,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
-  const alone = await restingRead(resting, false);
+  const alone = await restingRead(e, resting, false);
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
@@ -304,16 +304,15 @@ test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is r
     process.env.WF_VERIFY_REST = '1';
   });
   process.env.WF_VERIFY_REST = 'true';
-  await assert.rejects(
-    restingRead(resting),
-    (err: Error & { exitCode?: number }) =>
-      err.exitCode === 2 &&
-      err.message ===
-        'WF_VERIFY_REST=true is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.',
+  const said =
+    'WF_VERIFY_REST=true is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.';
+  assert.throws(
+    () => verifiesRest(process.env),
+    (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === said,
   );
   const res = await app.request('/api/runs');
   assert.equal(res.status, 422, 'an Invalid, as every route answers one');
-  assert.match(((await res.json()) as { error: string }).error, /^WF_VERIFY_REST=true is neither 1 nor 0\./);
+  assert.equal(((await res.json()) as { error: string }).error, said, "read off the app's environment on this request");
 });
 
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {

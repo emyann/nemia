@@ -11,22 +11,18 @@
  * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they ship;
  * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them.
  */
-import { observations } from './harness.ts';
+import { observations, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app } from '../src/app.ts';
+import { decide, engine, list, readRun, waitAdvice, waitWord } from 'agent-orchestrator';
 
-const root = scratch('nemia-api-after-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { decide, engine, list, readRun, waitAdvice, waitWord } = await import('agent-orchestrator');
 type Wait = import('agent-orchestrator').Wait;
 
 const git = (...args: string[]) =>

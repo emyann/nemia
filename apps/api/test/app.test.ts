@@ -1,4 +1,4 @@
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,14 +6,13 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
-
-const root = scratch('nemia-api-');
+import { app } from '../src/app.ts';
+import { engine, list, readFilings, readRun, timeline } from 'agent-orchestrator';
+import { claudeDetached, claudeOps } from 'agent-runtime/effect';
+import { Effect } from 'effect';
+import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
 const NOWHERE = scratch('nemia-api-nowhere-');
-process.env.WF_ROOT = root;
-const { app } = await import('../src/app.ts');
-const { engine, list, readRun } = await import('agent-orchestrator');
-const { DEFAULT_ROUNDS } = await import('agent-orchestrator/workflow');
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -2103,8 +2102,6 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
     said.set(id, filed.runsIn.mode);
   }
 
-  const { claudeOps } = await import('agent-runtime/effect');
-  const { Effect } = await import('effect');
   const bin = scratch('nemia-api-claude-');
   const argsFile = path.join(bin, 'args');
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
@@ -2127,7 +2124,6 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   );
   assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
 
-  const { claudeDetached } = await import('agent-runtime/effect');
   const jobWith = (permissionMode: string | undefined) => {
     const { args } = claudeDetached.command({
       name: 'ae/t/1',
@@ -2393,7 +2389,6 @@ const ranTask = (
   ]);
 
 test("the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words", async (t) => {
-  const { readFilings, timeline } = await import('agent-orchestrator');
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
   const feed = path.join(root, 'engine', 'feed.jsonl');
   const fileOnFeed = (taskId: string, at: string) =>

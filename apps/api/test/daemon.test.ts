@@ -1,21 +1,18 @@
 /**
  * GET /api/daemon (app.ts, daemon.ts): whether a `wf up` ticks the store, judged by the package off `daemon.json` and the process table as
- * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it. In a scratch store, set in `WF_ROOT` before the api
- * loads: agent-orchestrator locates its store as its module loads.
+ * `wf ls` judges it, and never written by the api — and the pure `daemonOf` under it. In the harness's scratch store
+ * (`root`).
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
+import { app } from '../src/app.ts';
+import { daemonOf } from '../src/factory/daemon.ts';
+import { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } from 'agent-orchestrator';
+const FILE = path.join(root, 'daemon.json');
 
-process.env.WF_ROOT = scratch('nemia-api-daemon-');
-const FILE = path.join(process.env.WF_ROOT, 'daemon.json');
-
-const { app } = await import('../src/app.ts');
-const { daemonOf } = await import('../src/factory/daemon.ts');
-const { daemonLine, procStartOf, staleAfterMs, STALE_FLOOR_MS } = await import('agent-orchestrator');
 type Daemon = import('../src/factory/daemon.ts').Daemon;
 type DaemonFile = import('agent-orchestrator').DaemonFile;
 

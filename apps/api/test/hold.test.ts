@@ -4,31 +4,38 @@
  * sends refused in the package's words (`heldRefusal`). Each held to what `wf ls` and `wf decide` say of the same run.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on ships by its branch being
- * merged, `WF_ROOT` set before the orchestrator is imported, as it locates its store as its modules load, and the harness's fake `claude`
- * (test/harness.ts) first on PATH.
+ * merged, in the harness's scratch store (`root`), and the harness's fake `claude` (test/harness.ts) first on PATH.
  *
  * The runs held on: `p-live`, still working, its branch not merged, which may ship yet; `p-shipped`, signed off and its branch merged into
  * main; `p-cancelled`, called off before anything of it was filed; `p-gone`, signed off on a branch deleted unmerged before any tick
  * recorded its tip.
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunHolding } from '../src/runs/judged.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app } from '../src/app.ts';
+import {
+  accept,
+  approve,
+  decide,
+  engine,
+  heldRefusal,
+  holdAdvice,
+  holdWord,
+  list,
+  readRun,
+  retry,
+  round,
+  unhold,
+} from 'agent-orchestrator';
 
-const root = scratch('nemia-api-hold-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
-const { accept, approve, decide, engine, heldRefusal, holdAdvice, holdWord, list, readRun, retry, round, unhold } =
-  await import('agent-orchestrator');
 type Wait = import('agent-orchestrator').Wait;
 
 const git = (...args: string[]) =>

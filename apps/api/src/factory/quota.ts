@@ -3,15 +3,15 @@
  * No prompt is sent, so no model is called and no token spent; it answers in about half a second with the plan's windows as claude.ai's
  * usage endpoint reports them (measured on Claude Code 2.1.278, packages/agent-orchestrator/docs/features.md, *the quota on the board*).
  *
- * Nothing asks unless a board asks. `readQuota` answers from the last ask while it is younger than `QUOTA_KEEP_MS`, starts one ask
+ * Nothing asks unless a board asks. A read (`makeQuota`) answers from the last ask while it is younger than `QUOTA_KEEP_MS`, starts one ask
  * otherwise — a request that comes while one is in flight joins it — and waits for it at most `QUOTA_WAIT_MS` before it says `asking`.
  * An answer in which Anthropic's usage service gave Claude Code nothing (`unanswered`) is kept longer, and longer again each time in a row
- * (`backoffOf`), until a good reading. What it holds is in this process's memory and nowhere else, judged against the time of each request:
- * a restart costs one ask.
+ * (`backoffOf`), until a good reading. What it holds is in the asker's memory (`QuotaAsker`, one for an app) and nowhere else, judged
+ * against the time of each request: a restart costs one ask.
  */
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import os from 'node:os';
-import { Effect, Exit } from 'effect';
+import { Context, Effect, Exit, Layer } from 'effect';
 
 /**
  * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The windows
@@ -216,7 +216,7 @@ export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): n
 
 /**
  * The quota, judged at `now` from the ask held — null while none is, and one is being asked — and the last answer that had windows, shown
- * while younger than `QUOTA_LAST_MS`. Pure: `readQuota` holds both and hands them here.
+ * while younger than `QUOTA_LAST_MS`. Pure: a quota asker (`makeQuota`) holds both and hands them here.
  */
 export function quotaOf(held: Held | null, last: Held | null, now: number, keepMs: number = QUOTA_KEEP_MS): Quota {
   const lastWindows = last?.asked.kind === 'answer' && now - last.at <= QUOTA_LAST_MS ? answerOf(last.asked.response, now) : null;
@@ -414,24 +414,8 @@ export const usageAsk = ({
   );
 };
 
-/** `usageAsk` as a Promise, for `readQuota`: never rejects. */
+/** `usageAsk` as a Promise, for `makeQuota`: never rejects. */
 export const askUsage = (opts: Parameters<typeof usageAsk>[0] = {}): Promise<Asked> => Effect.runPromise(usageAsk(opts));
-
-/**
- * What the api holds: the last ask's outcome, the last with windows, how many `unanswered` outcomes in a row since it, and the ask in
- * flight. This process's, and nobody's file.
- */
-let held: Held | null = null;
-let good: Held | null = null;
-let unanswered = 0;
-let inFlight: Promise<void> | null = null;
-
-/** Forget what is held, as a restart would: for tests. An ask in flight still lands. */
-export function forgetQuota(): void {
-  held = null;
-  good = null;
-  unanswered = 0;
-}
 
 /** A length of time from `env[name]`, in ms: a number 0 or more, or `fallback` for anything else. */
 const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number => {
@@ -441,48 +425,60 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
 };
 
 /**
- * The quota as this request should say it: from what is held while it is younger than its keep — the keep, or an `unanswered` outcome's
- * wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that. An answer that
- * came in the wait is this request's, however short the keep. A reading with windows begins the backoff again; each `unanswered` one in a
- * row lengthens it (`backoffOf`); another failure between two `unanswered` answers neither ends it nor adds to it.
+ * A read of the quota, with what it is judged against: how long it waits for an ask (`waitMs`), how long an ask is given (`timeoutMs`), the
+ * environment its keeps and the `claude` it asks are read from (`env`, `HKB_QUOTA_KEEP_MS` and `HKB_QUOTA_BACKOFF_MS` on each read), and
+ * the time (`now`).
  */
-export async function readQuota({
-  waitMs = QUOTA_WAIT_MS,
-  timeoutMs = QUOTA_TIMEOUT_MS,
-  env = process.env,
-  now = () => Date.now(),
-}: {
-  waitMs?: number;
-  timeoutMs?: number;
-  env?: NodeJS.ProcessEnv;
-  now?: () => number;
-} = {}): Promise<Quota> {
-  const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
-  const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
-  const current = () => held !== null && now() - held.at < (held.keptMs ?? keepMs);
-  if (!current()) {
-    const started = now();
-    inFlight ??= askUsage({ timeoutMs, env })
-      .then((asked) => {
-        const at = Math.max(started, now());
-        const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
-        if (read === 'windows') unanswered = 0;
-        if (read === 'unanswered') unanswered += 1;
-        held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
-        if (read === 'windows') good = held;
-      })
-      .finally(() => {
-        inFlight = null;
-      });
-    let wait: NodeJS.Timeout | undefined;
-    await Promise.race([
-      inFlight,
-      new Promise((r) => {
-        wait = setTimeout(r, waitMs);
-      }),
-    ]);
-    clearTimeout(wait);
-    if (inFlight !== null || held === null || held.at < started) return quotaOf(null, good, now(), keepMs);
-  }
-  return quotaOf(held, good, now(), keepMs);
+export type ReadQuota = (opts?: { waitMs?: number; timeoutMs?: number; env?: NodeJS.ProcessEnv; now?: () => number }) => Promise<Quota>;
+
+/**
+ * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many `unanswered`
+ * outcomes in a row since it, and the ask in flight, in its own memory and nobody's file.
+ *
+ * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
+ * outcome's wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that. An
+ * answer that came in the wait is this request's, however short the keep. A reading with windows begins the backoff again; each
+ * `unanswered` one in a row lengthens it (`backoffOf`); another failure between two `unanswered` answers neither ends it nor adds to it.
+ */
+export function makeQuota(): ReadQuota {
+  let held: Held | null = null;
+  let good: Held | null = null;
+  let unanswered = 0;
+  let inFlight: Promise<void> | null = null;
+  return async ({ waitMs = QUOTA_WAIT_MS, timeoutMs = QUOTA_TIMEOUT_MS, env = process.env, now = () => Date.now() } = {}) => {
+    const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
+    const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
+    const current = () => held !== null && now() - held.at < (held.keptMs ?? keepMs);
+    if (!current()) {
+      const started = now();
+      inFlight ??= askUsage({ timeoutMs, env })
+        .then((asked) => {
+          const at = Math.max(started, now());
+          const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
+          if (read === 'windows') unanswered = 0;
+          if (read === 'unanswered') unanswered += 1;
+          held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
+          if (read === 'windows') good = held;
+        })
+        .finally(() => {
+          inFlight = null;
+        });
+      let wait: NodeJS.Timeout | undefined;
+      await Promise.race([
+        inFlight,
+        new Promise((r) => {
+          wait = setTimeout(r, waitMs);
+        }),
+      ]);
+      clearTimeout(wait);
+      if (inFlight !== null || held === null || held.at < started) return quotaOf(null, good, now(), keepMs);
+    }
+    return quotaOf(held, good, now(), keepMs);
+  };
+}
+
+/** The quota asker every board's read shares, one for an app (`live`, a fresh `makeQuota`): a test gives its own with `layer`. */
+export class QuotaAsker extends Context.Service<QuotaAsker, ReadQuota>()('api/QuotaAsker') {
+  static readonly live: Layer.Layer<QuotaAsker> = Layer.sync(QuotaAsker)(makeQuota);
+  static readonly layer = (read: ReadQuota): Layer.Layer<QuotaAsker> => Layer.succeed(QuotaAsker)(read);
 }

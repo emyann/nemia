@@ -2775,8 +2775,9 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
-| `src/cli/main.ts` | the verbs: `main`, which parses, calls and prints, the help, and `runMain`, which runs `wf up` and `wf watch` as Effects |
-| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb's flags, read off the command line, and its help, by family: the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf rm`, `wf prune`, `wf hold` and `wf agents`; `wf decide`, `wf retry`, `wf approve`, `wf round` and `wf accept` |
+| `src/cli/main.ts` | the verbs' table: `main`, which looks up the verb in `VERBS` and runs it, or prints the help; the daemon's verbs, `wf tick`, `wf up`, `wf feed` and `wf watch`; and `runMain`, which runs `wf up` and `wf watch` as Effects |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb, its flags, read off the command line, and its help, by family: the help, a verb's shape (`Verb`) and the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents`; `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` |
+| `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),

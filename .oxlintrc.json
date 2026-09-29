@@ -517,12 +517,11 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli/main.ts"],
+      "files": ["packages/agent-orchestrator/src/cli/decide/decide.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1157, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 818, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 351 }],
-        "sonarjs/cognitive-complexity": ["error", 677]
+        "max-lines-per-function": ["error", { "max": 230, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 112 }],
+        "sonarjs/cognitive-complexity": ["error", 158]
       }
     },
     {

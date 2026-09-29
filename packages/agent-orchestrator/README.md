@@ -31,6 +31,11 @@ wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go o
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 ```
 
+**Nemia ships no workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
+person theirs under `~/.agent-workflows/workflows/`; the board's builder and its Agents page write both. The names above —
+`dev`, `dev-planned` — are a repository's own folders, not ones this package brings. The tests run the machinery on a small team
+of their own, `test/fixtures/team/`, which is never shipped.
+
 ## Following it: `wf watch` and `ae watch`
 
 Two feeds, one a layer. The engine's says what happened to its tasks — filed, started, ended,
@@ -152,11 +157,11 @@ Every `.md` in the folder is a step but its `README.md` (in any case), which say
 for: its first paragraph, past a heading, is the description the board lists the workflow with
 (`workflowDescription`). A folder with a README and no step is refused as a folder with no step is.
 A repository carries its workflows checked in, one folder each under `<repo>/workflows/`, as
-`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build`, `dev-planned`, `ui` and `supervisor` there — and
+`.github/workflows/` holds a repository's CI, and
 `wf start <brief> --workflows dev` picks one: a bare name is a folder under `<repo>/workflows/`, and a path to any
 workflow folder works too, looked at first. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
-`GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
+`GET /api/workflows` and `POST /api/runs`).
 
 A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
 in folder/write.store.ts. Each step is rendered by `renderStep` (workflow/step-file.ts), which is the parser run backwards: the keys the step sets, in
@@ -219,7 +224,7 @@ who does the work and for how long. Whether the work goes round again is still a
 
 `permissionMode` and `sandbox` are the harness's words, checked against the harness the step runs on: Claude Code's permission
 mode, and Codex's sandbox. `sandbox: read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
-the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
+a reviewer that runs so hands its review on as its closeout. `retries` is how many times the run re-files
 a step its check refused (*Trying again*, under the check).
 
 ### An agent is a node's attachment, and we pass it a brief: `agent:`
@@ -265,12 +270,11 @@ anywhere: the agent's keys are the defaults, a key the step writes wins, and the
 read the merged keys and name the step. On codex, and on a step that continues another's session (`resume:`), the brief is the
 agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go into the session's system prompt
 (*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: the shipped steps that have one are the `ship` of `dev-build`, `dev-planned-build` and `ui`, which tell the shipper why a build
-and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
+case: a `ship` step, say, telling its shipper why a build and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
 
-The repository's shipped folders are written this way (`workflows/agents/README.md` lists who does what), and the
+The tests' team (`test/fixtures/team/`) is written this way, and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
 The board's Agents page edits the agent itself (`writeAgent`, `removeAgent`): yours only, against the version it was read at, its result
 schema with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
@@ -397,9 +401,9 @@ file that is not there. With no plugin there is nothing to load, so the brief te
 instructions, read again from where a start of the run's folder finds them — an edit made since `wf start` reaches it, and a folder run,
 which keeps no repository, finds none in the one it was started in — or says which it could not tell and why (`unrendered`, `skillsAgain`).
 
-The shipped agents give skills (since 2026-09-25): each entry of an agent's card is a skill in the repository's `workflows/skills/`,
-the procedure the entry describes, and the agent's body keeps its role and its limits and says when to load each
-(`workflows/agents/README.md`). `test/skills-rendered.test.ts` reads each SKILL.md's frontmatter as YAML and holds it to its card entry.
+An agent that gives skills keeps its role and its limits in its body and says when to load each; each entry of its card is a skill,
+the procedure the entry describes, as the tests' team does (`test/fixtures/team/`). `test/skills-rendered.test.ts` reads every
+SKILL.md's frontmatter as YAML and holds it to its card entry.
 
 ### What a step may have: `tools:` and `effort:`
 
@@ -476,10 +480,10 @@ it may not run, `Bash(npm run build)`. The engine gives Claude Code the list as 
 filing of the step (the first, each try and each round), and a deny beats every allow: the checkout's
 `.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallowedTools:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
-for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
-`npm run build` and `npm run e2e`, which implement's check and its own run need and which write into the workspace — those two
-commands, and not the build and the e2e by another name (below). Every
-`implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
+for another step's sake by machinery, not by a sentence in its brief. A reviewer can be denied
+`npm run build` and `npm run e2e`, which an implementer's check needs and which write into the workspace — those two
+commands, and not the build and the e2e by another name (below) — and an implementer `SendMessage`, `CronCreate`, `CronDelete`
+and `RemoteTrigger`, which no step needs.
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
 would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule
@@ -492,7 +496,7 @@ and `Bash(node --test:*)` for the suite, and those run the build and the e2e by 
 `npx turbo run test build` and `node --test apps/web/test/e2e/run.ts`. No deny list closes an allow that runs
 any task or any file (`node --test` takes a glob, so a rule on the file's path is walked around). What keeps a
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
-then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev-planned's plan brief.
+then, only a sentence in the reviewer's brief.
 
 **The engine is the source of these words.** The permission modes and efforts `src/harness/harness.ts` refuses
 are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
@@ -517,9 +521,9 @@ stdin until its result (issue 29).
 
 `background: true` runs every session of the step — the first, each try and each round — as a **background session** instead,
 `claude --bg`, filed with the engine's `config.background`: one a person can attach to, and bridge to claude.ai (`remote:`, below). It
-keeps no spend cap, and its denials are not read (issue 17, issue 28). The shipped supervisor is the one step that says it: it does not
-end, and is answered from a phone. Every other shipped step is a job; until thin runtime stage 2 part 2 (2026-09-23) every step ran
-`--bg`.
+keeps no spend cap, and its denials are not read (issue 17, issue 28). A supervisor is the kind of step that says it: it does not
+end, and is answered from a phone (*A supervisor*, below). Most steps are jobs; until thin runtime stage 2 part 2 (2026-09-23) every
+step ran `--bg`.
 
 Refused at load: any word but `true` or `false`, and `true` on `codex` or `claude-detached`, which have no such mode; a `budget:` beside
 `background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
@@ -662,7 +666,7 @@ say something to the next one writes a file, deliberately, like a person would �
 
 ### Declared output: `output:` and `input:`
 
-Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s two steps:
+Two keys, neither control flow — one declares, one reads. Two steps of a workflow for a change to a web app:
 
 ```md
 ---
@@ -708,10 +712,10 @@ Review the change in this workspace as a second engineer would, and look at it a
 process does not* was written against handing the implementer's account to the reviewer. A declared
 output is an artifact: the step's deliberate product, exactly what `REVIEW.md` used to be. What
 changed is the transport, not the rule. The summary still goes to the person who decides and nowhere
-else. Nothing from any step's closeout reaches a step that did not ask for it. In `workflows/`,
-`implement` declares nothing and `review` reads nothing, so the reviewer judges the diff — and in a
-round, it is handed implement's replies to the last findings and nothing else, because its own `loop:`
-asked for them. In `workflows/ui/`, `review` also reads implement's `screenshots` and `pages`: pictures
+else. Nothing from any step's closeout reaches a step that did not ask for it. Where `implement`
+declares nothing and `review` reads nothing, the reviewer judges the diff — and in a round, it is
+handed implement's replies to the last findings and nothing else, because its own `loop:` asked for
+them. In the web workflow above, `review` also reads implement's `screenshots` and `pages`: pictures
 of the change, which are artifacts, and not an account of it.
 
 The transport buys three things. The reviewer writes nothing, so it runs `sandbox: read-only`.
@@ -1026,11 +1030,10 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 
-This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
-check a person used to run by hand at every trial merge — and every round of it is checked again.
-`workflows/ui/`, for a change to the web app, adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF`
-is set: a round's check runs no e2e, and its gated ship runs the line whole on the merged tree. Point the folder
-at another repository and change that line.
+The line is the workflow author's, for their repository. `check: npm test && npm run typecheck` is the check a
+person used to run by hand at every trial merge, and every round of it is checked again. A step that changes a
+web app adds `npm run build`, and `npm run e2e` where no `WF_BASE_REF` is set: a round's check runs no e2e, and a
+gated ship runs the line whole on the merged tree.
 
 ### What a step's line says
 
@@ -1197,7 +1200,7 @@ retries: 1
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
   each step that can take one; under a blocked step's `needs`, the `wf retry --message` that answers it.
 
-This repository's workflows declare no `retries:`. A flaky suite would spend a whole session on a nudge, so
+`retries:` is absent unless an author writes it. A flaky suite would spend a whole session on a nudge, so
 whether a refusal is the agent's to answer or a person's is left to each workflow's author.
 
 ### Telling a running step something: `wf say`
@@ -1233,8 +1236,8 @@ its own, and everything below reads the words back off the engine's view of the 
 
 ### Going round again: `loop:` and `rounds:`
 
-The shipped workflow used to be implement, review, respond, and then a person read the reply beside
-the findings. When the reply changed code, nobody reviewed the change; when a finding was wrong, the
+A workflow of implement, review and respond, then a person reading the reply beside the findings, leaves
+two gaps. When the reply changed code, nobody reviewed the change; when a finding was wrong, the
 argument reached the person cold. The edge back closes that: implement ⇄ review until the reviewer says
 the change is done, at most a few rounds — more is the sign of a design question or a decision — then a
 person.
@@ -1326,8 +1329,8 @@ the steps back to the reviewer, because the work passed and a second engineer is
 check that refuses the target inside a round is still `retries:`'s, and `retries:` counts within a
 round: a round is new work, and its check may refuse it afresh.
 
-This repository's `workflows/` is implement ⇄ review: `review.md` loops back to `implement` with
-`rounds: 3`. `respond.md` is gone, and its three answers are the loop contract.
+The tests' team (`test/fixtures/team/dev/`) is implement ⇄ review → ship: its `review.md` loops back to
+`implement` with `rounds: 3`. A `respond` step is not needed: its three answers are the loop contract.
 
 ## Files a person gives the run: `wf start --input`
 

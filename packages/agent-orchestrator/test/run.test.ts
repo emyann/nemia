@@ -9512,8 +9512,17 @@ test('`forgetRefusal` says its reasons in one order, whole — in flight, the ga
   const signed = phases({ t1: 'succeeded', t2: 'succeeded' });
   assert.equal(
     forgetRefusal(fan, gated, signed, [], signedDone, asked),
-    'plan and design wait at their gates for your approval, and what waits on them is filed once each is approved: wf approve r-1 plan, wf approve r-1 design; a and b are ready to be filed, and a pass may be filing it now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
-    'the gates before what is due; one line of steps ready is one thing due',
+    'plan and design wait at their gates for your approval, and what waits on them is filed once each is approved: wf approve r-1 plan, wf approve r-1 design; a and b are ready to be filed, and a pass may be filing them now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+    'the gates before what is due; two steps ready are them, though they are one line of what is due',
+  );
+  const pair = [step('a'), step('b')];
+  assert.equal(
+    forgetRefusal(pair, run({ a: null, b: null }), signed, [], signedDone, asked),
+    'a and b are ready to be filed, and a pass may be filing them now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+  assert.equal(
+    forgetRefusal(pair, run({ a: null, b: null }), signed, [], signedDone, asked, undefined, [], [], undefined, undefined, [], 'prune'),
+    'a and b are ready to be filed, and a pass may be filing them now. Pruning is not cancelling: wf cancel r-1 files nothing more, then wf prune r-1.',
   );
   assert.equal(
     forgetRefusal(fan, { ...gated, ...until('p-9') }, signed, [], signedDone, asked),

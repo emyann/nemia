@@ -309,11 +309,12 @@ function gatesHeld(c: Facts): string | undefined {
   return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`;
 }
 
-/** What a pass would file now — or once the hold lifts, on a held run. */
+/** What a pass would file now — or once the hold lifts, on a held run: `them` for more than one thing due, or for more than one step ready. */
 function dueHeld(c: Facts): string | undefined {
-  const { due, run, lifts } = c;
+  const { due, run, lifts, ready, waits } = c;
   if (!due.length) return undefined;
-  return run.hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`;
+  const many = due.length > 1 || (!waits && ready.length > 1);
+  return run.hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${many ? 'them' : 'it'} now`;
 }
 
 /** The asks no pass files as the run stands. */

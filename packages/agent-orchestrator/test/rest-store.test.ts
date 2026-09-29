@@ -141,7 +141,7 @@ const finish = async (blocking: readonly string[] = []): Promise<PassCost> => {
     h.signAll(inFlight, (name) => (blocking.some((id) => name.startsWith(`ae/${id}-`)) ? BLOCKED : undefined));
     const pass = await measured();
     const finished = listRuns().filter((r) => !inFlight.some((f) => f.id === r.id)).length;
-    if ((pass.rested ?? 0) === finished) return pass;
+    if (pass.rested === finished) return pass;
   }
   assert.fail('the store did not come to rest in twelve passes');
 };
@@ -194,13 +194,13 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
     );
     assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
   }
-  assert.equal(none.rested ?? 0, 0);
+  assert.equal(none.rested, 0);
 });
 
 test('the same store, the memo emptied before every pass as a restarted daemon has it: every finished run is read again, and git asked for each', async () => {
   const [none, , twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
   const fresh = await measured(freshRestMemo());
-  assert.equal(fresh.rested ?? 0, 0, 'nothing answered from memory');
+  assert.equal(fresh.rested, 0, 'nothing answered from memory');
   assert.ok(
     journals(fresh) >= journals(none) + 200,
     `each of the 200 finished runs' tasks read (${journals(fresh)} reads, against ${journals(twoHundred)})`,
@@ -219,7 +219,7 @@ test('the same store, the memo emptied before every pass as a restarted daemon h
 test('a pass that answers the finished runs from memory carries no refused move: their tasks are settled, and the runtime moves none', async () => {
   for (let k = 0; k < 3; k++) {
     const pass = await verified();
-    assert.ok((pass.cost!.rested ?? 0) >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
+    assert.ok(pass.cost!.rested >= 200, `pass ${k + 1}: the finished runs answered from memory (${pass.cost!.rested})`);
     assert.equal(
       pass.refused,
       undefined,
@@ -229,7 +229,7 @@ test('a pass that answers the finished runs from memory carries no refused move:
 });
 
 /** How many runs the next pass answers from memory, every one of them judged again in full. */
-const rested = async (): Promise<number> => (await verified()).cost!.rested ?? 0;
+const rested = async (): Promise<number> => (await verified()).cost!.rested;
 /** What the last pass answered of one run. */
 const answered = async (id: string) => (await verified()).runs.find((a) => a.run.id === id)!;
 /** The ids of the runs a test has taken with `aResting`, each taken once. */
@@ -296,7 +296,7 @@ test("a hold takes a run out of the memo for as long as it holds: what it waits 
 test('an ask takes a run out, and the try it asks for is filed: a retry, and an approval at a gate', async () => {
   const [run] = started(1);
   touched.add(run.id);
-  const before = (await finish([run.id])).rested!;
+  const before = (await finish([run.id])).rested;
   assert.equal((await answered(run.id)).status, 'failed', 'its step signed blocked');
   await retry(h.e, run.id, 'work', { mode: 'fresh' });
   assert.equal(await rested(), before - 1, 'the ask read');

@@ -159,9 +159,12 @@ export type StepSpec = {
    */
   workspace: string | null;
   resume: string | null;
-  /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
+  /**
+   * Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`, but for a codex step frozen before the
+   * rename, which holds its sandbox here.
+   */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`, or on a run frozen under the former key its `permissionMode`, read so): null on Claude Code. */
+  /** Codex's sandbox (`sandbox:`): null on Claude Code, and on a codex step frozen with its sandbox under `permissionMode`. */
   sandbox: string | null;
   /** The only tools the session may have: null for the harness's own set, empty for none. */
   tools: string[] | null;

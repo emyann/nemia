@@ -4506,22 +4506,18 @@ them under. The sections above keep the words they were written in.
 - **A run frozen with the former names loads.** `readRun` reads each frozen step through `asNamed` — its fields, and the agent's `keys`
   and `given` — so the tick, `wf ls`, `wf decide` and the api see the new names, and the tick's next write of the record saves them.
   `resolved-before.json`, which is never regenerated, is read the same way.
-- **A record is written under both names.** A `wf up` daemon runs the code it was started with until it is restarted, and the tick
-  from before the change files a step's lists from its `disallow` and `allow` alone: given a record with only the new names, it would
-  file every step of a run started since with no rule list, and nothing would say so — the reviewers' `Bash(npm run build)` deny and the
-  supervisor's git denies gone. So both writers of a record (`writeRun`, `rewriteRun`) copy each list under its former name beside the
-  new one (`withFormerNames`), and `asNamed` reads it back under the new name alone. `store.test.ts` reads a record as that tick did,
-  after `wf start` and after a pass.
+- **A record is written under the new names alone.** Until 2026-09-28 both writers of a record also copied each list under its former
+  name, for a `wf up` daemon started before the rename, which files a step's lists from `disallow` and `allow` alone. No daemon from
+  before 2026-09-23 runs any more, and the copies went; `store.test.ts` reads a record after `wf start` and after a pass and finds
+  none.
 - **Outside the package**, as CLAUDE.md's `STEP_KEYS` obligations say: the builder's `KINDS`, `WorkflowStepSpec` and `specOf`, the
   board's mirror with `UNSET`, the agent form's role keys, and the capabilities page, which names the lists as a step writes them.
 
 **What it leaves.** The note is printed by `wf start` alone: a run started from a card by the daemon, or from the board, starts under
 the former names silently. A board page opened before the change sends `disallow`/`allow` on a save, and `renderStep` and `renderAgent`
 refuse them (`formerKeyWritten`): the api answers 422, saying the name is the former one and to reload the page and save again. Restart
-`wf up` once this merges all the same: an old daemon keeps filing lists, off the copies, but it starts a queued card by parsing a
-shipped folder, which now says `disallowedTools:`, a key it does not know, and refuses the start — loudly, but until it is restarted. The
-copies under the former names are written until a change removes `withFormerNames` from `recordText`, once no daemon from before
-2026-09-23 can be running.
+`wf up` once this merges all the same: an old daemon starts a queued card by parsing a shipped folder, which now says
+`disallowedTools:`, a key it does not know, and refuses the start — loudly, but until it is restarted.
 
 ## Shipped: a codex step's sandbox under Codex's name — `sandbox:`
 
@@ -4538,8 +4534,10 @@ at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test
   agent's: a Claude Code agent's `permissionMode: dontAsk` is not given to a step that runs it on codex with a sandbox of its own — the
   step could not unset it — and the other way round. A save of `permissionMode:` on codex is refused as the former name only when it names
   a sandbox; a Claude Code mode a step kept when it was moved onto codex is written as sent and refused by the parser, naming `sandbox:`.
-- **A run frozen before loads**: `asNamed` reads a codex step's `permissionMode` as its `sandbox`. A record is written with the
-  sandbox under both names (`withFormerNames`), since a `wf up` from before files a codex step's `-s` from its `permissionMode` alone.
+- **A run frozen before loads** as it was frozen, a codex step's sandbox under `permissionMode`, and files that sandbox: the tick
+  hands the engine `sandbox ?? permissionMode` (`modeOf`), and the runtime reads `bypassPermissions` as `danger-full-access`. The api's
+  run detail gives such a step its `permissionMode` and a null `sandbox`; the board's `sandbox` row shows the one it has
+  (`Facts.tsx`).
 - **The runtime is unchanged.** The engine's task still calls either fence `config.permissionMode`, and the tick files the one a step
   has (`modeOf`). `validateFolderMode`'s judgement is unchanged, read off `modeOf`: it judges a step that says `background: true`, which
   is refused on codex. Codex's approval policy is not a key: `codex exec` asks nobody, and the engine passes no `-a`.
@@ -4552,8 +4550,7 @@ at shipped defaults, in a step and in an agent (`workflow.test.ts`, `agents.test
 **What it leaves.** A board page opened before the change sends `permissionMode` on a codex step's save, and is refused (`codexModeWritten`,
 by `renderStep` and `renderAgent`, and by `writeWorkflow` where the codex harness is the agent's), saying to reload; a save of a legacy
 file that changes nothing keeps the file, former line and all. Restart `wf up` once this merges: an old daemon parses the shipped
-`review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted. The copies under
-`permissionMode` go when `withFormerNames` does.
+`review.md`'s `sandbox:` as a key it does not know, and refuses to start a queued card until it is restarted.
 
 ## Shipped: the run checks the ending's merge and lands it
 

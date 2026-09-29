@@ -1147,6 +1147,7 @@ export const PASS = {
     bytes: 812_000,
     spawned: 1,
     overheadMs: 0.4,
+    rested: 0,
     phases: {
       records: { ms: 20, calls: 12, bytes: 12_000, reads: 12, spawned: 0 },
       asks: { ms: 5, calls: 40, bytes: 0, reads: 0, spawned: 0 },

@@ -2042,7 +2042,7 @@ test('a step with `disallowedTools:` reaches `e.file` with exactly those rules a
   );
 });
 
-test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under both', async () => {
+test('a run frozen while the lists were `disallow` and `allow` loads, files each step with its rules under the names they have now, and is written back under those alone', async () => {
   const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
   const at = path.join(ROOT, 'runs', `${run.id}.json`);
   const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
@@ -2086,94 +2086,65 @@ test('a run frozen while the lists were `disallow` and `allow` loads, files each
     [['SendMessage'], ['Edit(**)', 'Bash(npm test)']],
     'the pass that filed it wrote the record back under the new names',
   );
-  assert.deepEqual(
-    [written.disallow, written.allow],
-    [written.disallowedTools, written.allowedTools],
-    'and the former beside them (`withFormerNames`)',
-  );
+  assert.equal(Object.hasOwn(written, 'disallow') || Object.hasOwn(written, 'allow'), false, 'and under them alone');
 });
 
-test("a record written today holds each step's rule lists under their former names too, so a daemon older than the rename, reading a step as it did, still files them", async () => {
-  const run = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
-  const at = path.join(ROOT, 'runs', `${run.id}.json`);
-  const oldTickReads = () => {
-    const step = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find(
-      (s) => s.name === 'implement',
-    )!;
-    return [step.disallow, step.allow];
+test("a record written today holds each step's rule lists and a codex step's sandbox under the names they have now alone, at `wf start` and after a pass", async () => {
+  const lists = started(folder('disallowedTools: SendMessage\nallowedTools: Edit(**), Bash(npm test)'));
+  const codex = started(folder('harness: codex\nsandbox: read-only'));
+  const frozen = (id: string) =>
+    (
+      JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8')) as { workflow: Array<Record<string, unknown>> }
+    ).workflow.find((s) => s.name === 'implement')!;
+  const held = () => {
+    const step = frozen(lists.id);
+    const sandboxed = frozen(codex.id);
+    return {
+      lists: [step.disallowedTools, step.allowedTools],
+      former: [Object.hasOwn(step, 'disallow'), Object.hasOwn(step, 'allow'), Object.hasOwn(sandboxed, 'permissionMode')],
+      sandbox: sandboxed.sandbox,
+    };
   };
-  const LISTS = [['SendMessage'], ['Edit(**)', 'Bash(npm test)']];
-  assert.deepEqual(
-    oldTickReads(),
-    LISTS,
-    "`wf start` writes them (`writeRun`) where an older tick filed from: the raw step's `disallow` and `allow`, read with no renaming",
-  );
+  const TODAY = { lists: [['SendMessage'], ['Edit(**)', 'Bash(npm test)']], former: [false, false, false], sandbox: 'read-only' };
+  assert.deepEqual(held(), TODAY, '`wf start` writes them (`writeRun`) under the new names, and no former one');
   const { e } = board();
-  await advance(e, readRun(run.id));
-  assert.deepEqual(oldTickReads(), LISTS, 'and the tick writes them back (`rewriteRun`)');
-  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
-  assert.equal(Object.hasOwn(read, 'disallow') || Object.hasOwn(read, 'allow'), false, "today's code reads the new names alone");
-  const bare = (
-    JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${started(folder('')).id}.json`), 'utf8')) as {
-      workflow: Array<Record<string, unknown>>;
-    }
-  ).workflow;
-  assert.equal(
-    bare.some((s) => Object.hasOwn(s, 'disallow') || Object.hasOwn(s, 'allow')),
-    false,
-    'a step with no list gets no former field either: nothing is written that the step did not say',
-  );
+  await advance(e, readRun(lists.id));
+  await advance(e, readRun(codex.id));
+  assert.deepEqual(held(), TODAY, 'and the tick writes them back (`rewriteRun`) the same way');
 });
 
-test('a codex run frozen while its sandbox was `permissionMode` loads, files the sandbox it was written with, and is written back under both names', async () => {
-  const run = started(folder('harness: codex\nsandbox: read-only'));
-  const at = path.join(ROOT, 'runs', `${run.id}.json`);
-  const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
-  record.workflow = record.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({
-    ...step,
-    ...(sandbox ? { permissionMode: sandbox } : {}),
-  }));
-  fs.writeFileSync(at, JSON.stringify(record, null, 2));
-  assert.doesNotMatch(
-    fs.readFileSync(at, 'utf8'),
-    /"sandbox":/,
-    "the fixture is the record as an older `wf` froze it: the codex step's sandbox under `permissionMode`, and no `sandbox`",
-  );
-  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
-  assert.deepEqual(
-    [read.sandbox, Object.hasOwn(read, 'permissionMode')],
-    ['read-only', false],
-    'read as the sandbox, never as a Claude Code mode',
-  );
+test("a codex run frozen while its sandbox was `permissionMode` loads as it was frozen, and files that sandbox: the engine's task calls it `permissionMode` (`modeOf`)", async () => {
+  const frozenAs = (sandbox: string, word: string) => {
+    const run = started(folder(`harness: codex\nsandbox: ${sandbox}`));
+    const at = path.join(ROOT, 'runs', `${run.id}.json`);
+    const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+    record.workflow = record.workflow.map(({ sandbox: given, permissionMode: _, ...step }) => ({
+      ...step,
+      ...(given ? { permissionMode: word } : {}),
+    }));
+    fs.writeFileSync(at, JSON.stringify(record, null, 2));
+    assert.doesNotMatch(
+      fs.readFileSync(at, 'utf8'),
+      /"sandbox":/,
+      "the fixture is the record as an older `wf` froze it: the codex step's sandbox under `permissionMode`, and no `sandbox`",
+    );
+    return run;
+  };
   const { e, tasks } = board();
-  await advance(e, readRun(run.id));
-  assert.equal(
-    tasks.get(`${run.id}-implement`)!.spec.config?.permissionMode,
-    'read-only',
-    "the engine is handed the sandbox it was written with, not Codex's default",
-  );
-  const written = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find(
-    (s) => s.name === 'implement',
-  )!;
-  assert.deepEqual(
-    [written.sandbox, written.permissionMode],
+  for (const [sandbox, word] of [
     ['read-only', 'read-only'],
-    'written back under `sandbox`, and under the field an older daemon files from (`withFormerNames`)',
-  );
-
-  const wide = started(folder('harness: codex\nsandbox: danger-full-access'));
-  const wideAt = path.join(ROOT, 'runs', `${wide.id}.json`);
-  const wideRecord = JSON.parse(fs.readFileSync(wideAt, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
-  wideRecord.workflow = wideRecord.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({
-    ...step,
-    ...(sandbox ? { permissionMode: 'bypassPermissions' } : {}),
-  }));
-  fs.writeFileSync(wideAt, JSON.stringify(wideRecord, null, 2));
-  assert.equal(
-    readRun(wide.id).workflow!.find((s) => s.name === 'implement')!.sandbox,
-    'danger-full-access',
-    "the engine's alias, frozen, is read under Codex's own name for it",
-  );
+    ['danger-full-access', 'bypassPermissions'],
+  ]) {
+    const run = frozenAs(sandbox, word);
+    const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+    assert.deepEqual([read.permissionMode, read.sandbox], [word, undefined], 'read as it was frozen');
+    await advance(e, readRun(run.id));
+    assert.equal(
+      tasks.get(`${run.id}-implement`)!.spec.config?.permissionMode,
+      word,
+      "the engine is handed the sandbox it was written with, not Codex's default; the runtime reads `bypassPermissions` as `danger-full-access`",
+    );
+  }
 });
 
 test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a Claude Code step's `permissionMode:` as itself — each on its first filing", async () => {
@@ -2184,14 +2155,6 @@ test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a
   await advance(e, readRun(claudeRun.id));
   assert.equal(tasks.get(`${codexRun.id}-implement`)!.spec.config?.permissionMode, 'read-only');
   assert.equal(tasks.get(`${claudeRun.id}-implement`)!.spec.config?.permissionMode, 'dontAsk');
-  const raw = (
-    JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${codexRun.id}.json`), 'utf8')) as { workflow: Array<Record<string, unknown>> }
-  ).workflow.find((s) => s.name === 'implement')!;
-  assert.deepEqual(
-    [raw.sandbox, raw.permissionMode],
-    ['read-only', 'read-only'],
-    'a record written today holds the codex sandbox under `permissionMode` too, which a daemon older than `sandbox:` files from',
-  );
 });
 
 test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
@@ -2571,42 +2534,6 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
       [true, true],
     );
   }
-});
-
-test('a run frozen before steps were jobs, with `remote: true` and no `background`, files its step as the background session it was — which the engine takes, where it refuses the job', async () => {
-  const run = started(folder('background: true\nremote: true'));
-  const { workflow, ...rest } = readRun(run.id);
-  const old = workflow!.map(({ background: _, ...step }) => step);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify({ ...rest, workflow: old }, null, 2));
-  assert.deepEqual(
-    readRun(run.id).workflow!.map((s) => [s.name, s.remote, s.background]),
-    [
-      ['implement', true, undefined],
-      ['review', undefined, undefined],
-    ],
-    'as a record from before `background:` froze it: every claude step was `--bg`, and `remote: true` was taken on its own',
-  );
-
-  assert.deepEqual(
-    stepsOf(readRun(run.id)).map((s) => [s.name, s.background]),
-    [
-      ['implement', true],
-      ['review', undefined],
-    ],
-    'read as it ran',
-  );
-  const b = board();
-  await advance(b.e, readRun(run.id));
-  const spec = b.tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([spec.config?.background, spec.config?.claude?.remoteControl], [true, true]);
-
-  const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
-  await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: spec.config });
-  await assert.rejects(
-    engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: { ...(spec.config as object), background: undefined } }),
-    /bridges a session to claude\.ai/,
-    'the engine files what the tick filed, and refuses the step as written, a job with a bridge: a refusal out of `advance` stops the pass',
-  );
 });
 
 /** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */

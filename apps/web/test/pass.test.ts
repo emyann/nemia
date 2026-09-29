@@ -21,6 +21,7 @@ const PASS: PassCost = {
   bytes: 812_000,
   spawned: 1,
   overheadMs: 0.4,
+  rested: 0,
   phases: {
     records: phase(20, { calls: 12, bytes: 12_000, reads: 12 }),
     asks: phase(5),

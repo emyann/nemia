@@ -64,6 +64,8 @@ export type AgentListing = {
   from: WorkflowSource;
   dir: string;
   file: string;
+  /** The job it holds (`role:`), as its file writes it: `Product engineer`. Null when it says none. */
+  role: string | null;
   description: string | null;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
@@ -97,7 +99,7 @@ export type AgentListing = {
 };
 
 /**
- * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its description, skills and system prompt) are no step's, so the form
+ * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its role, description, skills and system prompt) are no step's, so the form
  * shows them apart (`RoleKey`).
  */
 const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
@@ -187,6 +189,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     }
     return {
       ...empty(from, dir, file, name, version, usedBy),
+      role: frontmatterKey(source, 'role') ?? null,
       description: frontmatterKey(source, 'description') ?? null,
       keys,
       body,
@@ -209,6 +212,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     from,
     dir,
     file,
+    role: agent.role ?? null,
     description: agent.description ?? null,
     keys: agent.keys,
     body: agent.body,
@@ -240,6 +244,7 @@ const empty = (from: WorkflowSource, dir: string, file: string, name: string, ve
   from,
   dir,
   file,
+  role: null,
   description: null,
   keys: {},
   body: '',
@@ -269,7 +274,7 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 export type AgentRefused = { error: string; users: string[] };
 
 const DRAFT =
-  '"description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -290,6 +295,7 @@ const DRAFT_FIELDS = {
   card: Schema.optionalKey(Schema.Never),
   cardText: Schema.optionalKey(Schema.Never),
   skillsText: Schema.optionalKey(Schema.Never),
+  role: Schema.optionalKey(Schema.NullOr(Schema.String)),
   description: Schema.optionalKey(Schema.NullOr(Schema.String)),
   skills: Schema.optionalKey(Schema.NullOr(Schema.String)),
   systemPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -315,6 +321,7 @@ function draftWords(route: string, shape: string): Words {
         `${sent.map((retired) => `\`${retired}\``).join(' and ')} named the card file beside the agent, which is retired: an agent's card is generated from its \`skills\`, an entry for each skill read off its SKILL.md, and from its description when it gives none. A page that sends it is stale: reload it, and save again`,
       );
     }
+    if (key === 'role') return wrong('`role` is the job the agent holds, a line of text — `"Product engineer"` — or null');
     if (key === 'description') return wrong('`description` is a line of text, or null');
     if (key === 'skills')
       return wrong(
@@ -379,6 +386,7 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
   return {
     draft: {
       name,
+      role: line(body.role),
       description: line(body.description),
       skills: line(body.skills),
       systemPrompt: line(body.systemPrompt),

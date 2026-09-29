@@ -18,12 +18,13 @@ import { stepFrom } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 
 /**
- * The keys an agent file sets: what it is for, in a line; the skills it is given (`skills:`), which are also what its card says it can do and what becomes of Claude Code's own system prompt (`systemPrompt:`); and who does the work and how. A step that names the
+ * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line; the skills it is given (`skills:`), which are also what its card says it can do and what becomes of Claude Code's own system prompt (`systemPrompt:`); and who does the work and how. A step that names the
  * agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins. Everything else a step sets is wiring — where
  * the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is
  * refused by name.
  */
 export const AGENT_KEYS = [
+  'role',
   'description',
   'skills',
   'systemPrompt',
@@ -41,16 +42,18 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: what it is for, the skills it is given and its system prompt. A step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
+ * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its system prompt. A step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
-export const AGENT_OWN_KEYS = ['description', 'skills', 'systemPrompt'] as const;
+export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'systemPrompt'] as const;
 export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];
 /** The keys a step takes from its agent: every agent key but its own (`AGENT_OWN_KEYS`). */
 export type RoleKey = Exclude<AgentKey, AgentOwnKey>;
 const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly string[]).includes(key);
 const isOwnKey = (key: string): key is AgentOwnKey => (AGENT_OWN_KEYS as readonly string[]).includes(key);
+/** What each of an agent's own lines is called where a draft gives it: its field, not one of its keys. */
+const OWN_LINE: Record<AgentOwnKey, string> = { role: 'role', description: 'description', skills: 'skills', systemPrompt: 'system prompt' };
 
 /**
  * What becomes of Claude Code's own system prompt for an agent's steps (`systemPrompt:`): `default` keeps it and appends the agent's
@@ -112,6 +115,8 @@ export type SkillsFound = { at: ReadonlyMap<string, string | WorkflowError>; loo
  */
 export type Agent = {
   name: string;
+  /** The job it holds, in a few words (`role:`): `Product engineer`. Its name is its own, and a step names it by that. */
+  role?: string;
   description?: string;
   /** The skills its steps are given, by name (`skills:`), each a folder in a `skills/` the load finds (`SkillsFound`). */
   skills?: string[];
@@ -177,7 +182,7 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   const {
-    meta: { description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written },
+    meta: { role, description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written },
     spelled,
   } =
     block === null
@@ -202,6 +207,7 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   if (composed !== undefined) refuse(composed);
   return {
     name,
+    ...(role !== undefined && { role }),
     ...(description !== undefined && { description }),
     ...(skills !== undefined && { skills }),
     ...(systemPrompt !== undefined && { systemPrompt }),
@@ -258,6 +264,7 @@ function systemPromptOf(file: string, written: string | undefined): SystemPrompt
  */
 export type AgentDraft = {
   name: string;
+  role?: string | null;
   description?: string | null;
   /** The skills it is given, as written: `review-a-change, write-a-note`. */
   skills?: string | null;
@@ -286,7 +293,7 @@ export function renderAgent(draft: AgentDraft): string {
       refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
     if (isOwnKey(key))
       refuse(
-        `${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${key === 'description' ? 'description' : key === 'skills' ? 'skills' : 'system prompt'}, once.`,
+        `${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${OWN_LINE[key]}, once.`,
       );
     if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
@@ -303,6 +310,7 @@ export function renderAgent(draft: AgentDraft): string {
     refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page that sends it is stale: reload it, and save again.`);
   }
   const own: Record<AgentOwnKey, string | null | undefined> = {
+    role: draft.role,
     description: draft.description,
     skills: draft.skills,
     systemPrompt: draft.systemPrompt,

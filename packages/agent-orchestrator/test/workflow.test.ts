@@ -572,6 +572,7 @@ test('a key a step does not have is refused by name, with the keys it does have'
   );
   assert.throws(() => fm('review', 'Harness: codex'), /`Harness` is not a key a step has/, 'keys are exact');
   assert.throws(() => fm('review', 'constructor: x'), /`constructor` is not a key a step has/, 'not an Object.prototype lookup');
+  assert.throws(() => fm('review', 'role: Reviewer'), /`role` is not a key a step has/, "the job an agent holds is the agent's own line");
 });
 
 test('`afer: implement` is refused — accepted, it made the reviewer a root that starts beside the implementer', () => {

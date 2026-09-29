@@ -34,6 +34,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   from: 'yours',
   dir: '/store/agents',
   file: '/store/agents/scribe.md',
+  role: 'Note writer',
   description: 'Use this when a change needs its notes written.',
   keys: { model: 'sonnet', effort: 'low' },
   body: 'You write the notes.\n',

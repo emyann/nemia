@@ -7,6 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { Schema } from 'effect';
 import { HOME } from '../store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
 import { feedChanges, foldFeed, freshMemo, type FeedLine, type FeedMemo } from './feed.ts';
@@ -77,14 +78,23 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
   return undefined;
 }
 
+/** A line of the feed as `recordFeed` writes one (`FeedLine`); a key it does not name is kept, as a newer `wf` may write one. */
+const isFeedLine = Schema.is(
+  Schema.Struct({
+    at: Schema.String,
+    run: Schema.String,
+    step: Schema.optionalKey(Schema.String),
+    word: Schema.String,
+    note: Schema.optionalKey(Schema.String),
+  }),
+);
+
 /** A line of the feed as it was written, or nothing for one that is not: a line a writer died in the middle of, ended by the next one. */
 function parseLine(text: string): FeedLine[] {
   if (!text) return [];
   try {
-    const l = JSON.parse(text) as Partial<FeedLine>;
-    return typeof l === 'object' && l !== null && typeof l.at === 'string' && typeof l.run === 'string' && typeof l.word === 'string'
-      ? [l as FeedLine]
-      : [];
+    const line: unknown = JSON.parse(text);
+    return isFeedLine(line) ? [line] : [];
   } catch {
     return [];
   }

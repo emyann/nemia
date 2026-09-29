@@ -17,7 +17,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from './workspace.ts';
 import { composeBrief, type Run } from '../run.ts';
-import type { Workflow } from '../workflow.ts';
+import type { Workflow } from '../step/step.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-deps-');

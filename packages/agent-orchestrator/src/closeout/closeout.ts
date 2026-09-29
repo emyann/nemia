@@ -5,7 +5,7 @@
  * Pure, as run.ts is, and beneath it: run.ts imports what it needs from here, and nothing here imports run.ts. `tick.ts` files each
  * step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing here reads a disk or calls the engine.
  */
-import { CLOSEOUT_FIELDS, LOOP_REPLIES, outputFields, type Workflow } from '../workflow.ts';
+import { CLOSEOUT_FIELDS, isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 
 /**
  * The shape of a step's closing statement, handed to the engine as a JSON Schema.
@@ -308,3 +308,69 @@ export const REPLIES_SCHEMA = {
     additionalProperties: false,
   },
 };
+
+/** Keywords whose value is a schema. `items` may also be an array of them, as older drafts wrote it. */
+const ONE_SCHEMA = [
+  'items',
+  'additionalItems',
+  'additionalProperties',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+  'contains',
+  'propertyNames',
+  'not',
+  'if',
+  'then',
+  'else',
+];
+/** Keywords whose value is an array of schemas. */
+const SCHEMA_LISTS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
+/** Keywords whose value maps a name to a schema. */
+const SCHEMA_MAPS = ['properties', 'patternProperties', 'dependentSchemas', 'dependencies', '$defs', 'definitions'];
+/** Keywords that stand for a schema written somewhere else. */
+const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
+
+/**
+ * The first object in a schema that is not strict, and why; or the first reference; or `undefined`.
+ *
+ * Every keyword that holds a schema is read, because an object the walk skips is an object nobody
+ * checked. A reference is refused rather than followed: resolving one is a second reading of the
+ * schema that can disagree with the harness's, and a loose object behind it would reach the harness
+ * unchecked.
+ */
+export function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
+  if (!isObject(node)) return undefined;
+  const ref = REFERENCES.find((k) => Object.hasOwn(node, k));
+  if (ref) return { at, ref };
+  const types = Array.isArray(node.type) ? node.type : [node.type];
+  if (types.includes('object') || 'properties' in node) {
+    const properties = isObject(node.properties) ? Object.keys(node.properties) : [];
+    const required = Array.isArray(node.required) ? node.required : [];
+    const missing = properties.filter((p) => !required.includes(p));
+    const stray = required.filter((r) => !properties.includes(r as string));
+    if (missing.length)
+      return { at, why: `${missing.map((p) => `\`${p}\``).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not in \`required\`` };
+    if (stray.length) return { at, why: `\`required\` names ${stray.map((p) => `\`${String(p)}\``).join(', ')}, which is not a property` };
+    if (node.additionalProperties !== false) return { at, why: '`additionalProperties` is not `false`' };
+  }
+  const below = (k: string) => (at ? `${at}.${k}` : k);
+  const children: Array<[string, unknown]> = [];
+  for (const k of SCHEMA_MAPS) {
+    const map = node[k];
+    if (isObject(map))
+      for (const [name, v] of Object.entries(map)) children.push([k === 'properties' ? below(name) : below(`${k}.${name}`), v]);
+  }
+  for (const k of ONE_SCHEMA) {
+    const values = k === 'items' && Array.isArray(node.items) ? node.items : [node[k]];
+    for (const v of values) children.push([k === 'items' ? `${at}[]` : below(k), v]);
+  }
+  for (const k of SCHEMA_LISTS) {
+    const list = node[k];
+    if (Array.isArray(list)) list.forEach((v, i) => children.push([k === 'prefixItems' ? `${at}[]` : `${at}.${k}[${i}]`, v]));
+  }
+  for (const [where, child] of children) {
+    const found = looseAt(child, where);
+    if (found) return found;
+  }
+  return undefined;
+}

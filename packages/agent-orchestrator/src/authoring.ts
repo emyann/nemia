@@ -9,34 +9,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { AGENTS_FOLDER, SKILLS_FOLDER, isReadme, WorkflowError, type Workflow } from './step/step.ts';
+import { codexModeWritten, formerSandbox, frontmatterKey } from './former/former.ts';
+import { parseWorkflow, renderStep, type StepDraft } from './workflow/index.ts';
+import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal } from './folder/folder.ts';
 import {
   agentNameRefusal,
-  agentsFolderRefusal,
-  AGENTS_FOLDER,
-  skillEntryOf,
   skillNameRefusal,
-  SKILLS_FOLDER,
-  codexModeWritten,
-  formerSandbox,
-  frontmatterKey,
-  isReadme,
-  linkRefusal,
   parseAgent,
-  parseFolder,
-  parseWorkflow,
   renderAgent,
-  renderSkill,
-  renderStep,
-  withPreload,
-  type SkillDraft,
-  stepNameRefusal,
-  WorkflowError,
   type Agent,
   type AgentDraft,
   type SkillsFound,
-  type StepDraft,
-  type Workflow,
-} from './workflow.ts';
+} from './agents/agents.ts';
+import { skillEntryOf, renderSkill, withPreload, type SkillDraft } from './skills/skills.ts';
 import { agentsFor, agentUsers, agentVersion, loadAgents, skillsFor, skillVersion, type Places } from './workflow-store.ts';
 import { HOME, isDirectory } from './record/record.store.ts';
 

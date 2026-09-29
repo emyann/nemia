@@ -62,7 +62,7 @@ import {
   type CheckReport,
 } from './views.ts';
 import { checkoutHold, runSlots } from './tick.ts';
-import { isRemoteHarness } from './workflow.ts';
+import { isRemoteHarness } from './harness/harness.ts';
 
 /**
  * What `wf ls` shows for one run — the pure call, over one read of each task.

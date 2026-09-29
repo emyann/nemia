@@ -1,10 +1,10 @@
 /**
  * The format read from disk: a workflow folder's steps, the agents beside it, and what a person's name for a folder points at.
  *
- * `workflow.ts` is the format as data — the keys, their parsing and checking, and a step or an agent written back — and reads nothing;
- * this file is what reads a folder and hands its text to it. A store file at the bottom of the tree beneath the controllers: it imports no
- * other (`test/boundary.test.ts`), and is exported from the package's root, not from `agent-orchestrator/workflow`
- * (`docs/architecture.md`).
+ * `workflow.ts` and the folders it re-exports are the format as data — the keys, their parsing and checking, and a step or an agent
+ * written back — and read nothing; this file is what reads a folder and hands its text to them. A store file at the bottom of the tree
+ * beneath the controllers: it imports no other (`test/boundary.test.ts`), and is exported from the package's root, not from
+ * `agent-orchestrator/workflow` (`docs/architecture.md`).
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -12,33 +12,18 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import {
   AGENTS_FOLDER,
-  agentsDir,
-  agentsFolderRefusal,
-  codexModeLine,
-  formerKeyLine,
-  formerKeysIn,
-  frontmatterKey,
-  isCardFile,
   isReadme,
-  linkRefusal,
-  ownSkill,
-  parseAgent,
-  parseFolder,
-  readmeDescription,
-  skillEntryOf,
   SKILLS_FOLDER,
   splitFrontmatter,
   STEP_KEYS,
-  stepFiles,
-  SYSTEM_PROMPTS,
   WorkflowError,
-  type Agent,
-  type Agents,
-  type AgentSkill,
-  type SkillsFound,
   type StepKey,
   type Workflow,
-} from './workflow.ts';
+} from './step/step.ts';
+import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from './former/former.ts';
+import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles } from './folder/folder.ts';
+import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from './agents/agents.ts';
+import { skillEntryOf, type AgentSkill } from './skills/skills.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and

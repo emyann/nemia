@@ -483,7 +483,7 @@
     {
       "files": ["packages/agent-orchestrator/src/authoring.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 518, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 504, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 141, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 41 }],
         "sonarjs/cognitive-complexity": ["error", 59]
@@ -569,7 +569,7 @@
     {
       "files": ["packages/agent-orchestrator/src/run.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 3607, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 3596, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 183, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 91 }],
         "sonarjs/cognitive-complexity": ["error", 156]
@@ -607,9 +607,46 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/workflow.ts"],
+      "files": ["packages/agent-orchestrator/src/agents/agents.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1945, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 21 }],
+        "sonarjs/cognitive-complexity": ["error", 29]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/closeout/closeout.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 25 }],
+        "sonarjs/cognitive-complexity": ["error", 42]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/former/former.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 48]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/keys/keys.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 18]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/skills/skills.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 22]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/workflow/step-file.ts"],
+      "rules": {
+        "sonarjs/cognitive-complexity": ["error", 18]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/workflow/validate.ts"],
+      "rules": {
         "complexity": ["error", { "max": 26 }],
         "sonarjs/cognitive-complexity": ["error", 52]
       }

@@ -7,7 +7,7 @@
  * a second `claude agents` call every pass (`pool.test.ts` counts them).
  */
 import { MOMENTUM, stepMomentum, type Run } from '../run.ts';
-import type { Workflow } from '../workflow.ts';
+import type { Workflow } from '../step/step.ts';
 
 /**
  * The pool each harness's sessions count against. Claude Code's job and its background session are one subscription, so they share one

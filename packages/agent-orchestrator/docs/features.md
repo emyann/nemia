@@ -559,8 +559,8 @@ What it leaves:
   functions above.
 - **The lesson line counts any change**, a deletion included. `CLAUDE.md +0 −12` is printed as what it is, and
   a person reads whether that is a lesson.
-- **Steps are still listed in file order** (plan §4b sends a topological order in `workflow.ts` to G). The
-  screen's steps read in `run.steps` order as before. Sorting at `wf start` is `workflow.ts`'s, not this screen's.
+- **Steps are still listed in file order** (plan §4b sends a topological order in `workflow/validate.ts` to G). The
+  screen's steps read in `run.steps` order as before. Sorting at `wf start` is `workflow/validate.ts`'s, not this screen's.
 
 ## Shipped: a step that asks gets an answer, and a step that plans
 
@@ -961,7 +961,7 @@ What was built:
 - **`planOrder(cards)`**, pure, puts parents first, and goes by name among the cards that may go next. It refuses an
   `after:` naming a card the plan does not have or the card itself, and a cycle, named round:
   `a.md, d.md, b.md wait on each other — a after d, d after b, b after a`.
-- **`workflowFolder(given, from, repo)`** in `workflow.ts` finds a workflow by a path from where it is written, or,
+- **`workflowFolder(given, from, repo)`** in `workflow-store.ts` finds a workflow by a path from where it is written, or,
   when nothing is there and the value is a bare name, under `<repo>/workflows/`. `wf start --workflows` used to take
   only a path. It now takes a name too (`--workflows dev`), and a card's `workflow:` is read the same way, from the
   plan folder. A name found nowhere is refused, naming both places and the workflows the repository has.
@@ -1104,7 +1104,7 @@ review` for `plan → implement ⇄ review`, and `wf ls`, `wf decide` and the bo
 
 What was built:
 
-- `orderSteps(steps)` in `workflow.ts`, pure. Each step comes after every step its `after` names, and otherwise keeps the
+- `orderSteps(steps)` in `workflow/validate.ts`, pure. Each step comes after every step its `after` names, and otherwise keeps the
   order it was given. `loadWorkflows` hands it a folder's files sorted by name, so a folder's siblings come by name, as §6 asked.
   A workflow frozen in an order that already runs forward is kept as frozen: the board lists a run's steps in its record's
   order, and apps/api holds that to `list`'s. `resume:` is already in `after`, and `loop:`, the edge back, orders nothing. It
@@ -2738,7 +2738,7 @@ What was built:
   address the operator gave in approving the plan, from its block on the Workflows canvas and from a line of step links under each graph:
   the same, for every key a step may set, its value as the loader reads it, which the page says (`after` names the step `resume:` names; a
   loop that sets no `rounds` runs 3). Neither page writes. The menu lights the Inbox and Workflows on them.
-- **The package's lines of meaning**, the one thing added to the package: `STEP_KEY_MEANINGS` beside `STEP_KEYS` in `workflow.ts`, a
+- **The package's lines of meaning**, the one thing added to the package: `STEP_KEY_MEANINGS` beside `STEP_KEYS` in `step/step.ts`, a
   count's line being `COUNTS`' own (so `COUNTS` moved up beside the keys), and `INBOX_KEY_MEANINGS` beside `INBOX_KEYS` in `inbox.ts`,
   re-exported from runner.ts. A key without a line does not typecheck.
 - **The api**, a route per page, each finding what it reads among what the package lists and never by a path joined from the request.
@@ -2998,7 +2998,7 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
 ### The package half
 
 
-- **`renderStep(step)`**, pure, in workflow.ts. It writes the frontmatter with only the keys the step sets, in `STEP_KEYS` order, each
+- **`renderStep(step)`**, pure, in workflow/step-file.ts. It writes the frontmatter with only the keys the step sets, in `STEP_KEYS` order, each
   as the parser reads it: a list as `a, b`, a count or a budget as its number, `output:` as the file it names. The body follows.
   `undefined` and `null` are unset, and so is an empty `after`, `input` or `disallow` list, since no line says the same thing. An empty
   `tools` list is written, and the parser refuses it: no tools reads as every tool to one person and as none to another. `rounds:` is
@@ -3048,7 +3048,7 @@ first (`renderStep`, `writeWorkflow`), then the api and the board in the apps ru
 
 A person builds a workflow of theirs on the Workflows page, and Save writes the folder through `writeWorkflow`. Apps only: nothing in
 `packages/` changed but this file. Read first: the apps/web lines of CLAUDE.md, the package half above, `STEP_KEYS`, `STEP_KEY_MEANINGS`
-and `COUNTS` in workflow.ts, `listWorkflows` and `folderOf` in `apps/api/src/workflows/workflows.ts`, and `WorkflowCanvas.tsx`.
+and `COUNTS` in step/step.ts, `listWorkflows` and `folderOf` in `apps/api/src/workflows/workflows.ts`, and `WorkflowCanvas.tsx`.
 
 **The decision made in the request: the builder writes yours only**, the store's `workflows/`. A write to the repository's is refused with a
 sentence that says to copy the folder into the repository by hand, and the api writes nothing into a checkout. `writeWorkflow` would take a
@@ -4156,7 +4156,7 @@ The first slice of P2 in `docs/pivot-2026-09-18.md`, "a workspace is a choice". 
 folder`, the first of a family of kinds; the record freezes `place: { kind: 'folder' }`; a record without `place` is a git run, and
 the git words are not renamed. No change to `packages/agent-runtime`: a task's `cwd` was all a folder needed.
 
-- **The word** (`workflow.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
+- **The word** (`workflow/validate.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
 - **The run** (`run.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
   caller says what a folder run gets. `places.store.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`start.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
@@ -4443,7 +4443,7 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   is not run, it is never in `retriesDue`, and the run waits on a person (`DENIED, waiting on you` in `wf decide`; `stoppedOn:
   'blocked'`).
 - **The offer names both ways out** (`deniedOffer`): the rule to add to the folder's `allowedTools:` for a new run, worded as Claude Code
-  matches it (`allowRuleOf` in `workflow.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
+  matches it (`allowRuleOf` in `keys/tools.ts`: `Bash(npm:*)`; a denied Write, MultiEdit or NotebookEdit as `Edit(<path>)`; a path in
   the step's own directory from it, `Edit(notes.md)`, since the next run's worktree is named by its own id; any other absolute path
   as `//path`, the run's id as `*`), except for a call the step's own `disallowedTools:` may have denied, which no allow overrides
   (`disallowedBy`), and `wf retry <run> <step> --fresh`, a new session whose brief says what the last was denied (`## What

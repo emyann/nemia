@@ -2,4 +2,4 @@
 export { ceilingsOf } from './ceilings.ts';
 export { readDaemon } from './daemon.ts';
 export { feed } from './feed.ts';
-export { readQuota } from './quota.ts';
+export { QuotaAsker } from './quota.ts';

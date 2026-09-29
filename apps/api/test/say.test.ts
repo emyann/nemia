@@ -12,7 +12,7 @@
  * `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work with its inbox listening: only the run's mark
  * refuses it.
  */
-import { registry } from './harness.ts';
+import { config, registry, root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -23,18 +23,10 @@ import { scratch } from './scratch.ts';
 import type { Said } from 'agent-orchestrator';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
+import { app } from '../src/app.ts';
+import { engine, list, readRun, say } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`hkb-api-say-${label}-`);
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its modules load. */
-const root = tmp('root');
-process.env.WF_ROOT = root;
-/** Where sessions register, set in `CLAUDE_CONFIG_DIR` before the api loads: the Claude runner reads it as its module loads. */
-const config = tmp('claude');
-process.env.CLAUDE_CONFIG_DIR = config;
-
-const { app } = await import('../src/app.ts');
-const { engine, list, readRun, say } = await import('agent-orchestrator');
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

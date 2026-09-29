@@ -25,7 +25,7 @@ import {
 import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
 import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from '../runs/judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
-import { e, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
+import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
@@ -285,16 +285,16 @@ function commandsOf(
  * nobody — is offered with the steps its send-back names (`sendBackTo`), which is what `wf decide` prints under the step; the word is
  * `listing`'s, as `needsOf` reads it for the verb.
  */
-export async function decisionOf(run: Run): Promise<RunDecision> {
+export async function decisionOf(run: Run, e: Engine['Service'], home: string): Promise<RunDecision> {
   const waits = await waitsIn(run, e);
   const waiting = waitingOf(run, waits);
   const holds = await holdsIn(run, e);
   const holding = holdingOf(run, holds);
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
-  const folder = workflowsOf(run).steps;
+  const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
-  const views = await viewsOf(run);
+  const views = await viewsOf(run, e);
   const judged = judge(run, names, folder, views, waits, holds);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };

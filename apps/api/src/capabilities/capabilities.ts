@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { Effect } from 'effect';
+import { Context, Effect, Layer } from 'effect';
 
 /** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
@@ -67,7 +67,7 @@ export type Capabilities = {
 export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /** The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — and its own checkout otherwise. */
-export const repoOf = (env: NodeJS.ProcessEnv = process.env): string => path.resolve(env.HKB_REPO?.trim() || HOME_REPO);
+export const repoOf = (env: NodeJS.ProcessEnv): string => path.resolve(env.HKB_REPO?.trim() || HOME_REPO);
 
 /** How long a server has to start and list its tools before it is reported as not answering. */
 export const ASK_MS = 15_000;
@@ -78,11 +78,16 @@ const MCP_JSON = '.mcp.json';
 /**
  * Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning.
  * A server not enabled is not started: a GET does not run a command the person has not turned on, which is what enabling a project
- * server is for.
+ * server is for. Each server enabled is asked through `asker`, the app's `McpAsker` on a request; with none, through an asker of this call's
+ * own, which asks each afresh.
  */
 export async function capabilitiesOf(
   repo: string,
-  { deadlineMs = ASK_MS, env = process.env }: { deadlineMs?: number; env?: NodeJS.ProcessEnv } = {},
+  {
+    deadlineMs = ASK_MS,
+    env = process.env,
+    asker = makeMcpAsker(),
+  }: { deadlineMs?: number; env?: NodeJS.ProcessEnv; asker?: AskServer } = {},
 ): Promise<Capabilities> {
   const warnings: string[] = [];
   const settings = jsonAt(repo, SETTINGS, warnings, 'nothing is read as denied or enabled from it');
@@ -128,7 +133,7 @@ export async function capabilitiesOf(
           error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
         };
       }
-      const answer = await answerOf(repo, stdio, launch, deadlineMs);
+      const answer = await asker(repo, stdio, launch, deadlineMs);
       return {
         ...entry,
         tools: answer.tools?.map((tool) => ({ ...tool, denied: denyingRule(deny, server.name, tool.name) })) ?? null,
@@ -497,17 +502,26 @@ function launchOf(repo: string, server: Declared & { command: string }, env: Nod
 
 type Answer = { tools: Array<{ name: string; description: string | null }> | null; error: string | null; checkedAt: string };
 
-/**
- * Every answer the api has had, for the life of the process. Keyed by the repository, the server and all it is
- * started with, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
- */
-const answers = new Map<string, Promise<Answer>>();
+/** A stdio server asked for its tools (`serverAsk`), in the repository, as `launch` starts it, given `deadlineMs`: never rejects. */
+export type AskServer = (repo: string, server: Started, launch: Launch, deadlineMs: number) => Promise<Answer>;
 
-function answerOf(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
-  const key = JSON.stringify([repo, server.name, launch]);
-  let answer = answers.get(key);
-  if (!answer) answers.set(key, (answer = Effect.runPromise(serverAsk(repo, server, launch, deadlineMs))));
-  return answer;
+/**
+ * An MCP asker that has asked nothing yet, and keeps every answer it has for as long as it lives. Keyed by the repository, the server and
+ * all it is started with, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
+ */
+export function makeMcpAsker(): AskServer {
+  const answers = new Map<string, Promise<Answer>>();
+  return (repo, server, launch, deadlineMs) => {
+    const key = JSON.stringify([repo, server.name, launch]);
+    let answer = answers.get(key);
+    if (!answer) answers.set(key, (answer = Effect.runPromise(serverAsk(repo, server, launch, deadlineMs))));
+    return answer;
+  };
+}
+
+/** The MCP asker every request shares, one for an app (`live`, a fresh `makeMcpAsker`): each server asked once while the app runs. */
+export class McpAsker extends Context.Service<McpAsker, AskServer>()('api/McpAsker') {
+  static readonly live: Layer.Layer<McpAsker> = Layer.sync(McpAsker)(makeMcpAsker);
 }
 
 /** How much of a server's stderr an error keeps: its end, where a crash says why. */

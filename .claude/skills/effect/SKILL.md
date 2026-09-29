@@ -85,10 +85,23 @@ version, and the version above must be the pin. An upgrade re-measures the table
   hands no failure back to the caller.
 - What an api route holds is let go in its scope too. A callback watch becomes a stream with `Stream.callback` on a bounded `suspend`
   buffer, each item handed on with an awaited `Queue.offer`, so the watch waits for a slow reader: `feedEvents` in
-  `apps/api/src/factory/feed.ts`. Hono's `streamSSE` runs it with `Effect.runPromiseExit(program, { signal })`, the signal aborted from
-  `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its release reading the
-  `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `usageAsk` in `apps/api/src/factory/quota.ts`, `serverAsk` in
-  `apps/api/src/capabilities/capabilities.ts`.
+  `apps/api/src/factory/feed.ts`. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
+  aborted from `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its
+  release reading the `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `usageAsk` in `apps/api/src/factory/quota.ts`,
+  `serverAsk` in `apps/api/src/capabilities/capabilities.ts`.
+
+## The api's runtime
+
+- The api runs its handlers on one `ManagedRuntime`, built from its layer (`appOf` in `apps/api/src/app.ts`), as
+  `ai-docs/src/04_integration/10_managed-runtime.ts` does for Hono: a middleware puts it on each request (`c.var.runtime`), and
+  `served` (`apps/api/src/layer.ts`) runs a handler over the services — the environment, the engine, the store's root, the MCP asker,
+  the quota asker, and what its reads keep between requests (`ApiConfig`, `Engine`, `StoreRoot`, `McpAsker`, `QuotaAsker`, `ReadMemo`).
+- What an app keeps between requests is a service built with its runtime (`Layer.sync`), never module state: each `ManagedRuntime`
+  builds its layer afresh, so an app over another engine keeps nothing of another's.
+- A test builds an app over `Layer.merge(liveOf(), …)`, the service it replaces given last: `Layer.merge` keeps the later of two.
+- A handler's body stays a plain `async` function: a failure yielded inside `Effect.gen` never reaches a `try` around the `yield*`,
+  and the routes catch what they word themselves. `runPromise` rejects with the failure itself, so a refusal reaches `app.onError`
+  as the instance it was.
 
 ## Plain faces
 

@@ -12,11 +12,11 @@
  *   record on disk (each package's README says so);
  * - a line that says `MARK`: an alias kept on purpose, or the history the README gives.
  *
- * The project was named Nemia on 2026-09-29 (`PROJECT_MARK`); its former name is refused as the packages' are, outside history and a line
- * that says `PROJECT_MARK`, in these forms (`projectNames`): the upper-case word; the name with its version, spaced or hyphenated, but in a
- * path, since a path that names the checkout names a folder on disk; and the lower-case word as a prefix of the machinery — a plugin, a
- * storage key, a client's name, a scratch folder — but for the folder's own name and the earlier project's migration notes; and, in the
- * board's own files (`BOARD`), the word alone. The brand is the name alone: `BRAND` is refused too.
+ * The project's former name is refused as the packages' are, outside history and a line that says `PROJECT_MARK`, in these forms
+ * (`projectNames`): the upper-case word; the name with its version, spaced or hyphenated, but in a path, since a path that names the
+ * checkout names a folder on disk; the lower-case word as a prefix of the machinery — a plugin, a storage key, a client's name, a scratch
+ * folder — but for the folder's own name and the earlier project's migration notes; and, in the board's own files (`BOARD`), the word
+ * alone. The brand is the name alone: `BRAND` is refused too.
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */

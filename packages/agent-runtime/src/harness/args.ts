@@ -8,6 +8,7 @@
  * is refused them too. What one harness takes and refuses — its modes, its efforts, its windows — stays with that
  * harness's runner.
  */
+import path from 'node:path';
 import type { McpServer } from './seam.ts';
 import type { ClaudeFlags } from './claude/vocabulary.ts';
 import { mcpRefuses } from './mcp.ts';
@@ -89,7 +90,20 @@ export type HarnessArgs = {
    * (`contextTokens`), what chooses the runtime's own process (`background`), or what a caller judges (`budgetUsd`).
    */
   claude?: ClaudeFlags;
+  /**
+   * Codex's own arguments, read by the `codex` harness alone (`CodexArgs`). Refused on a harness that is not Codex, which
+   * would start its session without them, and unless an object holding only `trustFrom`, an absolute path.
+   */
+  codex?: CodexArgs;
 };
+
+/**
+ * What a Codex session is given of its own. `trustFrom`: a directory whose trust in the operator's Codex config extends to
+ * the session's `cwd`, so a worktree of a repository you trust is trusted for the run and loads the project's rules. It is
+ * extended and never granted: a directory the config does not trust gives the session no trust. Absent: the repository
+ * behind `cwd`.
+ */
+export type CodexArgs = { trustFrom?: string };
 
 /** Every harness argument by name. Exhaustive by type: a key added to `HarnessArgs` and not here does not compile. */
 const KEYS: Record<keyof HarnessArgs, true> = {
@@ -105,6 +119,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   worktree: true,
   budgetUsd: true,
   claude: true,
+  codex: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -227,7 +242,7 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (config.budgetUsd !== undefined && !isDollars(config.budgetUsd)) {
     return `\`budgetUsd: ${shown(config.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
   }
-  return config.claude === undefined ? undefined : claudeFlagsRefusalOf(config.claude);
+  return claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex);
 };
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
@@ -238,6 +253,7 @@ const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;
  * command line: `false` and `null` would be dropped, an object has no flag's form, and an empty list gives nothing.
  */
 const claudeFlagsRefusalOf = (flags: unknown): string | undefined => {
+  if (flags === undefined) return undefined;
   if (typeof flags !== 'object' || flags === null || Array.isArray(flags)) {
     return `\`claude: ${JSON.stringify(flags)}\` is not a set of Claude Code's flags. Give an object keyed by flag in camelCase, like { "appendSystemPromptFile": "prompt.md" }, or leave it out.`;
   }
@@ -250,6 +266,27 @@ const claudeFlagsRefusalOf = (flags: unknown): string | undefined => {
     if (!one && !list) {
       return `\`claude.${key}: ${JSON.stringify(value)}\` is not a flag's value. Give true for the flag alone, a string or a number for its value, or a list of strings to give it once each — or leave the key out.`;
     }
+  }
+  return undefined;
+};
+
+/**
+ * Why `config.codex` cannot be handed to Codex — or `undefined`. An object holding only `trustFrom`, whose value is an
+ * absolute path: a key misspelled would name no directory, and a relative one would be read against a `cwd` it was not
+ * written for.
+ */
+const codexArgsRefusalOf = (args: unknown): string | undefined => {
+  if (args === undefined) return undefined;
+  if (typeof args !== 'object' || args === null || Array.isArray(args)) {
+    return `\`codex: ${JSON.stringify(args)}\` is not a set of Codex's arguments. Give an object, like { "trustFrom": "/path/to/repo" }, or leave it out.`;
+  }
+  const stray = Object.keys(args).find((key) => key !== 'trustFrom');
+  if (stray) {
+    return `\`codex.${stray}\` is not one of Codex's arguments. Its only one is \`trustFrom\`, the directory whose trust in your Codex config extends to the cwd.`;
+  }
+  const { trustFrom } = args as CodexArgs;
+  if (trustFrom !== undefined && !(typeof trustFrom === 'string' && path.isAbsolute(trustFrom))) {
+    return `\`codex.trustFrom: ${JSON.stringify(trustFrom)}\` is not an absolute directory. Name the directory you trust in your Codex config by its absolute path, like "/path/to/repo", or leave it out for the repository behind the cwd.`;
   }
   return undefined;
 };

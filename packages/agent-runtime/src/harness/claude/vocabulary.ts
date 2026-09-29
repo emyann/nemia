@@ -124,10 +124,13 @@ export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
-/** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
+/** What Claude Code cannot be asked for, Codex's own arguments among it, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const { permissionMode, effort } = task.config ?? {};
   const owned = Object.keys(task.config?.claude ?? {}).find((key) => CLAUDE_OWNED_FLAGS.includes(key));
+  if (task.config?.codex !== undefined) {
+    return `\`codex: ${JSON.stringify(task.config.codex)}\` gives Codex arguments of its own, and Claude Code is not Codex. Leave \`codex\` off a Claude Code task.`;
+  }
   if (owned) {
     return `\`claude.${owned}\` is a flag the runtime gives Claude Code itself (\`${claudeFlagName(owned)}\`), and the session would have it twice. Give it as the harness argument of its own where there is one — \`model\`, \`permissionMode\`, \`tools\`, \`budgetUsd\` and the rest — or leave it out.`;
   }

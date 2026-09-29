@@ -7,7 +7,8 @@
  *
  * What it reads and writes lives beside it, each in its own file: the transcript reader (`harness/transcript.ts`), a
  * Claude session's transcript and usage (`harness/claude/transcript.ts`), Claude Code's vocabulary
- * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), and MCP (`harness/mcp.ts`).
+ * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), its registry's rows (`harness/claude/registry.ts`), and MCP
+ * (`harness/mcp.ts`).
  */
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
@@ -22,6 +23,7 @@ import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
 import { RunnerError } from '../error.ts';
+import { registryOf, type RegistryRow } from './registry.ts';
 import type { RunnerOps, SpawnRequest } from '../seam.ts';
 
 /**
@@ -404,7 +406,12 @@ const sessionFlags = (r: SpawnRequest): string[] => {
  */
 const observeInto = (x: Reading, registry: Registry): RunnerOps['observe'] =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
-    Effect.map((out) => listedIn(out, registry)),
+    Effect.flatMap((out) => {
+      const read = registryOf(out);
+      return 'wrong' in read
+        ? Effect.fail(new RunnerError({ verb: 'observe', message: read.wrong }))
+        : Effect.succeed(listedIn(read.rows, registry));
+    }),
     Effect.flatMap((m) => {
       x.kept.prune(new Set([...m].map(([name, { sighting, startedAt }]) => attemptOf(name, sighting, startedAt))));
       return Effect.forEach([...m], ([name, { sighting, startedAt }]) => Effect.promise(() => reportOf(x, name, sighting, startedAt)), {
@@ -413,63 +420,46 @@ const observeInto = (x: Reading, registry: Registry): RunnerOps['observe'] =>
     }),
   );
 
-/** A `claude agents --json` row as it arrives: any field may be missing, and some of another type. */
-type AgentRow = {
-  sessionId?: string;
-  name?: string;
-  state?: string;
-  status?: string;
-  waitingFor?: unknown;
-  startedAt?: unknown;
-  pid?: unknown;
-};
-
 /**
- * `claude agents --json`'s output as our sessions by name, each with its start, and `registry` cleared and rebuilt from them in
- * row order: each session's state (`listed`), its process (`pids`) and its start (`starts`).
+ * Our decoded rows (`registryOf`) as sessions by name, each with its start, and `registry` cleared and rebuilt from them in row
+ * order: each session's state (`listed`), its process (`pids`) and its start (`starts`). Called only on a listing that decoded, so
+ * a refused one leaves the registry as the last one read.
  */
-const listedIn = (out: string, registry: Registry) => {
-  const rows = JSON.parse(out) as AgentRow[];
+const listedIn = (rows: RegistryRow[], registry: Registry) => {
   const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
   registry.listed.clear();
   registry.pids.clear();
   registry.starts.clear();
   for (const row of rows) {
     const ours = ourRow(row);
-    if (!ours) continue;
     const { sessionId, state } = ours.sighting;
     registry.listed.set(sessionId, state);
     if (ours.pid !== undefined) registry.pids.set(sessionId, ours.pid);
     if (ours.startedAt !== undefined) registry.starts.set(sessionId, ours.startedAt);
-    m.set(ours.name, { sighting: ours.sighting, startedAt: ours.startedAt });
+    m.set(row.name, { sighting: ours.sighting, startedAt: ours.startedAt });
   }
   return m;
 };
 
 /**
- * One row of the registry as our session, or `undefined` for a row that is not ours. A row is ours only when we named it (`ae/`)
- * and it has a `state`: `state` is the session's lifecycle and `status` whether its process is busy this instant, two answers and
- * not a fallback chain, and a row with no `state` is an interactive session, whose `status` read as a state would record `idle` as
- * a failure. The state is put in A2A's names (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is
- * carried as the harness says it and judged by nothing here (`Sighting.waitingFor`), trimmed, and only when it is a non-empty
- * string. The session id is the native id — `--resume` takes exactly it — and the row's `startedAt`, when this session started, is
- * what its usage is counted from. Its `pid` is its process only when a positive integer.
+ * A row of ours as a sighting, with its start and its process when it lists them. `state` is the session's lifecycle and `status`
+ * whether its process is busy this instant, two answers and not a fallback chain. The state is put in A2A's names
+ * (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is carried as the harness says it and judged by
+ * nothing here (`Sighting.waitingFor`), trimmed, and a blank one is none. The session id is the native id — `--resume` takes
+ * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from.
  */
-const ourRow = (row: AgentRow): { name: string; sighting: Sighting; startedAt?: number; pid?: number } | undefined => {
-  const said = typeof row.state === 'string' && row.state ? row.state : undefined;
-  const waitingFor = typeof row.waitingFor === 'string' && row.waitingFor.trim() ? row.waitingFor.trim() : undefined;
-  if (!row.name?.startsWith('ae/') || !row.sessionId || !said) return undefined;
+const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid?: number } => {
+  const waitingFor = row.waitingFor?.trim() || undefined;
   return {
-    name: row.name,
     sighting: {
       sessionId: row.sessionId,
-      state: claudeStateOf(said, waitingFor),
+      state: claudeStateOf(row.state, waitingFor),
       busy: row.status === 'busy',
       nativeId: row.sessionId,
       ...(waitingFor ? { waitingFor } : {}),
     },
-    startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
-    pid: Number.isInteger(row.pid) && (row.pid as number) > 0 ? (row.pid as number) : undefined,
+    startedAt: row.startedAt ?? undefined,
+    pid: row.pid ?? undefined,
   };
 };
 

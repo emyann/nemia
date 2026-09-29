@@ -1,0 +1,47 @@
+[
+  {
+    "id": "7c844357",
+    "cwd": "/work/1",
+    "kind": "background",
+    "startedAt": 1787801145585,
+    "sessionId": "7c844357-4294-48fa-a7d8-3855812463e7",
+    "name": "ae/listed/1",
+    "state": "blocked"
+  },
+  {
+    "id": "d0df7402",
+    "cwd": "/work/2",
+    "kind": "background",
+    "startedAt": 1788290142789,
+    "sessionId": "d0df7402-4f18-49e7-848b-655203eaaa02",
+    "name": "ae/listed/2",
+    "state": "done"
+  },
+  {
+    "id": "1116f779",
+    "cwd": "/work/3",
+    "kind": "background",
+    "startedAt": 1788303854604,
+    "sessionId": "1116f779-024e-46ec-a16d-84055068ed77",
+    "name": "ae/listed/3",
+    "state": "stopped"
+  },
+  {
+    "id": "ce9a6dc2",
+    "cwd": "/work/4",
+    "kind": "background",
+    "startedAt": 1788323201841,
+    "sessionId": "ce9a6dc2-c4a9-4b6b-8c8f-1865ecf0aadd",
+    "name": "ae/listed/4",
+    "state": "failed"
+  },
+  {
+    "pid": 4005,
+    "cwd": "/work/5",
+    "kind": "interactive",
+    "startedAt": 1790652358430,
+    "sessionId": "cb203301-c3e3-4ea7-b8e4-bc767b4ffa15",
+    "name": "ae/listed/5",
+    "status": "busy"
+  }
+]

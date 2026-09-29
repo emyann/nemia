@@ -872,14 +872,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/harness/claude/bg.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 243, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 23]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/harness/claude/code.ts"],
       "rules": {
         "complexity": ["error", { "max": 32 }]

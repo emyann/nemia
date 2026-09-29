@@ -27,7 +27,7 @@ import {
   STEP_KEY_MEANINGS,
   STEP_KEYS,
 } from 'agent-orchestrator/workflow';
-const repo = scratch('hkb-api-builder-repo-');
+const repo = scratch('nemia-api-builder-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 

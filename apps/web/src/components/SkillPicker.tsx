@@ -10,7 +10,8 @@ import { GivenSkills, SkillSourceBadge } from './AgentParts';
 /**
  * The skills an agent of yours gives, composed from a list: each given one with where it is found and what it costs a turn, and Remove; and
  * Add a skill, a sheet of every skill an agent of yours can be given — your library, then this repository's, in the order a start finds a
- * name — and the skills HKB ships, each copied into your library before it is given, since an agent of yours finds none where HKB keeps them.
+ * name — and the skills Nemia ships, each copied into your library before it is given, since an agent of yours finds none where Nemia keeps
+ * them.
  *
  * Adding and removing edit the form's `skills:` line, saved with the agent. The copy does not wait for Save: it writes your library at once,
  * and the sheet says so.

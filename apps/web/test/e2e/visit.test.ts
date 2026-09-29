@@ -15,7 +15,7 @@ type Ended = { code: number | null; stdout: string; stderr: string; shots: strin
 
 /** broken-page.ts, run to its end, with the screenshots it wrote. */
 async function e2eOn(how: string): Promise<Ended> {
-  const out = scratch('hkb-e2e-refusal-');
+  const out = scratch('nemia-e2e-refusal-');
   const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });

@@ -90,7 +90,7 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   fs.writeFileSync(registry, '[]');
 
   const e = engine();
-  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('hkb-api-cwd-'), harness: 'claude' });
+  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('nemia-api-cwd-'), harness: 'claude' });
   let before = observations();
   await e.list();
   assert.ok(

@@ -4,14 +4,14 @@ import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillR
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
   yours: 'Your library',
   repo: 'This repository',
-  shipped: 'Shipped with HKB',
+  shipped: 'Shipped with Nemia',
 };
 
 /** A given skill's badge: where an agent of yours finds it. */
 export const SOURCE_BADGES: Readonly<Record<SkillSource, string>> = {
   yours: 'your library',
   repo: 'this repository',
-  shipped: 'shipped with HKB',
+  shipped: 'shipped with Nemia',
 };
 
 /**
@@ -40,7 +40,7 @@ export function givenRows(names: readonly string[], given: readonly GivenSkill[]
 }
 
 /**
- * What the picker offers for a skill: to add it; to copy it into your library and add it, for one HKB ships that an agent of yours finds
+ * What the picker offers for a skill: to add it; to copy it into your library and add it, for one Nemia ships that an agent of yours finds
  * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a shipped skill your library or the repository has, so a
  * copy would write over yours or hide the repository's; or why no agent can be given it, and nothing to press.
  */

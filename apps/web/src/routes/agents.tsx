@@ -141,7 +141,7 @@ function AgentCard({ agent }: { agent: AgentListing }) {
 
 /**
  * The skills an agent can be given, one list a place in the order an agent of yours finds a name: your library, which the board writes, the
- * repository's and HKB's, which it reads. Each is linked to its page, which says who gives it and what it costs a turn.
+ * repository's and Nemia's, which it reads. Each is linked to its page, which says who gives it and what it costs a turn.
  */
 function SkillPlaces({ places }: { places: readonly SkillPlace[] }) {
   return (

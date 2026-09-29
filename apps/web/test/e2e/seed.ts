@@ -808,7 +808,7 @@ export const CHECKOUT = {
   agent: { file: 'tester.md', name: 'tester', description: 'Writes the tests a change is missing.' },
   /** apps/api's fixture server: what it lists, the first line of `echo`'s description, and the line after it. */
   server: { name: 'fixture', tools: ['echo', 'wipe'], said: 'Say it back.', secondLine: 'A second line', denied: 'mcp__fixture__wipe' },
-  missing: { name: 'missing', command: 'hkb-e2e-no-such-mcp-server' },
+  missing: { name: 'missing', command: 'nemia-e2e-no-such-mcp-server' },
   /** `Bash(find:*)` refuses one of Claude Code's read-only commands, which the page strikes on a step with Bash. */
   denied: ['Bash(git push:*)', 'mcp__fixture__wipe', 'Bash(find:*)'],
   /** `Bash(cat:*)` makes another of them ask, which the page strikes on a dontAsk step and on a job, and marks asking on a background session. */
@@ -1292,10 +1292,10 @@ function seedRepo(repo: string, branch: string): string {
       },
     );
   const pkg = (test: string) =>
-    `${JSON.stringify({ name: 'hkb-v2', private: true, workspaces: ['packages/*', 'apps/*'], scripts: { test } })}\n`;
+    `${JSON.stringify({ name: 'nemia', private: true, workspaces: ['packages/*', 'apps/*'], scripts: { test } })}\n`;
   git('init', '-q', '-b', 'main');
   write(path.join(repo, 'package.json'), pkg('turbo run test'));
-  write(path.join(repo, 'CLAUDE.md'), '# hkb-v2 — contributor guide\n');
+  write(path.join(repo, 'CLAUDE.md'), '# Nemia — contributor guide\n');
   write(path.join(repo, 'apps', 'web', 'src', 'main.tsx'), "export const app = 'board';\n");
   git('add', '-A');
   git('commit', '-q', '-m', 'base');
@@ -1315,7 +1315,7 @@ function seedRepo(repo: string, branch: string): string {
     path.join(repo, 'apps', 'web', 'test', 'theme.test.ts'),
     `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { tokens } from '../src/theme.ts';\n\n${cases.join('\n')}\n`,
   );
-  write(path.join(repo, 'CLAUDE.md'), '# hkb-v2 — contributor guide\n\n- A page is judged in both themes, or it is judged in neither.\n');
+  write(path.join(repo, 'CLAUDE.md'), '# Nemia — contributor guide\n\n- A page is judged in both themes, or it is judged in neither.\n');
   write(path.join(repo, 'package.json'), pkg('turbo run test --concurrency=1'));
   git('add', '-A');
   git('commit', '-q', '-m', 'Apply the colour tokens to every page');
@@ -1383,7 +1383,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
       'packages/agent-orchestrator/docs/queue.md',
       '# The queue\n\nThe cap is read on every pass, and stored nowhere.\n\nA card that cannot start keeps its place.\n',
     ],
-    ['CLAUDE.md', "# hkb-v2 — contributor guide, with the queue's rule\n"],
+    ['CLAUDE.md', "# Nemia — contributor guide, with the queue's rule\n"],
   ]);
   commit(
     SHIPPED.branch,

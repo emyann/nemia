@@ -29,8 +29,8 @@ const code = (text: string) => <code className="font-mono text-xs break-all">{te
 
 /**
  * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit, when
- * it is yours; to read, when it is the repository's or one HKB ships, which the board does not write. Save and the switch each write it back
- * against the version it was read at, and each changes every agent that gives it.
+ * it is yours; to read, when it is the repository's or one Nemia ships, which the board does not write. Save and the switch each write it
+ * back against the version it was read at, and each changes every agent that gives it.
  *
  * The form is drawn from the skill as read, but for a file that moved under unsaved words (`drawnSkill`), and drawn anew under each new
  * version a save or the switch brings. A write of the page is read back at once as the form's own, so its words do not read as unsaved. A
@@ -212,7 +212,7 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
         </>
       )}
       {from === 'shipped' && (
-        <>Shipped with HKB, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
+        <>Shipped with Nemia, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
       )}
     </p>
   );
@@ -220,7 +220,7 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
 
 /**
  * The switch that loads it every turn (`preload: true`), what a turn carries either way, and whom it changes: every agent that gives it. It
- * writes the file as it is on disk, so it waits while the form holds unsaved words; the repository's and HKB's are shown, not switched.
+ * writes the file as it is on disk, so it waits while the form holds unsaved words; the repository's and Nemia's are shown, not switched.
  */
 function Preload({
   detail,

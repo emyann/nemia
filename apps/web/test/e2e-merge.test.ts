@@ -51,7 +51,7 @@ function mergeOf(
   one: Record<string, string>,
   other: Record<string, string>,
 ): { repo: string; clean: boolean; said: string } {
-  const repo = scratch('hkb-e2e-merge-');
+  const repo = scratch('nemia-e2e-merge-');
   git(repo, 'init', '-q', '-b', 'main');
   writeAll(repo, base);
   git(repo, 'add', '-A');

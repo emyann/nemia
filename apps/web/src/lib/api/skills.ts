@@ -1,12 +1,12 @@
 /**
- * The skills an agent of yours can be given, a skill HKB ships copied into your library, one skill on its page, and one of yours written on the
- * board (apps/api/src/agents/skills.ts).
+ * The skills an agent of yours can be given, a skill Nemia ships copied into your library, one skill on its page, and one of yours written
+ * on the board (apps/api/src/agents/skills.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
 import { get } from './read.ts';
 import type { AgentSkill } from './agents.ts';
 
-/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what HKB ships. */
+/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what Nemia ships. */
 export type SkillSource = 'yours' | 'repo' | 'shipped';
 
 /**
@@ -54,7 +54,7 @@ export const skillsQuery = queryOptions({
   queryFn: () => get<SkillPlace[]>('/api/skills'),
 });
 
-/** A copy the api refused: its words, and its status — 404 for a skill HKB does not ship, 409 for a name your library has already. */
+/** A copy the api refused: its words, and its status — 404 for a skill Nemia does not ship, 409 for a name your library has already. */
 export class SkillRefusal extends Error {
   readonly status: number | null;
   constructor(message: string, status: number | null = null) {
@@ -63,7 +63,7 @@ export class SkillRefusal extends Error {
   }
 }
 
-/** Copy the skill HKB ships under `name` into your library, a write of its own: an agent of yours can then be given it. */
+/** Copy the skill Nemia ships under `name` into your library, a write of its own: an agent of yours can then be given it. */
 export async function copySkill(name: string): Promise<SkillAdded> {
   const res = await fetch('/api/skills/yours', {
     method: 'POST',

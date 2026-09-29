@@ -80,7 +80,6 @@ import { modeWord, nextTry, sessionModel, tryOf, turnsOf, type RetryAsk } from '
 import {
   artifactsDir,
   cancelFile,
-  isDirectory,
   checkStderr,
   consumeAsks,
   holdFile,
@@ -97,7 +96,7 @@ import {
   runsDir,
   stepsOf,
 } from './record/record.store.ts';
-import { agentFilesDir, skillsAgain } from './agents/agents.store.ts';
+import { agentFilesDir, renderedIn, skillsAgain } from './agents/agents.store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon/daemon.store.ts';
 import { maxRuns, verifiesRest } from './config/config.store.ts';
 import { feedFile, recordFeed } from './feed/feed.store.ts';
@@ -1117,15 +1116,16 @@ const localFields = <T extends object>(step: Workflow, fields: () => T): T | Rec
 /**
  * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
  * rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is filed with
- * no flags and told everything in its brief. Where the rendered folder is not there (`unrendered`), a flag naming a file that is not there
- * would end the session at its start, so its brief tells it its skills whole, read again from where a start of this run's folder finds
- * them (`skillsAgain`). Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by
- * default: as Claude Code's own flag, first among its others (`claude.remoteControl`).
+ * no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`, `renderedIn`) —
+ * gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its start, so its
+ * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to claude.ai,
+ * where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag, first among its
+ * others (`claude.remoteControl`).
  */
 function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
   const dir = agentFilesDir(run, step.name);
   const told =
-    rendersAgent(step) && !isDirectory(dir)
+    rendersAgent(step) && !renderedIn(dir, step)
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
   const rendered = renderedFlags(told, dir);

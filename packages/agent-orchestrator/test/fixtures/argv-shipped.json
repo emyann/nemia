@@ -36,7 +36,7 @@
     "--append-system-prompt-file",
     "<store>/runs/<run>/agents/implement/prompt.md",
     "--plugin-dir",
-    "<store>/runs/<run>/agents/implement/hkb-implementer",
+    "<store>/runs/<run>/agents/implement/nemia-implementer",
     "--permission-mode",
     "auto",
     "--strict-mcp-config",

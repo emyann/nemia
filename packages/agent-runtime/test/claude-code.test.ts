@@ -481,19 +481,19 @@ const EVERYTHING = {
 test("Claude Code's own flags (`config.claude`) are handed over as written, after the variadic lists and directly before the mode — on a job, on claude -p's other spec and on a background session", async () => {
   const claude = {
     appendSystemPromptFile: '/a/prompt.md',
-    pluginDir: ['/a/hkb-x', '/a/hkb-y'],
-    settings: '{"outputStyle":"hkb-x:no-coding"}',
+    pluginDir: ['/a/nemia-x', '/a/nemia-y'],
+    settings: '{"outputStyle":"nemia-x:no-coding"}',
     bare: true as const,
   };
   const want = [
     '--append-system-prompt-file',
     '/a/prompt.md',
     '--plugin-dir',
-    '/a/hkb-x',
+    '/a/nemia-x',
     '--plugin-dir',
-    '/a/hkb-y',
+    '/a/nemia-y',
     '--settings',
-    '{"outputStyle":"hkb-x:no-coding"}',
+    '{"outputStyle":"nemia-x:no-coding"}',
     '--bare',
   ];
   const { claudeDetached } = await import('../src/harness/claude/code.ts');

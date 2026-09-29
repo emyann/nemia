@@ -171,11 +171,14 @@ Each refusal is a `WorkflowError` in the voice `validateLoops` already uses: the
   `DEFAULT_ROUNDS`). So "a route back with no cap" cannot be written. `validateLoops` stays the one place a back edge is judged, and C10
   (§9) points a condition's `loop:` through it.
 - **A loop does not cross a condition.** A round files its whole span again (`loopSpan`), and a condition in it would be asked again
-  after its followers were filed, which the rule above refuses. So a loop's span holds no condition, and no step with `when:` but its
-  target: `review: \`loop: plan\`, and triage, a condition, is between plan and review: a round would ask it again after its routes were
-  taken. Loop back to a step after triage, on one route.` A loop may run on one route: its target says `when:`, and the looping step
-  follows it. On another route both are `skipped`, and a skipped step says no `again`, so no round is due. A loop across a join is already
-  refused, because a loop's steps are a chain (`validateLoops`).
+  after its followers were filed, which the rule above refuses. So a loop's span holds no condition but the looping step itself, and no
+  step with `when:` but its target: `review: \`loop: plan\`, and triage, a condition, is between plan and review: a round would ask it
+  again after its routes were taken. Only the step that says \`loop:\` may be a condition. Loop back to a step after triage, on one
+  route.` The looping step is excepted because it is never asked again after a follower is filed. When it answers the route its `loop:`
+  takes (C10's `again`), a round is filed and none of its followers is. When it answers another route, its followers are filed and no
+  round is due. The route `loop:` takes counts as taken for the rule that every route has a taker. A loop may run on one route: its target
+  says `when:`, and the looping step follows it. On another route both are `skipped`, and a skipped step says no `again`, so no round is
+  due. A loop across a join is already refused, because a loop's steps are a chain (`validateLoops`).
 - A condition that no route of another condition can reach is still reachable through `after`. An unreachable step can only arise from a
   `when:` that names no declared route, and that is refused above.
 

@@ -3,8 +3,7 @@
  * refuses before the engine is asked (`sayRefusal`), and how `wf ls` and `wf decide` show them (`saidWord`, `saidLines`). Pure.
  */
 import type { Workflow } from '../step/step.ts';
-import { tryOf } from '../retry.ts';
-import { fenced, prunedWords, type Run, type TaskPhase } from '../record/record.ts';
+import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 
 /**

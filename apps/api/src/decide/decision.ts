@@ -186,8 +186,8 @@ function lessonOf(touched: readonly Touched[]): Lesson {
  * command to copy and run. So an offer worded in the package goes in here in the same change (CLAUDE.md).
  *
  * A held run (`wf hold`) has no offer for this to read: `decisionOf` answers it `holding` before any line is made. The package's own lines
- * say the hold where they would offer a verb — `held until a-1 ships; once more is asked once the hold lifts` (`heldLater` in run.ts) — a
- * sentence with no `wf` verb in it, which would reach a person as a command to run if one got here.
+ * say the hold where they would offer a verb — `held until a-1 ships; once more is asked once the hold lifts` (`heldLater` in
+ * round/round.ts) — a sentence with no `wf` verb in it, which would reach a person as a command to run if one got here.
  */
 const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --fresh| --budget <amount>| --message "<(?:objection|why)>")?)/;
 

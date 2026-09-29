@@ -5,13 +5,14 @@
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
-import { tryOf, type RetryAsk } from '../retry.ts';
+import type { RetryAsk } from '../retry/index.ts';
 import {
   andList,
   firstLine,
   refusedCheck,
   SETTLED,
   TRIED_FROM,
+  tryOf,
   type Landed,
   type Run,
   type StepStatus,
@@ -19,7 +20,7 @@ import {
 } from '../record/record.ts';
 import { approvalOf, approvedFirst, branchWord, hasGate, landsOnCheck, resultOnBase, type BranchStanding } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import type { Assessment } from '../run.ts';
+import type { Assessment } from '../tick/assess.ts';
 
 /**
  * What the session of an ending that lands on its check is denied beyond its own `disallowedTools:`: the two commands that commit a staged

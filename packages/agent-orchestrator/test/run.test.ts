@@ -143,12 +143,12 @@ import {
   sessionModel,
   signoffsSpent,
   spentAsks,
-  tryOf,
   type EarlierTry,
   type RetryAsk,
   type RetryHow,
   type RetryMode,
-} from '../src/retry.ts';
+} from '../src/retry/retry-ask.ts';
+import { tryOf } from '../src/record/record.ts';
 import {
   firstFiledAt,
   runStartedAt,

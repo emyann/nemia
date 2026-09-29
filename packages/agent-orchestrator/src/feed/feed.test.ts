@@ -14,8 +14,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from 'agent-runtime';
 import type { Run } from '../record/record.ts';
-import { feedPhase, feedWords, listing } from '../run.ts';
-import { feedChanges, foldFeed, type FeedLine } from './feed.ts';
+import { listing } from '../list/list.ts';
+import { feedChanges, feedPhase, feedWords, foldFeed, type FeedLine } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-feed-');

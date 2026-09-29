@@ -13,10 +13,10 @@ import type { MergeState } from './ending/ending.ts';
 import { pruneAgain, pruneRefusal, type Pruning } from './prune/prune.ts';
 import { filesPrunedWords, isGitRun, namesInOrder, type Pruned, type Run } from './record/record.ts';
 import { approvedFirst, landsOnCheck } from './status/status.ts';
+import { decision, type Decision } from './decide/decide.ts';
 import {
   branchFates,
   checkLogsOf,
-  decision,
   forgetRefusal,
   heldWorktree,
   idRefusal,
@@ -24,10 +24,9 @@ import {
   runWorktrees,
   type AskName,
   type BranchFate,
-  type Decision,
   type ForgetHow,
   type Forgot,
-} from './run.ts';
+} from './forget/forget.ts';
 import {
   HOME,
   askFile,

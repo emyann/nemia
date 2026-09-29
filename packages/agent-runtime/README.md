@@ -1053,7 +1053,7 @@ runner reports how long a session has been quiet, and `decide` records what came
 **`stated` is a fact, and the engine does not judge it** (stage 4a, 2026-09-23). Whether an end without its statement is
 a failure, and whether its session is told to sign off, is the workload's question, so it is the layer above's: the
 orchestrator reads `stated: false` as `unsigned`, and continues the session once a round with a sign-off nudge
-(`closeoutAsked` and `endWords` in `agent-orchestrator/src/views.ts`, `retriesDue` in its `run.ts`). The task here settles
+(`closeoutAsked` and `endWords` in `agent-orchestrator/src/views.ts`, `retriesDue` in its `retry/retry.ts`). The task here settles
 as its harness ended it: it is not retried, not continued, and nobody is nudged. `ae show`
 and `ae feed` print such an end `done (no statement)`. The key is written only on an end read off a sighting of a task
 that asked for a statement; an end with no `stated` key — a journal written before, or a task that asked for nothing — is

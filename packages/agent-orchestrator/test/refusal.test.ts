@@ -105,7 +105,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
 
 /** The modules each entry the api loads is pinned to: its own files and `effect/Data`'s, measured on the pinned `effect`. */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 42, effect: 14 },
+  'agent-orchestrator/run': { all: 55, effect: 14 },
   'agent-orchestrator/workflow': { all: 30, effect: 14 },
   'agent-orchestrator/effect': { all: 16, effect: 14 },
 };

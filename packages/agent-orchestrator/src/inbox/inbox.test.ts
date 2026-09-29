@@ -23,7 +23,7 @@ import {
   workflowAt,
   type InboxListing,
 } from './inbox.ts';
-import { fromNote } from '../run.ts';
+import { fromNote } from '../start/inputs.ts';
 
 /**
  * A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as

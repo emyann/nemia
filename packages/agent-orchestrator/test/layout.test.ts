@@ -234,9 +234,37 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
   const wait = files.get('src/wait/wait.ts')!;
   files.set('src/wait/wait.ts', `${wait}\nimport { assess } from '../run.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/cap/cap.ts', 'src/prune/prune.ts', 'src/run.ts', 'src/say/say.ts', 'src/wait/wait.ts'],
+    [
+      'src/brief/brief-sections.ts',
+      'src/brief/brief.ts',
+      'src/brief/index.ts',
+      'src/cancel/cancel.ts',
+      'src/cap/cap.ts',
+      'src/decide/decide.ts',
+      'src/feed/feed.ts',
+      'src/forget/forget.ts',
+      'src/gate/gate.ts',
+      'src/list/list.ts',
+      'src/prune/prune.ts',
+      'src/retry/index.ts',
+      'src/retry/retry.ts',
+      'src/round/round.ts',
+      'src/run.ts',
+      'src/say/say.ts',
+      'src/tick/assess.ts',
+      'src/wait/wait.ts',
+    ],
   ]);
   files.set('src/wait/wait.ts', `${wait}\nimport type { Assessment } from '../run.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), []);
+});
+
+test('REFUSED on the source: a value import from a part cut out of run.ts back to the assessment closes a cycle; the type is let through', () => {
+  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
+  const round = files.get('src/round/round.ts')!;
+  files.set('src/round/round.ts', `${round}\nimport { assess } from '../tick/assess.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), [['src/retry/index.ts', 'src/retry/retry.ts', 'src/round/round.ts', 'src/tick/assess.ts']]);
+  files.set('src/round/round.ts', `${round}\nimport type { Assessment } from '../tick/assess.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
@@ -319,6 +347,18 @@ test('REFUSED on the source: a file outside keys/ importing its readers past key
   assert.deepEqual(
     faceBreaks(files, (f) => importsIn(f === 'src/tick.ts' ? `${read(f)}\nimport { toolsOf } from './keys/tools.ts';` : read(f))),
     ['src/tick.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
+  );
+});
+
+test('REFUSED on the source: a file outside retry/ or brief/ importing their pure code past the face', () => {
+  const files = sourceFiles();
+  const planted = `import { retryable } from './retry/retry.ts';\nimport { composeBrief } from './brief/brief.ts';`;
+  assert.deepEqual(
+    faceBreaks(files, (f) => importsIn(f === 'src/verbs.ts' ? `${read(f)}\n${planted}` : read(f))),
+    [
+      'src/verbs.ts imports src/brief/brief.ts: import src/brief/index.ts, the face of src/brief/',
+      'src/verbs.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
+    ],
   );
 });
 

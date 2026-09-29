@@ -13,7 +13,7 @@ import type { Workflow } from '../step/step.ts';
 import type { Run, TaskPhase } from '../record/record.ts';
 import { MOMENTUM, stepMomentum } from '../status/status.ts';
 import { hasStarted, runReady } from '../wait/wait.ts';
-import type { Assessment } from '../run.ts';
+import type { Assessment } from '../tick/assess.ts';
 
 /**
  * The pool each harness's sessions count against. Claude Code's job and its background session are one subscription, so they share one

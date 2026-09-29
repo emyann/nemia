@@ -10,16 +10,16 @@ import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } f
 import type { Consumed } from './radius.ts';
 import type { Workflow } from './step/step.ts';
 import { resultSteps } from './branches/branches.ts';
-import type { CloseoutAsked, Run, StepRecord, TaskPhase } from './record/record.ts';
+import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from './record/record.ts';
 import type { Said } from './say/say.ts';
 import { taskSpend, type SpendOf } from './status/status.ts';
 import { gated, type ParentRun } from './wait/wait.ts';
-import { decision, stepTasks } from './run.ts';
+import { decision } from './decide/decide.ts';
 import { parseCloseout, type Closeout } from './closeout/closeout.ts';
 import { signedAndHeld, taskUsage } from './timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
-import { continuesFrom } from './retry.ts';
+import { continuesFrom } from './retry/index.ts';
 
 /**
  * The engine's task phases, narrowed to what a run cares about.
@@ -246,7 +246,7 @@ export const harnessBlocked =
  * detached ones never do. Costs no observation of its own: the engine read it on the same pass it read the phase.
  *
  * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `waitingWords` and `harnessWaitLine` in
- * run.ts, which is the only place this repository turns the harness's word into a sentence.
+ * list/list.ts, which is the only place this repository turns the harness's word into a sentence.
  */
 export const waitingOf =
   (views: ReadonlyMap<string, TaskView>) =>
@@ -264,7 +264,7 @@ export const waitingOf =
  * says the current try's denials, and a try filed after them starts with none. A try that answers a task held open is a turn of that task
  * (`currentTurn`), and says the denials of its own attempts: what the turn it answered was denied was that try's.
  *
- * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in run.ts.
+ * Exported, log-free, for a consumer that words a step as `wf ls` does. The words themselves are `deniedWords` in list/list.ts.
  */
 export const deniedOf =
   (views: ReadonlyMap<string, TaskView>) =>

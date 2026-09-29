@@ -5,7 +5,7 @@
 import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
-import type { Assessment } from '../run.ts';
+import type { Assessment } from '../tick/assess.ts';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the

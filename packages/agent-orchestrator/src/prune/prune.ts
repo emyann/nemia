@@ -5,7 +5,7 @@
 import { andList, isGitRun, prunedWords, type Pruned, type Run } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
-import type { Decision } from '../run.ts';
+import type { Decision } from '../decide/decide.ts';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `wf prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>

@@ -20,7 +20,7 @@ import {
 } from '../record/record.ts';
 import { approvalOf, approvedFirst, branchWord, hasGate, landsOnCheck, resultOnBase, type BranchStanding } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import type { Assessment } from '../run.ts';
+import type { Assessment } from '../tick/assess.ts';
 
 /**
  * What the session of an ending that lands on its check is denied beyond its own `disallowedTools:`: the two commands that commit a staged

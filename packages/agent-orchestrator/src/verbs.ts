@@ -11,8 +11,12 @@ import { tryOf, type Acceptance, type Approval, type Hold, type Run } from './re
 import { sayRefusal, type Said } from './say/say.ts';
 import { approvedFirst, type RoundAsk } from './status/status.ts';
 import { holdRefusal } from './wait/wait.ts';
-import { acceptAsk, approvalRefusal, assess, cancelPlan, idRefusal, retryable, retryRefusal, roundAsk, type CancelPlan } from './run.ts';
-import type { RetryAsk, RetryHow } from './retry/index.ts';
+import { idRefusal } from './forget/forget.ts';
+import { cancelPlan, type CancelPlan } from './cancel/cancel.ts';
+import { assess } from './tick/assess.ts';
+import { approvalRefusal } from './gate/gate.ts';
+import { acceptAsk, roundAsk } from './round/round.ts';
+import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './retry/index.ts';
 import {
   acceptFile,
   acceptanceIn,

@@ -146,8 +146,8 @@ function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
 
 /**
  * The fence a try was filed with, in the words the workflow uses for it: a task filed `bypassPermissions` for a codex step whose record
- * reads `sandbox: danger-full-access` (`asNamed` reads a frozen `permissionMode: bypassPermissions` so) is that sandbox — Codex runs both
- * `-s danger-full-access` — and not a fence of the try's own.
+ * reads `sandbox: danger-full-access` (a step frozen with `permissionMode: bypassPermissions`, written back under its sandbox) is that
+ * sandbox — Codex runs both `-s danger-full-access` — and not a fence of the try's own.
  */
 const filedFence = (filed: string | null, workflow: string | null): string | null =>
   filed === 'bypassPermissions' && workflow === 'danger-full-access' ? workflow : filed;

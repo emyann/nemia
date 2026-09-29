@@ -57,6 +57,7 @@ const {
   list,
   listRuns,
   markCancelled,
+  Missing,
   missingArtifacts,
   parentOf,
   phaseOfView,
@@ -4997,8 +4998,8 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
     await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedWith(pattern), argv.join(' '));
   await assert.rejects(
     main(['retry', 'no-such-run', 'implement', '--budget=5'], e),
-    /^Error: no such run: no-such-run/,
-    'read, and the run is looked for',
+    (err: unknown) => err instanceof Missing && err.message === "no such run: no-such-run  (try 'wf ls')",
+    'read, and the run is looked for: refused as Missing',
   );
 });
 

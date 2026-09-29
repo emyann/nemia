@@ -4455,3 +4455,40 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
   assert.match(other, /data-workflow="notes"/);
   assert.doesNotMatch(other, /data-try-tag/);
 });
+
+test('REFUSED: the Debug panel is closed by default, and reads and draws nothing of the path while it is', async () => {
+  const { DebugPanel } = await import('../src/components/DebugPanel.tsx');
+  const client = new QueryClient();
+  const step = { name: 'implement', taskId: 't-1', status: 'running', tries: [{ try: 1, current: true }] };
+  const html = renderToStaticMarkup(
+    createElement(QueryClientProvider, { client }, createElement(DebugPanel, { run: { id: 'r-1' } as never, step: step as never })),
+  );
+  assert.match(html, /<section aria-label="Debug"/);
+  assert.match(html, /aria-expanded="false"[^>]*>▸ Debug<\/button>/);
+  assert.doesNotMatch(html, /data-path|data-machine|The path/, 'no path, graph or timeline drawn while closed');
+  assert.equal(client.getQueryCache().getAll().length, 0, 'and nothing read: no machine and no path');
+});
+
+test('a lifecycle state lit is marked data-lit and filled amber; a route taken is drawn heavier in --edge-taken, and marked data-taken', async () => {
+  const { MachineNode } = await import('../src/components/MachineNode.tsx');
+  const { MachineEdge } = await import('../src/components/MachineEdge.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const drawing = drawMachine({
+    initial: 'a',
+    states: ['a', 'b'],
+    final: ['b'],
+    edges: [{ from: 'a', event: 'GO', to: 'b', action: 'go' }],
+  });
+  const node = (lit: boolean) =>
+    renderToStaticMarkup(
+      createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...drawing.states[0], lit } } as never)),
+    );
+  assert.match(node(true), /data-state="a"[^>]*data-lit="true"[^>]*class="[^"]*ring-amber-400/);
+  assert.doesNotMatch(node(false), /data-lit|ring-amber/);
+  const edge = (taken: boolean) =>
+    renderToStaticMarkup(
+      createElement(ReactFlowProvider, null, createElement(MachineEdge, { data: { ...drawing.routes[0], taken } } as never)),
+    );
+  assert.match(edge(true), /stroke:var\(--edge-taken\);stroke-width:3/);
+  assert.match(edge(false), /stroke:var\(--edge-done\);stroke-width:1.5/);
+});

@@ -655,8 +655,8 @@ test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not 
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined);
   await assert.rejects(
     e.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { codex: { x: 1 } } as never }),
-    /`config\.codex` is not a harness argument/,
-    'a key that is no harness argument, `codex` among them, is refused: there is no bag for Codex',
+    /`codex\.x` is not one of Codex's arguments/,
+    "Codex's bag holds its own arguments, and a key that is none of them is refused",
   );
 });
 

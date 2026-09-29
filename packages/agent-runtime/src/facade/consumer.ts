@@ -190,7 +190,9 @@ export type Engine = {
    * on a harness with no context window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's
    * flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
    * a task whose `background` is not true); a `background` that is not true or false, or `true` on any harness not
-   * brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; and, on `'claude'`, a
+   * brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; a `codex` that is not
+   * an object holding only `trustFrom`, an absolute path, or one on any harness but a `HarnessSpec` with `codexArgs`, which is
+   * Codex; and, on `'claude'`, a
    * `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a `PromiseRunner` is asked
    * nothing of its own.
    */
@@ -468,10 +470,12 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
  *    runs a prompt and exits — `claude -p` among them, whose help offers Remote Control only to an interactive session;
  * 5. a `claude` on a `HarnessSpec` without `claudeFlags`: its session would start without them, and a body meant for the
  *    system prompt would be read by nobody;
- * 6. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
+ * 6. a `codex` on any harness but a `HarnessSpec` with `codexArgs` (`codexArgsMisplaced`): its session would start without
+ *    the trust it names;
+ * 7. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
- * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl` and a `claude`, and asked
- * nothing of its own.
+ * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude` and a
+ * `codex`, and asked nothing of its own.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {
@@ -515,15 +519,33 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
       .map((name) => `\`${name}\``);
     return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
   }
-  return (
-    h === 'claude'
-      ? claudeCodeRefuses
-      : h === 'claude-bg'
-        ? claudeBgRefuses
-        : isSpec(h)
-          ? h.refuses
-          : isRemote(h)
-            ? remoteRefuses(spec.harness)
-            : undefined
-  )?.(spec);
+  return codexArgsMisplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
+};
+
+/** What a harness refuses in its own words: Claude Code's lists, a spec's `refuses`, a remote agent's; a `PromiseRunner`, nothing. */
+const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string | undefined) | undefined =>
+  h === 'claude'
+    ? claudeCodeRefuses
+    : h === 'claude-bg'
+      ? claudeBgRefuses
+      : isSpec(h)
+        ? h.refuses
+        : isRemote(h)
+          ? remoteRefuses(name)
+          : undefined;
+
+/**
+ * Why a task's `config.codex` cannot go to its harness — or `undefined`: Codex's arguments on a harness that is not Codex,
+ * Claude Code or a remote agent or a `HarnessSpec` without `codexArgs`, which would start its session without them. The
+ * refusal names the harnesses of this engine that take them. A `PromiseRunner` is the consumer's own, and asked nothing.
+ */
+const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  const isCodex = (o: HarnessConfig) => isSpec(o) && o.codexArgs === true;
+  const h = harnesses[spec.harness];
+  const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
+  if (spec.config?.codex === undefined || ownRunner || isCodex(h)) return undefined;
+  const takers = Object.keys(harnesses)
+    .filter((name) => isCodex(harnesses[name]))
+    .map((name) => `\`${name}\``);
+  return `\`codex\` gives Codex arguments of its own, and the \`${spec.harness}\` harness is not Codex: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`codex\` off.` : "Leave `codex` off: none of this engine's harnesses is Codex."}`;
 };

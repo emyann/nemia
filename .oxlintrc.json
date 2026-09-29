@@ -854,15 +854,15 @@
     {
       "files": ["packages/agent-runtime/src/facade/consumer.ts"],
       "rules": {
-        "complexity": ["error", { "max": 28 }],
-        "sonarjs/cognitive-complexity": ["error", 37]
+        "complexity": ["error", { "max": 25 }],
+        "sonarjs/cognitive-complexity": ["error", 27]
       }
     },
     {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
         "complexity": ["error", { "max": 31 }],
-        "sonarjs/cognitive-complexity": ["error", 28]
+        "sonarjs/cognitive-complexity": ["error", 27]
       }
     },
     {

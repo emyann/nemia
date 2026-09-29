@@ -3,7 +3,7 @@
  * the Agent SDK's runner, as the A2A seam and the doors take them. A file of `core/` imports `seam.ts` and `args.ts` by their own path.
  */
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './args.ts';
-export type { HarnessArgs } from './args.ts';
+export type { CodexArgs, HarnessArgs } from './args.ts';
 export { sdkRunner } from './sdk.ts';
 export { Runner, RunnerError, composite, testOps } from './seam.ts';
 export type {

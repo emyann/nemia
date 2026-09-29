@@ -57,6 +57,7 @@ const harnessArgs = {
   background: Schema.optional(Schema.Boolean),
   budgetUsd: Schema.optional(Schema.Finite),
   claude: Schema.optional(ClaudeFlagsSchema),
+  codex: Schema.optional(Schema.StructWithRest(Schema.Struct({ trustFrom: Schema.optional(Schema.String) }), Rest)),
 };
 
 /** `FORMER_ARGS`: a former harness argument that Claude Code's flag of the same key replaces, which `upgrade` moves into `config.claude`. */

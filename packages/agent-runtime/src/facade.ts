@@ -36,6 +36,9 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts
 /** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { denialText, nameFor } from './core/index.ts';
+/** The task's lifecycle as plain data — states, edges, first and final states — for a board to draw; never the machine or its move. */
+export { lifecycleGraph } from './core/index.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState } from './core/index.ts';
 export { refusedText } from './core/engine/index.ts';
 export { retiredKeyRefusal } from './core/engine/index.ts';
 export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/index.ts';

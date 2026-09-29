@@ -9,6 +9,7 @@ import { capabilitiesWithSteps, McpAsker, repoOf } from './capabilities/index.ts
 import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
+import { machines } from './machines/machines.ts';
 import { runs } from './runs/index.ts';
 import { steps } from './steps/index.ts';
 import { Engine, StoreRoot } from './store.ts';
@@ -77,6 +78,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - asks/asks.ts — a person's asks of a run: a try, a round, words for a running session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
+ * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
  *
  * A route lets the orchestrator's refusals through, and `onError` answers each from `REFUSAL_STATUS`, `{ error }` in its words
  * (`answerError`). The two that carry more than a kind are the one exception, answered by their routes with what they carry: an
@@ -106,6 +108,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', asks)
     .route('/', steps)
     .route('/', feed)
+    .route('/', machines)
     .onError(answerError);
   return { app, runtime };
 }

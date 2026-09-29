@@ -2,13 +2,15 @@
  * XState stays inside the lifecycle: `src/core/lifecycle.ts` is the one file that imports it, no other
  * package of the workspace depends on it or imports it, and neither of the runtime's entries hands a consumer an XState name
  * or value, the machine, or the readings `decide` moves by. The machine is the runtime's judgement, as `decide` is, and a
- * consumer that could call it would be deciding beside the pass.
+ * consumer that could call it would be deciding beside the pass. One value of the lifecycle's leaves, by name: `lifecycleGraph`,
+ * while it is a function whose answer is plain data, which a board draws and nothing can move a task by.
  *
  * Each rule is made to refuse planted source first: a scan that read nothing, or matched nothing, passes too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import path from 'node:path';
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -151,10 +153,29 @@ test('XState is a dependency of the runtime alone, pinned', () => {
 /** The readings and the move a consumer must not be handed: they are `decide`'s, which no entry exports either. */
 const JUDGEMENT = ['lifecycleOf', 'observe', 'spawnRefused', 'settledQuiet', 'Lifecycle'];
 
-/** What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/core/lifecycle.ts` exports, or a reading `decide` moves by. */
+/** The lifecycle's values an entry may export by name: each a function that takes nothing and answers plain data. */
+const AS_DATA = ['lifecycleGraph'];
+
+/** Whether `value` is a function that takes nothing and answers what a JSON round trip gives back unchanged: no machine, no move. */
+const answersPlainData = (value: unknown): boolean => {
+  if (typeof value !== 'function' || value.length !== 0) return false;
+  try {
+    const answer: unknown = value();
+    return answer !== undefined && isDeepStrictEqual(answer, JSON.parse(JSON.stringify(answer)));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * What an entry hands a consumer of the lifecycle's: an XState name or value, a value `src/core/lifecycle.ts` exports, or a
+ * reading `decide` moves by. A name of `AS_DATA` is refused unless its value answers plain data.
+ */
 function exportBreaches(entry: string, exported: Record<string, unknown>, inside: { names: Set<string>; values: Set<unknown> }): string[] {
+  const lifecycles = (name: string, value: unknown) =>
+    AS_DATA.includes(name) ? !answersPlainData(value) : inside.names.has(name) || inside.values.has(value);
   return Object.entries(exported).flatMap(([name, value]) =>
-    inside.names.has(name) || inside.values.has(value) || JUDGEMENT.includes(name)
+    JUDGEMENT.includes(name) || lifecycles(name, value)
       ? [
           `${entry} exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`,
         ]
@@ -196,4 +217,18 @@ test('REFUSED: an entry that exports an XState name, the machine or its move ren
     says('agent-runtime', 'move'),
   ]);
   assert.deepEqual(exportBreaches('agent-runtime', { lifecycleOf }, inside), [says('agent-runtime', 'lifecycleOf')]);
+});
+
+test('REFUSED: the machine under the name let through as data, as a value or as what a function answers', async () => {
+  const inside = await insides();
+  const lifecycle = await import('../src/core/lifecycle.ts');
+  const says = (name: string) =>
+    `agent-runtime exports ${name}, which is the lifecycle's: a consumer reads what was decided (fold, views, the report), never the machine`;
+  assert.deepEqual(exportBreaches('agent-runtime', { lifecycleGraph: lifecycle.lifecycleGraph }, inside), [], 'not refused: the graph');
+  assert.deepEqual(exportBreaches('agent-runtime', { lifecycleGraph: () => lifecycle.MACHINE }, inside), [says('lifecycleGraph')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { lifecycleGraph: lifecycle.MACHINE }, inside), [says('lifecycleGraph')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { lifecycleGraph: () => lifecycle.transition }, inside), [says('lifecycleGraph')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { lifecycleGraph: lifecycle.transition }, inside), [says('lifecycleGraph')]);
+  assert.deepEqual(exportBreaches('agent-runtime', { graph: lifecycle.lifecycleGraph }, inside), [says('graph')], 'by its name only');
+  assert.deepEqual(exportBreaches('agent-runtime', { MACHINE: lifecycle.MACHINE }, inside), [says('MACHINE')]);
 });

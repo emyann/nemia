@@ -44,7 +44,12 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `packages/agent-runtime/src/core/engine/journal.ts`, `Runner` in `src/harness/seam.ts`, each `Layer.succeed(Tag)(Tag.of({ ... }))`.
 - A value with a default is a `Context.Reference`, given by `Layer.succeed`: `TickMemo` and `tickMemoLayer` in `src/core/engine/memo.ts`.
 - A layer built from another service is `Layer.unwrap(Effect.gen(...))`: `a2aRunner` in `src/a2a/client.ts`.
-- Layers are joined with `Layer.mergeAll` and provided once, where the program starts: `createEngine` in `src/facade/engine.ts`.
+- A service made from options is `Layer.effect(Tag, make(options))` under a static `layer`: `Engine` in `src/service/engine.ts`,
+  whose `make` joins the engine's layers with `Layer.mergeAll` and provides them to each verb.
+- A service changed in one verb is a layer over it: `Layer.effect(Tag, ...)` that reads the service and returns `Tag.of({ ...e, verb })`,
+  `.pipe(Layer.provide(inner))` (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`).
+- A test hands its own implementation as `Layer.succeed(Tag)(Tag.of({ ... }))`, a verb it does not keep an `Effect.die` naming
+  itself: `board` in `packages/agent-orchestrator/test/engine-board.ts`.
 
 ## Verbs
 
@@ -58,8 +63,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - The runtime's errors are `Schema.TaggedError` classes from `effect`, each with a `message`: `FileRefused` in
   `src/core/engine/filing.ts`, `TickRefused` in `src/core/engine/engine.ts`, `JournalError` in `src/core/engine/journal.ts`,
   `RunnerError` in `src/harness/error.ts`. A verb fails with
-  `return yield* Effect.fail(new TickRefused({ message }))`, and a caller picks one out with `Effect.catchTag('AdmitRefused', ...)`
-  (`src/facade/engine.ts`).
+  `return yield* Effect.fail(new TickRefused({ message }))`, and a caller picks one out with `Effect.catchTag('TickMemoDiverged', ...)`
+  (`src/service/engine.ts`).
 - A refusal written for a file that must not load the `effect` barrel — a pure file, or the orchestrator's refusals — is a
   `Data.TaggedError` imported from `effect/Data`, never from `effect`, and carries `exitCode: 2` as every refusal here does
   (the root `CLAUDE.md`, *Errors say what to do next*): `Missing`, `Conflict` and `Invalid` in
@@ -69,8 +74,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
 
 ## Plain faces
 
-- Consumers never adopt Effect. `agent-runtime` is Promises: `createEngine` in `src/facade/engine.ts` runs each verb with
-  `Effect.runPromise(e.pipe(Effect.provide(layer)))` and turns a tagged refusal into a plain `Error`.
+- Consumers never adopt Effect. `agent-runtime` is Promises: `promiseEngine` in `src/facade/engine.ts` builds an `Engine` layer
+  once and runs each verb with `Effect.runPromise`, a tagged refusal turned into a plain `Error`; `createEngine` is it over
+  `Engine.layer(options)`.
 - `agent-runtime/effect` (`src/index.ts`) is the one door that hands out Effect values, and it does not export `decide`.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
 

@@ -2806,7 +2806,7 @@ What it leaves:
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
 `POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate`, `atGate`,
-`approvalRefusal` and `approvedSection` in `run.ts`, `approve` in `verbs.ts`, `readApprovals` in `store.ts`.
+`approvalRefusal` and `approvedSection` in `run.ts`, `approve` in `verbs.ts`, `readApprovals` in `record/record.store.ts`.
 
 What was built, four commits:
 

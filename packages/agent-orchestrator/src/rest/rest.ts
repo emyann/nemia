@@ -4,7 +4,7 @@
  * (`evictedBy`). Whether its result branches still stand where it saw them is `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
- * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in store.ts), each of its tasks'
+ * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its tasks'
  * journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and judges every run afresh. Nothing
  * is written for it, and no verb, `wf ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.
  */

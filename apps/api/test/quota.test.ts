@@ -7,6 +7,7 @@
 import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect, Exit } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineTempDir, scratch } from './scratch.ts';
@@ -25,6 +26,7 @@ const {
   QUOTA_MARK_PERCENT,
   quotaOf,
   readQuota,
+  usageAsk,
   usageEnv,
 } = await import('../src/factory/quota.ts');
 type Quota = import('../src/factory/quota.ts').Quota;
@@ -436,16 +438,55 @@ test('REFUSED: a claude that never answers is ended at the timeout, and a read t
   const q = await readQuota({ waitMs: 50, timeoutMs: 400 });
   assert.equal(q.state, 'asking');
   assert.equal(q.said, 'Asking Claude Code for the quota…');
-  await new Promise((r) => setTimeout(r, 600));
-  const after = await readQuota({ waitMs: 50, timeoutMs: 400 });
+  let after = q;
+  for (const bound = Date.now() + 5_000; after.state === 'asking' && Date.now() < bound;)
+    after = await readQuota({ waitMs: 50, timeoutMs: 400 });
   assert.equal(after.state, 'timeout');
   assert.match(after.said!, /^Claude Code did not answer the usage request within 1 s:/);
-  const pid = Number(lastAskEnv().pid);
-  await new Promise((r) => setTimeout(r, 100));
   assert.throws(
-    () => process.kill(pid, 0),
+    () => process.kill(Number(lastAskEnv().pid), 0),
     (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
-    'the silent claude is gone',
+    'the silent claude is gone once the ask has its outcome',
   );
   usageAnswer(recorded('plan'));
+});
+
+test('REFUSED: an ask that times out has ended its claude by the time it resolves', async () => {
+  fresh();
+  usageAnswer(fs.readFileSync(answer, 'utf8'), 'silent');
+  try {
+    const earlier = lastAskEnv().pid;
+    assert.deepEqual(await askUsage({ timeoutMs: 1_000 }), { kind: 'timeout', ms: 1_000 });
+    const pid = Number(lastAskEnv().pid);
+    assert.notEqual(String(pid), earlier, 'the ask started its claude, which wrote its pid before it went silent');
+    assert.throws(
+      () => process.kill(pid, 0),
+      (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
+      `the silent claude (pid ${pid}) was sent SIGTERM and waited for, not left to end after the answer`,
+    );
+  } finally {
+    usageAnswer(recorded('plan'));
+  }
+});
+
+test('REFUSED: an ask interrupted before it has an outcome ends its claude before the interruption returns', async () => {
+  fresh();
+  usageAnswer(fs.readFileSync(answer, 'utf8'), 'silent');
+  try {
+    const earlier = lastAskEnv().pid;
+    const stop = new AbortController();
+    const exit = Effect.runPromiseExit(usageAsk(), { signal: stop.signal });
+    for (const bound = Date.now() + 5_000; lastAskEnv().pid === earlier && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
+    const pid = Number(lastAskEnv().pid);
+    assert.notEqual(String(pid), earlier, 'the ask started its claude');
+    stop.abort();
+    assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
+    assert.throws(
+      () => process.kill(pid, 0),
+      (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
+      `the silent claude (pid ${pid}) is gone`,
+    );
+  } finally {
+    usageAnswer(recorded('plan'));
+  }
 });

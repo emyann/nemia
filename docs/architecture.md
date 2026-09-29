@@ -59,10 +59,10 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — cap, check, closeout, daemon,
   feed, inbox, meter, plan, rest, timeline, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
-  workflow-store, store, worktree, branches, artifacts and authoring at the top, and daemon.store, feed.store,
-  inbox.store, tally.store, places.store and a2a.store in the folders. They load as a tree. At the bottom are
+  workflow-store, worktree, branches, artifacts and authoring at the top, and record.store, agents.store, daemon.store,
+  feed.store, inbox.store, tally.store, places.store and a2a.store in the folders. They load as a tree. At the bottom are
   record/places.store.ts, workflow-store.ts and meter/tally.store.ts (the pass's meter), which import no store file.
-  store.ts imports only those three, and worktree.ts imports only store.ts and the two others. No other store file is
+  record/record.store.ts imports only those three, and worktree.ts imports only record.store.ts and the two others. No other store file is
   imported by another. Outside the store, only the client and the controllers beneath the CLI import a store file, and
   one of them imports each.
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; views.ts,

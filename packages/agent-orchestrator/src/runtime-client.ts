@@ -24,7 +24,7 @@ import {
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { CHECK } from './check/check.ts';
-import { HOME } from './store.ts';
+import { HOME } from './record/record.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './workflow.ts';
 import { Invalid } from './refusal/refusal.ts';
 

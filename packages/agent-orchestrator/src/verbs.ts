@@ -48,7 +48,7 @@ import {
   stepsOf,
   writeAsk,
   writeHold,
-} from './store.ts';
+} from './record/record.store.ts';
 import { standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, phaseOfView, spendReader, taskPhases } from './views.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from './tick.ts';

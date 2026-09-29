@@ -8,12 +8,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Run } from '../src/run.ts';
-import { scratch } from './scratch.ts';
+import type { Run } from '../run.ts';
+import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-record-read-');
 process.env.WF_ROOT = ROOT;
-const store = await import('../src/store.ts');
+const store = await import('./record.store.ts');
 const {
   UnreadableRecord,
   acceptanceIn,

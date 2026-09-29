@@ -15,8 +15,8 @@
  * The project's former name is refused as the packages' are, outside history and a line that says `PROJECT_MARK`, in these forms
  * (`projectNames`): the upper-case word; the name with its version, spaced or hyphenated, but in a path, since a path that names the
  * checkout names a folder on disk; the lower-case word as a prefix of the machinery — a plugin, a storage key, a client's name, a scratch
- * folder — but for the folder's own name and the earlier project's migration notes; and, in the board's own files (`BOARD`), the word
- * alone. The brand is the name alone: `BRAND` is refused too.
+ * folder — but for the folder's own name, the earlier project's migration notes, and a key an older board wrote in a person's browser
+ * (`LEFT_IN_BROWSER`); and, in the board's own files (`BOARD`), the word alone. The brand is the name alone: `BRAND` is refused too.
  *
  * Turbo caches this package's pass by this package's files, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
@@ -113,6 +113,13 @@ const PROJECT_FORMS: readonly RegExp[] = [
 const PATHED = new RegExp(`[/\\\\-]${OLD_V}|path\\.join\\([^)]*['"\`]${OLD_V}['"\`]`, 'i');
 
 /**
+ * The keys an older board wrote in a person's browser, each quoted whole: the board reads or forgets what is under them, so their names
+ * are the browser's and stay. A key the board writes today is refused: this allows the Factory's narrow arrangement, its dragged steps,
+ * its arrangement and open runs, and a run's arrangement from before `v2`, and no other.
+ */
+const LEFT_IN_BROWSER = new RegExp(`'${OLD}:(?:factory-(?:layout(?::v2)?|steps|open)|canvas-layout:[^':]+)'`, 'g');
+
+/**
  * The board's own files, by path from the repository's root: what it shows is its name, so the lower-case word alone (`BARE`) is refused
  * there too. Elsewhere it is the earlier project, whose migration and ADRs the docs cite.
  */
@@ -121,8 +128,9 @@ const BARE = new RegExp(`(?<![\\w/.-])${OLD}(?![\\w:-])`, 'i');
 const onBoard = (file: string): boolean => BOARD.some((entry) => under(entry, file));
 
 /** Whether one line calls the project by its former name where it is not allowed, `board` for a line of the board's own files. */
-function namesOldProject(line: string, board: boolean): boolean {
-  if (line.includes(PROJECT_MARK)) return false;
+function namesOldProject(said: string, board: boolean): boolean {
+  if (said.includes(PROJECT_MARK)) return false;
+  const line = said.replace(LEFT_IN_BROWSER, "''");
   const [word, versioned, prefix, brand] = PROJECT_FORMS as [RegExp, RegExp, RegExp, RegExp];
   return (
     word.test(line) || (versioned.test(line) && !PATHED.test(line)) || prefix.test(line) || brand.test(line) || (board && BARE.test(line))
@@ -267,7 +275,10 @@ test('REFUSED: the former project name in a title, a package, a label, a plugin,
     `Shipped with ${upper}`,
     `the skills ${upper} ships`,
     `\`${OLD}-planner:plan-a-change\``,
-    `const FACTORY_KEY = '${OLD}:factory-layout:v2';`,
+    `const FACTORY_KEY = '${OLD}:factory-layout:v3';`,
+    `const layoutKey = (runId: string) => \`${OLD}:canvas-layout:v2:\${runId}\`;`,
+    `kept.set('${OLD}:canvas-layout:v2:r-1', saved);`,
+    `const KEY = "${OLD}:factory-open";`,
     `new Client({ name: '${OLD}-api', version: '0.0.0' })`,
     `const tmp = scratch('${OLD}-api-read-');`,
     `pluginDir: ['/a/${OLD}-x']`,
@@ -279,7 +290,7 @@ test('REFUSED: the former project name in a title, a package, a label, a plugin,
   assert.deepEqual(projectNames(`one\ntwo ${OLD}-v2\nthree`), [`2: two ${OLD}-v2`], 'the line is named');
 });
 
-test('a path that names the checkout, the earlier project, a store and the marked line pass; a word that only contains the name is not it', () => {
+test('a path that names the checkout, the earlier project, a store, a key an older board wrote and the marked line pass; a word that only contains the name is not it', () => {
   for (const line of [
     `cwd: '/code/${OLD}-v2',`,
     `path.join('claude', 'projects', '-home-yrnd1-projects-${OLD}-v2', 'x.jsonl')`,
@@ -293,6 +304,9 @@ test('a path that names the checkout, the earlier project, a store and the marke
     `The project was ${OLD} v2 until it was ${PROJECT_MARK}.`,
     `sh${OLD}-x and ${OLD}s: a word of its own`,
     'Nemia — the name alone',
+    `const NARROW_FACTORY_KEY = '${OLD}:factory-layout';`,
+    `const FACTORY_LEFTOVER_KEYS = ['${OLD}:factory-steps', '${OLD}:factory-layout:v2', '${OLD}:factory-open'];`,
+    `const kept = new Map([['${OLD}:canvas-layout:r-1', saved]]);`,
   ])
     assert.deepEqual(projectNames(line), [], line);
 });

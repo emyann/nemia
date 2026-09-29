@@ -212,20 +212,22 @@ const layoutKey = (runId: string) => `nemia:canvas-layout:v2:${runId}`;
 /**
  * The Factory's arrangement, one per browser: where each run's card was left, by run id.
  *
- * `v2`, the key of an arrangement whose cells are wide enough to hold a card's rail. One under the key without it puts its cards a narrower
- * cell apart: it is read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2` one is.
+ * `v2`, the key of an arrangement whose cells are wide enough to hold a card's rail. One under the key an older board wrote puts its cards
+ * a narrower cell apart: it is read only while no `v2` one is saved, widened on the way (`widenLayout`), and forgotten when the first `v2`
+ * one is.
  */
 const FACTORY_KEY = 'nemia:factory-layout:v2';
-const NARROW_FACTORY_KEY = 'nemia:factory-layout';
+const NARROW_FACTORY_KEY = 'hkb:factory-layout';
 
 /** The Factory's open runs, one list per browser, beside its arrangement: whose cards are open on their steps, in the order opened. */
 const FACTORY_OPEN_KEY = 'nemia:factory-open';
 
 /**
- * Where a browser may keep an arrangement of the steps of a graph unfolded beside a Factory card, which nothing reads: forgotten when the
- * floor opens, so it does not sit in a browser for ever.
+ * What a browser may keep for the Factory that nothing reads, each under the key an older board wrote: an arrangement of the steps of a
+ * graph unfolded beside a card, and the arrangement and open runs kept before the keys were `nemia:`. Forgotten when the floor opens, so
+ * they do not sit in a browser for ever.
  */
-const FACTORY_STEPS_KEY = 'nemia:factory-steps';
+const FACTORY_LEFTOVER_KEYS = ['hkb:factory-steps', 'hkb:factory-layout:v2', 'hkb:factory-open'];
 
 export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId), parseLayout, null);
 export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), Object.fromEntries(at));
@@ -247,7 +249,9 @@ export const readFactoryOpen = (): string[] => readAt(FACTORY_OPEN_KEY, parseOpe
 export const saveFactoryOpen = (ids: readonly string[]): void => saveAt(FACTORY_OPEN_KEY, ids);
 export const forgetFactoryOpen = (): void => forgetAt(FACTORY_OPEN_KEY);
 
-export const forgetFactorySteps = (): void => forgetAt(FACTORY_STEPS_KEY);
+export const forgetFactoryLeftovers = (): void => {
+  for (const key of FACTORY_LEFTOVER_KEYS) forgetAt(key);
+};
 
 /** The open runs as they were saved: run ids, each once, in order; none for anything that is not a list of ids. */
 export function parseOpen(raw: string | null): string[] {

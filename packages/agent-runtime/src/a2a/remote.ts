@@ -235,7 +235,7 @@ const sendRefused = (e: unknown): boolean => untaken(e) || REFUSALS.some((E) => 
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, and `then` goes before `nothing was sent`. */
+/** The card `read` gave, or a refusal in words: `what` names the card, its first wrong field follows, then `then`, and that nothing was sent. */
 const taken = (read: { card: AgentCard } | { wrong: string }, what: string, then = ''): AgentCard => {
   if ('wrong' in read) throw new Refusal(`${what}: ${read.wrong}. ${then ? `${then} nothing` : 'Nothing'} was sent.`);
   return read.card;

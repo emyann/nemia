@@ -440,7 +440,6 @@ const OTHER_PROGRAMS = new Set([
   'AUTH_REQUIRED',
   'SubscribeToTask',
   'TaskStore',
-  'supported_interfaces',
   'agentCardHandler',
   'canUseTool',
   'crossSessionInbound',

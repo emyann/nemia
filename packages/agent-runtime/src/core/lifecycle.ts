@@ -7,7 +7,8 @@
  * read off the journal that pass, for an event `observe` read off the journal and the pass's observation. The journal stays
  * the state, a pass carries nothing, and a restart reads the same state from the same journal (`domain.ts`, which is where
  * both readings live). XState is imported by this file alone (`test/xstate-boundary.test.ts`); no entry exports the
- * machine, as none exports `decide`.
+ * machine or its move, as none exports `decide`: `agent-runtime` hands out its graph as plain data (`lifecycleGraph`), which a
+ * board draws.
  *
  * **The states are A2A's `TaskState`, and three of the runtime's own.** `submitted`, `working`, `input-required`,
  * `completed`, `failed` and `canceled` are the protocol's words for what they say. The runtime's own:
@@ -470,8 +471,8 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
 
 /**
  * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,
- * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
- * drawn under its own name, by an id without one.
+ * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-`
+ * in a state's id, so `input-required` is drawn under its own name, by an id without one.
  */
 export const diagram = (machine = MACHINE): string => {
   const id = (s: string) => s.replace(/-/g, '_');
@@ -483,3 +484,20 @@ export const diagram = (machine = MACHINE): string => {
     ...[...FINAL].map((s) => `  ${id(s)} --> [*]`),
   ].join('\n');
 };
+
+/** One edge of the lifecycle, as `lifecycleGraph` hands it to a board: plain strings, never a piece of the machine. */
+export type LifecycleEdge = Edge;
+
+/** The lifecycle as plain data: its first state, every state in the table's order, the final ones, and every edge. */
+export type LifecycleGraph = { initial: LifecycleState; states: LifecycleState[]; final: LifecycleState[]; edges: LifecycleEdge[] };
+
+/**
+ * The shipped lifecycle as data a board draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`). Each call
+ * returns a fresh copy that survives a JSON round trip: it takes nothing, and hands out no machine and no move.
+ */
+export const lifecycleGraph = (): LifecycleGraph => ({
+  initial: CONFIG.initial,
+  states: statesOf(),
+  final: [...FINAL],
+  edges: edgesOf(),
+});

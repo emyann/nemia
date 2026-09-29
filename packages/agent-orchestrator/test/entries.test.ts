@@ -141,6 +141,7 @@ const PINNED: Record<string, string[]> = {
     'lastCeilings',
     'lastPassCost',
     'lessonLine',
+    'lifecycleGraph',
     'list',
     'listAgents',
     'listRuns',

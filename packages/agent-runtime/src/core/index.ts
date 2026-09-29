@@ -6,3 +6,5 @@ export { denialText, fold, nameFor, nameParts, waitsForInput } from './domain.ts
 export type { Attempt, Denial, EndReason, Event, Input, Said, Sighting, State, Usage } from './domain.ts';
 export { SESSION_STATES, formerStateOf, isLive, isSessionState, phaseWordOf, waitsOnPerson } from './session.ts';
 export type { Ended, Outcome, PhaseWord, SessionState } from './session.ts';
+export { lifecycleGraph } from './lifecycle.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState } from './lifecycle.ts';

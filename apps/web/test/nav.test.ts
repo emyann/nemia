@@ -5,11 +5,11 @@ import { NAV } from '../src/components/nav.ts';
 test('the menu starts with the Inbox, and the rest follow in their order', () => {
   assert.deepEqual(
     NAV.map((item) => item.label),
-    ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities'],
+    ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities', 'Machines'],
   );
   assert.deepEqual(
     NAV.map((item) => item.to),
-    ['/inbox', '/', '/runs', '/workflows', '/agents', '/capabilities'],
+    ['/inbox', '/', '/runs', '/workflows', '/agents', '/capabilities', '/machines'],
   );
 });
 
@@ -26,4 +26,5 @@ test("each page lights one place in the menu — a run and its steps lighting Ru
   assert.deepEqual(lit('/inboxes'), [], "refused: a path that only begins with a place's name is not under it");
   assert.deepEqual(lit('/workflowsx/repo'), [], "refused: a path that only begins with a place's name is not under it");
   assert.deepEqual(lit('/agentsx'), [], "refused: a path that only begins with a place's name is not under it");
+  assert.deepEqual(lit('/machinesx'), [], "refused: a path that only begins with a place's name is not under it");
 });

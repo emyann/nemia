@@ -1572,6 +1572,13 @@ next pass that reads it. A harness's `unread` crosses the A2A seam beside its Ta
 something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
 reads an unread harness as nothing.
 
+What `claude agents --all --json` prints is decoded where it is read (`registryOf`, `harness/claude/registry.ts`). A row is ours when it
+is an object named `ae/` with a `state` key; another program's row, an interactive session's (no `state`) and an element that is no object
+are skipped unread. Each row of ours is decoded by `RegistryRowSchema`: a non-empty `sessionId` and `state`, and `status`, `waitingFor`,
+`startedAt` and `pid` of their type or absent (`null` is absent). A listing that is no JSON array, or holds one row of ours that does not
+decode, fails `observe` with a `RunnerError` naming the row, the field, at most 60 characters of what it found, and the fix; so every
+background session it would have listed is unread, never gone, and none is ended `lost` or spawned again until the listing decodes.
+
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
 neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
@@ -1753,6 +1760,7 @@ of pure code sits beside it.
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |

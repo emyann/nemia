@@ -16,6 +16,7 @@ import {
   expectCount,
   expectDrawn,
   expectInside,
+  expectInView,
   expectLeftOf,
   expectMovedAlone,
   expectMovedWith,
@@ -209,6 +210,19 @@ test('a node hanging off the edge of its canvas is refused, naming it — as the
     expectInside(page.locator('.node'), page.locator('#canvas'), 'every step is on the canvas'),
     (err: Error) => err instanceof Refused && err.message === 'every step is on the canvas — respond is outside it',
   );
+});
+
+test('a state below the bottom of a scrolling view is refused, naming both spans — and taken once the view scrolls to it', async () => {
+  const { page } = await pageWith(`<div id="view" style="margin-top:20px;height:200px;overflow-y:auto">
+    <div style="height:600px;position:relative"><div id="state" style="position:absolute;top:400px;height:40px"></div></div>
+  </div>`);
+  const [state, view] = [page.locator('#state'), page.locator('#view')];
+  await assert.rejects(
+    expectInView(state, view, 'the lit state is in view', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the lit state is in view — it runs from 420 to 460, the view from 20 to 220',
+  );
+  await view.evaluate((el) => (el.scrollTop = 300));
+  await expectInView(state, view, 'the lit state is in view', 300);
 });
 
 test('a page that stays light in the dark is refused, and so is one nobody painted', async () => {

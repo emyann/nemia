@@ -307,6 +307,24 @@ async function until(problem: () => Promise<string | null>, assertion: string, t
 }
 
 /**
+ * `element` lies whole inside `frame`'s box, within `timeout`: a state a scrolling body brought into view, not one below its bottom edge.
+ * Both boxes are relative to the viewport.
+ */
+export async function expectInView(element: Locator, frame: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await until(
+    async () => {
+      const [box, view] = await Promise.all([element.boundingBox(), frame.boundingBox()]);
+      if (!box || !view) return 'not drawn';
+      return box.y >= view.y - 1 && box.y + box.height <= view.y + view.height + 1
+        ? null
+        : `it runs from ${Math.round(box.y)} to ${Math.round(box.y + box.height)}, the view from ${Math.round(view.y)} to ${Math.round(view.y + view.height)}`;
+    },
+    assertion,
+    timeout,
+  );
+}
+
+/**
  * Every element of `left` ends left of where every element of `right` begins, within `timeout`: a card left of each card that waits on
  * it. Nothing matched on either side is refused too.
  */

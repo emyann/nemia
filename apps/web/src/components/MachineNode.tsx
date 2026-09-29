@@ -54,7 +54,9 @@ export function MachineNode({ data }: NodeProps<MachineFlowNode>) {
         >
           {kindOf(data)}
         </p>
-        <p className="text-sm font-semibold">{data.id}</p>
+        <p data-state-name className="text-sm font-semibold">
+          {data.id}
+        </p>
       </div>
       {data.stays.length > 0 && (
         <div className="mt-1.5 border-t border-neutral-200 dark:border-neutral-800">

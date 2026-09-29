@@ -41,3 +41,4 @@ machines
 debug-path
 debug-polled
 debug-live
+debug-wide

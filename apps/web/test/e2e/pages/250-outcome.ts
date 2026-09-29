@@ -69,10 +69,16 @@ function writeRun(root: string): string[] {
   const plan = schemaOf('plan');
   const review = schemaOf('review');
   const implement = schemaOf('implement');
-  const odd = {
+  const strict = (properties: Record<string, object>) => ({
     type: 'object',
-    properties: { matrix: { type: 'array', items: { type: 'array', items: { type: 'integer' } } }, weights: { type: 'object' } },
-  };
+    properties,
+    required: Object.keys(properties),
+    additionalProperties: false,
+  });
+  const odd = strict({
+    matrix: { type: 'array', items: { type: 'array', items: { type: 'integer' } } },
+    weights: strict({ plan: { type: 'number' }, review: strict({ findings: { type: 'number' } }) }),
+  });
   const steps = [
     { name: 'plan', output: { file: 'plan.schema.json', schema: plan } },
     { name: 'implement', output: { file: 'implement.schema.json', schema: implement } },

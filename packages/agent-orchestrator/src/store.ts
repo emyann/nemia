@@ -22,7 +22,7 @@ import {
 } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
 import { asNamed, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from './workflow.ts';
-import { loadWorkflows, preloads } from './workflow-store.ts';
+import { FrozenStepSchema, loadWorkflows, preloads } from './workflow-store.ts';
 import {
   noCodingStyle,
   NO_CODING_STYLE,
@@ -74,22 +74,6 @@ const StepRecordSchema = Schema.StructWithRest(
   }),
   Rest,
 );
-
-/**
- * A step as the run froze it at `wf start`, checked only for what names it and orders it: the rest of its keys are the parser's output as
- * it was frozen, kept as they are and not checked.
- */
-const FrozenStepSchema = Schema.StructWithRest(
-  Schema.Struct({ name: Schema.String, after: Schema.optional(Strings), body: Schema.optional(Schema.String) }),
-  Rest,
-);
-
-/**
- * The frozen steps, read as the workflow they were parsed into: the one cast left on a record. Every key but those `FrozenStepSchema`
- * checks is taken on trust.
- */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the frozen step's keys are the parser's output, and no schema checks them
-const frozenSteps = (steps: readonly (typeof FrozenStepSchema.Type)[]): Workflow[] => steps as Workflow[];
 
 /**
  * A run's record as any version of the tick writes it: `Run`, with the person's files it composes on read
@@ -341,7 +325,7 @@ const readRecord = (id: string): Run => {
   const read = { ...raw };
   for (const key of ['approvals', 'acceptances', 'pruned', 'hold']) delete read[key];
   const { workflow, ...unfrozen } = read;
-  const run = workflow ? { ...read, workflow: frozenSteps(workflow).map(asNamed) } : unfrozen;
+  const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
   const pruned = readPruned(id);
   const hold = readHold(id);

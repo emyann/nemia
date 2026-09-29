@@ -769,7 +769,7 @@ const STEPS = [
   {
     file: 'review.md',
     text: '---\nharness: codex\nafter: implement\nsandbox: read-only\n---\nReview the change.\n',
-    /** Frozen with a codex step's sandbox as its `permissionMode`, which is read as its `sandbox`. */
+    /** Frozen with a codex step's sandbox as its `permissionMode`: read as it was frozen, and shown on the board's `sandbox` row. */
     frozen: { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'codex', permissionMode: 'read-only' },
   },
   {

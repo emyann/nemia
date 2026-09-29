@@ -12,7 +12,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 
 - **A key added to `STEP_KEYS` has three sites outside the package**: `KINDS` in `apps/api/src/workflows/builder.ts`, `WorkflowStepSpec` and
   `specOf` in `apps/api/src/workflows/workflows.ts`, and the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`).
-- **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`workflow.ts`), `asNamed` in `readRun`,
+- **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`workflow.ts`), `formerStepFields` and the agent's
+  `keys` in `FrozenStepSchema` (`workflow-store.ts`, held by `test/frozen-step.test.ts`), `asNamed` in `readRun`,
   `formerOf` in `apps/api/src/agents/agents.ts`, `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
 - **A key added to `AGENT_KEYS` that is no role key is excluded in three places** (`ROLE_KEYS` in the api's `builder.ts` and `agents.ts`,
   the web's `lib/agents.ts`); a key naming a file beside the agent is digested by `agentVersion` and by the api's `versionOf`.
@@ -56,11 +57,12 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
 - **What the store reads back is decoded by a schema in a store file, never a pure one** (`boundary.test.ts` refuses Effect in a pure file
   but `effect/Data`: the api loads `./run` and `./workflow`, whose modules `test/refusal.test.ts` pins). A run record, a person's ask,
-  `daemon.json`, `tick.json`, `tick-stats.json` and a queue try each have one, a `StructWithRest` where the file is written back (a
-  `Struct` strips the keys it does not name, and a record written by a newer tick keeps them). `Struct({})` accepts an array; a struct
-  with a key refuses one. A record that does not decode is refused by `readRun` with exit 2, naming the file and its first wrong field
-  (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. The frozen steps are the one
-  cast left on a record (`frozenSteps`), until phase 2 checks them with the parser's own words.
+  `daemon.json`, `tick.json`, `tick-stats.json`, a queue try and a line of the feed each have one, a `StructWithRest` where the file is
+  written back (a `Struct` strips the keys it does not name, and a record written by a newer tick keeps them). `Struct({})` accepts an
+  array; a struct with a key refuses one. A record that does not decode is refused by `readRun` with exit 2, naming the file and its first
+  wrong field (`UnreadableRecord`), and left out of `listRuns`, said once on stderr, so one bad file stops no other run. A frozen step is
+  decoded by `FrozenStepSchema` (`workflow-store.ts`), a field per `StepKey` (a key added without one fails the typecheck): the shape, not
+  the words.
 
 ## The tick
 

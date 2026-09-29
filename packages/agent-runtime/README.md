@@ -823,7 +823,7 @@ whether a session was bridged, and what a person types into it from the web is n
 
 ## Claude Code's own flags: `claude`
 
-`config: { claude: { appendSystemPromptFile: '/…/prompt.md', pluginDir: ['/…/hkb-note'] } }` hands Claude Code flags as they
+`config: { claude: { appendSystemPromptFile: '/…/prompt.md', pluginDir: ['/…/nemia-note'] } }` hands Claude Code flags as they
 are written: a key is the long flag in camelCase (`--append-system-prompt-file`), `true` the flag alone, a string or a number
 the flag and its value, and a list the flag once per entry. They go after the variadic lists and directly before
 `--permission-mode`, on a job, on `claude-detached` and on a background session alike (`claudeFlagsOf`). The five

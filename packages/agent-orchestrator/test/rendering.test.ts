@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
 import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/workflow-store.ts';
-import { briefBody, noCodingStyle, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/rendering.ts';
+import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/rendering.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-render-');
@@ -400,7 +400,7 @@ test('the prompt is the instructions, then each skill by its namespaced name, th
   });
   assert.equal(
     renderedPrompt(step, [{ name: 'write-a-note' }, { name: 'review-a-change', whole: 'Read the diff.\n' }]),
-    'You build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `hkb-builder:write-a-note`.\n\n## Skill `hkb-builder:review-a-change`\n\nRead the diff.\n',
+    'You build.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `nemia-builder:write-a-note`.\n\n## Skill `nemia-builder:review-a-change`\n\nRead the diff.\n',
   );
   assert.match(noCodingStyle('builder'), /^---\nname: no-coding\n[\s\S]*keep-coding-instructions: false\n---\n/);
 });
@@ -412,13 +412,13 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
   assert.deepEqual(flags('---\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
   assert.deepEqual(flags('---\nskills: write-a-note\n---\nYou build.\n', skill), {
     appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/hkb-builder`],
+    pluginDir: [`${dir}/nemia-builder`],
   });
   assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
   assert.deepEqual(flags('---\nsystemPrompt: no-coding\n---\nYou build.\n'), {
     appendSystemPromptFile: `${dir}/prompt.md`,
-    pluginDir: [`${dir}/hkb-builder`],
-    settings: JSON.stringify({ outputStyle: 'hkb-builder:no-coding' }),
+    pluginDir: [`${dir}/nemia-builder`],
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding' }),
   });
   assert.equal(
     flags('---\nmodel: opus\n---\n'),
@@ -471,26 +471,26 @@ test("wf start renders each Claude Code step's agent under runs/<id>/agents/<ste
   const at = agentFilesDir(run, 'write');
   assert.equal(
     fs.readFileSync(path.join(at, 'prompt.md'), 'utf8'),
-    'You write notes.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `hkb-scribe:write-a-note`.\n\n## Skill `hkb-scribe:mind-the-tone`\n\nHow to mind the tone.\n',
+    'You write notes.\n\nYour skills, each loaded with the Skill tool by its name when you need it: `nemia-scribe:write-a-note`.\n\n## Skill `nemia-scribe:mind-the-tone`\n\nHow to mind the tone.\n',
   );
   assert.equal(
-    fs.readFileSync(path.join(at, 'hkb-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
+    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
     SKILL('write-a-note'),
     "the store's skill, copied",
   );
   assert.equal(
-    fs.readFileSync(path.join(at, 'hkb-scribe', 'skills', 'write-a-note', 'template.md'), 'utf8'),
+    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'template.md'), 'utf8'),
     '# Title\n',
     'whole, with what is beside its SKILL.md',
   );
-  assert.ok(fs.existsSync(path.join(at, 'hkb-scribe', 'skills', 'mind-the-tone', 'SKILL.md')), "the repository's skill, copied");
-  assert.equal(JSON.parse(fs.readFileSync(path.join(at, 'hkb-scribe', '.claude-plugin', 'plugin.json'), 'utf8')).name, 'hkb-scribe');
-  assert.equal(fs.readFileSync(path.join(at, 'hkb-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
+  assert.ok(fs.existsSync(path.join(at, 'nemia-scribe', 'skills', 'mind-the-tone', 'SKILL.md')), "the repository's skill, copied");
+  assert.equal(JSON.parse(fs.readFileSync(path.join(at, 'nemia-scribe', '.claude-plugin', 'plugin.json'), 'utf8')).name, 'nemia-scribe');
+  assert.equal(fs.readFileSync(path.join(at, 'nemia-scribe', 'output-styles', 'no-coding.md'), 'utf8'), noCodingStyle('scribe'));
   assert.equal(fs.existsSync(agentFilesDir(run, 'code')), false, 'a codex step is not rendered');
 
   fs.appendFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), 'Edited later.\n');
   assert.doesNotMatch(
-    fs.readFileSync(path.join(at, 'hkb-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
+    fs.readFileSync(path.join(at, 'nemia-scribe', 'skills', 'write-a-note', 'SKILL.md'), 'utf8'),
     /Edited later/,
     "an edit after the start reaches no run already started: the folder is the run's",
   );
@@ -500,8 +500,8 @@ test("wf start renders each Claude Code step's agent under runs/<id>/agents/<ste
   const write = filed.get(`${run.id}-write`)!;
   assert.deepEqual(write.config?.claude, {
     appendSystemPromptFile: path.join(at, 'prompt.md'),
-    pluginDir: [path.join(at, 'hkb-scribe')],
-    settings: JSON.stringify({ outputStyle: 'hkb-scribe:no-coding' }),
+    pluginDir: [path.join(at, 'nemia-scribe')],
+    settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding' }),
   });
   assert.match(write.brief, /^Write about tides\.\n/, "the step's own note first");
   assert.doesNotMatch(write.brief, /You write notes/, 'the instructions are in the system prompt, not the brief');
@@ -536,6 +536,26 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25 — the
     /\n## Skill `mind-the-tone`\n\nNot told: no folder holds it in [^\n]*\/workflows\/skills\. Sign off blocked if you need it\.\n\n## What was asked for/,
     'a folder run keeps no repository, so the skill the start found in the one it was typed in is said not to be told, and where it was looked for',
   );
+});
+
+test('a rendered step whose plugin is under another name, as a start before the rename wrote it, is filed as one whose folder is gone; one that names no plugin is filed with its prompt', async () => {
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'plain.md'), '---\ntools: Read\n---\nYou write plainly.\n');
+  const dir = storeTeam('renamed', {
+    write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
+    plain: `---\nagent: plain\n${FOLDER}---\nWrite plainly.\n`,
+  });
+  const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir });
+  const at = agentFilesDir(run, 'write');
+  fs.renameSync(path.join(at, pluginOf('scribe')), path.join(at, 'before-scribe'));
+  const { e, filed } = board();
+  await advance(e, readRun(run.id));
+  const write = filed.get(`${run.id}-write`)!;
+  assert.equal(write.config?.claude, undefined, 'no flag naming a plugin that is not there');
+  assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
+  assert.match(write.brief, /\n## Skill `write-a-note`\n\nHow to write a note\./, 'and its skills told whole');
+  const plain = filed.get(`${run.id}-plain`)!;
+  assert.deepEqual(plain.config?.claude, { appendSystemPromptFile: path.join(agentFilesDir(run, 'plain'), 'prompt.md') });
+  assert.equal(fs.readdirSync(agentFilesDir(run, 'plain')).join(), 'prompt.md', 'its folder holds no plugin, and names none');
 });
 
 test("a git run's step whose folder is gone is told a skill from the run's repository too, as its start found it", async () => {

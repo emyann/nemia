@@ -593,7 +593,7 @@
     {
       "files": ["packages/agent-orchestrator/src/tick.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1219, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1218, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 463, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 136 }],
         "sonarjs/cognitive-complexity": ["error", 197]

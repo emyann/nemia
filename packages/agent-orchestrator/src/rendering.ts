@@ -7,8 +7,8 @@
  * - `prompt.md`, the agent's instructions, then a line naming each skill it is given, then the whole text of each skill that asks to be
  *   told whole (`preload: true`): appended to Claude Code's own system prompt, which is kept (`--append-system-prompt-file`), or put in
  *   its place for `systemPrompt: own` (`--system-prompt-file`);
- * - `hkb-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
- *   so a session loads them as `hkb-<agent>:<name>`; and, for `systemPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
+ * - `nemia-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
+ *   so a session loads them as `nemia-<agent>:<name>`; and, for `systemPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
  *
  * The step's brief is then its own note alone (`briefBody`): the instructions are in the system prompt. A codex step is handed them in its
@@ -24,8 +24,8 @@ export const PROMPT_FILE = 'prompt.md';
 /** The output style `systemPrompt: no-coding` chooses, in the step's plugin. */
 export const NO_CODING_STYLE = 'no-coding';
 
-/** The plugin an agent's skills are served from, and so their namespace: `hkb-<agent>`. */
-export const pluginOf = (agent: string): string => `hkb-${agent}`;
+/** The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`. */
+export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /**
  * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and takes no
@@ -117,6 +117,9 @@ export const pluginManifest = (agent: string): string =>
     2,
   ) + '\n';
 
+/** Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`). */
+export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.systemPrompt === 'no-coding');
+
 /**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
  * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and the style chosen (`no-coding`). Undefined for a
@@ -133,7 +136,7 @@ export function renderedFlags(
   const told = Boolean(agent.instructions || agent.skills?.length);
   return {
     ...(told ? (agent.systemPrompt === 'own' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),
-    ...(agent.skills?.length || agent.systemPrompt === 'no-coding' ? { pluginDir: [path.join(dir, plugin)] } : {}),
+    ...(namesPlugin(step) ? { pluginDir: [path.join(dir, plugin)] } : {}),
     ...(agent.systemPrompt === 'no-coding' ? { settings: JSON.stringify({ outputStyle: `${plugin}:${NO_CODING_STYLE}` }) } : {}),
   };
 }

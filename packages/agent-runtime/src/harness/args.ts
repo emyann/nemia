@@ -76,7 +76,7 @@ export type HarnessArgs = {
    */
   budgetUsd?: number;
   /**
-   * Flags handed to Claude Code as they are — `{ appendSystemPromptFile: 'prompt.md', pluginDir: ['hkb-note'] }` — on a
+   * Flags handed to Claude Code as they are — `{ appendSystemPromptFile: 'prompt.md', pluginDir: ['nemia-note'] }` — on a
    * job and a background session alike, directly before its `--permission-mode` (`ClaudeFlags`, `claudeFlagsOf`). A flag
    * the runtime gives itself is refused (`CLAUDE_OWNED_FLAGS`), and so is the bag on a harness that is not Claude Code,
    * which would start its session without them. A flag the CLI does not have fails the attempt as the CLI fails it, its

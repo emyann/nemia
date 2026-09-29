@@ -27,12 +27,13 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test("HARNESS_ARGS is the twelve arguments a harness takes — the spend cap and Claude Code's own flags among them, and remoteControl not: it is one of those flags", () => {
+test("HARNESS_ARGS is the thirteen arguments a harness takes — the spend cap, Claude Code's own flags and Codex's among them, and remoteControl not: it is one of those flags", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
     'allowedTools',
     'background',
     'budgetUsd',
     'claude',
+    'codex',
     'contextTokens',
     'disallowedTools',
     'effort',
@@ -59,7 +60,7 @@ test("remoteControl, one of Claude Code's own flags, is refused under config and
   assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the twelve — and the same value under config is taken', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the thirteen — and the same value under config is taken', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus',
     permissionMode: 'auto',
@@ -73,6 +74,7 @@ test('a harness argument filed beside config is refused, naming where it goes �
     worktree: true,
     budgetUsd: 5,
     claude: { appendSystemPromptFile: 'prompt.md' },
+    codex: { trustFrom: '/repo' },
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);
@@ -147,6 +149,25 @@ test("Claude Code's own flags are an object of flags in camelCase, each saying o
     }),
     undefined,
   );
+});
+
+test("Codex's own arguments are an object holding only `trustFrom`, an absolute directory: anything else is refused, at shipped defaults", () => {
+  for (const codex of [null, 'x', 7, [], true]) {
+    const says = argsRefusalOf({ ...task, config: { codex } } as never) ?? '';
+    assert.ok(says.startsWith(`\`codex: ${JSON.stringify(codex)}\` is not a set of Codex's arguments.`), says);
+    assert.ok(says.includes('{ "trustFrom": "/path/to/repo" }'), says);
+  }
+  assert.equal(
+    argsRefusalOf({ ...task, config: { codex: { trustfrom: '/a' } } } as never),
+    "`codex.trustfrom` is not one of Codex's arguments. Its only one is `trustFrom`, the directory whose trust in your Codex config extends to the cwd.",
+  );
+  for (const trustFrom of ['', 'rel/dir', 7, null]) {
+    const says = argsRefusalOf({ ...task, config: { codex: { trustFrom } } } as never) ?? '';
+    assert.ok(says.startsWith(`\`codex.trustFrom: ${JSON.stringify(trustFrom)}\` is not an absolute directory.`), says);
+  }
+  assert.equal(argsRefusalOf({ ...task, config: { codex: {} } }), undefined, 'none at all names no directory');
+  assert.equal(argsRefusalOf({ ...task, config: { codex: { trustFrom: '/repo' } } }), undefined);
+  assert.equal(argsRefusalOf({ ...task, config: { codex: { trustFrom: undefined } } }), undefined, 'an absent key spelled out');
 });
 
 test('a turn gives its own spend cap and nothing else of the configuration, which the session it continues was started with: each refused, at shipped defaults', () => {

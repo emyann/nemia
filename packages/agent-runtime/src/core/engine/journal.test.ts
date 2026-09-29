@@ -504,6 +504,34 @@ test('a harness argument of the wrong type is refused under config and beside it
   }
 });
 
+test("Codex's arguments are read from a journal as filed, and the engine folds them onto the task's config — and no byte on disk changes", async () => {
+  const codex = { ...TODAY, config: { model: 'gpt-5', codex: { trustFrom: '/repo' } } };
+  const dir = legacyStore({ 't-codex': [codex] });
+  const before = bytesOf(dir);
+  const [filed] = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-codex')),
+  );
+  assert.deepEqual(filed, codex);
+  const { createEngine } = await import('../../facade.ts');
+  assert.deepEqual((await createEngine({ root: dir }).view('t-codex')).state.config, { model: 'gpt-5', codex: { trustFrom: '/repo' } });
+  assert.deepEqual(bytesOf(dir), before);
+});
+
+test("a directory to extend Codex's trust from that is not a string fails the task's read, naming the field", async () => {
+  const dir = legacyStore({ 't-bad': [{ ...TODAY, config: { codex: { trustFrom: 7 } } }] });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(
+    error.message.startsWith(
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 1 is a \`filed\` event, and its \`config.codex.trustFrom\` is 7,`,
+    ),
+    error.message,
+  );
+});
+
 test("a line of a task's journal cut short fails that task's read, naming the entry and what it reads", async () => {
   const dir = legacyStore({ 't-cut': [TODAY] });
   fs.appendFileSync(path.join(dir, 'tasks', 't-cut.jsonl'), '{"kind":"start\n');

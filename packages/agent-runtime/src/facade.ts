@@ -43,7 +43,7 @@ export { refusedText } from './core/engine/index.ts';
 export { retiredKeyRefusal } from './core/engine/index.ts';
 export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/index.ts';
 export type { SessionState, Ended, Outcome } from './core/index.ts';
-export { HARNESS_ARGS, TURN_ARGS, type HarnessArgs } from './harness/index.ts';
+export { HARNESS_ARGS, TURN_ARGS, type CodexArgs, type HarnessArgs } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/index.ts';
 export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/index.ts';

@@ -104,6 +104,11 @@ export type HarnessSpec = {
    */
   claudeFlags?: true;
   /**
+   * The harness is Codex, and `prepare` reads a task's `config.codex` (`CodexArgs`). Absent: the harness has no such
+   * arguments, and `file()` refuses a task that carries them rather than start a session without them.
+   */
+  codexArgs?: true;
+  /**
    * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
    * `claude -p --resume` does. Set, the run file keeps the id it resumed, and `observe` takes the
    * parent's printed totals off — the latest run started before it under that id, as its own output read them. Where

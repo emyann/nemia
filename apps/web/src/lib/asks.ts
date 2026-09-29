@@ -45,7 +45,7 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 /**
  * Each step's need, in the run's order: what the Factory's card and the run's banner say.
  *
- * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli.ts): that
+ * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli/main.ts): that
  * line names the step and the command that approves it, and the same step is not asked for twice.
  */
 export const needsOf = (

@@ -53,9 +53,11 @@ import {
   type Span,
 } from '@/lib/factory';
 import { flowSteps, tilesOf } from '@/lib/flow';
+import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, type Transform } from '@/lib/frame';
 import { capLine, queueOf } from '@/lib/inbox';
 import { passLine, passTitle } from '@/lib/pass';
 import { useContent } from '@/lib/useContent';
+import { useFrameSize } from '@/lib/useFrameSize';
 import { useNow } from '@/lib/useNow';
 import type { Point } from '@/lib/layout';
 import { CanvasLegend } from './CanvasLegend';
@@ -77,12 +79,11 @@ const edgeTypes = { state: StateEdge };
 const FIT_GAP = 16;
 
 /**
- * How the floor is fitted: every card in view, and none under a panel drawn over the floor — the buttons at its top, the zoom controls,
- * the legend and the minimap at its bottom. Takes the floor's frame, or null; measures the panels in it where they are drawn, at each
- * call, since the legend's height moves with the floor's width; and returns React Flow's fit options, at zoom 1 at most, keeping clear
- * above and below as much as the panels take, plus `FIT_GAP`. A panel hidden on a narrow floor is drawn nowhere and takes no room.
+ * How far the panels drawn over the floor reach into it from its top — the buttons, the hint — and from its bottom — the zoom controls,
+ * the legend and the minimap. Takes the floor's frame, or null; measures the panels where they are drawn, at each call, since the legend's
+ * height moves with the floor's width. A panel hidden on a narrow floor is drawn nowhere and takes no room.
  */
-function fitClear(frame: HTMLElement | null) {
+function panelsOver(frame: HTMLElement | null): { top: number; bottom: number } {
   let top = 0;
   let bottom = 0;
   if (frame) {
@@ -94,11 +95,31 @@ function fitClear(frame: HTMLElement | null) {
       if (panel.classList.contains('bottom')) bottom = Math.max(bottom, box.bottom - at.top);
     }
   }
+  return { top, bottom };
+}
+
+/**
+ * How the floor is fitted: every card in view, and none under a panel drawn over the floor (`panelsOver`). Takes the floor's frame, or
+ * null, and returns React Flow's fit options, at zoom 1 at most, keeping clear above and below as much as the panels take, plus `FIT_GAP`.
+ */
+function fitClear(frame: HTMLElement | null) {
+  const { top, bottom } = panelsOver(frame);
   return { maxZoom: 1, padding: { top: `${top + FIT_GAP}px`, bottom: `${bottom + FIT_GAP}px`, x: `${2 * FIT_GAP}px` } } as const;
 }
 
+/** The box an open card at `at` takes on the floor: the cells it spans, less the gap beside the last, which React Flow may not measure. */
+const boxOf = (at: Point, span: Span): Box => ({
+  ...at,
+  width: span.columns * CELL_WIDTH - (CELL_WIDTH - CARD_WIDTH),
+  height: span.rows * CELL_HEIGHT - (CELL_WIDTH - CARD_WIDTH),
+});
+
 /** How far out bringing an open card into view zooms, at most: past it, the card is too small to read, and a person pans instead. */
 const REVEAL_MIN_ZOOM = 0.4;
+
+/** The view that brings `box` into the floor's `frame` from `transform`, clear of the panels at the frame's top (`revealView`). */
+const revealIn = (frame: HTMLElement, box: Box, transform: Transform) =>
+  revealView(box, transform, sizeOf(frame), REVEAL_MIN_ZOOM, panelsOver(frame).top + FIT_GAP);
 
 /** A handful of cells fits on a screen; past that, the minimap says where the rest are. */
 const HANDFUL = 5;
@@ -169,12 +190,16 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   an opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a
  *   card off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
  * - On mount it forgets what this browser keeps for the Factory that nothing reads (`forgetFactoryLeftovers`).
- * - A card opened is brought into view once the floor is laid out for it, and the run inspected is kept in view when the inspector
- *   narrows the floor: panned to its middle, if any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM`
- *   at most. Its box is the cells it takes (`openSpan`) less the gap beside the last, which React Flow may not have measured yet.
+ * - A card opened is brought into view once the floor is laid out for it, and the run inspected is kept in view whenever the floor's
+ *   frame changes size, across or down (`useFrameSize`): panned to its middle, if any of it is off screen, and zoomed out only as far as
+ *   it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the frame even then shows its head, below the panels
+ *   at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
  * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
  *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane,
- *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header.
+ *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header; and when the frame changes size with
+ *   no run inspected and leaves no card in view (`anyInView`).
+ * - No view is aimed at a frame without a size (`sized`), nor a reveal at one with no room below its panels: a reveal or a fit asked
+ *   for while the frame is hidden or squeezed flat waits until it has a size.
  * - Reset layout lays the cards on the grid again with every run closed and the saved arrangement forgotten; Collapse all closes every
  *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
  * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
@@ -318,64 +343,51 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 
   const edges = useMemo((): Edge[] => afterEdges(shown), [shown]);
 
+  const onFloor = shown.length > 0;
+  const size = useFrameSize(frame, onFloor);
+
   const reveal = useCallback(
     (runId: string) => {
       const { placed, spans } = latest.current;
       const card = placed.find((node) => node.id === runId);
-      const el = frame.current;
-      if (!card || !el) return;
-      const [tx, ty, zoom] = store.getState().transform;
-      const { x, y } = card.position;
-      const span = spans.get(runId) ?? ONE_CELL;
-      const width = span.columns * CELL_WIDTH - (CELL_WIDTH - CARD_WIDTH);
-      const height = span.rows * CELL_HEIGHT - (CELL_WIDTH - CARD_WIDTH);
-      if (
-        x * zoom + tx >= 0 &&
-        y * zoom + ty >= 0 &&
-        (x + width) * zoom + tx <= el.clientWidth &&
-        (y + height) * zoom + ty <= el.clientHeight
-      )
-        return;
-      const room = 0.9;
-      const to = Math.max(REVEAL_MIN_ZOOM, Math.min(zoom, (room * el.clientWidth) / width, (room * el.clientHeight) / height));
-      void setViewport(
-        { x: el.clientWidth / 2 - (x + width / 2) * to, y: el.clientHeight / 2 - (y + height / 2) * to, zoom: to },
-        { duration: 300 },
-      );
+      if (!card || !frame.current) return;
+      const to = revealIn(frame.current, boxOf(card.position, spans.get(runId) ?? ONE_CELL), store.getState().transform);
+      if (to) void setViewport(to, { duration: 300 });
     },
     [setViewport, store],
   );
 
+  const was = useRef<Size | null>(null);
+  useEffect(() => {
+    const { inspecting } = latest.current;
+    if (!sized(size)) {
+      if (inspecting) revealing.current = inspecting;
+      return;
+    }
+    const before = was.current;
+    was.current = size;
+    if (!before || (size.width === before.width && size.height === before.height) || revealing.current) return;
+    if (inspecting) return reveal(inspecting);
+    const { nodeLookup, transform } = store.getState();
+    if (!anyInView(boxesOf(nodeLookup.values()), transform, size)) void fitView({ ...fitClear(frame.current), duration: 300 });
+  }, [size, reveal, store, fitView]);
+
   useEffect(() => {
     const runId = revealing.current;
-    if (!runId || placedFor?.ids !== ids || placedFor.spans !== spans) return;
+    if (!runId || placedFor?.ids !== ids || placedFor.spans !== spans || !sized(size)) return;
     revealing.current = null;
     if (openSet.has(runId) && spans.has(runId)) reveal(runId);
-  }, [placedFor, ids, spans, openSet, reveal]);
+  }, [placedFor, ids, spans, openSet, reveal, size]);
 
   const [fits, setFits] = useState(1);
   const fitted = useRef(0);
   useEffect(() => {
-    if (fits === fitted.current) return;
+    if (fits === fitted.current || !sized(size)) return;
     if (placed.length !== ids.length || placed.some((node, i) => node.id !== ids[i])) return;
     const first = fitted.current === 0;
     fitted.current = fits;
     void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
-  }, [fits, placed, ids, fitView]);
-
-  const onFloor = shown.length > 0;
-  useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      if (latest.current.inspecting) reveal(latest.current.inspecting);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [onFloor, reveal]);
+  }, [fits, placed, ids, fitView, size]);
 
   const close = useCallback(() => setSelected(null), []);
 

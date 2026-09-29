@@ -33,7 +33,7 @@ const {
   start,
   unhold,
 } = await import('../src/runner.ts');
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

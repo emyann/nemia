@@ -82,7 +82,7 @@ process.env.WF_ROOT = ROOT;
 const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, retry, start, startQueued } =
   await import('../src/runner.ts');
 const { forgetLine, sentBack, stepTaskId } = await import('../src/run.ts');
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 /** What `main` printed, line by line, while it ran. */
 const printed = async (argv: string[], e?: Engine): Promise<string[]> => {

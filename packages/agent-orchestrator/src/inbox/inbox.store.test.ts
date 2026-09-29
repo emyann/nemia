@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, readRun, start, startFromInbox } = await import('../runner.ts');
-const { main } = await import('../cli.ts');
+const { main } = await import('../cli/main.ts');
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = {} as Engine;

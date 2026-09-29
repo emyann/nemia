@@ -25,7 +25,7 @@ delete process.env.WF_MAX_RUNS;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
 const { parsePassCost } = await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');
-const { main } = await import('../cli.ts');
+const { main } = await import('../cli/main.ts');
 
 const FILE = path.join(ROOT, 'daemon.json');
 
@@ -358,7 +358,7 @@ for (const [signal, code] of [
 ] as const)
   test(`\`wf up\` stopped by ${signal} lets the store go on the way out, with the signal's exit code, ${code}`, async () => {
     clear();
-    const cli = new URL('../cli.ts', import.meta.url).href;
+    const cli = new URL('../cli/main.ts', import.meta.url).href;
     const child = spawn(
       process.execPath,
       [

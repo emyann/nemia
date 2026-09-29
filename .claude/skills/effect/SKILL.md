@@ -76,9 +76,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
 ## Resources and the process
 
 - What a command holds while the process lives is `Effect.acquireRelease` in its scope, and a loop beside it `Effect.forkScoped`:
-  the claim on the store and the beat of `wf up`, and `watching` (the watcher of `wf watch`), in `packages/agent-orchestrator/src/cli.ts`.
+  the claim on the store and the beat of `wf up`, and `watching` (the watcher of `wf watch`), in `packages/agent-orchestrator/src/cli/main.ts`.
   Finalizers run in reverse, so the beat is interrupted before the store is let go.
-- `runMain` in `packages/agent-orchestrator/src/cli/run-main.ts` runs such a command: SIGINT, SIGTERM and SIGHUP interrupt it and
+- `runMain` in `packages/agent-orchestrator/src/cli/main.ts` runs such a command: SIGINT, SIGTERM and SIGHUP interrupt it and
   exit 130, 143 or 129 once the finalizers ran; otherwise it resolves the value or rejects with the failure itself (`Cause.squash`),
   so a refusal's `exitCode` reaches `bin/wf.ts`. Not `NodeRuntime.runMain` of `@effect/platform-node`, which is not installed: its
   default teardown (`Runtime.defaultTeardown`) exits 130 on any interruption, whichever signal came, it handles no SIGHUP, and it

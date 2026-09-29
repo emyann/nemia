@@ -27,7 +27,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } =
   await import('../runner.ts');
-const { main, watchPrinted, watching } = await import('../cli.ts');
+const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -632,7 +632,7 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   const b = board();
   const run = started('the cut');
   await tick(b.e);
-  const cli = new URL('../cli.ts', import.meta.url).href;
+  const cli = new URL('../cli/main.ts', import.meta.url).href;
   const child = spawn(
     process.execPath,
     ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`],

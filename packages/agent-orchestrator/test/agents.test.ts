@@ -548,7 +548,7 @@ test("`wf start` names each node's agent beside it — by the agent's name, not 
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.map(String).join(' '));
   });
-  const { main } = await import('../src/cli.ts');
+  const { main } = await import('../src/cli/main.ts');
   await main(['start', 'build it', '--workflows', path.join(dir, 'dev'), '--repo', repo], {} as never);
   const [id, said] = printed[0].split('  ');
   assert.ok(id, printed.join('\n'));

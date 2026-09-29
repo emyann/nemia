@@ -14,7 +14,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-former-keys-');
 process.env.WF_ROOT = ROOT;
 const { readRun } = await import('../src/runner.ts');
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 

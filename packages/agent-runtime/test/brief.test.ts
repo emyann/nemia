@@ -225,3 +225,58 @@ test("`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too:
     'unset, the same command runs',
   );
 });
+
+test('a parsed brief has the same own keys it always had: the six always, `holdOpen`, `queued` and `config` only when given', () => {
+  assert.deepEqual(Object.keys(parse('just do it')), ['brief', 'cwd', 'harness', 'deadlineSeconds', 'resumeFrom', 'closeoutSchema']);
+  const spec = parse(brief('holdOpen: true\nqueued: false\nmodel: opus\nworktree: true\ntools: Read'));
+  assert.deepEqual(Object.keys(spec), [
+    'brief',
+    'cwd',
+    'harness',
+    'deadlineSeconds',
+    'resumeFrom',
+    'closeoutSchema',
+    'holdOpen',
+    'queued',
+    'config',
+  ]);
+  assert.deepEqual(Object.keys(spec.config ?? {}), ['model', 'worktree', 'tools']);
+  assert.equal(Object.hasOwn(parse(brief('holdOpen: false')), 'holdOpen'), false, '`holdOpen: false` leaves the key out');
+});
+
+test('a `true or false` key refuses anything else in its own whole sentence', () => {
+  refuses(
+    brief('background: yes'),
+    /^brief: `background: yes` is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job\.$/,
+  );
+  refuses(
+    brief('queued: yes'),
+    /^brief: `queued: yes` is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts, or leave it out to start it on the next tick\.$/,
+  );
+  refuses(
+    brief('holdOpen: yes'),
+    /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then\.$/,
+  );
+});
+
+test('a brief wrong in every value is refused in one order: the prompt, then each value from `deadlineSeconds` to `tools`', () => {
+  const dir = tmp();
+  const lines = [
+    'deadlineSeconds: 5m',
+    'budgetUsd: $5',
+    'contextTokens: 200k',
+    'background: yes',
+    'queued: yes',
+    'holdOpen: yes',
+    `cwd: ${path.join(dir, 'nope')}`,
+    `closeoutSchema: ${path.join(dir, 'missing.json')}`,
+    'tools: Read,,Grep',
+  ];
+  refuses(brief(lines.join('\n'), ''), /there is no prompt/);
+  while (lines.length) {
+    const key = lines[0].slice(0, lines[0].indexOf(':'));
+    refuses(brief(lines.join('\n')), new RegExp(`^brief: \`${key}: `));
+    lines.shift();
+  }
+  assert.equal(parse(brief('model: opus')).brief, 'do the thing');
+});

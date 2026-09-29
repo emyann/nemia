@@ -700,7 +700,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/tick.ts"],
+      "files": ["packages/agent-orchestrator/src/tick/advance.verb.ts"],
       "rules": {
         "max-lines": ["error", { "max": 1200, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 463, "skipBlankLines": true, "skipComments": true }],

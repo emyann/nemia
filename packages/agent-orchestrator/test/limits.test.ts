@@ -148,7 +148,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/start/start.verb.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.verb.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/tick.ts': {
+  'packages/agent-orchestrator/src/tick/advance.verb.ts': {
     'max-lines': 1,
     'max-lines-per-function': 1,
     complexity: 2,

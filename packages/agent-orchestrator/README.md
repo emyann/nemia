@@ -200,8 +200,8 @@ own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is ref
 key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
 as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
 prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
-`sandbox:`. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same. The engine's task still calls either fence `permissionMode`,
-and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
+`sandbox:`. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same: the engine's task
+still calls either fence `permissionMode`, and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
 

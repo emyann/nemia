@@ -259,6 +259,15 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
+test('REFUSED on the source: a value import from a part cut out of run.ts back to the assessment closes a cycle; the type is let through', () => {
+  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
+  const round = files.get('src/round/round.ts')!;
+  files.set('src/round/round.ts', `${round}\nimport { assess } from '../tick/assess.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), [['src/retry/index.ts', 'src/retry/retry.ts', 'src/round/round.ts', 'src/tick/assess.ts']]);
+  files.set('src/round/round.ts', `${round}\nimport type { Assessment } from '../tick/assess.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), []);
+});
+
 test('REFUSED: a source file that imports a test or test support; a barrel that re-exports a whole module', () => {
   assert.deepEqual(testImports('src/check/check.ts', importsIn("import { corpus } from './check.test.ts';")), [
     'src/check/check.ts imports src/check/check.test.ts: nothing but a test imports a test — move what both need into the source',
@@ -338,6 +347,18 @@ test('REFUSED on the source: a file outside keys/ importing its readers past key
   assert.deepEqual(
     faceBreaks(files, (f) => importsIn(f === 'src/tick.ts' ? `${read(f)}\nimport { toolsOf } from './keys/tools.ts';` : read(f))),
     ['src/tick.ts imports src/keys/tools.ts: import src/keys/index.ts, the face of src/keys/'],
+  );
+});
+
+test('REFUSED on the source: a file outside retry/ or brief/ importing their pure code past the face', () => {
+  const files = sourceFiles();
+  const planted = `import { retryable } from './retry/retry.ts';\nimport { composeBrief } from './brief/brief.ts';`;
+  assert.deepEqual(
+    faceBreaks(files, (f) => importsIn(f === 'src/verbs.ts' ? `${read(f)}\n${planted}` : read(f))),
+    [
+      'src/verbs.ts imports src/brief/brief.ts: import src/brief/index.ts, the face of src/brief/',
+      'src/verbs.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
+    ],
   );
 });
 

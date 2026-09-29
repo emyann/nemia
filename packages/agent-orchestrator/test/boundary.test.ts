@@ -378,6 +378,15 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   );
   assert.deepEqual(impurities(adding('src/status/status.ts', 'effect')), ['src/status/status.ts is pure and imports effect']);
   assert.deepEqual(impurities(adding('src/record/record.ts', 'node:fs')), ['src/record/record.ts is pure and imports node:fs']);
+  assert.ok(
+    ['src/retry/retry.ts', 'src/list/list.ts', 'src/tick/assess.ts'].every((f) => f in packageSources()),
+    'the plants go into files the scan reads',
+  );
+  assert.deepEqual(impurities(adding('src/retry/retry.ts', 'effect')), ['src/retry/retry.ts is pure and imports effect']);
+  assert.deepEqual(impurities(adding('src/list/list.ts', 'node:fs')), ['src/list/list.ts is pure and imports node:fs']);
+  assert.deepEqual(impurities(adding('src/tick/assess.ts', 'src/record/record.store.ts')), [
+    'src/tick/assess.ts is pure and imports src/record/record.store.ts',
+  ]);
   assert.deepEqual(impurities(adding('src/radius.ts', 'node:fs')), ['src/radius.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'fs')), ['src/workflow.ts is pure and imports fs']);
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [

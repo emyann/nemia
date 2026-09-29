@@ -1,8 +1,8 @@
 /**
  * What one pass asks of the engine (`advance`), pinned: every call it makes, in order, with the task it names, and the meter's count of
  * calls in each phase it touches (`meteredEngine`, `metered`) — on a step filed fresh, a check, a ready step after it, a try, a round, a
- * cancelled run and an ending. A pass that asks the engine once more, or once less, reads more journals or files what it did not, and
- * fails here, whatever else it still gets right.
+ * cancelled run, an ending, and a try and a round due on one pass. A pass that asks the engine once more, or once less, reads more
+ * journals, files what it did not or files in another order, fails here, whatever else it still gets right.
  *
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo of runs at rest.
@@ -198,6 +198,48 @@ test('a round the looping step asked for is looked for, then filed, under its ta
     'file R-implement-try2',
   ]);
   assert.deepEqual(looped.counted, { journals: 4, act: 4 });
+});
+
+test('a try and a round due on one pass: the try is filed first, then the round, each looked for before', async () => {
+  const run = started(
+    folder(
+      {
+        implement: '',
+        review: 'after: implement\noutput: review.schema.json\nloop: implement',
+        docs: 'check: npm test\nretries: 1',
+      },
+      { 'review.schema.json': JSON.stringify(LOOPING) },
+    ),
+    true,
+  );
+  const b = board();
+  await pass(b, run.id);
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  b.settle(`${run.id}-docs`, 'succeeded', SIGNED);
+  await pass(b, run.id);
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, findings: [], again: true });
+  b.settle(`${run.id}-docs-check`, 'failed', undefined, 1);
+
+  const both = await pass(b, run.id);
+  assert.deepEqual([both.advanced.tried, both.advanced.looped], [['docs'], ['review']]);
+  assert.deepEqual(
+    both.calls,
+    [
+      'view R-docs',
+      'view R-docs-check',
+      'view R-implement',
+      'view R-review',
+      'view R-implement-try2',
+      'view R-docs-try2',
+      'view R-docs-try2',
+      'logs R-docs-check',
+      'file R-docs-try2',
+      'view R-implement-try2',
+      'file R-implement-try2',
+    ],
+    "the pass's reads, then the try looked for and filed, then the round",
+  );
+  assert.deepEqual(both.counted, { journals: 9, act: 5 });
 });
 
 test("a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {

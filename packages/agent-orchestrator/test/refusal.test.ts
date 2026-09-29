@@ -1,8 +1,8 @@
 /**
  * The orchestrator's refusals (`src/refusal/refusal.ts`): `Missing`, `Conflict` and `Invalid`, each an `Error` with its words and
- * `exitCode` 2, tagged so an Effect picks it out by kind. What loads them is held too: `agent-orchestrator/run` and
- * `agent-orchestrator/workflow`, which the api loads, take `effect/Data` and never the `effect` barrel, pinned by the modules a fresh
- * `node` loads for each; and no file under `src` sets `exitCode: 2` on an object of its own, so a refusal is thrown as one of the classes.
+ * `exitCode` 2, tagged so an Effect picks it out by kind, and `isRefusal`, which tells one from any other error. What loads them is held
+ * too: `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect`, which the api loads, take `effect/Data`
+ * and never the `effect` barrel, pinned by the modules a fresh `node` loads for each; and no file under `src` sets `exitCode: 2` on an object of its own, so a refusal is thrown as one of the classes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +14,7 @@ import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-refusal-store-');
 const { Conflict, Invalid, Missing, AgentWriteError, SkillWriteError, maxRuns, unhold } = await import('../src/runner.ts');
+const { isRefusal } = await import('agent-orchestrator/effect');
 const { WorkflowError } = await import('../src/workflow.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -39,6 +40,14 @@ test('each refusal is an Error with its words, its tag and exit code 2, and an E
     );
     assert.equal(caught, `${tag} 2`);
   }
+});
+
+test('isRefusal takes each kind, and a subclass of one; REFUSED: a plain Error carrying exitCode 2, and what is no Error', () => {
+  for (const err of [new Missing({ message: 'm' }), new Conflict({ message: 'c' }), new Invalid({ message: 'i' }), new WorkflowError('w')])
+    assert.equal(isRefusal(err), true, err._tag);
+  assert.equal(isRefusal(Object.assign(new Error('by hand'), { exitCode: 2 })), false, 'an exit code alone is no kind');
+  assert.equal(isRefusal({ _tag: 'Missing', message: 'a look-alike', exitCode: 2 }), false, 'an object shaped like one is no refusal');
+  assert.equal(isRefusal(undefined), false);
 });
 
 test("a workflow's refusal, and an agent's and a skill's written, are Invalid, with the words given and exit code 2", () => {
@@ -98,6 +107,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 24, effect: 14 },
   'agent-orchestrator/workflow': { all: 17, effect: 14 },
+  'agent-orchestrator/effect': { all: 16, effect: 14 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');
@@ -123,7 +133,7 @@ function loadBreaks(entry: string, loaded: readonly string[]): string[] {
   return out;
 }
 
-test('agent-orchestrator/run and agent-orchestrator/workflow load effect/Data, and no more of effect, as pinned', () => {
+test('agent-orchestrator/run, agent-orchestrator/workflow and agent-orchestrator/effect load effect/Data, and no more of effect, as pinned', () => {
   for (const entry of Object.keys(PINNED_MODULES)) {
     const loaded = modulesLoaded(entry);
     assert.deepEqual(loadBreaks(entry, loaded), [], loaded.join('\n'));

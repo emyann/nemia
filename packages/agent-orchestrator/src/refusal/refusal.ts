@@ -24,3 +24,6 @@ export class Invalid extends TaggedError('Invalid')<{ readonly message: string }
 
 /** Every refusal the orchestrator throws, by its kind. */
 export type Refusal = Missing | Conflict | Invalid;
+
+/** Whether `err` is one of the orchestrator's refusals, by its class: a plain `Error` carrying `exitCode` 2 is not. */
+export const isRefusal = (err: unknown): err is Refusal => err instanceof Missing || err instanceof Conflict || err instanceof Invalid;

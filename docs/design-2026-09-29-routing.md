@@ -64,7 +64,7 @@ The run routes on four fixed rules. Each is written into the pure pass (`status/
 
 | rule | the ways out | where the code decides |
 |---|---|---|
-| `check:` / `retries:` | exit 0: `verified`. A number other than 0: `failed (check)`, and `retries:` re-files the step (`retriesDue`). No number: the check did not finish, no try is spent, and a person runs `wf retry --recheck` | `ownStatus` reads the check task's phase. `refusedCheck` (`record/record.ts`) tells a refusal from a check that did not finish. `readVerdict` (`check/check.ts`) reads the `[wf check] exit N` trailer off the task's log. `retries` is counted in `step/step.ts` |
+| `check:` / `retries:` | exit 0: `verified`. A number other than 0: `failed (check)`, and `retries:` re-files the step (`retriesDue`). No number: the check did not finish, no try is spent, and a person runs `wf retry --recheck` | `ownStatus` reads the check task's phase. `refusedCheck` (`record/record.ts`) tells a refusal from a check that did not finish. `readVerdict` (`check/check.ts`) reads the `[wf check] exit N` trailer off the task's log. `retries:` is declared in `step/step.ts`, and the tries it covers are counted and filed by `retriesDue` (`retry/retry.ts`) |
 | `loop:` / `again` / `rounds:` | `again: false`: onward. `again: true` below the cap: a round (the target continued, then each step between, then the looping step). `again: true` at the cap: `exhausted`, and a person runs `wf round` or `wf accept` | `askedAgain` (one reader, for five uses), `capOf` (`DEFAULT_ROUNDS = 3`), `roundIn`, `roundsDue`. `ownStatus` makes a non-boolean `again` `unsigned`. At load, `loopSpan` and `validateLoops` (`workflow/validate.ts`) apply: a loop is a chain, one loop per step, no remote target, no `resume:` inside, and no `replies` field on the target |
 | `gate:` | `wf approve`: onward. `wf retry --message`: sent back to the step itself, or to its `after` if it was never filed (`sendBackTo`) | `hasGate`, `atGate` (a gated step signed off, with no approval for the try it is on), `approvedFirst` and `waitsAtGate` (an ending in the checkout, approved before it is filed). Approvals are a person's files, `approve-<step>-<try>` in the run's asks folder (`approvalFile`) |
 | `blocked` | none: a stop, to a person | `ownStatus` reads the closeout's `outcome` first. `stopsFollowers` makes it final. `assess` names the run `failed` and adds `stoppedOn: 'blocked'` |
@@ -127,8 +127,14 @@ when: web
 - every step in its `after` is skipped.
 
 It is worked out on every pass from the conditions' answers, by a pure `skippedBy(steps, run, routeOf)` beside `stepStatus`. It spreads
-down the graph and carries nothing between passes. A condition answered again on a later try un-skips what its new route takes. When a
-round files a condition again, its followers are recomputed from the new answer.
+down the graph and carries nothing between passes.
+
+**Once a follower is filed, the route is settled for the run.** A condition gets a new answer only while none of the steps after it has
+been filed, on any route. That is the rule `retryable` (`retry/retry.ts`) already keeps for a try of a satisfied step: it is offered only
+while `noneFiled`. So `wf route`, and `wf retry` of a condition, are refused once a follower is filed:
+`triage: build-web was filed on route web, so the run has taken it. Cancel the run and start it again to take another route.` A new
+answer can therefore un-skip only steps that were never filed, and no branch that ran is left beside one that a new route takes. A round
+never files a condition again, because load keeps conditions out of a loop's span (below).
 
 What the other rules make of it:
 
@@ -164,6 +170,12 @@ Each refusal is a `WorkflowError` in the voice `validateLoops` already uses: the
 - A route may never go back. An edge back to an earlier step is a `loop:` and nothing else, and every loop is capped (`rounds:`, or
   `DEFAULT_ROUNDS`). So "a route back with no cap" cannot be written. `validateLoops` stays the one place a back edge is judged, and C10
   (§9) points a condition's `loop:` through it.
+- **A loop does not cross a condition.** A round files its whole span again (`loopSpan`), and a condition in it would be asked again
+  after its followers were filed, which the rule above refuses. So a loop's span holds no condition, and no step with `when:` but its
+  target: `review: \`loop: plan\`, and triage, a condition, is between plan and review: a round would ask it again after its routes were
+  taken. Loop back to a step after triage, on one route.` A loop may run on one route: its target says `when:`, and the looping step
+  follows it. On another route both are `skipped`, and a skipped step says no `again`, so no round is due. A loop across a join is already
+  refused, because a loop's steps are a chain (`validateLoops`).
 - A condition that no route of another condition can reach is still reachable through `after`. An unreachable step can only arise from a
   `when:` that names no declared route, and that is refused above.
 
@@ -235,15 +247,18 @@ Two things hold the Jev kind back:
 - or a task under a derived id that a restarted pass adopts rather than files again (`stepTaskId`, as `checkTaskId` does for a check).
 
 The tick copies a script's answer onto the record once, so it is read from there even if the engine's log is later pruned. Only a new try
-asks again, and only a person files one (`wf retry`), or a round of a loop.
+asks again, and only a person files one (`wf retry`), before any follower is filed.
 
 **An answer that does not decode.** It is never a route, never the first route and never a default:
 
 - **The field and agent kinds.** A closeout whose `route` is missing or outside the list is `unsigned`, exactly as a non-boolean `again` is
   today. A field kind's value outside the enum makes the *producer* `unsigned`, since its closeout did not keep its schema.
-- **The script and Jev kinds.** Exit 0 with a last line that does not decode, or a non-zero exit, gives the condition `unsigned` or
-  `failed`, and it takes the tries a step takes. A check that did not finish gives `failed`, offered `wf retry` for nothing spent, in the
-  spirit of `--recheck`.
+- **The script and Jev kinds.** Each case has one word, and each is already a `StepStatus`:
+  - exit 0 with a last line that does not decode: `unsigned`, as a session that ends cleanly with no closeout;
+  - a non-zero exit: `failed`. The script ran and said nothing the run can use;
+  - no exit number (timed out, killed, no trailer, `refusedCheck`'s *did not finish*): `stopped`.
+
+  Load refuses `retries:` on a condition, so the run files no try of its own for any of these. Only a person files the next one.
 - **`unsure`, from any kind.** The condition reads `blocked`, with the words beside it, as an agent's `blocked` does.
 
 A person then either:
@@ -252,7 +267,7 @@ A person then either:
   `approvalFile` does, and the pass reads it before the condition's own answer;
 - or files a new try with `wf retry <run> <step>`.
 
-`wf decide` offers both, with the routes listed.
+`wf decide` offers both, with the routes listed. Both are refused once a follower is filed (§1).
 
 ## 3. Gates: a property, *input required*
 
@@ -262,8 +277,8 @@ that signed and waits for a person reads `input-required`, A2A's own task state,
 `lib/status.ts`). A gate is the same wait at the step's level, after the step and its checks.
 
 - **`gate:` is unchanged**, and it may sit on a condition. A gated condition holds its answered route for a person. `wf approve` confirms
-  the route, `wf route` changes it, and `wf retry --message` asks again. That is how a new dispatcher or a new Jev route earns trust inside
-  a workflow: gated first, ungated once measured.
+  the route, `wf route` changes it, and `wf retry --message` asks again. All three are open, since nothing after a gated step is filed
+  before it is approved. That is how a new dispatcher or a new Jev route earns trust inside a workflow: gated first, ungated once measured.
 - **The board draws a frame** around a gated node: a dashed border labelled *input required*. It turns solid and amber while the step is
   `awaiting approval`, and it reads *approved* once the try is approved. The frame comes from the spec (`gate` is already on
   `WorkflowStepSpec`) and from the run's `Decision`. The api already has both, so no new endpoint is needed. `approvedFirst` endings draw
@@ -487,19 +502,30 @@ stateDiagram-v2
   triage --> build_web: web
   triage --> build_backend: backend
   triage --> [*]: docs (ends)
-  build_web --> review
-  build_backend --> review
-  review --> build_web: again (rounds 3)
-  review --> [*]
+  build_web --> review_web
+  review_web --> build_web: again (rounds 3)
+  build_backend --> review_backend
+  review_backend --> build_backend: again (rounds 3)
+  review_web --> notes
+  review_backend --> notes
+  notes --> [*]
 ```
+
+Each loop runs on one route and is a chain: its target says `when:`, and its reviewer waits on the target alone, so the folder loads under
+`validateLoops` and the rule in §1 that a loop does not cross a condition. `notes` joins the two routes. On `web`, `build_backend` and
+`review_backend` are skipped, and `notes` runs after `review_web` alone, forking from its workspace. On `docs`, every step after triage
+is skipped and the run ends.
 
 - **Lit with a run's path.** `WorkflowCanvas` draws the folder, and `RunCanvas` draws a run, lit as the Debug panel lights a task's
   lifecycle (`litAt`, `takenRoutes` in the web's `lib/lifecyclePath.ts`). The path is read off the record: the steps filed, in the order
   of their tries, the route each condition took (`StepRecord.route`, or its closeout), and the rounds. Skipped steps are dimmed. Routes not
   taken are drawn thin.
-- **Its drift test:** a `diagram:` marker in `packages/agent-orchestrator/docs/` for one shipped folder, through a no-argument function
-  that reads it (`devPlannedDiagram()` in a store file, since it reads the folder). A change to that folder's wiring without its picture
-  fails the suite. Every other folder is drawn live by the same function the board uses, so there is nothing else to drift.
+- **Its drift test:** a `diagram:` marker in `packages/agent-orchestrator/docs/` for the package's own folder,
+  `packages/agent-orchestrator/workflows/` (implement, then review looping back to it), through a no-argument function that reads it
+  (`packageWorkflowDiagram()` in a store file, since it reads the folder). Turbo sees that folder, since it is inside the package, so a
+  change to its wiring without its picture fails even a cached `npm test`. The root's `workflows/` (dev-planned and the rest) is outside
+  every package's inputs: a marker on one of those would only fail under `npx turbo run test --force`, as the root `CLAUDE.md` warns. They
+  are drawn live instead, by the same function the board uses, so they have no picture to drift.
 
 ## 8. The agent column
 
@@ -565,7 +591,8 @@ is filed `--after` that slice's run. Each card is one refusal family or one page
    it there for C8 and saying so in the card, then narrowing it with the composable evaluation's connections (card 10), where a
    person's file holds a credential and a script is given it by name.
 4. **Does a gated condition confirm the route, or the closeout it read?** *Recommend* the route. The person sees the closeout beside it,
-   but what `wf approve` spends is the answer. A changed closeout comes with a new try of the producer, which un-skips and re-asks anyway.
+   but what `wf approve` spends is the answer. A closeout cannot change under it, since a new try of the producer is refused once a step
+   after it is filed (`noneFiled`), and a condition of the field kind, which has no task, counts as filed once one of its followers is.
 5. **When may the dispatcher queue on its own?** *Recommend* per route, after 20 confirmed cards with no override on that route, and never
    for `none fits` or `not ready`. The owner sets the number. The board shows the count.
 6. **Where the step machine's marker lives: the README or `docs/`?** *Recommend* the README, beside *Going round again*, where the

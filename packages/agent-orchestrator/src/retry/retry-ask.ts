@@ -1,13 +1,9 @@
 /**
- * Trying again: what a try is — how a person asks for one (`wf retry`), the tries a step's record keeps behind the one it is on, a try
- * due and how its record moves on once it is filed — and the words `wf ls` and `wf decide` say of them.
- *
- * Pure, as run.ts is, and beneath it: run.ts imports what it needs from here, and nothing here imports run.ts but its types. What of
- * the section reads a step's standing — `retryable`, `retriesDue`, `retryRefusal`, `tryNote`, `retryLines`, `answerLines` — stays in
- * run.ts, since it calls `standing`, the gates and the budget in `status/status.ts`, which imports this file: importing them here would
- * make a cycle.
+ * Trying again, as a person asks it and a record keeps it: how a person asks for a try (`wf retry`), the tries a step's record keeps
+ * behind the one it is on, a try due and how its record moves on once it is filed — and the words `wf ls` and `wf decide` say of them.
+ * Pure; what reads a step's standing to judge a try — `retryable`, `retriesDue`, `retryRefusal` — is `retry.ts`'s.
  */
-import type { Run, StepRecord } from '../record/record.ts';
+import { tryOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
@@ -104,9 +100,6 @@ export function messageRefusal(how: RetryHow, command = 'wf retry <runId> <step>
     return `--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — ${command} --message "<answer>" — or leave --message out.`;
   return null;
 }
-
-/** The try a step is on: the first, and one more for each try its record keeps behind it. */
-export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
 
 /**
  * The tries `retries:` has filed for a step in the round it is on. A person's do not count: `retries` is what the run may spend on its

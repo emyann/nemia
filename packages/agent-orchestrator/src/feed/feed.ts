@@ -19,10 +19,15 @@
  * grows. A read stops at the last newline, so it never passes a line half written. Unlike the engine's, a cursor that is not at the start
  * of a line, or is past the end, is refused by name (`feedCursorRefusal`): read on from there and every line after it would be misread.
  *
- * Pure: the line, the fold and what a pass owes. The file — read, appended to and followed — is `feed.store.ts`'s, and the controllers hand
- * the rest of the package what it needs.
+ * Pure: the line, the fold, what a pass owes and what it judged of a run in the feed's words (`feedWords`). The file — read, appended to
+ * and followed — is `feed.store.ts`'s, and the controllers hand the rest of the package what it needs.
  */
-import type { FeedSaid, FeedWords } from '../run.ts';
+import { onYouWords, type Listing } from '../list/list.ts';
+import { oneLine, type Run } from '../record/record.ts';
+import type { Assessment } from '../tick/assess.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import { holdWord } from '../wait/wait.ts';
+import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 
 /** One line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside it. */
 export type FeedLine = { at: string; run: string; step?: string; word: string; note?: string };
@@ -93,3 +98,76 @@ export function feedChanges(
 /** One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `wf feed` and `wf watch`. */
 export const feedLineWords = (l: FeedLine): string =>
   `${l.at.slice(11, 19)}  ${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
+
+/** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
+export type FeedSaid = { word: string; note?: string };
+
+/** What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run. */
+export type FeedWords = { run: FeedSaid; steps: Array<FeedSaid & { name: string }> };
+
+/**
+ * The engine's word for a task, as the feed keeps it: every word of a session at work — `running (working)`, `running (idle)`,
+ * `working (quiescent)`, `starting`, `between attempts` — is `running`, and every other word is itself. Pure.
+ *
+ * A session's live state moves between those words on its own, many times a step, and nothing of the run's judgement moves with it: a
+ * feed that wrote each would write a line every few passes for every step at work, and a watcher waiting for a gate would read through
+ * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human` and the settled
+ * words are kept: each is something the run decides on.
+ */
+export const feedPhase = (word: string): string =>
+  word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
+
+/**
+ * What the feed says of a run as a pass judged it: the listing `wf ls` prints (`listing`, handed the engine's words through `feedPhase`),
+ * in the feed's words. Pure.
+ *
+ * Each step's word is its status on `wf ls`, and its note the note beside it there — the try due or on, the gate and what answers it, how
+ * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. A step that signed
+ * off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for a run `failed` that nothing
+ * failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)` beside it as `wf ls` says
+ * it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until (`holdWord`), and nobody is waited on.
+ *
+ * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
+ * moves with every other run's start and end while nothing of this one does.
+ *
+ * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
+ *   word.
+ */
+export function feedWords(
+  l: Listing,
+  run: Pick<Run, 'pruned' | 'hold'>,
+  { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
+  closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
+): FeedWords {
+  const onYou = onYouWords(l);
+  return {
+    run: {
+      word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`,
+      ...(run.hold && status !== 'cancelled'
+        ? { note: holdWord(l.holding ?? []) }
+        : onYou.length
+          ? { note: `waiting on you: ${onYou.join(', ')}` }
+          : {}),
+    },
+    steps: l.steps.map((s) => {
+      const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
+      return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(note ? { note } : {}) };
+    }),
+  };
+}
+
+/**
+ * The longest `needs` the feed carries. A feed line is one line of `wf watch`, and a step's `needs` is the agent's, of any length: past this
+ * it is clipped, and `wf decide` has it whole.
+ */
+const NEEDS_CAP = 200;
+
+/**
+ * What a step that signed off blocked needs, for its line in the feed: `needs: <its closeout's needs>`, one line (`oneLine`) — or nothing, for
+ * a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so a
+ * watcher does not have to run `wf decide` to read it. Pure.
+ */
+const needsNote = (c: Closeout | { error: string } | undefined): string => {
+  const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
+  return needs ? `needs: ${needs}` : '';
+};

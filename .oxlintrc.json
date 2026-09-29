@@ -569,10 +569,71 @@
     {
       "files": ["packages/agent-orchestrator/src/brief/brief-sections.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 2506, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 183, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 24 }],
+        "sonarjs/cognitive-complexity": ["error", 29]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/brief/brief.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 134, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 54 }],
+        "sonarjs/cognitive-complexity": ["error", 56]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/decide/decide.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 115, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 33 }]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/forget/forget.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 150, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 91 }],
         "sonarjs/cognitive-complexity": ["error", 156]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/gate/gate.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 90, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 32 }],
+        "sonarjs/cognitive-complexity": ["error", 33]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/list/list.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 171, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 49 }],
+        "sonarjs/cognitive-complexity": ["error", 41]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/retry/retry.ts"],
+      "rules": {
+        "max-lines": ["error", { "max": 531, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 183, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 80 }],
+        "sonarjs/cognitive-complexity": ["error", 83]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/round/round.ts"],
+      "rules": {
+        "max-lines-per-function": ["error", { "max": 147, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 54 }],
+        "sonarjs/cognitive-complexity": ["error", 68]
+      }
+    },
+    {
+      "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
+      "rules": {
+        "complexity": ["error", { "max": 32 }],
+        "sonarjs/cognitive-complexity": ["error", 27]
       }
     },
     {
@@ -621,7 +682,7 @@
     {
       "files": ["packages/agent-orchestrator/src/tick.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 1211, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 1201, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 463, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 136 }],
         "sonarjs/cognitive-complexity": ["error", 197]

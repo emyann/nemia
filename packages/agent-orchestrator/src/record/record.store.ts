@@ -12,7 +12,7 @@ import { Result, Schema, SchemaIssue } from 'effect';
 import type { Acceptance, Approval, Hold, Pruned, Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../run.ts';
-import { spentAsks, type RetryAsk } from '../retry/retry-ask.ts';
+import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { asNamed, orderSteps, type Workflow } from '../workflow.ts';
 import { FrozenStepSchema, loadWorkflows } from '../workflow-store.ts';
 import { inputsRoot } from './places.store.ts';

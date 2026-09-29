@@ -7,12 +7,12 @@
  */
 import fs from 'node:fs';
 import type { Engine } from './runtime-client.ts';
-import type { Acceptance, Approval, Hold, Run } from './record/record.ts';
+import { tryOf, type Acceptance, type Approval, type Hold, type Run } from './record/record.ts';
 import { sayRefusal, type Said } from './say/say.ts';
 import { approvedFirst, type RoundAsk } from './status/status.ts';
 import { holdRefusal } from './wait/wait.ts';
 import { acceptAsk, approvalRefusal, assess, cancelPlan, idRefusal, retryable, retryRefusal, roundAsk, type CancelPlan } from './run.ts';
-import { tryOf, type RetryAsk, type RetryHow } from './retry/retry-ask.ts';
+import type { RetryAsk, RetryHow } from './retry/index.ts';
 import {
   acceptFile,
   acceptanceIn,

@@ -5,13 +5,14 @@
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
-import { tryOf, type RetryAsk } from '../retry/retry-ask.ts';
+import type { RetryAsk } from '../retry/index.ts';
 import {
   andList,
   firstLine,
   refusedCheck,
   SETTLED,
   TRIED_FROM,
+  tryOf,
   type Landed,
   type Run,
   type StepStatus,

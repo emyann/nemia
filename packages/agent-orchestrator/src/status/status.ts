@@ -9,12 +9,13 @@ import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../st
 import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/timeline.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
-import { tryOf, type Retry, type RetryHow } from '../retry/retry-ask.ts';
+import type { Retry, RetryHow } from '../retry/index.ts';
 import {
   refusedCheck,
   satisfiesAfter,
   SETTLED,
   TRIED_FROM,
+  tryOf,
   type Acceptance,
   type Approval,
   type CloseoutAsked,

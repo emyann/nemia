@@ -19,7 +19,7 @@ import { parseCloseout, type Closeout } from './closeout/closeout.ts';
 import { signedAndHeld, taskUsage } from './timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from './record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
-import { continuesFrom } from './retry/retry-ask.ts';
+import { continuesFrom } from './retry/index.ts';
 
 /**
  * The engine's task phases, narrowed to what a run cares about.

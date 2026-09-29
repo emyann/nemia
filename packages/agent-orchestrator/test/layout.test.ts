@@ -234,7 +234,26 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
   const wait = files.get('src/wait/wait.ts')!;
   files.set('src/wait/wait.ts', `${wait}\nimport { assess } from '../run.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/brief/brief-sections.ts', 'src/cap/cap.ts', 'src/prune/prune.ts', 'src/run.ts', 'src/say/say.ts', 'src/wait/wait.ts'],
+    [
+      'src/brief/brief-sections.ts',
+      'src/brief/brief.ts',
+      'src/brief/index.ts',
+      'src/cancel/cancel.ts',
+      'src/cap/cap.ts',
+      'src/decide/decide.ts',
+      'src/feed/feed.ts',
+      'src/forget/forget.ts',
+      'src/gate/gate.ts',
+      'src/list/list.ts',
+      'src/prune/prune.ts',
+      'src/retry/index.ts',
+      'src/retry/retry.ts',
+      'src/round/round.ts',
+      'src/run.ts',
+      'src/say/say.ts',
+      'src/tick/assess.ts',
+      'src/wait/wait.ts',
+    ],
   ]);
   files.set('src/wait/wait.ts', `${wait}\nimport type { Assessment } from '../run.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), []);

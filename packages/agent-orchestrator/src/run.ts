@@ -9,8 +9,9 @@
 export { durationWord } from './radius.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
 export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
-/** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; retry.ts imports only types from here. */
-export { answerOf, messageRefusal, type EarlierTry } from './retry/retry-ask.ts';
+/** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */
+export { answerOf, messageRefusal, type EarlierTry } from './retry/index.ts';
+export { answerLines, deniedOffer, overBudgetLine, retriesDue, retryable, retryLines, retryRefusal, tryNote } from './retry/index.ts';
 export {
   checkTaskId,
   filesPrunedWords,
@@ -21,9 +22,12 @@ export {
   placeOf,
   prunedWords,
   refusedCheck,
+  runTasks,
   satisfiesAfter,
   stepTaskId,
+  stepTasks,
   stopsFollowers,
+  unjudgedWords,
 } from './record/record.ts';
 export type {
   Acceptance,
@@ -119,7 +123,7 @@ export {
   toDecideWords,
 } from './ending/ending.ts';
 export type { Landing, MergeState, ToDecide } from './ending/ending.ts';
-export { approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
+export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
 export {
   admissionOrder,
   ceilingLines,
@@ -138,79 +142,39 @@ export { GIVEN, givenPlan, handOffDue, workspacePlan } from './workspace/workspa
 export type { Given, GivenFrom, WorkspacePlan } from './workspace/workspace.ts';
 export { saidLines, saidWord, sayRefusal } from './say/say.ts';
 export type { Said, SaidTo } from './say/say.ts';
+export { assess } from './tick/assess.ts';
+export type { Assessment } from './tick/assess.ts';
 export {
   acceptAsk,
-  acceptedLines,
   acceptWordsRefusal,
-  answerIn,
-  answerLines,
-  approvalRefusal,
-  assess,
-  branchFates,
-  cancelPlan,
-  checkLogsOf,
-  composeBrief,
-  costLine,
-  decision,
-  deniedOffer,
-  deniedWords,
-  feedPhase,
-  feedWords,
-  forgetLine,
-  forgetRefusal,
-  fromNote,
-  gateLines,
-  harnessWaitLine,
-  heldWorktree,
-  idRefusal,
-  inputRefusal,
-  inputsLine,
-  inputsNote,
-  listing,
-  loopSection,
-  onYouWords,
-  overBudgetLine,
-  parseWorktrees,
-  remoteBrief,
-  retriesDue,
-  retryable,
-  retryLines,
-  retryRefusal,
-  retrySection,
   roundAsk,
   roundBudgetRefusal,
   roundDueNote,
   roundFiled,
   roundLines,
   roundsDue,
-  roundSection,
-  runCostLines,
-  runTasks,
-  runWorktrees,
-  SIGNOFF,
   spentRoundAsks,
-  stepTasks,
-  tryNote,
-  unjudgedWords,
-  waitingWords,
-} from './brief/brief-sections.ts';
-export type {
-  AskName,
-  Assessment,
-  BranchFate,
-  CancelPlan,
-  Decision,
-  EndingStopped,
-  FeedSaid,
-  FeedWords,
-  ForgetHow,
-  Forgot,
-  GitWorktree,
-  InputFile,
-  Listing,
-  ParentCloseout,
-  ParentStep,
-  RetryBriefing,
-  RoundBriefing,
-  Shipped,
-} from './brief/brief-sections.ts';
+} from './round/round.ts';
+export { cancelPlan } from './cancel/cancel.ts';
+export type { CancelPlan } from './cancel/cancel.ts';
+export {
+  branchFates,
+  checkLogsOf,
+  forgetLine,
+  forgetRefusal,
+  heldWorktree,
+  idRefusal,
+  parseWorktrees,
+  runWorktrees,
+} from './forget/forget.ts';
+export type { AskName, BranchFate, ForgetHow, Forgot, GitWorktree } from './forget/forget.ts';
+export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/inputs.ts';
+export type { InputFile } from './start/inputs.ts';
+export { costLine, decision, runCostLines } from './decide/decide.ts';
+export type { Decision, Shipped } from './decide/decide.ts';
+export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, waitingWords } from './list/list.ts';
+export type { Listing } from './list/list.ts';
+export { feedPhase, feedWords } from './feed/feed.ts';
+export type { FeedSaid, FeedWords } from './feed/feed.ts';
+export { acceptedLines, composeBrief, gateLines, loopSection, remoteBrief, retrySection, roundSection, SIGNOFF } from './brief/index.ts';
+export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing } from './brief/index.ts';

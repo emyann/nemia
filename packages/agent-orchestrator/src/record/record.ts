@@ -1,12 +1,13 @@
 /**
  * A run's record, as data: its shape (`Run`, a `GitRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
- * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `Landed`) and the task
- * ids a run files, and the small words every part of the run's judgement shares (`andList`, `fenced`, `oneLine`, `prunedWords`, …).
+ * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `Landed`), the try it
+ * is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares (`andList`,
+ * `fenced`, `oneLine`, `prunedWords`, …).
  * Pure: `record.store.ts` reads and writes the record.
  */
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import { tryOf, type EarlierTry } from '../retry/retry-ask.ts';
+import type { EarlierTry } from '../retry/index.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
@@ -258,6 +259,9 @@ export const firstLine = (body: string): string =>
 export const TRIED_FROM: ReadonlySet<StepStatus> = new Set(['unsigned', 'failed (check)', 'failed', 'stopped', 'blocked', 'denied']);
 export const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', 'stopped']);
 
+/** The try a step is on: the first, and one more for each try its record keeps behind it. */
+export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
+
 /**
  * The id of a step's check task. Derived, never generated: a pass that files the check and dies
  * before writing the run down finds it under this id on the next pass, and adopts it rather than
@@ -365,4 +369,24 @@ export function fenced(text: string, info = ''): string[] {
 /** JSON in a fence longer than any run of backticks inside it (`fenced`). */
 export function dataBlock(value: unknown): string[] {
   return fenced(JSON.stringify(value, null, 2), 'json');
+}
+
+/** Every task a step has filed: its current try's and its check's, and each earlier try's and its check's, in that order. */
+export const stepTasks = ({ taskId, check, tries }: StepRecord): string[] => [
+  ...(taskId ? [taskId] : []),
+  ...(check ? [check.taskId] : []),
+  ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
+];
+
+/** Every task a run has filed (`stepTasks`), step by step: what a read of the whole run reads, and what a journal that does not read can cost it. */
+export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run.steps).flatMap(stepTasks);
+
+/**
+ * Why a run is not judged, whole, when a task it reads has a journal that does not read: `own`, the task of its own that does not
+ * (`runTasks`), or undefined for a task of a run it waits on; `why`, the runtime's words; `by`, what does not judge it — `the board`,
+ * `wf ls`, `wf decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that costs.
+ */
+export function unjudgedWords(runId: string, own: string | undefined, why: string, by: string): string {
+  const what = own ? `the journal of its task ${own} does not: ${why}` : `the journal of a task of a run it waits on does not: ${why}`;
+  return `${runId}'s record reads, but ${/[.!?]$/.test(what) ? what : `${what}.`} So ${by} does not judge the run, and the tick does not advance it, until that journal reads again.`;
 }

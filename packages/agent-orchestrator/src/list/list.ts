@@ -1,0 +1,402 @@
+/**
+ * What `wf ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's (`waitingWords`,
+ * `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
+ */
+import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
+import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
+import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, type ToDecide } from '../ending/ending.ts';
+import type { Workflow } from '../step/step.ts';
+import {
+  DENIED_CAP,
+  DENIED_SHOWN,
+  oneLine,
+  satisfiesAfter,
+  type CloseoutAsked,
+  type Run,
+  type StepStatus,
+  type TaskPhase,
+} from '../record/record.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import { verdictWord, type Verdict } from '../check/check.ts';
+import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
+import {
+  acceptanceOf,
+  approvedFirst,
+  budgetOf,
+  heldByCheckout,
+  loopOver,
+  overBudget,
+  resultOnBase,
+  roundSpans,
+  runSpend,
+  sendBackTo,
+  spentWord,
+  standing,
+  stepSpend,
+  unheld,
+  type BranchStanding,
+  type RoundAsk,
+  type SpendOf,
+} from '../status/status.ts';
+import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsDue } from '../round/round.ts';
+import { saidWord } from '../say/say.ts';
+import { budgetWord } from '../radius.ts';
+import { assess } from '../tick/assess.ts';
+import { neverApproved } from '../prune/prune.ts';
+
+export type Listing = {
+  /**
+   * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
+   * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
+   * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
+   */
+  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
+  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off, pruned or held. */
+  waitingOnYou: string[];
+  /**
+   * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `wf ls` says
+   * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
+   * on a hold whose file names no run, which `Run.hold` still says.
+   */
+  holding?: Wait[];
+  /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
+  waiting: Wait[];
+  /** The cap on runs in flight holding this run, and the count it is held at (`heldRuns`): absent unless it holds a run with nothing filed. */
+  slot?: RunSlot;
+  /**
+   * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no cost
+   * on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its budget.
+   */
+  cost?: string;
+  /**
+   * What a person has to decide about the run's result (`toDecide`), as `assess` reads it on the same inputs: its ending step's gate, or
+   * its branch ahead of the base with no ending step to take it. Absent while there is nothing — which is every run still going.
+   */
+  toDecide?: ToDecide;
+};
+
+/**
+ * What `wf ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
+ *
+ * The words are `stepStatus`'s, so the list says what the run established and not only what the
+ * engine settled: `verified ✓`, `checking`, `failed ✗ check (exit 1)`, `unsigned` — and `unverified`
+ * for a step whose only evidence is its own word, on every line where that is true, because a step
+ * nobody checked must not pass for one somebody did.
+ *
+ * Where the run has no verdict of its own, the step's closeout goes beside the word — `closeout unreadable`
+ * for one nobody can read. A step that stopped itself `blocked` ended its session as cleanly as one that
+ * finished the work, so the engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in
+ * the word `wf decide` uses. A step still running shows the engine's own word for it, and a session whose
+ * word is exactly `needs-human` what the harness says it waits for (`waitingWords`). Nothing is inferred
+ * for a step with no closeout — a missing closeout is not a claim that the work was done, and a run with
+ * none still lists. A cap reached says what was spent and the cap in force; a looping step held on another
+ * step's budget shows that step's.
+ *
+ * One line per step, deliberately. The summary, `needs` and a check's output were written for
+ * `wf decide`, where there is room to read them; here they would turn a list into a report.
+ *
+ * Who a run waits on is asked again here, so a caller's stale list cannot say a run that started, or was
+ * called off, waits on a run or a slot. A root not filed names them, and an ending step approved and not
+ * filed names the run whose step has the checkout (`checkoutWord`). The engine's word for a settled task
+ * is its outcome, and `input-required` reads as it signed (`phaseOfView`), while its line prints the word.
+ *
+ * Nothing waits on a person for a step the next tick tries again, nor for a loop going round again, and
+ * none of either is due on a run cancelled, pruned or held, whose `waitingOnYou` is empty. A step a round
+ * due files again reads no budget hold (`roundSpans`); an ending whose work is sent back reads `waiting`
+ * (`unheld`); and an ending at its gate whose result git already has waits on nobody, its note saying
+ * where the branch stands (`resultOnBase`).
+ *
+ * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
+ * says so (`heldByCheckout`) — or that a person accepted its loop (`wf accept`), never their words, which
+ * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
+ * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
+ * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ *
+ * @param phaseOf The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is.
+ * @param verdictOf What a refused check exited with, as its log tells it.
+ * @param asks What people asked for with `wf retry`, and the run has not consumed yet.
+ * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet.
+ * @param answers Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`).
+ * @param waits The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be.
+ * @param saidTo How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its
+ *   task.
+ * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts.
+ * @param slot The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be.
+ * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts):
+ *   what says a finished run is one nobody has decided.
+ * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+ *   tick.ts): what this run's ending says where `waiting` would be.
+ * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's
+ *   `needs-human` on the step's line, and nowhere else. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly,
+ *   here and by everything that reads a step's status — `harnessBlocked` in views.ts, the api's `needsOf`, `stepState` on the board — so
+ *   the phase a decision is made on stays the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in decide.ts
+ *   passes this; the api does not, and its step's `status` reaches the board's chip unchanged.
+ * @param deniedOf What each task's sessions were denied, as permission rules name them (`deniedOf` in views.ts): said as
+ *   `denied: Skill(look), Bash(pytest)` (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its
+ *   status — which stays the word every reader compares exactly. `list` in decide.ts passes this; the api does not, and carries the list as a field
+ *   of its own (`StepNeeds.denied`).
+ * @param holds The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
+ *   the runs the hold names, each taken as one that may still ship.
+ */
+export function listing(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => string,
+  closeoutOf: (step: string) => Closeout | { error: string } | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
+  roundAsks: readonly RoundAsk[] = [],
+  answers: readonly RetryAsk[] = [],
+  waits: readonly Wait[] = [],
+  saidTo: (step: string) => number = () => 0,
+  spendOf: SpendOf = () => undefined,
+  slot?: RunSlot,
+  standings: readonly BranchStanding[] = [],
+  checkout?: CheckoutHold,
+  waitingOf: (taskId: string) => string | undefined = () => undefined,
+  deniedOf: (taskId: string) => readonly string[] = () => [],
+  holds?: readonly Wait[],
+): Listing {
+  const waiting = gated(run) ? [...waits] : [];
+  const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
+  const settledOf = (taskId: string): TaskPhase => {
+    const word = phaseOf(taskId);
+    if (word === 'input-required') return 'succeeded';
+    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
+  };
+  const readable = (name: string): Closeout | undefined => {
+    const c = closeoutOf(name);
+    return c && !('error' in c) ? c : undefined;
+  };
+  const due =
+    run.cancelledAt || run.pruned || run.hold
+      ? []
+      : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
+  const rounds =
+    run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
+  const refiled = roundSpans(steps, rounds);
+  const waitingAgain = unheld(steps, run, due, rounds);
+  const takenByHand = (name: string): boolean =>
+    resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
+
+  const waitingOnYou: string[] = [];
+  const exhausted = new Set<string>();
+  const heldLoops = new Set<string>();
+  const atGates = new Set<string>();
+  const priced = new Set<string>();
+  const rows = steps.map((step) => {
+    const row = lineOf(step);
+    const spent = stepSpend(run, step.name, spendOf);
+    const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
+    const retry = due.find((r) => r.step === step.name);
+    const round = rounds.find((r) => r.step === step.name);
+    const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
+    const heldOut = retry && checkout && heldByCheckout(steps, step.name, checkout) ? checkout : undefined;
+    const tried = heldOut
+      ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
+      : retry
+        ? dueNote(step, run, retry)
+        : round
+          ? roundDueNote(steps, round)
+          : exhausted.has(step.name)
+            ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
+            : heldLoops.has(step.name)
+              ? heldNote(step, run)
+              : accepted
+                ? acceptedNote(step, run, accepted)
+                : waitingAgain.has(step.name) && run.steps[step.name]?.taskId
+                  ? `the work is sent back (${due
+                      .filter((r) => r.back?.includes(step.name))
+                      .map((r) => r.step)
+                      .join(', ')}) — it waits at its gate again once that settles`
+                  : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
+    const gate =
+      !atGates.has(step.name) || retry
+        ? ''
+        : takenByHand(step.name)
+          ? onBaseNote(run, step.name, standings)
+          : gateNote(run, step.name, sendBackTo(step, run));
+    const taskId = run.steps[step.name]?.taskId;
+    const landed = run.steps[step.name]?.landed;
+    const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
+    const note = [tried, gate, landing, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : '']
+      .filter(Boolean)
+      .join(' · ');
+    return { ...row, ...(note ? { note } : {}), ...cost };
+  });
+
+  function lineOf(step: Workflow): Listing['steps'][number] {
+    const { name } = step;
+    const taskId = run.steps[name]?.taskId;
+    const branch = run.steps[name]?.branch ?? null;
+    const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
+      if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name))
+        return { name, status: checkoutWord(checkout), branch };
+      return {
+        name,
+        status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting',
+        branch,
+      };
+    }
+    if (waitingAgain.has(name)) return { name, status: 'waiting', branch };
+
+    const status = refiled.has(name) ? own : stands;
+    const onYou =
+      status === 'blocked' ||
+      status === 'unsigned' ||
+      status === 'failed (check)' ||
+      status === 'awaiting approval' ||
+      status === 'exhausted' ||
+      status === 'over budget' ||
+      status === 'budget exhausted' ||
+      status === 'denied';
+    if (onYou && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
+    if (status === 'over budget' || status === 'budget exhausted') {
+      if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
+      if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
+      return { name, status: budgetStatus(step, status), branch };
+    }
+    if (status === 'awaiting approval') {
+      atGates.add(name);
+      return { name, status: 'awaiting approval', branch };
+    }
+    if (status === 'exhausted') {
+      exhausted.add(name);
+      return { name, status: 'rounds exhausted', branch };
+    }
+    if (status === 'verified') return { name, status: 'verified ✓', branch };
+    if (status === 'checking') return { name, status: 'checking', branch };
+    if (status === 'failed (check)') return { name, status: `failed ✗ check (${verdictWord(verdictOf(name) ?? 'unfinished')})`, branch };
+    if (status === 'denied') return { name, status: 'denied', branch };
+
+    const c = closeoutOf(name);
+    const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
+    const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
+    const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
+    return { name, status: `${word}${waitsFor ? `: ${waitingWords(waitsFor)}` : ''}${said}`, branch };
+  }
+
+  function budgetStatus(step: Workflow, status: StepStatus): string {
+    const spent = stepSpend(run, step.name, spendOf);
+    const cap = budgetOf(step, run.steps[step.name]);
+    const of = cap === undefined ? '' : ` of ${budgetWord(cap)}`;
+    if (status === 'budget exhausted')
+      return `budget exhausted${spent.measured ? ` ${spentWord(spent)}${of}` : cap === undefined ? '' : ` at ${budgetWord(cap)}`}`;
+    if (overBudget(step, run, spendOf)) return `over budget ${spentWord(spent)}${of}`;
+    return `over budget — ${loopOver(steps, step, run, spendOf)
+      .map((o) => `${o.name} ${spentWord(o.spent)} of ${budgetWord(o.cap)}`)
+      .join(', ')}`;
+  }
+
+  const total = runSpend(run, spendOf);
+  const { toDecide: decide } = assess(
+    steps,
+    run,
+    settledOf,
+    readable,
+    askedCloseout,
+    verdictOf,
+    asks,
+    roundAsks,
+    (taskId) => phaseOf(taskId) === 'needs-human',
+    spendOf,
+    standings,
+    checkout,
+  );
+  return {
+    steps: rows,
+    waitingOnYou: run.cancelledAt || run.pruned || run.hold ? [] : waitingOnYou,
+    waiting,
+    ...(run.hold && !run.cancelledAt ? { holding: holds ? [...holds] : run.hold.until.map((id) => ({ run: id })) } : {}),
+    ...(held ? { slot: held } : {}),
+    ...(total.measured ? { cost: spentWord(total) } : {}),
+    ...(decide ? { toDecide: decide } : {}),
+  };
+}
+
+/**
+ * The longest harness word a screen will print. Whatever `waitingFor` holds is the harness's, shown to a person verbatim, and on
+ * `wf ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
+ * never dropped — but `claude agents` is the only place the rest of it is: every screen here words it through `waitingWords`, the
+ * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
+ */
+const WAIT_CAP = 60;
+
+/** A word that already names its own thing. `permission prompt` does not, and reads as `a permission prompt`; `the login dialog` does. */
+const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
+
+/**
+ * What the harness says a blocked session is waiting for, in a sentence a person reads: `waiting for a permission prompt`.
+ *
+ * **One writer for these words**, because `wf ls`, `wf decide` and the board all say the same fact and must not word it three ways.
+ * The word itself is the harness's — no enum, here or in the engine — so all this does is put an
+ * article in front of it and clip it: `a`/`an` by the sound, none where the word brings its own determiner or is plural. That rule is
+ * a guess about English, not about the harness, and it is wrong for an odd noun phrase a harness emits; printing the word bare reads
+ * wrong for `permission prompt`.
+ *
+ * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
+ * would run, say — and `wf ls` pads each status to the width of the widest (`cli.ts`): a status with a newline in it breaks its row in
+ * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
+ * before the word is measured or clipped.
+ */
+export function waitingWords(waitingFor: string): string {
+  const shown = oneLine(waitingFor, WAIT_CAP);
+  const article = DETERMINED.test(shown) || /s$/i.test(shown) ? '' : /^[aeiou]/i.test(shown) ? 'an ' : 'a ';
+  return `waiting for ${article}${shown}`;
+}
+
+/**
+ * What a step's sessions were denied, in a line a person reads: `denied: Skill(look), Bash(pytest)` — or nothing, for none. Pure.
+ *
+ * **One writer for these words**, as `waitingWords` is for a wait: `wf ls`, `wf decide` and the board say the same fact. Each call is the
+ * harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `wf ls` prints the
+ * line in its note, `wf decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many more.
+ */
+export function deniedWords(denied: readonly string[]): string {
+  if (!denied.length) return '';
+  const named = denied.slice(0, DENIED_SHOWN).map((d) => oneLine(d, DENIED_CAP));
+  const more = denied.length - named.length;
+  return `denied: ${named.join(', ')}${more ? ` and ${more} more` : ''}`;
+}
+
+/**
+ * What a person does about such a wait: `answer it in Claude Code: claude agents, session ae/<task>/1`, naming the session `claude agents`
+ * lists it under (`nameFor`), or without it where no attempt is on the record yet. Its own writer, because a screen with room for the
+ * whole sentence says it in one line (`harnessWaitLine`, `wf decide`) and one whose card says the wait already puts this under it (the
+ * board's banner): the same words either way, and never assembled twice.
+ *
+ * The advice assumes the wait is something a person can answer in the harness, as a `permission prompt` is: a `waitingFor` naming
+ * something nobody can answer there is given the same advice.
+ *
+ * A step on a remote A2A agent (`harness: a2a:<name>`, given as `remote`) is in no Claude Code: its Task waits on its caller, and the
+ * answer is a follow-up message on it, which `wf say` sends; the question is the Task's last message, which `wf logs` prints.
+ */
+export const answerIn = (session: string | null, remote?: { run: string; step: string }): string =>
+  remote
+    ? `read its question with wf logs ${remote.run} ${remote.step}, and answer it with wf say ${remote.run} ${remote.step} "<your answer>"`
+    : `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
+
+/** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
+export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
+  `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
+
+/**
+ * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
+ * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
+ * Pruned, neither word is left: `wf approve` and `wf retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
+ */
+const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
+  run.pruned
+    ? neverApproved(run.pruned)
+    : run.hold
+      ? heldLater(run.hold, 'its approval')
+      : `approve it: wf approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
+
+/**
+ * What `wf ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a step
+ * at its gate, what is asked of them, `approve plan`. Pure.
+ */
+export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
+  l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));

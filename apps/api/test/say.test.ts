@@ -26,7 +26,7 @@ import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
 import { engine, list, readRun, say } from 'agent-orchestrator';
 
-const tmp = (label: string) => scratch(`hkb-api-say-${label}-`);
+const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

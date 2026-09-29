@@ -4311,7 +4311,7 @@ test("a new skill's form takes its name, title, description, tags, examples and 
   assert.match(html, />Create skill</);
 });
 
-test("a skill of yours is filled from its file, its name set once, and saved; the repository's or HKB's is read, not saved", async () => {
+test("a skill of yours is filled from its file, its name set once, and saved; the repository's or Nemia's is read, not saved", async () => {
   const between = (changed: boolean) => createElement('p', { 'data-between': String(changed) });
   const mine = await skillForm({ detail: SKILL_DETAIL, between });
   assert.match(mine, /readOnly=""[^>]*value="write-a-note"/, 'the name is its folder, and an agent names it by it');

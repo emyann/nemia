@@ -63,7 +63,7 @@ function refuses(fn: () => unknown, why: string, said: RegExp): void {
 const fresh = (): void => fs.rmSync(LIBRARY, { recursive: true, force: true });
 const read = (name: string): string => fs.readFileSync(path.join(LIBRARY, name, 'SKILL.md'), 'utf8');
 
-test('a skill is rendered as HKB ships its own, and read back as it was written, by the card reader and by YAML', () => {
+test('a skill is rendered as Nemia ships its own, and read back as it was written, by the card reader and by YAML', () => {
   const text = renderSkill(DRAFT);
   assert.equal(
     text,

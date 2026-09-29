@@ -556,7 +556,7 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
           stderr: 'pipe',
         });
         transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
-        return { transport, client: new Client({ name: 'hkb-api', version: '0.0.0' }) };
+        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }) };
       }),
       ({ client }) => Effect.promise(() => client.close().catch(() => {})),
     );

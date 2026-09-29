@@ -355,8 +355,8 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
 
 - `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own system prompt, which is kept (F1).
-- `hkb-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
-  it, so a session loads them with the `Skill` tool as `hkb-<agent>:<name>`, and nothing of the machine's own plugins is touched.
+- `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
+  it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
 - `systemPrompt:` — `default`, or no line, keeps Claude Code's prompt and appends the instructions after it; `no-coding` does too, less
   Claude Code's coding instructions, through an output style in the plugin that says `keep-coding-instructions: false`, chosen by its
   namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude

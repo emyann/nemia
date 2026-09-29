@@ -15,6 +15,7 @@ import { preloads } from '../workflow-store.ts';
 import {
   noCodingStyle,
   NO_CODING_STYLE,
+  namesPlugin,
   pluginManifest,
   pluginOf,
   PROMPT_FILE,
@@ -22,13 +23,21 @@ import {
   rendersAgent,
   type SkillAgain,
 } from '../rendering.ts';
-import { runsDir } from '../record/record.store.ts';
+import { isDirectory, runsDir } from '../record/record.store.ts';
 
 /**
  * Where `wf start` renders a step's agent for Claude Code (`rendering.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and inputs,
  * outside every workspace, and removed with them. The tick files the step with the flags that name it (`renderedFlags`).
  */
 export const agentFilesDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'agents', step);
+
+/**
+ * Whether a step's rendered folder `dir` is there as its flags name it (`renderedFlags`): the folder, and the plugin in it where the flags
+ * name one (`namesPlugin`). A folder rendered under another plugin name, as one `wf start` wrote before the plugin was renamed, is not:
+ * its flags would name a plugin that is not there.
+ */
+export const renderedIn = (dir: string, step: Workflow): boolean =>
+  isDirectory(dir) && (!namesPlugin(step) || isDirectory(path.join(dir, pluginOf(step.agent!.name))));
 
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied whole
@@ -52,7 +61,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
         ? { name, whole: splitFrontmatter(`${name}/SKILL.md`, fs.readFileSync(path.join(from, 'SKILL.md'), 'utf8')).body }
         : { name };
     });
-    if (told.length || agent.systemPrompt === 'no-coding') {
+    if (namesPlugin(step)) {
       fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
       fs.writeFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), pluginManifest(agent.name));
     }

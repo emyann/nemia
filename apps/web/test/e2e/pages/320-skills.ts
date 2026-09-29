@@ -21,10 +21,10 @@ function tree(dir: string): Array<[string, string]> {
 export default {
   /**
    * An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, is given a
-   * skill HKB ships, the first on disk your library and the repository do not have. Its file first names that skill, as one copied from a
+   * skill Nemia ships, the first on disk your library and the repository do not have. Its file first names that skill, as one copied from a
    * repository would, so its row reads not found, and its description is edited and left unsaved. The sheet lists your library, this
-   * repository's and HKB's in that order, the repository's `scratch` refused with its reason and nothing to press. The skill is copied into
-   * your library from the sheet's third group, a write of its own, on disk byte for byte before any save. The copy moves the agent's
+   * repository's and Nemia's in that order, the repository's `scratch` refused with its reason and nothing to press. The skill is copied
+   * into your library from the sheet's third group, a write of its own, on disk byte for byte before any save. The copy moves the agent's
    * version, since the version digests the skills its file names; the form keeps the edit, the sheet stays open, and the save sends the
    * version the copy moved to and is not refused as stale. Its tools, which leave out Skill, are put right from the note that says so, and
    * Doesn't write code is picked, with Only my instructions behind For experts. Saved, the file gives the skill and says
@@ -45,7 +45,7 @@ export default {
       .find((name) => !had.includes(name) && !repoHas.includes(name));
     if (!shipped)
       throw new Refused(
-        `HKB ships a skill neither your library nor the repository has — ${shippedDir} holds ${fs.readdirSync(shippedDir).join(', ')}`,
+        `Nemia ships a skill neither your library nor the repository has — ${shippedDir} holds ${fs.readdirSync(shippedDir).join(', ')}`,
       );
     const copied = path.join(library, shipped);
     const was = fs.readFileSync(agentFile, 'utf8');
@@ -87,8 +87,8 @@ export default {
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await expectTexts(
         sheet.locator('section[data-skill-place] h3'),
-        ['Your library', 'This repository', 'Shipped with HKB'],
-        'the sheet lists your library, this repository and what HKB ships, in the order an agent of yours finds a name',
+        ['Your library', 'This repository', 'Shipped with Nemia'],
+        'the sheet lists your library, this repository and what Nemia ships, in the order an agent of yours finds a name',
       );
       const scratch = sheet.locator('section[aria-label="This repository"] [data-offered-skill="scratch"]');
       await expectVisible(
@@ -100,7 +100,7 @@ export default {
         sheet.locator('[data-copy-note]', { hasText: 'a write of its own' }),
         'the shipped group says a copy is a write of its own',
       );
-      const offered = sheet.locator(`section[aria-label="Shipped with HKB"] [data-offered-skill="${shipped}"]`);
+      const offered = sheet.locator(`section[aria-label="Shipped with Nemia"] [data-offered-skill="${shipped}"]`);
       await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${shipped} says what it costs a turn`);
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `skills-sheet-${await themeOf(page)}.png`) });

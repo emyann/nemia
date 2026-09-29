@@ -37,7 +37,7 @@ const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts
 
 /** A checkout with only these files in it. An object is written as JSON. */
 const repoWith = (files: Record<string, string | object>): string => {
-  const repo = scratch('hkb-api-repo-');
+  const repo = scratch('nemia-api-repo-');
   for (const [file, content] of Object.entries(files)) write(path.join(repo, file), content);
   return repo;
 };
@@ -114,7 +114,7 @@ test('skills and agents, with frontmatter and without: named by it or by their d
 });
 
 test('a repository with none of it — or no repository at all, or `.claude/skills` a file and not a directory — is empty lists and a 200, never an error', async () => {
-  const gone = path.join(scratch('hkb-api-nowhere-'), 'no-such-repo');
+  const gone = path.join(scratch('nemia-api-nowhere-'), 'no-such-repo');
   for (const repo of [repoWith({}), gone, repoWith({ '.claude/skills': 'a file', '.claude/agents': 'a file' })]) {
     const { status, body } = await served(repo);
     assert.equal(status, 200, repo);
@@ -181,7 +181,7 @@ test('a server that lists its tools: each with its description, and the one a ru
 
 test('a server whose command does not exist is an error on its entry: a 200, and the other server still lists its tools', async () => {
   const repo = repoWith({
-    '.mcp.json': { mcpServers: { missing: { command: 'hkb-no-such-mcp-server', args: ['--stdio'] }, fixture: fixture() } },
+    '.mcp.json': { mcpServers: { missing: { command: 'nemia-no-such-mcp-server', args: ['--stdio'] }, fixture: fixture() } },
     '.claude/settings.json': { enabledMcpjsonServers: ['missing', 'fixture'] },
   });
   const { status, body } = await served(repo);
@@ -191,7 +191,7 @@ test('a server whose command does not exist is an error on its entry: a 200, and
   assert.equal(missing.tools, null);
   assert.equal(
     missing.error,
-    '`hkb-no-such-mcp-server --stdio` did not start: there is no command `hkb-no-such-mcp-server` on its PATH. Install it, or fix `command` for missing in .mcp.json.',
+    '`nemia-no-such-mcp-server --stdio` did not start: there is no command `nemia-no-such-mcp-server` on its PATH. Install it, or fix `command` for missing in .mcp.json.',
   );
   assert.deepEqual(
     working.tools?.map((tool) => tool.name),
@@ -228,7 +228,7 @@ test('a server that exits before it answers is an error with what it printed on 
 const WAITABLE_DEADLINE_MS = 500;
 
 test('a server that never answers is an error once its time is up, and it is stopped', async () => {
-  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
+  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { silent: fixture({ HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['silent'] },
@@ -243,8 +243,8 @@ test('a server that never answers is an error once its time is up, and it is sto
 });
 
 test('REFUSED: a server asked, whose ask is interrupted before it answers, is stopped before the interruption returns', async () => {
-  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
-  const repo = scratch('hkb-api-repo-');
+  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
+  const repo = scratch('nemia-api-repo-');
   const args = [FIXTURE_SERVER];
   const env = { ...(process.env as Record<string, string>), HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts };
   const stop = new AbortController();
@@ -261,7 +261,7 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
 });
 
 test("each server is asked once while an app runs: requests after the first, and requests at once, read that answer, the app's environment naming the repository", async () => {
-  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
+  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { fixture: fixture({ HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
@@ -340,7 +340,7 @@ test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} 
 });
 
 test("an entry naming a variable the api's environment does not set, with no default, is an error on its entry, and not started", async () => {
-  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
+  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': {
       mcpServers: {
@@ -363,7 +363,7 @@ test("an entry naming a variable the api's environment does not set, with no def
 });
 
 test('a server .claude/settings.json does not enable is listed, and not started', async () => {
-  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
+  const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const off = fixture({ HKB_TEST_STARTS: starts });
   for (const settings of [
     null,

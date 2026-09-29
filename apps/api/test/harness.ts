@@ -16,7 +16,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 /** Where the fake `claude` is, first on PATH. */
-export const bin = scratch('hkb-api-harness-');
+export const bin = scratch('nemia-api-harness-');
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
 /** Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each with its pid. */
@@ -65,10 +65,10 @@ fs.writeFileSync(
 );
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 /** Where Claude Code keeps its sessions and transcripts: `CLAUDE_CONFIG_DIR`, which the Claude runner reads as its module loads. */
-export const config = scratch('hkb-api-harness-claude-');
+export const config = scratch('nemia-api-harness-claude-');
 process.env.CLAUDE_CONFIG_DIR = config;
 /** The store's root, `WF_ROOT`: the package fixes its root (`HOME`) as its modules load. */
-export const root = scratch('hkb-api-store-');
+export const root = scratch('nemia-api-store-');
 process.env.WF_ROOT = root;
 
 /** How many calls of `verb` the fake has answered. */

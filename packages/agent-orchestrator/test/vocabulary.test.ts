@@ -268,6 +268,6 @@ test("a step that names no mode is filed in the mode the parser refuses `auto` f
   const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
   assert.equal(args[args.indexOf('--permission-mode') + 1], DEFAULT_PERMISSION_MODE, "the parser's copy of the runtime's default");
   assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
-  assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/hkb-scribe');
-  assert.equal(args[args.indexOf('--settings') + 1], '{"outputStyle":"hkb-scribe:no-coding"}');
+  assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
+  assert.equal(args[args.indexOf('--settings') + 1], '{"outputStyle":"nemia-scribe:no-coding"}');
 });

@@ -1,4 +1,4 @@
-# hkb-v2 — contributor guide
+# Nemia — contributor guide
 
 Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/core/domain.ts` is
 the whole judgement). `packages/agent-orchestrator` sequences runtime tasks into runs of steps — a folder of markdown is a workflow (the

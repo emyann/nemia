@@ -15,7 +15,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { app } from '../src/app.ts';
 /** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
-const notARepo = scratch('hkb-api-folder-here-');
+const notARepo = scratch('nemia-api-folder-here-');
 process.env.HKB_REPO = notARepo;
 
 /** A folder team of the store's own, as workflows/note is: every step says `workspace: folder`, so it looks at no repository. */

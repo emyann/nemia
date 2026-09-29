@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''), { cause: err });
   }
 
-  const store = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-'));
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-'));
   setStore(store);
   seed(store);
   const checkout = path.join(store, 'checkout');

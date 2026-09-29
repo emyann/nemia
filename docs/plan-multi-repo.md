@@ -79,7 +79,7 @@ Read 2026-09-22 (`~/projects/pipao-v2`, main at `1dfe63b`).
 
 **Step 1 — a pilot from the CLI, nothing built.** A workflow folder for pipao in the home store
 (`~/.agent-workflows/workflows/pipao-planned`, with its `agents/`): `dev-planned` with pipao's check (`npm test && npm run
-typecheck && npm run lint`), the agents' hkb-v2 words taken out, pipao's allow-list extended for what its reviewers must
+typecheck && npm run lint`), the agents' Nemia words taken out, pipao's allow-list extended for what its reviewers must
 run, and `.worktreeinclude` for `apps/web/.env` if a check needs it. Run one or two real small cards through it with
 `wf start --repo ~/projects/pipao-v2`. What breaks there is the list the next steps answer, measured rather than guessed —
 the migration note's advice: "run your own real work through `agent-runtime` + `agent-orchestrator` for a week first".

@@ -429,7 +429,7 @@ test('an answered ask closes its stdin, and the process ends of its own', async 
 
 test('REFUSED: no claude on PATH is no-claude', async () => {
   fresh();
-  const env = { ...process.env, PATH: path.join(scratch('hkb-api-nowhere-'), 'no-such-dir') };
+  const env = { ...process.env, PATH: path.join(scratch('nemia-api-nowhere-'), 'no-such-dir') };
   assert.deepEqual(await askUsage({ env }), { kind: 'no-claude' });
   assert.equal((await readQuota({ env })).state, 'no-claude');
 });

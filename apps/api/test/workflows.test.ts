@@ -19,7 +19,7 @@ import { loadWorkflows, parentRecord, readRun } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, isReadme, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
-const repo = scratch('hkb-api-repo-');
+const repo = scratch('nemia-api-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -615,7 +615,7 @@ const ship = (check: string) => ({
 });
 
 test("this repository's workflows read as workflows: dev and dev-build are implement ⇄ review → ship with the package's reviewer on Claude, and ui is the package's, copied, ending in the same ship", () => {
-  const listed = listWorkflows(HOME_REPO, scratch('hkb-api-no-yours-'));
+  const listed = listWorkflows(HOME_REPO, scratch('nemia-api-no-yours-'));
   for (const name of ['dev', 'dev-build', 'ui'])
     assert.ok(
       listed.some((w) => w.name === name),

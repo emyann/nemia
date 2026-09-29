@@ -159,10 +159,10 @@ export function skillDraftOf(file: string, id: string, text: string): SkillDraft
 /**
  * A skill as its SKILL.md: `name:` its folder, `title:` and `description:` as JSON strings, `tags:` and `examples:` as one-line JSON lists,
  * each only where set; then every other key `was` — the file as it is, on an edit — has, line for line, its lines that go on from it with it;
- * `preload: true` where it is set, or, left out of the draft, where `was` says so; and its instructions. The shape of the skills HKB ships,
- * and what the card reader reads (`skillEntryOf`), which judges the result before it is returned: a draft the reader would refuse — no
- * description, an empty list — is refused here, in its words. Refused before that: a name that is not a skill's (`skillNameRefusal`), and a
- * line break in a value, which would make what follows it a line of its own. Pure.
+ * `preload: true` where it is set, or, left out of the draft, where `was` says so; and its instructions. The shape of the skills Nemia
+ * ships, and what the card reader reads (`skillEntryOf`), which judges the result before it is returned: a draft the reader would refuse —
+ * no description, an empty list — is refused here, in its words. Refused before that: a name that is not a skill's (`skillNameRefusal`),
+ * and a line break in a value, which would make what follows it a line of its own. Pure.
  */
 export function renderSkill(draft: SkillDraft, was?: string): string {
   const named = skillNameRefusal(draft?.name);

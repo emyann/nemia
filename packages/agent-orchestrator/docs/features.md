@@ -4,7 +4,7 @@ The features agent-orchestrator is still missing, in the order I would take them
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-runtime/docs/open-issues.md](../../agent-runtime/docs/open-issues.md).
 
-State as of 2026-09-17: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
+State as of 2026-09-17: the check (package C of `docs/plan-hold-the-bar.md`, Nemia), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
@@ -3231,7 +3231,7 @@ What changed in the app's own code:
   fold draws its content only while open, as Radix's did, with its spacing on what it draws. `Reasoning`'s `useControllableState` is a few
   lines of local state.
 - **Two local edits to a registry file, both in `sidebar.tsx`.** The mobile sidebar's sheet hides its close button with
-  `showCloseButton={false}`: the registry's `[&>button]:hidden` misses the button inside the dialog, and at 390 pixels it sat over the hkb
+  `showCloseButton={false}`: the registry's `[&>button]:hidden` misses the button inside the dialog, and at 390 pixels it sat over the Nemia
   row. And `SidebarMenu` and `SidebarMenuItem` are a `ul` of `li`s again. aria-nova draws them as `div`s, where radix-nova drew a list and
   aria-nova's own `SidebarMenuSub` still does, so a screen reader no longer heard a list of five places. React Aria plays no part in it.
 
@@ -5247,7 +5247,7 @@ holds the findings that the design depends on, measured on Claude Code 2.1.282:
 
 Built since, by the design's cards: 1a (the machinery) and 1b (the shipped procedures as skills), 4 (jobs without user settings), and 2
 (the card generated from the skills, with the `card:` key and the `.skills.json` files retired), and 3a (an agent of yours composes its
-skills on the board from your library, this repository's and HKB's shipped ones, a shipped one copied into your library first, each
+skills on the board from your library, this repository's and Nemia's shipped ones, a shipped one copied into your library first, each
 with what it costs a turn; `systemPrompt` as radios by what the agent does), and 3b (a skill of your own written on the board, with a
 page of its own that lists who gives it and holds `preload:` as a switch with its cost), and 3c (an agent tried on a short brief from its page on the board, a try refused and said
 on its listing when the try's fence does not reach it). Their commits: 3a `ef147a1` and 3b `c8145ca` (2026-09-25), 3c `60afb7b`

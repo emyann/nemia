@@ -20,7 +20,7 @@ import {
   readRun,
   startFromInbox,
 } from 'agent-orchestrator';
-const repo = scratch('hkb-api-inbox-repo-');
+const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
@@ -128,7 +128,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
     path.join(root, 'workflows', 'both'),
     'one both have, said which: yours by folder',
   );
-  const elsewhere = scratch('hkb-api-inbox-elsewhere-');
+  const elsewhere = scratch('nemia-api-inbox-elsewhere-');
   assert.equal(
     ((await (await file({ body: 'Elsewhere', workflow: 'dev', repo: elsewhere })).json()) as InboxFiled).workflow,
     dev,
@@ -694,8 +694,8 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
 
 test("a card whose `repo:` is a folder a run cannot branch from — no git checkout, or no commit — fails without a refusal, as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
   clear();
-  const plain = scratch('hkb-api-inbox-plain-');
-  const empty = scratch('hkb-api-inbox-empty-');
+  const plain = scratch('nemia-api-inbox-plain-');
+  const empty = scratch('nemia-api-inbox-empty-');
   execFileSync('git', ['init', '-q'], { cwd: empty });
   const said = t.mock.method(console, 'error', () => {});
   for (const about of [plain, empty]) {

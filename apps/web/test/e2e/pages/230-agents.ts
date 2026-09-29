@@ -41,6 +41,7 @@ export default {
     await expectVisible(scribe.getByText(seeded.description, { exact: true }), `${seeded.name} with its description`);
     await expectVisible(scribe.locator('dd', { hasText: /^sonnet$/ }), 'and the keys it sets');
     await expectTexts(scribe.locator('[data-used-by]'), ['No node names it yet.'], `and that no node names ${seeded.name}`);
+    await expectTexts(scribe.locator('[data-agent-role]'), [`No role yet · ${seeded.name}`], `${seeded.name} holds no role, and says so`);
     const says = (where: ReturnType<typeof card>, skill: { id: string; name: string; description: string; tags: readonly string[] }) =>
       where.locator(`[data-agent-skill="${skill.id}"]`);
     await expectTexts(
@@ -50,6 +51,15 @@ export default {
     );
     await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
     const implementer = card(page, 'repo', good.agent.name);
+    await expectVisible(
+      implementer.locator(`img[data-agent-face="${good.agent.name}"][alt="${good.agent.person}"]`),
+      `${good.agent.name}'s face`,
+    );
+    await expectTexts(
+      implementer.locator('[data-agent-role]'),
+      [`${good.agent.role} · ${good.agent.name}`],
+      `${good.agent.person} holds the job its role line says, beside the name a node gives it`,
+    );
     await expectVisible(
       says(implementer, good.agent.skill).getByText(good.agent.skill.name, { exact: true }),
       `${good.agent.name} says what it can do too, its skill's title as the entry's name`,
@@ -62,7 +72,7 @@ export default {
     if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`)
       throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
 
-    await implementer.getByRole('link', { name: good.agent.name, exact: true }).click();
+    await implementer.getByRole('link', { name: good.agent.person, exact: true }).click();
     await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
     const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
     await expectVisible(repoForm, `${good.agent.name}'s form`);

@@ -1,4 +1,5 @@
 ---
+role: Release engineer
 description: Ends a run in the repository's own checkout by staging the merge of its result and writing its commit message.
 skills: trial-merge-a-branch
 harness: claude

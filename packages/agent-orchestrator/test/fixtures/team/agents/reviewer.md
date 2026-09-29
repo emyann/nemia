@@ -1,4 +1,5 @@
 ---
+role: Code reviewer
 description: Reads a change as a second engineer would, and sends it round again while a finding is worth it.
 skills: review-a-change, ask-for-another-round
 harness: claude

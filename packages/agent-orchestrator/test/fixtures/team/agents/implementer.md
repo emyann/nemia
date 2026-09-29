@@ -1,4 +1,5 @@
 ---
+role: Software engineer
 description: Makes the change a card asks for, with a test for what it touches.
 skills: implement-a-change
 harness: claude

@@ -78,7 +78,9 @@ the step's place, as a start gives it: a test that loads a shipped folder passes
 
 A step is a job (`claude -p`): it cannot wait inside a conversation. To ask, it signs off `blocked` with its questions; the person
 answers on the board or with `wf retry <run> <step> --message "…"`, and the same session continues with the answers as its next turn.
-Say so in the body of an agent that interviews, and gate the step whose closeout a person must accept (`gate: true`). A closeout
+Say so in the body of an agent that interviews, and gate the step whose closeout a person must accept (`gate: true`). A job's last
+turn is its sign-off: an agent that runs long commands (the e2e) is told to run them in the foreground or wait on them, never to sign
+off with one running (Ada's first web build signed off before its e2e ended). A closeout
 signed `blocked` is read on its own, so an agent that asks in rounds carries everything settled so far in each one: Iris's third
 round once dropped her earlier decisions. The board renders a round as Markdown, where single line breaks join: tell such an agent to put
 each option on its own list line after a blank line (Iris's first rounds ran her options into the question).

@@ -11,6 +11,9 @@ description: "Build a change from its spec in this repository: tests first where
 3. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
 4. **Check as the run will**: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`; and when `apps/web` changes,
    `npm run build` and `npm run e2e`, then read the pictures it writes with the `look` skill. Green is the floor, not the bar.
+   You run as a job, and a turn you end is your last: run each long command in the foreground, under the 10-minute limit of one call,
+   or start it in the background and wait on it with a blocking call (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).
+   Never sign off while a check you started is still running.
 5. **Never make it pass by weakening it**: a test loosened, a ceiling raised in `.oxlintrc.json`, a check skipped. Cut the function; lower
    the ceiling of a file you shrank.
 6. **Answer the review**, from the second round: for each finding, fix it, or say in `replies` why not (`won't fix`, and the reason). A

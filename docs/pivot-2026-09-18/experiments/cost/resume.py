@@ -2,7 +2,7 @@ import json,glob,os,datetime,collections
 root=os.path.expanduser('~/.claude/projects')
 def ts(s): return datetime.datetime.fromisoformat(s.replace('Z','+00:00')).timestamp() if s else None
 out=[]
-for p in glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl'):
+for p in glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl'):
     name=None; pending=None; prev=None; seen=set()
     for line in open(p,errors='replace'):
         if '"agent-name"' in line:

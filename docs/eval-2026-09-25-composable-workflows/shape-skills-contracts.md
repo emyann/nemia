@@ -414,10 +414,10 @@ A provider can ship `mcp.json`, in `.mcp.json`'s shape. It is passed as the task
 12. **Skill text costs context.** Appended to the brief, it costs tokens on every step and gives up the harness's native progressive disclosure. This is unmeasured.
 
 The harness flagged the facts section of the task because it names `settings.json` and `bypassPermissions`. Both are descriptions of existing configuration, not instructions, and I acted on neither. I made no file changes. I read, among others:
-- `/home/yrnd1/projects/hkb-v2/workflows/dev/`
-- `/home/yrnd1/projects/hkb-v2/workflows/note/`
-- `/home/yrnd1/projects/hkb-v2/workflows/agents/shipper.md`
-- `/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/tick.ts`
-- `/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/src/workflow.ts`
-- `/home/yrnd1/projects/hkb-v2/packages/agent-orchestrator/README.md`
-- `/home/yrnd1/projects/hkb-v2/docs/pivot-2026-09-18.md`
+- `<repo>/workflows/dev/`
+- `<repo>/workflows/note/`
+- `<repo>/workflows/agents/shipper.md`
+- `<repo>/packages/agent-orchestrator/src/tick.ts`
+- `<repo>/packages/agent-orchestrator/src/workflow.ts`
+- `<repo>/packages/agent-orchestrator/README.md`
+- `<repo>/docs/pivot-2026-09-18.md`

@@ -2,8 +2,8 @@
 
 > The packages were renamed on 2026-09-23: `agent-engine` is now `packages/agent-runtime`, and `agent-workflows` `packages/agent-orchestrator`. This document is history, and keeps the names it was written with.
 
-All paths are relative to `/home/yrnd1/projects/hkb-v2` unless prefixed `hkb:` (the ancestor at
-`/home/yrnd1/projects/harness-kanban-board`). Every claim about today's code was checked against the
+All paths are relative to `<repo>` unless prefixed `hkb:` (the ancestor at
+`~/projects/harness-kanban-board`). Every claim about today's code was checked against the
 source; the baseline is green (`npm test`: 109 + 72 + 3, `npm run typecheck`: 4/4).
 
 ## 1. Thesis

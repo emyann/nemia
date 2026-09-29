@@ -293,7 +293,7 @@ test('REFUSED: the former project name in a title, a package, a label, a plugin,
 test('a path that names the checkout, the earlier project, a store, a key an older board wrote and the marked line pass; a word that only contains the name is not it', () => {
   for (const line of [
     `cwd: '/code/${OLD}-v2',`,
-    `path.join('claude', 'projects', '-home-yrnd1-projects-${OLD}-v2', 'x.jsonl')`,
+    `path.join('claude', 'projects', '-home-me-projects-${OLD}-v2', 'x.jsonl')`,
     `const repo = path.join(root, '${OLD}-v2');`,
     `assert.equal(repoName('/x/${OLD}-v2'), '${OLD}-v2');`,
     `| \`docs/${OLD}-migration.md\` | notes toward moving ${OLD} onto this engine |`,

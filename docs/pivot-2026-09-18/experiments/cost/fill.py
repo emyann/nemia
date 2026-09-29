@@ -5,7 +5,7 @@ bytool=collections.Counter(); ntool=collections.Counter(); bigreads=collections.
 stepcost=collections.defaultdict(collections.Counter)
 hourly=collections.Counter(); daily=collections.Counter()
 img=0
-for p in glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl'):
+for p in glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl'):
     name=None; seen=set(); uses={}
     for line in open(p,errors='replace'):
         if '"agent-name"' in line:

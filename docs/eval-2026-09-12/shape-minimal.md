@@ -4,7 +4,7 @@
 
 What `packages/agent-workflows` should look like if the four points are covered with the smallest set
 of additions and everything else is pushed into content or above the package. Paths are relative to
-`/home/yrnd1/projects/hkb-v2`; the code was read, not the maps, for every claim below. Baseline: `npm test`
+`<repo>`; the code was read, not the maps, for every claim below. Baseline: `npm test`
 3/3 tasks green (109 + 72 + 3), `npm run typecheck` 4/4.
 
 ## 1. Thesis

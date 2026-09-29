@@ -3,8 +3,8 @@ from tx import analyze
 root=os.path.expanduser('~/.claude/projects')
 W,R,O=10.0,0.5,25.0
 def cost(rows): return sum(r['cw']*W+r['cr']*R+r['out']*O+r['inp']*5 for r in rows)/1e6
-groups={'workers':glob.glob(root+'/-home-yrnd1--agent-workflows-worktrees-*/*.jsonl'),
-        'main checkout (interactive, supervisor, ship)':glob.glob(root+'/-home-yrnd1-projects-hkb-v2/*.jsonl')}
+groups={'workers':glob.glob(root+'/-home-*--agent-workflows-worktrees-*/*.jsonl'),
+        'main checkout (interactive, supervisor, ship)':glob.glob(root+'/-home-*-projects-hkb-v2/*.jsonl')}
 for g,files in groups.items():
     allrows=[]
     for p in files:

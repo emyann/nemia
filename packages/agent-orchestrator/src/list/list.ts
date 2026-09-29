@@ -122,8 +122,8 @@ export type Listing = {
  *   task.
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts.
  * @param slot The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be.
- * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in branches.ts):
- *   what says a finished run is one nobody has decided.
+ * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in
+ *   branches.store.ts): what says a finished run is one nobody has decided.
  * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
  *   ending.verb.ts): what this run's ending says where `waiting` would be.
  * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's

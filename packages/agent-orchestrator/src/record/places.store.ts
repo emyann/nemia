@@ -2,8 +2,8 @@
  * Where a run's steps work, for a run that is not a git run: the kinds of workspace a team can say beside git's (`place` on the run
  * record). There is one, `folder` (`workspace: folder`), and nothing here reads git, the network, or the engine.
  *
- * A git run's steps work in worktrees of its repository, and every word about them is in worktree.store.ts, branches.ts, forget.verb.ts and
- * prune.verb.ts. A folder run is the other kind, whole: what
+ * A git run's steps work in worktrees of its repository, and every word about them is in worktree.store.ts, branches.store.ts,
+ * forget.verb.ts and prune.verb.ts. A folder run is the other kind, whole: what
  * `advance` makes for a step, what it does when the step is finished, and where it all lives, which is under the run's own directory in the
  * store, so `wf rm` forgets it with the record and runs no git.
  */

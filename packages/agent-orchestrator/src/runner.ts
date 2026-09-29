@@ -13,11 +13,12 @@
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step
- * hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and `skills.store.ts` (an
- * agent and a skill written), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and
- * `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath
- * `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
+ * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
+ * `skills.store.ts` (an agent and a skill written), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on
+ * disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree:
+ * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
+ * (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';

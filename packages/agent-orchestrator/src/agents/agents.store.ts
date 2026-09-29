@@ -2,7 +2,7 @@
  * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), and a
  * skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside
  * it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`) — and the agents of the two places the board lists them from
- * (`agentPlaces`, `listAgents`, `findAgent`). What a folder holds is `rendering.ts`'s; this writes and reads it.
+ * (`agentPlaces`, `listAgents`, `findAgent`). What a folder holds is `agents.ts`'s; this writes and reads it.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at `wf start`.
@@ -35,7 +35,7 @@ import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
 
 /**
- * Where `wf start` renders a step's agent for Claude Code (`rendering.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and inputs,
+ * Where `wf start` renders a step's agent for Claude Code (`agents.ts`): `runs/<id>/agents/<step>`, beside the run's artifacts and inputs,
  * outside every workspace, and removed with them. The tick files the step with the flags that name it (`renderedFlags`).
  */
 export const agentFilesDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'agents', step);

@@ -227,9 +227,9 @@ export const heldByCheckout = (steps: readonly Workflow[], name: string, checkou
   Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
 
 /**
- * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in branches.ts):
- * `on` it — merged, or with nothing committed past the run's base — `ahead` of it by N commits, or `gone`, a branch git no longer has and
- * no recorded tip puts on the base.
+ * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in
+ * branches.store.ts): `on` it — merged, or with nothing committed past the run's base — `ahead` of it by N commits, or `gone`, a branch git
+ * no longer has and no recorded tip puts on the base.
  */
 export type BranchStanding =
   | { branch: string; where: 'on' }

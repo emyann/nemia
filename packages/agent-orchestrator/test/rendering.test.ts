@@ -1,5 +1,5 @@
 /**
- * An agent rendered for Claude Code (`rendering.ts`): the skills it gives by name, found in the workflow's own root, the repository's
+ * An agent rendered for Claude Code (`agents/agents.ts`): the skills it gives by name, found in the workflow's own root, the repository's
  * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's system prompt; what `wf start` writes under
  * `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The runs are folder teams, so
  * no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.

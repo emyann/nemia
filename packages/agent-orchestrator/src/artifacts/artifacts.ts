@@ -1,6 +1,6 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
- * file it names is found (`artifactPlace`), and the lines that list them (`artifactLines`). Pure: the root's `artifacts.ts` copies them.
+ * file it names is found (`artifactPlace`), and the lines that list them (`artifactLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
 import { filesPrunedWords, type Pruned } from '../record/record.ts';
@@ -16,7 +16,7 @@ import { filesPrunedWords, type Pruned } from '../record/record.ts';
  *
  * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
- * the directory at hand-off, before the check (`collectArtifacts` in artifacts.ts), so such a step hands it over too.
+ * the directory at hand-off, before the check (`collectArtifacts` in artifacts.store.ts), so such a step hands it over too.
  *
  * `inMain` for a step that works in the repository's own checkout (`workspace: main`): there the second way is
  * false and does harm. The run hands nothing off in a person's checkout (`handOffDue`), so nothing is collected
@@ -80,7 +80,7 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
  *
  *   workspace  a path from the workspace root — collected from the workspace into the step's files directory
- *              when the step hands off (`collectArtifacts` in artifacts.ts), and read from there
+ *              when the step hands off (`collectArtifacts` in artifacts.store.ts), and read from there
  *   files      an absolute path inside the step's files directory — on disk, where the run keeps it
  *   escapes    a path from the workspace root that climbs out of it, `../notes.md` — refused, and never read
  *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
@@ -103,7 +103,7 @@ export function artifactPlace(file: string, dir: string): ArtifactPlace {
 export type ArtifactFile = { path: string; bytes: number };
 
 /**
- * A declared artifact the run does not have, and why (`missingArtifacts` in artifacts.ts):
+ * A declared artifact the run does not have, and why (`missingArtifacts` in artifacts.store.ts):
  *
  *   not there      a path from the workspace root with nothing at it, nor on the branch
  *   directory      a path from the workspace root that is a directory: not collected, since a step names each file

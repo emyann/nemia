@@ -9,7 +9,9 @@ import path from 'node:path';
 import { HARNESSES, readRemote } from './runtime-client.ts';
 import { remoteAgentsFile } from './harness/a2a.store.ts';
 import { refusalLines } from './workspace/workspace.ts';
-import { fansOut, isFolderTeam, remoteNameOf, WorkflowError, type Workflow } from './workflow.ts';
+import { WorkflowError, type Workflow } from './step/step.ts';
+import { remoteNameOf } from './harness/harness.ts';
+import { fansOut, isFolderTeam } from './workflow/index.ts';
 import { loadWorkflows, skillsFor, workflowFolder, workflowsIn, type Places } from './workflow-store.ts';
 import {
   inboxListing,

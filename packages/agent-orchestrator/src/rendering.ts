@@ -16,7 +16,8 @@
  * step on a remote A2A agent, which keeps its operator's.
  */
 import path from 'node:path';
-import { isRemoteHarness, type Workflow } from './workflow.ts';
+import type { Workflow } from './step/step.ts';
+import { isRemoteHarness } from './harness/harness.ts';
 
 /** The prompt's file in a step's rendered folder. */
 export const PROMPT_FILE = 'prompt.md';

@@ -1,0 +1,331 @@
+/**
+ * The steps of a folder checked together: `validate` refuses what no one step file shows — a step that waits on one not there, steps that
+ * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
+ * read the graph the `after` edges draw.
+ */
+import { LOOP_REPLIES, type Workflow, WorkflowError } from '../step/step.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
+import { contextText, sessionContext } from '../keys/index.ts';
+
+/** Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does (`validate`). */
+export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean =>
+  steps.length > 0 && steps.every((s) => s.workspace === 'folder');
+
+/**
+ * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
+ * wait on each other, or a step reads the output of one that has not finished or declares none. All
+ * are caught here, before anything is spent.
+ *
+ * A step reads an `input:` it waits on through `after:` or through `resume:`, which the parser adds to `after`. A step resumes a session
+ * on the harness that made it, never another, and in the one window of its session's whole chain (`sessionContext`). The steps wait on
+ * each other when some are left once every step that waits on nothing left is taken away.
+ */
+export function validate(steps: readonly Workflow[]): void {
+  const names = new Set(steps.map((s) => s.name));
+  for (const s of steps) {
+    for (const a of s.after) {
+      if (!names.has(a)) throw new WorkflowError(`${s.name}: waits on "${a}", which is not a step here`);
+      if (a === s.name) throw new WorkflowError(`${s.name}: waits on itself`);
+    }
+    for (const from of s.input ?? []) {
+      const producer = steps.find((x) => x.name === from);
+      if (!producer)
+        throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
+      if (!s.after.includes(from) && s.resume !== from) {
+        throw new WorkflowError(
+          `${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`,
+        );
+      }
+      if (!producer.output) {
+        throw new WorkflowError(
+          `${s.name}: \`input: ${from}\`, but ${from} declares no \`output:\`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step. Give ${from}.md an \`output:\` schema, or delete the line.`,
+        );
+      }
+    }
+    if (s.resume) {
+      const target = steps.find((x) => x.name === s.resume);
+      if (!target) throw new WorkflowError(`${s.name}: resumes "${s.resume}", which is not a step here`);
+      if ((target.harness ?? 'claude') !== (s.harness ?? 'claude')) {
+        throw new WorkflowError(`${s.name}: resumes ${target.name}, which runs on a different harness (${target.harness ?? 'claude'})`);
+      }
+      const window = sessionContext(target, steps);
+      if (s.context !== undefined && s.context !== window) {
+        throw new WorkflowError(
+          `${s.name}: \`context: ${contextText(s.context)}\`, and it continues ${target.name}'s session, which runs on ${window === undefined ? "the model's whole window" : `\`context: ${contextText(window)}\``}. A session keeps one window: delete the line, and ${s.name} continues on ${target.name}'s${window === undefined ? '' : `, or give ${target.name} the window you meant for both`}.`,
+        );
+      }
+    }
+  }
+
+  validateFolder(steps);
+  validateFolderMode(steps);
+  validateMainWorkspace(steps);
+  validateSlot(steps);
+
+  const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const [name, deps] of pending) {
+      if (deps.size === 0) {
+        pending.delete(name);
+        for (const other of pending.values()) other.delete(name);
+        moved = true;
+      }
+    }
+  }
+  if (pending.size) throw new WorkflowError(`these steps wait on each other: ${[...pending.keys()].sort().join(', ')}`);
+
+  validateLoops(steps);
+}
+
+/**
+ * The ways a step cannot run in the repository's own checkout (`workspace: main`): it is not the workflow's last step.
+ *
+ * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
+ * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
+ * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
+ */
+function validateMainWorkspace(steps: readonly Workflow[]): void {
+  for (const s of steps.filter((x) => x.workspace === 'main')) {
+    const named = `${s.name}: \`workspace: main\` runs the step in the repository's own checkout`;
+    const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
+    if (waiting.length) {
+      throw new WorkflowError(
+        `${named}, and ${waiting.join(', ')} ${waiting.length > 1 ? 'wait' : 'waits'} on it — each would start from a checkout this step has changed, and none of them is where the run's work is. It is a workflow's last step: nothing may wait on it. Move ${waiting.join(', ')} before ${s.name}, or delete the line.`,
+      );
+    }
+    const beside = steps.filter((x) => x.name !== s.name && !steps.some((other) => other.after.includes(x.name))).map((x) => x.name);
+    if (beside.length) {
+      throw new WorkflowError(
+        `${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`,
+      );
+    }
+  }
+}
+
+/**
+ * The one way a team cannot work in folders (`workspace: folder`): some of its steps do not say so.
+ *
+ * A run is of one kind — a git run, whose steps work on branches of one repository, or a folder run, which needs no repository — and the
+ * kind is the run's, frozen on its record at start (`place`). A step without the line is a git step, so a team that says it on some steps
+ * and not on others would be both. Refused, rather than one of the two guessed.
+ */
+function validateFolder(steps: readonly Workflow[]): void {
+  const folder = steps.filter((s) => s.workspace === 'folder').map((s) => s.name);
+  const not = steps.filter((s) => s.workspace !== 'folder').map((s) => s.name);
+  if (!folder.length || !not.length) return;
+  throw new WorkflowError(
+    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.` +
+      ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
+  );
+}
+
+/**
+ * The permission modes in which a Claude Code background session (`claude --bg`) never stops to ask a person: `dontAsk`, which denies what
+ * it is not given and lets the session read the refusal and carry on, and `bypassPermissions`, which allows everything. Every other mode
+ * asks, `auto` — the engine's default, and what a step that names no mode runs in — among them.
+ */
+const BACKGROUND_UNASKING = ['dontAsk', 'bypassPermissions'] as const;
+const DEFAULT_MODE = 'auto';
+
+/**
+ * The way a step of a folder team cannot be run: as a background session in a permission mode that can stop and ask.
+ *
+ * On Claude Code 2.1.278, in a folder no settings file names, a fenced `--bg` session that reaches outside its own directory — the run's
+ * artifacts beside it, or the store — is asked to approve it, and nobody is there: `claude agents` reads it `blocked`, `waitingFor:
+ * 'permission prompt'`, and it waits for ever, in `acceptEdits` and in `auto` alike. In `dontAsk` the same call is denied with no
+ * prompt, the session is told so, and it carries on.
+ *
+ * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
+ * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude` step without `background: true`,
+ * every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one shell, fenced by the sandbox its
+ * `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a harness's own: Codex has no
+ * permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
+ *
+ * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
+ * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
+ * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped to the
+ * step's own folder (`Edit(**)`).
+ */
+function validateFolderMode(steps: readonly Workflow[]): void {
+  if (!isFolderTeam(steps)) return;
+  const asking = steps.find((s) => s.background && !(BACKGROUND_UNASKING as readonly string[]).includes(s.permissionMode ?? DEFAULT_MODE));
+  if (!asking) return;
+  const mode = asking.permissionMode
+    ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
+    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE}\`, which can stop and ask a person to approve something`;
+  throw new WorkflowError(
+    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
+      ' — a read or a write outside the folder can, and an unattended background session then waits for ever on a prompt nobody answers.' +
+      ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
+      " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
+  );
+}
+
+/**
+ * The one way a run cannot take no run slot (`slot: none`): its workflow has another step.
+ *
+ * The cap on runs in flight holds the work this machine does at once. A run outside it is a session that watches the runs inside it —
+ * one step, which is how a reader tells the two apart at a glance, and how the machinery does. The line on one step of a workflow of
+ * work would take the whole run out of the cap, since a slot is a run's and not a step's, so it is refused here rather than let the
+ * run's other steps past the cap with nothing said.
+ */
+function validateSlot(steps: readonly Workflow[]): void {
+  const watcher = steps.find((s) => s.slot === 'none');
+  const beside = steps.filter((s) => s !== watcher).map((s) => s.name);
+  if (!watcher || !beside.length) return;
+  throw new WorkflowError(
+    `${watcher.name}: \`slot: none\` takes this step's whole RUN out of the cap on runs in flight (WF_MAX_RUNS), and this workflow has ${beside.join(', ')} beside it` +
+      ` — a slot is a run's, not a step's, so ${beside.join(', ')} would run outside the cap too. A run that takes no slot is one step: a session that watches the other runs.` +
+      ` Delete the line, or give ${watcher.name} a folder of its own.`,
+  );
+}
+
+/**
+ * The steps in the order they run: every step after each step its `after` names, and otherwise in the order they are given — by name,
+ * for the steps `loadWorkflows` reads, since a folder lists them so. `resume:` is in `after` already, and `loop:` is the edge back, which
+ * orders nothing. Pure.
+ *
+ * What a run's steps are listed in. In the folder's order, alphabetical, `wf start`, `wf ls`, `wf decide` and the board read a
+ * `plan → implement ⇄ review` workflow as implement, plan, review. The order given breaks a tie, not the name, so a workflow frozen in an
+ * order that already runs forward reads as it was frozen: the board lists a run's steps in its record's order, and holds that to `list`'s.
+ * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
+ * steps that wait on each other go last, as given, rather than nowhere.
+ */
+export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: readonly S[]): S[] {
+  const names = new Set(steps.map((s) => s.name));
+  const order: S[] = [];
+  const placed = new Set<string>();
+  let pending = [...steps];
+  for (;;) {
+    const next = pending.find((s) => s.after.every((a) => placed.has(a) || !names.has(a)));
+    if (!next) break;
+    order.push(next);
+    placed.add(next.name);
+    pending = pending.filter((s) => s !== next);
+  }
+  return [...order, ...pending];
+}
+
+/** Every step `name` waits on, directly or through another. */
+export function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+  const found = new Set<string>();
+  const queue = [name];
+  while (queue.length) {
+    const at = queue.pop();
+    const current = steps.find((s) => s.name === at);
+    for (const a of current?.after ?? []) {
+      if (!found.has(a)) {
+        found.add(a);
+        queue.push(a);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * The steps a round of `looping`'s loop files again, in the workflow's order: its target, every step between
+ * the target and it, and itself. `[]` for a step with no `loop:`.
+ */
+export function loopSpan(steps: readonly Workflow[], looping: Workflow): string[] {
+  const target = looping.loop;
+  if (!target) return [];
+  const up = upstreamOf(steps, looping.name);
+  return steps
+    .filter((s) => s.name === target || s.name === looping.name || (up.has(s.name) && upstreamOf(steps, s.name).has(target)))
+    .map((s) => s.name);
+}
+
+/**
+ * The ways a loop cannot run as a round: it names no earlier step, or a round could not file its steps again as
+ * they were filed the first time.
+ *
+ * A round works in the workspaces the first one made. A step that inherits its predecessor's gets the target's
+ * new commits by being there; one that forked or merged a worktree of its own was cut once, from the first
+ * round's branch, and would review work that is not the change. So a loop's steps are a chain. A step in
+ * one is a new session each round, so it cannot `resume:` another; a step in two would be re-filed by a round of
+ * either; and a target's `output:` may not take the field the run adds to it. A target runs on a harness of ours: each round continues
+ * it in the session it kept, and the run keeps none of a remote agent's.
+ */
+function validateLoops(steps: readonly Workflow[]): void {
+  const spans = new Map<string, Workflow>();
+  for (const s of steps.filter((x) => x.loop)) {
+    const target = s.loop!;
+    const named = `${s.name}: \`loop: ${target}\``;
+    if (target === s.name) {
+      throw new WorkflowError(
+        `${named} names this step. A loop runs an earlier step again, then every step between it and this one, then this one: name the step this one reviews, which it waits on through \`after\`.`,
+      );
+    }
+    const producer = steps.find((x) => x.name === target);
+    if (!producer) throw new WorkflowError(`${named} names a step that is not here. Correct the name, or delete the line.`);
+    if (isRemoteHarness(producer.harness)) {
+      throw new WorkflowError(
+        `${named}, and ${target} runs on \`harness: ${producer.harness}\`, a remote A2A agent: a loop's target is continued each round in the session it kept, and the run keeps none of a remote agent's. Loop back to a step on a harness of ours, or delete the line.`,
+      );
+    }
+    if (!upstreamOf(steps, s.name).has(target)) {
+      throw new WorkflowError(
+        `${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`,
+      );
+    }
+    if (producer.output && Object.hasOwn(producer.output.schema.properties, LOOP_REPLIES)) {
+      throw new WorkflowError(
+        `${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`,
+      );
+    }
+
+    const span = loopSpan(steps, s);
+    for (const name of span) {
+      const other = spans.get(name);
+      if (other) {
+        throw new WorkflowError(
+          `${name} is in two loops: ${other.name}'s (\`loop: ${other.loop}\`) and ${s.name}'s (\`loop: ${target}\`). A round of either would file it again under the other. Give it one loop: make one loop's steps end before the other's begin.`,
+        );
+      }
+      spans.set(name, s);
+      if (name === target) continue;
+      const step = steps.find((x) => x.name === name)!;
+      if (step.resume) {
+        throw new WorkflowError(
+          `${name}: \`resume: ${step.resume}\`, and ${name} is in ${s.name}'s loop (\`loop: ${target}\`), which files it as a new session each round — so it cannot continue another. Delete the line: only the loop's first step, ${target}, is continued, and the run does that itself.`,
+        );
+      }
+      const [from] = step.after;
+      const siblings = steps.filter((x) => from !== undefined && x.after.includes(from)).map((x) => x.name);
+      if (step.after.length !== 1 || siblings.length !== 1) {
+        const why =
+          step.after.length > 1
+            ? `it waits on ${step.after.join(' and ')}, so it merges their branches into a worktree of its own`
+            : `${siblings.filter((x) => x !== name).join(' and ')} ${siblings.length > 2 ? 'wait' : 'waits'} on ${from} too, so ${name} forks a worktree of its own`;
+        throw new WorkflowError(
+          `${named} files ${span.filter((x) => x !== target).join(', then ')} again after ${target} each round, in the workspace ${target} works in, and ${name} does not work there: ${why}, cut once, which would not have the next round's work. A loop's steps are a chain — each waits on the one before it, and nothing else does. Move what runs beside them after ${s.name}.`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Could two steps of this workflow ever run at the same time?
+ *
+ * True when there is more than one starting point, or when any step is followed by more than one.
+ * `wf start` refuses `--no-worktree` on a workflow that fans out: without isolation those steps would
+ * share a directory, which is the arrangement the whole worktree design exists to prevent.
+ */
+export function fansOut(steps: readonly Workflow[]): boolean {
+  const roots = steps.filter((s) => s.after.length === 0);
+  if (roots.length > 1) return true;
+  return steps.some((s) => steps.filter((x) => x.after.includes(s.name)).length > 1);
+}
+
+/**
+ * The steps nothing waits on — where a run's work ends up.
+ *
+ * A run that succeeded is useless if nobody can find what it produced, so this is what `wf ls`
+ * reports as the result. Usually one step; several when a workflow deliberately ends wide.
+ */
+export function terminalSteps(steps: readonly Workflow[]): Workflow[] {
+  return steps.filter((s) => !steps.some((other) => other.after.includes(s.name)));
+}

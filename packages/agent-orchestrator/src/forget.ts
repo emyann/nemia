@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from './runtime-client.ts';
-import type { Workflow } from './workflow.ts';
+import type { Workflow } from './step/step.ts';
 import {
   approvedFirst,
   branchFates,

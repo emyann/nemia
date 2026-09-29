@@ -893,17 +893,19 @@ test('at shipped defaults Claude Code is given its name, the permission mode aut
   ]);
 });
 
-test('a registry row is ours only when named `ae/`, with a session id and a non-empty state; its wait is trimmed, and a blank one is none', async () => {
+test("a registry row is ours only when named `ae/` with a `state` key: another's row, an interactive one and a non-object are skipped", async () => {
   const restore = withFakeClaude(
     JSON.stringify([
-      { name: 'other/a/1', sessionId: 's-a', state: 'working', status: 'idle' },
-      { name: 'ae/b/1', sessionId: 's-b', status: 'idle' },
-      { name: 'ae/c/1', sessionId: 's-c', state: '', status: 'idle' },
-      { name: 'ae/d/1', state: 'working', status: 'idle' },
+      { name: 'other/a/1', sessionId: 's-a', state: 'working', status: 'idle', pid: 'not ours', startedAt: 'not ours' },
+      { name: 'ae/b/1', sessionId: 's-b', status: 'idle', pid: -1 },
       { name: 'ae/e/1', sessionId: 's-e', state: 'blocked', status: 'waiting', waitingFor: '   ' },
       { name: 'ae/f/1', sessionId: 's-f', state: 'blocked', status: 'waiting', waitingFor: '  authentication  ' },
-      { name: 'ae/g/1', sessionId: 's-g', state: 'working', status: 'busy', waitingFor: 7 },
+      { name: 'ae/g/1', sessionId: 's-g', state: 'working', status: 'busy', waitingFor: null, pid: null, startedAt: null },
       { sessionId: 's-h', state: 'working', status: 'idle' },
+      { name: 7, sessionId: 's-i', state: 'working' },
+      7,
+      null,
+      'ae/j/1',
     ]),
   );
   try {
@@ -926,14 +928,88 @@ test('a registry row is ours only when named `ae/`, with a session id and a non-
   }
 });
 
-test("a row's process is a positive integer and its start a number, or neither is kept: `say` finds no process, `release` reads no usage", async () => {
+test('every row a real `claude agents --all --json` printed decodes as ours, and one with no `state` is still no session of ours', async () => {
+  const listing: Record<string, unknown>[] = JSON.parse(
+    fs.readFileSync(new URL('./fixtures/claude-agents-listing.json', import.meta.url), 'utf8'),
+  );
+  const restore = withFakeClaude(JSON.stringify(listing));
+  try {
+    const ops = claudeOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
+    const seen = await Effect.runPromise(ops.observe);
+    assert.deepEqual(
+      [...seen.keys()],
+      listing.filter((r) => Object.hasOwn(r, 'state')).map((r) => r.name),
+    );
+    assert.ok(
+      listing.some((r) => !Object.hasOwn(r, 'state')),
+      'the fixture holds an interactive row',
+    );
+  } finally {
+    restore();
+  }
+});
+
+const refusalOf = async (out: string) => {
+  const restore = withFakeClaude(out);
+  try {
+    const ops = claudeOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
+    return await Effect.runPromise(
+      ops.observe.pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+      ),
+    );
+  } finally {
+    restore();
+  }
+};
+
+test('a row of ours with a field Claude Code does not list so refuses the whole listing, naming the row, the field and the fix', async () => {
+  const long = 'x'.repeat(5000);
+  const cases: [Record<string, unknown>, string, RegExp][] = [
+    [{ sessionId: undefined }, 'sessionId', /`sessionId` is missing/],
+    [{ sessionId: '' }, 'sessionId', /`sessionId` is "", where/],
+    [{ state: '' }, 'state', /`state` is "", where/],
+    [{ state: 7 }, 'state', /`state` is 7, where Claude Code lists a non-empty string/],
+    [{ status: 7 }, 'status', /`status` is 7, where/],
+    [{ waitingFor: 7 }, 'waitingFor', /`waitingFor` is 7, where/],
+    [{ startedAt: '5' }, 'startedAt', /`startedAt` is "5", where/],
+    [{ pid: 0 }, 'pid', /`pid` is 0, where/],
+    [{ pid: 1.5 }, 'pid', /`pid` is 1.5, where/],
+    [{ pid: '7' }, 'pid', /`pid` is "7", where/],
+    [{ pid: -3 }, 'pid', /`pid` is -3, where/],
+    [{ pid: long }, 'pid', /`pid` is "x{59}…, where Claude Code lists an integer greater than 0, or nothing/],
+  ];
+  for (const [fields, field, words] of cases) {
+    const bad = { name: 'ae/bad/1', sessionId: 's-bad', state: 'working', status: 'idle', ...fields };
+    const err = await refusalOf(JSON.stringify([{ name: 'ae/ok/1', sessionId: 's-ok', state: 'working' }, bad]));
+    assert.ok(err, `${field}: ${JSON.stringify(fields).slice(0, 40)} is refused`);
+    assert.equal(err.verb, 'observe');
+    assert.match(err.message, /^`claude agents --all --json` lists `ae\/bad\/1`, a session of ours, and its /);
+    assert.match(err.message, words);
+    assert.match(err.message, /Every background session of ours stays unread, neither there nor gone, until the listing decodes/);
+    assert.match(err.message, /RegistryRowSchema/);
+    assert.ok(err.message.length < 600, `the message is bounded: ${err.message.length}`);
+  }
+});
+
+test('output that is no JSON array is refused as a RunnerError quoting at most 60 characters of it, never a defect', async () => {
+  for (const out of ['not json', '{}', '"x"', JSON.stringify({ rows: 'y'.repeat(10_000) })]) {
+    const err = await refusalOf(out);
+    assert.ok(err, `${out.slice(0, 20)} is refused`);
+    assert.equal(err.verb, 'observe');
+    assert.match(err.message, /^`claude agents --all --json` printed no JSON list of sessions: it reads "/);
+    assert.match(err.message, /Every background session of ours stays unread, neither there nor gone, until the listing decodes/);
+    assert.ok(err.message.length < 600, `the message is bounded: ${err.message.length}`);
+  }
+});
+
+test("a row's process and start are kept when it lists them, and none is when it lists neither or null: `say` finds no process, `release` reads no usage", async () => {
   const rows = [
-    { name: 'ae/a/1', sessionId: 's-a', pid: 0, startedAt: '5' },
-    { name: 'ae/b/1', sessionId: 's-b', pid: 1.5, startedAt: null },
-    { name: 'ae/c/1', sessionId: 's-c', pid: '7' },
-    { name: 'ae/d/1', sessionId: 's-d', pid: -3 },
+    { name: 'ae/a/1', sessionId: 's-a' },
+    { name: 'ae/b/1', sessionId: 's-b', pid: null, startedAt: null },
     { name: 'ae/e/1', sessionId: 's-e', pid: 999_999_999, startedAt: 5 },
-    { name: 'ae/f/1', sessionId: 's-f', pid: 999_999_998, startedAt: '5' },
+    { name: 'ae/f/1', sessionId: 's-f', pid: 999_999_998 },
   ].map((r) => ({ ...r, state: 'done', status: 'idle' }));
   const restore = withFakeClaude(JSON.stringify(rows));
   try {
@@ -960,15 +1036,15 @@ test("a row's process is a positive integer and its start a number, or neither i
     );
     assert.deepEqual(
       said.map((m) => /`claude agents` lists no process for/.test(m)),
-      [true, true, true, true, false, false],
+      [true, true, false, false],
       said.join('\n'),
     );
     since.length = 0;
     const released = [];
     for (const r of rows)
       released.push(await Effect.runPromise(ops.release!({ sessionId: r.sessionId, state: 'completed' }, { worktree: true })));
-    assert.deepEqual(released, [undefined, undefined, undefined, undefined, { turns: 1, toolCalls: 0 }, undefined]);
-    assert.deepEqual(since, [5], 'only the row with a numeric start, and a process, is read again');
+    assert.deepEqual(released, [undefined, undefined, { turns: 1, toolCalls: 0 }, undefined]);
+    assert.deepEqual(since, [5], 'only the row with a start, and a process, is read again');
   } finally {
     restore();
   }

@@ -255,6 +255,32 @@ test("observeFor says which names it could not read: a background session's, and
   }
 });
 
+test('a row of ours `claude agents` lists that does not decode leaves that name unread, never gone, and a job still seen', async () => {
+  const f = fake();
+  try {
+    const ops = opsIn(tmp('root'));
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+    const expected = [
+      { name: 'ae/j/1', harness: 'claude' },
+      { name: 'ae/b/1', harness: 'claude' },
+    ];
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([{ name: 'ae/b/1', state: 'working', status: 'busy' }]));
+    const refused = await Effect.runPromise(ops.observeFor!(expected));
+    assert.deepEqual([...refused.seen.keys()], ['ae/j/1']);
+    assert.deepEqual(refused.unread, new Set(['ae/b/1']), 'a row of ours with no session id is unread, not gone');
+
+    fs.writeFileSync(
+      path.join(f.dir, 'agents.json'),
+      JSON.stringify([{ name: 'ae/b/1', sessionId: BG_ID, state: 'working', status: 'busy' }]),
+    );
+    const fixed = await Effect.runPromise(ops.observeFor!(expected));
+    assert.equal(fixed.seen.get('ae/b/1')?.sessionId, BG_ID);
+    assert.deepEqual(fixed.unread, new Set());
+  } finally {
+    f.restore();
+  }
+});
+
 test('a stop, a release and words reach the mode the id belongs to, by its shape — with no observe made first, as after a restart', async () => {
   const f = fake();
   try {

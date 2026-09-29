@@ -247,6 +247,7 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
       'src/list/list.ts',
       'src/prune/prune.ts',
       'src/retry/index.ts',
+      'src/retry/retry-refusal.ts',
       'src/retry/retry.ts',
       'src/round/round.ts',
       'src/run.ts',
@@ -271,7 +272,9 @@ test('REFUSED on the source: a value import from a part cut out of run.ts back t
   const files = new Map(sourceFiles().map((f) => [f, read(f)]));
   const round = files.get('src/round/round.ts')!;
   files.set('src/round/round.ts', `${round}\nimport { assess } from '../tick/assess.ts';`);
-  assert.deepEqual(cycles(valueGraph(files)), [['src/retry/index.ts', 'src/retry/retry.ts', 'src/round/round.ts', 'src/tick/assess.ts']]);
+  assert.deepEqual(cycles(valueGraph(files)), [
+    ['src/retry/index.ts', 'src/retry/retry-refusal.ts', 'src/retry/retry.ts', 'src/round/round.ts', 'src/tick/assess.ts'],
+  ]);
   files.set('src/round/round.ts', `${round}\nimport type { Assessment } from '../tick/assess.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), []);
 });

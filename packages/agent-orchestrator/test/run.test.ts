@@ -9430,3 +9430,198 @@ test("REFUSED: a round's budget that is not dollars above zero, in words naming 
   assert.equal(roundBudgetRefusal('r-1', undefined), null);
   assert.equal(roundBudgetRefusal('r-1', 2.5), null);
 });
+
+test("`wf retry`'s refusals, whole: a `--model` an `auto` step would drop, one on a remote step, a cancelled run, a step not filed yet, a check still running, a step the run tries again itself — and an ask already waiting is said before a `--budget` the step cannot take", () => {
+  const refusal = (
+    steps: Workflow[],
+    r: Run,
+    p: Record<string, TaskPhase>,
+    how: RetryHow,
+    asks: RetryAsk[] = [],
+    name = 'implement',
+    verdict: Verdict | undefined = 'unfinished',
+  ) => retryRefusal(steps, r, name, how, phases(p), signedDone, asked, () => verdict, asks);
+  const remote: Workflow[] = [{ ...step('implement'), harness: 'a2a:reviewer' }, step('review', ['implement'])];
+  const failed = run({ implement: 't1', review: null });
+  assert.equal(
+    refusal(STEPS, failed, { t1: 'failed' }, { mode: 'nudge', model: 'haiku' }),
+    "`--model haiku`: implement names no `permissionMode:`, so it is filed in `auto`, the runtime's default, and Claude Code drops `auto` on that model: the session runs in `default`, and a job denies every call `default` would ask about. The step's mode is frozen with the run, so ask for a model that keeps `auto` — wf retry r-1 implement --model sonnet, or opus, or fable — or, to run it on haiku, start a run of a folder whose step names a mode the model keeps: `permissionMode: acceptEdits`, or `permissionMode: dontAsk` with `allowedTools:` rules.",
+  );
+  assert.equal(
+    refusal(remote, failed, { t1: 'failed' }, { mode: 'fresh', model: 'opus' }),
+    '`--model opus` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and implement runs on `harness: a2a:reviewer`, a remote A2A agent: its try would be sent without it. Ask without --model: wf retry r-1 implement.',
+  );
+  assert.equal(
+    refusal(remote, failed, { t1: 'failed' }, { mode: 'nudge', budget: 5 }),
+    '`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost, and implement runs on `harness: a2a:reviewer`, a remote A2A agent: its try would be sent without it. Ask without --budget: wf retry r-1 implement.',
+  );
+  assert.equal(
+    refusal(RETRIED, onTry([], 'c1', CANCELLED), { t1: 'succeeded', c1: 'stopped' }, { mode: 'nudge' }),
+    'r-1 was cancelled at 2026-01-02T00:00:00Z, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.',
+  );
+  assert.equal(
+    refusal(STEPS, failed, { t1: 'running' }, { mode: 'nudge' }, [], 'review'),
+    'review has not been filed yet, so there is no try to replace. Wait for it: wf ls r-1.',
+  );
+  assert.equal(
+    refusal(RETRIED, onTry(), { t1: 'succeeded', c1: 'running' }, { mode: 'nudge' }),
+    "implement's check is still due or running, so there is no verdict to act on yet. Wait for it: wf ls r-1.",
+  );
+  assert.equal(
+    refusal(RETRIED, onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1),
+    'the run tries implement again itself: its check refused, and `retries: 2` has 2 left, so the next tick files try 2. Wait for it: wf ls r-1.',
+  );
+  const waiting = { t1: 'succeeded', c1: 'stopped' } as const;
+  assert.equal(
+    refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }),
+    '--budget raises the cap of a step over its budget, or ended at it, and implement is failed (check), and has no `budget:` to raise. Try it without --budget: wf retry r-1 implement.',
+  );
+  assert.equal(
+    refusal(RETRIED, onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]),
+    'try 2 of implement is already asked for (--nudge, at 2026-09-13T10:00:00.000Z), and the next tick honours it once. Wait for it: wf ls r-1.',
+    'an ask already waiting is said first, before the --budget the step would refuse',
+  );
+});
+
+test('`forgetRefusal` says its reasons in one order, whole — in flight, the gates, what is due, the asks unheard, the runs stranded, the runs held, and each fix in the same order — and each in its plural', () => {
+  const at = (a: { kind: string; step: string; n: number }) => `/wf/runs/r-1.asks/${a.kind}-${a.step}-${a.n}`;
+  const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
+  const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });
+  const child = (id: string) => run({ implement: null, review: null }, { id, after: ['r-1'] });
+  const unsigned = run({ implement: 't1', review: null });
+  const none = () => undefined;
+  assert.equal(
+    forgetRefusal(
+      STEPS,
+      unsigned,
+      phases({ t1: 'running' }),
+      [heldBy('h-1'), child('c-1')],
+      none,
+      asked,
+      undefined,
+      [askFor(2, 'recheck')],
+      [],
+      undefined,
+      at,
+    ),
+    'implement is running; try 2 of implement is asked for, and no pass files it as the run stands; c-1 waits on it and has not started: forgotten, it would read waiting on r-1 (no such run) for ever; h-1 is held until it ships: forgotten, its hold would wait on no such run for ever. Forgetting is not cancelling: wf cancel r-1 stops what is in flight and files nothing more, then wf rm r-1 once what was in flight has settled (wf ls r-1). Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-2. Let it start first, on the pass after wf decide says r-1 has shipped, or call it off: wf cancel c-1. Let it go on first, on the pass after wf decide says r-1 has shipped, or lift the hold: wf hold h-1 --off.',
+  );
+
+  const fan = [step('plan'), step('design'), step('a'), step('b')];
+  const gated = run({ plan: 't1', design: 't2', a: null, b: null }, { gates: ['plan', 'design'] });
+  const signed = phases({ t1: 'succeeded', t2: 'succeeded' });
+  assert.equal(
+    forgetRefusal(fan, gated, signed, [], signedDone, asked),
+    'plan and design wait at their gates for your approval, and what waits on them is filed once each is approved: wf approve r-1 plan, wf approve r-1 design; a and b are ready to be filed, and a pass may be filing it now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+    'the gates before what is due; one line of steps ready is one thing due',
+  );
+  assert.equal(
+    forgetRefusal(fan, { ...gated, ...until('p-9') }, signed, [], signedDone, asked),
+    'plan and design wait at their gates for your approval, and what waits on them is filed once each is approved, once the hold lifts — it is held until p-9 ships; a and b are ready to be filed, once the hold lifts — it is held until p-9 ships. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+  const checked = [step('a'), { ...step('b'), check: 'npm test' }];
+  assert.equal(
+    forgetRefusal(checked, run({ a: null, b: 't2' }), signed, [], signedDone, asked),
+    "a is ready to be filed and b's check is due, and a pass may be filing them now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.",
+  );
+  assert.equal(
+    forgetRefusal(LOOP, inRound(3), ALL_SUCCEEDED, [], saidIn(3, true), asked, undefined, [], [roundAskFor(4)]),
+    "round 4 of review's loop is due (wf round), and a pass may be filing it now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.",
+  );
+
+  const two = [step('implement'), { ...SHIP, after: ['implement'] }, { ...SHIP, name: 'land', after: ['implement'] }];
+  assert.equal(
+    forgetRefusal(two, run({ implement: 't1', ship: null, land: null }), phases({ t1: 'succeeded' }), [], signedDone, asked),
+    'ship and land wait at their gates for your approval, and each is filed once each is approved: wf approve r-1 ship, wf approve r-1 land. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+  const mixed: Workflow[] = [step('plan'), step('implement'), { ...SHIP, after: ['implement'] }];
+  assert.equal(
+    forgetRefusal(mixed, run({ plan: 't1', implement: 't2', ship: null }, { gates: ['plan'] }), signed, [], signedDone, asked),
+    'plan and ship wait at their gates for your approval, and each is filed, or what waits on it is once each is approved: wf approve r-1 plan, wf approve r-1 ship. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+
+  assert.equal(
+    forgetRefusal(
+      STEPS,
+      unsigned,
+      phases({ t1: 'succeeded' }),
+      [],
+      none,
+      asked,
+      undefined,
+      [askFor(2, 'recheck'), askFor(3, 'recheck')],
+      [],
+      undefined,
+      at,
+    ),
+    'try 2 of implement and try 3 of implement are asked for, and no pass files them as the run stands. Take those asks back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-2 /wf/runs/r-1.asks/retry-implement-3.',
+  );
+  const holders = [heldBy('h-2'), heldBy('h-1')];
+  assert.equal(
+    forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, holders, signedDone, asked),
+    'h-1 and h-2 are held until it ships: forgotten, each hold would wait on no such run for ever. Let them go on first, on the pass after wf decide says r-1 has shipped, or lift each hold: wf hold h-1 --off, wf hold h-2 --off.',
+  );
+  assert.equal(
+    forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), DONE, holders, signedDone, asked),
+    'h-1 and h-2 are held until it ships: forgotten, each hold would wait on no such run for ever. Lift each hold: wf hold h-1 --off, wf hold h-2 --off.',
+  );
+});
+
+test('`forgetRefusal` keeps its order between every two reasons that can stand together — a task in flight or an ending not landed before a gate, an ending not landed or a wait on runs before an ask unheard, what is due before an ask unheard — and its fixes the same way', () => {
+  const at = (a: { kind: string; step: string; n: number }) => `/wf/runs/r-1.asks/${a.kind}-${a.step}-${a.n}`;
+  const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
+  const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });
+  const child = (id: string) => run({ implement: null, review: null }, { id, after: ['r-1'] });
+  const none = () => undefined;
+  const landed = phases({ 't-impl': 'succeeded', 't-ship': 'succeeded', 't-ship-check': 'succeeded', 't-x': 'succeeded' });
+  const closeoutOf = (): Closeout => ({ ...signedDone(), output: { message: 'Add a flag' } });
+  const forget = (steps: readonly Workflow[], r: Run, others: readonly Run[], asks: readonly RetryAsk[]) =>
+    forgetRefusal(steps, r, landed, others, closeoutOf, () => false, none, asks, [], none, at, [], 'rm', 'ours');
+
+  assert.equal(
+    forget(LANDING_STEPS, atLanding(), [child('c-1'), heldBy('h-1')], [askFor(5)]),
+    "ship's merge is staged in the repository's checkout (/repo), and the run has not yet committed or aborted it; try 5 of implement is asked for, and no pass files it as the run stands; c-1 waits on it and has not started: forgotten, it would read waiting on r-1 (no such run) for ever; h-1 is held until it ships: forgotten, its hold would wait on no such run for ever. Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-5. The next tick lands it, cancelled or not: wf rm r-1 once wf ls r-1 says what became of ship's merge. Let it start first, on the pass after wf decide says r-1 has shipped, or call it off: wf cancel c-1. Let it go on first, on the pass after wf decide says r-1 has shipped, or lift the hold: wf hold h-1 --off.",
+  );
+
+  const x: Workflow = { ...step('x', ['implement']), gate: true };
+  const r = atLanding({ gates: ['x'] });
+  assert.equal(
+    forget([...LANDING_STEPS, x], { ...r, steps: { ...r.steps, x: { taskId: 't-x' } } }, [], []),
+    "ship's merge is staged in the repository's checkout (/repo), and the run has not yet committed or aborted it; x waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 x. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1. The next tick lands it, cancelled or not: wf rm r-1 once wf ls r-1 says what became of ship's merge.",
+  );
+
+  const fan = [step('plan'), step('design'), step('a', ['plan', 'design'])];
+  assert.equal(
+    forgetRefusal(
+      fan,
+      run({ plan: 't1', design: 't2', a: null }, { gates: ['plan'] }),
+      phases({ t1: 'succeeded', t2: 'running' }),
+      [],
+      signedDone,
+      asked,
+    ),
+    'design is running; plan waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 plan. Forgetting is not cancelling: wf cancel r-1 stops what is in flight and files nothing more, then wf rm r-1 once what was in flight has settled (wf ls r-1).',
+  );
+
+  assert.equal(
+    forgetRefusal(
+      STEPS,
+      run({ implement: null, review: null }, { after: ['p-1'] }),
+      phases({}),
+      [],
+      none,
+      asked,
+      undefined,
+      [askFor(5)],
+      [],
+      undefined,
+      at,
+    ),
+    'it waits on p-1, and files implement once it has shipped; try 5 of implement is asked for, and no pass files it as the run stands. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1. Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-5.',
+  );
+
+  assert.equal(
+    forgetRefusal(CHECKED, withCheck(null), phases({ t1: 'succeeded' }), [], signedDone, asked, undefined, [askFor(5)], [], undefined, at),
+    "implement's check is due, and a pass may be filing it now; try 5 of implement is asked for, and no pass files it as the run stands. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1. Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-5.",
+  );
+});

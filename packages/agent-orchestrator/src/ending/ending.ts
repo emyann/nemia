@@ -5,7 +5,7 @@
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
-import { tryOf, type RetryAsk } from '../retry.ts';
+import { tryOf, type RetryAsk } from '../retry/retry-ask.ts';
 import {
   andList,
   firstLine,

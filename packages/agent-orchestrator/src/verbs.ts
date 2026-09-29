@@ -12,7 +12,7 @@ import { sayRefusal, type Said } from './say/say.ts';
 import { approvedFirst, type RoundAsk } from './status/status.ts';
 import { holdRefusal } from './wait/wait.ts';
 import { acceptAsk, approvalRefusal, assess, cancelPlan, idRefusal, retryable, retryRefusal, roundAsk, type CancelPlan } from './run.ts';
-import { tryOf, type RetryAsk, type RetryHow } from './retry.ts';
+import { tryOf, type RetryAsk, type RetryHow } from './retry/retry-ask.ts';
 import {
   acceptFile,
   acceptanceIn,

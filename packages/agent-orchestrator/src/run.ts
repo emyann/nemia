@@ -33,7 +33,7 @@ import {
   type RetryAsk,
   type RetryHow,
   type RetryMode,
-} from './retry.ts';
+} from './retry/retry-ask.ts';
 import {
   andList,
   dataBlock,
@@ -123,7 +123,7 @@ import { saidWord, type Said } from './say/say.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
 export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; retry.ts imports only types from here. */
-export { answerOf, messageRefusal, type EarlierTry } from './retry.ts';
+export { answerOf, messageRefusal, type EarlierTry } from './retry/retry-ask.ts';
 export {
   checkTaskId,
   filesPrunedWords,

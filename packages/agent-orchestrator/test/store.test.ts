@@ -25,7 +25,7 @@ import {
   type TaskView,
 } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
-import type { RetryHow } from '../src/retry.ts';
+import type { RetryHow } from '../src/retry/retry-ask.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { isGitRun, SIGNOFF } from '../src/run.ts';

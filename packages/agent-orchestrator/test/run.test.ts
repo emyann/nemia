@@ -148,7 +148,7 @@ import {
   type RetryAsk,
   type RetryHow,
   type RetryMode,
-} from '../src/retry.ts';
+} from '../src/retry/retry-ask.ts';
 import {
   firstFiledAt,
   runStartedAt,

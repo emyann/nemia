@@ -6,7 +6,7 @@
  */
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import { tryOf, type EarlierTry } from '../retry.ts';
+import { tryOf, type EarlierTry } from '../retry/retry-ask.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';

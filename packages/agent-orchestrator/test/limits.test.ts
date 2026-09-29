@@ -8,12 +8,14 @@
  * per rule. These tests measure the files with the four rules at their thresholds, and `refusals` refuses a ceiling above the measure,
  * a count of offenders other than the measure, a ceiling `RECORD` does not know, an entry with no ceiling, and an entry for a file with
  * no offender left. Oxlint accepts a rule name it does not know without a word, so plants over each threshold prove every rule runs.
+ * No directive in the code may turn a limit off, by naming it or by naming no rule.
  *
  * A file moved whole renames its entry and its ceiling block in the same commit, its numbers unchanged. A file cut into parts gives an
  * entry only to the parts still over a limit, each no higher than the original's ceiling per rule, their counts summing to no more than
  * the original's. No number is ever raised: a change that meets a limit cuts the function.
  *
- * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
+ * The test reads files outside this package. `turbo.json` makes `.oxlintrc.json` and the apps' sources inputs of this package's tests, and
+ * the runtime reaches them as a dependency; after a change anywhere else, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -522,15 +524,53 @@ test('each limit the config names runs at its threshold, is off only in the exem
   );
 });
 
-test('no directive in the code turns a limit off for a line or a file', () => {
+/**
+ * The directives in `text` that turn a limit off: one that names a limit, and one that names no rule, which turns every rule off. A
+ * directive's reason, after `--`, names no rule.
+ */
+function limitDirectives(text: string): string[] {
+  return [...text.matchAll(/(?:oxlint|eslint)-disable(?:-next-line|-line)?(?![\w-])([^\n]*)/g)]
+    .filter(([, rest]) => {
+      const rules = rest
+        .replace(/\*\/.*$/, '')
+        .replace(/\s--(?:\s.*)?$/, '')
+        .trim();
+      return rules === '' || rules.split(/[\s,]+/).some((rule) => isLimit(rule));
+    })
+    .map(([directive]) => directive.trim());
+}
+
+test('REFUSED: a directive that names a limit, or no rule at all, is found', () => {
+  const fixture = [
+    '/* oxlint-disable */',
+    '// oxlint-disable-next-line -- the whole line, every rule',
+    '// eslint-disable-next-line complexity -- a long switch',
+    '/* oxlint-disable max-lines, no-console */',
+    '{/* oxlint-disable-next-line sonarjs/cognitive-complexity */}',
+    '// oxlint-disable-next-line no-control-regex -- a control character is refused',
+    '// oxlint-disable-next-line typescript/no-base-to-string, jsx-a11y/no-noninteractive-element-interactions -- max-lines is not named',
+    '// oxlint-enable complexity',
+  ].join('\n');
+  assert.deepEqual(limitDirectives(fixture), [
+    'oxlint-disable */',
+    'oxlint-disable-next-line -- the whole line, every rule',
+    'eslint-disable-next-line complexity -- a long switch',
+    'oxlint-disable max-lines, no-console */',
+    'oxlint-disable-next-line sonarjs/cognitive-complexity */}',
+  ]);
+});
+
+test('no directive in the code turns a limit off for a line or a file, by naming it or by naming no rule', () => {
   const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint'], { cwd: ROOT, encoding: 'utf8' })
     .split('\n')
-    .filter((file) => /\.(?:[cm]?js|tsx?)$/.test(file) && !/(?:^|\/)test\/|\.test\.ts$/.test(file) && fs.existsSync(path.join(ROOT, file)));
+    .filter(
+      (file) =>
+        /\.(?:[cm]?js|tsx?)$/.test(file) && !EXEMPT.some((glob) => path.matchesGlob(file, glob)) && fs.existsSync(path.join(ROOT, file)),
+    );
   assert.ok(files.length > 100, `read ${files.length} source files, far fewer than the workspace has`);
-  const directive = /(?:oxlint|eslint)-disable[^\n]*?\b(?:max-lines|complexity)\b/;
   assert.deepEqual(
-    files.filter((file) => directive.test(fs.readFileSync(path.join(ROOT, file), 'utf8'))),
+    files.flatMap((file) => limitDirectives(fs.readFileSync(path.join(ROOT, file), 'utf8')).map((found) => `${file}: ${found}`)),
     [],
-    'a limit is met by cutting the function, never by a directive',
+    'a limit is met by cutting the function, never by a directive: name the rule the line breaks, which is not a limit',
   );
 });

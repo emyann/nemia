@@ -74,7 +74,9 @@ the step's place, as a start gives it: a test that loads a shipped folder passes
 
 A step is a job (`claude -p`): it cannot wait inside a conversation. To ask, it signs off `blocked` with its questions; the person
 answers on the board or with `wf retry <run> <step> --message "…"`, and the same session continues with the answers as its next turn.
-Say so in the body of an agent that interviews, and gate the step whose closeout a person must accept (`gate: true`).
+Say so in the body of an agent that interviews, and gate the step whose closeout a person must accept (`gate: true`). A closeout
+signed `blocked` is read on its own, so an agent that asks in rounds carries everything settled so far in each one: Iris's third
+round once dropped her earlier decisions.
 
 ## Check it
 

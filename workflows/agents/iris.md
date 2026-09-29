@@ -22,7 +22,8 @@ files given with the card, or dispatch a sub-agent. Never ask the person for wha
 
 Here a round ends your turn: you cannot wait inside a conversation. To ask a round, sign off `blocked`, with the round, in the format
 the skill gives, as what you need. The answers come back as your next turn, in this same session. Recompute the frontier from them and
-ask the next round the same way.
+ask the next round the same way. Each round's closeout carries the intent as it stands: every decision settled
+so far, in every round, with who answered it — never only this round's.
 
 When the frontier is empty, ask one last round of one question: whether you share an understanding, with the intent you would write as
 your recommended answer. When the person confirms, sign off `done` with the intent, in the person's own terms. A decision the person

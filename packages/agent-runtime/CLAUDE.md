@@ -51,6 +51,9 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
   struct's rest is `unknown`). Each event keeps the keys it does not name (`StructWithRest`: a `Struct` strips them), and a decoded
   struct comes back with its keys in the schema's order, so where the object's own keys matter test it with `Schema.is` and decode
   only to say why not.
+- **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
+  fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
+  a row not ours (no `ae/` name, no `state`) is skipped undecoded.
 
 ## Processes and streams
 

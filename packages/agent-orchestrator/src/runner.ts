@@ -302,5 +302,5 @@ export { forget } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
 export { decide } from './decide/decide.verb.ts';
 export { list, unjudgedOf } from './list/list.verb.ts';
-export type { Answered } from './decide/decide.verb.ts';
+export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { Unjudged } from './list/list.verb.ts';

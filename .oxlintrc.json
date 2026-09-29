@@ -517,14 +517,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli/decide/decide.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 230, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 112 }],
-        "sonarjs/cognitive-complexity": ["error", 158]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/feed/feed.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 82, "skipBlankLines": true, "skipComments": true }],

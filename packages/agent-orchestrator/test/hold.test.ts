@@ -76,6 +76,16 @@ const twoSteps = () => {
   return dir;
 };
 
+/** Four steps: `a` and `b`, each with a check, `d` with none, and `c` after `d`. */
+const twoChecks = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'checks-'));
+  fs.writeFileSync(path.join(dir, 'a.md'), '---\ncheck: npm test\n---\ndo a\n');
+  fs.writeFileSync(path.join(dir, 'b.md'), '---\ncheck: npm test\n---\ndo b\n');
+  fs.writeFileSync(path.join(dir, 'd.md'), 'do d\n');
+  fs.writeFileSync(path.join(dir, 'c.md'), '---\nafter: d\n---\ndo c\n');
+  return dir;
+};
+
 /** A loop: `implement`, then `review`, which may send it back once. */
 const looping = () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'loop-'));
@@ -401,6 +411,61 @@ test('a held run files nothing — the next step, nor on a hold written between 
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold file is gone');
   assert.ok(b.filings.includes(`${run.id}-implement`), 'and the run went on on the same pass');
   assert.equal(readRun(run.id).hold, undefined);
+});
+
+test('a hold a pass reads while it files its checks stops the rest of that pass, though it is lifted the instant after: the other check and the ready step are filed on the next pass', async (t: TestContext) => {
+  const b = board();
+  const repo = aRepo();
+  const other = await aRunning(b, repo);
+  const run = start({ brief: 'two checks and a step after', repo, workflowDir: twoChecks() });
+  await advance(b.e, readRun(run.id));
+  const id = run.id;
+  assert.deepEqual(
+    [`${id}-a`, `${id}-b`, `${id}-d`].filter((task) => b.filings.includes(task)),
+    [`${id}-a`, `${id}-b`, `${id}-d`],
+    `the first pass files the roots: ${b.filings.join(', ')}`,
+  );
+  assert.ok(!b.filings.includes(`${id}-c`), 'c waits on d');
+  for (const step of ['a', 'b', 'd']) b.settle(`${id}-${step}`, 'succeeded', SIGNED);
+
+  const hold = holdFileOf(id);
+  const file = b.e.file.bind(b.e);
+  let held = false;
+  t.mock.method(b.e, 'file', async (spec: Parameters<Engine['file']>[0]) => {
+    if (!held && spec.id?.endsWith('-check')) {
+      held = true;
+      fs.writeFileSync(hold, JSON.stringify({ at: 'by hand', until: [other.id] }));
+    }
+    return file(spec);
+  });
+  const exists = fs.existsSync;
+  let lifted = false;
+  t.mock.method(fs, 'existsSync', (p: fs.PathLike) => {
+    const there = exists(p);
+    if (p === hold && there && !lifted) {
+      lifted = true;
+      fs.rmSync(hold);
+    }
+    return there;
+  });
+  await advance(b.e, readRun(id));
+  t.mock.restoreAll();
+
+  const checks = [`${id}-a-check`, `${id}-b-check`];
+  assert.ok(held && lifted, 'the pass filed a check, then read the hold, which was lifted as it was read');
+  assert.equal(checks.filter((task) => b.filings.includes(task)).length, 1, `one check filed, and not the other: ${b.filings.join(', ')}`);
+  assert.ok(!fs.existsSync(hold) && readRun(id).hold === undefined, 'nothing holds the run once the pass has read the hold');
+  assert.ok(
+    !b.filings.includes(`${id}-c`),
+    'the ready step c is not filed: the pass read the hold in its checks, and its refusal holds for every phase after, though the store reads clear',
+  );
+
+  await advance(b.e, readRun(id));
+  assert.deepEqual(
+    [...checks, `${id}-c`].filter((task) => b.filings.includes(task)),
+    [...checks, `${id}-c`],
+    'the next pass files the other check and c: the refusal lasted one pass',
+  );
 });
 
 test('REFUSED while held: an approval, a retry, a round and an acceptance — and wf ls, wf decide and decide offer none of them, but say the hold; the question comes back once it lifts', async (t) => {

@@ -1,9 +1,11 @@
 /**
- * One pass over one run (`advance`): read the world, decide, file what became ready, and write the run's record, which this file alone
- * writes. Beside it, the filings a pass made and died before writing down, adopted onto the record (`adoptChecks`, `adoptTries`,
- * `adoptRounds`, `unrecordedSteps`), and the tasks held open it closes or answers (`closeWaitingTasks`). Those are here, and not beside the
- * verbs that call them first (`cancel`, `forget`, `prune`), because they write the record by the tick's own judgement: those verbs import
- * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * One pass over one run (`advance`, `advanceRun`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift a
+ * hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the nudge that
+ * answers a task held open; then keep the tips and write the run's record, which this file alone writes. Beside it, the filings a pass
+ * made and died before writing down, adopted onto the record (`adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps`), the steps
+ * owed a hand-off (`handOffOwed`), and the tasks held open it closes (`closeWaitingTasks`). Those are here, and not beside the verbs that
+ * call them first (`cancel`, `forget`, `prune`), because they write the record by the tick's own judgement: those verbs import this file,
+ * and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import type { Engine, TaskView } from '../runtime-client.ts';

@@ -1,10 +1,14 @@
-/** A step's own reads: its session output, the files it wrote, and its conversation, read once from a cursor or followed. */
+/**
+ * A step's own reads: its session output, the files it wrote, its conversation, read once from a cursor or followed, and its task's path
+ * through the runtime's lifecycle.
+ */
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
 import { phaseOfView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
+import { pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import { e, taskOfStep, type TaskView, workFolderOf } from '../store.ts';
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
@@ -147,6 +151,10 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  *   the stream, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying:
  *   false`, and ends it. Any other failure is of that read, not the conversation: it is said once as `unreadable` with `retrying: true`,
  *   read again on the next beat from the same cursor, and cleared with `readable` by the first read that works.
+ * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`), the
+ *   current try's by default: each state its journal says, the entry that moved it and when, from the filing to now, replayed off the
+ *   journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the answer that opened the
+ *   next turn (`pathToTurn`). A step not filed yet has an empty path. Refusals are `tryOfStep`'s; 502 when the journal could not be read.
  */
 export const steps = new Hono()
   .get('/api/runs/:id/steps/:step/log', async (c) => {
@@ -224,6 +232,27 @@ export const steps = new Hono()
       );
     }
     return c.body(new Uint8Array(file.body), 200, served(file.type));
+  })
+  .get('/api/runs/:id/steps/:step/path', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    const asked = tryOfStep(found.run, step, c.req.query('try'));
+    if ('error' in asked) return c.json({ error: asked.error }, asked.status);
+    if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
+    try {
+      const path = pathToTurn(await e.path(asked.taskId), asked.turn);
+      return c.json({ taskId: asked.taskId, try: asked.try, path } satisfies StepPath);
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      return c.json(
+        {
+          error: `Could not read the journal of task ${asked.taskId} (step '${step}', try ${asked.try}): ${why}. \`wf ls\` reads the same record from the command line.`,
+        },
+        502,
+      );
+    }
   })
   .get('/api/runs/:id/steps/:step/transcript', async (c) => {
     const id = c.req.param('id');

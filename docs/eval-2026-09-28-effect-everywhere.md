@@ -396,7 +396,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    *Stop here and measure:* lines added and removed, test lines touched, typecheck time, and review rounds per card. Then
    decide A or B, and whether to go on.
 7. **Controllers one at a time**, smallest first: `decide`, `forget`, `verbs`, `views`, `start`, then `tick` last and alone.
-   The meter stays a module global until a pass is concurrent.
+   The meter stays a module global until a pass is concurrent. `decide` landed as the pattern the others follow: the program
+   (`decideRun`, an `Effect.fn`) requires the Promise engine as a service (`EngineService`, in `runtime-client.ts`), and the
+   plain `decide(engine, id)` runs it over that engine and rejects with what it failed with.
 8. **The api's errors.** One mapping from the union to statuses (under B, checked by the compiler), `app.onError` for the
    rest, and the 6 `messageOf` copies gone. Landed under B. Left for a card of its own: the authoring errors that carry a
    `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their

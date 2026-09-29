@@ -13,6 +13,7 @@
  * moves.
  */
 import { Schema, SchemaIssue } from 'effect';
+import { quote } from './quote.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -167,10 +168,7 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
 /** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
-const shown = (value: unknown): string => {
-  const text = JSON.stringify(value) ?? 'undefined';
-  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
-};
+const shown = (value: unknown): string => quote(JSON.stringify(value) ?? 'undefined');
 
 /**
  * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds

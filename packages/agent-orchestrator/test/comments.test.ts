@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import plugin from '../../../lint/comments.ts';
@@ -54,6 +55,10 @@ const workspacePackages = (): string[] =>
 /** The glob of the folder beside the packages that one guard block, and one only, lists after its package: the plugin's own. */
 const LINT = 'lint/**';
 
+/** A jsPlugins specifier made absolute, as a config in another folder needs it: a path from the root, or a package the root installs. */
+const resolvePlugin = (specifier: string): string =>
+  specifier.startsWith('.') ? path.join(ROOT, specifier) : createRequire(path.join(ROOT, 'package.json')).resolve(specifier);
+
 type Diagnostic = { file: string; line: number; rule: string };
 
 /** A rule as the config names it, from the code oxlint reports: `comments(no-code-comments)` or `eslint(no-inline-comments)`. */
@@ -71,7 +76,7 @@ function lint(fixtures: Record<string, string>): Diagnostic[] {
   const { options: _options, $schema: _schema, ...rest } = config;
   const used = {
     ...rest,
-    jsPlugins: config.jsPlugins.map((entry) => ({ ...entry, specifier: path.join(ROOT, entry.specifier) })),
+    jsPlugins: config.jsPlugins.map((entry) => ({ ...entry, specifier: resolvePlugin(entry.specifier) })),
     overrides: [
       { ...on, files: ['on/**'] },
       { ...on, files: ['off/**'], excludeFiles: ['off/**'] },
@@ -252,7 +257,7 @@ test("the plugin's rules are the ones each guard block names, and each block hol
   }
   const config = readConfig();
   assert.deepEqual(
-    config.jsPlugins.map((entry) => entry.name),
+    config.jsPlugins.filter((entry) => entry.specifier === './lint/comments.ts').map((entry) => entry.name),
     [plugin.meta.name],
     'the plugin is loaded under the name its rules are named by',
   );

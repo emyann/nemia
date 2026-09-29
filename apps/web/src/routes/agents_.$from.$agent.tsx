@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { AgentForm } from '../components/AgentForm';
-import { AgentRefused, FromBadge, UsedBy } from '../components/AgentParts';
+import { AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from '../components/AgentParts';
 import { AsWritten } from '../components/FilePage';
 import { TryAgent, TryYours } from '../components/TryAgent';
 import { agentQuery, AgentRefusal, keyFormQuery, readAgent, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
@@ -103,21 +103,7 @@ function AgentPage() {
     <article className="space-y-6">
       <BackToAgents />
 
-      <header className="space-y-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="font-mono text-base font-semibold">{agent.name}</h1>
-          <span className="text-xs text-neutral-500">an agent</span>
-          <FromBadge from={agent.from} />
-        </div>
-        {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
-        <UsedBy listing={agent} />
-        {!mine && (
-          <p data-read-only className="text-xs text-neutral-500">
-            The repository's agents are read here, not written: they change with the repository, in a commit. To start one of yours from
-            this one, {code(`cp ${agent.file} ~/.agent-workflows/workflows/agents/`)}.
-          </p>
-        )}
-      </header>
+      <AgentHeader agent={agent} mine={mine} />
 
       {agent.error !== null && (
         <div
@@ -146,6 +132,37 @@ function AgentPage() {
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
+  );
+}
+
+/**
+ * Who the agent is, at the head of its page: its face and name as a person's, the job it holds and the name a node gives it, what it is
+ * for, the nodes that name it, and, for the repository's, how to start one of yours from it.
+ */
+function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
+  return (
+    <header className="space-y-2">
+      <div className="flex items-center gap-4">
+        <AgentFace name={agent.name} size={56} />
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-lg font-semibold">{personOf(agent.name)}</h1>
+            <FromBadge from={agent.from} />
+          </div>
+          <p data-agent-role className="text-sm text-neutral-600 dark:text-neutral-400">
+            {agent.role ?? 'No role yet'} · <span className="font-mono text-xs">agent: {agent.name}</span>
+          </p>
+        </div>
+      </div>
+      {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
+      <UsedBy listing={agent} />
+      {!mine && (
+        <p data-read-only className="text-xs text-neutral-500">
+          The repository's agents are read here, not written: they change with the repository, in a commit. To start one of yours from this
+          one, {code(`cp ${agent.file} ~/.agent-workflows/workflows/agents/`)}.
+        </p>
+      )}
+    </header>
   );
 }
 

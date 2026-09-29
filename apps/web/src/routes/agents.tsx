@@ -2,7 +2,7 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { LinkButton } from '@/components/ui/button';
-import { FromBadge, RouteLink, SkillLink, Skills, UsedBy } from '../components/AgentParts';
+import { AgentFace, FromBadge, personOf, RouteLink, SkillLink, Skills, UsedBy } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
 import { agentsQuery, skillsQuery, type AgentListing, type SkillPlace } from '../lib/api';
 import { KEY_LABELS, ROLE_KEYS } from '../lib/agents';
@@ -99,17 +99,25 @@ function AgentCard({ agent }: { agent: AgentListing }) {
       data-from={agent.from}
       className="h-full space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h3 className="font-mono text-sm font-semibold">
-          <RouteLink
-            to="/agents/$from/$agent"
-            params={{ from: agent.from, agent: agent.name }}
-            className="rounded-sm underline decoration-neutral-300 underline-offset-4 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600"
-          >
-            {agent.name}
-          </RouteLink>
-        </h3>
-        <FromBadge from={agent.from} />
+      <header className="flex items-center gap-3">
+        <AgentFace name={agent.name} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h3 className="text-sm font-semibold">
+              <RouteLink
+                to="/agents/$from/$agent"
+                params={{ from: agent.from, agent: agent.name }}
+                className="rounded-sm underline decoration-neutral-300 underline-offset-4 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600"
+              >
+                {personOf(agent.name)}
+              </RouteLink>
+            </h3>
+            <FromBadge from={agent.from} />
+          </div>
+          <p data-agent-role className="text-xs text-neutral-500">
+            {agent.role ?? 'No role yet'} · <span className="font-mono">{agent.name}</span>
+          </p>
+        </div>
       </header>
       {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
       {agent.error === null &&

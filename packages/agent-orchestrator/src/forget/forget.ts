@@ -108,11 +108,105 @@ export function forgetRefusal(
   merging: MergeState['merging'] = 'none',
   command = `wf ${verb} ${run.id}`,
 ): string | null {
-  const held: string[] = [];
-  const fixes: string[] = [];
-  const id = run.id;
-  const again = command;
+  const asked: Forgetting = {
+    steps,
+    run,
+    id: run.id,
+    again: command,
+    phaseOf,
+    closeoutOf,
+    askedCloseout,
+    verdictOf,
+    asks,
+    roundAsks,
+    spendOf,
+    askAt,
+    standings,
+    verb,
+    merging,
+  };
+  const c = factsOf(asked, others);
+  const held = HELD.map((reason) => reason(c)).filter((words) => words !== undefined);
+  const fixes = FIXES.map((fix) => fix(c)).filter((words) => words !== undefined);
+  return held.length ? `${held.join('; ')}. ${fixes.join('. ')}.` : null;
+}
 
+/** What `forgetRefusal` was asked: its arguments, the run's id, and the command its fixes name (`again`). */
+type Forgetting = {
+  steps: readonly Workflow[] | undefined;
+  run: Run;
+  id: string;
+  again: string;
+  phaseOf: (taskId: string) => TaskPhase;
+  closeoutOf: (step: string) => Closeout | undefined;
+  askedCloseout: (taskId: string) => CloseoutAsked;
+  verdictOf: (step: string) => Verdict | undefined;
+  asks: readonly RetryAsk[];
+  roundAsks: readonly RoundAsk[];
+  spendOf: SpendOf;
+  askAt: (ask: AskName) => string;
+  standings: readonly BranchStanding[];
+  verb: 'rm' | 'prune';
+  merging: MergeState['merging'];
+};
+
+/**
+ * The run read once for its reasons: its tasks in flight (`live`), its ending whose merge is not landed (`unlanded`), what a pass would
+ * file were it not waiting on runs (`ready`, `waits`), the steps at their gates, what is due, the asks no pass files, the runs that wait on
+ * it (`stranded`) or are held until it ships (`holders`), and how a hold on it is said (`lifts`).
+ */
+type Facts = Forgetting & {
+  live: string[];
+  unlanded?: Workflow;
+  ready: string[];
+  waits: boolean;
+  atGates: string[];
+  due: string[];
+  unheard: AskName[];
+  stranded: string[];
+  holders: string[];
+  lifts: string;
+};
+
+/** What `assess` says a pass would file of a run. */
+type Assessment = ReturnType<typeof assess>;
+
+/** `forgetRefusal`'s facts of a run, among the store's `others`: a cancelled run's steps and asks are not judged. */
+function factsOf(f: Forgetting, others: readonly Run[]): Facts {
+  const { steps, run, id } = f;
+  const { hold, ...free } = run;
+  const live = liveTasks(run, f.phaseOf);
+  const judged =
+    !run.cancelledAt && steps
+      ? {
+          a: assess(steps, free, f.phaseOf, f.closeoutOf, f.askedCloseout, f.verdictOf, f.asks, f.roundAsks, () => false, f.spendOf),
+          steps,
+        }
+      : undefined;
+  const waits = judged !== undefined && gated(run) && judged.a.ready.length > 0;
+  return {
+    ...f,
+    live,
+    unlanded: unlandedEnding(f, live),
+    ready: judged?.a.ready ?? [],
+    waits,
+    atGates: judged ? gatesOf(f, judged.steps) : [],
+    due: judged ? dueOf(judged.a, judged.steps, waits) : [],
+    unheard: run.cancelledAt ? [] : unheardOf(f, judged?.a),
+    stranded: others
+      .filter((o) => o.id !== id && o.after?.includes(id) && gated(o))
+      .map((o) => o.id)
+      .sort(),
+    holders: others
+      .filter((o) => o.id !== id && !o.cancelledAt && o.hold?.until.includes(id))
+      .map((o) => o.id)
+      .sort(),
+    lifts: hold ? `, once the hold lifts — it is ${holdWord(hold.until.map((u) => ({ run: u })))}` : '',
+  };
+}
+
+/** Each of the run's tasks — a step's, or its check's — that is pending or running, as `<label> is <phase>`. */
+function liveTasks(run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const live: string[] = [];
   for (const [name, record] of Object.entries(run.steps)) {
     for (const [label, taskId] of [
@@ -123,128 +217,182 @@ export function forgetRefusal(
       if (phase === 'pending' || phase === 'running') live.push(`${label} is ${phase}`);
     }
   }
-  if (live.length) held.push(andList(live));
+  return live;
+}
+
+/** The ending that lands on its check whose merge is not landed (`landingOpen`), with nothing of the run in flight — or undefined. */
+function unlandedEnding(f: Forgetting, live: readonly string[]): Workflow | undefined {
+  const { steps, run, phaseOf, closeoutOf, askedCloseout, spendOf, merging } = f;
   const ending = steps?.find((s) => landsOnCheck(s, run));
   const unlanded =
     ending &&
     !live.length &&
     steps &&
     landingOpen(ending, run, ownStatus(ending, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf), phaseOf, merging);
-  if (ending && unlanded) {
-    held.push(
-      merging === 'ours'
-        ? `${ending.name}'s merge is staged in the repository's checkout (${run.repo}), and the run has not yet committed or aborted it`
-        : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`,
-    );
-  }
-
-  const due: string[] = [];
-  const unheard: AskName[] = [];
-  let waits = false;
-  let atGates: string[] = [];
-  const { hold, ...free } = run;
-  const lifts = hold ? `, once the hold lifts — it is ${holdWord(hold.until.map((u) => ({ run: u })))}` : '';
-  if (!run.cancelledAt) {
-    const a = steps ? assess(steps, free, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf) : undefined;
-    if (a && steps) {
-      waits = gated(run) && a.ready.length > 0;
-      if (waits) {
-        held.push(
-          `it waits on ${andList(run.after!)}, and files ${andList(a.ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} shipped`,
-        );
-      } else if (a.ready.length) due.push(`${andList(a.ready)} ${a.ready.length > 1 ? 'are' : 'is'} ready to be filed`);
-      for (const name of a.check) due.push(`${name}'s check is due`);
-      for (const r of a.retry) {
-        const step = steps.find((s) => s.name === r.step);
-        due.push(
-          `try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : r.by === 'signoff' ? 'a nudge to sign off' : `wf retry ${modeWord(r)}`})`,
-        );
-      }
-      for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
-      const takenByHand = (st: Workflow): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
-      atGates = steps
-        .filter(
-          (s) =>
-            standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval' &&
-            !takenByHand(s),
-        )
-        .map((s) => s.name);
-      if (atGates.length) {
-        const one = atGates.length === 1;
-        const files = atGates.every((name) => !run.steps[name]?.taskId)
-          ? one
-            ? 'it is filed'
-            : 'each is filed'
-          : atGates.some((name) => !run.steps[name]?.taskId)
-            ? 'each is filed, or what waits on it is'
-            : `what waits on ${one ? 'it' : 'them'} is filed`;
-        held.push(
-          `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`,
-        );
-      }
-    }
-    if (due.length)
-      held.push(hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
-    for (const ask of asks) {
-      if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
-      unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
-    }
-    for (const ask of roundAsks) {
-      if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => r.by === 'ask' && r.step === ask.step && r.round === ask.round))
-        continue;
-      unheard.push({ kind: 'round', step: ask.step, n: ask.round });
-    }
-    if (unheard.length) {
-      const named = unheard.map((u) => (u.kind === 'retry' ? `try ${u.n} of ${u.step}` : `round ${u.n} of ${u.step}'s loop`));
-      held.push(
-        `${andList(named)} ${unheard.length > 1 ? 'are' : 'is'} asked for, and no pass files ${unheard.length > 1 ? 'them' : 'it'} as the run stands`,
-      );
-    }
-  }
-
-  if (live.length && run.cancelledAt) {
-    fixes.push(`It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (wf ls ${id})`);
-  } else if (live.length || due.length || waits || atGates.length) {
-    fixes.push(
-      `${verb === 'rm' ? 'Forgetting' : 'Pruning'} is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then ${again}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`,
-    );
-  }
-  if (unheard.length)
-    fixes.push(`Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: rm ${unheard.map(askAt).join(' ')}`);
-  if (unlanded)
-    fixes.push(`The next tick lands it, cancelled or not: ${again} once wf ls ${id} says what became of ${ending.name}'s merge`);
-
-  const stranded = others
-    .filter((o) => o.id !== id && o.after?.includes(id) && gated(o))
-    .map((o) => o.id)
-    .sort();
-  if (stranded.length) {
-    const one = stranded.length === 1;
-    held.push(
-      `${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`,
-    );
-    fixes.push(
-      `Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`,
-    );
-  }
-  const holders = others
-    .filter((o) => o.id !== id && !o.cancelledAt && o.hold?.until.includes(id))
-    .map((o) => o.id)
-    .sort();
-  if (holders.length) {
-    const one = holders.length === 1;
-    held.push(
-      `${andList(holders)} ${one ? 'is' : 'are'} held until it ships: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`,
-    );
-    const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `wf hold ${h} --off`).join(', ')}`;
-    fixes.push(
-      run.cancelledAt
-        ? `Lift ${lift}`
-        : `Let ${one ? 'it' : 'them'} go on first, on the pass after wf decide says ${id} has shipped, or lift ${lift}`,
-    );
-  }
-  return held.length ? `${held.join('; ')}. ${fixes.join('. ')}.` : null;
+  return unlanded ? ending : undefined;
 }
+
+/** The steps awaiting approval, but an ending whose result git already has and that never ran (`resultOnBase`). */
+function gatesOf(f: Forgetting, steps: readonly Workflow[]): string[] {
+  const { run, phaseOf, closeoutOf, askedCloseout, spendOf, verdictOf, standings } = f;
+  const takenByHand = (st: Workflow): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
+  return steps
+    .filter(
+      (s) =>
+        standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval' && !takenByHand(s),
+    )
+    .map((s) => s.name);
+}
+
+/** What a pass would file now, each said: the steps ready, unless the run waits on runs (`waits`), the checks, tries and rounds due. */
+function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): string[] {
+  const due: string[] = [];
+  if (!waits && a.ready.length) due.push(`${andList(a.ready)} ${a.ready.length > 1 ? 'are' : 'is'} ready to be filed`);
+  for (const name of a.check) due.push(`${name}'s check is due`);
+  for (const r of a.retry) {
+    const step = steps.find((s) => s.name === r.step);
+    due.push(
+      `try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : r.by === 'signoff' ? 'a nudge to sign off' : `wf retry ${modeWord(r)}`})`,
+    );
+  }
+  for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
+  return due;
+}
+
+/** The asks no pass has spent and none files as the run stands (`a`): tries, then rounds. */
+function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
+  const { run, asks, roundAsks } = f;
+  const unheard: AskName[] = [];
+  for (const ask of asks) {
+    if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
+    unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
+  }
+  for (const ask of roundAsks) {
+    if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => r.by === 'ask' && r.step === ask.step && r.round === ask.round)) continue;
+    unheard.push({ kind: 'round', step: ask.step, n: ask.round });
+  }
+  return unheard;
+}
+
+/** The run's tasks in flight. */
+const liveHeld = (c: Facts): string | undefined => (c.live.length ? andList(c.live) : undefined);
+
+/** An ending's merge the run has not yet committed or aborted. */
+function unlandedHeld(c: Facts): string | undefined {
+  const { unlanded: ending, run, merging } = c;
+  if (!ending) return undefined;
+  return merging === 'ours'
+    ? `${ending.name}'s merge is staged in the repository's checkout (${run.repo}), and the run has not yet committed or aborted it`
+    : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`;
+}
+
+/** What the run files once the runs it waits on have shipped. */
+function waitsHeld(c: Facts): string | undefined {
+  const { run, ready, waits } = c;
+  if (!waits) return undefined;
+  return `it waits on ${andList(run.after!)}, and files ${andList(ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} shipped`;
+}
+
+/** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
+function gateFiles(atGates: readonly string[], run: Run): string {
+  const one = atGates.length === 1;
+  if (atGates.every((name) => !run.steps[name]?.taskId)) return one ? 'it is filed' : 'each is filed';
+  return atGates.some((name) => !run.steps[name]?.taskId)
+    ? 'each is filed, or what waits on it is'
+    : `what waits on ${one ? 'it' : 'them'} is filed`;
+}
+
+/** The steps waiting at their gates, and the approvals that file them — once the hold lifts, on a held run. */
+function gatesHeld(c: Facts): string | undefined {
+  const { atGates, run, id, lifts } = c;
+  const { hold } = run;
+  if (!atGates.length) return undefined;
+  const one = atGates.length === 1;
+  const files = gateFiles(atGates, run);
+  return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`;
+}
+
+/** What a pass would file now — or once the hold lifts, on a held run. */
+function dueHeld(c: Facts): string | undefined {
+  const { due, run, lifts } = c;
+  if (!due.length) return undefined;
+  return run.hold ? `${andList(due)}${lifts}` : `${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`;
+}
+
+/** The asks no pass files as the run stands. */
+function unheardHeld(c: Facts): string | undefined {
+  const { unheard } = c;
+  if (!unheard.length) return undefined;
+  const named = unheard.map((u) => (u.kind === 'retry' ? `try ${u.n} of ${u.step}` : `round ${u.n} of ${u.step}'s loop`));
+  return `${andList(named)} ${unheard.length > 1 ? 'are' : 'is'} asked for, and no pass files ${unheard.length > 1 ? 'them' : 'it'} as the run stands`;
+}
+
+/** The runs that wait on this one and have not started. */
+function strandedHeld(c: Facts): string | undefined {
+  const { stranded, id } = c;
+  if (!stranded.length) return undefined;
+  const one = stranded.length === 1;
+  return `${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`;
+}
+
+/** The runs held until this one ships. */
+function holdersHeld(c: Facts): string | undefined {
+  const { holders } = c;
+  if (!holders.length) return undefined;
+  const one = holders.length === 1;
+  return `${andList(holders)} ${one ? 'is' : 'are'} held until it ships: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`;
+}
+
+/** Why the run is held, each reason in the order a person is told it. */
+const HELD = [liveHeld, unlandedHeld, waitsHeld, gatesHeld, dueHeld, unheardHeld, strandedHeld, holdersHeld];
+
+/** Wait for a cancelled run's tasks to settle — or cancel, which files nothing more, when anything is in flight or would be filed. */
+function cancelFix(c: Facts): string | undefined {
+  const { live, due, waits, atGates, run, id, again, verb } = c;
+  if (live.length && run.cancelledAt) {
+    return `It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (wf ls ${id})`;
+  }
+  if (live.length || due.length || waits || atGates.length) {
+    return `${verb === 'rm' ? 'Forgetting' : 'Pruning'} is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then ${again}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`;
+  }
+  return undefined;
+}
+
+/** Take the unheard asks back, by their files. */
+function unheardFix(c: Facts): string | undefined {
+  const { unheard, again, askAt } = c;
+  if (!unheard.length) return undefined;
+  return `Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then ${again}: rm ${unheard.map(askAt).join(' ')}`;
+}
+
+/** Wait for the next tick to land the ending's merge. */
+function unlandedFix(c: Facts): string | undefined {
+  const { unlanded: ending, again, id } = c;
+  if (!ending) return undefined;
+  return `The next tick lands it, cancelled or not: ${again} once wf ls ${id} says what became of ${ending.name}'s merge`;
+}
+
+/** Let the runs that wait on this one start first, or call them off. */
+function strandedFix(c: Facts): string | undefined {
+  const { stranded, id } = c;
+  if (!stranded.length) return undefined;
+  const one = stranded.length === 1;
+  return `Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`;
+}
+
+/** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never ships. */
+function holdersFix(c: Facts): string | undefined {
+  const { holders, run, id } = c;
+  if (!holders.length) return undefined;
+  const one = holders.length === 1;
+  const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `wf hold ${h} --off`).join(', ')}`;
+  return run.cancelledAt
+    ? `Lift ${lift}`
+    : `Let ${one ? 'it' : 'them'} go on first, on the pass after wf decide says ${id} has shipped, or lift ${lift}`;
+}
+
+/** What to do about each reason, in the order a person is told it. */
+const FIXES = [cancelFix, unheardFix, unlandedFix, strandedFix, holdersFix];
 
 /**
  * A worktree as `git worktree list --porcelain` lists it: where, its HEAD's commit, the branch checked out in it — or `detached`, on none —

@@ -124,7 +124,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/brief/brief-sections.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/brief/brief.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/decide/decide.ts': { 'max-lines-per-function': 1, complexity: 1 },
-  'packages/agent-orchestrator/src/forget/forget.ts': { 'max-lines-per-function': 1, complexity: 2, 'sonarjs/cognitive-complexity': 3 },
+  'packages/agent-orchestrator/src/forget/forget.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/gate/gate.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/list/list.ts': { 'max-lines-per-function': 1, complexity: 3, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/retry/retry.ts': { 'max-lines-per-function': 1, complexity: 3, 'sonarjs/cognitive-complexity': 4 },

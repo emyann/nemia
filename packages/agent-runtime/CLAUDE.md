@@ -65,6 +65,9 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
   (`InProcessTransport` forwards them).
 - **A card the SDK's own server serves loses its security schemes in the SDK's parser**: `cardOfJson` keeps them;
   `test/remote-server.ts` serves both forms (`cardForm`).
+- **A card is decoded by `CardSchema` (`a2a/card.ts`) on both roads, served and configured, before `AgentCard.fromJSON`**, which
+  coerces anything and reads snake_case too: a field the runtime starts reading is added to the schema, its snake_case spelling
+  refused beside it.
 - **A remote session's `nativeId` is the Task's context**, not its id: `bySession` resolves one to the other.
 - **A request to another party's address is bounded (`REQUEST_MS`), goes to the origin it was given, follows no redirect, and is named by
   origin and path** (`cardUrlOf`, `shownUrl`).

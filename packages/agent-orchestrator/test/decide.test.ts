@@ -850,3 +850,48 @@ test('`wf ls` views each task once, and runs added in a repository it already re
     "three more runs, each with a result branch, in a repository already read, add no git process: the store holds the other tests' runs too, so what is counted is what they add",
   );
 });
+
+test("`wf decide`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
+  const { Effect } = await import('effect');
+  const { decide, decideRun } = await import('../src/decide/decide.verb.ts');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
+  await advance(e, readRun(run.id));
+  await retry(e, run.id, 'implement', { mode: 'nudge', message: 'Keep it.' });
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+
+  const face = await decide(e, run.id);
+  const program = await Effect.runPromise(decideRun(run.id).pipe(Effect.provide(EngineService.layer(e))));
+  assert.deepEqual(
+    face.answers.implement,
+    { try: 2, message: 'Keep it.', needs: 'Rename --flag?' },
+    'a try answered, and the try before read',
+  );
+  assert.deepStrictEqual(program, face);
+});
+
+test('`wf decide` of a run that is not there rejects with the refusal itself: a `Missing`, exit code 2, in its words', async () => {
+  const { decide } = await import('../src/decide/decide.verb.ts');
+  const { Missing } = await import('../src/refusal/refusal.ts');
+  const err = await decide(board().e, 'no-such-run').then(
+    () => assert.fail('decide of no run resolved'),
+    (x: unknown) => x,
+  );
+  assert.ok(err instanceof Missing, `a Missing, not ${String(err)}`);
+  assert.equal(err.exitCode, 2);
+  assert.match(err.message, /^no such run: no-such-run/);
+});
+
+test("`wf decide`'s program says in its type that it needs the engine: run without it, it does not typecheck", async () => {
+  const { Effect } = await import('effect');
+  const { decideRun } = await import('../src/decide/decide.verb.ts');
+  const unprovided = () =>
+    // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement
+    Effect.runPromise(decideRun('x'));
+  assert.equal(typeof unprovided, 'function');
+});

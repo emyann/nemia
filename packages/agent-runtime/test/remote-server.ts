@@ -14,7 +14,7 @@
  * whichever binding it came: what the tests assert of the runtime's traffic.
  *
  * What an agent elsewhere may do is an option too: live under a path (`prefix`), serve its card at a path of its own
- * (`cardAt`), name interfaces on another origin (`interfacesAt`), answer every A2A request with a redirect (`redirectTo`),
+ * (`cardAt`), serve a card of its own making (`cardJson`), name interfaces on another origin (`interfacesAt`), answer every A2A request with a redirect (`redirectTo`),
  * or hold a request with no answer (`hanging`, switched on and off as the test goes).
  */
 import express from 'express';
@@ -78,6 +78,8 @@ export type ServerOptions = {
   script?: (t: Turn) => Step[];
   security?: Security;
   cardForm?: 'wire' | 'sdk';
+  /** The card as it is answered, made from the card in the form `cardForm` gives: a card no agent should serve, say. */
+  cardJson?: (card: Record<string, unknown>) => unknown;
   /** A path the whole agent lives under, `/agents/reviewer`: its card and its routes beneath it, its URL with it. */
   prefix?: string;
   /** Where the card is served, under the prefix. Default `/.well-known/agent-card.json`. */
@@ -340,7 +342,8 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   app.get(`${prefix}${o.cardAt ?? '/.well-known/agent-card.json'}`, (req, res) => {
     cards.push(req.originalUrl);
     if (hanging.card) return;
-    res.json(o.cardForm === 'sdk' ? JSON.parse(JSON.stringify(card())) : AgentCard.toJSON(card()));
+    const served = (o.cardForm === 'sdk' ? JSON.parse(JSON.stringify(card())) : AgentCard.toJSON(card())) as Record<string, unknown>;
+    res.json(o.cardJson ? o.cardJson(served) : served);
   });
   app.use(`${prefix}/a2a`, async (req, res, go) => {
     headers.push({ ...req.headers });

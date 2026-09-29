@@ -55,7 +55,13 @@ const sourceFiles = () =>
 
 test('the scan reads the seam and the rest of the package — or it would pass by reading nothing', () => {
   const files = sourceFiles();
-  assert.deepEqual(files.filter(inSeam), ['src/a2a/client.ts', 'src/a2a/handler.ts', 'src/a2a/map.ts', 'src/a2a/remote.ts']);
+  assert.deepEqual(files.filter(inSeam), [
+    'src/a2a/card.ts',
+    'src/a2a/client.ts',
+    'src/a2a/handler.ts',
+    'src/a2a/map.ts',
+    'src/a2a/remote.ts',
+  ]);
   assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   assert.ok(
     files.filter(inSeam).every((f) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK))),

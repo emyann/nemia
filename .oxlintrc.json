@@ -525,14 +525,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/decide/decide.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 135, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 45 }],
-        "sonarjs/cognitive-complexity": ["error", 54]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/feed/feed.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 82, "skipBlankLines": true, "skipComments": true }],
@@ -808,10 +800,9 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 619, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 418, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 24]
+        "max-lines": ["error", { "max": 593, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 411, "skipBlankLines": true, "skipComments": true }],
+        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

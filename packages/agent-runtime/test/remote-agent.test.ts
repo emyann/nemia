@@ -219,7 +219,8 @@ test('a card that could not be read is named by its origin and path, never its q
   assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
 });
 
-test('createEngine refuses a remote agent it could never reach, or whose address carries a secret', async () => {
+test('createEngine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
+  const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };
   const cases: Array<[unknown, RegExp]> = [
     [{ url: 'https://user:pw@agent.example' }, /carries a user name or password/],
     [{ url: 'https://:pw@agent.example' }, /carries a user name or password/],
@@ -230,8 +231,20 @@ test('createEngine refuses a remote agent it could never reach, or whose address
     [{ url: 'https://a.example', card: {} }, /and was given both/],
     [{ url: 'https://a.example', token: 's' }, /takes `url` or `card` and nothing else, and was given `token`/],
     [{ card: 'a card' }, /`card` is not an agent card/],
-    [{ card: {} }, /`card` lists no interface/],
-    [{ card: { supportedInterfaces: [{ url: 'https://a.example' }] } }, /`card` lists no interface/],
+    [{ card: {} }, /`card` is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces` is missing\. Give the JSON object/],
+    [{ card: { supportedInterfaces: [{ url: 'https://a.example' }] } }, /its `supportedInterfaces\.0\.protocolBinding` is missing/],
+    [
+      { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
+      /its `supportedInterfaces\.0\.url` is 3, where an A2A 1\.0 card holds string/,
+    ],
+    [
+      { card: { supportedInterfaces: [ONE], securitySchemes: { b: { httpAuthSecurityScheme: {} } } } },
+      /its `securitySchemes\.b\.httpAuthSecurityScheme\.scheme` is missing/,
+    ],
+    [
+      { card: { supported_interfaces: [ONE] } },
+      /its `supportedInterfaces` is missing, and `supported_interfaces` is there: write `supportedInterfaces`, as A2A's JSON does/,
+    ],
   ];
   for (const [agent, said] of cases) {
     const err = await refusal(() => createEngine({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } }));
@@ -386,6 +399,52 @@ test("a card served as the SDK's own objects is read with its security schemes w
   assert.match(refused.error ?? '', /`token` needs a secret/);
   assert.equal(s.paths.length, 0, 'refused off the card, before any request: the scheme was read');
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 'sdk-token' : undefined) });
+  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+});
+
+test('a served card that does not decode: unstartable, naming its first wrong field and the card by its path alone, and nothing sent', async () => {
+  const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] }) });
+  const { e } = engineOn(s);
+  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  assert.equal(a.reason, 'unstartable');
+  assert.match(a.error ?? '', /serves is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces\.0\.url` is 3, where/);
+  assert.ok((a.error ?? '').includes(`what ${s.url}/.well-known/agent-card.json serves`), a.error);
+  assert.match(a.error ?? '', /The agent's operator serves the card; nothing was sent\.$/);
+  assert.equal(s.paths.length, 0, 'no A2A request was made');
+
+  const q = createEngine({
+    root: scratch('ae-remote-'),
+    harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
+  });
+  const b = (await settled(q, await q.file(task()))).state.attempts[0];
+  assert.match(b.error ?? '', /agent-card\.json serves is not an A2A 1\.0 agent card/);
+  assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
+});
+
+test('a scheme of a kind A2A 1.0 does not define is kept: a requirement that names it is unmet, in either form, and another requirement is met', async () => {
+  const future = { wire: { futureScheme: { flow: 'x' } }, sdk: { scheme: { $case: 'futureScheme', value: {} } } };
+  for (const [form, scheme] of Object.entries(future)) {
+    const only = await serve({
+      script: HELD,
+      cardForm: form === 'sdk' ? 'sdk' : 'wire',
+      cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
+    });
+    const { e } = engineOn(only, { credentials: () => 'a secret it has' });
+    const a = (await settled(e, await e.file(task()))).state.attempts[0];
+    assert.equal(a.reason, 'unstartable', form);
+    assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
+    assert.equal(only.paths.length, 0, form);
+  }
+  const s = await serve({
+    security: bearer('t0k'),
+    script: () => [{ data: { ok: true }, state: 'completed' }],
+    cardJson: (c) => ({
+      ...c,
+      securitySchemes: { ...(c.securitySchemes as object), future: future.wire },
+      securityRequirements: [{ schemes: { future: {} } }, ...(c.securityRequirements as object[])],
+    }),
+  });
+  const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 't0k' : undefined) });
   assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
 });
 

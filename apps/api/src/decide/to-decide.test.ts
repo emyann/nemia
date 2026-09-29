@@ -9,18 +9,18 @@
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
  * `claude` (test/harness.ts) first on PATH.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import type { RunDecision } from '../src/decide/decision.ts';
-import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
-import { app } from '../src/app.ts';
-import { mergesOnto } from '../src/decide/merge.ts';
+import { scratch } from '../../test/scratch.ts';
+import type { RunDecision } from './decision.ts';
+import type { RunDetail } from '../detail/detail.ts';
+import type { RunSummary } from '../runs/runs.ts';
+import { app } from '../app.ts';
+import { mergesOnto } from './merge.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();

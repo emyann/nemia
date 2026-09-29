@@ -611,7 +611,7 @@ What was measured:
   loaded from the repository, its graph and plan's fence asserted, with a guard shown to refuse a plan given a
   tool that writes.
 - The first run of the whole check from the root failed one api test. The offer for a blocked step had carried
-  `--message "<answer>"` after its command, and `apps/api/test/decision.test.ts` pins the offer's shape
+  `--message "<answer>"` after its command, and `apps/api/src/decide/decision.test.ts` pins the offer's shape
   (`:  wf retry <run> <step>  (--fresh`), because the board cuts its command out of the line. The package's
   suite cannot see that test. The offer went back to what it was, and the command moved under the question.
 - Round 2's review found `--message` refusing any answer that started with `--`, so the brief's own example
@@ -1772,7 +1772,7 @@ What was built:
 
 What was measured:
 
-- `apps/api/test/inbox.test.ts`, 15 tests: the listing (none, bodies, filing times, a refused entry with no body, `started as`, a card
+- `apps/api/src/inbox/inbox.test.ts`, 15 tests: the listing (none, bodies, filing times, a refused entry with no body, `started as`, a card
   dropped between requests); filing by name, yours by folder, one both have by `from`, one about another repository by folder; every shape
   refusal; the package's refusals compared with `addToInbox`'s own message; a drop, and a drop's 404 and 400s (a hidden name, and `/` and `\`
   sent encoded, which the route decodes); the guard on both writes (three content types and none, three sites, three hosts), then the board's
@@ -2058,7 +2058,7 @@ The api's half of what was sketched here. What was built, in `apps/api/src/facto
   Neither feed carries a session's live words, its cost, a harness's `waitingFor` or a git standing, so the board keeps a slow poll
   either way.
 
-Tested in `apps/api/test/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
+Tested in `apps/api/src/factory/feed.test.ts`: a gate, a run's word and a `removed` written by `recordFeed` arriving as `step`, `run` and
 `removed` with the feed's end as each id; a reconnect by `Last-Event-ID` over `?after`; a cursor inside a line, past the end, and not a
 number refused by address and by header, each a 400; a truncated feed ending the stream; three streams holding three watchers and none
 once their readers go, and a closed socket giving its watcher back. And in the package's `src/feed/feed.test.ts`: each line's cursor is one
@@ -2134,7 +2134,7 @@ stopped, and it was read as the machine being slow. What was built, in `apps/`:
 - **Polled, not streamed**: the feed carries no pass of the daemon (a pass writes a line only where a word changed), so `daemonQuery`
   reads on `pace(5_000)`, the cap's fallback — every minute while the feed is followed — and `polled()` counts it.
 
-Tested in `apps/api/test/daemon.test.ts` (each kind through the route, a long pass read as ticking by its beat, a 500 for a directory in
+Tested in `apps/api/src/factory/daemon.test.ts` (each kind through the route, a long pass read as ticking by its beat, a 500 for a directory in
 the file's place, and after every read the file's bytes and mtime unchanged and no file made where there was none),
 `apps/web/test/daemon.test.ts` (the words of each kind, nothing for ticking) and the e2e's `daemon` page (the seeded store's `none` line, a
 stalled file's line and the floor fitted clear of it, no line for a fresh one, the file taken back).
@@ -2214,7 +2214,7 @@ What was built:
 
 - **`POST /api/runs/:id/prune`**, behind the api's write guard, calls the package's `prune` with `yes`, `artifacts` and `unmerged` as
   the body says, and answers 200 with `wf prune`'s lines, 409 with its refusal in its words alone (a run not over, one already pruned, one
-  nobody merged without `unmerged`; the page says *Not pruned* above them), 404 for a run not in the store. Each refusal is proven in `apps/api/test/prune.test.ts`, the store
+  nobody merged without `unmerged`; the page says *Not pruned* above them), 404 for a run not in the store. Each refusal is proven in `apps/api/src/runs/prune.test.ts`, the store
   unchanged after it; the e2e makes none, since its watch counts every 4xx.
 - **What is on disk**: a run's detail carries `onDisk: {worktrees, files}`, so the page offers only what a prune would find and no button
   that could only be answered *nothing to prune*.
@@ -2225,7 +2225,7 @@ What was built:
   `pruneQuestion` in `apps/web/src/lib/prune.ts`).
 - **Who decided it is the package's word.** The popover reads the run's decision before it offers anything, and `GET /api/runs/:id/decision`
   carries `awaiting` — `decision`'s own `awaiting`, the reading `pruneRefusal` refuses without `--unmerged` — with its result branches and
-  whether it worked on its base branch itself. `apps/api/test/prune.test.ts` holds the field to `wf prune`'s answer for a run merged, one
+  whether it worked on its base branch itself. `apps/api/src/runs/prune.test.ts` holds the field to `wf prune`'s answer for a run merged, one
   nobody merged, one running, a failed run merged by hand and one that worked on main itself.
 - **The marks**: a `pruned` word on the run's row on Runs and a `pruned` badge on its Factory card, each with `wf ls`'s words as its title.
 - **The e2e's `prune` page** prunes the seeded unmerged run through its page, checks the store and the kept branch, reads both marks, and
@@ -2606,7 +2606,7 @@ What was decided, and why:
 
 What was measured:
 
-- `apps/api/test/queue.test.ts`, 10 tests: the listing's `queued` and `tried` compared whole with `readInbox()`'s; a queue with its place, a
+- `apps/api/src/inbox/queue.test.ts`, 10 tests: the listing's `queued` and `tried` compared whole with `readInbox()`'s; a queue with its place, a
   second behind it, `{}` taken as no body, DELETE taking one back and the card behind moving up, and a DELETE of a card not queued writing
   nothing. A card filed an hour before another, queued and taken back, keeps its `filedAt` each time, and a refusal sets none. A queued card
   whose repository is gone is taken back. Refused, each compared with `queueInInbox`'s own sentence and nothing written:
@@ -2854,7 +2854,7 @@ What was built, four commits:
   a gated step's name, `gate  approved 23:10Z — "<words>"` or `gate  awaiting approval:` with both commands (`gateLines`, on `decide`'s
   `gates`). `wf ls`'s vocabulary in the help, the keys line, `wf decide --help` and the README (*A gate*, the table, the closeout's part)
   say it.
-- **One line outside the package**: `apps/api/test/inbox.test.ts` pinned three key rows, and the api lays out one per `INBOX_KEYS` entry;
+- **One line outside the package**: `apps/api/src/inbox/inbox.test.ts` pinned three key rows, and the api lays out one per `INBOX_KEYS` entry;
   it gains the `gate` row. Nothing in `apps/*/src`.
 
 What was measured:
@@ -2957,7 +2957,7 @@ What was measured:
 
 - From the root, `npx turbo run test --force`: api 173, from 166; web 212, from 203; agent-orchestrator 520 (519 passed, 1 skipped) and
   agent-runtime 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
-- `apps/api/test/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
+- `apps/api/src/asks/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
   - the detail's `gates` and every step's `gate`, including a gated step not signed off;
   - `approve` and `onYou` on both endpoints, compared with `onYouWords` over `list`, and none on a run called off;
   - the decision's two commands;
@@ -3136,7 +3136,7 @@ What was measured:
 
 - From the root, `npx turbo run test --force` before the change: api 173, web 212, agent-orchestrator 543 (1 skipped), agent-runtime 326
   (9 skipped). After it: api 186, web 223; after round 2, api 190 and web 225; the packages unchanged. `npm run typecheck` and `npm run build` clean.
-- `apps/api/test/builder.test.ts`, new, 13 tests, over a scratch store and repository:
+- `apps/api/src/workflows/builder.test.ts`, new, 13 tests, over a scratch store and repository:
   - the key form held to the parser;
   - a copy of `dev` put back as listed, with everything kept;
   - a folder drawn, then cut back: a step added, an edge, a key, the README, a step gone. Each file is asserted as written, and the answer
@@ -3155,7 +3155,7 @@ What was measured:
 - **Round 2, from review.** Three findings, each fixed. The pasted schema and the stale save above. And `builder.ts`'s two
   control-character classes were raw NUL and DEL bytes, which a heredoc had turned from escapes into characters: ripgrep took the file for
   binary, and a search of `apps/api/src` did not find it. They are escapes now, and each app has `test/source.test.ts`, which refuses a raw
-  control character anywhere in its `src` and `test` and names where. `apps/api/test/builder.test.ts` is now 15 tests: the schema
+  control character anywhere in its `src` and `test` and names where. `apps/api/src/workflows/builder.test.ts` is now 15 tests: the schema
   route's two gave way to a schema saved with the folder (new and replaced, kept when the same), six schema refusals with the folder
   unchanged, hand edits each refused with a 409 and kept (seven since round 3: a hidden step and a hidden schema added among them), and a disk failure that puts both schemas back. Nine guards broken on purpose,
   one at a time — the version check, the version required, the schemas' judgement, their JSON object check, putting them back, leaving a
@@ -4114,7 +4114,7 @@ changed but this file.
   a marked window is amber with a warning icon. Every other state shows its sentence, and under it the last good reading, dimmed,
   with `as of 11:20, 25 min ago`. Loaded in the route's loader, and the floor fitted again when the line comes or goes, or the last
   reading does.
-- **Tests.** `apps/api/test/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
+- **Tests.** `apps/api/src/factory/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
   an unsupported subtype, and the usage service's silence — the last rebuilt from the owner's recording of 2026-09-19, whose fields
   it has, with the no-plan recording's session block) and drives the ask through the harness's fake `claude`: the flags exactly, the
   scrubbed env and cwd, the id match past decoy lines, stdin closed, one ask for concurrent reads, the keep and its override, the
@@ -4600,7 +4600,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   git), and `wf ls` says nothing of a landing the run did not make. Left unwritten, the landing stayed owed for good: a person's
   `git merge --no-commit` of the run's branch to resolve the conflict by hand read as the run's, and the next pass aborted it — their
   resolution with it — while `wf rm` refused the run on it (review round 3).
-- **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/test/decision.test.ts` asserts the bare
+- **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/src/decide/decision.test.ts` asserts the bare
   command for an ending whose check did not finish.
 - **Tests that refuse**, each proven against a mutant: a commit on any settled check, another merge touched, no abort on cancel, a
   blank message committed, the checkout released before the landing (`ship.test.ts`, `run.test.ts`, with real git for
@@ -4875,7 +4875,7 @@ approach for the api: a cache of a pure function keyed by the same facts, rebuil
   settled, the workflow frozen, every git question answered. `startedAt` is read per request, so a kept answer holds no clock. The runs it
   judges are read through one `list(taskIds)`, with the runs they wait on or are held until. A run's detail reads the same way.
 - **Proved.** The api's test harness sets `WF_VERIFY_REST=1`, so every api test judges each kept answer afresh and fails the request on a
-  difference. `apps/api/test/resting.test.ts` moves each watch — the record, an ask, a feed line, a branch merged, the run removed — and a
+  difference. `apps/api/src/runs/resting.test.ts` moves each watch — the record, an ask, a feed line, a branch merged, the run removed — and a
   mutant of each fails its test; a journal changed with no feed line is shown unseen, and the check catches it.
 - **Measured** (`artifacts/implement/{before,after}.txt` of the run, a fixture of 200 finished runs, and a copy of the live store with its
   repositories as scratch mirrors, never ticked):

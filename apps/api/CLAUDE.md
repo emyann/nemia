@@ -3,8 +3,9 @@
 Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orchestrator/run`, `agent-orchestrator/workflow`,
 `agent-orchestrator/effect`).
 
-- **Every test file imports `test/harness.ts` first**: a fake `claude` first on PATH, so no test asks this machine's live registry
-  (`harness.test.ts` refuses a file that does not).
+- **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
+  (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
+  hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
@@ -25,7 +26,7 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 - **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing; a page that must
-  agree with a verb's refusal reads `Decidable.awaiting`, which `test/prune.test.ts` holds to `wf prune`'s own answer.
+  agree with a verb's refusal reads `Decidable.awaiting`, which `src/runs/prune.test.ts` holds to `wf prune`'s own answer.
 - **A remote step's wait is answered with `wf say`** (`answerIn` in `needsOf`), never in Claude Code.
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
 - **A route lets the package's refusal through and never picks its status**: `app.onError` answers it by kind (`answerError`,
@@ -50,5 +51,5 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `usageAsk`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
-- **A handle count is waited for, never read once after a close** (`watchers` and `until` in `test/feed.test.ts`): a stream's watch is
+- **A handle count is waited for, never read once after a close** (`watchers` and `until` in `src/factory/feed.test.ts`): a stream's watch is
   taken a few microtasks after its response, so a test waits for it before it breaks the feed.

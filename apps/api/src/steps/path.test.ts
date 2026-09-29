@@ -5,13 +5,13 @@
  * At shipped defaults: the api's own engine over the harness's store (`root`), which this file seeds, and its fake `claude` first on PATH.
  * The path is read off the journal alone, so no harness is asked.
  */
-import { observations, root } from './harness.ts';
+import { observations, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../src/app.ts';
-import type { StepPath } from '../src/steps/path.ts';
+import { app } from '../app.ts';
+import type { StepPath } from './path.ts';
 
 const T0 = Date.parse('2026-09-29T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

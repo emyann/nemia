@@ -2,12 +2,12 @@
  * GET /api/machines (machines/machines.ts): the state machines the board draws, listed, and each one's graph, read off its code through
  * the orchestrator's `lifecycleGraph`, over the harness's scratch store (`root`).
  */
-import './harness.ts';
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lifecycleGraph } from 'agent-orchestrator';
-import { app } from '../src/app.ts';
-import type { MachineGraph, MachineListing } from '../src/machines/machines.ts';
+import { app } from '../app.ts';
+import type { MachineGraph, MachineListing } from './machines.ts';
 
 test('the list names each machine, its title and the file it is drawn from', async () => {
   const res = await app.request('/api/machines');

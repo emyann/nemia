@@ -16,7 +16,7 @@ export default {
    * offers three choices, the first two unavailable since nobody merged it, and the third said plainly as leaving its branch the only copy
    * of its work; the prune is asked twice. Then the worktree and the files are gone, the branch stays, and the run's page, its row on Runs
    * and its card on the Factory say pruned. What the api refuses — a run not over, one already pruned, one nobody merged without the third
-   * choice — is proven in its own tests (`apps/api/test/prune.test.ts`), since the e2e's watch counts every 4xx.
+   * choice — is proven in its own tests (`apps/api/src/runs/prune.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'prune',
   route: '/',

@@ -7,15 +7,15 @@
  * every call, so a test can count what the stream costs. The store and CLAUDE_CONFIG_DIR are the harness's
  * scratch ones (`root`, `config`).
  */
-import { config, observations, registry, root } from './harness.ts';
+import { config, observations, registry, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { StepTranscript } from '../src/steps/steps.ts';
-import { app } from '../src/app.ts';
+import type { StepTranscript } from './steps.ts';
+import { app } from '../app.ts';
 import { engine } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');

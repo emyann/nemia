@@ -4,21 +4,21 @@
  * refuse, asserted on its words, with the folder as it was. The repository holds the tests' team (`team.ts`) — its agents, its skills and
  * `dev`, whose steps name them; yours holds the same, `dev` beside them.
  */
-import { root } from './harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
-import { TEAM } from './team.ts';
-import { app } from '../src/app.ts';
+import { scratch } from '../../test/scratch.ts';
+import { TEAM } from '../../test/team.ts';
+import { app } from '../app.ts';
 const repo = scratch('nemia-api-agents-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
-type AgentListing = import('../src/agents/agents.ts').AgentListing;
-type AgentSaved = import('../src/agents/agents.ts').AgentSaved;
+type AgentListing = import('./agents.ts').AgentListing;
+type AgentSaved = import('./agents.ts').AgentSaved;
 
 const STORE = path.join(root, 'workflows');
 const AGENTS = path.join(STORE, 'agents');
@@ -626,7 +626,7 @@ test("REFUSED at shipped defaults: skills or a system prompt not written as text
 test('an agent is answered as an A2A Agent Card, with what it leaves out said beside it and never inside it', async () => {
   const res = await app.request('/api/agents/repo/reviewer/card');
   assert.equal(res.status, 200, await res.clone().text());
-  const answer = (await res.json()) as import('../src/agents/agents.ts').AgentCardAnswer;
+  const answer = (await res.json()) as import('./agents.ts').AgentCardAnswer;
   assert.equal(answer.servedOverA2A, false);
   assert.match(answer.why, /Nothing here serves reviewer over A2A/);
   assert.match(answer.why, /`supportedInterfaces` REQUIRED/);

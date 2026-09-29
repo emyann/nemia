@@ -34,7 +34,7 @@ import {
   type SkillAgain,
 } from './rendering.ts';
 import { inputsRoot } from './record/places.store.ts';
-import { Invalid } from './refusal/refusal.ts';
+import { Invalid, Missing } from './refusal/refusal.ts';
 import { wfRoot } from './config/config.store.ts';
 import { countRecord, readText, within } from './meter/tally.store.ts';
 
@@ -323,12 +323,12 @@ export const removeHold = (id: string, at: string): boolean => {
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
- * `wf ls`, for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
+ * `wf ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
 
 const readRecord = (id: string): Run => {
-  if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
+  if (!fs.existsSync(runFile(id))) throw new Missing({ message: `no such run: ${id}  (try 'wf ls')` });
   countRecord();
   let raw: unknown;
   try {

@@ -3,8 +3,9 @@
 Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orchestrator/run`, `agent-orchestrator/workflow`,
 `agent-orchestrator/effect`).
 
-- **Every test file imports `test/harness.ts` first**: a fake `claude` first on PATH, so no test asks this machine's live registry
-  (`harness.test.ts` refuses a file that does not).
+- **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
+  (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
+  hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.

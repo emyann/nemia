@@ -5,19 +5,13 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` first on PATH (test/harness.ts).
  */
-import './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
-
-/** The scratch store, set in `WF_ROOT` before the api loads: agent-orchestrator locates its store as its module loads. */
-const root = scratch('hkb-api-read-');
-process.env.WF_ROOT = root;
-
-const { app } = await import('../src/app.ts');
+import { app } from '../src/app.ts';
 
 const T0 = Date.parse('2026-09-19T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

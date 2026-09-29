@@ -20,7 +20,8 @@ import { isRefusal } from 'agent-orchestrator/effect';
 import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-orchestrator/run';
 import { NotBlank, readBody, type BodyIssue } from '../body.ts';
 import { type Guarded, type Refusal, refusedBeforeReading } from '../guard.ts';
-import { e, findRun, noSuchRun, taskOfStep } from '../store.ts';
+import { type ApiEnv, served } from '../layer.ts';
+import { findRun, noSuchRun, taskOfStep } from '../store.ts';
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
 const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount> }`';
@@ -187,161 +188,173 @@ const roundWords =
  *   (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that ended
  *   `again: false`, a try already accepted, a run called off.
  */
-export const asks = new Hono()
-  .post('/api/runs/:id/steps/:step/retry', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const refused = refusedBeforeReading(
-      retryGuard(id, step),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const read = await readBody(c.req, RETRY_BODY, `POST …/retry takes a JSON body: ${RETRY_SHAPE}.`, retryWords);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const how = howOf(read.body, `wf retry ${id} ${step}`);
-    if ('status' in how) return c.json({ error: how.error }, how.status);
-    const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
-    if (wrong) return c.json({ error: wrong }, 422);
-    try {
-      const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
-      return c.json({ try: ask.try, file, stopFirst }, 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const said = err instanceof Error ? err.message : String(err);
-      return c.json(
-        {
-          error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.`,
-        },
-        502,
+export const asks = new Hono<ApiEnv>()
+  .post('/api/runs/:id/steps/:step/retry', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const refused = refusedBeforeReading(
+        retryGuard(id, step),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    }
-  })
-  .post('/api/runs/:id/round', async (c) => {
-    const id = c.req.param('id');
-    const refused = refusedBeforeReading(
-      roundGuard(id),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-    const read = await readBody(c.req, ROUND_BODY, `POST …/round takes a JSON body: ${ROUND_SHAPE}.`, roundWords(id));
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const how = read.body;
-    if (how.step !== undefined) {
-      const found = taskOfStep(id, how.step);
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const found = taskOfStep(id, step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
-    }
-    const notAmount = roundBudgetRefusal(id, how.budget);
-    if (notAmount) return c.json({ error: notAmount }, 400);
-    try {
-      const { ask, file } = await round(e, id, how.step, how.budget);
-      return c.json({ step: ask.step, round: ask.round, file }, 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const said = err instanceof Error ? err.message : String(err);
-      return c.json(
-        { error: `Could not ask for another round of ${id}'s loop: ${said}. \`wf round ${id}\` asks the same way from the command line.` },
-        502,
+      const read = await readBody(c.req, RETRY_BODY, `POST …/retry takes a JSON body: ${RETRY_SHAPE}.`, retryWords);
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const how = howOf(read.body, `wf retry ${id} ${step}`);
+      if ('status' in how) return c.json({ error: how.error }, how.status);
+      const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
+      if (wrong) return c.json({ error: wrong }, 422);
+      try {
+        const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
+        return c.json({ try: ask.try, file, stopFirst }, 202);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        const said = err instanceof Error ? err.message : String(err);
+        return c.json(
+          {
+            error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.`,
+          },
+          502,
+        );
+      }
+    }),
+  )
+  .post('/api/runs/:id/round', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const refused = refusedBeforeReading(
+        roundGuard(id),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    }
-  })
-  .post('/api/runs/:id/steps/:step/say', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const refused = refusedBeforeReading(
-      sayGuard(id, step),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const read = await readBody(c.req, SAY_BODY, `POST …/say takes a JSON body: ${SAY_SHAPE}.`, ({ path: [key], input }) =>
-      key === 'text'
-        ? `\`text\` is the words to hand the step's session, as \`wf say ${id} ${step} "<words>"\` takes them: text. This request's was ${JSON.stringify(input) ?? 'left out'}: ${SAY_SHAPE}.`
-        : `POST …/say takes a JSON object: ${SAY_SHAPE}.`,
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    try {
-      const { said } = await say(e, id, step, read.body.text);
-      return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
-    }
-  })
-  .post('/api/runs/:id/steps/:step/approve', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const refused = refusedBeforeReading(
-      approveGuard(id, step),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const read = await readBody(c.req, APPROVE_BODY, `POST …/approve takes a JSON body: ${APPROVE_SHAPE}.`, ({ path: [key], input }) =>
-      key === 'message'
-        ? `\`message\` is the words to approve with, which every step after the gate is handed, as \`wf approve ${id} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`
-        : `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.`,
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { message } = read.body;
-    const empty = approvalWordsRefusal(message, `wf approve ${id} ${step}`);
-    if (empty) return c.json({ error: empty }, 422);
-    try {
-      const { approval, file } = await approve(e, id, step, message);
-      return c.json({ try: approval.try, at: approval.at, message: approval.message ?? null, file }, 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const said = err instanceof Error ? err.message : String(err);
-      return c.json(
-        { error: `Could not approve step '${step}': ${said}. \`wf approve ${id} ${step}\` approves the same way from the command line.` },
-        502,
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+      const read = await readBody(c.req, ROUND_BODY, `POST …/round takes a JSON body: ${ROUND_SHAPE}.`, roundWords(id));
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const how = read.body;
+      if (how.step !== undefined) {
+        const found = taskOfStep(id, how.step, home);
+        if ('error' in found) return c.json({ error: found.error }, 404);
+      }
+      const notAmount = roundBudgetRefusal(id, how.budget);
+      if (notAmount) return c.json({ error: notAmount }, 400);
+      try {
+        const { ask, file } = await round(e, id, how.step, how.budget);
+        return c.json({ step: ask.step, round: ask.round, file }, 202);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        const said = err instanceof Error ? err.message : String(err);
+        return c.json(
+          {
+            error: `Could not ask for another round of ${id}'s loop: ${said}. \`wf round ${id}\` asks the same way from the command line.`,
+          },
+          502,
+        );
+      }
+    }),
+  )
+  .post('/api/runs/:id/steps/:step/say', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const refused = refusedBeforeReading(
+        sayGuard(id, step),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
       );
-    }
-  })
-  .post('/api/runs/:id/steps/:step/accept', async (c) => {
-    const id = c.req.param('id');
-    const step = c.req.param('step');
-    const refused = refusedBeforeReading(
-      acceptGuard(id, step),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const found = taskOfStep(id, step);
-    if ('error' in found) return c.json({ error: found.error }, 404);
-    const read = await readBody(c.req, ACCEPT_BODY, `POST …/accept takes a JSON body: ${ACCEPT_SHAPE}.`, ({ path: [key], input }) =>
-      key === 'message'
-        ? `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`wf accept ${id} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(input)}: ${ACCEPT_SHAPE}.`
-        : `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.`,
-    );
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { message } = read.body;
-    const words = acceptWordsRefusal(message, `wf accept ${id} ${step}`);
-    if (words) return c.json({ error: words }, 422);
-    try {
-      const { acceptance, file } = await accept(e, id, step, message);
-      return c.json({ step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file }, 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const said = err instanceof Error ? err.message : String(err);
-      return c.json(
-        {
-          error: `Could not accept ${step}'s loop as it stands: ${said}. \`wf accept ${id} ${step} --message "<why>"\` accepts the same way from the command line.`,
-        },
-        502,
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const read = await readBody(c.req, SAY_BODY, `POST …/say takes a JSON body: ${SAY_SHAPE}.`, ({ path: [key], input }) =>
+        key === 'text'
+          ? `\`text\` is the words to hand the step's session, as \`wf say ${id} ${step} "<words>"\` takes them: text. This request's was ${JSON.stringify(input) ?? 'left out'}: ${SAY_SHAPE}.`
+          : `POST …/say takes a JSON object: ${SAY_SHAPE}.`,
       );
-    }
-  });
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      try {
+        const { said } = await say(e, id, step, read.body.text);
+        return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
+      }
+    }),
+  )
+  .post('/api/runs/:id/steps/:step/approve', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const refused = refusedBeforeReading(
+        approveGuard(id, step),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const read = await readBody(c.req, APPROVE_BODY, `POST …/approve takes a JSON body: ${APPROVE_SHAPE}.`, ({ path: [key], input }) =>
+        key === 'message'
+          ? `\`message\` is the words to approve with, which every step after the gate is handed, as \`wf approve ${id} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(input)}: ${APPROVE_SHAPE}.`
+          : `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.`,
+      );
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { message } = read.body;
+      const empty = approvalWordsRefusal(message, `wf approve ${id} ${step}`);
+      if (empty) return c.json({ error: empty }, 422);
+      try {
+        const { approval, file } = await approve(e, id, step, message);
+        return c.json({ try: approval.try, at: approval.at, message: approval.message ?? null, file }, 202);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        const said = err instanceof Error ? err.message : String(err);
+        return c.json(
+          { error: `Could not approve step '${step}': ${said}. \`wf approve ${id} ${step}\` approves the same way from the command line.` },
+          502,
+        );
+      }
+    }),
+  )
+  .post('/api/runs/:id/steps/:step/accept', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const step = c.req.param('step');
+      const refused = refusedBeforeReading(
+        acceptGuard(id, step),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const found = taskOfStep(id, step, home);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+      const read = await readBody(c.req, ACCEPT_BODY, `POST …/accept takes a JSON body: ${ACCEPT_SHAPE}.`, ({ path: [key], input }) =>
+        key === 'message'
+          ? `\`message\` is why the work is good enough with its findings open, which every step after the loop is handed, as \`wf accept ${id} ${step} --message "<why>"\` takes it: text. This request's was ${JSON.stringify(input)}: ${ACCEPT_SHAPE}.`
+          : `POST …/accept takes a JSON object: ${ACCEPT_SHAPE}.`,
+      );
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const { message } = read.body;
+      const words = acceptWordsRefusal(message, `wf accept ${id} ${step}`);
+      if (words) return c.json({ error: words }, 422);
+      try {
+        const { acceptance, file } = await accept(e, id, step, message);
+        return c.json({ step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file }, 202);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        const said = err instanceof Error ? err.message : String(err);
+        return c.json(
+          {
+            error: `Could not accept ${step}'s loop as it stands: ${said}. \`wf accept ${id} ${step} --message "<why>"\` accepts the same way from the command line.`,
+          },
+          502,
+        );
+      }
+    }),
+  );

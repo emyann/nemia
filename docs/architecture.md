@@ -94,9 +94,10 @@ directly or around a loop. A folder another folder reads has a face, `index.ts`.
 
 **The api's folders.** The api has no kinds: it is routes over readers, and its `src/` is a folder per page or verb a
 person uses — `runs/`, `detail/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
-`agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts` and `body.ts` (the request-body reader
-every folder uses) and nothing else. A folder holds at most six source files; one of two or more has a face, `index.ts`,
-which holds only re-exports by name, and one of one file has none. `app.ts` mounts each folder through its face. An
+`agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
+`served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
+A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of
+one file has none. `app.ts` mounts each folder through its face. An
 import between two folders names the file it needs wherever the face would close a cycle — `agents/` reads the runs'
 judgement and `runs/` an agent's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
 files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:

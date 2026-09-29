@@ -2,8 +2,6 @@
  * The api's one answer to an error a route threw (`answerError`, app.ts): a refusal of the orchestrator's by its kind, from
  * `REFUSAL_STATUS` — `Missing` 404, `Conflict` 409, `Invalid` 422 — in its own words, and anything else a 500. A router mounted as app.ts
  * mounts its routers throws to it, and the api's own app answers with it.
- *
- * `WF_ROOT` is set before the api or the package is imported: the orchestrator locates its store as its modules load.
  */
 import './harness.ts';
 import { test, type TestContext } from 'node:test';
@@ -11,14 +9,12 @@ import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { scratch } from './scratch.ts';
+import { answerError, app, REFUSAL_STATUS } from '../src/app.ts';
+import { Conflict, Invalid, Missing } from 'agent-orchestrator/effect';
+import { WorkflowError } from 'agent-orchestrator/workflow';
+import { noCardLine } from 'agent-orchestrator';
 
-process.env.WF_ROOT = scratch('hkb-api-refusal-');
-const { answerError, app, REFUSAL_STATUS } = await import('../src/app.ts');
-const { Conflict, Invalid, Missing } = await import('agent-orchestrator/effect');
 type Refusal = import('agent-orchestrator/effect').Refusal;
-const { WorkflowError } = await import('agent-orchestrator/workflow');
-const { noCardLine } = await import('agent-orchestrator');
 
 /** A router that throws `thrown`, mounted on an app that answers with `answerError`, as app.ts mounts its routers and answers. */
 const answered = async (thrown: unknown): Promise<{ status: number; body: unknown }> => {

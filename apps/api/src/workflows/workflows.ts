@@ -23,7 +23,6 @@ import {
   agentsFor,
   agentVersion,
   cardSkills,
-  HOME,
   inboxNameRefusal,
   loadWorkflows,
   lookupRoots,
@@ -46,8 +45,8 @@ import {
   type Workflow,
 } from 'agent-orchestrator/workflow';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
-import { repoOf } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
+import { type ApiEnv, served } from '../layer.ts';
 import { graphOf, type RunGraph } from '../runs/graph.ts';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -181,13 +180,13 @@ export const keyRows = (step: Workflow): KeyRow[] =>
   STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
 /** Where workflows are read from, in the order they are listed: the repository's, then yours. */
-export const sourcesOf = (repo: string, home: string = HOME): Array<{ from: WorkflowSource; dir: string }> => [
+export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> => [
   { from: 'repo', dir: path.join(repo, 'workflows') },
   { from: 'yours', dir: path.join(home, 'workflows') },
 ];
 
 /** Every workflow `repo` and `home` have: each folder in each source, by name. Loads every folder, so each can say whether it reads. */
-export function listWorkflows(repo: string, home: string = HOME): WorkflowListing[] {
+export function listWorkflows(repo: string, home: string): WorkflowListing[] {
   return sourcesOf(repo, home).flatMap(({ from, dir }) =>
     foldersIn(dir).map((name) => listed(name, from, path.join(dir, name), { repo, home })),
   );
@@ -198,7 +197,7 @@ export function listWorkflows(repo: string, home: string = HOME): WorkflowListin
  * `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so the board shows a
  * folder as a start would read it.
  */
-export const placesOf = (repo: string, home: string = HOME): Places => ({ repo, home });
+export const placesOf = (repo: string, home: string): Places => ({ repo, home });
 
 /** One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. */
 export function listed(name: string, from: WorkflowSource, dir: string, places: Places): WorkflowListing {
@@ -516,80 +515,83 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
  *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
  */
-export const workflows = new Hono()
-  .get('/api/workflows', (c) => c.json(listWorkflows(repoOf())))
-  .get('/api/workflows/:from/:name/:step', (c) => {
-    const { from, name, step } = c.req.param();
-    if (from !== 'repo' && from !== 'yours') {
-      return c.json(
-        {
-          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.`,
-        },
-        400,
-      );
-    }
-    const folder = folderOf(name, from, repoOf(), HOME);
-    if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-    const steps = loadWorkflows(folder.dir, placesOf(repoOf()));
-    const found = steps.find((s) => s.name === step);
-    if (!found) {
-      return c.json(
-        { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
-        404,
-      );
-    }
-    const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-    const places = placesOf(repoOf());
-    const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
-    let agentSkills: AgentSkill[] | null = null;
-    if (attached !== undefined && !(attached instanceof Error)) {
-      try {
-        agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
-      } catch {
-        agentSkills = null;
+export const workflows = new Hono<ApiEnv>()
+  .get('/api/workflows', (c) => served(c, ({ repo, home }) => c.json(listWorkflows(repo, home))))
+  .get('/api/workflows/:from/:name/:step', (c) =>
+    served(c, async ({ repo, home }) => {
+      const { from, name, step } = c.req.param();
+      if (from !== 'repo' && from !== 'yours') {
+        return c.json(
+          {
+            error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.`,
+          },
+          400,
+        );
       }
-    }
-    return c.json({
-      workflow: name,
-      from,
-      dir: folder.dir,
-      step: found.name,
-      body: found.body,
-      source,
-      keys: keyRows(found),
-      agentSkills,
-    } satisfies WorkflowStepPage);
-  })
-  .get('/api/repository', (c) => c.json({ repo: repoOf() }))
-  .post('/api/runs', async (c) => {
-    const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const repo = repoOf();
-    const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const asked = startOf(read.body, repo, HOME);
-    if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-    if (asked.card !== undefined) {
-      const started = startFromInbox({
-        name: asked.card,
-        callerRepo: repo,
-        workflow: asked.dir,
-        ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
-        ...(asked.after ? { after: asked.after } : {}),
-      });
-      c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
-      return c.json(
-        {
-          id: started.run.id,
-          card: started.card.name,
-          removed: started.removed,
-          ...(started.removed ? {} : { why: started.why }),
-          ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-        },
-        201,
-      );
-    }
-    const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
-    c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
-    return c.json({ id }, 201);
-  });
+      const folder = folderOf(name, from, repo, home);
+      if ('status' in folder) return c.json({ error: folder.error }, folder.status);
+      const steps = loadWorkflows(folder.dir, placesOf(repo, home));
+      const found = steps.find((s) => s.name === step);
+      if (!found) {
+        return c.json(
+          { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
+          404,
+        );
+      }
+      const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
+      const places = placesOf(repo, home);
+      const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
+      let agentSkills: AgentSkill[] | null = null;
+      if (attached !== undefined && !(attached instanceof Error)) {
+        try {
+          agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
+        } catch {
+          agentSkills = null;
+        }
+      }
+      return c.json({
+        workflow: name,
+        from,
+        dir: folder.dir,
+        step: found.name,
+        body: found.body,
+        source,
+        keys: keyRows(found),
+        agentSkills,
+      } satisfies WorkflowStepPage);
+    }),
+  )
+  .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
+  .post('/api/runs', (c) =>
+    served(c, async ({ repo, home }) => {
+      const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const asked = startOf(read.body, repo, home);
+      if ('status' in asked) return c.json({ error: asked.error }, asked.status);
+      if (asked.card !== undefined) {
+        const started = startFromInbox({
+          name: asked.card,
+          callerRepo: repo,
+          workflow: asked.dir,
+          ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
+          ...(asked.after ? { after: asked.after } : {}),
+        });
+        c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
+        return c.json(
+          {
+            id: started.run.id,
+            card: started.card.name,
+            removed: started.removed,
+            ...(started.removed ? {} : { why: started.why }),
+            ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+          },
+          201,
+        );
+      }
+      const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
+      c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
+      return c.json({ id }, 201);
+    }),
+  );

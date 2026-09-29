@@ -22,7 +22,7 @@ import {
 } from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import { everyView, judgedUnlessUnreadable, seenBy } from '../store.ts';
+import { type Engine, everyView, judgedUnlessUnreadable, seenBy } from '../store.ts';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
@@ -56,15 +56,16 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
  * make once per task. `runSlots` answers the held runs alone, and the count in flight is what the board says; so its judgement is made here
  * with the package's own pure parts (`slotNeed`, `heldRuns`), and the api's test holds `held` to what `runSlots` answers on the same store.
  * A run a task of which does not read, its own or a run's it waits on, is counted in flight unjudged, as the tick counts it (`UNJUDGED`).
+ * Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment (`maxRuns`).
  */
-export async function ceilingsOf(): Promise<Ceilings> {
+export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
   const last = lastCeilings() ?? null;
   const pass = lastPassCost() ?? null;
-  const cap = last?.runs ?? maxRuns();
+  const cap = last?.runs ?? maxRuns(env);
   if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
   const runs = listRuns();
-  const { views, unreadable } = await everyView();
-  const reader = seenBy(views);
+  const { views, unreadable } = await everyView(e);
+  const reader = seenBy(e, views);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {

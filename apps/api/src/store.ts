@@ -1,21 +1,37 @@
 /**
- * The store as every run route reads it: the one engine the process reads through, the engine's views of a run's tasks, a run found by
- * its id, its workflow and the steps it is judged by, and the feed's filing times — read on from where the last read stopped.
+ * The store as every run route reads it: the engine an app reads through and the store's root, as services (`Engine`, `StoreRoot`); the
+ * engine's views of a run's tasks, a run found by its id, its workflow and the steps it is judged by, and the feed's filing times — read on
+ * from where the last read stopped.
  */
 import fs from 'node:fs';
+import { Context, Layer } from 'effect';
 import { engine, HOME, listRuns, loadWorkflows, readFilings, unreadableJournal } from 'agent-orchestrator';
 import { isGitRun, runTasks, type Run, unjudgedWords } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
 /**
- * One engine for the process, and the api only reads through it — `list`, `view` and `logs`, never
- * `tick` or `file`.
- * Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything. The one write through it is a try's removal
- * (`DELETE /api/runs/:id`), `wf rm`'s own code, which closes a task that waits for a word nobody will give once the record is gone.
+ * The engine the api reads through — `list`, `view` and `logs`, never `tick` or `file` — one for an app, built with its runtime (`live`:
+ * the package's `engine()`). Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything. The one write
+ * through it is a try's removal (`DELETE /api/runs/:id`), `wf rm`'s own code, which closes a task that waits for a word nobody will give
+ * once the record is gone.
  */
-export const e = engine();
+export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
+  static readonly live: Layer.Layer<Engine> = Layer.sync(Engine)(engine);
+}
 
-export type TaskView = Awaited<ReturnType<typeof e.view>>;
+/**
+ * The store's root as the api's own reads and writes take it: your workflows, agents and skills, and a try's folder, looked for and written
+ * under it. Live, the package's `HOME`, which it fixes as it loads (`WF_ROOT`). What the package reads by itself is under its `HOME`
+ * whatever this says: the runs (`listRuns`, `findRun`), the inbox and the queue, the daemon's file, and every verb a route calls. So a
+ * test that gives another root moves where the api looks for yours, and nothing of the package's.
+ */
+export class StoreRoot extends Context.Service<StoreRoot, string>()('api/StoreRoot') {
+  static readonly live: Layer.Layer<StoreRoot> = Layer.succeed(StoreRoot)(HOME);
+}
+
+type Reader = Engine['Service'];
+
+export type TaskView = Awaited<ReturnType<Reader['view']>>;
 export type Views = ReadonlyMap<string, TaskView>;
 /** Each task a read left out because its journal does not read, by id, with why in the runtime's words (`list`'s `unreadable`). */
 export type Unreadable = ReadonlyMap<string, string>;
@@ -27,7 +43,7 @@ export type Unreadable = ReadonlyMap<string, string>;
  * runs' files for a job, a `claude agents` call for a background session. Read through `reader`, a request's own (`viewsFor`), a task two
  * runs read is viewed once.
  */
-export async function viewsOf(run: Run, reader: typeof e = e): Promise<Views> {
+export async function viewsOf(run: Run, reader: Reader): Promise<Views> {
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await reader.view(taskId));
@@ -77,14 +93,15 @@ export async function judgedUnlessUnreadable<T>(
  * (`everyView`), and never a run waited on a `view` a task, its journal once more.
  */
 export async function viewsFor(
+  e: Reader,
   runs: readonly Run[],
   store: () => readonly Run[] = listRuns,
-): Promise<{ views: Views; reader: typeof e; unreadable: Unreadable }> {
+): Promise<{ views: Views; reader: Reader; unreadable: Unreadable }> {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
   const listed = await e.list(read.flatMap(runTasks));
   const views: Views = new Map(listed.views.map((view) => [view.id, view]));
-  return { views, reader: seenBy(views), unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) };
+  return { views, reader: seenBy(e, views), unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) };
 }
 
 /**
@@ -95,7 +112,7 @@ export async function viewsFor(
  * `view`'s empty state does: no brief, so `unknown`. One whose journal does not read is in `unreadable` instead, and in no view
  * (`judgedUnlessUnreadable`).
  */
-export async function everyView(): Promise<{ views: Views; unreadable: Unreadable }> {
+export async function everyView(e: Reader): Promise<{ views: Views; unreadable: Unreadable }> {
   const listed = await e.list();
   return {
     views: new Map(listed.views.map((view) => [view.id, view])),
@@ -108,7 +125,7 @@ export async function everyView(): Promise<{ views: Views; unreadable: Unreadabl
  * package's `parentOf` is handed on the list and on a run's detail, so reading the runs a run waits on observes no harness again — the
  * list is what the Factory polls. A task the read did not see, filed since, is viewed.
  */
-export const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
+export const seenBy = (e: Reader, views: Views): Reader => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
 
 /**
  * The run's workflow folder, read now.
@@ -119,9 +136,9 @@ export const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) 
  * comes from it. Its agents and skills are looked for where the start looked: the run's repository's
  * `.claude/`, then yours.
  */
-export function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
+export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   try {
-    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home: HOME }), warning: null };
+    return { steps: loadWorkflows(run.workflowDir, { repo: run.repo, home }), warning: null };
   } catch (err) {
     const why = fs.existsSync(run.workflowDir)
       ? `The workflow folder ${run.workflowDir} no longer reads as a workflow: ${(err as Error).message}.`
@@ -166,15 +183,15 @@ export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
  * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
  * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor on
  * each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
- * since. A read's cache: a fresh process reads the feed from the start.
+ * since. A read's cache, one for an app, of its engine's feed (`ReadMemo`, layer.ts): a fresh app reads the feed from the start.
  */
-const filings = { filed: new Map<string, string>(), cursor: 0 };
+export type Filings = { filed: Map<string, string>; cursor: number };
 
 /**
- * Every task's filing time the feed has, read on from where the last read stopped. A feed that cannot be read this time leaves what was
- * read before: the queue times of tasks filed since say `not known` until a read works.
+ * Every task's filing time `e`'s feed has, read on from where the last read into `filings` stopped. A feed that cannot be read this time
+ * leaves what was read before: the queue times of tasks filed since say `not known` until a read works.
  */
-export async function filedTimes(): Promise<ReadonlyMap<string, string>> {
+export async function filedTimes(e: Reader, filings: Filings): Promise<ReadonlyMap<string, string>> {
   try {
     filings.cursor = (await readFilings(e, filings.cursor, filings.filed)).cursor;
   } catch {}
@@ -197,10 +214,10 @@ export const noSuchRun = (id: string) =>
  * The run and the task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by
  * that id, or no step by that name on the run's page, which shows those on the record and any the folder has gained (`stepNames`).
  */
-export function taskOfStep(id: string, step: string): { run: Run; taskId: string | null } | { error: string } {
+export function taskOfStep(id: string, step: string, home: string): { run: Run; taskId: string | null } | { error: string } {
   const run = findRun(id);
   if (!run) return { error: noSuchRun(id) };
-  if (!stepNames(run, workflowsOf(run).steps).includes(step)) {
+  if (!stepNames(run, workflowsOf(run, home).steps).includes(step)) {
     return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` };
   }
   return { run, taskId: run.steps[step]?.taskId ?? null };

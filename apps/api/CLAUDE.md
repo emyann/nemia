@@ -34,15 +34,21 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   key named: no schema message reaches a response. A new key goes into the schema and its `*_SHAPE`, with a test that makes it refuse.
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
   runtime always writes fails the read, not the assertion you meant.
-- **A test sets `WF_ROOT` (and `CLAUDE_CONFIG_DIR`) before it imports the api or the package**: the orchestrator reads them as its
-  modules load, so the imports after the assignment are dynamic (`test/app.test.ts`).
+- **A handler reads what it needs through `served(c, …)`** (`layer.ts`), never off a module: the engine, the store's root, the
+  environment and the askers are the app's services, and a test gives its own with `appOf(Layer.merge(liveOf(), …))`
+  (`test/layer.test.ts`). What a read keeps between requests is the app's too (`ReadMemo`, an asker's closure): a test wanting a fresh
+  one builds an app. `StoreRoot` moves where the api looks for yours, never the package's runs or inbox, which keep its `HOME`.
+- **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
+  it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
+- **A test imports the api and the package statically, after the harness**, which sets `WF_ROOT` and `CLAUDE_CONFIG_DIR` to scratch
+  folders as it loads (`root`, `config`): the package fixes its store as its modules load. `harness.test.ts` refuses an `import()`.
 - **A folder's face (`index.ts`) is the door `app.ts` mounts**: an import between folders names the file where the face would close a
   value cycle (`runs/` ↔ `agents/`), which tsc passes and the load fails on (`test/layout.test.ts`). `body.ts` stays at the root:
   every folder decodes its bodies there.
 - **A route's contract is an entry in the JSDoc of its exported router** (`asks` in `asks/asks.ts`): the comment guard refuses a JSDoc on
   `.post(`. In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `usageAsk`, `serverAsk`): a release
-  that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`readQuota`, `answers` in
-  `capabilities/capabilities.ts`) is never interrupted by one request's going.
+  that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
+  `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
 - **A handle count is waited for, never read once after a close** (`watchers` and `until` in `test/feed.test.ts`): a stream's watch is
   taken a few microtasks after its response, so a test waits for it before it breaks the feed.

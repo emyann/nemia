@@ -4054,7 +4054,7 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
  * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: where they are, and each by name.
  * Undefined for a run given none, or with no directory to name.
  *
- * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow.ts): the run's own `inputs/`
+ * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own `inputs/`
  * sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say so. The
  * run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
  */
@@ -4090,7 +4090,7 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  *
  * `inFolder` for a step of a folder run (`workspace: folder`): there the *first* way is the one that does harm. Such a step runs in
- * `dontAsk` (`validateFolderMode` in workflow.ts), fenced to its own folder, and that directory sits beside the folder, outside the
+ * `dontAsk` (`validateFolderMode` in workflow/validate.ts), fenced to its own folder, and that directory sits beside the folder, outside the
  * fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
  * the same. So it too is told one way, and neither mentions a branch, since a folder run has none.
  */
@@ -5118,7 +5118,7 @@ export function composeBrief(
  *
  * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts directory,
  * the run's inputs, a workspace — names nothing it can open, and none is said: files given with `wf start --input` are named, never located.
- * Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in workflow.ts), and it is done when its
+ * Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in harness/harness.ts), and it is done when its
  * Task completes. A try is a new Task, never a turn of the last one, so it is told what any first try is, and then which try it is.
  */
 export function remoteBrief(
@@ -5827,7 +5827,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
  * both, so the brief never names a path the fence denies.
  *
- * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow.ts): a call outside the step's own directory is denied with no
+ * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow/validate.ts): a call outside the step's own directory is denied with no
  * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of the
  * steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
  * harness. `artifactsContract`'s folder branch goes the same way round.

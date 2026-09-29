@@ -1,10 +1,10 @@
 /**
  * The format read from disk: a workflow folder's steps, the agents beside it, and what a person's name for a folder points at.
  *
- * `workflow.ts` is the format as data — the keys, their parsing and checking, and a step or an agent written back — and reads nothing;
- * this file is what reads a folder and hands its text to it. A store file at the bottom of the tree beneath the controllers: it imports no
- * other (`test/boundary.test.ts`), and is exported from the package's root, not from `agent-orchestrator/workflow`
- * (`docs/architecture.md`).
+ * `workflow.ts` and the folders it re-exports are the format as data — the keys, their parsing and checking, and a step or an agent
+ * written back — and read nothing; this file is what reads a folder and hands its text to them. A store file at the bottom of the tree
+ * beneath the controllers: it imports no other (`test/boundary.test.ts`), and is exported from the package's root, not from
+ * `agent-orchestrator/workflow` (`docs/architecture.md`).
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

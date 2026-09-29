@@ -2739,8 +2739,9 @@ holding a concurrency slot forever.
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), and a line in words (`feedLineWords`); the file is `src/feed/feed.store.ts`'s |
 | `src/cli.ts` | the verbs |
 
-The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`) and
-`agent-orchestrator/workflow` (`src/workflow.ts`). Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
+The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),
+`agent-orchestrator/workflow` (`src/workflow.ts`) and `agent-orchestrator/effect` (`src/effect.ts`, the refusals by kind, which
+the api answers by kind: `Missing` 404, `Conflict` 409, `Invalid` 422). Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
 folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
 `workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
@@ -2785,6 +2786,6 @@ files in one, no folder named `utils` or the like, no two files that need each o
 imports a test, and a folder's pure code imported from outside it through its face — its `index.ts`, or its one pure
 file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
 files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
-`agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`), whose names
+`agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` alone (`test/contract.test.ts`), whose names
 `test/entries.test.ts` pins.
 `docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.

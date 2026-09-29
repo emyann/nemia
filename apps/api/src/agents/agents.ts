@@ -103,8 +103,6 @@ export type AgentListing = {
  */
 const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
 
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
 /**
  * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
  * `.claude/skills/`, then the store's. What its version digests and its card is read from.
@@ -156,7 +154,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
   try {
     source = fs.readFileSync(file, 'utf8');
   } catch (err) {
-    return { ...empty(from, dir, file, name, version, usedBy), error: messageOf(err) };
+    return { ...empty(from, dir, file, name, version, usedBy), error: (err as Error).message };
   }
   const sidecarOf = (named: string | undefined): AgentSchema | null => {
     if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
@@ -205,7 +203,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
   try {
     card = cardSkills(agent, found);
   } catch (err) {
-    cardError = messageOf(err);
+    cardError = (err as Error).message;
   }
   return {
     name,
@@ -393,16 +391,12 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
 }
 
 /**
- * A package refusal as the api answers it: an agent not there is 404; stale, taken or still named is 409; anything else it judged, 422 —
- * `renderAgent`'s and the parser's refusals among them, which are a `WorkflowError` (a key, a value, a line break). Null for an error that
- * is not a refusal.
+ * A write of an agent the package refused, as the api answers it, with the nodes that still name the agent: one not there is 404; stale,
+ * taken or still named is 409; a key or a value it refused, 422. Null for an error that is not an `AgentWriteError`, which the route throws
+ * on to `app.onError` (app.ts): the parser's refusals, a `WorkflowError`, are answered by their kind there.
  */
 function refusalOf(err: unknown): { body: AgentRefused; status: 404 | 409 | 422 } | null {
-  if (!(err instanceof AgentWriteError)) {
-    if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2)
-      return { body: { error: err.message, users: [] }, status: 422 };
-    return null;
-  }
+  if (!(err instanceof AgentWriteError)) return null;
   const status = err.why === 'missing' ? 404 : err.why === 'refused' ? 422 : 409;
   return { body: { error: err.message, users: err.users }, status };
 }
@@ -424,7 +418,7 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
 /**
  * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
  * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
- * 403 for the repository's); the package's refusals have `refusalOf`'s statuses.
+ * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind (`app.onError`).
  *
  * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is
  *   now.
@@ -447,57 +441,42 @@ function placeOf(from: string, name: string | null, route: string): { dir: strin
  *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
  */
 export const agents = new Hono()
-  .get('/api/agents', (c) => {
-    try {
-      return c.json(listAgents(repoOf()));
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
-  })
+  .get('/api/agents', (c) => c.json(listAgents(repoOf())))
   .get('/api/agents/:from/:name', (c) => {
     const { from, name } = c.req.param();
     const place = placeOf(from, name, `GET /api/agents/${from}/${name}`);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    try {
-      const agent = listedAgent(from as WorkflowSource, place.dir, name, repoOf());
-      if (!agent)
-        return c.json(
-          {
-            error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
-          },
-          404,
-        );
-      return c.json(agent);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
+    const agent = listedAgent(from as WorkflowSource, place.dir, name, repoOf());
+    if (!agent)
+      return c.json(
+        {
+          error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
+        },
+        404,
+      );
+    return c.json(agent);
   })
   .get('/api/agents/:from/:name/card', (c) => {
     const { from, name } = c.req.param();
     const route = `GET /api/agents/${from}/${name}/card`;
     const place = placeOf(from, name, route);
     if ('status' in place) return c.json({ error: place.error }, place.status);
-    try {
-      const agent = loadAgents(place.dir).get(name);
-      if (agent === undefined)
-        return c.json(
-          {
-            error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
-          },
-          404,
-        );
-      if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const found = skillsOfPlace(place.dir, repoOf());
-      const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
-      return c.json({
-        card,
-        servedOverA2A: false,
-        why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`,
-      } satisfies AgentCardAnswer);
-    } catch (err) {
-      if (err instanceof Error && (err as { exitCode?: number }).exitCode === 2) return c.json({ error: err.message }, 422);
-      return c.json({ error: messageOf(err) }, 500);
-    }
+    const agent = loadAgents(place.dir).get(name);
+    if (agent === undefined)
+      return c.json(
+        {
+          error: `${from === 'yours' ? 'Yours has' : 'The repository has'} no agent named '${name}' (${path.join(place.dir, `${name}.md`)}). GET /api/agents lists the agents there are.`,
+        },
+        404,
+      );
+    if (agent instanceof Error) return c.json({ error: agent.message }, 422);
+    const found = skillsOfPlace(place.dir, repoOf());
+    const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
+    return c.json({
+      card,
+      servedOverA2A: false,
+      why: `Nothing here serves ${name} over A2A: this card describes the agent, and declares no interfaces and no security schemes. A2A marks \`supportedInterfaces\` REQUIRED, so it is not a card a client could call.`,
+    } satisfies AgentCardAnswer);
   })
   .post('/api/agents/:from', async (c) => {
     const { from } = c.req.param();
@@ -620,7 +599,7 @@ export const agents = new Hono()
     } catch (err) {
       const answer = refusalOf(err);
       if (answer) return c.json(answer.body, answer.status);
-      return c.json({ error: messageOf(err) }, 500);
+      throw err;
     }
   })
   .delete('/api/agents/:from/:name', async (c) => {
@@ -651,17 +630,17 @@ export const agents = new Hono()
     } catch (err) {
       const answer = refusalOf(err);
       if (answer) return c.json(answer.body, answer.status);
-      return c.json({ error: messageOf(err) }, 500);
+      throw err;
     }
   });
 
-/** `writeAgent`, answered: the agent as it now reads, or the package's refusal with its status. */
+/** `writeAgent`, answered: the agent as it now reads, or its `AgentWriteError` with its status. Throws any other error. */
 function saved(
   dir: string,
   draft: AgentDraft,
   how: Parameters<typeof writeAgent>[2],
   ok: 200 | 201,
-): { body: AgentSaved | AgentRefused | { error: string }; status: 200 | 201 | 404 | 409 | 422 | 500 } {
+): { body: AgentSaved | AgentRefused; status: 200 | 201 | 404 | 409 | 422 } {
   try {
     const done = writeAgent(dir, draft, how);
     return {
@@ -669,6 +648,8 @@ function saved(
       status: ok,
     };
   } catch (err) {
-    return refusalOf(err) ?? { body: { error: messageOf(err) }, status: 500 };
+    const answer = refusalOf(err);
+    if (!answer) throw err;
+    return answer;
   }
 }

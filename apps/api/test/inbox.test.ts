@@ -688,6 +688,31 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
   assert.deepEqual(cards(), [`${card.name}.md`, 'broken.md', `${started.name}.md`].sort());
 });
 
+test("a card whose `repo:` is a folder a run cannot branch from — no git checkout, or no commit — fails without a refusal, as the queue tries it again: a 500 in the failure's words, said on stderr, and nothing is written or removed", async (t) => {
+  clear();
+  const plain = scratch('hkb-api-inbox-plain-');
+  const empty = scratch('hkb-api-inbox-empty-');
+  execFileSync('git', ['init', '-q'], { cwd: empty });
+  const said = t.mock.method(console, 'error', () => {});
+  for (const about of [plain, empty]) {
+    const { card } = addToInbox({ text: 'Not a repository', repo: about });
+    let failure: (Error & { exitCode?: unknown }) | undefined;
+    try {
+      startFromInbox({ name: card.name, callerRepo: repo, workflow: dev });
+    } catch (err) {
+      failure = err as Error & { exitCode?: unknown };
+    }
+    assert.ok(failure && failure.exitCode !== 2 && failure.message.includes('git rev-parse HEAD'), `${about}: ${failure?.message}`);
+    const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
+    assert.equal(res.status, 500, about);
+    assert.equal(((await res.json()) as Refused).error, failure.message);
+    assert.deepEqual(runFiles(), [], 'no run written');
+    assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
+    clear();
+  }
+  assert.equal(said.mock.calls.length, 2, 'each failure said once on stderr');
+});
+
 test("REFUSED at shipped defaults: a `card` that is not a card's name is a 400 in the package's words, and one that is not text or with a brief that is not a 400 in the api's — before any workflow is looked for", async () => {
   clear();
   const { card } = addToInbox({ text: 'Keep this one' });

@@ -237,9 +237,9 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
  * have no part in it.
  *
  * Refused before the engine is asked, with what to do instead (`sayRefusal`): a step the run does not have, a cancelled run, a step with no
- * task filed, and one whose task has settled. Then the engine's refusals pass through as it words them, exit code 2 and all — empty words,
- * an attempt not started, a harness with no way in, a session its harness does not list running — and so does a failure to deliver, which
- * journals nothing and has no exit code: ask again.
+ * task filed, and one whose task has settled — each a `Conflict`. Then the engine's refusals, each a `Conflict` in the engine's words —
+ * empty words, an attempt not started, a harness with no way in, a session its harness does not list running — and a failure to deliver,
+ * as the engine throws it, which journals nothing and has no exit code: ask again.
  */
 export async function say(e: Engine, id: string, stepName: string, text: string): Promise<Told> {
   const run = readRun(id);
@@ -248,7 +248,10 @@ export async function say(e: Engine, id: string, stepName: string, text: string)
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
   const refused = sayRefusal(steps, run, stepName, () => phase);
   if (refused) throw new Conflict({ message: refused });
-  return { run, taskId: taskId!, try: tryOf(run, stepName), said: await e.say(taskId!, text) };
+  const said = await e.say(taskId!, text).catch((err: unknown) => {
+    throw (err as { exitCode?: unknown }).exitCode === 2 ? new Conflict({ message: (err as Error).message }) : err;
+  });
+  return { run, taskId: taskId!, try: tryOf(run, stepName), said };
 }
 
 /**

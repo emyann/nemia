@@ -281,7 +281,14 @@ and the api depend on `effect` too, their ranges must resolve to that same copy,
 
 ## The public faces
 
-The owner has not decided this. Both options:
+**Decided 2026-09-29: B.** The owner chose face B at card 8. `agent-orchestrator/effect` (`src/effect.ts`) sits beside the
+three plain faces, which export what they did. It holds the refusal union — `Missing`, `Conflict`, `Invalid`, the type
+`Refusal` and `isRefusal`, which tells a refusal by its class — and loads `effect/Data` alone (16 modules, pinned in
+`test/refusal.test.ts`). The api maps the union to statuses in one table, `REFUSAL_STATUS` in `apps/api/src/app.ts`,
+checked by the compiler, and `app.onError` answers it and the rest. The api is not an Effect program yet: its handlers,
+the `ManagedRuntime` and the layers come with cards 9 and 10, and the face grows with them.
+
+The options as they were weighed:
 
 **A. Plain faces stay; Effect is inside.** `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`
 export what they export today. The controllers are Effects run by a facade, as the runtime runs its own
@@ -391,7 +398,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
 7. **Controllers one at a time**, smallest first: `decide`, `forget`, `verbs`, `views`, `start`, then `tick` last and alone.
    The meter stays a module global until a pass is concurrent.
 8. **The api's errors.** One mapping from the union to statuses (under B, checked by the compiler), `app.onError` for the
-   rest, and the 6 `messageOf` copies gone.
+   rest, and the 6 `messageOf` copies gone. Landed under B. Left for a card of its own: the authoring errors that carry a
+   `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their
+   routes; moving each `why` onto `Missing` or `Conflict` puts them in the table too.
 9. **The api's resources.** The feed as a `Stream` over the watch, `quota.ts`'s child and `capabilities.ts`'s MCP ask under
    `acquireRelease` and `Effect.timeout`.
 10. **The api's root and engine as layers.** The 29 dynamic imports become static, file by file.

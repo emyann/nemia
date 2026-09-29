@@ -2899,6 +2899,15 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
 export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] => asks.filter((a) => a.round <= roundOf(run, a.step));
 
 /**
+ * Why a `--budget` cannot ride on `wf round <id>`, in words that say what to do instead — or null. Pure, and asked before anything about
+ * the run, by `roundAsk` and by a caller that answers it apart: an amount that is not dollars above zero.
+ */
+export const roundBudgetRefusal = (id: string, budget?: number): string | null =>
+  budget !== undefined && !(Number.isFinite(budget) && budget > 0)
+    ? `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: wf round ${id} [<step>] --budget <amount>, like 5 or 2.50.`
+    : null;
+
+/**
  * What `wf round` asks for — the looping step and the round — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop whose rounds are spent with `again` still true — `exhausted` — may go
@@ -2932,11 +2941,8 @@ export function roundAsk(
   budget?: number,
 ): { step: string; round: number; budget?: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
-  if (budget !== undefined && !(Number.isFinite(budget) && budget > 0)) {
-    return no(
-      `--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: wf round ${run.id} [<step>] --budget <amount>, like 5 or 2.50.`,
-    );
-  }
+  const notAmount = roundBudgetRefusal(run.id, budget);
+  if (notAmount) return no(notAmount);
   if (run.cancelledAt) {
     return no(
       `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a round would never be honoured. Start a new run for the work with wf start.`,
@@ -2985,16 +2991,8 @@ export function roundAsk(
       `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`,
     );
 
-  const at = (n: string) =>
-    standing(
-      steps.find((s) => s.name === n)!,
-      run,
-      phaseOf,
-      closeoutOf,
-      askedCloseout,
-      steps,
-      spendOf,
-    );
+  const step = (n: string) => steps.find((s) => s.name === n)!;
+  const at = (n: string) => standing(step(n), run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
   if (stuck) {
     return no(

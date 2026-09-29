@@ -303,7 +303,7 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
   try {
     return fs.readdirSync(path.join(repo, dir)).sort();
   } catch (err) {
-    if (!absent(err)) warnings.push(`${dir} could not be listed (${messageOf(err)}), so nothing in it is shown. Check its permissions.`);
+    if (!absent(err)) warnings.push(`${dir} could not be listed (${sentenceOf(err)}), so nothing in it is shown. Check its permissions.`);
     return [];
   }
 }
@@ -314,7 +314,7 @@ function describedAt(repo: string, source: string, fallback: string, warnings: s
   try {
     text = fs.readFileSync(path.join(repo, source), 'utf8');
   } catch (err) {
-    if (!absent(err)) warnings.push(`${source} could not be read (${messageOf(err)}), so it is not listed. Make it a readable file.`);
+    if (!absent(err)) warnings.push(`${source} could not be read (${sentenceOf(err)}), so it is not listed. Make it a readable file.`);
     return null;
   }
   const fields = frontmatterOf(text);
@@ -384,7 +384,7 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
   try {
     text = fs.readFileSync(path.join(repo, file), 'utf8');
   } catch (err) {
-    if (!absent(err)) warnings.push(`${file} could not be read (${messageOf(err)}), so ${leftOut}. Make it a readable file.`);
+    if (!absent(err)) warnings.push(`${file} could not be read (${sentenceOf(err)}), so ${leftOut}. Make it a readable file.`);
     return null;
   }
   try {
@@ -393,7 +393,7 @@ function jsonAt(repo: string, file: string, warnings: string[], leftOut: string)
     warnings.push(`${file} is not a JSON object, so ${leftOut}. Make it one: \`{ … }\`.`);
   } catch (err) {
     warnings.push(
-      `${file} does not parse as JSON (${messageOf(err)}), so ${leftOut}. Fix the file; the page reads it again on the next visit.`,
+      `${file} does not parse as JSON (${sentenceOf(err)}), so ${leftOut}. Fix the file; the page reads it again on the next visit.`,
     );
   }
   return null;
@@ -570,9 +570,9 @@ function whyNot(server: Declared & { command: string }, err: unknown): string {
   if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
     return `${started} did not start: there is no command \`${server.command}\` on its PATH. Install it, or fix \`command\` for ${server.name} in ${MCP_JSON}.`;
   }
-  return `${started} did not list its tools: ${messageOf(err)}. Run it yourself to see why, or fix its entry in ${MCP_JSON}.`;
+  return `${started} did not list its tools: ${sentenceOf(err)}. Run it yourself to see why, or fix its entry in ${MCP_JSON}.`;
 }
 
 const absent = (err: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException)?.code ?? '');
 
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/\.$/, '');
+const sentenceOf = (err: unknown): string => (err instanceof Error ? err.message : String(err)).replace(/\.$/, '');

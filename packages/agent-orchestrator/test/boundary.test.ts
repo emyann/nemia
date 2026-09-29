@@ -28,7 +28,7 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement at the root of `src`: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['radius', 'rendering', 'retry', 'run', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['effect', 'radius', 'rendering', 'retry', 'run', 'workflow'].map((f) => `src/${f}.ts`);
 
 /**
  * The I/O beneath the controllers at the root of `src`: no runtime, never a controller or the client, and a tree (`STORE_BOTTOM`,

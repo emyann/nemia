@@ -35,6 +35,17 @@ test('a refusal exits 2 and prints its sentence: wf approve of a run that does n
   assert.equal(stderr, 'no such run: r-nope. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.\n');
 });
 
+test("REFUSED: wf retry and wf say of a run that does not exist exit 2, with the store's sentence naming wf ls", () => {
+  for (const argv of [
+    ['retry', 'r-nope', 'implement'],
+    ['say', 'r-nope', 'implement', 'the words'],
+  ]) {
+    const { status, stderr } = wf(path.join(scratch('wf-exit-code-no-run-'), 'store'), argv);
+    assert.equal(status, 2, `wf ${argv[0]} of no run exits with the refusal's code; it said: ${stderr}`);
+    assert.equal(stderr, "no such run: r-nope  (try 'wf ls')\n", `wf ${argv[0]}`);
+  }
+});
+
 test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sibling refusals do, and nothing is written', () => {
   const dir = scratch('wf-exit-code-fan-out-');
   const repo = path.join(dir, 'repo');

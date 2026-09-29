@@ -102,7 +102,7 @@ test('a card the runtime cannot read is refused, naming its first wrong field an
       card({ securityRequirements: [{ schemes: { bearer: { list: ['a', 2] } } }] }),
       /^its `securityRequirements\.0\.schemes\.bearer\.list\.1` is 2, where/,
     ],
-    [[INTERFACE], /^it is \[.*\], where an A2A 1\.0 card holds object$/],
+    [[INTERFACE], /^it is \[\{"url":"https:\/\/a\.example\/a2a\/jsonrpc","protocolBinding":"J…, where an A2A 1\.0 card holds object$/],
   ];
   for (const [json, said] of cases) assert.match(wrong(json), said, JSON.stringify(json));
 });

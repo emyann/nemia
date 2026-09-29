@@ -311,9 +311,9 @@ test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is r
       err.message ===
         'WF_VERIFY_REST=true is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.',
   );
-  const error = t.mock.method(console, 'error', () => {});
-  assert.equal((await app.request('/api/runs')).status, 500);
-  error.mock.restore();
+  const res = await app.request('/api/runs');
+  assert.equal(res.status, 422, 'an Invalid, as every route answers one');
+  assert.match(((await res.json()) as { error: string }).error, /^WF_VERIFY_REST=true is neither 1 nor 0\./);
 });
 
 test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and is served without it', async () => {

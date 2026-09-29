@@ -229,8 +229,6 @@ export function stepsNamed(message: string, names: readonly string[]): string[] 
   return opens === undefined ? [] : [opens];
 }
 
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const STEP_SHAPE =
@@ -483,7 +481,7 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
       schema = JSON.parse(text);
     } catch (err) {
       return {
-        error: `${file} is not JSON (${messageOf(err)}). A schema is a JSON object — \`{ "type": "object", "properties": { … } }\`.`,
+        error: `${file} is not JSON (${err instanceof Error ? err.message : String(err)}). A schema is a JSON object — \`{ "type": "object", "properties": { … } }\`.`,
         steps: namingSchema(steps, file),
       };
     }
@@ -648,25 +646,21 @@ export const builder = new Hono()
     const { name, readme } = read.body;
     const step = draftOf(read.body.step, '`step`', route, POST_SHAPE);
     if ('status' in step) return c.json({ error: step.error }, step.status);
-    try {
-      const dir = path.join(HOME, 'workflows', name);
-      if (fs.lstatSync(dir, { throwIfNoEntry: false })) {
-        const folder = foldersIn(path.dirname(dir)).includes(name);
-        return c.json(
-          {
-            error: folder
-              ? `Yours already has a workflow named '${name}' (${dir}). PUT /api/workflows/yours/${name} changes it, or name the new one otherwise.`
-              : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
-          },
-          409,
-        );
-      }
-      const saved = write(name, dir, placesOf(repo), [step], readme);
-      if ('error' in saved) return c.json(saved, 422);
-      return c.json(saved, 201);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
+    const dir = path.join(HOME, 'workflows', name);
+    if (fs.lstatSync(dir, { throwIfNoEntry: false })) {
+      const folder = foldersIn(path.dirname(dir)).includes(name);
+      return c.json(
+        {
+          error: folder
+            ? `Yours already has a workflow named '${name}' (${dir}). PUT /api/workflows/yours/${name} changes it, or name the new one otherwise.`
+            : `Yours has a file named '${name}' in ${path.dirname(dir)}, which is not a workflow and is not the builder's to replace. Name the workflow otherwise.`,
+        },
+        409,
+      );
     }
+    const saved = write(name, dir, placesOf(repo), [step], readme);
+    if ('error' in saved) return c.json(saved, 422);
+    return c.json(saved, 201);
   })
   .put('/api/workflows/:from/:name', async (c) => {
     const { from, name } = c.req.param();
@@ -692,26 +686,22 @@ export const builder = new Hono()
     }
     const schemas = schemasOf(body.schemas, route);
     if ('status' in schemas) return c.json({ error: schemas.error }, schemas.status);
-    try {
-      const folder = folderOf(name, 'yours', repo, HOME);
-      if ('status' in folder) {
-        const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
-        return c.json({ error: `${folder.error}${make}` }, folder.status);
-      }
-      const now = versionOf(folder.dir, placesOf(repo));
-      if (now !== body.version) {
-        return c.json(
-          {
-            error: `${folder.dir} has changed since it was read at version ${body.version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
-            steps: [],
-          },
-          409,
-        );
-      }
-      const saved = write(name, folder.dir, placesOf(repo), steps, body.readme, schemas);
-      if ('error' in saved) return c.json(saved, 422);
-      return c.json(saved, 200);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
+    const folder = folderOf(name, 'yours', repo, HOME);
+    if ('status' in folder) {
+      const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
+      return c.json({ error: `${folder.error}${make}` }, folder.status);
     }
+    const now = versionOf(folder.dir, placesOf(repo));
+    if (now !== body.version) {
+      return c.json(
+        {
+          error: `${folder.dir} has changed since it was read at version ${body.version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
+          steps: [],
+        },
+        409,
+      );
+    }
+    const saved = write(name, folder.dir, placesOf(repo), steps, body.readme, schemas);
+    if ('error' in saved) return c.json(saved, 422);
+    return c.json(saved, 200);
   });

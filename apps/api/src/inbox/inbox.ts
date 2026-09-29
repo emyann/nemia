@@ -71,8 +71,6 @@ export type InboxQueueAnswer = {
   of: number | null;
 };
 
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
@@ -193,23 +191,6 @@ function queueBodyRefusal(route: string, text: string): Refusal | null {
 }
 
 /**
- * The status of a queue — or its taking back — that `queueInInbox` refused, in its words (`exitCode` 2), by what is on disk once refused: 404
- * for a card not there; 422 for a card that does not read, or a card to queue that names no workflow; 409 for a card to queue that a run's
- * record already names, or that is queued already — a card whose state is not the one the request was made against.
- */
-function queueRefusalStatus(name: string): 404 | 409 | 422 {
-  if (!fs.existsSync(path.join(inboxDir(), `${name}.md`))) return 404;
-  let entry: InboxListing | undefined;
-  try {
-    entry = readInbox().find((e) => e.file === `${name}.md`);
-  } catch {
-    return 422;
-  }
-  if (!entry || entry.error !== null) return 422;
-  return entry.startedAs.length || entry.queued ? 409 : 422;
-}
-
-/**
  * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders a
  * start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
  *
@@ -258,32 +239,21 @@ const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e)
  *   dropped since the listing read it, the sentence naming the cards that are. Its keys are as the listing reads them: `queued` is when it
  *   was queued (the listing carries its place too), null when unset.
  * - `POST /api/inbox` — `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line (201,
- *   `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for word (`exitCode` 2), is 422:
- *   an idea with nothing in it, a key it would write on two lines, a repo that is not an absolute path to a directory, an `after:` in the
- *   idea's own frontmatter. Anything else is the store's, 500: the inbox could not be written.
+ *   `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for word, is an `Invalid`, which
+ *   `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is not an absolute path to a
+ *   directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not be written.
  * - `DELETE /api/inbox/:name` — `wf inbox rm <name>`: a card dropped without being started. A name that would leave the inbox, or a hidden
  *   one, is refused in the package's words (400) before anything is read; 404 for a card not there.
  * - `POST` and `DELETE /api/inbox/:name/queue` — `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names;
  *   and `--off`, the mark taken back (`queueRoute`).
  */
 export const inbox = new Hono()
-  .get('/api/inbox', (c) => {
-    try {
-      return c.json(listInbox());
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
-  })
+  .get('/api/inbox', (c) => c.json(listInbox()))
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    let entries: InboxEntry[];
-    try {
-      entries = listInbox();
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
+    const entries = listInbox();
     const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
     if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
     let source: string;
@@ -309,19 +279,15 @@ export const inbox = new Hono()
     if ('status' in read) return c.json({ error: read.error }, read.status);
     const asked = filingOf(read.body, repoOf(), HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-    try {
-      const { card, file } = addToInbox({
-        text: asked.text,
-        ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
-        ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
-      });
-      return c.json(
-        { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
-        201,
-      );
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, (err as { exitCode?: unknown }).exitCode === 2 ? 422 : 500);
-    }
+    const { card, file } = addToInbox({
+      text: asked.text,
+      ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
+      ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
+    });
+    return c.json(
+      { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
+      201,
+    );
   })
   .delete('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
@@ -334,20 +300,18 @@ export const inbox = new Hono()
     if (refused) return c.json({ error: refused.error }, refused.status);
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    try {
-      const dropped = dropFromInbox(name);
-      if (!dropped.removed) return c.json({ error: noCardLine(name, dropped.cards) }, 404);
-      return c.json(dropped);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
+    const dropped = dropFromInbox(name);
+    if (!dropped.removed) return c.json({ error: noCardLine(name, dropped.cards) }, 404);
+    return c.json(dropped);
   })
   .post('/api/inbox/:name/queue', (c) => queueRoute(c, false))
   .delete('/api/inbox/:name/queue', (c) => queueRoute(c, true));
 
 /**
  * A queue, or its taking back: the guard, then the name in the package's words (400) and the body (400), before the card is read; then
- * `queueInInbox`, whose refusals are its sentences with the status of what is on disk (`queueRefusalStatus`).
+ * `queueInInbox`, whose refusals go to `app.onError` (app.ts), which answers each by its kind in its words: 404 for a card not there
+ * (`Missing`); 409 for a card a run's record already names, or queued already — a card whose state is not the one the request was made
+ * against (`Conflict`); 422 for a card that does not read, or a card to queue that names no workflow (`Invalid`).
  *
  * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
  * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken back
@@ -365,23 +329,18 @@ async function queueRoute(c: Context, off: boolean) {
   if (shaped) return c.json({ error: shaped.error }, shaped.status);
   const file = path.join(inboxDir(), `${name}.md`);
   const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
-  try {
-    const done = queueInInbox(name, { off });
-    if (filed && done.was !== 'not queued') {
-      try {
-        fs.utimesSync(file, filed, filed);
-      } catch {}
-    }
-    return c.json({
-      name: done.card.name,
-      file: done.file,
-      was: done.was,
-      queued: done.card.queued ?? null,
-      place: done.place ?? null,
-      of: done.of ?? null,
-    } satisfies InboxQueueAnswer);
-  } catch (err) {
-    if ((err as { exitCode?: unknown }).exitCode !== 2) return c.json({ error: messageOf(err) }, 500);
-    return c.json({ error: messageOf(err) }, queueRefusalStatus(name));
+  const done = queueInInbox(name, { off });
+  if (filed && done.was !== 'not queued') {
+    try {
+      fs.utimesSync(file, filed, filed);
+    } catch {}
   }
+  return c.json({
+    name: done.card.name,
+    file: done.file,
+    was: done.was,
+    queued: done.card.queued ?? null,
+    place: done.place ?? null,
+    of: done.of ?? null,
+  } satisfies InboxQueueAnswer);
 }

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { HOME } from 'agent-orchestrator';
 import { AGENTS_FOLDER, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import type { Run } from 'agent-orchestrator/run';
+import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
 
 /** Where every try's folder is: `tries/` in the store, beside `workflows/`. */
@@ -106,17 +107,16 @@ export function untriedOf(
 
 /**
  * The agent's try folder, written when its step file does not read or was written at another version of the agent, and left as it is
- * otherwise. A folder or a step file that is a link is refused: written through, it would change whatever it points at.
+ * otherwise. A folder or a step file that is a link is refused (`Invalid`): written through, it would change whatever it points at.
  */
 export function writeTryFolder(name: string, version: string, home: string = HOME): string {
   const dir = tryDir(name, home);
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
     if (fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) {
-      throw Object.assign(
-        new Error(`${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`),
-        { exitCode: 2 },
-      );
+      throw new Invalid({
+        message: `${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`,
+      });
     }
   }
   const text = tryText(name, version);

@@ -4,7 +4,19 @@
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { accept, approve, budgetRefusal, messageRefusal, retry, type RetryHow, round, type Said, say } from 'agent-orchestrator';
+import {
+  accept,
+  approve,
+  budgetRefusal,
+  messageRefusal,
+  retry,
+  type RetryHow,
+  round,
+  roundBudgetRefusal,
+  type Said,
+  say,
+} from 'agent-orchestrator';
+import { isRefusal } from 'agent-orchestrator/effect';
 import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-orchestrator/run';
 import { NotBlank, readBody, type BodyIssue } from '../body.ts';
 import { type Guarded, type Refusal, refusedBeforeReading } from '../guard.ts';
@@ -143,9 +155,11 @@ const roundWords =
 
 /**
  * The board's writes for a person's asks of a run. Each route is guarded as a start is (guard.ts), answers 404 for a run or a step it does
- * not have and 400 for a body that is not an ask, and writes through the package's own verb, whose refusals it quotes verbatim: the api
- * judges none of it. A 202 is accepted and not yet done: the next tick honours the ask once, as it does one made at the command line. A
- * write that fails otherwise is a 502 naming the command that asks the same way.
+ * not have and 400 for a body that is not an ask, and writes through the package's own verb, whose refusals it lets through to `app.onError`
+ * (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the route read it (`Missing`), 409 for a state that forbids
+ * the ask (`Conflict`), 422 for a record that does not read (`Invalid`). The api judges none of it. A 202 is accepted and not yet done: the
+ * next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the command that
+ * asks the same way.
  *
  * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
  *   by `retry()`, `wf retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the ask
@@ -155,12 +169,12 @@ const roundWords =
  *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try.
  * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
  *   cap raised. Made by `round()`, `wf round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with 400,
- *   which `roundAsk` refuses first, whatever the run; a round the loop may not go, or a budget not above what its steps have cost
- *   (`roundAsk`), with 409.
+ *   before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go, or a
+ *   budget not above what its steps have cost (`roundAsk`), with 409.
  * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `wf say`'s own, which hands them
  *   to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
- *   session its harness does not list running. Words the harness did not take are the engine's error, verbatim, with 502: nothing was
+ *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `say()`. Words the harness did not take are the engine's error, verbatim, with 502: nothing was
  *   journalled, and asking again may work. Its 202 means the session's harness took the words and the engine journalled them; whether the
  *   session reads them is the session's.
  * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `wf approve`'s own, which
@@ -196,8 +210,8 @@ export const asks = new Hono()
       const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
       return c.json({ try: ask.try, file, stopFirst }, 202);
     } catch (err) {
+      if (isRefusal(err)) throw err;
       const said = err instanceof Error ? err.message : String(err);
-      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json(
         {
           error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.`,
@@ -223,13 +237,14 @@ export const asks = new Hono()
       const found = taskOfStep(id, how.step);
       if ('error' in found) return c.json({ error: found.error }, 404);
     }
+    const notAmount = roundBudgetRefusal(id, how.budget);
+    if (notAmount) return c.json({ error: notAmount }, 400);
     try {
       const { ask, file } = await round(e, id, how.step, how.budget);
       return c.json({ step: ask.step, round: ask.round, file }, 202);
     } catch (err) {
+      if (isRefusal(err)) throw err;
       const said = err instanceof Error ? err.message : String(err);
-      if ((err as { exitCode?: unknown }).exitCode === 2)
-        return c.json({ error: said }, how.budget !== undefined && !(how.budget > 0) ? 400 : 409);
       return c.json(
         { error: `Could not ask for another round of ${id}'s loop: ${said}. \`wf round ${id}\` asks the same way from the command line.` },
         502,
@@ -258,8 +273,8 @@ export const asks = new Hono()
       const { said } = await say(e, id, step, read.body.text);
       return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
     } catch (err) {
-      const words = err instanceof Error ? err.message : String(err);
-      return c.json({ error: words }, (err as { exitCode?: unknown }).exitCode === 2 ? 409 : 502);
+      if (isRefusal(err)) throw err;
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
     }
   })
   .post('/api/runs/:id/steps/:step/approve', async (c) => {
@@ -287,8 +302,8 @@ export const asks = new Hono()
       const { approval, file } = await approve(e, id, step, message);
       return c.json({ try: approval.try, at: approval.at, message: approval.message ?? null, file }, 202);
     } catch (err) {
+      if (isRefusal(err)) throw err;
       const said = err instanceof Error ? err.message : String(err);
-      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json(
         { error: `Could not approve step '${step}': ${said}. \`wf approve ${id} ${step}\` approves the same way from the command line.` },
         502,
@@ -320,8 +335,8 @@ export const asks = new Hono()
       const { acceptance, file } = await accept(e, id, step, message);
       return c.json({ step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file }, 202);
     } catch (err) {
+      if (isRefusal(err)) throw err;
       const said = err instanceof Error ? err.message : String(err);
-      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json(
         {
           error: `Could not accept ${step}'s loop as it stands: ${said}. \`wf accept ${id} ${step} --message "<why>"\` accepts the same way from the command line.`,

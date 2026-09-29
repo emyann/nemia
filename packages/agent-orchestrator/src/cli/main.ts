@@ -3,8 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline/promises';
-import { Effect } from 'effect';
+import { Cause, Effect, Exit, Fiber } from 'effect';
 import {
   addPass,
   breakdownLines,
@@ -12,11 +11,8 @@ import {
   summaryDue,
   summaryLine,
   type Interval,
-  AGENT_FACING,
   CHECK_AFFECTING,
   Conflict,
-  Invalid,
-  LESSON,
   accept,
   feedCursorRefusal,
   feedLineWords,
@@ -41,7 +37,6 @@ import {
   merges,
   sendBackTo,
   toDecideWords,
-  approvalWordsRefusal,
   ceilingLines,
   ceilings,
   queueInInbox,
@@ -75,7 +70,6 @@ import {
   startFromInbox,
   workflowAt,
   artifactFiles,
-  budgetRefusal,
   budgetWord,
   artifactLines,
   artifacts,
@@ -98,12 +92,10 @@ import {
   list,
   unjudgedOf,
   listRuns,
-  messageRefusal,
   missingArtifacts,
   namesInOrder,
   outputLines,
   owedFields,
-  parseGlobs,
   planLines,
   planStopped,
   readArtifact,
@@ -129,22 +121,21 @@ import {
   verdictWord,
   waitAdvice,
   waitWord,
-  type AgentPlace,
   agentPlaces,
   agentSkillsFound,
   cardSkills,
   findAgent,
   formerKeyLines,
   listAgents,
-  type ForgetHow,
-  type RetryHow,
-  type RetryMode,
   agentVersion,
   viewedOnce,
   workflowFolder,
 } from './runner.ts';
-import { agentCard, dollarsOf } from './workflow.ts';
-import { runMain } from './cli/run-main.ts';
+import { agentCard } from './workflow.ts';
+import { usage, confirmed } from './flags.ts';
+import { PLAN_HELP, INBOX_HELP, startHow, planHow, inboxQueueHow, inboxAddHow } from './start.ts';
+import { rmHow, pruneHow, holdHow, agentsHow } from './runs.ts';
+import { DECIDE_HELP, decideHow, retryHow, approveHow, roundHow, acceptHow } from './asks.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -313,503 +304,41 @@ a run's task ids carry the run and the step, so its output already names the wor
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
-const usage = (message: string): never => {
-  throw new Invalid({ message });
-};
-
-const PLAN_HELP = `wf plan <folder> [--repo .]
-
-Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.
-That is the record wf start --after writes, so the tick files a card's run once its parents have shipped, and
-every card is a decision at its own wf decide. Nothing else is written: the runs and their after are the plan.
-It prints a line per card: the card, its run, its workflow, and what it waits on.
-
-A card is one markdown file, <card>.md, and README.md beside the cards says what the plan is for:
-
-    ---
-    workflow: dev     # a workflow under <repo>/workflows/, or a path from the plan folder
-    after: b, c       # the cards whose runs ship first; without it, the card starts at once
-    ---
-    Put the flag on the settings page, now that it is parsed and stored.
-
-The body is the run's brief. Refused by name before any run is started: a key a card does not have, a card
-with no workflow: or an empty body, an after: naming a card the folder does not have, cards that wait on
-each other, a file that is not .md, a folder with no card, and a card whose workflow does not load.
-
-The folder says what --after, --workflows and --no-worktree would, and wf plan refuses them. A wf start that
-refuses part-way stops the plan: the runs it started stand, and it prints a wf start for each card left.`;
-
-const INBOX_HELP = `wf inbox
-wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
-wf inbox queue <name> [--workflow <w>] [--off]
-wf inbox rm <name>
-
-An inbox is cards before they are started: \${WF_ROOT:-~/.agent-workflows}/inbox/, one <name>.md per card, beside
-runs/. A card is a plan's card with two differences — its keys optional, and no after:, since what it waits on
-is said at start:
-
-    ---
-    workflow: dev              # what runs it, chosen at start when the card does not say
-    repo: /home/me/code/app    # the repository it is about, as an absolute path
-    queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: wf inbox queue writes it
-    gate: plan                 # the step whose closeout waits for wf approve in the run it starts
-    ---
-    Cache the engine's views between passes.
-
-  wf inbox       lists each card: its name, the first line of its body, its workflow and repo when set, and
-                 started as <runId> for a card a run's record says it was started as — a card whose removal failed.
-                 An entry that does not read as a card is listed with why.
-  wf inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
-                 all; --workflow and --repo write the keys, over a file's own.
-  wf inbox queue marks a card to start on its own: each pass, once every run has been advanced and a run slot is
-                 free (WF_MAX_RUNS; always, with no cap), the tick starts the oldest queued card, one per pass, on its
-                 workflow: and its repo: or the directory wf up runs in. --workflow writes the key too; --off, or
-                 wf inbox rm, takes the card back. wf inbox says queued and its place; a start the package refused
-                 is said there and on wf up's line, and the card is not tried again until it is edited or queued again
-                 (or, naming no repo:, wf up runs in another repository); a start that failed otherwise is said once,
-                 and tried again on the next pass.
-  wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
-
-Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
-directory, a queued: that is not a time or is on a card with no workflow:, a gate: naming more than one step or
-saying true — and, at start, one naming no step of the workflow — an add with no idea, and a name that would
-leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
-already queued, and of one a run was started from.`;
-
-const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
-
-What the run produced, and the choice it leaves you. It reports facts and runs nothing. On a run waiting
-on you, after the run's verdicts and before each step's closeout:
-
-  touched   what each result branch changed against the run's base: files and lines by workspace
-            package or top-level directory, then, each only when true, the agent-facing files and
-            the check-affecting ones
-  lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
-  in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
-
-and beside each step's check, what its session consumed — used, cost — or that nobody measured it, then
-its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
-long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
-each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
-Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
-wf approve that lets what follows be filed and the wf retry --message that sends it back.
-
-Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
-and then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
-what happens when the work is done; that prose is printed with the wf approve that runs it and the wf
-retry --message that sends the work back. A workflow with no such step ends by handing you a branch, and
-the git commands are printed instead: ship it, drop it. Neither is run.
-
-  --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
-                       screen; the touched lines still say which files are check-affecting
-
-  check-affecting, the default --sensitive:  ${CHECK_AFFECTING.join(', ')}
-  agent-facing:                              ${AGENT_FACING.join(', ')}
-  where the next agent reads:                ${LESSON.join(', ')}, and <workspace>/docs/ for each
-                                             npm workspace in the base's package.json — not any docs/
-
-A workspace glob is read as npm reads it, ./packages/* as packages/*. One with ** is named on the screen,
-and a file still counts once: in the outermost package on its way, and as a lesson only in its docs/.
-
-A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
-them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
-
-/** `wf decide`'s one flag: `--sensitive`, once, with at least one glob. Anything else is refused before a run is read. */
-function decideHow(argv: string[]): { sensitive?: string[] } {
-  let sensitive: string[] | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg !== '--sensitive')
-      usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
-    if (sensitive) usage('wf decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
-    const value = argv[++i];
-    const globs = value === undefined || value.startsWith('--') ? [] : parseGlobs(value);
-    if (!globs.length)
-      usage(
-        '--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".',
-      );
-    sensitive = globs;
-  }
-  return { sensitive };
-}
+/** The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number. */
+const SIGNALS = [
+  ['SIGINT', 130],
+  ['SIGTERM', 143],
+  ['SIGHUP', 129],
+] as const;
 
 /**
- * How a verb reads its flags: the value flags it takes and what each takes, as its refusal says it; its switches; the value flags it takes
- * more than once; flags it refuses with a reason of their own; and the refusals of an argument it does not take and of a flag given twice.
+ * Runs `program` as the process's command. SIGINT, SIGTERM and SIGHUP interrupt it, and once its finalizers have run the process exits 130,
+ * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that very
+ * value, so a refusal's `exitCode` reaches `bin/wf.ts`. The handlers are its own, taken off as it ends: a second signal while the finalizers
+ * run is Node's to handle.
+ *
+ * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
+ * handles no SIGHUP, and it hands no failure back to the caller.
  */
-type FlagRules = {
-  takes: Readonly<Record<string, string>>;
-  switches?: readonly string[];
-  repeats?: readonly string[];
-  refuses?: Readonly<Record<string, string>>;
-  unknown: (arg: string) => string;
-  twice: (flag: string) => string;
-};
-
-/**
- * A verb's flags after its one positional argument — `wf start`'s and `wf plan`'s — each value flag also as `--flag=<value>`. Anything else is
- * refused before anything is read: a flag the verb does not take, a misspelt one, a value flag with no value or given twice, and a second
- * positional: dropped instead, a misspelt `--after` would start a run that waits on nothing, filed on the next pass.
- */
-function readFlags(argv: string[], rules: FlagRules): { values: Record<string, string[]>; switches: string[] } {
-  const values: Record<string, string[]> = {};
-  const switches: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (rules.switches?.includes(arg)) {
-      switches.push(arg);
-      continue;
-    }
-    const joined = arg.startsWith('--') && arg.includes('=');
-    const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
-    if (rules.refuses && Object.hasOwn(rules.refuses, name)) usage(rules.refuses[name]);
-    if (!Object.hasOwn(rules.takes, name)) usage(rules.unknown(arg));
-    const value = joined ? arg.slice(arg.indexOf('=') + 1) : argv[++i];
-    if (!value || (!joined && value.startsWith('--'))) usage(`${name} takes ${rules.takes[name]}`);
-    if (values[name] && !rules.repeats?.includes(name)) usage(rules.twice(name));
-    (values[name] ??= []).push(value);
-  }
-  return { values, switches };
-}
-
-type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[]; gates: string[]; brief?: string };
-
-/** What each of `wf start`'s value flags takes, as its refusal says it. */
-const START_TAKES = {
-  '--workflows': 'the workflow folder: wf start <brief> --workflows <dir>',
-  '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
-  '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
-  '--input': "a file to hand the run's steps: wf start <brief> --input <file> [--input <file> ...]",
-  '--gate':
-    'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
-  '--brief':
-    'what the run is asked to do in place of an inbox card\'s body, as text or a file: wf start <inbox>/<name>.md --brief "<brief>"',
-} as const;
-
-/**
- * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on, `--input <file>`
- * as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, and `--no-worktree`.
- */
-function startHow(argv: string[]): StartHow {
-  const { values, switches } = readFlags(argv, {
-    takes: START_TAKES,
-    switches: ['--no-worktree'],
-    repeats: ['--after', '--input', '--gate'],
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>".`
-        : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`,
-    twice: (flag) =>
-      `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
+export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
+  return new Promise<A>((resolve, reject) => {
+    const fiber = Effect.runFork(program);
+    let stoppedWith: number | undefined;
+    const stops = SIGNALS.map(([signal, code]) => {
+      const stop = () => {
+        stoppedWith = code;
+        Effect.runFork(Fiber.interrupt(fiber));
+      };
+      process.once(signal, stop);
+      return [signal, stop] as const;
+    });
+    fiber.addObserver((exit) => {
+      for (const [signal, stop] of stops) process.off(signal, stop);
+      if (stoppedWith !== undefined) process.exit(stoppedWith);
+      if (Exit.isSuccess(exit)) resolve(exit.value);
+      else reject(Cause.squash(exit.cause));
+    });
   });
-  return {
-    workflows: values['--workflows']?.[0],
-    repo: values['--repo']?.[0],
-    isolate: !switches.length,
-    after: values['--after'] ?? [],
-    inputs: values['--input'] ?? [],
-    gates: values['--gate'] ?? [],
-    ...(values['--brief'] ? { brief: values['--brief'][0] } : {}),
-  };
-}
-
-/**
- * `wf plan`'s one flag, after the folder: `--repo <r>`. `wf start`'s others are refused by name, each with why the folder says it instead;
- * and anything else, as `wf start` refuses it.
- */
-function planHow(argv: string[]): { repo?: string } {
-  const { values } = readFlags(argv, {
-    takes: { '--repo': 'the repository the plan works on: wf plan <folder> --repo <r>' },
-    refuses: {
-      '--after':
-        'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
-      '--workflows':
-        'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
-      '--input':
-        'wf plan does not take --input: a card has no input files of its own. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.',
-      '--gate':
-        "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
-      '--no-worktree':
-        'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
-    },
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r>.`
-        : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`,
-    twice: () => 'wf plan takes --repo once: a plan works on one repository.',
-  });
-  return { repo: values['--repo']?.[0] };
-}
-
-/** `wf agents`' flags: `--repo <r>` once, and for a card `--from repo|yours` once, when both places have an agent of that name. */
-function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } {
-  const { values } = readFlags(argv, {
-    takes: {
-      '--repo': 'the repository whose workflows/agents to read: wf agents --repo <r>',
-      '--from': 'which place the agent is in: wf agents card <name> --from repo|yours',
-    },
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-        : `wf agents takes no argument but card <name>: wf agents, or wf agents card ${arg}.`,
-    twice: (flag) => `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
-  });
-  const from = values['--from']?.[0];
-  if (from !== undefined && from !== 'repo' && from !== 'yours')
-    usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
-  return { repo: values['--repo']?.[0], ...(from === 'repo' || from === 'yours' ? { from } : {}) };
-}
-
-/** `wf inbox queue`'s flags, after the card's name: `--workflow <w>` once, and `--off` — not both. */
-function inboxQueueHow(argv: string[]): { workflow?: string; off: boolean } {
-  const { values, switches } = readFlags(argv, {
-    takes: { '--workflow': 'the workflow the card starts on, by name or as a path: wf inbox queue <name> --workflow <w>' },
-    switches: ['--off'],
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
-        : `wf inbox queue queues one card, and ${arg} is a second: wf inbox queue <name>, once per card.`,
-    twice: () => 'wf inbox queue takes --workflow once: a card starts on one workflow.',
-  });
-  const workflow = values['--workflow']?.[0];
-  if (switches.length && workflow !== undefined)
-    usage('--off takes the card out of the queue, and --workflow writes what starts it: give one of them.');
-  return { ...(workflow !== undefined ? { workflow } : {}), off: switches.length > 0 };
-}
-
-/** `wf inbox add`'s flags, after the idea: `--workflow <name>` and `--repo <path>`, once each. */
-function inboxAddHow(argv: string[]): { workflow?: string; repo?: string } {
-  const { values } = readFlags(argv, {
-    takes: {
-      '--workflow': 'the workflow to start the card on, by name or as a path: wf inbox add "<idea>" --workflow <name>',
-      '--repo': 'the repository the idea is about: wf inbox add "<idea>" --repo <path>',
-    },
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name> and --repo <path>.`
-        : `wf inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — wf inbox add "<idea>" — or give it as a file: wf inbox add ./idea.md.`,
-    twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
-  });
-  return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
-}
-
-/**
- * `wf rm`'s arguments: the runs to forget, each once, and its two switches. Refused before any run is read: a flag it does not take, and
- * `--force-unmerged` without `--delete-branches` — it forces what that flag deletes, and alone would delete nothing, silently.
- */
-function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
-  const ids: string[] = [];
-  const how: ForgetHow = {};
-  for (const arg of argv) {
-    if (arg === '--delete-branches') how.deleteBranches = true;
-    else if (arg === '--force-unmerged') how.forceUnmerged = true;
-    else if (arg.startsWith('-'))
-      usage(
-        `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]].`,
-      );
-    else if (!ids.includes(arg)) ids.push(arg);
-  }
-  if (how.forceUnmerged && !how.deleteBranches) {
-    usage(
-      "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.",
-    );
-  }
-  if (!ids.length && argv.length) usage('wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.');
-  return { ids, how };
-}
-
-/** `wf prune`'s arguments: the runs to prune, each once — none is every run — and its three switches. Refused before any run is read: a flag it does not take. */
-function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: boolean; artifacts: boolean } {
-  const ids: string[] = [];
-  let unmerged = false;
-  let yes = false;
-  let artifacts = false;
-  for (const arg of argv) {
-    if (arg === '--unmerged') unmerged = true;
-    else if (arg === '--yes') yes = true;
-    else if (arg === '--artifacts') artifacts = true;
-    else if (arg.startsWith('-'))
-      usage(
-        `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
-      );
-    else if (!ids.includes(arg)) ids.push(arg);
-  }
-  return { ids, unmerged, yes, artifacts };
-}
-
-/**
- * `wf hold`'s arguments after the run: `--until <runId>`, once for each run to wait on, or `--off` alone. Refused before any run is read:
- * neither, both, a flag it does not take, and `--until` with no run. A run named twice is the verb's to refuse (`holdRefusal`), in its words.
- */
-function holdHow(argv: string[]): { until: string[]; off: boolean } {
-  const shape = 'wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off';
-  const until: string[] = [];
-  let off = false;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--off') off = true;
-    else if (arg === '--until' || arg.startsWith('--until=')) {
-      const id = arg === '--until' ? argv[++i] : arg.slice('--until='.length);
-      if (!id || id.startsWith('-')) usage(`--until takes the run to wait on, by id: ${shape}.`);
-      until.push(id);
-    } else usage(`wf hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${shape}.`);
-  }
-  if (off && until.length) usage(`wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${shape}.`);
-  if (!off && !until.length) usage(`wf hold needs the runs to wait on, or --off to lift a hold: ${shape}.`);
-  return { until, off };
-}
-
-/** A person's yes, asked on the terminal: false with no terminal to ask on, and for anything but y or yes. */
-async function confirmed(question: string): Promise<boolean> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    return /^y(es)?$/i.test((await rl.question(question)).trim());
-  } finally {
-    rl.close();
-  }
-}
-
-/** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
-const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message', '--budget'];
-
-/**
- * `wf retry`'s one choice of how, read off its flags: at most one way, `--model` with a name, and `--message` at most once, with what
- * to tell the step — refused, before a run is read, when it is empty or rides on `--recheck` (`messageRefusal`). The argument after
- * `--message` is the answer whatever it starts with, since an answer about a flag names it ("--flag stays"): only one of this verb's own
- * flags, alone, reads as the answer left out, and `--message=<answer>` carries even that.
- */
-function retryHow(argv: string[]): RetryHow {
-  const given: Array<{ mode: RetryMode; model?: string }> = [];
-  let message: string | undefined;
-  let budget: number | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--nudge' || arg === '--fresh' || arg === '--recheck') given.push({ mode: arg.slice(2) as RetryMode });
-    else if (arg === '--model') {
-      const model = argv[++i];
-      if (!model || model.startsWith('--')) usage('--model takes the model to run the new session on: wf retry <runId> <step> --model <m>');
-      given.push({ mode: 'fresh', model });
-    } else if (arg === '--message' || arg.startsWith('--message=')) {
-      if (message !== undefined)
-        usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
-      const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
-      if (text === undefined) return usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
-      if (arg === '--message' && RETRY_FLAGS.includes(text)) {
-        usage(
-          `--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`,
-        );
-      }
-      message = text;
-    } else if (arg === '--budget' || arg.startsWith('--budget=')) {
-      if (budget !== undefined)
-        usage('wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.');
-      budget = amountOf(
-        arg === '--budget' ? argv[++i] : arg.slice('--budget='.length),
-        "the most the step's tries may cost together, in dollars, above what they have cost",
-        'wf retry <runId> <step> --budget <amount>',
-      );
-    } else
-      usage(
-        `wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
-      );
-  }
-  if (given.length > 1) usage('wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.');
-  const how: RetryHow = {
-    ...(given[0] ?? { mode: 'nudge' }),
-    ...(message !== undefined ? { message } : {}),
-    ...(budget !== undefined ? { budget } : {}),
-  };
-  const wrong = messageRefusal(how) ?? budgetRefusal(how);
-  if (wrong) usage(wrong);
-  return how;
-}
-
-/**
- * `wf approve`'s one flag, after the run and the step: `--message "<words>"`, or `--message=<words>`, once — the next argument is the words
- * whatever it starts with, as `wf retry`'s is — refused before a run is read when it is missing or empty (`approvalWordsRefusal`). Anything
- * else is refused.
- */
-function approveHow(argv: string[]): string | undefined {
-  let message: string | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg !== '--message' && !arg.startsWith('--message=')) {
-      usage(
-        `wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`,
-      );
-    }
-    if (message !== undefined)
-      usage('wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".');
-    const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
-    if (text === undefined)
-      usage('--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".');
-    message = text;
-  }
-  const wrong = approvalWordsRefusal(message);
-  if (wrong) usage(wrong);
-  return message;
-}
-
-/** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
-function amountOf(text: string | undefined, takes: string, form: string): number {
-  const amount = text === undefined ? undefined : dollarsOf(text);
-  if (amount === undefined)
-    usage(
-      `--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
-    );
-  return amount!;
-}
-
-/** `wf round`'s arguments after the run: the step that closes the loop, when there is more than one, and `--budget <amount>`, at most once each. */
-function roundHow(argv: string[]): { stepName?: string; budget?: number } {
-  let stepName: string | undefined;
-  let budget: number | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--budget' || arg.startsWith('--budget=')) {
-      if (budget !== undefined)
-        usage(
-          'wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.',
-        );
-      budget = amountOf(
-        arg === '--budget' ? argv[++i] : arg.slice('--budget='.length),
-        'the most a step of the loop may cost together, in dollars, above what it has cost',
-        'wf round <runId> [<step>] --budget <amount>',
-      );
-    } else if (arg.startsWith('--') || stepName !== undefined) {
-      usage(
-        'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
-      );
-    } else stepName = arg;
-  }
-  return { ...(stepName !== undefined ? { stepName } : {}), ...(budget !== undefined ? { budget } : {}) };
-}
-
-/**
- * `wf accept`'s arguments after the run: the step that closes the loop, when there is more than one, and `--message "<why>"`, at most once
- * each — the next argument is the words whatever it starts with, as `wf approve`'s is. Words that are missing or empty are refused where
- * every other refusal of this verb is (`acceptAsk`), which knows the run and can name it.
- */
-function acceptHow(argv: string[]): { stepName?: string; message?: string } {
-  let stepName: string | undefined;
-  let message: string | undefined;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === '--message' || arg.startsWith('--message=')) {
-      if (message !== undefined)
-        usage('wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".');
-      const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
-      if (text === undefined)
-        usage('--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".');
-      message = text;
-    } else if (arg.startsWith('--') || stepName !== undefined) {
-      usage(
-        'wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".',
-      );
-    } else stepName = arg;
-  }
-  return { ...(stepName !== undefined ? { stepName } : {}), ...(message !== undefined ? { message } : {}) };
 }
 
 /**

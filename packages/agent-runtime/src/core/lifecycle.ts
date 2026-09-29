@@ -42,6 +42,7 @@
  * where it was. A final state's snapshot is `status: 'done'` and `can` is false there for every event.
  */
 import { setup, transition as xTransition } from 'xstate';
+import { toDirectedGraph } from 'xstate/graph';
 import { endOf, phaseWordOf, type Ended, type Outcome } from './session.ts';
 import type { Action, EndReason, Sighting } from './domain.ts';
 
@@ -438,33 +439,38 @@ export const withoutEdge = (from: LifecycleState, event: EventType): Move => mov
 /** One edge of the machine, as its table says it: where it leaves from, on what, under which guard, to where, doing what. */
 export type Edge = { from: LifecycleState; event: EventType; guard?: string; to: LifecycleState; action: string };
 
+/** Each state of a machine, as XState's public graph of it (`toDirectedGraph`) gives it: its name, its kind, its edges. */
+const nodesOf = (machine: ReturnType<typeof machineOf>) => toDirectedGraph(machine).children;
+
+/** The states of a machine, in the order its table names them. */
+export const statesOf = (machine = MACHINE): LifecycleState[] => nodesOf(machine).map((n) => n.stateNode.key as LifecycleState);
+
 /**
- * Every edge of a machine, read off XState's own nodes, so the list is the machine and not a copy of it. A guard named in
- * the table is kept as its name; one given as an object, by its type.
+ * Every edge of a machine, read off XState's public graph of it (`toDirectedGraph`), so the list is the machine and not a
+ * copy of it. An edge with no target is drawn back to its source. A guard named in the table is kept as its name; one
+ * given as an object, by its type.
  */
 export const edgesOf = (machine = MACHINE): Edge[] =>
-  Object.entries(machine.root.states).flatMap(([from, node]) =>
-    [...node.transitions.entries()].flatMap(([event, defs]) =>
-      defs.map((d) => ({
-        from: from as LifecycleState,
-        event: event as EventType,
-        ...(d.guard ? { guard: typeof d.guard === 'string' ? d.guard : (d.guard as { type: string }).type } : {}),
-        to: (d.target?.[0]?.key ?? from) as LifecycleState,
-        action: d.actions.map((a) => (a as { type: string }).type).join(' '),
-      })),
-    ),
+  nodesOf(machine).flatMap((node) =>
+    node.edges.map(({ source, target, label, transition: t }) => ({
+      from: source.key as LifecycleState,
+      event: label.text as EventType,
+      ...(t.guard ? { guard: typeof t.guard === 'string' ? t.guard : (t.guard as { type: string }).type } : {}),
+      to: target.key as LifecycleState,
+      action: t.actions.map((a) => (a as { type: string }).type).join(' '),
+    })),
   );
 
 /** The final states: a task settled, whose record takes no event. */
 export const FINAL: ReadonlySet<LifecycleState> = new Set(
-  Object.entries(MACHINE.root.states)
-    .filter(([, n]) => n.type === 'final')
-    .map(([k]) => k as LifecycleState),
+  nodesOf(MACHINE)
+    .filter((n) => n.stateNode.type === 'final')
+    .map((n) => n.stateNode.key as LifecycleState),
 );
 
 /**
  * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,
- * and `src/core/lifecycle.test.ts` fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
+ * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-` in a state's id, so `input-required` is
  * drawn under its own name, by an id without one.
  */
 export const diagram = (machine = MACHINE): string => {

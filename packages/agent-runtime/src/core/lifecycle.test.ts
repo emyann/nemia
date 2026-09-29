@@ -14,7 +14,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {
   decide,
   fold,
@@ -31,9 +30,9 @@ import {
   diagram,
   edgesOf,
   FINAL,
-  MACHINE,
   machineWithout,
   STATES,
+  statesOf,
   transition,
   withoutEdge,
   type LifecycleEvent,
@@ -260,7 +259,7 @@ test("what the tick's memo rests on: a settled task decides nothing in every jou
 });
 
 test('the machine: its states are the ones named, each edge names one action, every state but a final one leaves or holds by an edge, every state is reached, and a guarded edge falls through to one with no guard, so a guard never leaves an event unanswered', () => {
-  assert.deepEqual(Object.keys(MACHINE.root.states), [...STATES]);
+  assert.deepEqual(statesOf(), [...STATES]);
   assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
   const actions = new Set(['nothing', 'start', 'spawn', 'record-end', 'stop', 'settle']);
   for (const e of edgesOf()) assert.ok(actions.has(e.action), `${e.from} on ${e.event} does ${e.action}, not one action`);
@@ -288,12 +287,14 @@ test('the machine: its states are the ones named, each edge names one action, ev
   for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
 });
 
-test("the README's lifecycle diagram is the machine's, generated", () => {
-  const readme = fs.readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
-  const block = readme.match(/<!-- lifecycle:begin.*-->\n```mermaid\n([\s\S]*?)\n```\n<!-- lifecycle:end -->/);
-  assert.ok(block, 'the README holds the diagram between its markers');
-  assert.equal(block[1], diagram(), 'regenerate it: node -e "import(\'./src/core/lifecycle.ts\').then((m) => console.log(m.diagram()))"');
-  assert.notEqual(diagram(machineWithout('working', 'LOST')), diagram(), 'the pin sees an edge taken away');
+test('the diagram is drawn from the machine: an edge taken away takes exactly its one line with it', () => {
+  const line = '  working --> ending: LOST / record-end';
+  const whole = diagram().split('\n');
+  assert.ok(whole.includes(line), 'the edge is drawn');
+  assert.deepEqual(
+    diagram(machineWithout('working', 'LOST')).split('\n'),
+    whole.filter((l) => l !== line),
+  );
 });
 
 test('UNREAD: a pass that could not read the harness does nothing to an attempt in flight, past its grace too, and never reads it lost', () => {

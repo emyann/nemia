@@ -19,7 +19,7 @@
  *
  * Pure: handed the folder's files, never reading one (`readPlan` in start.ts reads them).
  */
-import { isReadme, splitFrontmatter, WorkflowError } from '../workflow.ts';
+import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
 /** One entry of a plan folder: its name there — a folder inside it with a trailing `/` — and, for a `.md` file, its text. */
 export type PlanFile = { file: string; text: string };

@@ -30,7 +30,7 @@
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import type { Run } from '../run.ts';
-import { isReadme, splitFrontmatter, WorkflowError } from '../workflow.ts';
+import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `wf inbox rm` and a start name it by. */

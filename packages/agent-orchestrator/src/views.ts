@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { denialText, type Engine, type TaskView } from './runtime-client.ts';
 import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check/check.ts';
 import type { Consumed } from './radius.ts';
-import type { Workflow } from './workflow.ts';
+import type { Workflow } from './step/step.ts';
 import {
   decision,
   gated,

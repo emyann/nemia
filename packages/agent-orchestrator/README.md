@@ -159,7 +159,7 @@ workflow folder works too, looked at first. The board lists them, and the folder
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
 
 A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
-in authoring.ts. Each step is rendered by `renderStep` (workflow.ts), which is the parser run backwards: the keys the step sets, in
+in authoring.ts. Each step is rendered by `renderStep` (workflow/step-file.ts), which is the parser run backwards: the keys the step sets, in
 the order listed below, each written as the parser reads it (a list as `a, b`, a count as its number, `output:` as the file it
 names), then the body. Before a byte is written, the folder as it would be is parsed in memory by `parseFolder`, the same reading
 `loadWorkflows` uses, with the schemas read from the folder as they are. So anything the parser would refuse is refused first, in
@@ -183,7 +183,7 @@ reads as it was written.
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
-it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
+it cannot use (`src/workflow/step-file.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
 ([below](#trying-again-retries-and-wf-retry)). A run frozen with the key still loads, lists and files, without it.
 
@@ -494,9 +494,9 @@ any task or any file (`node --test` takes a glob, so a rule on the file's path i
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
 then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev-planned's plan brief.
 
-**The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
+**The engine is the source of these words.** The permission modes and efforts `src/harness/harness.ts` refuses
 are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
-`CODEX_EFFORTS`, which it exports. They are copies because `workflow.ts` is pure and imports no runtime
+`CODEX_EFFORTS`, which it exports. They are copies because `harness/harness.ts` is pure and imports no runtime
 (`docs/architecture.md`), and the engine refuses a word only when the step is filed, after the run exists.
 `test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
@@ -2702,7 +2702,17 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format — pure: parse a folder of markdown from its text (`parseFolder`), and render a step or an agent back to it (`renderStep`, `renderAgent`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
+| `src/workflow.ts` | the format — pure, the entry `agent-orchestrator/workflow`: each name it exports re-exported by name from the folders below, and nothing else |
+| `src/step/step.ts` | a step's shape — pure: what a step file is once read (`Workflow`), its closed list of keys (`STEP_KEYS`, `STEP_KEY_MEANINGS`), the fields every closeout carries (`CLOSEOUT_FIELDS`, `outputFields`), and what every reader of a markdown file shares (`WorkflowError`, `splitFrontmatter`) |
+| `src/harness/harness.ts` | the harnesses and the words each takes — pure: `HARNESSES`, `PERMISSION_MODES`, `SANDBOXES`, `EFFORTS`, `CONTEXT_WINDOWS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
+| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
+| `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
+| `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
+| `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |
+| `src/workflow/validate.ts` | a folder's steps checked together — pure: a cycle, a dangling `after`, an `input:` on work that has not finished, a workspace, a mode or a loop the team cannot run (`validate`), and the graph the `after` edges draw (`orderSteps`, `upstreamOf`, `fansOut`, `terminalSteps`) |
+| `src/folder/folder.ts` | a folder of markdown from its text — pure: its step files (`stepFiles`), the names a step and the folders beside it may take, and every step read and checked together (`parseFolder`) |
+| `src/agents/agents.ts` | an agent — pure: its keys (`AGENT_KEYS`), read and written back (`parseAgent`, `renderAgent`), the skills it names and what they cost a turn (`skillTurnCost`), and its card (`agentCard`) |
+| `src/skills/skills.ts` | a skill on an agent — pure: the entry its card lists (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`, `skillDraftOf`), and its `preload:` line (`withPreload`) |
 | `src/workflow-store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |

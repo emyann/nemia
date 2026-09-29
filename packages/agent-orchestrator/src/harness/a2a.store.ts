@@ -13,7 +13,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { REMOTE_NAME, REMOTE_PREFIX } from '../workflow.ts';
+import { REMOTE_NAME, REMOTE_PREFIX } from './harness.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** The file, in the store's root (`$WF_ROOT`). */

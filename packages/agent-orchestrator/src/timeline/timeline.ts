@@ -7,7 +7,8 @@
  */
 import { dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../radius.ts';
 import { hasStarted, roundIn, type Run } from '../run.ts';
-import { loopSpan, type Workflow } from '../workflow.ts';
+import type { Workflow } from '../step/step.ts';
+import { loopSpan } from '../workflow/index.ts';
 
 /**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the

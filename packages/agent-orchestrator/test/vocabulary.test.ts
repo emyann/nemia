@@ -1,8 +1,8 @@
 /**
  * The parser's words are the engine's.
  *
- * `workflow.ts` refuses a permission mode, a sandbox or an effort its step's harness does not take, at load, before a run
- * exists. It cannot ask the engine — it is pure, and imports no runtime (`docs/architecture.md`) — so it keeps a
+ * The format refuses a permission mode, a sandbox or an effort its step's harness does not take, at load, before a run
+ * exists. It cannot ask the engine — it is pure, and imports no runtime (`docs/architecture.md`) — so `harness/harness.ts` keeps a
  * copy, and this holds the copy to the lists the runtime exports: the source. A copy that drifts refuses a word the
  * engine takes, `manual` on Claude Code or `bypassPermissions` on codex, and nothing else notices.
  *

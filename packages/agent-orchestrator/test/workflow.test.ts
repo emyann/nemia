@@ -34,7 +34,7 @@ import {
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
-import { shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
+import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -2397,7 +2397,7 @@ test('`renderStep` is the parser run backwards: every step of every folder there
   const root = path.dirname(TEAM_DEV);
   assert.ok(folders.length > 1, `the team and the examples are read: ${folders.join(', ')}`);
   for (const dir of folders) {
-    const steps = loadWorkflows(dir);
+    const steps = loadWorkflows(dir, placesOf(dir));
     const read = readIn(dir);
     const agents = loadAgents(agentsDir(dir));
     for (const step of steps) {

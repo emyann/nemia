@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { workflowsIn } from '../src/folder/folder.store.ts';
+import { workflowsIn, type Places } from '../src/folder/folder.store.ts';
 import { stepFiles } from '../src/folder/folder.ts';
 import { scratch } from './scratch.ts';
 
@@ -27,6 +27,20 @@ export const SHIPPED_HOLDERS = [
   path.join(import.meta.dirname, '..', '..', '..', 'workflows'),
   path.join(import.meta.dirname, '..', 'workflows'),
 ];
+
+/** The repository this package is checked out in: where a start of a shipped folder finds its harness's skills (`.claude/skills`). */
+export const REPO = path.join(import.meta.dirname, '..', '..', '..');
+
+/**
+ * Where a start of the folder `dir` looks for its agents and skills beyond the folder's own: the repository, for a shipped folder, as a
+ * start in this checkout gives it; nothing more for any other, such as the tests' team, which holds all it names.
+ */
+export const placesOf = (dir: string): Places =>
+  SHIPPED_HOLDERS.some(
+    (holder) => path.resolve(dir).startsWith(path.resolve(holder) + path.sep) || path.resolve(dir) === path.resolve(holder),
+  )
+    ? { repo: REPO }
+    : {};
 
 /** Every workflow folder shipped, read off the disk: a holder that holds steps itself, and each folder of steps in one. */
 export const shippedFolders = (): string[] =>

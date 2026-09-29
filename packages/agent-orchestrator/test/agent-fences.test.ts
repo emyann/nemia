@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
-import { shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
+import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -117,7 +117,8 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
 }
 
 /** Every step of every shipped folder, by its folder. */
-const shipped = (): { dir: string; step: Step }[] => FOLDERS.flatMap((dir) => loadWorkflows(dir).map((step) => ({ dir, step })));
+const shipped = (): { dir: string; step: Step }[] =>
+  FOLDERS.flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
 
 /** The step of the tests' team that names an agent, as its folder resolves it. */
 const stepOf = (agent: string): Step => loadWorkflows(TEAM_DEV).find((step) => step.agent?.name === agent)!;

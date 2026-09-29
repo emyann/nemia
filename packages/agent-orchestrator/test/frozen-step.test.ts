@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
-import { shippedFolders, TEAM_DEV } from './team.ts';
+import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';
 
 /** Every folder shipped (`team.ts`), and the tests' team's `dev`. */
 const FOLDERS = [...shippedFolders(), TEAM_DEV];
@@ -22,7 +22,7 @@ test("every step of every folder shipped and of the tests' team, frozen, reads b
   assert.ok(FOLDERS.includes(TEAM_DEV), `the team is read: ${FOLDERS.join(', ')}`);
   let agents = 0;
   for (const dir of FOLDERS) {
-    const steps = loadWorkflows(dir);
+    const steps = loadWorkflows(dir, placesOf(dir));
     assert.ok(steps.length > 0, `${dir} has steps`);
     for (const step of steps) {
       const decoded = decode(frozen(step));

@@ -285,7 +285,7 @@ none of them.
 **Since stage 4b (2026-09-25) the runtime keeps no budget at all.** The cap is a harness argument (`config.budgetUsd`),
 handed to a harness that keeps one as its own flag, and a cut it reports is carried on the attempt as `limit: 'budget'`,
 unjudged; whether a run went over its budget is the orchestrator's (`taskSpend`, `ownStatus` in agent-orchestrator's
-`run.ts`). That judgement reads what the runtime reported, and no harness reports a running session's spend — not `--bg`
+`status/status.ts`). That judgement reads what the runtime reported, and no harness reports a running session's spend — not `--bg`
 (above), not `claude -p`, whose one `result` is printed at its end, not `codex exec`, which reports no cost. So the
 orchestrator can say a run is over its budget only after an attempt has ended, and cannot stop a session mid-spend: the
 one live bound is still the harness's own cap, on a `claude` job alone. A harness that streamed its spend would let the
@@ -998,7 +998,7 @@ a newer run's first step. A time that does not parse orders its task last, never
 Both doors refuse it at any value, `0` and `undefined` as an own key included (exit 2, naming `queued: true` and `admit`),
 and a journal that carries one from before is folded unread; `ae ls` prints no priority. The run's momentum it carried
 until stage 4c is agent-orchestrator's `momentumOf` (`src/cap/cap.ts`), read off the run records by the filing rules
-(`stepMomentum`, `MOMENTUM` in `src/run.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
+(`stepMomentum`, `MOMENTUM` in `src/status/status.ts`). What was left of it — no preemption, no aging — is the orchestrator's now,
 and still true there: nothing running is stopped for a waiting task, and a steady stream of runs in flight keeps a new
 run's first step waiting for as long as it lasts.
 

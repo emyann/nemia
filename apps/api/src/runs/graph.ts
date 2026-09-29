@@ -17,7 +17,7 @@ export type RunGraph = { roots: string[]; edges: GraphEdge[] };
  * from each looping step back to its target. Only between the steps given: an `after` or `loop:` naming anything else
  * draws nothing and makes no root of the step — which on a workflow `validate` accepts never happens, and on a record
  * edited by hand keeps every step reachable from the card. A loop that does not say how many rounds runs the default (`DEFAULT_ROUNDS`),
- * as `capOf` in agent-orchestrator's run.ts reads it. Pure.
+ * as `capOf` in agent-orchestrator's status/status.ts reads it. Pure.
  */
 export function graphOf(steps: readonly Pick<Workflow, 'name' | 'after' | 'loop' | 'rounds'>[]): RunGraph {
   const names = new Set(steps.map((s) => s.name));

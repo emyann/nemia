@@ -4,7 +4,8 @@
  *
  * Pure, as run.ts is, and beneath it: run.ts imports what it needs from here, and nothing here imports run.ts but its types. What of
  * the section reads a step's standing — `retryable`, `retriesDue`, `retryRefusal`, `tryNote`, `retryLines`, `answerLines` — stays in
- * run.ts, since it calls `standing`, the gates and the budget there, and importing those here would make a cycle.
+ * run.ts, since it calls `standing`, the gates and the budget in `status/status.ts`, which imports this file: importing them here would
+ * make a cycle.
  */
 import type { Run, StepRecord } from './record/record.ts';
 import type { Workflow } from './step/step.ts';

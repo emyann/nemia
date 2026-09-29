@@ -187,7 +187,7 @@ export async function waitsIn(run: Run, reader: typeof e, git: BranchReader = br
 /**
  * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to resolve.
  *
- * The package decides it (`neverShips` in run.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when it may
+ * The package decides it (`neverShips` in its wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when it may
  * never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
 const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);

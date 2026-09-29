@@ -185,7 +185,7 @@ export const dueNote = (step: Workflow, run: Run, r: Retry): string =>
 
 /**
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try
- * before it replaced by that mode, on that model. Pure. Read off the ask files, waiting and consumed (`readAnswers` in store.ts),
+ * before it replaced by that mode, on that model. Pure. Read off the ask files, waiting and consumed (`readAnswers` in record.store.ts),
  * because the record keeps no message: the run's json stays the tick's, and what a person said stays in their own file.
  */
 export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): RetryAsk | undefined {

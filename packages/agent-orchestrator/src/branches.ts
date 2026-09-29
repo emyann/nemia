@@ -4,7 +4,7 @@
  * and what a branch holds against the run's base — the files it added, one file's text, its diff stat, what it touched and the diff of
  * what decides a check.
  *
- * Beneath the controllers, beside `store.ts` and `worktree.ts`, whose `git` helpers it reads through: it imports neither the engine nor
+ * Beneath the controllers, beside `record.store.ts` and `worktree.ts`, whose `git` helpers it reads through: it imports neither the engine nor
  * a controller, and `runner.ts` re-exports most of what it exports. What asks the engine as well — `parentOf`, `decide` — is
  * the controllers' (`views.ts`, `decide.ts`).
  */

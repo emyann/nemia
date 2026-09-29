@@ -121,7 +121,7 @@ type RunBase = {
    */
   after?: string[];
   /**
-   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in store.ts), by name, in the order given.
+   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order given.
    * Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a run
    * given none.
    */
@@ -140,7 +140,7 @@ type RunBase = {
   gates?: string[];
   /**
    * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>` —
-   * composed on read, as `cancelledAt` is (`readRun` in store.ts), and never written into the record: the tick owns the record, a person
+   * composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a person
    * owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when there
    * are none.
    */
@@ -173,7 +173,7 @@ type RunBase = {
   cancelledAt?: string;
   /**
    * When `wf prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
-   * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in store.ts), and never written into the record. A pruned run is read as it was,
+   * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record. A pruned run is read as it was,
    * off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree refuses
    * it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
    */
@@ -3677,7 +3677,7 @@ export function branchFates(
 
 /**
  * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, for each step the
- * record names (`checkStderr` in store.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could be
+ * record names (`checkStderr` in record.store.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could be
  * another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
  * `r-xyz-implement-check.stderr` is `r-xyz`'s.
  */
@@ -4087,7 +4087,7 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * A file a step writes into its workspace is committed by the hand-off and rides the branch — a
  * screenshot, under the step's name, into what ships — and a gitignored one never reaches the next
  * step's worktree at all. So the run makes a directory per step, beside the run's record and outside
- * every workspace (`artifactsDir` in store.ts), and says where it is. Mechanism, like the closeout: a
+ * every workspace (`artifactsDir` in record.store.ts), and says where it is. Mechanism, like the closeout: a
  * step does not have to find somewhere, and a workflow author does not have to remember to say where.
  *
  * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
@@ -4972,14 +4972,14 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
  * the workflow's checks its work was judged by (`workChecks`).
  *
  * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
- * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in store.ts).
+ * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in record.store.ts).
  * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.ts).
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
  *   (`fromRunSection`), gathered by tick.ts. Given to no other step: a run without `after`, and every step after a root, is composed
  *   without it.
- * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in store.ts): named, with `run.inputs`, under
+ * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`, under
  *   what was asked for.
  */
 export function composeBrief(

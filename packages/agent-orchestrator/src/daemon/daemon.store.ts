@@ -2,7 +2,7 @@
  * The store's two files about the tick itself: `tick.json`, the ceilings the last pass ran with, and `daemon.json`, who ticks the store —
  * read, judged by `daemon.ts`'s pure half against the process table, and written.
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
  * exports of it.
  */
 import fs from 'node:fs';

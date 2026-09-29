@@ -3,7 +3,7 @@
  * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`), and the agents of the two places the board lists them from (`agentPlaces`,
  * `listAgents`, `findAgent`).
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run is
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run is
  * changed by none of it: it froze its folder, and its agents, at `wf start`.
  */
 import fs from 'node:fs';

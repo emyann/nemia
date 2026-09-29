@@ -1,7 +1,7 @@
 /**
  * The feed (`feed.ts`) over the store's own file: `$WF_ROOT/feed.jsonl`, and this process's one fold of it, which the tick writes through.
  *
- * Beneath the controllers, beside `store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. `feed.ts` is the pure half — the
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. `feed.ts` is the pure half — the
  * line, the fold, what a pass owes — and this is the file: read, appended to and followed, each helper taking the file as an argument, and
  * the exports over the store's own.
  */

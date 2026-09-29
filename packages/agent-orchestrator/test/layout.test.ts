@@ -352,12 +352,12 @@ test('REFUSED on the source: a file outside keys/ importing its readers past key
 
 test('REFUSED on the source: a file outside retry/ or brief/ importing their pure code past the face', () => {
   const files = sourceFiles();
-  const planted = `import { retryable } from './retry/retry.ts';\nimport { composeBrief } from './brief/brief.ts';`;
+  const planted = `import { retryable } from '../retry/retry.ts';\nimport { composeBrief } from '../brief/brief.ts';`;
   assert.deepEqual(
-    faceBreaks(files, (f) => importsIn(f === 'src/verbs.ts' ? `${read(f)}\n${planted}` : read(f))),
+    faceBreaks(files, (f) => importsIn(f === 'src/cancel/cancel.verb.ts' ? `${read(f)}\n${planted}` : read(f))),
     [
-      'src/verbs.ts imports src/brief/brief.ts: import src/brief/index.ts, the face of src/brief/',
-      'src/verbs.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
+      'src/cancel/cancel.verb.ts imports src/brief/brief.ts: import src/brief/index.ts, the face of src/brief/',
+      'src/cancel/cancel.verb.ts imports src/retry/retry.ts: import src/retry/index.ts, the face of src/retry/',
     ],
   );
 });

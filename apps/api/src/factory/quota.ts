@@ -9,8 +9,9 @@
  * (`backoffOf`), until a good reading. What it holds is in this process's memory and nowhere else, judged against the time of each request:
  * a restart costs one ask.
  */
-import { spawn } from 'node:child_process';
+import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import os from 'node:os';
+import { Effect, Exit } from 'effect';
 
 /**
  * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The windows
@@ -310,7 +311,7 @@ export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEn
   return Object.fromEntries(Object.entries(env).filter(([key]) => !SESSION_KEYS.has(key)));
 }
 
-/** How long an asked process has, once its stdin is closed, to end of its own before it is killed. */
+/** How long an asked process has, once its stdin is closed or it is sent SIGTERM, to end before it is killed. */
 const END_MS = 2_000;
 
 /**
@@ -319,37 +320,48 @@ const END_MS = 2_000;
  */
 const ignoreClosedPipe = (): void => {};
 
+/** Whether `child` has not ended: no exit code and no signal yet. */
+const running = (child: ChildProcessWithoutNullStreams): boolean => child.exitCode === null && child.signalCode === null;
+
+/** Waits until `child` has ended, at most `ms`: whether it has. */
+const endedWithin = (child: ChildProcessWithoutNullStreams, ms: number): Effect.Effect<boolean> =>
+  Effect.callback<boolean>((resume) => {
+    if (!running(child)) return resume(Effect.succeed(true));
+    const ended = () => resume(Effect.succeed(true));
+    child.once('exit', ended);
+    return Effect.sync(() => child.off('exit', ended));
+  }).pipe(Effect.timeoutOrElse({ duration: ms, orElse: () => Effect.succeed(false) }));
+
 /**
- * Ask Claude Code for the plan's usage: start `claude` (USAGE_ARGS) in the system's temporary directory, write one `get_usage` request with
- * an id of its own, and read its stdout for the control_response with that id. Then close its stdin, on which it ends of its own; killed
- * if it has not in `END_MS`. Never rejects: every way it can go is an `Asked`.
+ * Lets an asked process go. Its stdin is closed, on which it ends of its own. An ask that came to an outcome does not wait for that: the
+ * process is killed if it has not ended in `END_MS`. One that did not — timed out, or interrupted — sends it SIGTERM and waits for it to
+ * end, SIGKILL after `END_MS`, so it is gone by the time the ask is. A process that never started has nothing to end.
  */
-export function askUsage({
-  command = 'claude',
-  timeoutMs = QUOTA_TIMEOUT_MS,
-  env = process.env,
-}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): Promise<Asked> {
-  const id = `usage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return new Promise((resolve) => {
-    let done = false;
-    let out = '';
-    let err = '';
-    const child = spawn(command, USAGE_ARGS, { cwd: os.tmpdir(), env: usageEnv(env), stdio: ['pipe', 'pipe', 'pipe'] });
-    const end = (signal: NodeJS.Signals | null) => {
-      child.stdin.end();
-      if (signal && child.exitCode === null) child.kill(signal);
-      const kill = setTimeout(() => child.exitCode === null && child.signalCode === null && child.kill('SIGKILL'), END_MS);
+const letGo = (child: ChildProcessWithoutNullStreams, cameTo: boolean): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    child.stdin.end();
+    if (child.pid === undefined || !running(child)) return;
+    if (cameTo) {
+      const kill = setTimeout(() => running(child) && child.kill('SIGKILL'), END_MS);
       kill.unref();
       child.once('exit', () => clearTimeout(kill));
-    };
-    const settle = (asked: Asked, signal: NodeJS.Signals | null = null) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      end(signal);
-      resolve(asked);
-    };
-    const timer = setTimeout(() => settle({ kind: 'timeout', ms: timeoutMs }, 'SIGTERM'), timeoutMs);
+      return;
+    }
+    child.kill('SIGTERM');
+    if (yield* endedWithin(child, END_MS)) return;
+    child.kill('SIGKILL');
+    yield* endedWithin(child, END_MS);
+  });
+
+/**
+ * What an asked process comes to: the control_response with `id` on its stdout, or how it could not start, or how it ended before it
+ * answered. It writes the request once it listens for all of them.
+ */
+const answered = (child: ChildProcessWithoutNullStreams, id: string): Effect.Effect<Asked> =>
+  Effect.callback<Asked>((resume) => {
+    const settle = (asked: Asked) => resume(Effect.succeed(asked));
+    let out = '';
+    let err = '';
     child.on('error', (e: NodeJS.ErrnoException) =>
       settle(e.code === 'ENOENT' ? { kind: 'no-claude' } : { kind: 'failed', code: null, signal: null, said: e.message }),
     );
@@ -361,28 +373,49 @@ export function askUsage({
       out += d.toString();
       const lines = out.split('\n');
       out = lines.pop()!;
-      for (const line of lines) {
-        let message: unknown;
-        try {
-          message = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        if (isObject(message) && message.type === 'control_response' && isObject(message.response) && message.response.request_id === id) {
-          settle({ kind: 'answer', response: message.response });
-          return;
-        }
-      }
+      const response = lines.map(controlResponseOf).find((r) => r?.request_id === id);
+      if (response) settle({ kind: 'answer', response });
     });
-    child.on('close', (code, signal) => {
-      const said = err.trim().split('\n').pop()?.trim() ?? '';
-      settle({ kind: 'failed', code, signal, said });
-    });
+    child.on('close', (code, signal) => settle({ kind: 'failed', code, signal, said: err.trim().split('\n').pop()?.trim() ?? '' }));
     child.stdin.write(
       `${JSON.stringify({ type: 'control_request', request_id: id, request: { subtype: 'get_usage', skip_behaviors: true } })}\n`,
     );
   });
+
+/** The `response` of a line that is a control_response, or undefined for any other line, JSON or not. */
+function controlResponseOf(line: string): Record<string, unknown> | undefined {
+  let message: unknown;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  return isObject(message) && message.type === 'control_response' && isObject(message.response) ? message.response : undefined;
 }
+
+/**
+ * Ask Claude Code for the plan's usage: start `claude` (USAGE_ARGS) in the system's temporary directory, write one `get_usage` request with
+ * an id of its own, and read its stdout for the control_response with that id. The process is taken in the ask's scope and let go as it
+ * closes (`letGo`), whatever ends it: an outcome, the timeout, or an interruption. Never fails: every way it can go is an `Asked`.
+ */
+export const usageAsk = ({
+  command = 'claude',
+  timeoutMs = QUOTA_TIMEOUT_MS,
+  env = process.env,
+}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): Effect.Effect<Asked> => {
+  const id = `usage-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return Effect.acquireRelease(
+    Effect.sync(() => spawn(command, USAGE_ARGS, { cwd: os.tmpdir(), env: usageEnv(env), stdio: ['pipe', 'pipe', 'pipe'] })),
+    (child, exit) => letGo(child, Exit.isSuccess(exit)),
+  ).pipe(
+    Effect.flatMap((child) => answered(child, id)),
+    Effect.scoped,
+    Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed<Asked>({ kind: 'timeout', ms: timeoutMs }) }),
+  );
+};
+
+/** `usageAsk` as a Promise, for `readQuota`: never rejects. */
+export const askUsage = (opts: Parameters<typeof usageAsk>[0] = {}): Promise<Asked> => Effect.runPromise(usageAsk(opts));
 
 /**
  * What the api holds: the last ask's outcome, the last with windows, how many `unanswered` outcomes in a row since it, and the ask in

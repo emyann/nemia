@@ -83,6 +83,12 @@ version, and the version above must be the pin. An upgrade re-measures the table
   so a refusal's `exitCode` reaches `bin/wf.ts`. Not `NodeRuntime.runMain` of `@effect/platform-node`, which is not installed: its
   default teardown (`Runtime.defaultTeardown`) exits 130 on any interruption, whichever signal came, it handles no SIGHUP, and it
   hands no failure back to the caller.
+- What an api route holds is let go in its scope too. A callback watch becomes a stream with `Stream.callback` on a bounded `suspend`
+  buffer, each item handed on with an awaited `Queue.offer`, so the watch waits for a slow reader: `feedEvents` in
+  `apps/api/src/factory/feed.ts`. Hono's `streamSSE` runs it with `Effect.runPromiseExit(program, { signal })`, the signal aborted from
+  `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its release reading the
+  `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `usageAsk` in `apps/api/src/factory/quota.ts`, `serverAsk` in
+  `apps/api/src/capabilities/capabilities.ts`.
 
 ## Plain faces
 

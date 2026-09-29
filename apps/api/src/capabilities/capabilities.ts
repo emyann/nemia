@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Effect } from 'effect';
 
 /** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
@@ -505,7 +506,7 @@ const answers = new Map<string, Promise<Answer>>();
 function answerOf(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
   const key = JSON.stringify([repo, server.name, launch]);
   let answer = answers.get(key);
-  if (!answer) answers.set(key, (answer = ask(repo, server, launch, deadlineMs)));
+  if (!answer) answers.set(key, (answer = Effect.runPromise(serverAsk(repo, server, launch, deadlineMs))));
   return answer;
 }
 
@@ -518,35 +519,50 @@ const SAID_LINES = 20;
  */
 const STDERR_SETTLE_MS = 50;
 
+/** A server as the api starts it: its name, and the command and args `.mcp.json` writes, which an error quotes. */
+type Started = Pick<Declared, 'name' | 'args'> & { command: string };
+
 /**
- * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Resolves with the
- * tools, or with why not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never rejects.
+ * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Succeeds with the tools, or with why
+ * not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never fails. The client and its server are
+ * taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an answer,
+ * `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given no
+ * abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
  */
-async function ask(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
-  const transport = new StdioClientTransport({ command: launch.command, args: launch.args, env: launch.env, cwd: repo, stderr: 'pipe' });
-  let said = '';
-  transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
-  const client = new Client({ name: 'hkb-api', version: '0.0.0' });
-  let timer: NodeJS.Timeout | undefined;
-  const late = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`it did not list its tools within ${deadlineMs / 1000} s`)), deadlineMs);
-  });
-  try {
-    const tools = await Promise.race([listTools(client, transport), late]);
-    return { tools, error: null, checkedAt: new Date().toISOString() };
-  } catch (err) {
-    await new Promise((resolve) => setTimeout(resolve, STDERR_SETTLE_MS));
-    const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
-    return {
-      tools: null,
-      error: `${whyNot(server, err)}${tail ? `\nWhat it printed on stderr:\n${tail}` : ''}`,
-      checkedAt: new Date().toISOString(),
-    };
-  } finally {
-    clearTimeout(timer);
-    await client.close().catch(() => {});
-  }
-}
+export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
+  Effect.gen(function* () {
+    let said = '';
+    const { client, transport } = yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        const transport = new StdioClientTransport({
+          command: launch.command,
+          args: launch.args,
+          env: launch.env,
+          cwd: repo,
+          stderr: 'pipe',
+        });
+        transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
+        return { transport, client: new Client({ name: 'hkb-api', version: '0.0.0' }) };
+      }),
+      ({ client }) => Effect.promise(() => client.close().catch(() => {})),
+    );
+    return yield* Effect.tryPromise({ try: () => listTools(client, transport), catch: (err) => err }).pipe(
+      Effect.timeoutOrElse({
+        duration: deadlineMs,
+        orElse: () => Effect.fail(new Error(`it did not list its tools within ${deadlineMs / 1000} s`)),
+      }),
+      Effect.map((tools): Answer => ({ tools, error: null, checkedAt: new Date().toISOString() })),
+      Effect.catch((err) =>
+        Effect.sleep(STDERR_SETTLE_MS).pipe(
+          Effect.map((): Answer => {
+            const tail = said.trimEnd().split('\n').slice(-SAID_LINES).join('\n');
+            const printed = tail ? `\nWhat it printed on stderr:\n${tail}` : '';
+            return { tools: null, error: `${whyNot(server, err)}${printed}`, checkedAt: new Date().toISOString() };
+          }),
+        ),
+      ),
+    );
+  }).pipe(Effect.scoped);
 
 /**
  * The tools a connected server lists, every page of them. A server that offers no tools — only prompts or resources — has no `tools/list`
@@ -565,7 +581,7 @@ async function listTools(client: Client, transport: StdioClientTransport): Promi
   return tools;
 }
 
-function whyNot(server: Declared & { command: string }, err: unknown): string {
+function whyNot(server: Started, err: unknown): string {
   const started = `\`${[server.command, ...server.args].join(' ')}\``;
   if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
     return `${started} did not start: there is no command \`${server.command}\` on its PATH. Install it, or fix \`command\` for ${server.name} in ${MCP_JSON}.`;

@@ -241,13 +241,25 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
   assert.equal(retrying, false);
   assert.match(error, /is past the end of the feed/);
   assert.equal(said.filter((b) => b.event === 'unreadable').length, 1, 'said once');
+  await until(
+    () => watchers() === 0,
+    () => `the watch outlived the feed that ended its stream: ${watchers()} left`,
+  );
 });
 
 test('a read that fails for a beat is said once, `retrying`, and cleared by the first read that works — before any line is written', async (t) => {
   const pass = emptyFeed();
   pass({ 'r-1': planAt('running') });
+  await until(
+    () => watchers() === 0,
+    () => `${watchers()} watchers left behind by the tests before this one`,
+  );
   const { reader, text } = await open(`?after=${end()}`);
   try {
+    await until(
+      () => watchers() === 1,
+      () => `the stream's watch did not start: ${watchers()} watchers`,
+    );
     fs.chmodSync(feedFile(), 0o000);
     try {
       if (process.getuid?.() === 0) {

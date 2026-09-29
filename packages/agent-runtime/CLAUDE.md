@@ -74,4 +74,6 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
 - **A remote session's `nativeId` is the Task's context**, not its id: `bySession` resolves one to the other.
 - **A request to another party's address is bounded (`REQUEST_MS`), goes to the origin it was given, follows no redirect, and is named by
   origin and path** (`cardUrlOf`, `shownUrl`).
+- **A sentence quotes another party's content through `quote` (`core/quote.ts`)**, and an error in the runtime's own words is a class
+  `wordsOf` leaves whole (`a2a/said.ts`); anything else is cut at 200. `test/remote-quotes.test.ts` holds a huge-value fixture per site.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.

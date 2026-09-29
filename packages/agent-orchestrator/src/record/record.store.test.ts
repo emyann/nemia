@@ -83,6 +83,15 @@ test("a frozen step's `after` that is no list is refused at its path, saying wha
   assert.ok(said.includes('its `workflow.1.after` is "implement", where wf writes'), said);
 });
 
+test("a field that holds a huge value is refused in bounded words: the value's first 60 characters as JSON, cut marked `…`", () => {
+  const record = aRecord('r-huge');
+  (record.workflow as Array<Record<string, unknown>>)[1].after = 'x'.repeat(100_000);
+  put('r-huge', record);
+  const said = refusalOf('r-huge');
+  assert.ok(said.includes(`its \`workflow.1.after\` is "${'x'.repeat(59)}…, where wf writes`), said.slice(0, 300));
+  assert.ok(said.length < 2_000, `${said.length} characters`);
+});
+
 test('a frozen step with no name, a step record with no task, and a folder run with no place kind are each refused at their field', () => {
   const noName = aRecord('r-noname');
   delete (noName.workflow as Array<Record<string, unknown>>)[0].name;

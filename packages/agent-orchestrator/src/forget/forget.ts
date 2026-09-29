@@ -20,7 +20,7 @@ import {
 } from '../status/status.ts';
 import { landingOpen, type MergeState } from '../ending/ending.ts';
 import { gated, holdWord } from '../wait/wait.ts';
-import { assess } from '../tick/assess.ts';
+import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
@@ -167,9 +167,6 @@ type Facts = Forgetting & {
   holders: string[];
   lifts: string;
 };
-
-/** What `assess` says a pass would file of a run. */
-type Assessment = ReturnType<typeof assess>;
 
 /** `forgetRefusal`'s facts of a run, among the store's `others`: a cancelled run's steps and asks are not judged. */
 function factsOf(f: Forgetting, others: readonly Run[]): Facts {

@@ -4,15 +4,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import type { MachineEdge } from '../src/lib/api/machines.ts';
 import {
   byAction,
   drawMachine,
+  END_INSET,
   eventOf,
   HEAD_HEIGHT,
   LINE_HEIGHT,
   PAD_Y,
-  pathThrough,
+  pathOf,
   stateSize,
   type Drawing,
 } from '../src/lib/machine.ts';
@@ -35,6 +37,9 @@ const MACHINE = {
     { from: 'held', event: 'GIVEN_UP', to: 'failed', action: 'settle' },
   ] satisfies MachineEdge[],
 };
+
+/** The task's lifecycle as the api served it when its drawing was written: a machine the size of the real one, held as it was. */
+const LIFECYCLE = JSON.parse(fs.readFileSync(new URL('./fixtures/lifecycle-graph.json', import.meta.url), 'utf8')) as typeof MACHINE;
 
 type Box = { name: string; x: number; y: number; width: number; height: number };
 
@@ -102,16 +107,73 @@ test('nothing is laid over anything else: no two boxes meet, whether states or l
   );
 });
 
-test('read top to bottom: the first state above every other, and each route leaves its state and reaches the next', () => {
+/** Points along an SVG path of absolute `M`, `L`, `Q` and `C` commands, every segment cut in `steps`: where its line is drawn. */
+function along(path: string, steps = 40): { x: number; y: number }[] {
+  const tokens = path.match(/[MLQC]|-?[\d.]+(?:e-?\d+)?/g) ?? [];
+  const points: { x: number; y: number }[] = [];
+  let at = { x: 0, y: 0 };
+  for (let i = 0; i < tokens.length;) {
+    const command = tokens[i++];
+    const count = { M: 1, L: 1, Q: 2, C: 3 }[command] ?? 0;
+    assert.ok(count, `a command along() reads, not ${command}`);
+    const given = Array.from({ length: count }, () => ({ x: Number(tokens[i++]), y: Number(tokens[i++]) }));
+    const ends = [at, ...given];
+    for (let step = command === 'M' ? steps : 1; step <= steps; step++) {
+      const t = step / steps;
+      const blend = (key: 'x' | 'y') =>
+        ends.reduce((sum, p, k) => sum + p[key] * binomial(ends.length - 1, k) * (1 - t) ** (ends.length - 1 - k) * t ** k, 0);
+      points.push({ x: blend('x'), y: blend('y') });
+    }
+    at = given[given.length - 1];
+  }
+  return points;
+}
+
+const binomial = (n: number, k: number): number => (k === 0 || k === n ? 1 : binomial(n - 1, k - 1) + binomial(n - 1, k));
+
+/** Each route whose line enters a box other than its own label, by a pixel or more: a state, or another route's label. */
+const crossings = (drawing: Drawing): string[] =>
+  drawing.routes.flatMap((route) =>
+    boxesOf(drawing)
+      .filter((box) => box.name !== `label ${route.id}`)
+      .filter((box) =>
+        along(route.path).some((p) => p.x > box.x + 1 && p.x < box.x + box.width - 1 && p.y > box.y + 1 && p.y < box.y + box.height - 1),
+      )
+      .map((box) => `${route.id} through ${box.name}`),
+  );
+
+test("no route's line runs through a state or behind another route's label, on the machine the size of the lifecycle too", () => {
+  assert.deepEqual(crossings(drawMachine(MACHINE)), []);
+  assert.deepEqual(crossings(drawMachine(LIFECYCLE)), []);
   const drawing = drawMachine(MACHINE);
-  const at = new Map(drawing.states.map((s) => [s.id, s]));
-  for (const state of drawing.states.filter((s) => s.id !== 'idle')) assert.ok(at.get('idle')!.y < state.y, state.id);
-  for (const route of drawing.routes) {
-    const [first, last] = [route.points[0], route.points[route.points.length - 1]];
-    const inside = (p: { x: number; y: number }, s: Box) =>
-      p.x >= s.x - 1 && p.x <= s.x + s.width + 1 && p.y >= s.y - 1 && p.y <= s.y + s.height + 1;
-    assert.ok(inside(first, { name: route.from, ...at.get(route.from)! }), `${route.id} leaves ${route.from}`);
-    assert.ok(inside(last, { name: route.to, ...at.get(route.to)! }), `${route.id} reaches ${route.to}`);
+  const [route, other] = drawing.routes;
+  const { x, y, width } = other.label;
+  const across = `M ${x - width / 2 - 2} ${y} L ${x + width / 2 + 2} ${y}`;
+  assert.deepEqual(
+    crossings({ ...drawing, routes: [{ ...route, path: across }, ...drawing.routes.slice(1)] }),
+    [`${route.id} through label ${other.id}`],
+    'REFUSED: a line drawn straight across another label',
+  );
+});
+
+test('read top to bottom: the first state above every other, and each route leaves its state and comes straight into the next', () => {
+  for (const machine of [MACHINE, LIFECYCLE]) {
+    const drawing = drawMachine(machine);
+    const at = new Map(drawing.states.map((s) => [s.id, s]));
+    for (const state of drawing.states.filter((s) => s.id !== machine.initial)) assert.ok(at.get(machine.initial)!.y < state.y, state.id);
+    for (const route of drawing.routes) {
+      const line = along(route.path);
+      const [first, last, before] = [line[0], line[line.length - 1], line[line.length - 2]];
+      const [from, to] = [at.get(route.from)!, at.get(route.to)!];
+      const down = to.y > from.y;
+      const across = (x: number, box: typeof from) => x >= box.x + END_INSET && x <= box.x + box.width - END_INSET;
+      assert.ok(first.y === (down ? from.y + from.height : from.y) && across(first.x, from), `${route.id} leaves ${route.from}`);
+      assert.ok(last.y === (down ? to.y : to.y + to.height) && across(last.x, to), `${route.id} reaches ${route.to}`);
+      assert.ok(
+        down === before.y < last.y && Math.abs(before.x - last.x) < 0.5,
+        `${route.id} comes upright into ${route.to}, as its arrow points`,
+      );
+    }
   }
 });
 
@@ -140,21 +202,22 @@ test('a box and a label are sized for their lines: a line per event and one per 
   assert.ok(wide.width > stateSize([]).width, 'a long event widens its box');
 });
 
-test('a route is drawn through its points, straight at its ends and bending at each point between', () => {
-  assert.equal(pathThrough([]), '');
+test('a route is drawn along its legs, straight along each and curving upright from one to the next, down or back up', () => {
+  assert.equal(pathOf([]), '');
+  assert.equal(pathOf([{ x: 5, enter: 0, leave: 10 }]), 'M 5 0 L 5 10');
   assert.equal(
-    pathThrough([
-      { x: 0, y: 0 },
-      { x: 10, y: 0 },
+    pathOf([
+      { x: 0, enter: 0, leave: 10 },
+      { x: 20, enter: 30, leave: 30 },
+      { x: 20, enter: 50, leave: 60 },
     ]),
-    'M 0 0 L 10 0',
+    'M 0 0 L 0 10 C 0 20 20 20 20 30 C 20 40 20 40 20 50 L 20 60',
   );
   assert.equal(
-    pathThrough([
-      { x: 0, y: 0 },
-      { x: 10, y: 10 },
-      { x: 20, y: 30 },
+    pathOf([
+      { x: 20, enter: 60, leave: 50 },
+      { x: 0, enter: 10, leave: 0 },
     ]),
-    'M 0 0 Q 10 10 15 20 L 20 30',
+    'M 20 60 L 20 50 C 20 30 0 30 0 10 L 0 0',
   );
 });

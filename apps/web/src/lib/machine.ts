@@ -29,13 +29,16 @@ export type StateBox = {
   stays: ByAction[];
 };
 
-/** The edges from one state to another, drawn as one: its route, its edges by action, and the box its label sits in, by its centre. */
+/** A stretch of a route drawn straight, at `x` from the `enter` y to the `leave` y, down or back up: where it crosses one rank. */
+export type Leg = { x: number; enter: number; leave: number };
+
+/** The edges from one state to another, drawn as one: its SVG path, its edges by action, and the box its label sits in, by its centre. */
 export type Route = {
   id: string;
   from: string;
   to: string;
   edges: ByAction[];
-  points: Point[];
+  path: string;
   label: Point & { width: number; height: number };
 };
 
@@ -88,9 +91,42 @@ export const labelSize = (edges: readonly ByAction[]): { width: number; height: 
   height: LINE_HEIGHT * linesOf(edges) + PAD_Y,
 });
 
+/** How far a route's end stays from either side of its state's box. */
+export const END_INSET = 12;
+
 /**
- * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with the points dagre routes it through
- * and its label where dagre makes room for it. A state an edge names that the graph does not list is drawn too, so no edge is lost.
+ * Half the height of each rank's band, by the rank's y: half its tallest box, a state's or a label's. Dagre lays every box of a rank
+ * across one band and leaves the gap between two bands empty; a rank of a route's bends alone is a line, of half height 0.
+ */
+function bandsOf(boxes: readonly { y: number; height: number }[]): (y: number) => number {
+  const half = new Map<number, number>();
+  for (const { y, height } of boxes) half.set(Math.round(y), Math.max(half.get(Math.round(y)) ?? 0, height / 2));
+  return (y) => half.get(Math.round(y)) ?? 0;
+}
+
+/** Where a route's end meets its state's box: across at `x`, kept `END_INSET` inside the box. */
+const acrossIn = (x: number, box: StateBox) => Math.min(Math.max(x, box.x + END_INSET), box.x + box.width - END_INSET);
+
+/**
+ * A route's legs, one per rank it crosses, in the order it travels them: out of `from` to the edge of its band, through each band at the
+ * bend dagre placed there (`points` between the first and the last), and from the edge of the band of `to` into it. A route goes down
+ * out of the foot of `from` onto the head of `to`, or, back up, out of the head of `from` into the foot of `to`. Dagre keeps each bend
+ * clear of the other boxes of its rank, so a leg runs past them, never through one.
+ */
+function legsOf(points: readonly Point[], from: StateBox, to: StateBox, half: (y: number) => number): Leg[] {
+  const [out, into] = [from.y + from.height / 2, to.y + to.height / 2];
+  const way = into >= out ? 1 : -1;
+  return [
+    { x: acrossIn(points[0]?.x ?? 0, from), enter: out + (way * from.height) / 2, leave: out + way * half(out) },
+    ...points.slice(1, -1).map((p) => ({ x: p.x, enter: p.y - way * half(p.y), leave: p.y + way * half(p.y) })),
+    { x: acrossIn(points[points.length - 1]?.x ?? 0, to), enter: into - way * half(into), leave: into - (way * to.height) / 2 },
+  ];
+}
+
+/**
+ * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room
+ * for it and its line drawn down through the ranks it crosses (`legsOf`, `pathOf`). A state an edge names that the graph does not list
+ * is drawn too, so no edge is lost.
  */
 export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges'>): Drawing {
   const names = [...new Set([...graph.states, ...graph.edges.flatMap((e) => [e.from, e.to])])];
@@ -112,20 +148,34 @@ export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'fi
     const box = { x: x - width / 2, y: y - height / 2, width, height };
     return { id, ...box, initial: id === graph.initial, final: graph.final.includes(id), stays: stays.get(id)! };
   });
-  const routes = [...pairs].map(([id, edges]) => {
+  const laid = [...pairs].map(([id, edges]) => {
     const { from, to } = edges[0];
     const { points = [], x = 0, y = 0, width = 0, height = 0 } = g.edge(from, to);
-    return { id, from, to, edges: byAction(edges), points: points.map((p: Point) => ({ x: p.x, y: p.y })), label: { x, y, width, height } };
+    return { id, from, to, edges: byAction(edges), points: points as Point[], label: { x, y, width, height } };
   });
+  const half = bandsOf([...states.map((s) => ({ y: s.y + s.height / 2, height: s.height })), ...laid.map((r) => r.label)]);
+  const at = new Map(states.map((s) => [s.id, s]));
+  const routes = laid.map(({ points, ...route }) => ({
+    ...route,
+    path: pathOf(legsOf(points, at.get(route.from)!, at.get(route.to)!, half)),
+  }));
   const { width = 0, height = 0 } = g.graph();
   return { states, routes, width, height };
 }
 
-/** An SVG path through a route's points: straight from the first, bending at each point between, straight into the last. */
-export function pathThrough(points: readonly Point[]): string {
-  if (points.length < 2) return '';
-  const [first, ...rest] = points;
-  const bends = rest.slice(0, -1).map((p, i) => `Q ${p.x} ${p.y} ${(p.x + rest[i + 1].x) / 2} ${(p.y + rest[i + 1].y) / 2}`);
-  const last = rest[rest.length - 1];
-  return [`M ${first.x} ${first.y}`, ...bends, `L ${last.x} ${last.y}`].join(' ');
+/**
+ * An SVG path along a route's legs: straight along each, and from where one leaves its band to where the next enters its own a curve
+ * that leaves and arrives upright, so it bends only in the empty gap between two bands. A leg of no length draws no line.
+ */
+export function pathOf(legs: readonly Leg[]): string {
+  const [first, ...rest] = legs;
+  if (!first) return '';
+  const along = (leg: Leg) => (leg.leave === leg.enter ? [] : [`L ${leg.x} ${leg.leave}`]);
+  const parts = [`M ${first.x} ${first.enter}`, ...along(first)];
+  rest.forEach((leg, i) => {
+    const before = i ? rest[i - 1] : first;
+    const mid = (before.leave + leg.enter) / 2;
+    parts.push(`C ${before.x} ${mid} ${leg.x} ${mid} ${leg.x} ${leg.enter}`, ...along(leg));
+  });
+  return parts.join(' ');
 }

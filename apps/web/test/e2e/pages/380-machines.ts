@@ -41,6 +41,39 @@ async function expectNoneMeet(boxes: Locator, assertion: string): Promise<void> 
   if (met.length) throw new Refused(`${assertion} — ${met.join(', ')} overlap`);
 }
 
+/**
+ * No route's line runs behind the label of another: each drawn path, walked every two pixels, stays out of every label but its own. A
+ * route and a label are matched by their id (`data-id` on React Flow's edge, `data-route` on the label). No label or no path is refused.
+ */
+async function expectClearOfLabels(frame: Locator, assertion: string): Promise<void> {
+  const { labels, paths, crossed } = await frame.evaluate((root) => {
+    const boxes = Array.from((root as Element).querySelectorAll('[data-route]')).map((label) => ({
+      id: label.getAttribute('data-route'),
+      r: label.getBoundingClientRect(),
+    }));
+    const edges = Array.from((root as Element).querySelectorAll('.react-flow__edge'));
+    const found = edges.flatMap((edge) => {
+      const id = edge.getAttribute('data-id');
+      const line = edge.querySelector('path.react-flow__edge-path') as SVGPathElement | null;
+      const ctm = line?.getScreenCTM();
+      if (!line || !ctm) return [`${id} is not drawn`];
+      const behind = new Set<string>();
+      for (let at = 0; at <= line.getTotalLength(); at += 2) {
+        const on = line.getPointAtLength(at);
+        const p = new DOMPoint(on.x, on.y).matrixTransform(ctm);
+        for (const { id: label, r } of boxes) {
+          if (label !== id && p.x > r.left + 1 && p.x < r.right - 1 && p.y > r.top + 1 && p.y < r.bottom - 1)
+            behind.add(`${id} behind ${label}'s label`);
+        }
+      }
+      return [...behind];
+    });
+    return { labels: boxes.length, paths: edges.length, crossed: found };
+  });
+  if (!labels || !paths) throw new Refused(`${assertion} — nothing to look at: ${labels} labels and ${paths} paths found`);
+  if (crossed.length) throw new Refused(`${assertion} — ${crossed.join(', ')}`);
+}
+
 export default {
   /**
    * The Machines page: the task's lifecycle drawn from the graph the api reads off the runtime's code, every state a box and every edge a
@@ -73,6 +106,7 @@ export default {
     const labels = frame.locator('[data-route]');
     await expectApart(states, labels, 'no route label lies over a state');
     await expectNoneMeet(frame.locator('[data-state], [data-route]'), 'no two boxes, states or labels, lie over each other');
+    await expectClearOfLabels(frame, "no route's line runs behind another route's label");
     await expectInside(states, frame, 'every state inside the drawing, none cut off at 1280 wide');
     await expectInside(labels, frame, 'every route label inside the drawing');
     await expectUncut(frame.locator('[data-edge-line]'), 'every event line read whole');

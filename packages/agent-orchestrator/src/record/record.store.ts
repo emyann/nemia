@@ -19,10 +19,10 @@ import {
   type Pruned,
   type RoundAsk,
   type Run,
-} from './run.ts';
-import { spentAsks, type RetryAsk } from './retry.ts';
-import { asNamed, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from './workflow.ts';
-import { FrozenStepSchema, loadWorkflows, preloads } from './workflow-store.ts';
+} from '../run.ts';
+import { spentAsks, type RetryAsk } from '../retry.ts';
+import { asNamed, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from '../workflow.ts';
+import { FrozenStepSchema, loadWorkflows, preloads } from '../workflow-store.ts';
 import {
   noCodingStyle,
   NO_CODING_STYLE,
@@ -32,11 +32,11 @@ import {
   renderedPrompt,
   rendersAgent,
   type SkillAgain,
-} from './rendering.ts';
-import { inputsRoot } from './record/places.store.ts';
-import { Invalid, Missing } from './refusal/refusal.ts';
-import { wfRoot } from './config/config.store.ts';
-import { countRecord, readText, within } from './meter/tally.store.ts';
+} from '../rendering.ts';
+import { inputsRoot } from './places.store.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
+import { wfRoot } from '../config/config.store.ts';
+import { countRecord, readText, within } from '../meter/tally.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 

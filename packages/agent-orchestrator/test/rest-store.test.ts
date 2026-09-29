@@ -28,7 +28,7 @@ delete process.env.WF_MAX_RUNS;
 const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = await import('../src/runner.ts');
 const { tick, freshRestMemo } = await import('../src/tick.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
-  await import('../src/store.ts');
+  await import('../src/record/record.store.ts');
 const { feedFile } = await import('../src/feed/feed.store.ts');
 
 const git = (repo: string, ...args: string[]) =>

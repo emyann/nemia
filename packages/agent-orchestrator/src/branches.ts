@@ -11,7 +11,7 @@
 import { execCounted } from './meter/tally.store.ts';
 import { isGitRun, resultSteps, type BranchStanding, type GitRun, type ParentRun, type Run, type Shipped } from './run.ts';
 import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
-import { readRun, stepsOf } from './store.ts';
+import { readRun, stepsOf } from './record/record.store.ts';
 import { git, gitSays } from './worktree.ts';
 
 /**

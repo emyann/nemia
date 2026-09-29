@@ -50,7 +50,7 @@ import {
   runFile,
   runsDir,
   stepsOf,
-} from './store.ts';
+} from './record/record.store.ts';
 import { gitSays, handOff, mergeInProgress, mergeState } from './worktree.ts';
 import { shippedOf, standingsOf } from './branches.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';

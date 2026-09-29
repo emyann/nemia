@@ -11,7 +11,7 @@ import path from 'node:path';
 import type { Closeout } from './closeout/closeout.ts';
 import { inside } from './workspace/workspace.ts';
 import { artifactPlace, isGitRun, sizeOf, type ArtifactFile, type MissingArtifact, type Run } from './run.ts';
-import { artifactsDir, checkStderr, lstatOf } from './store.ts';
+import { artifactsDir, checkStderr, lstatOf } from './record/record.store.ts';
 import { gitSays } from './worktree.ts';
 
 /**

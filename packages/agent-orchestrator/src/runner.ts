@@ -206,7 +206,7 @@ export {
   roundAskFile,
   runId,
   stepsOf,
-} from './store.ts';
+} from './record/record.store.ts';
 export {
   alive,
   beat,

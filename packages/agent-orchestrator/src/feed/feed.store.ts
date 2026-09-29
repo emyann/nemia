@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { HOME } from '../store.ts';
+import { HOME } from '../record/record.store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
 import { feedChanges, foldFeed, freshMemo, type FeedLine, type FeedMemo } from './feed.ts';
 import type { FeedWords } from '../run.ts';

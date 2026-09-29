@@ -106,7 +106,7 @@ import {
   runFile,
   runsDir,
   stepsOf,
-} from './store.ts';
+} from './record/record.store.ts';
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon/daemon.store.ts';
 import { maxRuns, verifiesRest } from './config/config.store.ts';
 import { feedFile, recordFeed } from './feed/feed.store.ts';

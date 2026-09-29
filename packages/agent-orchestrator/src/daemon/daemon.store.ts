@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
-import { HOME } from '../store.ts';
+import { HOME } from '../record/record.store.ts';
 import { maxConcurrent, maxRuns } from '../config/config.store.ts';
 import { PHASES, type PassCost, type Phase } from '../meter/meter.ts';
 import {

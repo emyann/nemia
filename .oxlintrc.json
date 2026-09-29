@@ -77,7 +77,7 @@
         "packages/agent-runtime/src/core/event-schema.ts",
         "packages/agent-runtime/src/core/engine/journal.ts",
         "packages/agent-runtime/src/harness/detached/detached.ts",
-        "packages/agent-orchestrator/src/store.ts",
+        "packages/agent-orchestrator/src/record/record.store.ts",
         "packages/agent-orchestrator/src/daemon/daemon.store.ts",
         "packages/agent-orchestrator/src/inbox/inbox.store.ts",
         "packages/agent-orchestrator/src/feed/feed.store.ts",
@@ -584,7 +584,7 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/store.ts"],
+      "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
         "max-lines": ["error", { "max": 612, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]

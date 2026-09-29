@@ -38,7 +38,7 @@ import {
   type Workflow,
 } from './workflow.ts';
 import { agentsFor, agentUsers, agentVersion, loadAgents, skillsFor, skillVersion, type Places } from './workflow-store.ts';
-import { HOME, isDirectory } from './store.ts';
+import { HOME, isDirectory } from './record/record.store.ts';
 
 /** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */
 export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };

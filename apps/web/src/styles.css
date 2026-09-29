@@ -219,3 +219,14 @@
     --sidebar-ring: oklch(0.556 0 0);
   }
 }
+
+/*
+ * A character card is hovered as its face is: its name's link is stretched over the whole card, so the face under it is never hovered
+ * itself. The same waking Blobatar's `.mo-root:hover` gives, where a pointer hovers; reduced motion still stops it.
+ */
+@media (hover: hover) and (pointer: fine) {
+  [data-agent-card]:hover .mo-root {
+    --mo-amp: 1;
+    transform: translateY(-1.5px) scale(1.04);
+  }
+}

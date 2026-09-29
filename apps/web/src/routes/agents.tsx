@@ -2,10 +2,10 @@ import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { LinkButton } from '@/components/ui/button';
-import { AgentFace, FromBadge, personOf, RouteLink, SkillLink, Skills, UsedBy } from '../components/AgentParts';
+import { AgentCard } from '../components/AgentCard';
+import { SkillLink } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
 import { agentsQuery, skillsQuery, type AgentListing, type SkillPlace } from '../lib/api';
-import { KEY_LABELS, ROLE_KEYS } from '../lib/agents';
 import { PLACE_LABELS } from '../lib/skills';
 
 export const Route = createFileRoute('/agents')({
@@ -65,7 +65,7 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
     <section aria-label={title} className="space-y-3">
       <h2 className="text-sm font-semibold">{title}</h2>
       {agents.length ? (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => (
             <li key={`${agent.from}:${agent.name}`}>
               <AgentCard agent={agent} />
@@ -75,74 +75,6 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
       ) : (
         <p className="text-sm text-neutral-500">{empty}</p>
       )}
-    </section>
-  );
-}
-
-/**
- * One agent: its name, linked to its page, what it is for, what it says it can do, the keys it sets on its nodes, what its sessions are told
- * beyond its instructions (the skills it gives and its system prompt), and the nodes that name it.
- */
-function AgentCard({ agent }: { agent: AgentListing }) {
-  const rows: [string, string][] = [
-    ...ROLE_KEYS.filter((key) => agent.keys[key] !== undefined).map((key): [string, string] => [
-      KEY_LABELS[key].toLowerCase(),
-      agent.keys[key]!,
-    ]),
-    ...(agent.skills ? [['skills', agent.skills] as [string, string]] : []),
-    ...(agent.systemPrompt ? [['system prompt', agent.systemPrompt] as [string, string]] : []),
-  ];
-  return (
-    <section
-      aria-label={`Agent ${agent.name}`}
-      data-agent={agent.name}
-      data-from={agent.from}
-      className="h-full space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
-    >
-      <header className="flex items-center gap-3">
-        <AgentFace name={agent.name} size={36} follows />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h3 className="text-sm font-semibold">
-              <RouteLink
-                to="/agents/$from/$agent"
-                params={{ from: agent.from, agent: agent.name }}
-                className="rounded-sm underline decoration-neutral-300 underline-offset-4 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600"
-              >
-                {personOf(agent.name)}
-              </RouteLink>
-            </h3>
-            <FromBadge from={agent.from} />
-          </div>
-          <p data-agent-role className="text-xs text-neutral-500">
-            {agent.role ?? 'No role yet'} · <span className="font-mono">{agent.name}</span>
-          </p>
-        </div>
-      </header>
-      {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
-      {agent.error === null &&
-        (agent.cardError !== null ? (
-          <p data-card-error className="font-mono text-xs break-words text-red-700 dark:text-red-400">
-            {agent.cardError}
-          </p>
-        ) : (
-          <Skills skills={agent.card} />
-        ))}
-      {agent.error !== null ? (
-        <p className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.error}</p>
-      ) : (
-        rows.length > 0 && (
-          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {rows.map(([label, value]) => (
-              <div key={label} className="flex gap-1.5">
-                <dt className="text-neutral-500">{label}</dt>
-                <dd className="font-mono text-neutral-800 dark:text-neutral-200">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        )
-      )}
-      <UsedBy listing={agent} />
     </section>
   );
 }

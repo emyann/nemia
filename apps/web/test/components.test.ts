@@ -4530,3 +4530,68 @@ test('a face that follows the pointer is an inline drawing its driver can move, 
   const drawing = (html: string) => html.replace(/<title>[^<]*<\/title>/, '').replace(/data-agent-face="[^"]*"/, '');
   assert.notEqual(drawing(face('nora')), drawing(iris), 'another name draws another face, not only another title');
 });
+
+test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the grey round; one without stays on the grey round', async () => {
+  const { AgentFace } = await import('../src/components/AgentParts.tsx');
+  const backdrop = /<svg [^>]*>(?:<title>[^<]*<\/title>)?<path [^>]*><\/path><g class="mo-root/;
+  const plated = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true, plate: true }));
+  assert.match(plated, backdrop, 'a backdrop drawn under the face, in its own colours');
+  assert.doesNotMatch(plated, /rounded-full|bg-neutral-100/, 'and no grey round behind it');
+  const bare = renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 112, follows: true }));
+  assert.doesNotMatch(bare, backdrop);
+  assert.match(bare, /class="[^"]*rounded-full bg-neutral-100/);
+  assert.match(renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })), /^<img [^>]*class="[^"]*rounded-full bg-neutral-100/);
+});
+
+/** An agent as the Agents page lists it, one that sets every kind of key: what a character card is drawn from. */
+const character = {
+  ...composing,
+  name: 'iris',
+  role: 'Product engineer',
+  description: 'Turns an idea into an intent.',
+  keys: {
+    model: 'opus',
+    effort: 'high',
+    harness: 'claude',
+    disallowedTools: 'Bash(git push)',
+    permissionMode: 'auto',
+    tools: 'Read, Grep',
+    output: 'iris.schema.json',
+  },
+  skills: 'grilling',
+  systemPrompt: 'no-coding',
+  card: [{ id: 'grilling', name: 'Grilling', description: 'Asks until the plan holds.', tags: ['interview'] }],
+  usedBy: [{ from: 'repo', workflow: 'intake', step: 'ask' }],
+};
+
+const agentCard = async (agent: Record<string, unknown>) => {
+  const { AgentCard } = await import('../src/components/AgentCard.tsx');
+  return routedWith(createElement(AgentCard, { agent: { ...character, ...agent } as never }));
+};
+
+test('REFUSED: a character card shows what its agent can do and its model, effort and harness, and none of its other keys', async () => {
+  const html = await agentCard({});
+  const stats = /<dl data-agent-stats[^>]*>([\s\S]*?)<\/dl>/.exec(html)?.[1] ?? '';
+  for (const value of ['opus', 'high', 'claude']) assert.match(stats, new RegExp(`>${value}<`), `the stats hold ${value}: ${stats}`);
+  assert.match(html, /data-agent-skill="grilling"[\s\S]*>Grilling<[\s\S]*title="Asks until the plan holds\."/, 'its skills, in front');
+  assert.match(html, /data-agent-role[^>]*>Product engineer · <span[^>]*>iris<\/span>/);
+  for (const hidden of ['Bash(git push)', '>auto<', 'no-coding', 'Read, Grep', 'iris.schema.json', '>interview<', '>grilling<'])
+    assert.ok(!html.includes(hidden), `the card leaves ${hidden} to the agent's page`);
+});
+
+test("a character card holds one link to its agent's page, and its nodes' links beside it, never inside it", async () => {
+  const html = await agentCard({});
+  assert.equal([...html.matchAll(/href="\/agents\/yours\/iris"/g)].length, 1, html);
+  assert.match(html, /<a [^>]*href="\/agents\/yours\/iris"[^>]*>Iris<\/a>/, "the person's name is the link");
+  assert.match(html, /href="\/workflows\/repo\/intake\/ask"/);
+  assert.doesNotMatch(html, /<a [^>]*>(?:(?!<\/a>)[\s\S])*<a /, 'no link inside a link');
+});
+
+test('REFUSED: a character card draws no stats line for an agent that sets none, nor for one whose file does not read', async () => {
+  const unset = await agentCard({ keys: { tools: 'Read' } });
+  assert.match(unset, /data-agent-skill="grilling"/, 'the card is drawn');
+  assert.doesNotMatch(unset, /data-agent-stats/);
+  const broken = await agentCard({ error: 'agents/iris.md: no frontmatter.' });
+  assert.match(broken, /agents\/iris\.md: no frontmatter\./);
+  assert.doesNotMatch(broken, /data-agent-stats/);
+});

@@ -143,7 +143,7 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
   return (
     <header className="space-y-2">
       <div className="flex items-center gap-4">
-        <AgentFace name={agent.name} size={56} follows />
+        <AgentFace name={agent.name} size={96} follows plate />
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="text-lg font-semibold">{personOf(agent.name)}</h1>

@@ -32,7 +32,7 @@ import {
 import { refusedCheck } from '../run.ts';
 import { exitVerdicts } from '../views.ts';
 import { loadWorkflows } from '../workflow-store.ts';
-import { modeOf } from '../workflow.ts';
+import { modeOf } from '../former/former.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ENV: CheckEnv = {

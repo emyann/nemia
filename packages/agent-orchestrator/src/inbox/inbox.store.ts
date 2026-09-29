@@ -25,7 +25,8 @@ import {
 } from './inbox.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
-import { isFolderTeam, WorkflowError, type Workflow } from '../workflow.ts';
+import { WorkflowError, type Workflow } from '../step/step.ts';
+import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../workflow-store.ts';
 import { HOME, isDirectory, listRuns, runId, runsDir } from '../record/record.store.ts';
 

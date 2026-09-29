@@ -7,7 +7,7 @@
  * run.ts, since it calls `standing`, the gates and the budget there, and importing those here would make a cycle.
  */
 import type { Run, StepRecord } from './run.ts';
-import type { Workflow } from './workflow.ts';
+import type { Workflow } from './step/step.ts';
 
 /**
  * How a person asks for another try of a step, with `wf retry`.

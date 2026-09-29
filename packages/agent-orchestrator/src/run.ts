@@ -12,22 +12,11 @@ import { depsLines, inside, type Provisioned } from './workspace/workspace.ts';
 import { budgetWord, dollars, durationWord, readWords, type Consumed } from './radius.ts';
 
 export { durationWord };
-import {
-  allowRuleOf,
-  autoDropped,
-  DEFAULT_ROUNDS,
-  disallowedBy,
-  type DeniedAt,
-  isRemoteHarness,
-  LOOP_REPLIES,
-  loopSpan,
-  modeOf,
-  outputFields,
-  remoteRetryRefusal,
-  terminalSteps,
-  upstreamOf,
-  type Workflow,
-} from './workflow.ts';
+import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from './step/step.ts';
+import { isRemoteHarness, remoteRetryRefusal } from './harness/harness.ts';
+import { allowRuleOf, disallowedBy, type DeniedAt } from './keys/index.ts';
+import { modeOf } from './former/former.ts';
+import { autoDropped, loopSpan, terminalSteps, upstreamOf } from './workflow/index.ts';
 import type { TaskClock } from './timeline/timeline.ts';
 import { briefBody } from './rendering.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from './closeout/closeout.ts';

@@ -9,7 +9,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseAgent, parseFolder, parseWorkflow, REMOTE_REFUSED_KEYS, STEP_KEYS, WorkflowError, type Agents } from '../workflow.ts';
+import { STEP_KEYS, WorkflowError } from '../step/step.ts';
+import { REMOTE_REFUSED_KEYS } from './harness.ts';
+import { parseWorkflow } from '../workflow/index.ts';
+import { parseFolder } from '../folder/folder.ts';
+import { parseAgent, type Agents } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
 import { scratch } from '../../test/scratch.ts';
 

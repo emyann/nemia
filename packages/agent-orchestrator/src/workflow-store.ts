@@ -12,33 +12,18 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import {
   AGENTS_FOLDER,
-  agentsDir,
-  agentsFolderRefusal,
-  codexModeLine,
-  formerKeyLine,
-  formerKeysIn,
-  frontmatterKey,
-  isCardFile,
   isReadme,
-  linkRefusal,
-  ownSkill,
-  parseAgent,
-  parseFolder,
-  readmeDescription,
-  skillEntryOf,
   SKILLS_FOLDER,
   splitFrontmatter,
   STEP_KEYS,
-  stepFiles,
-  SYSTEM_PROMPTS,
   WorkflowError,
-  type Agent,
-  type Agents,
-  type AgentSkill,
-  type SkillsFound,
   type StepKey,
   type Workflow,
-} from './workflow.ts';
+} from './step/step.ts';
+import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from './former/former.ts';
+import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles } from './folder/folder.ts';
+import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from './agents/agents.ts';
+import { skillEntryOf, type AgentSkill } from './skills/skills.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and

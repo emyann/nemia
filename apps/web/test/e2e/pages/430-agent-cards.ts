@@ -68,6 +68,7 @@ export default {
     await expectCount(page.locator('section[data-agent]'), people.length, 'the list draws a card an agent');
     const card = `section[data-agent="${WORKFLOWS.good.agent.name}"]`;
     await waitForAmp(page, card, '0', 'a face rests while nothing hovers its card');
+    await page.locator(`${card} [data-agent-role]`).scrollIntoViewIfNeeded();
     const role = await page.locator(`${card} [data-agent-role]`).boundingBox();
     if (!role) throw new Refused('the role line is laid out');
     await page.mouse.move(role.x + role.width / 2, role.y + role.height / 2, { steps: 4 });

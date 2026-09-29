@@ -2549,42 +2549,6 @@ test("REFUSED at `wf start`, in the engine's words, with nothing written: `remot
   }
 });
 
-test('a run frozen before steps were jobs, with `remote: true` and no `background`, files its step as the background session it was — which the engine takes, where it refuses the job', async () => {
-  const run = started(folder('background: true\nremote: true'));
-  const { workflow, ...rest } = readRun(run.id);
-  const old = workflow!.map(({ background: _, ...step }) => step);
-  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify({ ...rest, workflow: old }, null, 2));
-  assert.deepEqual(
-    readRun(run.id).workflow!.map((s) => [s.name, s.remote, s.background]),
-    [
-      ['implement', true, undefined],
-      ['review', undefined, undefined],
-    ],
-    'as a record from before `background:` froze it: every claude step was `--bg`, and `remote: true` was taken on its own',
-  );
-
-  assert.deepEqual(
-    stepsOf(readRun(run.id)).map((s) => [s.name, s.background]),
-    [
-      ['implement', true],
-      ['review', undefined],
-    ],
-    'read as it ran',
-  );
-  const b = board();
-  await advance(b.e, readRun(run.id));
-  const spec = b.tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([spec.config?.background, spec.config?.claude?.remoteControl], [true, true]);
-
-  const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
-  await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: spec.config });
-  await assert.rejects(
-    engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: { ...(spec.config as object), background: undefined } }),
-    /bridges a session to claude\.ai/,
-    'the engine files what the tick filed, and refuses the step as written, a job with a bridge: a refusal out of `advance` stops the pass',
-  );
-});
-
 /** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */
 const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
   const views = new Map<string, TaskView>();

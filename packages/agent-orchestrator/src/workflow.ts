@@ -2931,15 +2931,6 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
 }
 
 /**
- * A step read back off a record as it runs: a `claude` step frozen with `remote: true` and no `background` is a background session
- * (`claude --bg`). Filed as a job with a bridge, it would be refused by the runtime at `file` — and a refusal thrown out of one run's
- * `advance` stops the whole pass, every run in the store with it, on every pass after. Read by `stepsOf` and never by `wf start`, which
- * refuses `remote: true` without `background: true`: so it changes only a frozen record, and nothing a folder can say. Pure.
- */
-export const asRan = (step: Workflow): Workflow =>
-  step.remote && step.background === undefined && (step.harness ?? 'claude') === 'claude' ? { ...step, background: true } : step;
-
-/**
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees

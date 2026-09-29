@@ -21,7 +21,7 @@ import {
   type Run,
 } from './run.ts';
 import { spentAsks, type RetryAsk } from './retry.ts';
-import { asNamed, asRan, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from './workflow.ts';
+import { asNamed, orderSteps, splitFrontmatter, type SkillsFound, type Workflow } from './workflow.ts';
 import { loadWorkflows, preloads } from './workflow-store.ts';
 import {
   noCodingStyle,
@@ -362,11 +362,9 @@ const readRecord = (id: string): Run => {
  *
  * The folder is read only for a record that froze no workflow, never for a run `wf start` froze, so
  * nothing written into the folder after `wf start` reaches it. Ordered on the way out, so a record
- * frozen in the folder's order, alphabetical, reads in the order its steps run. And each step as it
- * ran when it was frozen (`asRan`): a frozen `remote: true` step with no `background` is the background
- * session it was.
+ * frozen in the folder's order, alphabetical, reads in the order its steps run.
  */
-export const stepsOf = (run: Run): Workflow[] => orderSteps((run.workflow ?? loadWorkflows(run.workflowDir)).map(asRan));
+export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.

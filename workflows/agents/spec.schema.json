@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "properties": {
+    "goal": { "type": "string", "description": "What the intent wants true once this is built, restated for the steps after you: they read the spec, not the intent." },
+    "constraints": { "type": "array", "description": "What the work must respect, from the intent and from this repository's rules. Empty when none applies.", "items": { "type": "string" } },
+    "approach": { "type": "string", "description": "The change in a paragraph: what it does, and why this way rather than another." },
+    "changes": {
+      "type": "array",
+      "description": "Every path the change touches, by path from the workspace root, each with one line on what changes in it.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "A file you have read, or one the change adds." },
+          "change": { "type": "string", "description": "One line on what changes in it." }
+        },
+        "required": ["path", "change"],
+        "additionalProperties": false
+      }
+    },
+    "steps": { "type": "array", "description": "The work, in order: each a thing an engineer can do and check was done.", "items": { "type": "string" } },
+    "tests": { "type": "array", "description": "What proves the change: each test to add or change, and for a rule, the fixture that makes it refuse.", "items": { "type": "string" } },
+    "risks": { "type": "array", "description": "What could go wrong, what the tests would not catch, and what you are unsure of. Empty when nothing is.", "items": { "type": "string" } },
+    "decisions": {
+      "type": "array",
+      "description": "Every decision a round with the person settled, in order. Empty when you asked nothing.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "answeredBy": { "type": "string", "description": "`person`, or who answered on their behalf, as the answer says." }
+        },
+        "required": ["question", "answer", "answeredBy"],
+        "additionalProperties": false
+      }
+    },
+    "open": { "type": "array", "description": "What is still undecided, each as a question. Empty only when nothing is.", "items": { "type": "string" } }
+  },
+  "required": ["goal", "constraints", "approach", "changes", "steps", "tests", "risks", "decisions", "open"],
+  "additionalProperties": false
+}

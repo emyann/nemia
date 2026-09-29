@@ -43,6 +43,8 @@ started with: an edit reaches the next run, never one in flight.
 - **Reserved:** `outcome`, `summary`, `artifacts`, `needs` are the run's own on every closeout; the loader refuses a schema that declares
   one. (Iris's intent says `proposedOutcome` for that reason.)
 - Keep a schema the same across the tries of a session: a continued session given a changed schema rebuilds its whole prompt cache.
+- A step reads a closeout with `input: <step>` from any step it waits on, through the steps between too; a step that loops (`loop:`)
+  may wait on one step only, so it reads what came before the loop that way (`workflows/build/review.md` reads the spec).
 
 ## Its skills
 

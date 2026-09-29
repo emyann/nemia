@@ -52,8 +52,10 @@ export default {
     await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
     const implementer = card(page, 'repo', good.agent.name);
     await expectVisible(
-      implementer.locator(`img[data-agent-face="${good.agent.name}"][alt="${good.agent.person}"]`),
-      `${good.agent.name}'s face`,
+      implementer
+        .getByRole('img', { name: good.agent.person, exact: true })
+        .and(implementer.locator(`svg[data-agent-face="${good.agent.name}"]`)),
+      `${good.agent.name}'s face, a drawing its eyes can move in, named ${good.agent.person}`,
     );
     await expectTexts(
       implementer.locator('[data-agent-role]'),
@@ -107,6 +109,10 @@ export default {
     await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
     const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
     await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
+    await expectVisible(
+      page.locator(`[data-step-agent] img[data-agent-face="${good.agent.name}"][alt="${good.agent.person}"]`),
+      `and its small face beside the link is still an image: the faces beside a link do not follow the pointer`,
+    );
     await expectVisible(
       page.locator(`[data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
       `and what that agent says it can do, beneath it: ${good.agent.skill.name}`,

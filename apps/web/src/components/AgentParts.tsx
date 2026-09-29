@@ -1,4 +1,5 @@
 import { Blobatar } from '@blobatar/react';
+import { useGaze } from '@blobatar/react/gaze';
 import type { ReactNode } from 'react';
 import { Link as AriaLink } from 'react-aria-components';
 import type { AgentListing, AgentSkill, AgentUser, GivenSkill, SkillSource } from '../lib/api';
@@ -109,18 +110,31 @@ export const personOf = (name: string): string => {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 };
 
+const FACE = 'shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800';
+
 /**
  * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
- * design. An image with the agent's name as its title; `size` in pixels.
+ * design. Named as a person is, for a screen reader; `size` in pixels. Still, it is one image; with `follows`, it is an inline drawing whose
+ * eyes turn toward the pointer and which comes alive while hovered — unless the person asked for reduced motion, or has no fine pointer
+ * that hovers, where its eyes stay still.
  */
-export function AgentFace({ name, size, className }: { name: string; size: number; className?: string }) {
+export function AgentFace({ name, size, follows, className }: { name: string; size: number; follows?: boolean; className?: string }) {
+  if (follows) return <FollowingFace name={name} size={size} className={className} />;
+  return <Blobatar name={name} size={size} title={personOf(name)} data-agent-face={name} className={cn(FACE, className)} />;
+}
+
+/** An agent's face whose eyes follow the pointer: Blobatar's gaze driver on its inline drawing, three units of a hundred at most. */
+function FollowingFace({ name, size, className }: { name: string; size: number; className?: string }) {
+  const { ref } = useGaze({ travel: 3, lookAt: 'pointer' });
   return (
     <Blobatar
+      ref={ref}
+      animate="hover"
       name={name}
       size={size}
       title={personOf(name)}
       data-agent-face={name}
-      className={cn('shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800', className)}
+      className={cn(FACE, className)}
     />
   );
 }

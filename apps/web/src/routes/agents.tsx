@@ -100,7 +100,7 @@ function AgentCard({ agent }: { agent: AgentListing }) {
       className="h-full space-y-2 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
     >
       <header className="flex items-center gap-3">
-        <AgentFace name={agent.name} size={36} />
+        <AgentFace name={agent.name} size={36} follows />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h3 className="text-sm font-semibold">

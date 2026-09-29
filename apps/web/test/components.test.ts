@@ -4514,3 +4514,19 @@ test("an agent's face is drawn from its name: the same name the same face, anoth
   assert.equal(personOf('iris'), 'Iris');
   assert.equal(personOf('note-writer'), 'Note writer');
 });
+
+test('a face that follows the pointer is an inline drawing its driver can move, still named as a person is', async () => {
+  const { AgentFace } = await import('../src/components/AgentParts.tsx');
+  const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 36, follows: true }));
+  const iris = face('iris');
+  assert.match(iris, /^<svg [^>]*>/, iris);
+  assert.doesNotMatch(iris, /<img/, 'no image: a driver moves only an inline drawing');
+  const open = /^<svg [^>]*>/.exec(iris)?.[0] ?? '';
+  assert.match(open, /role="img"/);
+  assert.match(open, /data-agent-face="iris"/);
+  assert.match(iris, /^<svg [^>]*><title>Iris<\/title>/, 'its name is its first child, so a screen reader says it');
+  assert.match(iris, /class="[^"]*mo-eyes/, 'it has eyes a driver can move');
+  assert.equal(face('iris'), iris, 'the same name draws the same face');
+  const drawing = (html: string) => html.replace(/<title>[^<]*<\/title>/, '').replace(/data-agent-face="[^"]*"/, '');
+  assert.notEqual(drawing(face('nora')), drawing(iris), 'another name draws another face, not only another title');
+});

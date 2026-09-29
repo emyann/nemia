@@ -77,7 +77,7 @@ export function checkIn(command: string, taskId: string | undefined, views: View
 
 /**
  * Each judged step's check: its command, and for a check that refused, what it said — what `checkReports`
- * in views.ts reads for `wf ls` and `wf decide`, which the package does not export. A `logs` call through `e` per
+ * in views.verb.ts reads for `wf ls` and `wf decide`, which the package does not export. A `logs` call through `e` per
  * refused check, which observes every harness again: on one run's page, and never on the list.
  */
 export async function checksOf(e: Engine['Service'], run: Run, steps: readonly Workflow[], views: Views): Promise<Map<string, StepCheck>> {

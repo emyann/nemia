@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 import type { Engine, TaskSpec } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { terminalSteps } from '../src/workflow.ts';
-import { loadWorkflows, workflowDescription } from '../src/workflow-store.ts';
+import { loadWorkflows, workflowDescription } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-supervisor-');

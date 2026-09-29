@@ -2,7 +2,7 @@
  * What a fresh worktree needs that git did not give it — the pure half.
  *
  * A worktree holds tracked files only. Two things fill the rest in, both decided here from names and
- * applied by `worktree.ts`, which reads the disk this file never touches:
+ * applied by `worktree.store.ts`, which reads the disk this file never touches:
  *
  * - **`node_modules`, per worktree.** npm workspaces are links whose real path is the main checkout, so
  *   one link to main's whole tree would have a worktree's apps import main's packages, and a branch's
@@ -50,7 +50,7 @@ export type DepsAction =
   | { kind: 'tree'; path: string; from: string };
 
 /**
- * What a worktree's `node_modules` turned out to be. `worktree.ts`'s `provisionDeps` returns it.
+ * What a worktree's `node_modules` turned out to be. `worktree.store.ts`'s `provisionDeps` returns it.
  *
  * - `hardlinked`: made from `depsPlan`, main's packages hardlinked; `made` is how many entries this call added, so 0 on a second call.
  * - `linked`: made from `depsPlan` with main's packages linked, not hardlinked, where a hardlink to main's files cannot be made (another

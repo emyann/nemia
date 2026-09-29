@@ -15,7 +15,7 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one; `true`, asked; `unsigned`, asked, and its
  * last attempt ended without it (`stated: false` on its end, or `reason: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
- * or a no gives that (`closeoutAsked` in views.ts reads all three).
+ * or a no gives that (`closeoutAsked` in views.verb.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
@@ -85,8 +85,8 @@ type RunBase = {
   inputs?: string[];
   /**
    * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox` in
-   * start.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this run,
-   * and `wf decide` names the card under the run's line. Absent on a run started any other way.
+   * inbox.verb.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this
+   * run, and `wf decide` names the card under the run's line. Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**

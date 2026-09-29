@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentCard, ownSkill, parseAgent, WorkflowError, type Agent } from '../src/workflow.ts';
-import { agentVersion, cardSkills, loadAgents, skillsFor } from '../src/workflow-store.ts';
+import { agentVersion, cardSkills, loadAgents, skillsFor } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');

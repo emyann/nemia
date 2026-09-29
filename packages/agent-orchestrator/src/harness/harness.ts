@@ -12,7 +12,7 @@ export const DEFAULT_HARNESS = 'claude';
 /**
  * How a step names a remote A2A agent, one another party runs: `harness: a2a:<name>`, the name one the store's `a2a-agents.json` declares
  * (`a2a.store.ts`), which the runtime client hands the engine as a harness of that name. The parser checks the shape and what such a step
- * may not set (`REMOTE_REFUSED`); `wf start` checks the name is declared (`undeclaredRefusal` in start.ts).
+ * may not set (`REMOTE_REFUSED`); `wf start` checks the name is declared (`undeclaredRefusal` in start.verb.ts).
  */
 export const REMOTE_PREFIX = 'a2a:';
 

@@ -1,0 +1,192 @@
+/**
+ * What the board's skill picker and skill page write: a skill copied whole from another folder of skills (`copySkill`), and a skill made or
+ * changed (`writeSkill`), each refused as `SkillWriteError`.
+ *
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run is
+ * changed by none of it: it froze its folder, and its agents' skills, at `wf start`.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
+import { linkRefusal } from '../folder/folder.ts';
+import { skillNameRefusal } from '../agents/agents.ts';
+import { skillEntryOf, renderSkill, withPreload, type SkillDraft } from './skills.ts';
+import { skillVersion } from '../folder/folder.store.ts';
+import { HOME } from '../record/record.store.ts';
+import { isWorkflowsHolder } from '../folder/write.store.ts';
+
+/**
+ * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed since
+ * it was read (`stale`), or anything else judged.
+ */
+export class SkillWriteError extends WorkflowError {
+  readonly why: 'missing' | 'exists' | 'stale' | 'refused';
+  constructor(message: string, why: SkillWriteError['why'] = 'refused') {
+    super(message);
+    this.why = why;
+  }
+}
+
+/** What `copySkill` did: the skill's folder where it now is, and its files by their path in it. */
+export type SkillCopied = { dir: string; name: string; written: string[] };
+
+/**
+ * The skill `name` of the folder of skills `from` copied whole into the folder of skills `to`, under the same name: what the board's skill
+ * picker does with a skill Nemia ships, so an agent of yours can give it — an agent of the store finds skills in the store and the
+ * repository it runs on, never in the checkout Nemia ships from. A write of its own, done before and apart from any save of an agent.
+ *
+ * Judged whole before a byte is written, each refusal by name: `to` is a `skills/` beside the workflows the board lists — the store's, or a
+ * repository's — unless `{ anywhere: true }`; the name is a skill's (`skillNameRefusal`); `from` has that skill, a folder holding a SKILL.md
+ * whose card entry reads (`skillEntryOf`), so a copy is never a skill no agent could be given; nothing in it is a link, since a copy would
+ * follow it and bring in whatever it points at; and `to` has no skill of that name, which a copy would write over. It is then copied into a
+ * hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be found.
+ */
+export function copySkill(from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}): SkillCopied {
+  const refuse = refuseSkill;
+  const at = path.resolve(to);
+  const linkWhy = 'a copy follows a link, and would bring in whatever it points at, outside the skill.';
+  judgeSkillPlace(at, name, anywhere, 'Copy it', linkWhy);
+  const source = path.join(path.resolve(from), name);
+  if (fs.lstatSync(source, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(source, linkWhy));
+  const skillFile = path.join(source, 'SKILL.md');
+  if (!fs.lstatSync(skillFile, { throwIfNoEntry: false })?.isFile()) {
+    refuse(
+      `${path.resolve(from)} has no skill named ${name}: a skill is a folder holding a SKILL.md, and ${skillFile} is not there.`,
+      'missing',
+    );
+  }
+  const files = (fs.readdirSync(source, { recursive: true }) as string[]).sort();
+  const linked = files.find((file) => fs.lstatSync(path.join(source, file)).isSymbolicLink());
+  if (linked !== undefined) refuse(linkRefusal(path.join(source, linked), linkWhy));
+  try {
+    skillEntryOf(skillFile, name, fs.readFileSync(skillFile, 'utf8'));
+  } catch (err) {
+    refuse(err instanceof Error ? err.message : String(err));
+  }
+  const target = path.join(at, name);
+  if (fs.lstatSync(target, { throwIfNoEntry: false })) {
+    refuse(
+      `${SKILLS_FOLDER}/${name} is there already, in ${at}, and a copy would write over it. Give it as it is, or remove that folder first.`,
+      'exists',
+    );
+  }
+
+  fs.mkdirSync(at, { recursive: true });
+  const staging = path.join(at, `.${name}.copying-${process.pid}-${Date.now()}`);
+  try {
+    fs.cpSync(source, staging, { recursive: true, errorOnExist: true, force: false });
+    fs.renameSync(staging, target);
+  } catch (err) {
+    fs.rmSync(staging, { recursive: true, force: true });
+    throw err;
+  }
+  const written = files.filter((file) => fs.statSync(path.join(target, file)).isFile());
+  return { dir: target, name, written };
+}
+
+const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): void => {
+  if (why) throw new SkillWriteError(why, kind);
+};
+
+/**
+ * The refusals a copy and a write of a skill share, judged before either reads a byte of it: `at` is a `skills/` beside the workflows the board
+ * lists — the store's, or a repository's — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and neither `at` nor the folder it is in
+ * is a link, which a write would follow out of the store.
+ */
+function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
+  if (path.basename(at) !== SKILLS_FOLDER)
+    refuseSkill(
+      `${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`,
+    );
+  if (!anywhere && !isWorkflowsHolder(path.dirname(at))) {
+    refuseSkill(
+      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's (<repo>/workflows/${SKILLS_FOLDER}, beside its .git). ${verb} to one of the two, or pass { anywhere: true } to write ${at} all the same.`,
+    );
+  }
+  refuseSkill(skillNameRefusal(name));
+  for (const place of [at, path.dirname(at)])
+    if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuseSkill(linkRefusal(place, linkWhy));
+}
+
+/** A change `writeSkill` makes: a whole skill, as the board's form writes it, or its `preload:` line alone, as the board's switch does. */
+export type SkillChange = SkillDraft | { name: string; preload: boolean };
+
+/** What `writeSkill` did: the skill's folder, its version now (`skillVersion`), and the files it wrote there. */
+export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
+
+/**
+ * A skill of the folder of skills `to` written: made, with `{ version: null }`, or changed, with the version it was read at. What the board's
+ * skill page does — a person writes a skill of their own in the store's library, where an agent of the store finds it. A skill's version is
+ * digested into the version of every agent that gives it (`agentVersion`), so a change of it is a change of every one of them.
+ *
+ * Judged whole before a byte is written, each refusal by name: the place and the name as a copy judges them (`judgeSkillPlace`); a SKILL.md
+ * that is not a file of the folder's own — a link — which the write would follow; for a skill made, a name already taken (`exists`), and a
+ * change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`missing`) and one whose files moved since
+ * the version was read (`stale`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words. A skill whose SKILL.md
+ * does not read may be written — that is how it is mended — so only what is written must read. A skill made is written in a hidden folder
+ * beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails leaves no half a skill.
+ */
+export function writeSkill(
+  to: string,
+  change: SkillChange,
+  { version, anywhere = false }: { version: string | null; anywhere?: boolean },
+): SkillWritten {
+  const at = path.resolve(to);
+  const name = change?.name;
+  judgeSkillPlace(at, name, anywhere, 'Write it', 'a write follows a link, and would write whatever it points at, outside the store.');
+  const target = path.join(at, name);
+  const file = path.join(target, 'SKILL.md');
+  const named = `${SKILLS_FOLDER}/${name}`;
+  const whole = 'body' in change;
+  for (const place of [target, file]) {
+    if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink())
+      refuseSkill(linkRefusal(place, "a skill's files are its own, and a write would follow the link. Remove it by hand."));
+  }
+  const rendered = (was?: string): string => {
+    try {
+      return whole ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload);
+    } catch (err) {
+      throw new SkillWriteError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  if (version === null) {
+    if (!whole)
+      refuseSkill(
+        `${named} is a change of \`preload:\` alone, and there is no skill to change: write the whole skill — its description and instructions — to make it.`,
+      );
+    if (fs.lstatSync(target, { throwIfNoEntry: false })) {
+      refuseSkill(
+        `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it.`,
+        'exists',
+      );
+    }
+    const text = rendered();
+    fs.mkdirSync(at, { recursive: true });
+    const staging = path.join(at, `.${name}.writing-${process.pid}-${Date.now()}`);
+    try {
+      fs.mkdirSync(staging);
+      fs.writeFileSync(path.join(staging, 'SKILL.md'), text);
+      fs.renameSync(staging, target);
+    } catch (err) {
+      fs.rmSync(staging, { recursive: true, force: true });
+      throw err;
+    }
+  } else {
+    if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile())
+      refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, 'missing');
+    const now = skillVersion(target);
+    if (now !== version)
+      refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, 'stale');
+    const text = rendered(fs.readFileSync(file, 'utf8'));
+    const staging = path.join(target, `.SKILL.md.writing-${process.pid}-${Date.now()}`);
+    try {
+      fs.writeFileSync(staging, text);
+      fs.renameSync(staging, file);
+    } catch (err) {
+      fs.rmSync(staging, { force: true });
+      throw err;
+    }
+  }
+  return { dir: target, name, version: skillVersion(target)!, written: ['SKILL.md'] };
+}

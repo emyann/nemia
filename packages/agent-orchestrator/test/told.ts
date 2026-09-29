@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitFrontmatter, type Workflow } from '../src/workflow.ts';
-import { skillsFor } from '../src/workflow-store.ts';
+import { skillsFor } from '../src/folder/folder.store.ts';
 
 export function toldIn(dir: string, step: Workflow): string {
   const found = skillsFor(dir);

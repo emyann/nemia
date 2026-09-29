@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { skillNameRefusal, skillTurnCost, tokensAbout } from '../src/workflow.ts';
-import { preloads, skillsFor } from '../src/workflow-store.ts';
+import { preloads, skillsFor } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-copy-');

@@ -20,7 +20,7 @@ import {
   type Agent,
   type Agents,
 } from '../src/workflow.ts';
-import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/workflow-store.ts';
+import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-agents-');

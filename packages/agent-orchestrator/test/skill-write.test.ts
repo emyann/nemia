@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { renderSkill, skillDraftOf, skillEntryOf, splitFrontmatter, withPreload, WorkflowError, type SkillDraft } from '../src/workflow.ts';
-import { agentVersion, preloads, skillVersion } from '../src/workflow-store.ts';
+import { agentVersion, preloads, skillVersion } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-skill-write-');

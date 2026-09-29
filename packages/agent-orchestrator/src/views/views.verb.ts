@@ -1,50 +1,27 @@
 /**
- * What the runtime's views of a run's tasks say, read into the words the pure functions take: a task's phase, a step's closeout and
- * whether it was asked for one, what its sessions cost, what its check exited with and said, what was said to it, what the runs it waits
- * on concluded (`parentOf`), what each step consumed, and when each task was filed. A controller: it reads the runtime through the client
- * (`runtime-client.ts`), and the store's files beneath it, and files nothing — the tick (`tick.ts`), the verbs and the screens read through it.
+ * What the runtime's views of a run's tasks say, read into the words the pure functions take: a step's closeout and whether it was asked
+ * for one, what its sessions cost, what its check exited with and said, what was said to it, what the runs it waits on concluded
+ * (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the engine's word for it are `views-words.ts`'s.
+ * A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and files nothing — the
+ * tick (`tick.ts`), the verbs and the screens read through it.
  */
 import fs from 'node:fs';
-import { denialText, type Engine, type TaskView } from './runtime-client.ts';
-import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check/check.ts';
-import type { Consumed } from './radius.ts';
-import type { Workflow } from './step/step.ts';
-import { resultSteps } from './branches/branches.ts';
-import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from './record/record.ts';
-import type { Said } from './say/say.ts';
-import { taskSpend, type SpendOf } from './status/status.ts';
-import { gated, type ParentRun } from './wait/wait.ts';
-import { decision } from './decide/decide.ts';
-import { parseCloseout, type Closeout } from './closeout/closeout.ts';
-import { signedAndHeld, taskUsage } from './timeline/timeline.ts';
-import { checkStderr, readAsks, stepsOf } from './record/record.store.ts';
-import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
-import { continuesFrom } from './retry/index.ts';
-
-/**
- * The engine's task phases, narrowed to what a run cares about.
- *
- * A task the engine has never heard of is `unknown`, NOT `pending`. It folds to the same empty
- * state as one that is filed and waiting for a slot — `settled: null`, zero attempts — and the one
- * thing that tells them apart is that a filed task has the brief it was filed with.
- *
- * Worth the line, because `pending` counts as in flight: a run whose engine board has been cleared
- * would read as running for ever, `wf cancel` claiming to stop steps nobody can find.
- *
- * A task held open whose turn signed (`signedAndHeld`) is `succeeded`: waiting on a person with no
- * process running, its session is over, and the run reads its closeout, check and gate as a settled
- * task's; closed after it signed, it is read as the `succeeded` the engine settles it at on its next
- * pass, never `running` for the pass between.
- *
- * Exported, log-free, so a consumer narrows a view as the tick does. No view at all is `unknown` too.
- */
-export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
-  if (!v) return 'unknown';
-  if (v.state.settled) return v.state.settled;
-  if (signedAndHeld(v)) return 'succeeded';
-  if (v.state.attempts.length) return 'running';
-  return v.state.brief ? 'pending' : 'unknown';
-};
+import { denialText, type Engine, type TaskView } from '../runtime-client.ts';
+import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from '../check/check.ts';
+import type { Consumed } from '../radius.ts';
+import type { Workflow } from '../step/step.ts';
+import { resultSteps } from '../branches/branches.ts';
+import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import type { Said } from '../say/say.ts';
+import { taskSpend, type SpendOf } from '../status/status.ts';
+import { gated, type ParentRun } from '../wait/wait.ts';
+import { decision } from '../decide/decide.ts';
+import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { taskUsage } from '../timeline/timeline.ts';
+import { checkStderr, readAsks, stepsOf } from '../record/record.store.ts';
+import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches.ts';
+import { continuesFrom } from '../retry/index.ts';
+import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
 
 /**
  * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
@@ -53,15 +30,6 @@ export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
  */
 const currentTurn = (state: TaskView['state']): TaskView['state']['attempts'] =>
   state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
-
-/**
- * Whether a task held open waits for a person's word now — `input-required`: its turn signed, nobody closed it, and nothing runs. What the
- * tick answers (`e.answer`) or closes (`e.close`), and nothing else is. Off views already read.
- */
-export const waitsForWord =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): boolean =>
-    views.get(taskId)?.phase === 'input-required';
 
 /**
  * How many answers a task held open has been given (`answer`): the turns after its first. Zero for any other task, and for one nobody read.
@@ -188,18 +156,6 @@ export async function taskPhases(
 }
 
 /**
- * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
- * reports: its harness let the session go `done` with `stated: false`; or the runtime's own verdict `reason: 'unsigned'`, which a journal
- * may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `done` with no closeout on a
- * journal that says nothing of `stated` is not unsigned, and is never nudged.
- */
-const unsignedEnd = (state: TaskView['state'], a: TaskView['state']['attempts'][number] | undefined): boolean =>
-  state.closeoutSchema !== undefined &&
-  a !== undefined &&
-  a.closeout === undefined &&
-  (a.reason === 'unsigned' || (a.ended === 'done' && a.stated === false));
-
-/**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
  * attempt ended without it (`unsignedEnd`), which the runtime reports and the orchestrator judges. What tells a step that ended
  * without one — `unsigned` — from a task that was never asked, and from one that failed. Exported, log-free, for a consumer that
@@ -212,23 +168,6 @@ export const closeoutAsked =
     if (!state?.closeoutSchema) return false;
     return unsignedEnd(state, currentTurn(state).at(-1)) ? 'unsigned' : true;
   };
-
-/**
- * How an attempt ended, in the words a person reads for it: an attempt its harness cut at its spend cap is `failed`, `budget` — off the
- * runtime's `limit: 'budget'`, a fact it carries and not an end it judges — one that ended without the statement its task asked for is
- * `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) — and any other is as the runtime
- * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
- * attempt's raw `reason` for `unsigned` or `budget`.
- */
-export const endWords = (
-  state: TaskView['state'],
-  a: TaskView['state']['attempts'][number],
-): { ended: string | null; reason: string | null } =>
-  a.limit === 'budget'
-    ? { ended: 'failed', reason: 'budget' }
-    : unsignedEnd(state, a)
-      ? { ended: 'failed', reason: 'unsigned' }
-      : { ended: a.ended, reason: a.reason };
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
@@ -309,24 +248,6 @@ export const exitVerdicts =
  */
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
   continuesFrom(views.get(taskId)?.state.attempts);
-
-/**
- * The engine's own word for a task's phase, off views already read — but `unknown` for a task it has no record of, as `phaseOfView` has it:
- * the engine folds that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight. What `wf ls`
- * prints beside a step, and what the feed words it from (`feedPhase`).
- */
-export const engineWord =
-  (views: ReadonlyMap<string, TaskView>) =>
-  (taskId: string): string =>
-    wordOfView(views.get(taskId));
-
-/**
- * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
- * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on it,
- * so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
- */
-export const wordOfView = (v: TaskView | undefined): string =>
-  !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;
 
 /**
  * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —

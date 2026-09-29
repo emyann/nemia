@@ -2,19 +2,22 @@
  * The package's root: what `agent-orchestrator` exports, each name re-exported by name from the file that holds it, and nothing else here.
  *
  * The runtime is reached through one client, `runtime-client.ts`, the only file that imports `agent-runtime`: it creates the runtime
- * (`engine()`, `HARNESSES`) and names its types. The controllers are split by what they do, and each imports the client, never the runtime:
- * `views.ts` (what the runtime's views of a run's tasks say), `start.ts` (starting runs, plans and inbox cards), `tick.ts` (a pass —
- * `advance`, `tick` — and the filings it adopts), `verbs.ts` (what a person asks of a run), `forget.ts` (`wf rm` and `wf prune`) and
- * `decide.ts` (what a person reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick
- * beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
+ * (`engine()`, `HARNESSES`) and names its types. The controllers are a verb each, in its feature's folder, and each imports the client, or
+ * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
+ * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.ts` (a pass — `advance`, `tick` — and the filings it
+ * adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`,
+ * `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts` (what a person
+ * reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the rest — so no
+ * cycle forms among them (`test/boundary.test.ts`).
  *
- * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them: `record.store.ts` (the run store —
- * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon.store.ts` (`tick.json` and who
- * ticks the store), `feed.store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
- * `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step hands over), `authoring.ts` (a workflow
- * folder and an agent written), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller,
- * and `record.store.ts` and `worktree.ts` — which imports `record.store.ts` alone of them — are the only ones the others import, so they load as a tree
- * and no cycle can form (`test/boundary.test.ts`).
+ * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
+ * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),
+ * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
+ * its `node_modules`, the hand-off commit), `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step
+ * hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and `skills.store.ts` (an
+ * agent and a skill written), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and
+ * `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath
+ * `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
@@ -158,8 +161,8 @@ export {
   workflowDescription,
   workflowFolder,
   workflowsIn,
-} from './workflow-store.ts';
-export type { Places } from './workflow-store.ts';
+} from './folder/folder.store.ts';
+export type { Places } from './folder/folder.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
 export {
@@ -232,7 +235,7 @@ export type { TakenStore } from './daemon/daemon.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
 export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
-export { lockfileParts, provisionDeps } from './worktree.ts';
+export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts.ts';
 export {
   artifacts,
@@ -249,29 +252,12 @@ export {
   type BranchReader,
 } from './branches.ts';
 export { evictedBy } from './rest/rest.ts';
-export {
-  AgentWriteError,
-  agentPlaces,
-  agentSkillsFound,
-  copySkill,
-  findAgent,
-  listAgents,
-  removeAgent,
-  SkillWriteError,
-  writeAgent,
-  writeSkill,
-  writeWorkflow,
-} from './authoring.ts';
-export type {
-  AgentPlace,
-  AgentSchema,
-  AgentSidecar,
-  AgentWritten,
-  SkillChange,
-  SkillCopied,
-  SkillWritten,
-  WorkflowWritten,
-} from './authoring.ts';
+export { AgentWriteError, agentPlaces, agentSkillsFound, findAgent, listAgents, removeAgent, writeAgent } from './agents/agents.store.ts';
+export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';
+export { writeWorkflow } from './folder/write.store.ts';
+export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
+export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.store.ts';
+export type { WorkflowWritten } from './folder/write.store.ts';
 export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
@@ -282,26 +268,41 @@ export {
   closeoutReader,
   consumption,
   deniedOf,
-  endWords,
   exitVerdicts,
   harnessBlocked,
   parentOf,
-  phaseOfView,
   readFilings,
   saidCount,
   spendReader,
   viewedOnce,
   unjudgedWord,
   waitingOf,
-  wordOfView,
-} from './views.ts';
-export type { CheckReport } from './views.ts';
-export { readPlan, start, startFromInbox, startPlan, startQueued } from './start.ts';
-export type { InboxStart, InboxStarted, PlanStarted } from './start.ts';
+} from './views/views.verb.ts';
+export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
+export type { CheckReport } from './views/views.verb.ts';
+export { readPlan } from './plan/plan.store.ts';
+export { start } from './start/start.verb.ts';
+export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
+export { startPlan } from './plan/plan.verb.ts';
+export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';
+export type { PlanStarted } from './plan/plan.verb.ts';
 export { advance, checkoutHold, refusalLines, runSlots, tick } from './tick.ts';
 export type { Advanced, Pass } from './tick.ts';
-export { accept, approve, cancel, hold, retry, round, say, unhold } from './verbs.ts';
-export type { Accepted, Approved, Asked, Cancelled, Holding, RoundAsked, Told } from './verbs.ts';
-export { forget, prune } from './forget.ts';
-export { decide, list, unjudgedOf } from './decide.ts';
-export type { Answered, Unjudged } from './decide.ts';
+export { accept, round } from './round/round.verb.ts';
+export { approve } from './gate/gate.verb.ts';
+export { cancel } from './cancel/cancel.verb.ts';
+export { hold, unhold } from './wait/wait.verb.ts';
+export { retry } from './retry/retry.verb.ts';
+export { say } from './say/say.verb.ts';
+export type { Accepted, RoundAsked } from './round/round.verb.ts';
+export type { Approved } from './gate/gate.verb.ts';
+export type { Asked } from './retry/retry.verb.ts';
+export type { Cancelled } from './cancel/cancel.verb.ts';
+export type { Holding } from './wait/wait.verb.ts';
+export type { Told } from './say/say.verb.ts';
+export { forget } from './forget/forget.verb.ts';
+export { prune } from './prune/prune.verb.ts';
+export { decide } from './decide/decide.verb.ts';
+export { list, unjudgedOf } from './list/list.verb.ts';
+export type { Answered } from './decide/decide.verb.ts';
+export type { Unjudged } from './list/list.verb.ts';

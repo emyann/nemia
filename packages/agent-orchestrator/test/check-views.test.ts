@@ -22,7 +22,7 @@ const ROOT = scratch('wf-check-views-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { engine, tick } = await import('../src/runner.ts');
-const { taskPhases } = await import('../src/views.ts');
+const { taskPhases } = await import('../src/views/views.verb.ts');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const e = engine();

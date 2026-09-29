@@ -1,7 +1,7 @@
 /**
  * The decider screen's pure part: what a branch touched, told by where it is and by what reads it.
  *
- * Data in, lines out. `branches.ts` asks git (`numstat`, `sensitiveDiff`), `views.ts` the engine (`consumption`),
+ * Data in, lines out. `branches.ts` asks git (`numstat`, `sensitiveDiff`), `views.verb.ts` the engine (`consumption`),
  * `cli.ts` prints, and nothing here reads a disk or spawns a thing — so every line the screen shows a
  * person can be tested as a string.
  *

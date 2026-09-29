@@ -79,7 +79,7 @@ export function parseFolder(
  * What a workflow is for, in its author's words, from the text of its folder's README: the first paragraph, its lines joined into one.
  *
  * A heading is the README's title, not a paragraph, and a frontmatter block is not prose, so both are passed over. Null when the README has
- * nothing else. Pure: `workflowDescription` (`workflow-store.ts`) reads the README and asks this.
+ * nothing else. Pure: `workflowDescription` (`folder.store.ts`) reads the README and asks this.
  */
 export function readmeDescription(text: string): string | null {
   text = text

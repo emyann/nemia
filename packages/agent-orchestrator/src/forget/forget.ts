@@ -86,9 +86,9 @@ export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
  * @param verb The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`.
- * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.ts), for an ending that lands on its
- *   check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the engine
- *   say holds it.
+ * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.store.ts), for an ending that lands on
+ *   its check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the
+ *   engine say holds it.
  * @param command The command its fixes name, when it is more than `wf <verb> <id>`: a prune's, with the flags it was given (`pruneAgain`).
  */
 export function forgetRefusal(

@@ -38,7 +38,7 @@ export const filedDenies = (
 ): string[] | undefined =>
   landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...LANDING_DENIED])] : step.disallowedTools;
 
-/** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.ts). */
+/** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.store.ts). */
 export type MergeState = {
   /**
    * `ours`: a merge is in progress — MERGE_HEAD — and every commit it merges is the tip of one of this run's result branches; `other`: one is,

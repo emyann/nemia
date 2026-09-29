@@ -17,7 +17,7 @@
  * **The keys are a closed list**, as a step's are, and for the same reason: `afer: a` read as no `after` would start the card at once,
  * beside the run it was written to wait for. Refused by name, with the fix, before anything is started.
  *
- * Pure: handed the folder's files, never reading one (`readPlan` in start.ts reads them).
+ * Pure: handed the folder's files, never reading one (`readPlan` in plan.store.ts reads them).
  */
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
@@ -51,8 +51,8 @@ function refuse(why: string): never {
  * card twice. Edges are `planOrder`'s: an `after:` naming a card the folder does not have, or the card itself, and a cycle. `where` is what a
  * refusal calls the folder.
  *
- * Whether each card's workflow loads is not read here, since that is a folder on disk: `startPlan` in start.ts asks, card by card, before
- * the first run is started.
+ * Whether each card's workflow loads is not read here, since that is a folder on disk: `startPlan` in plan.verb.ts asks, card by card,
+ * before the first run is started.
  */
 export function parsePlan(files: readonly PlanFile[], where = 'the plan folder'): Card[] {
   const stray = files

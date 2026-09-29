@@ -19,11 +19,11 @@ import {
   WorkflowError,
   type StepKey,
   type Workflow,
-} from './step/step.ts';
-import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from './former/former.ts';
-import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles } from './folder/folder.ts';
-import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from './agents/agents.ts';
-import { skillEntryOf, type AgentSkill } from './skills/skills.ts';
+} from '../step/step.ts';
+import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from '../former/former.ts';
+import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles } from './folder.ts';
+import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
+import { skillEntryOf, type AgentSkill } from '../skills/skills.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and

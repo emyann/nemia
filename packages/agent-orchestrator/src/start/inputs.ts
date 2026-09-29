@@ -7,8 +7,8 @@ import { GIVEN } from '../workspace/workspace.ts';
 import type { Run } from '../record/record.ts';
 
 /**
- * A file `wf start --input` was given, as start.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
- * judges; start.ts looks, and this file does not.
+ * A file `wf start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
+ * `inputRefusal` judges; start.verb.ts looks, and this file does not.
  */
 export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
 

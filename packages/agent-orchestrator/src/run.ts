@@ -2991,16 +2991,8 @@ export function roundAsk(
       `round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`,
     );
 
-  const at = (n: string) =>
-    standing(
-      steps.find((s) => s.name === n)!,
-      run,
-      phaseOf,
-      closeoutOf,
-      askedCloseout,
-      steps,
-      spendOf,
-    );
+  const step = (n: string) => steps.find((s) => s.name === n)!;
+  const at = (n: string) => standing(step(n), run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
   if (stuck) {
     return no(

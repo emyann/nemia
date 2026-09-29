@@ -6,58 +6,26 @@
  * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
-import path from 'node:path';
 import type { Engine, TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from '../check/check.ts';
-import { isRemoteHarness, modeOf, sessionContext, type Workflow } from '../workflow.ts';
+import type { Verdict } from '../check/check.ts';
+import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
 import { tipBranches, tipsSeen } from '../branches/branches.ts';
-import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type RunSlot } from '../cap/cap.ts';
-import { endingAsked, filedDenies } from '../ending/ending.ts';
+import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
+import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isGitRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import {
-  askingTry,
-  budgetOf,
-  budgetUsdFor,
-  capOf,
-  holdsOpenOn,
-  landsOnCheck,
-  ownStatus,
-  sentBack,
-  stepSpend,
-  stepStatus,
-  triedFrom,
-  type RoundAsk,
-  type SpendOf,
-} from '../status/status.ts';
+import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, holdsOf, runReady, waitsOf, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { assess, type Assessment } from './assess.ts';
-import { composeBrief, remoteBrief, type EndingStopped } from '../brief/index.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
-import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { modeWord, nextTry, retriesDue, sessionModel, turnsOf, type RetryAsk } from '../retry/index.ts';
-import {
-  artifactsDir,
-  cancelFile,
-  checkStderr,
-  consumeAsks,
-  holdFile,
-  inputsDir,
-  pruneFile,
-  removeHold,
-  readAnswers,
-  readAsks,
-  rewriteRun,
-  runFile,
-  runsDir,
-  stepsOf,
-} from '../record/record.store.ts';
-import { checkoutParts } from '../workspace/worktree.store.ts';
-import { gitSays, handOff, workspaceFor } from '../workspace/worktree.store.ts';
+import type { Closeout } from '../closeout/closeout.ts';
+import { nextTry, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
+import { consumeAsks, readAnswers, readAsks, removeHold, rewriteRun, runFile, runsDir, stepsOf } from '../record/record.store.ts';
+import { handOff } from '../workspace/worktree.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
 import { refsOf } from '../branches/branches.store.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
@@ -70,10 +38,7 @@ import {
   harnessBlocked,
   parentOf,
   parentsOf,
-  refusalOf,
   saidCount,
-  saidIn,
-  sessionIn,
   spendReader,
   taskPhases,
   waitingOf,
@@ -81,7 +46,7 @@ import {
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
-import { localFields, parentCloseouts, toldOf } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
@@ -332,8 +297,41 @@ export async function advanceRun(
   run: Run,
   slot?: RunSlot,
 ): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
-  const steps = stepsOf(run);
+  const { reads, askNotes } = await readPass(e, run);
+  const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
+  const adopted = await adoptAll(e, run, reads);
+  if (run.cancelledAt) await stopCancelled(e, run, reads);
+  const handed = handOffAll(run, reads);
+  const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
+  const checkout = await checkoutHold(e, run, steps);
+  const liftNotes = await liftHold(e, run);
+  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
+  const closer = closerOf(e, reads.views);
+  const closeNotes = await closeHeldOpen(run, reads, closer);
+  const admission = await admit(e, run, slot, reads, assessed);
+  const feed = wordFeed(run, reads, assessed, admission, checkout);
 
+  const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
+  const f: Filing = { e, run, reads, closer, mayFile: mayFileOf(run), notes };
+  const { tried, rechecked } = await fileTries(f, assessed.retry);
+  const looped = await fileRounds(f, assessed.round);
+  const checked = await fileChecks(f, [...assessed.check, ...rechecked]);
+  const filed = await fileReady(f, admission.ready, admission.starting);
+  const heldFirst = holdFirst(f, admission.held, assessed.ready);
+  const { tipped, tips } = keepTips(run, steps, assessed.status);
+  const wrote =
+    [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
+    Boolean(tips || heldFirst || handed.marked || landing.landed);
+  if (wrote) rewriteRun(run);
+  consumeAsks(run, asks, roundAsks);
+
+  const done = { filed, checked, tried, looped, notes, feed };
+  return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
+}
+
+/** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
+async function readPass(e: Engine, run: Run): Promise<{ reads: PassReads; askNotes: string[] }> {
+  const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run, { earlierTries: underBudget(steps, run) });
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
@@ -341,21 +339,46 @@ export async function advanceRun(
   const sessionBlocked = harnessBlocked(views);
   const spendOf = spendReader(views);
   const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
-  const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks, spendOf);
-  const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, spendOf);
-  const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked, spendOf);
+  return { reads: { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks }, askNotes };
+}
 
-  if (run.cancelledAt) {
-    const unrecorded = await unrecordedSteps(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, spendOf);
-    const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(phaseOf(taskId)));
-    for (const { taskId } of [...inFlight(run, phaseOf), ...live]) {
-      if (!views.get(taskId)?.state.stopRequested) await e.stop(taskId);
-    }
+/** Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step adopted. */
+async function adoptAll(e: Engine, run: Run, r: PassReads): Promise<string[]> {
+  const rounds = await adoptRounds(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.roundAsks, r.spendOf);
+  const tries = await adoptTries(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.verdictOf, r.asks, r.spendOf);
+  const checks = await adoptChecks(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.spendOf);
+  return [...rounds, ...tries, ...checks];
+}
+
+/** Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included: none the engine was already asked to stop. */
+async function stopCancelled(e: Engine, run: Run, r: PassReads): Promise<void> {
+  const unrecorded = await unrecordedSteps(
+    e,
+    run,
+    r.steps,
+    r.views,
+    r.phaseOf,
+    r.signedOff,
+    r.asked,
+    r.verdictOf,
+    r.asks,
+    r.roundAsks,
+    r.spendOf,
+  );
+  const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(r.phaseOf(taskId)));
+  for (const { taskId } of [...inFlight(run, r.phaseOf), ...live]) {
+    if (!r.views.get(taskId)?.state.stopRequested) await e.stop(taskId);
   }
+}
 
-  let markedHandedOff = false;
+/**
+ * Hand off every step owed it (`handOffOwed`) while the run is there, and collect what each named: answers with the notes collecting said,
+ * and whether a hand-off was marked on the record.
+ */
+function handOffAll(run: Run, r: PassReads): { collected: string[]; marked: boolean } {
+  let marked = false;
   const collected = within('act', () =>
-    handOffOwed(steps, run, phaseOf).flatMap((name) => {
+    handOffOwed(r.steps, run, r.phaseOf).flatMap((name) => {
       if (!fs.existsSync(runFile(run.id))) return [];
       const record = run.steps[name];
       let handed: ReturnType<typeof handOff>;
@@ -363,432 +386,147 @@ export async function advanceRun(
       else folderPlace(runsDir()).handOff(run, name);
       if (!(handed && 'error' in handed)) {
         run.steps[name] = { ...record, handedOff: record.taskId! };
-        markedHandedOff = true;
+        marked = true;
       }
-      return collectArtifacts(run, name, signedOff(name));
+      return collectArtifacts(run, name, r.signedOff(name));
     }),
   );
+  return { collected, marked };
+}
 
-  const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
+/** Lift a person's hold once every run it names has shipped, and only the hold this pass read (`removeHold`): answers with its note. */
+async function liftHold(e: Engine, run: Run): Promise<string[]> {
+  if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
+  let shipped = true;
+  for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
+  if (!shipped || !removeHold(run.id, run.hold.at)) return [];
+  const { until } = run.hold;
+  delete run.hold;
+  return [
+    `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
+  ];
+}
 
-  const checkout = await checkoutHold(e, run, steps);
-  const liftNotes: string[] = [];
-  if (run.hold && !run.cancelledAt && run.hold.until.length) {
-    let shipped = true;
-    for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
-    if (shipped && removeHold(run.id, run.hold.at)) {
-      const { until } = run.hold;
-      liftNotes.push(
-        `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
-      );
-      delete run.hold;
-    }
-  }
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
-  const { check, retry, round, blocked, status } = assessed;
+/** The pass's closer (`Closer`), with the tasks waiting for a word as the pass read them (`waits`) and those it closed (`closed`). */
+type PassCloser = Closer & { waits: (taskId: string) => boolean; closed: Set<string> };
+
+/** One closer for the pass: every close it makes, the sweep's and the filings', counted in one `closed`. */
+function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>): PassCloser {
   const waits = waitsForWord(views);
   const closed = new Set<string>();
-  const closeNotes: string[] = [];
   const closeWaiting = async (name: string, taskId: string): Promise<string | undefined> => {
     const refused = await closeHeld(e, taskId);
     if (!refused) closed.add(taskId);
     return refused && `${name}: ${refused}`;
   };
-  for (const step of steps) {
-    const taskId = run.steps[step.name]?.taskId;
-    if (!taskId || !waits(taskId) || holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf)) continue;
-    const refused = await closeWaiting(step.name, taskId);
-    if (refused) closeNotes.push(refused);
-  }
   const awaitsWord = (taskId: string | null | undefined): boolean => Boolean(taskId && waits(taskId) && !closed.has(taskId));
+  return { closeWaiting, awaitsWord, waits, closed };
+}
+
+/** Close each step's task held open that waits for a word nobody is to give (`holdsOpen`): answers with the engine's refusals, worded. */
+async function closeHeldOpen(run: Run, r: PassReads, closer: PassCloser): Promise<string[]> {
+  const notes: string[] = [];
+  for (const step of r.steps) {
+    const taskId = run.steps[step.name]?.taskId;
+    if (!taskId || !closer.waits(taskId) || holdsOpen(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf))
+      continue;
+    const refused = await closer.closeWaiting(step.name, taskId);
+    if (refused) notes.push(refused);
+  }
+  return notes;
+}
+
+/**
+ * Whether the run files its roots on this pass: the runs it waits on as they stand (`parent`), whether it has started, what it needs of a
+ * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose shipping it waits on (`waitsOf`).
+ */
+type Admission = {
+  parent: Awaited<ReturnType<typeof parentsOf>>;
+  starting: boolean;
+  need: ReturnType<typeof slotNeed>;
+  held: RunSlot | undefined;
+  ready: string[];
+  waiting: Wait[];
+};
+
+/** Admit the run's ready steps: while it has nothing filed, once every run it waits on has shipped and the cap leaves it a slot. */
+async function admit(e: Engine, run: Run, slot: RunSlot | undefined, r: PassReads, assessed: Assessment): Promise<Admission> {
   const parent = await parentsOf(e, run);
   const starting = !hasStarted(run);
-  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped, steps);
-  const admitted = runAdmitted(run, slot, steps);
+  const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).shipped, r.steps);
+  const admitted = runAdmitted(run, slot, r.steps);
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
-  const waiting = waitsOf(run, parent);
-  const feed = feedWords(
+  return { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
+}
+
+/** The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything. */
+function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admission, checkout: CheckoutHold | undefined): FeedWords {
+  const { views, steps } = r;
+  return feedWords(
     listing(
       steps,
       run,
       (taskId) => feedPhase(engineWord(views)(taskId)),
       (name) => closeoutOf(views, run, name),
-      asked,
-      verdictOf,
-      asks,
-      roundAsks,
+      r.asked,
+      r.verdictOf,
+      r.asks,
+      r.roundAsks,
       readAnswers(run.id),
-      waiting,
+      admission.waiting,
       saidCount(views, run),
-      spendOf,
-      held,
+      r.spendOf,
+      admission.held,
       [],
       checkout,
       waitingOf(views),
       undefined,
-      holdsOf(run, parent),
+      holdsOf(run, admission.parent),
     ),
     run,
     assessed,
     (name) => closeoutOf(views, run, name),
   );
+}
 
-  const tried: string[] = [];
-  const rechecked: string[] = [];
-  const notes: string[] = [...askNotes, ...collected, ...landing.notes, ...liftNotes, ...closeNotes];
-  let calledOff = false;
-  const mayFile = (): boolean =>
-    !(calledOff ||=
-      !fs.existsSync(runFile(run.id)) ||
-      fs.existsSync(cancelFile(run.id)) ||
-      fs.existsSync(pruneFile(run.id)) ||
-      fs.existsSync(holdFile(run.id)));
-  const endingSaid = (ending: Workflow): EndingStopped => {
-    const said = signedOff(ending.name);
-    return {
-      step: ending.name,
-      status: ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf),
-      ...(said?.summary ? { summary: said.summary } : {}),
-      ...(said?.needs ? { needs: said.needs } : {}),
-      onto: isGitRun(run) ? run.branch : 'the base branch',
-    };
-  };
-  for (const r of retry) {
-    const step = steps.find((s) => s.name === r.step)!;
-    const record = run.steps[r.step];
-    if (r.stopFirst) {
-      if (!views.get(record.taskId!)?.state.stopRequested) {
-        await e.stop(record.taskId!);
-        const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
-        notes.push(
-          `${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`,
-        );
-      }
-      continue;
-    }
-    if (!mayFile()) continue;
-    const said = `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`;
-    if (r.mode === 'recheck') {
-      tried.push(r.step);
-      notes.push(said);
-      run.steps[r.step] = nextTry(record, r);
-      rechecked.push(r.step);
-      continue;
-    }
-
-    const answers =
-      awaitsWord(record.taskId) &&
-      r.by === 'ask' &&
-      r.mode === 'nudge' &&
-      Boolean(sessionIn(views, record.taskId!)) &&
-      holdsOpen(step, run, phaseOf, signedOff, asked, steps, spendOf, verdictOf);
-    if (!answers && awaitsWord(record.taskId)) {
-      const refused = await closeWaiting(r.step, record.taskId!);
-      if (refused) {
-        notes.push(refused);
-        continue;
-      }
-    }
-    const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
-    if (answers || !(await e.view(taskId)).state.brief) {
-      const files = artifactsDir(run, r.step);
-      fs.mkdirSync(files, { recursive: true });
-      const remote = isRemoteHarness(step.harness);
-      const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(views, record.taskId!) : undefined;
-      const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
-      const asking = resumeFrom ? undefined : askingTry(steps, run, r.step);
-      const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
-      const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
-      const reads = (name: string): Closeout | undefined =>
-        asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name);
-      const tried = triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf);
-      const told = toldOf(run, step);
-      const brief = remote
-        ? remoteBrief(step, run, steps, reads, {
-            try: r.try,
-            by: r.by,
-            mode: r.mode,
-            resumed: false,
-            status: tried,
-            ...(r.message !== undefined ? { message: r.message } : {}),
-          })
-        : composeBrief(
-            told.step,
-            run,
-            steps,
-            reads,
-            files,
-            undefined,
-            {
-              try: r.try,
-              by: r.by,
-              mode: r.mode,
-              ...(r.model ? { model: r.model } : {}),
-              ...(r.message !== undefined ? { message: r.message } : {}),
-              ...(r.budget !== undefined ? { budget: r.budget } : {}),
-              resumed: Boolean(resumeFrom),
-              ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-              status: tried,
-              ...(refusal ? { refusal } : {}),
-              ...(tried === 'denied' ? { denied: spendOf(record.taskId!)?.denied ?? [] } : {}),
-              ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
-            },
-            undefined,
-            undefined,
-            inputsDir(run),
-          );
-      const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf));
-      if (answers) {
-        const refused = await answerHeld(e, taskId, brief, budgetUsd);
-        if (refused) {
-          notes.push(`${r.step}: ${refused}`);
-          continue;
-        }
-      } else
-        await e.file({
-          id: taskId,
-          brief,
-          cwd: record.workspace ?? run.workspace,
-          harness: step.harness,
-          ...localFields(step, () => ({
-            config: {
-              /** A fresh try runs on the model it asked for, or the step's; any other try on the model its session was started on. */
-              model: r.mode === 'fresh' ? (r.model ?? step.model) : sessionModel(step, record),
-              effort: step.effort,
-              contextTokens: sessionContext(step, steps),
-              permissionMode: modeOf(step),
-              tools: step.tools,
-              disallowedTools: filedDenies(step, run),
-              allowedTools: step.allowedTools,
-              background: step.background,
-              budgetUsd,
-              claude: told.claude,
-            },
-            resumeFrom,
-            ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-            closeoutSchema: closeoutSchemaOf(step, steps),
-          })),
-          deadlineSeconds: step.deadlineSeconds,
-        });
-    }
-    tried.push(r.step);
-    notes.push(said);
-    run.steps[r.step] = nextTry(record, r, taskId);
-    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
-  }
-
-  const looped: string[] = [];
-  for (const r of round) {
-    if (!mayFile()) break;
-    const looping = steps.find((s) => s.name === r.step)!;
-    const target = steps.find((s) => s.name === r.target)!;
-    const record = run.steps[r.target];
-    const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
-    if (awaitsWord(record.taskId)) {
-      const refused = await closeWaiting(r.target, record.taskId!);
-      if (refused) {
-        notes.push(refused);
-        continue;
-      }
-    }
-    looped.push(r.step);
-    notes.push(
-      `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
-    );
-    if (!(await e.view(taskId)).state.brief) {
-      const files = artifactsDir(run, r.target);
-      fs.mkdirSync(files, { recursive: true });
-      const resumeFrom = record.taskId ? sessionIn(views, record.taskId) : undefined;
-      const told = toldOf(run, target);
-      await e.file({
-        id: taskId,
-        /** Read off the closeout that asked for the round, before the record moves it behind (`roundFiled`). */
-        brief: composeBrief(
-          told.step,
-          run,
-          steps,
-          signedOff,
-          files,
-          undefined,
-          undefined,
-          {
-            loop: r.step,
-            round: r.round,
-            rounds: capOf(looping),
-            by: r.by,
-            resumed: Boolean(resumeFrom),
-            ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-          },
-          undefined,
-          inputsDir(run),
-        ),
-        cwd: record.workspace ?? run.workspace,
-        harness: target.harness,
-        ...localFields(target, () => ({
-          config: {
-            model: sessionModel(target, record),
-            effort: target.effort,
-            contextTokens: sessionContext(target, steps),
-            permissionMode: modeOf(target),
-            tools: target.tools,
-            disallowedTools: filedDenies(target, run),
-            allowedTools: target.allowedTools,
-            background: target.background,
-            budgetUsd: budgetUsdFor(
-              target,
-              r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
-              stepSpend(run, r.target, spendOf),
-            ),
-            claude: told.claude,
-          },
-          resumeFrom,
-          ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
-          closeoutSchema: closeoutSchemaOf(target, steps),
-        })),
-        deadlineSeconds: target.deadlineSeconds,
-      });
-    }
-    Object.assign(run.steps, roundFiled(steps, run, r, taskId));
-  }
-
-  const checked: string[] = [];
-  for (const name of [...check, ...rechecked]) {
-    if (!mayFile()) break;
-    const step = steps.find((s) => s.name === name)!;
-    const workspace = run.steps[name].workspace ?? run.workspace;
-    const taskId = checkTaskId(run, name);
-    if (!(await e.view(taskId)).state.brief) {
-      fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
-      const files = artifactsDir(run, name);
-      fs.mkdirSync(files, { recursive: true });
-      const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
-      if (install)
-        notes.push(
-          `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
-        );
-      await e.file({
-        id: taskId,
-        harness: 'check',
-        brief: checkBrief(
-          step.check!,
-          {
-            WF_RUN: run.id,
-            WF_STEP: name,
-            ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
-            WF_WORKSPACE: workspace,
-            WF_STDERR: checkStderr(taskId),
-            WF_ARTIFACTS: files,
-          },
-          install,
-        ),
-        cwd: workspace,
-        deadlineSeconds: CHECK_DEADLINE_SECONDS,
-      });
-    }
-    run.steps[name] = { ...run.steps[name], check: { taskId } };
-    checked.push(name);
-  }
-
-  const sessionOf = (stepName: string): string | undefined => {
-    const taskId = run.steps[stepName]?.taskId;
-    return taskId ? sessionIn(views, taskId) : undefined;
-  };
-
-  if (ready.length && starting && run.after?.length && isGitRun(run))
-    run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
-  const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
-
-  const filed: string[] = [];
-  for (const name of ready) {
-    if (!mayFile()) break;
-    const step = steps.find((s) => s.name === name)!;
-    const place = await within('act', () => workspaceFor(run, steps, step));
-    notes.push(...place.notes.map((note) => `${name}: ${note}`));
-    if (!mayFile()) break;
-    const files = artifactsDir(run, name);
-    fs.mkdirSync(files, { recursive: true });
-    const told = toldOf(run, step);
-
-    const taskId = await e.file({
-      /**
-       * Chosen, not generated (`stepTaskId`): a person scanning their sessions sees which run and which step, two steps of one run share a
-       * prefix, and a step filed on a later try or round says which.
-       */
-      id: stepTaskId(run, name, tryOf(run, name)),
-      /**
-       * Read off the closeouts the assessment that made the step ready read, so it is handed what it was filed on; a remote agent's names
-       * nothing of this machine (`remoteBrief`).
-       */
-      brief: isRemoteHarness(step.harness)
-        ? remoteBrief(step, run, steps, signedOff, undefined, step.after.length ? undefined : parents)
-        : composeBrief(
-            told.step,
-            run,
-            steps,
-            signedOff,
-            files,
-            place.deps,
-            undefined,
-            undefined,
-            step.after.length ? undefined : parents,
-            inputsDir(run),
-          ),
-      cwd: place.workspace,
-      harness: step.harness,
-      deadlineSeconds: step.deadlineSeconds,
-      ...localFields(step, () => ({
-        /**
-         * The harness's arguments, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow this run froze. The
-         * runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`).
-         */
-        config: {
-          model: step.model,
-          effort: step.effort,
-          contextTokens: sessionContext(step, steps),
-          permissionMode: modeOf(step),
-          tools: step.tools,
-          disallowedTools: filedDenies(step, run),
-          allowedTools: step.allowedTools,
-          background: step.background,
-          budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
-          claude: told.claude,
-        },
-        resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
-        ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
-        /**
-         * The engine hands it to the harness and records the answer without reading it: what the fields mean is this package's (`Closeout`).
-         */
-        closeoutSchema: closeoutSchemaOf(step, steps),
-      })),
-    });
-    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
-    filed.push(name);
-  }
-  const heldFirst = Boolean(held && !run.slotHeldAt && mayFile());
+/** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */
+function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]): boolean {
+  const heldFirst = Boolean(held && !f.run.slotHeldAt && f.mayFile());
   if (heldFirst) {
-    run.slotHeldAt = new Date().toISOString();
-    notes.push(`${assessed.ready.join(', ')}: ${slotWord(held!)} — filed once a run in flight settles`);
+    f.run.slotHeldAt = new Date().toISOString();
+    f.notes.push(`${ready.join(', ')}: ${slotWord(held!)} — filed once a run in flight settles`);
   }
+  return heldFirst;
+}
+
+/** Keep each result branch's tip as git has it (`tipsSeen`), on the record where one moved: the branches read, and the tips kept. */
+function keepTips(run: Run, steps: readonly Workflow[], status: Assessment['status']): { tipped: string[]; tips: Run['tips'] | undefined } {
   const tipped = isGitRun(run) ? tipBranches(run, steps, status) : [];
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
-  const wrote = Boolean(
-    filed.length ||
-    checked.length ||
-    tried.length ||
-    looped.length ||
-    adopted.length ||
-    adoptedTries.length ||
-    adoptedRounds.length ||
-    tips ||
-    heldFirst ||
-    markedHandedOff ||
-    landing.landed,
-  );
-  if (wrote) rewriteRun(run);
-  consumeAsks(run, asks, roundAsks);
+  return { tipped, tips };
+}
 
+/** What a pass filed and said, as `Advanced` carries it. */
+type Done = Pick<Advanced, 'filed' | 'checked' | 'tried' | 'looped' | 'notes' | 'feed'>;
+
+/**
+ * The pass's answer: what it did (`Advanced`), what holds the run out of rest (`restBlockers`), and at rest the branches it read the tips
+ * of. `acted` says the pass wrote the record or closed a task.
+ */
+function answerOf(
+  run: Run,
+  r: PassReads,
+  assessed: Assessment,
+  admission: Admission,
+  done: Done,
+  pass: { acted: boolean; tipped: string[] },
+): { advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } } {
+  const { steps, views, phaseOf, asks } = r;
+  const { held, waiting } = admission;
+  const { filed, checked, tried, looped, notes, feed } = done;
+  const { status, blocked } = assessed;
   const advanced: Advanced = {
     run,
     filed,
@@ -799,7 +537,7 @@ export async function advanceRun(
     blocked,
     notes,
     waiting,
-    inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
+    inFlight: !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0)),
     ...(held ? { held } : {}),
     feed,
   };
@@ -813,13 +551,13 @@ export async function advanceRun(
     inFlight: advanced.inFlight,
     held: Boolean(held),
     settled: [...views.values()].every((v) => Boolean(v.state.settled)),
-    acted: wrote || closed.size > 0,
+    acted: pass.acted,
     handOffDue: handOffOwed(steps, run, phaseOf),
     landingOwed: steps.some((s) => landsOnCheck(s, run) && Boolean(run.steps[s.name]?.taskId) && !run.steps[s.name]?.landed),
     checkoutAsked: Boolean(ending && !run.cancelledAt && endingAsked(run, ending, asks) !== undefined),
   };
   const blockers = restBlockers(facts);
-  return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped } }) };
+  return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped: pass.tipped } }) };
 }
 
 /**
@@ -862,19 +600,4 @@ export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<
     if (said) refused.push(`${name}: ${said}`);
   }
   return refused;
-}
-
-/**
- * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
- * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a nudge's brief, which the runtime hands the session it
- * continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
- */
-async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: number | undefined): Promise<string | undefined> {
-  try {
-    await e.answer(taskId, text, budgetUsd === undefined ? {} : { config: { budgetUsd } });
-    return undefined;
-  } catch (err) {
-    if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
-    throw err;
-  }
 }

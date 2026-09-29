@@ -2,7 +2,17 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, forget, listRuns, prune, runStartedAt, unhold, unjudgedWord } from 'agent-orchestrator';
+import {
+  type BranchReader,
+  branchReader,
+  forget,
+  listRuns,
+  prune,
+  runStartedAt,
+  unhold,
+  unjudgedWord,
+  verifiesRest,
+} from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator/effect';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { readBody, type BodyIssue } from '../body.ts';
@@ -26,8 +36,9 @@ import { type RunGraph, runGraph } from './graph.ts';
 import { restingMemo, restingRead } from './resting.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { tryOf } from '../agents/try.ts';
+import { type ApiEnv, type Served, served } from '../layer.ts';
 import {
-  e,
+  type Engine,
   filedTimes,
   findRun,
   judgedSteps,
@@ -123,8 +134,8 @@ export type RunSummary = {
 /** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
 type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: Asked };
 
-async function summarize(run: Run, views: Views, reader: typeof e, git: BranchReader): Promise<Judged> {
-  const folder = workflowsOf(run).steps;
+async function summarize(run: Run, views: Views, reader: Engine['Service'], git: BranchReader, home: string): Promise<Judged> {
+  const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const asked: Asked = { branches: [], failed: false };
   const judged = judge(run, names, folder, views, await waitsIn(run, reader, git), await holdsIn(run, reader, git), (status, steps) =>
@@ -137,7 +148,7 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
     work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
-    try: tryOf(run),
+    try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
@@ -171,8 +182,8 @@ async function summarize(run: Run, views: Views, reader: typeof e, git: BranchRe
  * — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and counts it in flight, so it is `running` and
  * moving until the journal reads again.
  */
-function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string): Omit<RunSummary, 'startedAt'> {
-  const folder = workflowsOf(run).steps;
+function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string): Omit<RunSummary, 'startedAt'> {
+  const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const wordOf = unjudgedWord(views, unreadable);
   return {
@@ -182,7 +193,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string):
     work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,
     workflowDir: run.workflowDir,
-    try: tryOf(run),
+    try: tryOf(run, home),
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
@@ -218,20 +229,21 @@ async function judgedOrNot(
   run: Run,
   views: Views,
   unreadable: Unreadable,
-  reader: typeof e,
+  reader: Engine['Service'],
   git: BranchReader,
+  home: string,
 ): Promise<Judged | { unjudged: Omit<RunSummary, 'startedAt'> }> {
-  const one = await judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git));
-  return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable) };
+  const one = await judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git, home));
+  return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
 }
 
 /** Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try, agents.ts). */
-export async function judgedNow(some: readonly Run[]): Promise<Array<Omit<RunSummary, 'startedAt'>>> {
-  const { views, reader, unreadable } = await viewsFor(some);
+export async function judgedNow(e: Engine['Service'], home: string, some: readonly Run[]): Promise<Array<Omit<RunSummary, 'startedAt'>>> {
+  const { views, reader, unreadable } = await viewsFor(e, some);
   const git = branchReader();
   const out: Array<Omit<RunSummary, 'startedAt'>> = [];
   for (const run of some) {
-    const one = await judgedOrNot(run, views, unreadable, reader, git);
+    const one = await judgedOrNot(run, views, unreadable, reader, git, home);
     out.push('unjudged' in one ? one.unjudged : one.summary);
   }
   return out;
@@ -300,7 +312,7 @@ function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): str
  * frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
  * package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
  */
-async function atRest(run: Run, judged: Judged, reader: typeof e): Promise<boolean> {
+async function atRest(run: Run, judged: Judged, reader: Engine['Service']): Promise<boolean> {
   const { summary, asked } = judged;
   if (!run.workflow || run.hold || asked.failed || summary.moving || summary.waiting || summary.holding) return false;
   if (!run.pruned && !['succeeded', 'failed', 'cancelled'].includes(summary.status)) return false;
@@ -344,82 +356,92 @@ export const resting = restingMemo<Omit<RunSummary, 'startedAt'>>();
  *   the package's goes to `app.onError`, which answers it by its kind, and any other failure is a 502. No feed line: the marker the prune writes moves the run's
  *   `restStamps`, and the board reads the run again itself.
  */
-export const runs = new Hono()
-  .get('/api/runs', async (c) => {
-    const read = await restingRead(resting);
-    const runs = listRuns();
-    read.only(runs.map((run) => run.id));
-    const filed = await filedTimes();
-    const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
-    const toJudge: Run[] = [];
-    for (const run of runs) {
-      const answer = read.kept(run);
-      if (answer) kept.set(run.id, answer);
-      if (!answer || read.verify) toJudge.push(run);
+/**
+ * Every run's summary, in the store's order, as `GET /api/runs` answers it: through the app's engine and root, the memo verified as its
+ * environment says (`WF_VERIFY_REST`).
+ */
+async function listed({ e, env, home }: Served): Promise<RunSummary[]> {
+  const read = await restingRead(e, resting, verifiesRest(env));
+  const runs = listRuns();
+  read.only(runs.map((run) => run.id));
+  const filed = await filedTimes(e);
+  const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
+  const toJudge: Run[] = [];
+  for (const run of runs) {
+    const answer = read.kept(run);
+    if (answer) kept.set(run.id, answer);
+    if (!answer || read.verify) toJudge.push(run);
+  }
+  const { views, reader, unreadable } = await viewsFor(e, toJudge, () => runs);
+  const git = branchReader();
+  git.prime(toJudge);
+  const judged = new Map<string, Judged>();
+  const notJudged = new Map<string, Omit<RunSummary, 'startedAt'>>();
+  for (const run of toJudge) {
+    const one = await judgedOrNot(run, views, unreadable, reader, git, home);
+    if ('unjudged' in one) {
+      notJudged.set(run.id, one.unjudged);
+      kept.delete(run.id);
+      read.drop(run);
+      continue;
     }
-    const { views, reader, unreadable } = await viewsFor(toJudge, () => runs);
-    const git = branchReader();
-    git.prime(toJudge);
-    const judged = new Map<string, Judged>();
-    const notJudged = new Map<string, Omit<RunSummary, 'startedAt'>>();
-    for (const run of toJudge) {
-      const one = await judgedOrNot(run, views, unreadable, reader, git);
-      if ('unjudged' in one) {
-        notJudged.set(run.id, one.unjudged);
-        kept.delete(run.id);
-        read.drop(run);
-        continue;
-      }
-      judged.set(run.id, one);
-      const was = kept.get(run.id);
-      if (was && !isDeepStrictEqual(was, one.summary)) {
-        throw new Error(
-          `The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`,
-        );
-      }
-      if (was) continue;
-      if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
-      else read.drop(run);
-    }
-    const summaries: RunSummary[] = runs.map((run) => {
-      const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id)!;
-      if (kept.has(run.id)) read.hit();
-      return { ...summary, startedAt: runStartedAt(run, filed) };
-    });
-    return c.json(summaries);
-  })
-  .get('/api/runs/:id', async (c) => {
-    const id = c.req.param('id');
-    const run = findRun(id);
-    if (!run) return c.json({ error: noSuchRun(id) }, 404);
-    const full = await detail(run);
-    if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
-    return c.json(full);
-  })
-  .delete('/api/runs/:id', async (c) => {
-    const id = c.req.param('id');
-    const route = `DELETE /api/runs/${id}`;
-    const refused = refusedBeforeReading(
-      removeGuard(route),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const run = findRun(id);
-    if (!run) return c.json({ error: noSuchRun(id) }, 404);
-    if (!tryOf(run)) {
-      return c.json(
-        {
-          error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.`,
-        },
-        409,
+    judged.set(run.id, one);
+    const was = kept.get(run.id);
+    if (was && !isDeepStrictEqual(was, one.summary)) {
+      throw new Error(
+        `The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`,
       );
     }
-    const gone = await forget(e, id);
-    if (gone.kind === 'refused') return c.json({ error: gone.refusal }, 409);
-    return c.json({ id, removed: true });
-  })
+    if (was) continue;
+    if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
+    else read.drop(run);
+  }
+  const summaries: RunSummary[] = runs.map((run) => {
+    const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id)!;
+    if (kept.has(run.id)) read.hit();
+    return { ...summary, startedAt: runStartedAt(run, filed) };
+  });
+  return summaries;
+}
+
+export const runs = new Hono<ApiEnv>()
+  .get('/api/runs', (c) => served(c, async (s) => c.json(await listed(s))))
+  .get('/api/runs/:id', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      const full = await detail(run, e, home);
+      if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
+      return c.json(full);
+    }),
+  )
+  .delete('/api/runs/:id', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const route = `DELETE /api/runs/${id}`;
+      const refused = refusedBeforeReading(
+        removeGuard(route),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      if (!tryOf(run, home)) {
+        return c.json(
+          {
+            error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.`,
+          },
+          409,
+        );
+      }
+      const gone = await forget(e, id);
+      if (gone.kind === 'refused') return c.json({ error: gone.refusal }, 409);
+      return c.json({ id, removed: true });
+    }),
+  )
   .delete('/api/runs/:id/hold', async (c) => {
     const id = c.req.param('id');
     const route = `DELETE /api/runs/${id}/hold`;
@@ -440,37 +462,41 @@ export const runs = new Hono()
       return c.json({ error: `${route}: the hold was not lifted — ${message}. Lift it with \`wf hold ${id} --off\`.` }, 502);
     }
   })
-  .post('/api/runs/:id/prune', async (c) => {
-    const id = c.req.param('id');
-    const route = `POST /api/runs/${id}/prune`;
-    const refused = refusedBeforeReading(
-      pruneGuard(route),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const read = await readBody(c.req, PRUNE_BODY, `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.`, pruneWords, PRUNE_OPTIONS);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-    try {
-      const { artifacts = false, unmerged = false } = read.body;
-      const p = await prune(e, id, { artifacts, unmerged, yes: true });
-      if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
-      if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
-      return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const message = err instanceof Error ? err.message : String(err);
-      return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
-    }
-  })
-  .get('/api/runs/:id/decision', async (c) => {
-    const id = c.req.param('id');
-    const run = findRun(id);
-    if (!run) return c.json({ error: noSuchRun(id) }, 404);
-    const { unreadable } = await viewsFor([run]);
-    const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run));
-    if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
-    return c.json(read.judged);
-  });
+  .post('/api/runs/:id/prune', (c) =>
+    served(c, async ({ e }) => {
+      const id = c.req.param('id');
+      const route = `POST /api/runs/${id}/prune`;
+      const refused = refusedBeforeReading(
+        pruneGuard(route),
+        c.req.header('host'),
+        c.req.header('sec-fetch-site'),
+        c.req.header('content-type'),
+      );
+      if (refused) return c.json({ error: refused.error }, refused.status);
+      const read = await readBody(c.req, PRUNE_BODY, `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.`, pruneWords, PRUNE_OPTIONS);
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+      try {
+        const { artifacts = false, unmerged = false } = read.body;
+        const p = await prune(e, id, { artifacts, unmerged, yes: true });
+        if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
+        if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
+        return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        const message = err instanceof Error ? err.message : String(err);
+        return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
+      }
+    }),
+  )
+  .get('/api/runs/:id/decision', (c) =>
+    served(c, async ({ e, home }) => {
+      const id = c.req.param('id');
+      const run = findRun(id);
+      if (!run) return c.json({ error: noSuchRun(id) }, 404);
+      const { unreadable } = await viewsFor(e, [run]);
+      const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run, e, home));
+      if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
+      return c.json(read.judged);
+    }),
+  );

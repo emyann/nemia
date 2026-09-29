@@ -11,7 +11,6 @@ import {
   exitVerdicts,
   fromNote,
   HARNESSES,
-  HOME,
   phaseOfView,
   remoteAgents,
   type Retry,
@@ -65,7 +64,7 @@ import {
 import { checksOf, type StepCheck } from '../steps/logs.ts';
 import {
   bare,
-  e,
+  type Engine,
   filedTimes,
   judgedSteps,
   judgedUnlessUnreadable,
@@ -503,7 +502,7 @@ const lastSaid = new Map<string, { cursor: string; line: string | null }>();
  * not its whole conversation again; a cursor the engine refuses, of a transcript replaced since, is read again from the start. A read's
  * cache, and nothing is decided by it: a fresh process reads from the start.
  */
-async function lastLineOf(view: TaskView): Promise<string | null> {
+async function lastLineOf(e: Engine['Service'], view: TaskView): Promise<string | null> {
   const key = `${view.id}#${view.state.attempts.length}`;
   const read = (after?: string) => e.transcript(view.id, after).catch(() => undefined);
   let from = lastSaid.get(key);
@@ -568,11 +567,11 @@ const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly W
  * run's own detail reads. What its tries consumed and cost, and its timeline, come off the same views and the feed's filing times
  * (`filedTimes`), with no observation of their own; the timeline's rounds are of the loops of the steps the run is judged by.
  */
-export async function detail(run: Run): Promise<RunDetail | { unjudged: string }> {
-  const folder = workflowsOf(run);
+export async function detail(run: Run, e: Engine['Service'], home: string): Promise<RunDetail | { unjudged: string }> {
+  const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const { views, reader: seen, unreadable } = await viewsFor([run]);
+  const { views, reader: seen, unreadable } = await viewsFor(e, [run]);
   const read = await judgedUnlessUnreadable(run, unreadable, async () =>
     judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
       standingsOf(run, steps, status),
@@ -581,10 +580,10 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);
-  const checks = await checksOf(run, steps, views);
+  const checks = await checksOf(e, run, steps, views);
   const source = shownWorkflow(run, workflows);
   const used = consumption(views, run);
-  const filed = await filedTimes();
+  const filed = await filedTimes(e);
   const clock = timeline(run, views, filed, steps);
   return {
     id: run.id,
@@ -593,7 +592,7 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
     place: placeOf(run),
     work: isGitRun(run) ? null : run.workspace,
     workflowDir: run.workflowDir,
-    try: tryOf(run),
+    try: tryOf(run, home),
     baseRef: run.baseRef ?? null,
     branch: run.branch ?? null,
     isolate: run.isolate ?? null,
@@ -607,7 +606,7 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
           artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
         }
       : null,
-    onDisk: onDiskOf(run),
+    onDisk: onDiskOf(run, home),
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
@@ -653,7 +652,7 @@ export async function detail(run: Run): Promise<RunDetail | { unjudged: string }
           branch: run.steps[name]?.branch ?? null,
           note: judged.notes.get(name) ?? null,
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
+          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
@@ -770,7 +769,7 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
 }
 
 /** What of a run `wf prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
-function onDiskOf(run: Run): RunDetail['onDisk'] {
+function onDiskOf(run: Run, home: string): RunDetail['onDisk'] {
   const files = path.dirname(artifactsDir(run, '_'));
-  return { worktrees: isGitRun(run) && fs.existsSync(path.join(HOME, 'worktrees', run.id)), files: fs.existsSync(files) };
+  return { worktrees: isGitRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };
 }

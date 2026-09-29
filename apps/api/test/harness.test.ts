@@ -67,7 +67,9 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
     "the package's engine, listing a task filed on its Claude harness, observed the harness's `claude`: a list observes every harness, where a view of a task with no attempt in flight reads its record alone",
   );
   before = observations();
-  await (await import('../src/store.ts')).e.list();
+  const { runtime } = await import('../src/app.ts');
+  const { Engine } = await import('../src/store.ts');
+  await (await runtime.runPromise(Engine.useSync((e) => e))).list();
   assert.ok(observations() > before, "and so did the api's");
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });

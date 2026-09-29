@@ -7,30 +7,41 @@
 import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Exit } from 'effect';
+import { Effect, Exit, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { machineTempDir, scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('hkb-api-quota-');
 
-const { app } = await import('../src/app.ts');
+const { appOf, liveOf } = await import('../src/app.ts');
 const {
   askUsage,
   backoffOf,
-  forgetQuota,
   QUOTA_BACKOFF_CEILING_MS,
   QUOTA_BACKOFF_MS,
   QUOTA_KEEP_MS,
   QUOTA_LAST_MS,
   QUOTA_MARK_PERCENT,
   quotaOf,
-  readQuota,
+  makeQuota,
+  QuotaAsker,
   usageAsk,
   usageEnv,
 } = await import('../src/factory/quota.ts');
 type Quota = import('../src/factory/quota.ts').Quota;
 type Held = import('../src/factory/quota.ts').Held;
+type ReadQuota = import('../src/factory/quota.ts').ReadQuota;
+
+/** An app over the live services but its quota asker, `read`: the one the test asks directly too. */
+const appAsking = (read: ReadQuota) => appOf(Layer.merge(liveOf(), QuotaAsker.layer(read))).app;
+let readQuota = makeQuota();
+let app = appAsking(readQuota);
+/** A quota asker with nothing held, as a process that has just started has, and an app that asks through it. */
+const forgetQuota = () => {
+  readQuota = makeQuota();
+  app = appAsking(readQuota);
+};
 
 const NOW = Date.parse('2026-09-19T10:00:00.000Z');
 /** A success answer, as Claude Code's control_response carries it, with these `rate_limits`. */

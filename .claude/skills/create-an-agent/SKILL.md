@@ -66,6 +66,8 @@ the step's place, as a start gives it: a test that loads a shipped folder passes
   rest is refused without asking. The repository's `.claude/settings.json` allows commands for other roles — `npm run build` and
   `npm run e2e` write into the workspace — so an agent given `Bash` denies them by name: `disallowedTools: Bash(npm run build), Bash(npm
   run e2e)`. A sub-agent inherits the mode and the rules; list `Agent` in `allowedTools:` so the dispatch itself is never refused.
+  Allow by name each read-only check the role runs that the settings do not: they allow `npm test` and `npm run typecheck`, not
+  `npm run lint` (Agora's first review could not run it).
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
   -D:*)`, `Bash(git branch --delete --force:*)`, `mcp__playwright__browser_run_code_unsafe`.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:

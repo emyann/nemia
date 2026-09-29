@@ -52,11 +52,12 @@ once per try:
 Any answer that does not decode is never a route. The condition stops, as `blocked` does, until a person names the route (`wf route`) or
 asks again (`wf retry`).
 
-**Gates** stay a property of a step: A2A's *input required*, drawn as a frame around the node. **Checks** become several named checks per
-step, and each verdict becomes a fact a condition may route on. Today's four rules keep what they mean: `check:` is one named check, a
-`loop:` is a condition with a way back, and `gate:` and `blocked` stay as they are. The **inbox** gets the same condition one level up.
-Its routes are the team folders, and a person confirms each answer until measured agreement earns the dispatcher more. **Two machines**
-print themselves: a step's lifecycle, and each workflow's graph of steps and routes, which the board lights with a run's path.
+**Gates** stay a property of a step: A2A's *input required*, which the board shows as it does today, *waiting on you*. **Checks** become
+several named checks per step, and each verdict becomes a fact a condition may route on. Today's four rules keep what they mean: `check:`
+is one named check, a `loop:` is a condition with a way back, and `gate:` and `blocked` stay as they are. The **inbox** gets the same
+condition one level up. Its routes are the team folders, and a person confirms each answer until measured agreement earns the dispatcher
+more. **Two machines** print themselves: a step's lifecycle, and each workflow's graph of steps and routes, which the board lights with a
+run's path.
 
 ## Today's four rules, as the code runs them
 
@@ -282,10 +283,15 @@ that signed and waits for a person reads `input-required`, A2A's own task state,
 - **`gate:` is unchanged**, and it may sit on a condition. A gated condition holds its answered route for a person. `wf approve` confirms
   the route, `wf route` changes it, and `wf retry --message` asks again. All three are open, since nothing after a gated step is filed
   before it is approved. That is how a new dispatcher or a new Jev route earns trust inside a workflow: gated first, ungated once measured.
-- **The board draws a frame** around a gated node: a dashed border labelled *input required*. It turns solid and amber while the step is
-  `awaiting approval`, and it reads *approved* once the try is approved. The frame comes from the spec (`gate` is already on
-  `WorkflowStepSpec`) and from the run's `Decision`. The api already has both, so no new endpoint is needed. `approvedFirst` endings draw
-  the frame before the node runs.
+- **The board shows the wait as it does today**, and that is the design. On the Factory (`FactoryCanvas`), the card (`RunNode`) of a run
+  with a step at its gate carries an amber *waiting on you* badge (`waitsOnYou`) and answers the gate in its gate row (`CardGate`, off
+  `gateOfSummary`). When that step is the run's ending, which the api gives as `toDecide` of kind `approve`, the card also has a green
+  frame, `ring-1 ring-emerald-500/60`, and a green *to decide* badge; a result branch nobody merged (`toDecide` of kind `git`) gets the
+  same. On the run's page, the step itself (`StepNode`) reads *human gate*, has a 2px amber border, and says *waiting on you* on its last
+  line. *Waiting on you* is the board's word for *input required* at a gate, so a gated condition needs nothing new there: its wait is a
+  gate's wait. If the card is redesigned, it is redesigned on its own.
+- **An idea for later, not a card:** a gated step could carry an outline of its own on the canvas, marking that it has a gate before it
+  waits. The spec already says so (`gate` is on `WorkflowStepSpec`), so it would need no new endpoint.
 - **"Send back" is the gate's, not a route.** `wf retry --message` is a person's word that goes to one step (`sendBackTo`) as a new try.
   A route is the folder's graph, which an author declares and load checks. A person's word is outside that graph: it can go to any step,
   at any time, and no load could check it. The loop's `again` stays the agent's route, since the agent says it and the folder bounds it.
@@ -371,7 +377,7 @@ the whole step anyway.
 |---|---|---|---|
 | `check:` / `retries:` | a property: one named check, `check`. `retries:` unchanged | unchanged. It reads as `checks: { check }` | unchanged words (`failed (check)`, `wf retry --recheck`). The board's check box lists one check |
 | `loop:` / `again` / `rounds:` | a condition with a way back. The looping step's `again` is a field-kind route (`again`, `on`), and `loop:` names where `again` goes | unchanged, and the code path stays until C10. The board draws the loop as a route edge labelled `again`, with its cap | unchanged (`exhausted`, `wf round`, `wf accept`). The edge is lit on the run with the round count |
-| `gate:` | unchanged: a property (*input required*). It may sit on a condition | unchanged | unchanged words. The board adds the frame |
+| `gate:` | unchanged: a property (*input required*). It may sit on a condition | unchanged | unchanged words. The board shows *waiting on you*, as today |
 | `blocked` | unchanged: the agent's word to a person, a stop and never a route. A condition's `unsure` reads the same | unchanged | unchanged |
 
 Frozen runs decode through `FrozenStepSchema` unchanged: every new key is an optional field, and a record frozen before them has none.
@@ -496,7 +502,7 @@ Each workflow folder is a machine: steps as states, `after`, routes, loops and t
 
 - **`workflowGraph(steps)`**, pure, in `packages/agent-orchestrator/src/workflow/`, exported on `agent-orchestrator/workflow`. It replaces
   the api's own `graphOf` (`apps/api/src/runs/graph.ts`), so the api draws what load validates and derives nothing itself.
-- **`GraphEdge`** gains `{ from, to, kind: 'route', route }`. Gates are node properties (the frame), not edges.
+- **`GraphEdge`** gains `{ from, to, kind: 'route', route }`. Gates are node properties, not edges.
 
 ```mermaid
 stateDiagram-v2
@@ -565,7 +571,7 @@ is filed `--after` that slice's run. Each card is one refusal family or one page
 | card | what | after |
 |---|---|---|
 | C1 | The step machine: `step-machine.ts`, its `diagram:step` marker, the replay test, `MACHINES.step`. No behaviour changes | the slices, Effect 7 |
-| C2 | `workflowGraph` in the package, the api's `graphOf` retired, `kind: 'route'` edges, the gate frame on the board | C1 |
+| C2 | `workflowGraph` in the package, the api's `graphOf` retired, `kind: 'route'` edges | C1 |
 | C3 | `routes:` / `route: from` / `when:` / `ends:`, `skipped`, the join rule, load's refusals, `git-runs-before.json` refreshed | C2 |
 | C4 | The script kind: the frozen script, `WF_REQUEST`, the answer off the log, `StepRecord.route`, `wf route` | C3 |
 | C5 | The agent kind: the run's `route` enum in the closeout schema, read-only refusals | C3 |

@@ -141,7 +141,7 @@ worked out in code today with no git: the parent's workspace, the checkout, the 
 | `make` | before filing a `fork` or `merge` step of an isolated run | `{ repo, at, name, from, also[] }`: `at` is `WF_ROOT/worktrees/<id>/<step>`, `name` is `wf/<id>/<step>`, `from` a branch or the base | `Made { workspace, branch, conflicts[], notes[] }` | `workspaceFor`'s git half, `includeFiles` |
 | `handoff` | each pass a finished step's hand-off is due, and before `wf rm` removes a workspace | `{ workspace, step, why }` | `HandedOff { commit: string \| null }` | `handOff` |
 | `report` | when a run's result tips or its base moved since the last report (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, the api's `mergesOnto` |
-| `standing` | batched: one call per repository and frozen copy, per pass or per request (below) | `{ repo, branches: [{ branch, tip?, baseRef }], base }` | `Standing { heads, branches: [{ branch, tip, onBase, pastBase, ahead }] }` | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`'s reads |
+| `standing` | by the tick, each pass: one call per repository and frozen copy, over every result branch the store's records name there; written to a snapshot the api and `wf ls` read (below) | `{ repo, branches: [{ branch, tip?, baseRef }], base }` | `Standing { heads, branches: [{ branch, tip, onBase, pastBase, ahead }] }` | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`'s reads |
 | `status` | only while an ending that lands on its check holds the checkout (`landingOpen`) | `{ checkout, tips }` | `Status { merging, conflicted, missing[], head? }` | `mergeInProgress`, `mergeState` |
 | `land` | when `landingDue` says `commit` or `abort` | `{ checkout, act: 'commit', message }` or `{ checkout, act: 'abort' }` | `Landed { commit }` or `{ aborted: true }` | `commitMerge`, `abortMerge` |
 | `inventory` | `wf rm`, `wf prune` | `{ repo, under, prefix }`: the run's worktrees root and branch prefix | `Inventory { workspaces[], branches[] }` | the listings in `forget.ts` |
@@ -220,10 +220,11 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
 ## Freezing
 
 - At `wf start`, the skill `place:` names is found by `skillsFor(workflowDir, placesOf(repo))`, the same lookup an agent's skills use.
-  Its `version` is `skillVersion`'s digest. It is copied whole, links dereferenced, to `WF_ROOT/places/<skill>@<version>/`, unless that
-  folder is already there. The copy is written beside it and renamed into place, so a folder under that name is always whole, and it is
-  never written again: the same name holds the same bytes, whoever wrote it. `place.json` is decoded then, and a start it refuses leaves
-  no record behind, as a failed `writeAgentFiles` does (`start.ts:268-279`).
+  Its `version` is `skillVersion`'s digest. Start always freezes under a fresh name: it copies the skill whole, links dereferenced, to
+  `WF_ROOT/places/.<skill>@<version>.<pid>.<random>/`, decodes `place.json` and runs `open` from that copy, writes the record, and only
+  then renames the copy onto `WF_ROOT/places/<skill>@<version>/`. If a copy is already under that name, the rename fails and the fresh
+  one is removed: the same name holds the same bytes, whoever wrote it, and a folder under it is always whole. A start refused before
+  the record is written removes its fresh copy and leaves no record behind, as a failed `writeAgentFiles` does (`start.ts:268-279`).
 - **The record keeps `place` as it is.** Absent, it is a repository run; `{ kind: 'folder' }`, a folder run. `GitRecordSchema`
   (`record/record.store.ts:90-100`) requires `place` absent, and `placeOf` and `isGitRun` (`run.ts:86-89`) read the kind off it, so a new
   value there would make every record unreadable and every in-flight run a folder run. The frozen skill goes in a field of its own on the
@@ -234,12 +235,21 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
   package's own code, never a checkout's. No reader writes to such a record or freezes anything for it, so `wf ls`, the api, and an
   `--after` check of a parent the tick never passes again all have a script to run.
 - `open` runs on the frozen copy. Its `Opened` fills `repo`, `baseRef` and `branch`, the fields a repository run has today.
-- **After that, no pass reads the skill from where the lookup finds it.** A frozen copy that is missing, or whose `skillVersion` is no
-  longer the one its name says, stops the run's passes with a refusal (`Invalid`, exit 2). The refusal names the fix (open question 6).
-  This is the opposite of `skillsAgain` (`agents/agents.store.ts:71`), which reads an agent's skill again from the lookup when its
-  rendered folder is gone. That is acceptable for prose an agent reads. It is not acceptable for a command the machinery runs: "no command
-  from a checkout".
-- **A frozen copy is removed only by `wf prune`**, and only when no record in the store names it. `wf rm` of one run leaves it.
+- **After that, no pass reads the skill from where the lookup finds it.** A frozen copy whose `skillVersion` is no longer the one its
+  name says stops the run's passes with a refusal (`Invalid`, exit 2). The refusal names the fix (open question 6). This is the opposite
+  of `skillsAgain` (`agents/agents.store.ts:71`), which reads an agent's skill again from the lookup when its rendered folder is gone.
+  That is acceptable for prose an agent reads. It is not acceptable for a command the machinery runs: "no command from a checkout". A
+  copy that is not there makes the run's verbs unread for that pass, not a stop: `wf prune` may hold it aside for a moment (below). If
+  it stays missing, it stays unread, and its words name `wf refreeze`.
+- **A frozen copy is removed only by `wf prune`**, and only when no record in the store names it, checked again after the copy is moved.
+  `wf rm` of one run leaves it. Prune lists the records, renames a copy none names aside to a fresh name, and lists the records again. A
+  copy that a record now names is renamed back, or dropped if a start has put one under the name meanwhile. Any other copy is deleted.
+  Prune also removes a fresh `.`-named folder whose process is gone. This leaves no gap for a start:
+  - A start whose record the second listing sees gets the copy back.
+  - A start whose record it misses wrote that record after the copy was set aside. So its own rename, which comes after its record,
+    finds the name free and puts its copy there.
+  - Either way the copy is under its name when both are done. At worst, the new run's first pass meets the moment it is aside, and reads
+    as unread once.
 
 ## The contracts
 
@@ -252,7 +262,7 @@ judgements (`landingDue`, `shippedBy`, `radius`) take. **The place's script alwa
 | `Made` | `workspace`, `branch`, `conflicts: string[]`, `notes: string[]` | the tick, on the step's record (`workspace`, `branch`); `conflicts` and `notes` into the brief | the brief (*Where to look*, the fan-in's conflict section), the check's `cwd` |
 | `HandedOff` | `commit: string \| null` | the tick's note; `wf rm`'s `handedOff` | `wf rm`'s words |
 | `Changes` | `at: { baseRef, onto, tips }`; `files: [{ path, from?, status, added: int \| null, removed: int \| null }]` per branch; `diffs: { path: text }` for `diffOf`; `merges: { clean: true } \| { clean: false, conflicts[] } \| { unknown: words }` per branch; `present: { path: 'file' \| 'directory' \| 'absent' }`; `atBase: { path: text \| null }` | the tick, to `runs/<id>/place/report.json`: one file, one writer | `radius` (pure, as today, from `files` and the npm workspaces it parses out of `atBase['package.json']`); `wf decide`; the board's decision page, through a reader the package exports on `agent-orchestrator/run`; `workspaceArtifact`'s branch fallback |
-| `Standing` | `heads: { branch: commit }`; `branches: [{ branch, tip: string \| null, onBase: 'yes' \| 'no' \| 'unknown', pastBase: boolean \| null, ahead: int \| null }]` | not stored: read on the pass or request that asks, as today, since a person merging by hand changes it; `tipsSeen` writes `run.tips` as today | `shippedBy`, `branchStandings`, `parentOf` and `runReady` (`--after`), `wf ls`, the board's list, the memo of runs at rest |
+| `Standing` | `heads: { branch: commit }`; `branches: [{ branch, tip: string \| null, onBase: 'yes' \| 'no' \| 'unknown', pastBase: boolean \| null, ahead: int \| null }]` | the tick, each pass, to `WF_ROOT/standing.json`: one file, one writer, each repository's answer (or its unread words) with the time it was read; `tipsSeen` writes `run.tips` as today | in the tick, from its own call: `shippedBy`, `parentOf` and `runReady` (`--after`), the memo of runs at rest. From the snapshot, running nothing: `wf ls`, and the api's list, decision page and memo of runs at rest (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through a reader the package exports on `agent-orchestrator/run` |
 | `Status` | `merging: 'ours' \| 'other' \| 'none'`, `conflicted`, `missing: string[]`, `head?` | not stored | `landingDue`, `landingOpen`, `mainClaim` |
 | `Landed` | `{ commit }` or `{ aborted: true }` | the tick, on the step's `landed` (as today) | `landedWords`, `wf ls`, the board |
 | `Inventory` | `workspaces: [{ path, step?, branch?, head?, detached, locked?, prunable, clean: boolean \| null, onBranch }]`; `branches: [{ branch, merged }]` | not stored | `heldWorktree`, `branchFates`, `forgetRefusal`, `pruneRefusal` |
@@ -331,8 +341,8 @@ gone, not moved.
 | F. `make` and `handoff` | 6 | `workspaceFor`'s git half and `handOff` (`workspace/worktree.store.ts`, `tick/`); `includeFiles` and `check-ignore` into `make`; `provisionDeps` stays and runs on `Made.workspace`; the realpath guard. |
 | G. The landing | 6 | `status` and `land` in `landEnding` and `mainClaim` (`ending/ending.verb.ts`); `denyWhileLanding` in `filedDenies`; `LANDING_DENIED` goes. |
 | H. `report` | 7 | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`; the snapshot and its refresh; `wf decide`'s print (`cli.ts`, wherever slice 7 puts it). |
-| I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`. |
-| J. The api and the web | H, I | The api reads the snapshot (`decide/decision.ts`) and `standing` through the package; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
+| I. `standing` | 7 | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`; `tipsSeen` over `Standing`; the tick writes `WF_ROOT/standing.json`, and `wf ls` reads it. |
+| J. The api and the web | H, I | The api reads the two snapshots, `report.json` (`decide/decision.ts`) and `standing.json` (`runs/runs.ts`, `runs/judged.ts`, `runs/resting.ts`), through the package, and no request runs a script; `decide/merge.ts` goes; `ToDecide` `kind: 'result'`; the computed kind's word `'git'` becomes `'repository'` in `PlaceKind` (`placeOf`, the api's detail `place`, the web's `lib/api/runs.ts` and `prune.ts:44`, in one card, since nothing stores it), with `GitRun` and `isGitRun` renamed to match; the meter's phase `git` renamed `place` (`meter/meter.ts`, `meter/tally.store.ts`, the web's `lib/pass.ts` and `lib/api/ceilings.ts`). |
 | K. The guard | last | A test over `packages/*/src` and `apps/*/src` that refuses a `'git'` command handed to a spawn, and a `.git` or `MERGE_HEAD` path, with a plant that makes it refuse. The `.git` probe in `authoring.ts` is settled first (open question 5). |
 
 **The pin.** `test/fixtures/git-runs-before.json` holds what every shipped folder's git runs read as: briefs, plans, decisions, listings
@@ -358,7 +368,9 @@ absorbs. The `say` templates are what make the words match.
 - **Processes.** A verb is a node process (tens of milliseconds) where today's call was an `execFileSync` of git or a `stat`. Per pass:
   one `standing` per repository and frozen copy (it replaces a `for-each-ref` per repository), one `handoff` per step whose hand-off is
   due, one `status` per ending holding a checkout, and a few `report`s when something moved. Nothing measured this yet. Card A measures a
-  verb's cost on the owner's machine, and card J compares the pass's `place` phase with today's `git` phase in `tick-stats.json`.
+  verb's cost on the owner's machine, and card J compares the pass's `place` phase with today's `git` phase in `tick-stats.json`. A
+  board request spawns nothing, where today the list, the decision page and the memo of runs at rest run git on each request
+  (`branchReader`, `headsOf`).
 - **Code.** The git code does not disappear; it moves into the skill's scripts. The package loses `worktree.ts`'s git half, most of
   `branches.ts`, the git calls of `forget.ts`, and the api's `merge.ts`. It gains `place/` and the decoders.
 
@@ -366,9 +378,10 @@ absorbs. The `say` templates are what make the words match.
 
 1. **`place:` on every step, or once per workflow?** A workflow-level key needs a file the format does not have: a folder's README.md has
    no frontmatter. *Recommend* per step, with the same-value rule, as `workspace: folder` is today. The builder writes it on every step.
-2. **The report: a snapshot or live?** *Recommend* a snapshot refreshed by the tick when its tips or base move (above). The board then
-   runs nothing, and "as the base is now" is at most one pass old. A live read would make the api run the place's script, which is our
-   code running a command at a person's click.
+2. **The report and the standing: snapshots or live?** *Recommend* snapshots, both written by the tick: `report.json` refreshed when a
+   run's tips or base move, `standing.json` each pass. The board and `wf ls` then run nothing, and what they show is at most one pass
+   old. When no daemon is ticking, they show the snapshot's age rather than read live. A live read would make the api run the place's
+   script, which is our code running a command at a person's click.
 3. **Codex trust: a task field, or leave `repositoryOf` in the runtime?** *Recommend* `config.codex.trustFrom` (cards B1, B2). The runtime
    is finished, but this is a harness's own flag, the shape `config.claude` already has. batch/v1 has no field for it, and neither does
    it for `config.claude`.
@@ -381,8 +394,7 @@ absorbs. The `say` templates are what make the words match.
    exception the guard test lists.
 6. **Refreezing a run's place.** A frozen skill with a bug stalls its runs as unread. *Recommend* `wf refreeze <run>`. It writes a
    person's file, `runs/<id>.refreeze`, which the tick reads: it freezes the skill again from the lookup and writes the new version into
-   the record's `placeSkill`. The
-   person chose the new copy by name, so no command comes from a checkout unasked.
+   the record's `placeSkill`. The person chose the new copy by name, so no command comes from a checkout unasked.
 7. **A `staged` marker without a process.** If card J's measure shows `status` costs a pass too much, `open` could answer the path of a
    file whose existence means "something is staged" (for git, the checkout's MERGE_HEAD, which the skill locates), and the code would
    `stat` that path without knowing what it is. *Recommend* not building it until measured.

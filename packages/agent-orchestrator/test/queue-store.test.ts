@@ -18,6 +18,7 @@ import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { queueLine } from '../src/inbox/inbox.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-queue-');
 const RUNS = path.join(ROOT, 'runs');
@@ -1093,4 +1094,17 @@ test('a try the tick wrote down is read only as the tick writes it: a file whose
   for (const [name, body] of Object.entries(files)) fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(body));
   fs.writeFileSync(path.join(queue, 'torn.json'), '{"at": "2026');
   assert.deepEqual([...queueTries()], [['kept', kept]]);
+});
+
+test('the whole screen of a run held by the cap on runs in flight', async (t) => {
+  emptyStore('1');
+  const b = board();
+  const [, held] = [started('first', at(1)), started('second', at(2))];
+  await tick(b.e);
+  assert.deepEqual(await decideScreen(t, b.e, [held.id], { '<id>': held.id, '<root>': ROOT }), [
+    '<id>  second',
+    '',
+    '  waiting for a run slot (1 of 1 in flight)',
+    '  nothing of <id> is filed until a run in flight settles, oldest held first; nothing to decide yet',
+  ]);
 });

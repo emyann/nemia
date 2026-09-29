@@ -29,6 +29,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-folder-');
 const NOT_A_REPO = path.join(ROOT, 'somewhere');
@@ -632,4 +633,43 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
     'and nothing of the run was written in a directory shaped as the copy is, which a followed link would empty',
   );
   await forget(e, run.id);
+});
+
+test('the whole screen of a folder run: where the work is, and the one command there is', async (t) => {
+  const run = start({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'work', 'write', 'note.md'), '# Tides\n');
+  settle(`${run.id}-write`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
+  await advance(e, readRun(run.id));
+  assert.deepEqual(await decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT }), [
+    '<id>  a note on tides',
+    '',
+    '  UNVERIFIED: review, write  — no check: declared; only its own word says it worked',
+    '',
+    '  write',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    wrote it',
+    '    files:',
+    '      <root>/runs/<id>/artifacts/write/note.md  8 B',
+    '',
+    '  review',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    wrote it',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '',
+    '  worked in folders, with no git repository: <root>/runs/<id>/work, a folder per step; nothing to merge',
+    '',
+    '  done with it   wf rm <id>  — forgets the run with its folders and files',
+  ]);
+  assert.deepEqual(gitAsked(), []);
 });

@@ -7,7 +7,7 @@
  *
  * `WF_ROOT` is set before the runner is imported: the module reads it as it loads.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +16,7 @@ import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import { CHECK } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { decideScreen } from './screens.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 
 const ROOT = scratch('wf-ship-');
@@ -1880,4 +1881,193 @@ test('REFUSED at shipped defaults: a folder with no loop before its ending has n
   const done = await advance(e, readRun(id));
   assert.equal(done.status, 'succeeded', 'once its merge lands the run is over');
   assert.notEqual((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval', 'not at its gate again');
+});
+
+test('the whole screen of a run whose result a person merged by hand, its ending never run', async (t) => {
+  const { repo, id, branch, e } = await atTheGate();
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  assert.deepEqual(await decideScreen(t, e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT }), [
+    '<id>  add sub',
+    '',
+    '  shipped — wf/<id>/implement is already on main',
+    '  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel <id>',
+  ]);
+});
+
+/**
+ * The screen of an ending whose check on the staged merge settled with `exitCode`, its approval's time written as `08:00Z` and two of the
+ * check's pictures in its files.
+ */
+async function checkedScreen(t: TestContext, exitCode: number | undefined): Promise<string[]> {
+  const { repo, id, e, settle, checkId } = await stagedAndSigned();
+  const approval = path.join(ROOT, 'runs', `${id}.asks`, 'approve-ship-1');
+  fs.writeFileSync(approval, JSON.stringify({ ...JSON.parse(fs.readFileSync(approval, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
+  photographed(id, { count: 2, bytes: 10 });
+  settle(checkId, 'failed', undefined, exitCode);
+  await advance(e, readRun(id));
+  return decideScreen(t, e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT });
+}
+
+test("the whole screen of an ending whose check did not finish on the merge, with the check's files", async (t) => {
+  assert.deepEqual(await checkedScreen(t, undefined), [
+    '<id>  add sub',
+    '',
+    '  CHECK DID NOT FINISH: ship  — stopped, or killed before it exited: no verdict on the work, and no retry spent; nothing after it ran',
+    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+    '',
+    '  once more, on the next tick:',
+    '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  wf retry <id> ship',
+    '',
+    '  touched  wf/<id>/implement',
+    '    (root)  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did the work',
+    '',
+    '  ship',
+    '    gate  approved 08:00Z — "Merge it."',
+    '    check  npm test && npm run typecheck && npm run lint  →  unfinished ✗',
+    '      stdout:',
+    '        (no output yet)',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed not known  settled before it spawned  used not measured',
+    '              try 1 check  filed not known  settled before it spawned',
+    '    did the work',
+    '    message: Add sub',
+    '      ',
+    '      add.ts exports sub beside add.',
+    '      The run, its branch: 1 commit; the check on the merged tree.',
+    '      ',
+    '    files:',
+    '      <root>/runs/<id>/artifacts/ship/answer-light-failed.png  10 B',
+    '      <root>/runs/<id>/artifacts/ship/page-001-dark.png  10 B',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+  ]);
+});
+
+test("the whole screen of an ending whose check refused the merge, with the check's files", async (t) => {
+  assert.deepEqual(await checkedScreen(t, 1), [
+    '<id>  add sub',
+    '',
+    '  FAILED CHECK: ship  — the run executed its check and it did not exit 0; nothing after it ran',
+    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+    '',
+    '  once more, on the next tick:',
+    '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry <id> ship  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  wf/<id>/implement',
+    '    (root)  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did the work',
+    '',
+    '  ship',
+    '    gate  approved 08:00Z — "Merge it."',
+    '    check  npm test && npm run typecheck && npm run lint  →  exit 1 ✗',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1        filed not known  settled before it spawned  used not measured',
+    '              try 1 check  filed not known  settled before it spawned',
+    '    did the work',
+    '    message: Add sub',
+    '      ',
+    '      add.ts exports sub beside add.',
+    '      The run, its branch: 1 commit; the check on the merged tree.',
+    '      ',
+    '    files:',
+    '      <root>/runs/<id>/artifacts/ship/answer-light-failed.png  10 B',
+    '      <root>/runs/<id>/artifacts/ship/page-001-dark.png  10 B',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<id>/implement is ahead of main by 1 commit',
+  ]);
+});
+
+test('the whole screen of a run whose ending waits for the checkout, first filed and then sent back', async (t) => {
+  const { repo, first, second, e, settle } = await twoApproved();
+  await advance(e, readRun(second.id));
+  await advance(e, readRun(first.id));
+  const ids = { '<first>': first.id, '<second>': second.id, '<repo>': repo, '<root>': ROOT };
+  assert.deepEqual(await decideScreen(t, e, [first.id], ids), [
+    '<first>  add sub',
+    '',
+    '  still running: ship',
+    "  ship: waiting on the checkout (<second>'s ship has it) — it works in the repository's own checkout, and two endings never do at once; the next tick files ship once <second>'s ship has settled",
+    '  nothing to decide yet',
+  ]);
+  settle(`${second.id}-ship`, 'succeeded', BLOCKED);
+  await advance(e, readRun(first.id));
+  assert.deepEqual(await decideScreen(t, e, [second.id], ids), [
+    '<second>  add sub',
+    '',
+    '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
+    '  BLOCKED, waiting on you: ship',
+    '',
+    '  once more, on the next tick:',
+    '    ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry <second> ship  (--fresh, or --model <m>, for a new session)',
+    '',
+    '  touched  wf/<second>/implement',
+    '    (root)  1 file   +1 −0',
+    '  lesson  nothing written where the next agent reads',
+    '',
+    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+    '  none',
+    '',
+    '  implement',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    did the work',
+    '',
+    '  ship  BLOCKED',
+    '    gate  approved 08:00Z',
+    '    used  not measured',
+    '    cost  not measured',
+    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
+    '    the check refused',
+    '    !! declared and not given: message',
+    '    needs: read the suite',
+    '    to answer it:  wf retry <second> ship --message "<answer>"',
+    '',
+    '  cost  run not measured',
+    '  timeline  run  queued —  ran —  wall not known',
+    '',
+    '  wf/<second>/implement  —1 file changed, 1 insertion(+)',
+    '',
+    '  branch    wf/<second>/implement is ahead of main by 1 commit',
+  ]);
+  await retry(e, second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' });
+  await advance(e, readRun(second.id));
+  assert.deepEqual(await decideScreen(t, e, [second.id], ids), [
+    '<second>  add sub',
+    '',
+    '  still running: ship',
+    "  ship: waiting on the checkout (<first>'s ship has it) — it works in the repository's own checkout, and two endings never do at once; the next tick files ship once <first>'s ship has settled",
+    '  nothing to decide yet',
+  ]);
 });

@@ -27,7 +27,7 @@ import { builder, workflows } from './workflows/index.ts';
  * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 500 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
- *   (`runCapOf`), or a record that does not parse.
+ *   (`maxRuns`), or a record that does not parse.
  * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call

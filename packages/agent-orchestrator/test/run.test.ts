@@ -36,7 +36,6 @@ import {
   heldRuns,
   roundSpans,
   runAdmitted,
-  runCapOf,
   slotNeed,
   slotWord,
   branchFates,
@@ -626,20 +625,6 @@ test('a fan-in step is told it is holding merged work, and that conflicts are it
   const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);
   assert.match(brief, /work of a and b has been merged/);
   assert.match(brief, /yours to resolve/);
-});
-
-test('REFUSED by name at shipped defaults: `WF_MAX_RUNS` that is not a whole count — a word, a negative, a fraction, a unit — while unset, empty and 0 are no cap', () => {
-  assert.deepEqual([runCapOf(undefined), runCapOf(''), runCapOf('  '), runCapOf('0'), runCapOf('2'), runCapOf(' 3 ')], [0, 0, 0, 0, 2, 3]);
-  for (const value of ['two', '-1', '1.5', '2 runs', '0x2', '1e3']) {
-    assert.throws(
-      () => runCapOf(value),
-      (err: Error & { exitCode?: number }) =>
-        err.exitCode === 2 &&
-        err.message ===
-          `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`,
-      value,
-    );
-  }
 });
 
 test('`slotNeed`: a run is in flight while a task of it is filed and not settled, or it has started and a pass files something — between two steps too; a run with nothing filed and a root ready wants a slot, unless it waits on a run or was called off', () => {

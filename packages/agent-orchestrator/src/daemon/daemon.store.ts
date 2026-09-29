@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { HOME } from '../store.ts';
-import { runCapOf } from '../run.ts';
+import { maxConcurrent, maxRuns } from '../config/config.store.ts';
 import { PHASES, type PassCost, type Phase } from '../meter/meter.ts';
 import {
   DAEMON_FILE,
@@ -38,13 +38,13 @@ const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the tick's admission's
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is the tick's admission's
  * (`toAdmit` in `cap.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of its own,
- * and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `runCapOf`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
+ * and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
  */
 export const ceilings = (): { sessions: number; runs: number } => ({
-  sessions: Number(process.env.WF_MAX_CONCURRENT) || 2,
-  runs: runCapOf(process.env.WF_MAX_RUNS),
+  sessions: maxConcurrent(),
+  runs: maxRuns(),
 });
 
 /**

@@ -77,7 +77,7 @@ function kinds(sources: Sources): Record<Kind, string[]> {
 const beneathCli = (sources: Sources): string[] => kinds(sources).CONTROLLER.filter((f) => !isCli(f));
 
 /** The bottom of the store's tree: they import no store file. */
-const STORE_BOTTOM = ['src/record/places.store.ts', 'src/workflow-store.ts', 'src/meter/tally.store.ts'];
+const STORE_BOTTOM = ['src/record/places.store.ts', 'src/workflow-store.ts', 'src/meter/tally.store.ts', 'src/config/config.store.ts'];
 
 /**
  * The store files another store file may import, each with the store files it may import itself: the bottom, then the run store on it, then
@@ -88,6 +88,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],
   'src/workflow-store.ts': [],
   'src/meter/tally.store.ts': [],
+  'src/config/config.store.ts': [],
   'src/store.ts': STORE_BOTTOM,
   'src/worktree.ts': ['src/store.ts', 'src/record/places.store.ts', 'src/meter/tally.store.ts'],
 };
@@ -95,8 +96,8 @@ const STORE_SHARED: Record<string, readonly string[]> = {
 /** The package's files the CLI may import, beside the files of its own folder. */
 const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];
 
-/** The package's files `bin/wf.ts` may import. */
-const BIN_REACHES = ['src/cli.ts'];
+/** The package's files `bin/wf.ts` may import: the CLI, and what it exits with, imported before the package loads. */
+const BIN_REACHES = ['src/cli.ts', 'src/cli/exit.ts'];
 
 const IMPURE = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process'];
 
@@ -211,7 +212,7 @@ function treeBreaks(sources: Sources): string[] {
   return out;
 }
 
-/** The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts` only through the CLI. */
+/** The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts` only through the CLI and what it exits with. */
 function cliBreaks(sources: Sources): string[] {
   const reaching = (file: string, reaches: readonly string[], own: (m: string) => boolean) =>
     (sources[file] ?? [])
@@ -400,10 +401,10 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
     'src/workflow-store.ts imports src/store.ts, which the tree does not let it: it is the bottom, and imports no store file',
   ]);
   assert.deepEqual(treeBreaks(adding('src/store.ts', 'src/worktree.ts')), [
-    'src/store.ts imports src/worktree.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/workflow-store.ts, src/meter/tally.store.ts',
+    'src/store.ts imports src/worktree.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/workflow-store.ts, src/meter/tally.store.ts, src/config/config.store.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/artifacts.ts', 'src/branches.ts')), [
-    'src/artifacts.ts imports src/branches.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/workflow-store.ts, src/meter/tally.store.ts, src/store.ts, src/worktree.ts',
+    'src/artifacts.ts imports src/branches.ts, which the tree does not let it: of the store it imports src/record/places.store.ts, src/workflow-store.ts, src/meter/tally.store.ts, src/config/config.store.ts, src/store.ts, src/worktree.ts',
   ]);
   assert.deepEqual(treeBreaks(adding('src/inbox/inbox.store.ts', 'src/decide.ts')), [
     'src/inbox/inbox.store.ts is a store file and imports src/decide.ts, a controller: a cycle',
@@ -422,7 +423,7 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   ]);
 });
 
-test('cli.ts reaches the package only through runner.ts and workflow.ts, and bin/wf.ts only through cli.ts', () => {
+test('cli.ts reaches the package only through runner.ts and workflow.ts, and bin/wf.ts only through cli.ts and cli/exit.ts', () => {
   assert.deepEqual(cliBreaks(packageSources()), []);
   assert.deepEqual(
     cliBreaks(adding('src/cli.ts', 'src/store.ts')),
@@ -436,7 +437,7 @@ test('cli.ts reaches the package only through runner.ts and workflow.ts, and bin
   );
   assert.deepEqual(
     cliBreaks(adding('bin/wf.ts', 'src/runner.ts')),
-    ['bin/wf.ts imports src/runner.ts: it reaches the package through src/cli.ts'],
+    ['bin/wf.ts imports src/runner.ts: it reaches the package through src/cli.ts and src/cli/exit.ts'],
     'REFUSED: bin/wf.ts reaching past the CLI',
   );
   const folder = { ...packageSources(), 'src/cli/start.ts': ['src/runner.ts', 'src/cli/flags.ts'], 'src/cli/flags.ts': [] };

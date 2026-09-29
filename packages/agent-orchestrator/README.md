@@ -2225,7 +2225,8 @@ run 'wf tick' (or 'wf up') to start it
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
-Two ceilings, both read from the environment `wf up` runs in, and both said in words when it starts:
+Two ceilings, both read from the environment `wf up` runs in, through Effect's `Config` (`src/config/config.store.ts`), and both said in
+words when it starts:
 
 ```text
 $ WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up
@@ -2261,11 +2262,13 @@ up — every 4000ms, ^C to stop
   `maxConcurrent: Infinity`, until it is restarted; restarted, it builds its engine with no ceiling, and a tree only half merged —
   a client that still passes `maxConcurrent` to an engine that refuses it — fails where the engine is built, exit 2, rather than
   running with a ceiling nobody keeps.
+- **`WF_MAX_CONCURRENT` is a whole number from 1**; unset, empty or blank, it is 2. Anything else — `0`, `-3`, `1.5`, `two` — is refused
+  by name, exit 2, by `wf up` before it takes the store, and by `wf tick` (`maxConcurrent`).
 - **`WF_MAX_RUNS`, unset or 0 for no cap, counts runs in flight.** A run is in flight while a task of it — a step's or a check's — is filed
   and not settled, or while it has started and the tick files something of it on the pass: a run between two steps is still in flight. One
   that waits on a person, or has finished, is not; one called off is, until the engine has stopped what it had in flight. A run with nothing
   filed files its roots only while fewer runs than the cap are in flight (`runAdmitted`, pure, beside `runReady`). Anything else is refused by
-  name, exit 2, by `wf up`, `wf tick` and `wf ls`: read as no cap, `WF_MAX_RUNS=two` would lift the cap it was set to hold.
+  name, exit 2, by `wf up`, `wf tick` and `wf ls` (`maxRuns`): read as no cap, `WF_MAX_RUNS=two` would lift the cap it was set to hold.
 - **A pass admits serially, oldest first, and carries nothing.** The tick advances every run that has started first — the cap never holds
   one — and counts those in flight once each pass is done. Then it takes the runs with nothing filed by `createdAt` (`admissionOrder`), each
   judged against the count so far and counted, once it has filed, for the next — as the tick admits its tasks. The next pass counts again,
@@ -2421,6 +2424,7 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   flight a pass reads 4 journals and starts 2 git processes, as it does with none (`test/rest-store.test.ts`). The memo lives in the
   daemon's memory and nowhere else, and a restart rebuilds it with one full pass: it never decides what a full pass would not.
   The tests that tick set `WF_VERIFY_REST=1`, which judges every run answered from memory in full as well and throws where the two differ.
+  It takes `1` or `0`, and unset or empty is off; anything else is refused by name, exit 2 (`verifiesRest`).
 
 ## Calling a run off
 
@@ -2723,6 +2727,7 @@ holding a concurrency slot forever.
 | `src/branches.ts` | what git says of a run's result branches: whether each landed and where it stands (`isShipped`, `branchStandings`, `resultBranches`), a parent run as its record and git say it (`parentRecord`), and what a branch holds — the files it added, one file's text, its diff stat, what it touched, the diff of what decides a check (`artifacts`, `readArtifact`, `diffStat`, `touchedBy`, `sensitiveDiff`) |
 | `src/artifacts.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`), what its files directory holds (`artifactFiles`), and a landed ending's check pictures removed (`dropLandedPictures`) |
 | `src/authoring.ts` | what the board's builder and Agents page write: a workflow folder from its steps (`writeWorkflow`), an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
+| `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox on disk: read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, and the runtime's types, passed through |
 | `src/views.ts` | what the engine's views of a run's tasks say: a step's phase (`phaseOfView`), whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
@@ -2741,7 +2746,8 @@ The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`),
 folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
 `workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
-The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
+The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set). It is read once, as the package loads (`wfRoot`), and must be an
+absolute path: a relative or empty one is refused by name, exit 2, since each process would read a store under its own working directory.
 
 The store keeps the package's former name on purpose. The package became `agent-orchestrator` on 2026-09-23 and the
 store did not follow: every run record, the inbox, the feed and its cursors, the daemon's lease in `daemon.json` and the
@@ -2768,13 +2774,13 @@ in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts
 other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
 `CLIENT`. **Pure** files (`run.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
-no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`
-and `meter/tally.store.ts` (the pass's meter) at the bottom, `store.ts` on those three, `worktree.ts` on `store.ts` and
+no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `workflow-store.ts`,
+`meter/tally.store.ts` (the pass's meter) and `config/config.store.ts` (the `WF_` environment) at the bottom, `store.ts` on those, `worktree.ts` on `store.ts` and
 the two others — and outside the store only the client and the controllers beneath the CLI import them.
 **Controllers** use the runtime through the client: `runner.ts`, the root, which re-exports; `views.ts`, `start.ts`,
 `tick.ts`, `verbs.ts`, `forget.ts` and `decide.ts`, which import one another one way, with no cycle; and `cli.ts` and
 `bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and `bin/wf.ts` only through
-`cli.ts`. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
+`cli.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
 controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
 files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that

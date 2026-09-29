@@ -297,10 +297,10 @@ what, who may drive it, for how long and for how much. Everything else the agent
   words, with the wf approve that runs it — or, in a folder with no ending step, its branch ahead of the
   base branch with nothing having merged it.
 
-  WF_ROOT            where runs and the engine's board live
-  WF_MAX_CONCURRENT  sessions at work per pool at once (default 2): claude and claude-detached one pool,
-                     codex and checks their own; a blocked session holds no slot; one run's review
-                     competes with another run's implement
+  WF_ROOT            where runs and the engine's board live, an absolute path (default ~/.agent-workflows)
+  WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude and
+                     claude-detached one pool, codex and checks their own; a blocked session holds no
+                     slot; one run's review competes with another run's implement
   WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
                      slot, oldest first; a run waiting on --after counts once it is filed; a run of a
                      one-step workflow that says slot: none is not counted and never waits for one
@@ -313,12 +313,6 @@ a run's task ids carry the run and the step, so its output already names the wor
 
 const usage = (message: string): never => {
   throw new Invalid({ message });
-};
-
-/** What `wf` exits with on what `main` threw: its `exitCode` when that is a whole number from 1 to 255, and 1 otherwise. */
-export const exitCodeOf = (thrown: unknown): number => {
-  const code = (thrown as { exitCode?: unknown } | null | undefined)?.exitCode;
-  return typeof code === 'number' && Number.isInteger(code) && code > 0 && code <= 255 ? code : 1;
 };
 
 const PLAN_HELP = `wf plan <folder> [--repo .]

@@ -13,9 +13,8 @@ import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-refusal-store-');
-const { Conflict, Invalid, Missing, AgentWriteError, SkillWriteError, unhold } = await import('../src/runner.ts');
+const { Conflict, Invalid, Missing, AgentWriteError, SkillWriteError, maxRuns, unhold } = await import('../src/runner.ts');
 const { WorkflowError } = await import('../src/workflow.ts');
-const { runCapOf } = await import('../src/run.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
 
@@ -69,7 +68,7 @@ test('REFUSED: a verb throws the kind of what it refuses, with its words', () =>
       err.message === 'no such run: r-nope. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.',
   );
   assert.throws(
-    () => runCapOf('two'),
+    () => maxRuns({ WF_MAX_RUNS: 'two' }),
     (err: unknown) => err instanceof Invalid && err.exitCode === 2 && err.message.startsWith('WF_MAX_RUNS=two is not a count.'),
   );
 });

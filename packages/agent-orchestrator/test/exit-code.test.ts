@@ -2,8 +2,7 @@
  * `wf` run as a process exits with a refusal's code, and 1 on anything else. The package refuses with `exitCode` 2 and a sentence saying
  * what to do next (CLAUDE.md, *Errors say what to do next*); a `bin/wf.ts` that exits 1 on every error leaves a script unable to tell a
  * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `wf` exits with.
- * A fake `claude` and `codex` first on PATH, so nothing real is asked. `WF_ROOT` is set before the command line is imported, which reads
- * it as the module loads.
+ * A fake `claude` and `codex` first on PATH, so nothing real is asked.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,17 +11,17 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 
-process.env.WF_ROOT = scratch('wf-exit-code-store-');
-const { exitCodeOf } = await import('../src/cli.ts');
+import { exitCodeOf } from '../src/cli/exit.ts';
 
 const WF = path.join(import.meta.dirname, '..', 'bin', 'wf.ts');
 const BIN = scratch('wf-exit-code-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 
-/** `wf <argv>` over the store at `root`, with the engine's store beside it. */
-function wf(root: string, argv: string[]): { status: number | null; stderr: string } {
+/** `wf <argv>` over the store at `root`, with the engine's store beside it, in `cwd`, the directory above the store unless given. */
+function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: number | null; stderr: string } {
   const dir = path.dirname(root);
   const { status, stderr } = spawnSync(process.execPath, [WF, ...argv], {
+    cwd,
     env: { ...process.env, WF_ROOT: root, AE_ROOT: path.join(dir, 'engine'), PATH: `${BIN}${path.delimiter}${process.env.PATH}` },
     encoding: 'utf8',
     timeout: 60_000,
@@ -54,6 +53,19 @@ test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sib
     'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\nEither drop --no-worktree, or make the steps a chain.\n',
   );
   assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run written');
+});
+
+test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relative or empty, exits 2 as the package loads, with its sentence alone, and nothing is written', () => {
+  for (const root of ['relative/store', '']) {
+    const cwd = scratch('wf-exit-code-root-');
+    const { status, stderr } = wf(root, ['ls'], cwd);
+    assert.equal(status, 2, `WF_ROOT=${root} exits with the refusal's code; it said: ${stderr}`);
+    assert.equal(
+      stderr,
+      `WF_ROOT=${root} is not an absolute path. It is the directory where runs and the engine's board live, the same for every process that reads them: WF_ROOT=/srv/wf — or unset, for ~/.agent-workflows.\n`,
+    );
+    assert.deepEqual(fs.readdirSync(cwd), [], `nothing written under the working directory for WF_ROOT=${root}`);
+  }
 });
 
 test('a crash exits 1 and prints its message, with no stack: wf ls over a store that is a file', () => {

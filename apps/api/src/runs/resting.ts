@@ -13,7 +13,7 @@
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { evictedBy, headsOf, restStamps } from 'agent-orchestrator';
+import { evictedBy, headsOf, restStamps, verifiesRest } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
 import { e } from '../store.ts';
 
@@ -54,7 +54,7 @@ export type RestingRead<T> = {
  * that cannot be read empties the memo, and a read made while it cannot be read keeps nothing. The read keeps where it read the feed to: a
  * line past it is read by the next request, unless another request reads it first, and then its `keep` keeps nothing.
  */
-export async function restingRead<T>(memo: RestingMemo<T>, verify = process.env.WF_VERIFY_REST === '1'): Promise<RestingRead<T>> {
+export async function restingRead<T>(memo: RestingMemo<T>, verify = verifiesRest()): Promise<RestingRead<T>> {
   let fed = true;
   try {
     if (memo.cursor === undefined) {

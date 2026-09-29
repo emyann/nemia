@@ -430,6 +430,47 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
   emptyStore(undefined);
 });
 
+test('REFUSED at shipped defaults: WF_MAX_CONCURRENT=-3 by `wf up`, before the store is taken, and by `wf tick` before it admits anything; WF_VERIFY_REST=true by `wf up`, `wf tick` and `tick`, before the engine is asked anything — each by name, exit 2', async (t) => {
+  emptyStore(undefined);
+  started('first', at(1));
+  const daemon = path.join(ROOT, 'daemon.json');
+  const held = fs.existsSync(daemon) ? fs.readFileSync(daemon, 'utf8') : undefined;
+  const concurrent = process.env.WF_MAX_CONCURRENT;
+  t.after(() => {
+    if (concurrent === undefined) delete process.env.WF_MAX_CONCURRENT;
+    else process.env.WF_MAX_CONCURRENT = concurrent;
+    process.env.WF_VERIFY_REST = '1';
+  });
+  const asked = board();
+  const stop = Object.assign(new Error('the engine was asked to tick'), { exitCode: 9 });
+  (asked.e as { tick: () => Promise<unknown> }).tick = async () => {
+    throw stop;
+  };
+  const log = t.mock.method(console, 'log', () => {});
+
+  process.env.WF_MAX_CONCURRENT = '-3';
+  const sessions = refusedWith(
+    /^WF_MAX_CONCURRENT=-3 is not a count from 1\. It is the most sessions at work per pool at once, a whole number: WF_MAX_CONCURRENT=4 — or unset, for 2\.$/,
+  );
+  await assert.rejects(main(['up'], asked.e), sessions);
+  assert.equal(fs.existsSync(daemon) ? fs.readFileSync(daemon, 'utf8') : undefined, held, 'the store is not taken');
+  const ticked = board();
+  await assert.rejects(main(['tick'], ticked.e), sessions);
+  assert.deepEqual(ticked.filings, [], 'nothing filed by the pass that refused');
+  delete process.env.WF_MAX_CONCURRENT;
+
+  process.env.WF_VERIFY_REST = 'true';
+  const verify = refusedWith(
+    /^WF_VERIFY_REST=true is neither 1 nor 0\. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off\.$/,
+  );
+  await assert.rejects(main(['up'], asked.e), verify);
+  await assert.rejects(main(['tick'], asked.e), verify);
+  await assert.rejects(tick(asked.e), verify);
+  log.mock.restore();
+  assert.deepEqual(asked.filings, [], 'nothing filed');
+  emptyStore(undefined);
+});
+
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
 const aRepoWith = (...workflows: string[]): string => {
   const repo = aRepo();

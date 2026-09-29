@@ -12,12 +12,13 @@
  * a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs), `daemon.store.ts` (`tick.json` and who
  * ticks the store), `feed.store.ts` (the feed's file), `worktree.ts` (git, a step's worktree, its `node_modules`, the hand-off commit),
  * `branches.ts` (what git says of a run's result branches), `artifacts.ts` (the files a step hands over), `authoring.ts` (a workflow
- * folder and an agent written) and `inbox.store.ts` (the inbox and the queue on disk). They import neither the runtime nor a controller,
+ * folder and an agent written), `inbox.store.ts` (the inbox and the queue on disk) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller,
  * and `store.ts` and `worktree.ts` — which imports `store.ts` alone of them — are the only ones the others import, so they load as a tree
  * and no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
+export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,

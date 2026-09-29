@@ -117,8 +117,8 @@ holds what every change needs.
 - `docs/architecture.md` — the layers, what each owns and its public contract, and the rules that hold them.
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
-- `.claude/skills/` — the repository's skills: `look` and `effect` (ours; `effect` is how we write Effect 4); `shadcn` (its CLI runs
-  from `apps/web`, where `components.json` is), and `grilling` and `grill-me` (Iris's interview), vendored unchanged, pinned in
-  `skills-lock.json` and credited to their authors in `THIRD_PARTY_NOTICES.md`.
+- `.claude/skills/` — the repository's skills. Ours: `look`, `effect` (how we write Effect 4) and `create-an-agent` (how an agent is
+  made here). Vendored unchanged, pinned in `skills-lock.json` and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (its CLI runs from
+  `apps/web`, where `components.json` is), and `grilling` and `grill-me` (Iris's interview).
 - `workflows/` — this repository's own team: `agents/` (`iris`, a product engineer) and `intake`. Nemia ships none.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

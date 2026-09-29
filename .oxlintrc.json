@@ -577,12 +577,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/radius.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/rest/rest.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]

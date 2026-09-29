@@ -11,8 +11,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { AGENTS_FOLDER, splitFrontmatter, WorkflowError, type Workflow } from '../step/step.ts';
-import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft, type SkillsFound } from './agents.ts';
 import {
+  agentNameRefusal,
+  parseAgent,
+  renderAgent,
+  type Agent,
+  type AgentDraft,
+  type SkillsFound,
   noCodingStyle,
   NO_CODING_STYLE,
   namesPlugin,
@@ -22,7 +27,7 @@ import {
   renderedPrompt,
   rendersAgent,
   type SkillAgain,
-} from '../rendering.ts';
+} from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
 import { agentUsers, agentVersion, loadAgents, preloads, skillsFor } from '../folder/folder.store.ts';

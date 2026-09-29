@@ -28,7 +28,7 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement at the root of `src`: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['effect', 'radius', 'rendering', 'run', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['effect', 'run', 'workflow'].map((f) => `src/${f}.ts`);
 
 /**
  * The I/O beneath the controllers at the root of `src`: none, as every store sits in a feature folder under a `.store.ts` name. A store
@@ -326,8 +326,8 @@ test('REFUSED: a file of no kind, a file of two, and a kind naming a file that i
   assert.deepEqual(unsorted({ ...packageSources(), 'src/x.ts': [] }), [
     'src/x.ts is of no kind: put it in a feature folder under a name that says its kind, or name it in PURE, STORE, CONTROLLER or CLIENT in test/boundary.test.ts',
   ]);
-  const { 'src/radius.ts': _, ...gone } = packageSources();
-  assert.deepEqual(unsorted(gone), ['PURE names src/radius.ts, which is not there']);
+  const { 'src/effect.ts': _, ...gone } = packageSources();
+  assert.deepEqual(unsorted(gone), ['PURE names src/effect.ts, which is not there']);
   const { [CLIENT]: __, ...clientGone } = packageSources();
   assert.deepEqual(unsorted(clientGone), ['CLIENT names src/runtime-client.ts, which is not there']);
   const named = [...PURE, ...STORE, ...CONTROLLER, CLIENT];
@@ -388,14 +388,16 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/tick/assess.ts', 'src/record/record.store.ts')), [
     'src/tick/assess.ts is pure and imports src/record/record.store.ts',
   ]);
-  assert.deepEqual(impurities(adding('src/radius.ts', 'node:fs')), ['src/radius.ts is pure and imports node:fs']);
+  assert.ok('src/branches/branches.ts' in packageSources());
+  assert.deepEqual(impurities(adding('src/branches/branches.ts', 'node:fs')), ['src/branches/branches.ts is pure and imports node:fs']);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'fs')), ['src/workflow.ts is pure and imports fs']);
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [
     'src/check/check.ts is pure and imports node:child_process',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
-  assert.deepEqual(impurities(adding('src/rendering.ts', 'src/agents/agents.store.ts')), [
-    'src/rendering.ts is pure and imports src/agents/agents.store.ts',
+  assert.ok('src/agents/agents.ts' in packageSources());
+  assert.deepEqual(impurities(adding('src/agents/agents.ts', 'src/agents/agents.store.ts')), [
+    'src/agents/agents.ts is pure and imports src/agents/agents.store.ts',
   ]);
   assert.deepEqual(impurities(adding('src/workflow.ts', 'src/folder/folder.store.ts')), [
     'src/workflow.ts is pure and imports src/folder/folder.store.ts',

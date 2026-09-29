@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
 import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/folder/folder.store.ts';
-import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/rendering.ts';
+import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-render-');

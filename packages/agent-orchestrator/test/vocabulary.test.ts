@@ -229,7 +229,7 @@ test("REFUSED at load in the engine's words: a `budget:` beside `background: tru
 
 test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
   const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
-  const { renderedFlags } = await import('../src/rendering.ts');
+  const { renderedFlags } = await import('../src/agents/agents.ts');
   const scribe = parseAgent('scribe', '---\nsystemPrompt: no-coding\n---\nYou write.\n');
   const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
   const claude = renderedFlags(step, '/runs/r/agents/write');

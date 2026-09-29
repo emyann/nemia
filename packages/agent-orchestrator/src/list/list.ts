@@ -37,10 +37,10 @@ import {
   type BranchStanding,
   type RoundAsk,
   type SpendOf,
+  budgetWord,
 } from '../status/status.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsDue } from '../round/round.ts';
 import { saidWord } from '../say/say.ts';
-import { budgetWord } from '../radius.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 

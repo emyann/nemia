@@ -5,9 +5,8 @@
  * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.verb.ts` reads the views and the feed (`readFilings`) and
  * hands them here, `cli/main.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
  */
-import { dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../radius.ts';
 import type { Run } from '../record/record.ts';
-import { roundIn } from '../status/status.ts';
+import { roundIn, dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../status/status.ts';
 import { hasStarted } from '../wait/wait.ts';
 import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';

@@ -26,21 +26,14 @@ export type { Refusal } from './refusal/refusal.ts';
 export {
   AGENT_FACING,
   CHECK_AFFECTING,
-  LARGE_CONTEXT,
   LESSON,
   branchesToRead,
-  budgetWord,
-  dollars,
   inFullLines,
   lessonLine,
   parseGlobs,
-  peakMark,
-  readWords,
-  rebuiltCache,
-  sumUsage,
   touchedLines,
-  usedLines,
-} from './radius.ts';
+} from './branches/branches.ts';
+export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
 export { isGitRun, placeOf } from './run.ts';
 export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**

@@ -23,15 +23,24 @@ const REPO = path.join(import.meta.dirname, '..', '..', '..');
  * The package's former folder, as the fixture names it and keeps it: its keys are read at the package's folder today. It is spelled in
  * parts, so that the line is not one `names.test.ts` refuses for naming a former package. The fixture's steps hold `disallow` and
  * `allow`, the former names of `disallowedTools` and `allowedTools`: each is read as a run frozen with them is read (`asNamed`, in
- * `readRun`). Nothing else of it is touched.
+ * `readRun`). Its one codex step holds its sandbox under `permissionMode`, the name a codex step gave it then, and is read under
+ * `sandbox`, the name a folder gives it today (`codexSandbox`). Nothing else of it is touched.
  */
 const FORMER_PACKAGE = ['packages/agent', 'workflows/'].join('-');
 const atToday = (folder: string) =>
   folder.startsWith(FORMER_PACKAGE) ? `packages/agent-orchestrator/${folder.slice(FORMER_PACKAGE.length)}` : folder;
+const codexSandbox = (step: Workflow): Workflow => {
+  if (step.harness !== 'codex' || step.permissionMode === undefined) return step;
+  const { permissionMode: sandbox, ...rest } = step;
+  return { ...rest, sandbox };
+};
 const BEFORE: Record<string, Array<Record<string, unknown>>> = Object.fromEntries(
   Object.entries(
     JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8')) as Record<string, Workflow[]>,
-  ).map(([folder, steps]) => [atToday(folder), steps.map(asNamed) as unknown as Array<Record<string, unknown>>]),
+  ).map(([folder, steps]) => [
+    atToday(folder),
+    steps.map((step) => codexSandbox(asNamed(step))) as unknown as Array<Record<string, unknown>>,
+  ]),
 );
 
 /**

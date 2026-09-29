@@ -2113,51 +2113,38 @@ test("a record written today holds each step's rule lists and a codex step's san
   assert.deepEqual(held(), TODAY, 'and the tick writes them back (`rewriteRun`) the same way');
 });
 
-test('a codex run frozen while its sandbox was `permissionMode` loads, files the sandbox it was written with, and is written back under `sandbox` alone', async () => {
-  const run = started(folder('harness: codex\nsandbox: read-only'));
-  const at = path.join(ROOT, 'runs', `${run.id}.json`);
-  const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
-  record.workflow = record.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({
-    ...step,
-    ...(sandbox ? { permissionMode: sandbox } : {}),
-  }));
-  fs.writeFileSync(at, JSON.stringify(record, null, 2));
-  assert.doesNotMatch(
-    fs.readFileSync(at, 'utf8'),
-    /"sandbox":/,
-    "the fixture is the record as an older `wf` froze it: the codex step's sandbox under `permissionMode`, and no `sandbox`",
-  );
-  const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
-  assert.deepEqual(
-    [read.sandbox, Object.hasOwn(read, 'permissionMode')],
-    ['read-only', false],
-    'read as the sandbox, never as a Claude Code mode',
-  );
+test("a codex run frozen while its sandbox was `permissionMode` loads as it was frozen, and files that sandbox: the engine's task calls it `permissionMode` (`modeOf`)", async () => {
+  const frozenAs = (sandbox: string, word: string) => {
+    const run = started(folder(`harness: codex\nsandbox: ${sandbox}`));
+    const at = path.join(ROOT, 'runs', `${run.id}.json`);
+    const record = JSON.parse(fs.readFileSync(at, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
+    record.workflow = record.workflow.map(({ sandbox: given, permissionMode: _, ...step }) => ({
+      ...step,
+      ...(given ? { permissionMode: word } : {}),
+    }));
+    fs.writeFileSync(at, JSON.stringify(record, null, 2));
+    assert.doesNotMatch(
+      fs.readFileSync(at, 'utf8'),
+      /"sandbox":/,
+      "the fixture is the record as an older `wf` froze it: the codex step's sandbox under `permissionMode`, and no `sandbox`",
+    );
+    return run;
+  };
   const { e, tasks } = board();
-  await advance(e, readRun(run.id));
-  assert.equal(
-    tasks.get(`${run.id}-implement`)!.spec.config?.permissionMode,
-    'read-only',
-    "the engine is handed the sandbox it was written with, not Codex's default",
-  );
-  const written = (JSON.parse(fs.readFileSync(at, 'utf8')) as { workflow: Array<Record<string, unknown>> }).workflow.find(
-    (s) => s.name === 'implement',
-  )!;
-  assert.deepEqual([written.sandbox, Object.hasOwn(written, 'permissionMode')], ['read-only', false], 'written back under `sandbox` alone');
-
-  const wide = started(folder('harness: codex\nsandbox: danger-full-access'));
-  const wideAt = path.join(ROOT, 'runs', `${wide.id}.json`);
-  const wideRecord = JSON.parse(fs.readFileSync(wideAt, 'utf8')) as Run & { workflow: Array<Record<string, unknown>> };
-  wideRecord.workflow = wideRecord.workflow.map(({ sandbox, permissionMode: _, ...step }) => ({
-    ...step,
-    ...(sandbox ? { permissionMode: 'bypassPermissions' } : {}),
-  }));
-  fs.writeFileSync(wideAt, JSON.stringify(wideRecord, null, 2));
-  assert.equal(
-    readRun(wide.id).workflow!.find((s) => s.name === 'implement')!.sandbox,
-    'danger-full-access',
-    "the engine's alias, frozen, is read under Codex's own name for it",
-  );
+  for (const [sandbox, word] of [
+    ['read-only', 'read-only'],
+    ['danger-full-access', 'bypassPermissions'],
+  ]) {
+    const run = frozenAs(sandbox, word);
+    const read = readRun(run.id).workflow!.find((s) => s.name === 'implement')!;
+    assert.deepEqual([read.permissionMode, read.sandbox], [word, undefined], 'read as it was frozen');
+    await advance(e, readRun(run.id));
+    assert.equal(
+      tasks.get(`${run.id}-implement`)!.spec.config?.permissionMode,
+      word,
+      "the engine is handed the sandbox it was written with, not Codex's default; the runtime reads `bypassPermissions` as `danger-full-access`",
+    );
+  }
 });
 
 test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a Claude Code step's `permissionMode:` as itself — each on its first filing", async () => {

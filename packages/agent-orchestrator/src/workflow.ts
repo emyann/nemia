@@ -107,9 +107,9 @@ export type Workflow = {
    * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
    *
    * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
-   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename (`codexModeLine`). A
-   * run record that holds the field as `permissionMode` is read the same way (`asNamed`). The engine's task calls it `permissionMode`: the
-   * tick hands it over under that name (`modeOf`).
+   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `wf start` names the line to rename (`codexModeLine`). The
+   * engine's task calls it `permissionMode`: the tick hands it over under that name (`modeOf`), so a run record that holds a codex step's
+   * sandbox as `permissionMode` is filed with it all the same.
    */
   sandbox?: string;
   /**
@@ -2935,14 +2935,9 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
  * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
  * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
- * value. A step with no former name is returned as it is. A codex step's sandbox, frozen under `permissionMode`, is read as `sandbox` the
- * same way (`sandboxRead`). Pure.
+ * value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: Workflow): Workflow {
-  return sandboxRead(renamedKeys(step));
-}
-
-function renamedKeys(step: Workflow): Workflow {
   const fields = Object.keys(step);
   const agent = step.agent;
   const given = agent?.given ? Object.keys(agent.given) : [];
@@ -2966,34 +2961,6 @@ function renamedKeys(step: Workflow): Workflow {
                 .map(([key, value]) => [keyNamed(key), value]),
             ),
           }
-        : {}),
-    },
-  };
-}
-
-/**
- * A codex step frozen with its sandbox under the former key: its sandbox is the field `permissionMode` — the engine's task field,
- * which the step carried under that name — and the key `permissionMode` among its agent's `keys` and `given`. Read so, the tick would file
- * it with no sandbox, and Codex would run it in `workspace-write`: wider than a reviewer written `read-only`, and said nowhere. So the field
- * moves to `sandbox` (`bypassPermissions` as `danger-full-access`), and a step that holds both keeps `sandbox`'s.
- * A step that does not run on codex is returned as it is: its `permissionMode` is Claude Code's. Pure.
- */
-function sandboxRead(step: Workflow): Workflow {
-  const agent = step.agent;
-  const legacy =
-    step.permissionMode !== undefined || Boolean(agent?.keys.includes('permissionMode')) || agent?.given?.permissionMode !== undefined;
-  if (step.harness !== 'codex' || !legacy) return step;
-  const { permissionMode: word, ...rest } = step;
-  const read: Workflow = { ...rest, ...(rest.sandbox === undefined && word !== undefined ? { sandbox: sandboxNamed(word) } : {}) };
-  if (!agent) return read;
-  const { permissionMode: given, ...others } = agent.given ?? {};
-  return {
-    ...read,
-    agent: {
-      ...agent,
-      keys: [...new Set(agent.keys.map((key) => (key === 'permissionMode' ? 'sandbox' : key)))],
-      ...(agent.given
-        ? { given: { ...others, ...(others.sandbox === undefined && given !== undefined ? { sandbox: sandboxNamed(given) } : {}) } }
         : {}),
     },
   };

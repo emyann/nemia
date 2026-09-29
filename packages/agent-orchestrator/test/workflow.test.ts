@@ -1176,36 +1176,6 @@ test('`wf start` is told which files still write a former name: the steps, then 
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
-test("a codex step frozen with its sandbox as `permissionMode` is read as `sandbox` (`asNamed`), and a Claude Code step's mode is its own", () => {
-  const frozen = { name: 'review', after: [], body: 'Review.', harness: 'codex', permissionMode: 'read-only' } as Workflow;
-  assert.deepEqual(asNamed(frozen), { name: 'review', after: [], body: 'Review.', harness: 'codex', sandbox: 'read-only' });
-  assert.deepEqual(asNamed({ ...frozen, permissionMode: 'bypassPermissions' }), {
-    name: 'review',
-    after: [],
-    body: 'Review.',
-    harness: 'codex',
-    sandbox: 'danger-full-access',
-  });
-  const resolved = {
-    ...frozen,
-    agent: { name: 'reviewer', keys: ['permissionMode'], body: '', given: { harness: 'codex', permissionMode: 'workspace-write' } },
-  } as unknown as Workflow;
-  assert.deepEqual(
-    asNamed(resolved).agent,
-    {
-      name: 'reviewer',
-      keys: ['sandbox'],
-      body: '',
-      given: { harness: 'codex', sandbox: 'workspace-write' },
-    },
-    'resolved against an agent: the key among what the step set and what it was given',
-  );
-  const today = fm('review', 'harness: codex\nsandbox: read-only');
-  assert.equal(asNamed(today), today, 'nothing to rename, nothing copied');
-  const claude = fm('implement', 'permissionMode: dontAsk');
-  assert.equal(asNamed(claude), claude, "Claude Code's permissionMode is its own key: not read as a sandbox");
-});
-
 test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
   assert.equal(
     codexModeLine('w/review.md', 'bypassPermissions'),

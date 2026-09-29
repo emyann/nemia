@@ -13,6 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
+import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-gate-');
@@ -22,6 +23,7 @@ process.env.WF_ROOT = ROOT;
 const { advance, approve, cancel, forget, inboxDir, list, markCancelled, parentOf, readRun, retry, start, startFromInbox } =
   await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
+const { engineOf } = await import('../src/runtime-client.ts');
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -49,50 +51,10 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   return dir;
 };
 
-/**
- * An engine board a test settles by hand, as store.test.ts's: what each task was filed with, every filing, and each task's own session
- * (`native-<id>`). A settled task carries the closeout it is given.
- */
+/** The engine board (`test/engine-board.ts`), and the engine the controllers take over it, as `wf` builds one over the runtime. */
 const board = () => {
-  type Filed = { id: string; brief: string; closeoutSchema?: object } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
-  const filings: string[] = [];
-  const stopped: string[] = [];
-  const e = {
-    view: async (id: string) => {
-      const t = tasks.get(id);
-      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
-      return {
-        id,
-        phase: t?.phase ?? 'pending',
-        sessionId: t ? 's' : null,
-        state: {
-          brief: t?.spec.brief ?? '',
-          closeoutSchema: t?.spec.closeoutSchema,
-          settled,
-          stopRequested: false,
-          said: [],
-          attempts:
-            !t || t.phase === 'pending'
-              ? []
-              : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null }],
-        },
-      };
-    },
-    file: async (spec: Filed) => {
-      filings.push(spec.id);
-      tasks.set(spec.id, { spec, phase: 'pending' });
-      return spec.id;
-    },
-    stop: async (id: string) => {
-      stopped.push(id);
-    },
-    logs: async () => '(no output yet)',
-    feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
-    Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
-  return { e, tasks, filings, stopped, settle };
+  const b = engineBoard();
+  return { ...b, e: engineOf(b.layer) };
 };
 
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
@@ -283,7 +245,7 @@ test('a gated step with `check:` is checked before it is held: its check filed o
     workflowDir: planned({ plan: 'check: test -f PLAN.md\ngate: true' }),
     isolate: false,
   });
-  const { e, filings, settle } = board();
+  const { e, filings, specs, settle } = board();
   await advance(e, readRun(run.id));
   settle(`${run.id}-plan`, 'succeeded', SIGNED);
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['plan']);
@@ -293,6 +255,11 @@ test('a gated step with `check:` is checked before it is held: its check filed o
   assert.deepEqual((await advance(e, readRun(run.id))).filed, []);
   assert.equal((await list(e, readRun(run.id))).steps[0].status, 'awaiting approval');
   assert.deepEqual(filings, [`${run.id}-plan`, `${run.id}-plan-check`]);
+  assert.deepEqual(
+    specs.map((s) => s.queued),
+    [true, true],
+    'every filing goes out queued, for the tick to admit',
+  );
 });
 
 test("REFUSED at shipped defaults: a parent whose last step waits at its gate has not shipped, though a person merged its branch — a run `--after` it files nothing — and once that step is approved, it has, and the child's next tick files its roots", async () => {

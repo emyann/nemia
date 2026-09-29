@@ -76,17 +76,18 @@ source files that need each other's values, no source file that imports a test, 
 outside through its face — its `index.ts`, or its one pure file.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
-agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`) and
-passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
+agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
+runtime's `Engine` service from `agent-runtime/effect`, provided as a layer, each verb run as a Promise for the controllers
+(`engineOf`, which a test hands a layer of its own). It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, and it imports no controller.
 
 **Inside the runtime, folders by feature**, held by path in `packages/agent-runtime/test/layout.test.ts`. The two entries,
 `src/facade.ts` and `src/index.ts`, are the only files flat in `src/`; each re-exports by name. `core/` is the judgement
 (`domain.ts`, `session.ts`, `lifecycle.ts`) and `core/engine/` its shell (the engine, filing, the journal, the memo, the tally);
 `harness/` is the seam (`seam.ts`, `args.ts`) and each harness's driver beneath it (`claude/`, `codex/`, `detached/`); `a2a/` is
-the one place the A2A SDK is imported; `facade/` is the Promise door behind `src/facade.ts`, and `cli/` the `ae` command. The
-core imports of the harnesses only `seam.ts`, `args.ts` and the harness face; neither the core nor a harness imports `a2a/`,
-`facade/` or `cli/`; `cli/` reaches the runtime through `src/facade.ts` alone; and no two files import each other's values,
+the one place the A2A SDK is imported; `service/` is the engine as an Effect service, `facade/` the Promise door over it behind
+`src/facade.ts`, and `cli/` the `ae` command. The core imports of the harnesses only `seam.ts`, `args.ts` and the harness face;
+neither the core nor a harness imports `a2a/`, `service/`, `facade/` or `cli/`; `cli/` reaches the runtime through `src/facade.ts` alone; and no two files import each other's values,
 directly or around a loop. A folder another folder reads has a face, `index.ts`.
 
 **The api's folders.** The api has no kinds: it is routes over readers, and its `src/` is a folder per page or verb a

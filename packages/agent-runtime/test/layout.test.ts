@@ -1,7 +1,7 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
- * nothing of A2A or of the doors, and the CLI reaches the runtime through `src/facade.ts` alone. No two files need each other's
- * values, no source file imports a test, a face re-exports by name, and only the two entries sit flat in `src/`.
+ * nothing of A2A, of the engine service or of the doors, and the CLI reaches the runtime through `src/facade.ts` alone. No two files
+ * need each other's values, no source file imports a test, a face re-exports by name, and only the two entries sit flat in `src/`.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -64,7 +64,7 @@ const SEAM = ['src/harness/seam.ts', 'src/harness/args.ts', 'src/harness/index.t
 /** Why each rule refuses, and what to do instead. */
 const WHY = {
   core: `the core knows a harness only by ${SEAM.join(', ')} — put what it needs in the seam`,
-  below: 'the core and the harnesses sit below A2A and the doors — move what both need down',
+  below: 'the core and the harnesses sit below A2A, the engine service and the doors — move what both need down',
   cli: 'the CLI reaches the runtime through src/facade.ts alone — export what it needs there',
 };
 
@@ -74,7 +74,7 @@ function pathBreaches(file: string, imports: Import[]): string[] {
   for (const { spec } of imports) {
     const target = resolved(file, spec);
     if (target === undefined || !target.startsWith('src/')) continue;
-    const above = DOORS.includes(target) || ['a2a', 'facade', 'cli'].some((dir) => under(target, dir));
+    const above = DOORS.includes(target) || ['a2a', 'service', 'facade', 'cli'].some((dir) => under(target, dir));
     if (under(file, 'core') && under(target, 'harness') && !SEAM.includes(target)) {
       out.push(`${file} imports ${target}: ${WHY.core}`);
     } else if ((under(file, 'core') || under(file, 'harness')) && above) {
@@ -146,7 +146,7 @@ const starExports = (file: string, text: string): string[] =>
     (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
   );
 
-test('REFUSED: the core reaching a driver, A2A or a door; a harness reaching A2A or a door; the CLI reaching past the facade', () => {
+test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a harness reaching A2A, the service or a door; the CLI reaching past the facade', () => {
   const planted: Array<[string, string, string, string]> = [
     ['src/core/engine/engine.ts', "import { claudeOps } from '../../harness/claude/bg.ts';", 'src/harness/claude/bg.ts', WHY.core],
     [
@@ -157,6 +157,7 @@ test('REFUSED: the core reaching a driver, A2A or a door; a harness reaching A2A
     ],
     ['src/core/domain.ts', "import { nameParts } from '../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
     ['src/core/engine/filing.ts', "import { createEngine } from '../../facade/engine.ts';", 'src/facade/engine.ts', WHY.below],
+    ['src/core/engine/filing.ts', "import { Engine } from '../../service/index.ts';", 'src/service/index.ts', WHY.below],
     ['src/core/lifecycle.ts', "const cli = await import('../cli/main.ts');", 'src/cli/main.ts', WHY.below],
     ['src/harness/claude/code.ts', "import { nameParts } from '../../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
     ['src/harness/seam.ts', "export { promiseOps } from '../facade/promise.ts';", 'src/facade/promise.ts', WHY.below],

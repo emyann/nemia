@@ -122,6 +122,12 @@ the composite sees opaque ops. A value passed to `file` instead would be opt-in:
 layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
 workspace files through the Effect door (agent-orchestrator and the api use `createEngine`).
 
+**What changed** (the engine as a service). The Effect door has the engine too: `Engine.layer(options)` holds the harness
+configs, and its `file` asks `refusalOf`, `argsRefusalOf` and `harnessRefusalOf` first, as `createEngine().file()` does, since
+that one is now its Promise face (`service/engine.ts`, `facade/engine.ts`). `test/doors.test.ts` refuses an unknown harness
+and a mode its harness rejects at both doors. What is left is the bare `file` building block, which still has only the
+runner to ask, and so the paragraph above still holds for a consumer that composes its own layers.
+
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
 Codex has one shell and three sandboxes, not a tool list, so a list can only take writing away: none
@@ -332,7 +338,7 @@ door, which the named key never did, so `claudeJob` and `claudeDetached` refuse 
   told.
 - **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
   drops a released session at once was not looked at.
-- **The Effect door refuses no harness's words** (issue 6): it refuses a `claude.remoteControl` the bag refuses of any flag
+- **The Effect door's bare `file` refuses no harness's words** (issue 6; `Engine`'s `file` does): it refuses a `claude.remoteControl` the bag refuses of any flag
   (`false`, `''`), and one on `claude-detached` (since 2026-09-25); one that reaches `codex` or a `check` through it is dropped without a word.
 - **Not a brief key.** agent-orchestrator files it for a step that says `remote: true` (features.md §2).
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";

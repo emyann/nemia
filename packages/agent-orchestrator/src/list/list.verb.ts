@@ -23,7 +23,7 @@ import {
   waitingOf,
 } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
-import { checkoutHold } from '../tick.ts';
+import { checkoutHold } from '../ending/ending.verb.ts';
 
 /**
  * What `wf ls` shows for one run — the pure call, over one read of each task.

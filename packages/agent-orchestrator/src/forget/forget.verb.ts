@@ -44,7 +44,7 @@ import { gitSays, handOff } from '../workspace/worktree.store.ts';
 import { standingsOf } from '../branches.ts';
 import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /**

@@ -36,7 +36,8 @@ import {
   waitingOf,
   type CheckReport,
 } from '../views/views.verb.ts';
-import { checkoutHold, runSlots } from '../tick.ts';
+import { checkoutHold } from '../ending/ending.verb.ts';
+import { runSlots } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */

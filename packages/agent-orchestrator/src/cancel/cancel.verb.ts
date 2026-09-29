@@ -8,7 +8,7 @@ import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
 import { markCancelled, readAsks, readRun, stepsOf } from '../record/record.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from '../tick.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from '../tick/advance.verb.ts';
 
 export type Cancelled = { run: Run; plan: CancelPlan };
 

@@ -166,9 +166,16 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
+/** `value` as JSON, cut to its first 60 characters and marked `…` where it was cut. */
+const shown = (value: unknown): string => {
+  const text = JSON.stringify(value) ?? 'undefined';
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+};
+
 /**
  * The first thing a schema refused in `value`: where, and what is there instead of what it expected, said as what `holder` holds
- * there (`the runtime writes`, the default, for a journal).
+ * there (`the runtime writes`, the default, for a journal). The value found there is quoted as JSON to at most 60 characters, a cut
+ * marked `…`.
  */
 export const firstRefusal = (
   value: unknown,
@@ -182,7 +189,7 @@ export const firstRefusal = (
   const words =
     message === 'Missing key'
       ? 'is missing'
-      : `is ${JSON.stringify(found) ?? 'undefined'}, where ${message.replace(/^Expected /, `${holder} `).replace(/ \| undefined$/, '')}`;
+      : `is ${shown(found)}, where ${message.replace(/^Expected /, `${holder} `).replace(/ \| undefined$/, '')}`;
   return { path, words };
 };
 
@@ -197,7 +204,7 @@ export const entryWords = (where: string, entry: unknown, error: Schema.SchemaEr
   const kind = fieldOf(feed ? fieldOf(entry, 'event') : entry, 'kind');
   const what =
     typeof entry === 'string'
-      ? `is no JSON object, as a write cut short leaves a line: it reads ${JSON.stringify(entry.length > 60 ? `${entry.slice(0, 60)}…` : entry)}`
+      ? `is no JSON object, as a write cut short leaves a line: it reads ${shown(entry)}`
       : feed && path[0] !== 'event'
         ? `is no feed entry: its ${path.length ? `\`${String(path[0])}\`` : 'shape'} ${words}`
         : typeof kind !== 'string' || !EVENT_KINDS.includes(kind)

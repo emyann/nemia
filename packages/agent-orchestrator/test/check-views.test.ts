@@ -8,7 +8,7 @@
  * 799 ms. So the count is one for the pass and one for each check in flight.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST` has every run a pass answers from its memo
- * of runs at rest judged in full as well, and a difference throws (`verifyRest` in tick.ts).
+ * of runs at rest judged in full as well, and a difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

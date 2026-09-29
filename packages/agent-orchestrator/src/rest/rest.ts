@@ -1,7 +1,7 @@
 /**
  * A run at rest: one whose pass would read the same things and decide the same nothing until one of its inputs changes — the pure half of
- * the tick's memo of such runs (`restMemo` in tick.ts). What makes a run at rest (`atRest`), which task ids name a run on the engine's feed
- * (`evictedBy`). Whether its result branches still stand where it saw them is `tipsSeen`'s, as a full pass asks it.
+ * the tick's memo of such runs (`restMemo` in tick.verb.ts). What makes a run at rest (`atRest`), which task ids name a run on the engine's
+ * feed (`evictedBy`). Whether its result branches still stand where it saw them is `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
  * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its tasks'

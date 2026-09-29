@@ -1,7 +1,7 @@
 /**
  * `wf cancel`: call a run off (`cancel`). It stops what the run has in flight, then writes the person's own file, never the run's record,
  * which the tick owns. A controller, reaching the runtime through the client (`runtime-client.ts`); it adopts what a pass filed and never
- * wrote down as the tick does (`tick.ts`).
+ * wrote down as the tick does (`tick/advance.verb.ts`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';

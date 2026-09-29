@@ -4,7 +4,7 @@
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT`: the runs of the other store tests would be counted in it. `WF_ROOT` is
  * read as the module loads, so it is set before the import. `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo of
- * runs at rest, and a difference throws (`verifyRest` in tick.ts).
+ * runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,7 +1,7 @@
 /**
  * What the tick's memo of runs at rest saves a pass, counted by the meter on a store of finished runs beside a few in flight, and that each
- * input of a run takes it out of the memo (`advanceResting` in tick.ts): its record, the files a person keeps beside it, its asks and what
- * is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
+ * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
+ * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
  * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
  * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in

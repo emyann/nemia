@@ -4569,11 +4569,11 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   word, and needs no new approval.
 - **The ending stages; the run lands.** The shipper merges `--no-ff --no-commit` and signs off `done` with the commit message as its
   closeout's `message` (`workflows/agents/shipper.schema.json`); its brief says so under *The run checks and lands your merge*
-  (`landingContract` in `check.ts`). The tick files the check on the `check` harness in the checkout, with `CHECK_DEADLINE_SECONDS`,
-  niced, its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue`
-  (pure, `ending/ending.ts`) says what the settled check calls for, and `landEnding` (`tick.ts`) applies it: `git commit -F -` with the message
-  on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check (…)` /
-  `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and `wf ls` words it on the step's line
+  (`landingContract` in `check.ts`). The tick files the check on the `check` harness in the checkout, with `CHECK_DEADLINE_SECONDS`, niced,
+  its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue` (pure,
+  `ending/ending.ts`) says what the settled check calls for, and `landEnding` (`ending/ending.verb.ts`) applies it: `git commit -F -` with
+  the message on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check
+  (…)` / `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and `wf ls` words it on the step's line
   (`landedWords`), which the api carries to the board as the step's `note`. The daemon's log has the tick's note; the feed does not.
 - **The session cannot commit what the run commits.** A landing ending is filed with `Bash(git commit:*)` and
   `Bash(git merge --continue:*)` beside its own `disallowedTools:` (`filedDenies` in `ending/ending.ts`), each try and each round, so the folder
@@ -4793,12 +4793,13 @@ out (`restBlockers`, `src/rest/rest.ts`, which `atRest` is now written on). Ther
 
 `checkoutAsked`, `due.retry`, `landingOwed` and `notes` held no run out, so nothing was changed for them.
 
-- **A hand-off is owed only where there is a workspace to hand it off from** (`handOffOwed` in `src/tick.ts`). `handOffDue` (pure) reads
-  a step's record and not the disk, so a step with a workspace and no `handedOff` was owed one forever. Each pass ran `git status` in a
-  directory that was gone, got `{error}` back, and tried again on the next pass, saying nothing: 70 runs and two git processes each, every
-  pass. Is re-judging right? A workspace that is gone comes back only when a step is filed, and a filing writes the record, so the
-  memo's stamp already sees it. The pass reads whether the workspace exists and the memo does not watch it. A pruned run owes nothing. `wf prune` reads the same function, so it no longer refuses a
-  run as *still to be handed off* when the only thing owed is a hand-off from a worktree already gone.
+- **A hand-off is owed only where there is a workspace to hand it off from** (`handOffOwed` in `src/tick/advance.verb.ts`). `handOffDue`
+  (pure) reads a step's record and not the disk, so a step with a workspace and no `handedOff` was owed one forever. Each pass ran `git
+  status` in a directory that was gone, got `{error}` back, and tried again on the next pass, saying nothing: 70 runs and two git processes
+  each, every pass. Is re-judging right? A workspace that is gone comes back only when a step is filed, and a filing writes the record, so
+  the memo's stamp already sees it. The pass reads whether the workspace exists and the memo does not watch it. A pruned run owes nothing.
+  `wf prune` reads the same function, so it no longer refuses a run as *still to be handed off* when the only thing owed is a hand-off from
+  a worktree already gone.
 - **A run with nothing filed goes through the memo, with its slot** (`advanceResting` in `pass()`'s unstarted loop). A run called off
   before it started is final and settled, but it was judged outside the memo on every pass: its asks were read, and one journal each.
   The departure: every unstarted run is routed there, not only a cancelled one, because `atRest` already judges them and the answer does
@@ -4902,7 +4903,7 @@ Shipped 2026-09-25. Part 1 made a remote A2A agent a harness of the runtime; thi
 - **Secrets from the environment**, `WF_A2A_<NAME>_<SCHEME>`, read on every request and never written: a spawn refused for one not
   set says the variable (`missingCredential`). Two names whose variables can meet are refused together.
 - **Filed bare.** A remote step's task carries no `config`, no schema, no `claude` block and no `holdOpen` — left out, not emptied,
-  since the runtime counts the keys (`localFields` in `tick.ts`) — and its brief (`remoteBrief`) names no path of this machine.
+  since the runtime counts the keys (`localFields` in `tick/file.verb.ts`) — and its brief (`remoteBrief`) names no path of this machine.
 - **Refused at load**, from the step or its agent: the keys that tell a harness of ours how to run (`REMOTE_REFUSED`), `workspace:
   main`, an agent's skills and system prompt, and being a loop's target.
 - **The send leaves the pass** (the runtime's half): a spawn waits a second for the agent's answer, and one that answers later is

@@ -87,8 +87,8 @@ export type Assessment = {
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.
  * @param standings Where each result branch stands against the base branch on this pass (`branchStandings` in branches.ts): what says a
  *   run whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
- * @param checkout The run whose `workspace: main` step is in the repository's own checkout (`checkoutHold` in tick.ts), if one is. Left
- *   out, nothing holds the checkout.
+ * @param checkout The run whose `workspace: main` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
+ *   Left out, nothing holds the checkout.
  */
 export function assess(
   steps: readonly Workflow[],

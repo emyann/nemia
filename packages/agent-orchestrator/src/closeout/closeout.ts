@@ -3,8 +3,8 @@
  * declared and owes, and what every step is told about finishing.
  *
  * Pure, as `tick/assess.ts` is, and beneath it: the run's judgement imports what it needs from here, and nothing here imports it.
- * `tick.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing here reads
- * a disk or calls the engine.
+ * `advance.verb.ts` files each step with `closeoutSchemaOf`, and the controllers read the engine's record with `parseCloseout`; nothing
+ * here reads a disk or calls the engine.
  */
 import { CLOSEOUT_FIELDS, isObject, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 

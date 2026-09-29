@@ -1,7 +1,7 @@
 /**
  * `wf decide` (`decide`): the pure call over one read of each task, with what a person needs to decide the run. It reads the repository's
- * own checkout as the pass that would file into it reads it (`checkoutHold`, in `tick.ts`). A controller, reaching the runtime through the
- * client (`runtime-client.ts`).
+ * own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the runtime
+ * through the client (`runtime-client.ts`).
  */
 import { nameFor, type Engine, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';

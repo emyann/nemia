@@ -4,11 +4,11 @@
  * The runtime is reached through one client, `runtime-client.ts`, the only file that imports `agent-runtime`: it creates the runtime
  * (`engine()`, `HARNESSES`) and names its types. The controllers are a verb each, in its feature's folder, and each imports the client, or
  * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
- * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.ts` (a pass — `advance`, `tick` — and the filings it
- * adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`,
- * `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts` (what a person
- * reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the rest — so no
- * cycle forms among them (`test/boundary.test.ts`).
+ * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
+ * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
+ * `wait.verb.ts`, `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts`
+ * (what a person reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the
+ * rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),

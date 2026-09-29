@@ -1,10 +1,10 @@
 /**
  * A workflow step on a remote A2A agent, end to end: `wf start` on a folder team whose step says `harness: a2a:reviewer`, the store's
  * `a2a-agents.json` naming an agent the SDK's own server runs over HTTP (`a2a-server.ts`), and ticks of the engine `wf up` makes
- * (`engine()`), each run at rest judged in full as well (`WF_VERIFY_REST`): a difference throws (`verifyRest` in tick.ts). The agent is
- * sent the brief as a message, with the secret its card asks for read from the variable `envNameOf` names, WF_A2A_REVIEWER_TOKEN here, and
- * never written to the store; the brief names nothing of this machine; the Task it completes is the step's sign-off, and a data part on it
- * is read as a closeout. A secret not given sends nothing, and the step's failure names the variable to set. `WF_ROOT` is set before the
+ * (`engine()`), each run at rest judged in full as well (`WF_VERIFY_REST`): a difference throws (`verifyRest` in tick.verb.ts). The agent
+ * is sent the brief as a message, with the secret its card asks for read from the variable `envNameOf` names, WF_A2A_REVIEWER_TOKEN here,
+ * and never written to the store; the brief names nothing of this machine; the Task it completes is the step's sign-off, and a data part on
+ * it is read as a closeout. A secret not given sends nothing, and the step's failure names the variable to set. `WF_ROOT` is set before the
  * import, since the module reads it as it loads.
  */
 import { test } from 'node:test';

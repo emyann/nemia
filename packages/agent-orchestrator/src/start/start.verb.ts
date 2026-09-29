@@ -5,23 +5,23 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HARNESSES, readRemote } from './runtime-client.ts';
-import { remoteAgentsFile } from './harness/a2a.store.ts';
-import { refusalLines } from './workspace/workspace.ts';
-import { type Workflow } from './step/step.ts';
-import { remoteNameOf } from './harness/harness.ts';
-import { fansOut, isFolderTeam } from './workflow/index.ts';
-import { loadWorkflows, skillsFor, type Places } from './workflow-store.ts';
-import { workRoot } from './record/places.store.ts';
-import { gateRefusal } from './ending/ending.ts';
-import { type Run } from './record/record.ts';
-import { afterRefusal } from './wait/wait.ts';
-import { inputRefusal, type InputFile } from './start/inputs.ts';
-import { HOME, inputsDir, runId, runsDir, writeRun } from './record/record.store.ts';
-import { writeAgentFiles } from './agents/agents.store.ts';
-import { makeWorkspace, readInclude } from './worktree.ts';
-import { parentRecord } from './branches.ts';
-import { Invalid } from './refusal/refusal.ts';
+import { HARNESSES, readRemote } from '../runtime-client.ts';
+import { remoteAgentsFile } from '../harness/a2a.store.ts';
+import { refusalLines } from '../workspace/workspace.ts';
+import { type Workflow } from '../step/step.ts';
+import { remoteNameOf } from '../harness/harness.ts';
+import { fansOut, isFolderTeam } from '../workflow/index.ts';
+import { loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { workRoot } from '../record/places.store.ts';
+import { gateRefusal } from '../ending/ending.ts';
+import { type Run } from '../record/record.ts';
+import { afterRefusal } from '../wait/wait.ts';
+import { inputRefusal, type InputFile } from './inputs.ts';
+import { HOME, inputsDir, runId, runsDir, writeRun } from '../record/record.store.ts';
+import { writeAgentFiles } from '../agents/agents.store.ts';
+import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
+import { parentRecord } from '../branches.ts';
+import { Invalid } from '../refusal/refusal.ts';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which

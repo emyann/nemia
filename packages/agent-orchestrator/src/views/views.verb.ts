@@ -6,21 +6,22 @@
  * tick (`tick.ts`), the verbs and the screens read through it.
  */
 import fs from 'node:fs';
-import { denialText, type Engine, type TaskView } from './runtime-client.ts';
-import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check/check.ts';
-import type { Consumed } from './radius.ts';
-import type { Workflow } from './step/step.ts';
-import { resultSteps } from './branches/branches.ts';
-import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from './record/record.ts';
-import type { Said } from './say/say.ts';
-import { taskSpend, type SpendOf } from './status/status.ts';
-import { gated, type ParentRun } from './wait/wait.ts';
-import { decision } from './decide/decide.ts';
-import { parseCloseout, type Closeout } from './closeout/closeout.ts';
-import { taskUsage } from './timeline/timeline.ts';
-import { checkStderr, readAsks, stepsOf } from './record/record.store.ts';
-import { oneByOne, parentRecord, shippedOf, type BranchReader } from './branches.ts';
-import { continuesFrom } from './retry/index.ts';
+import { denialText, type Engine, type TaskView } from '../runtime-client.ts';
+import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from '../check/check.ts';
+import type { Consumed } from '../radius.ts';
+import type { Workflow } from '../step/step.ts';
+import { resultSteps } from '../branches/branches.ts';
+import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
+import type { Said } from '../say/say.ts';
+import { taskSpend, type SpendOf } from '../status/status.ts';
+import { gated, type ParentRun } from '../wait/wait.ts';
+import { decision } from '../decide/decide.ts';
+import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { taskUsage } from '../timeline/timeline.ts';
+import { checkStderr, readAsks, stepsOf } from '../record/record.store.ts';
+import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches.ts';
+import { continuesFrom } from '../retry/index.ts';
+import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
 
 /**
  * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a

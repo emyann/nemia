@@ -12,7 +12,7 @@ import path from 'node:path';
 import type { Run } from '../record/record.ts';
 import { AGENTS_FOLDER, splitFrontmatter, WorkflowError, type Workflow } from '../step/step.ts';
 import { agentNameRefusal, parseAgent, renderAgent, type Agent, type AgentDraft, type SkillsFound } from './agents.ts';
-import { preloads } from '../workflow-store.ts';
+import { preloads } from '../folder/folder.store.ts';
 import {
   noCodingStyle,
   NO_CODING_STYLE,

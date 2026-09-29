@@ -30,8 +30,8 @@ import {
   type CheckEnv,
 } from './check.ts';
 import { refusedCheck } from '../record/record.ts';
-import { exitVerdicts } from '../views.ts';
-import { loadWorkflows } from '../workflow-store.ts';
+import { exitVerdicts } from '../views/views.verb.ts';
+import { loadWorkflows } from '../folder/folder.store.ts';
 import { modeOf } from '../former/former.ts';
 import { scratch } from '../../test/scratch.ts';
 

@@ -2,12 +2,13 @@
  * `wf retry`: ask for another try of a step (`retry`), by writing the person's ask and nothing else, refused before anything is written. A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
-import type { Engine } from './runtime-client.ts';
-import { tryOf, type Run } from './record/record.ts';
-import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './retry/index.ts';
-import { askFile, askIn, readAsks, readRun, stepsOf, writeAsk } from './record/record.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
-import { Conflict } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import { tryOf, type Run } from '../record/record.ts';
+import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
+import { askFile, askIn, readAsks, readRun, stepsOf, writeAsk } from '../record/record.store.ts';
+import { strayAsk } from '../say/say.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
+import { Conflict } from '../refusal/refusal.ts';
 
 /** A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files the try. */
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };

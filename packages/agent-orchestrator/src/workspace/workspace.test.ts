@@ -547,7 +547,7 @@ test('an npm ci that fails is reported, not hidden, and tried again on the next 
 });
 
 test("the checkout against the merge staged in it: a package nested in a workspace is read where it is installed, and parts only when it is not the lockfile's", async () => {
-  const { checkoutParts, lockfileParts } = await import('../worktree.ts');
+  const { checkoutParts, lockfileParts } = await import('./worktree.store.ts');
   const repo = fs.mkdtempSync(path.join(ROOT, 'checkout-'));
   const lock = (nested: string) => ({
     name: 'fixture',

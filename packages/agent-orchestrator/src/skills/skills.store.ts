@@ -7,12 +7,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from './step/step.ts';
-import { linkRefusal } from './folder/folder.ts';
-import { skillNameRefusal } from './agents/agents.ts';
-import { skillEntryOf, renderSkill, withPreload, type SkillDraft } from './skills/skills.ts';
-import { skillVersion } from './workflow-store.ts';
-import { HOME } from './record/record.store.ts';
+import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
+import { linkRefusal } from '../folder/folder.ts';
+import { skillNameRefusal } from '../agents/agents.ts';
+import { skillEntryOf, renderSkill, withPreload, type SkillDraft } from './skills.ts';
+import { skillVersion } from '../folder/folder.store.ts';
+import { HOME } from '../record/record.store.ts';
+import { isWorkflowsHolder } from '../folder/write.store.ts';
 
 /**
  * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed since

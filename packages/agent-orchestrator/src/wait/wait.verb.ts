@@ -3,14 +3,14 @@
  * anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
-import type { Engine } from './runtime-client.ts';
-import { type Hold, type Run } from './record/record.ts';
-import { holdRefusal } from './wait/wait.ts';
-import { idRefusal } from './forget/forget.ts';
-import { assess } from './tick/assess.ts';
-import { holdFile, listRuns, readAsks, readRun, removeHold, runFile, stepsOf, writeHold } from './record/record.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, spendReader, taskPhases } from './views.ts';
-import { Conflict, Invalid, Missing } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import { type Hold, type Run } from '../record/record.ts';
+import { holdRefusal } from './wait.ts';
+import { idRefusal } from '../forget/forget.ts';
+import { assess } from '../tick/assess.ts';
+import { holdFile, listRuns, readAsks, readRun, removeHold, runFile, stepsOf, writeHold } from '../record/record.store.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, spendReader, taskPhases } from '../views/views.verb.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
 /** What `wf hold` did: the run, and the hold that now stands on it. */
 export type Holding = { run: Run; hold: Hold };

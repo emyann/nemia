@@ -4,8 +4,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { WorkflowError } from './step/step.ts';
-import { parsePlan, planOrder, type Card } from './plan/plan.ts';
+import { WorkflowError } from '../step/step.ts';
+import { parsePlan, planOrder, type Card } from './plan.ts';
 
 /**
  * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it

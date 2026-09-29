@@ -3,15 +3,27 @@
  * checkout as the pass that would file into it reads it (`checkoutHold`, in `tick.ts`). A controller, reaching the runtime through the
  * client (`runtime-client.ts`).
  */
-import { unreadableJournal, type Engine } from './runtime-client.ts';
-import type { RunSlot } from './cap/cap.ts';
-import { runTasks, unjudgedWords, type Run } from './record/record.ts';
-import { holdsOf, waitsOf } from './wait/wait.ts';
-import { listing, type Listing } from './list/list.ts';
-import { readAnswers, readAsks, stepsOf } from './record/record.store.ts';
-import { branchReader, standingsOf, type BranchReader } from './branches.ts';
-import { checkReports, closeoutAsked, closeoutOf, deniedOf, engineWord, parentsOf, saidCount, spendReader, taskPhases, unjudgedWord, waitingOf } from './views.ts';
-import { checkoutHold } from './tick.ts';
+import { unreadableJournal, type Engine } from '../runtime-client.ts';
+import type { RunSlot } from '../cap/cap.ts';
+import { runTasks, unjudgedWords, type Run } from '../record/record.ts';
+import { holdsOf, waitsOf } from '../wait/wait.ts';
+import { listing, type Listing } from './list.ts';
+import { readAnswers, readAsks, stepsOf } from '../record/record.store.ts';
+import { branchReader, standingsOf, type BranchReader } from '../branches.ts';
+import {
+  checkReports,
+  closeoutAsked,
+  closeoutOf,
+  deniedOf,
+  parentsOf,
+  saidCount,
+  spendReader,
+  taskPhases,
+  unjudgedWord,
+  waitingOf,
+} from '../views/views.verb.ts';
+import { engineWord } from '../views/views-words.ts';
+import { checkoutHold } from '../tick.ts';
 
 /**
  * What `wf ls` shows for one run — the pure call, over one read of each task.

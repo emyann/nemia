@@ -3,26 +3,41 @@
  * own checkout as the pass that would file into it reads it (`checkoutHold`, in `tick.ts`). A controller, reaching the runtime through the
  * client (`runtime-client.ts`).
  */
-import { nameFor, type Engine, type Usage } from './runtime-client.ts';
-import type { CheckoutHold, RunSlot } from './cap/cap.ts';
-import type { ToDecide } from './ending/ending.ts';
-import { type Run } from './record/record.ts';
-import type { SaidTo } from './say/say.ts';
-import type { BranchStanding, Round } from './status/status.ts';
-import { hasStarted, holdsOf, waitsOf, type Wait } from './wait/wait.ts';
-import { roundsDue } from './round/round.ts';
-import { deniedWords, harnessWaitLine } from './list/list.ts';
-import { costLine, decision, runCostLines, type Decision } from './decide/decide.ts';
-import { assess } from './tick/assess.ts';
-import { acceptedLines, gateLines } from './brief/index.ts';
-import { parseCloseout, type Closeout } from './closeout/closeout.ts';
-import { answerLines, answerOf, overBudgetLine, retriesDue, type Retry } from './retry/index.ts';
-import { timeline, type Timeline } from './timeline/timeline.ts';
-import { readAnswers, readAsks, readRun, stepsOf } from './record/record.store.ts';
-import { branchReader, shippedOf, standingsOf } from './branches.ts';
-import { checkReports, closeoutAsked, closeoutOf, closeoutReader, consumption, deniedOf, harnessBlocked, parentsOf, saidIn, spendReader, taskPhases, viewedOnce, waitingOf, type CheckReport } from './views.ts';
-import { checkoutHold, runSlots } from './tick.ts';
-import { isRemoteHarness } from './harness/harness.ts';
+import { nameFor, type Engine, type Usage } from '../runtime-client.ts';
+import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
+import type { ToDecide } from '../ending/ending.ts';
+import { type Run } from '../record/record.ts';
+import type { SaidTo } from '../say/say.ts';
+import type { BranchStanding, Round } from '../status/status.ts';
+import { hasStarted, holdsOf, waitsOf, type Wait } from '../wait/wait.ts';
+import { roundLines, roundsDue } from '../round/round.ts';
+import { deniedWords, harnessWaitLine } from '../list/list.ts';
+import { costLine, decision, runCostLines, type Decision } from './decide.ts';
+import { assess } from '../tick/assess.ts';
+import { acceptedLines, gateLines } from '../brief/index.ts';
+import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
+import { answerLines, answerOf, overBudgetLine, retriesDue, retryLines, type Retry } from '../retry/index.ts';
+import { timeline, type Timeline } from '../timeline/timeline.ts';
+import { readAnswers, readAsks, readRun, stepsOf } from '../record/record.store.ts';
+import { branchReader, shippedOf, standingsOf } from '../branches.ts';
+import {
+  checkReports,
+  closeoutAsked,
+  closeoutOf,
+  closeoutReader,
+  consumption,
+  deniedOf,
+  harnessBlocked,
+  parentsOf,
+  saidIn,
+  spendReader,
+  taskPhases,
+  viewedOnce,
+  waitingOf,
+  type CheckReport,
+} from '../views/views.verb.ts';
+import { checkoutHold, runSlots } from '../tick.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };

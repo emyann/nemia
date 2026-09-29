@@ -16,7 +16,7 @@ import type { ParentRun } from './wait/wait.ts';
 import type { Shipped } from './decide/decide.ts';
 import { radius, sensitivePaths, type Radius, type Touched } from './radius.ts';
 import { readRun, stepsOf } from './record/record.store.ts';
-import { git, gitSays } from './worktree.ts';
+import { git, gitSays } from './workspace/worktree.store.ts';
 
 /**
  * Has this branch landed on the base branch? Git's answer, not ours — and which yes it is (`Shipped`).

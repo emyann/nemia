@@ -3,14 +3,14 @@
  * written where a file that is not one stands (`strayAsk`), which `wf retry` and `wf round` say. A controller, reaching the runtime through
  * the client (`runtime-client.ts`).
  */
-import type { Engine } from './runtime-client.ts';
-import { tryOf, type Run } from './record/record.ts';
-import { sayRefusal, type Said } from './say/say.ts';
-import { type RoundAsk } from './status/status.ts';
-import { type RetryAsk } from './retry/index.ts';
-import { lstatOf, readRun, stepsOf } from './record/record.store.ts';
-import { phaseOfView } from './views.ts';
-import { Conflict } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import { tryOf, type Run } from '../record/record.ts';
+import { sayRefusal, type Said } from './say.ts';
+import { type RoundAsk } from '../status/status.ts';
+import { type RetryAsk } from '../retry/index.ts';
+import { lstatOf, readRun, stepsOf } from '../record/record.store.ts';
+import { phaseOfView } from '../views/views-words.ts';
+import { Conflict } from '../refusal/refusal.ts';
 
 /** What `wf say` did: the step's task the words were said to, the try that task is, and the engine's `said` entry, as it journalled it. */
 export type Told = { run: Run; taskId: string; try: number; said: Said };

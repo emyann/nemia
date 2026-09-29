@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { lastLines } from './check/check.ts';
+import { lastLines } from '../check/check.ts';
 import {
   depsPlan,
   inside,
@@ -25,14 +25,14 @@ import {
   type Installed,
   type Provisioned,
   type WorktreeInclude,
-} from './workspace/workspace.ts';
-import { folderPlace } from './record/places.store.ts';
-import type { MergeState } from './ending/ending.ts';
-import { isGitRun, type Run } from './record/record.ts';
-import { workspacePlan } from './workspace/workspace.ts';
-import type { Workflow } from './step/step.ts';
-import { HOME, lstatOf, runsDir } from './record/record.store.ts';
-import { countSpawn, execCounted, readText } from './meter/tally.store.ts';
+} from './workspace.ts';
+import { folderPlace } from '../record/places.store.ts';
+import type { MergeState } from '../ending/ending.ts';
+import { isGitRun, type Run } from '../record/record.ts';
+import { workspacePlan } from './workspace.ts';
+import type { Workflow } from '../step/step.ts';
+import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
+import { countSpawn, execCounted, readText } from '../meter/tally.store.ts';
 
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;

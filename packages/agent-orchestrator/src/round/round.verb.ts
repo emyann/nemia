@@ -4,13 +4,25 @@
  * client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
-import type { Engine } from './runtime-client.ts';
-import { type Acceptance, type Run } from './record/record.ts';
-import { type RoundAsk } from './status/status.ts';
-import { acceptAsk, roundAsk } from './round/round.ts';
-import { acceptFile, acceptanceIn, lstatOf, readAsks, readRun, roundAskFile, roundAskIn, runFile, stepsOf, writeAsk } from './record/record.store.ts';
-import { closeoutAsked, closeoutReader, spendReader, taskPhases } from './views.ts';
-import { Conflict, Missing } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import { type Acceptance, type Run } from '../record/record.ts';
+import { type RoundAsk } from '../status/status.ts';
+import { acceptAsk, roundAsk } from './round.ts';
+import {
+  acceptFile,
+  acceptanceIn,
+  lstatOf,
+  readAsks,
+  readRun,
+  roundAskFile,
+  roundAskIn,
+  runFile,
+  stepsOf,
+  writeAsk,
+} from '../record/record.store.ts';
+import { strayAsk } from '../say/say.verb.ts';
+import { closeoutAsked, closeoutReader, spendReader, taskPhases } from '../views/views.verb.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
 

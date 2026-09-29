@@ -6,20 +6,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from './runtime-client.ts';
-import type { Workflow } from './step/step.ts';
-import type { MergeState } from './ending/ending.ts';
-import { pruneAgain, pruneRefusal, type Pruning } from './prune/prune.ts';
-import { filesPrunedWords, isGitRun, namesInOrder, type Pruned, type Run } from './record/record.ts';
-import { approvedFirst, landsOnCheck } from './status/status.ts';
-import { decision, type Decision } from './decide/decide.ts';
-import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from './forget/forget.ts';
-import { HOME, askFile, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runsDir, stepsOf } from './record/record.store.ts';
-import { gitSays, mergeInProgress, mergeState } from './worktree.ts';
-import { shippedOf, standingsOf } from './branches.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries, handOffOwed, resultTips, unrecordedSteps } from './tick.ts';
-import { Invalid } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import type { Workflow } from '../step/step.ts';
+import type { MergeState } from '../ending/ending.ts';
+import { pruneAgain, pruneRefusal, type Pruning } from './prune.ts';
+import { filesPrunedWords, isGitRun, namesInOrder, type Pruned, type Run } from '../record/record.ts';
+import { approvedFirst, landsOnCheck } from '../status/status.ts';
+import { decision, type Decision } from '../decide/decide.ts';
+import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from '../forget/forget.ts';
+import { HOME, askFile, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runsDir, stepsOf } from '../record/record.store.ts';
+import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
+import { shippedOf, standingsOf } from '../branches.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
+import { adoptChecks, adoptRounds, adoptTries, handOffOwed, resultTips, unrecordedSteps } from '../tick.ts';
+import { Invalid } from '../refusal/refusal.ts';
 
 /** Whose merge is in the repository's checkout, asked of git only for a run whose ending lands on its check (`forgetRefusal`). */
 export const merging = (run: Run, steps: readonly Workflow[] | undefined): MergeState['merging'] =>

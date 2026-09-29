@@ -3,14 +3,14 @@
  * written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
-import type { Engine } from './runtime-client.ts';
-import { tryOf, type Approval, type Run } from './record/record.ts';
-import { approvedFirst } from './status/status.ts';
-import { approvalRefusal } from './gate/gate.ts';
-import { approvalFile, approvalIn, lstatOf, readAsks, readRun, runFile, stepsOf, writeAsk } from './record/record.store.ts';
-import { standingsOf } from './branches.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from './views.ts';
-import { Conflict, Missing } from './refusal/refusal.ts';
+import type { Engine } from '../runtime-client.ts';
+import { tryOf, type Approval, type Run } from '../record/record.ts';
+import { approvedFirst } from '../status/status.ts';
+import { approvalRefusal } from './gate.ts';
+import { approvalFile, approvalIn, lstatOf, readAsks, readRun, runFile, stepsOf, writeAsk } from '../record/record.store.ts';
+import { standingsOf } from '../branches.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /** What `wf approve` did: the run, the approval as written, and its file. */
 export type Approved = { run: Run; approval: Approval; file: string };

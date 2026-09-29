@@ -90,7 +90,16 @@ import { agentFilesDir, renderedIn, skillsAgain } from './agents/agents.store.ts
 import { ceilings, lastCeilings, recordCeilings, recordPassCost } from './daemon/daemon.store.ts';
 import { maxRuns, verifiesRest } from './config/config.store.ts';
 import { feedFile, recordFeed } from './feed/feed.store.ts';
-import { abortMerge, checkoutParts, commitMerge, gitSays, handOff, mergeInProgress, mergeState, workspaceFor } from './worktree.ts';
+import {
+  abortMerge,
+  checkoutParts,
+  commitMerge,
+  gitSays,
+  handOff,
+  mergeInProgress,
+  mergeState,
+  workspaceFor,
+} from './workspace/worktree.store.ts';
 import { collectArtifacts, dropLandedPictures, LANDED_PICTURES } from './artifacts.ts';
 import { headsOf, refsOf, resultBranches } from './branches.ts';
 import { evictedBy, restBlockers, type RestFacts } from './rest/rest.ts';
@@ -99,12 +108,10 @@ import {
   closeoutAsked,
   closeoutOf,
   closeoutReader,
-  engineWord,
   exitVerdicts,
   harnessBlocked,
   parentOf,
   parentsOf,
-  phaseOfView,
   refusalOf,
   reportedEngine,
   saidCount,
@@ -113,10 +120,11 @@ import {
   spendReader,
   taskPhases,
   waitingOf,
-  waitsForWord,
-} from './views.ts';
-import { placesOf, startQueued } from './start.ts';
-import { skillsFor } from './workflow-store.ts';
+} from './views/views.verb.ts';
+import { engineWord, phaseOfView, waitsForWord } from './views/views-words.ts';
+import { placesOf } from './start/start.verb.ts';
+import { startQueued } from './inbox/inbox.verb.ts';
+import { skillsFor } from './folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from './rendering.ts';
 import { momentumOf, toAdmit } from './cap/cap.ts';
 import { addRuntime, aside, countRested, metered, within, type Tallies } from './meter/tally.store.ts';

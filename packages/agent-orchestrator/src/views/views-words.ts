@@ -3,8 +3,8 @@
  * attempt ended (`endWords`), and the engine's word for it (`engineWord`, `wordOfView`). Over a view shape written out here (`WordView`),
  * since a pure file imports no runtime.
  */
-import { type TaskPhase } from './record/record.ts';
-import { signedAndHeld, type AttemptClock, type TaskClock } from './timeline/timeline.ts';
+import { type TaskPhase } from '../record/record.ts';
+import { signedAndHeld, type AttemptClock, type TaskClock } from '../timeline/timeline.ts';
 
 /**
  * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came (`stated`),

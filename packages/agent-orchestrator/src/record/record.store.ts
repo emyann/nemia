@@ -14,7 +14,7 @@ import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/statu
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { asNamed, orderSteps, type Workflow } from '../workflow.ts';
-import { FrozenStepSchema, loadWorkflows } from '../workflow-store.ts';
+import { FrozenStepSchema, loadWorkflows } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { wfRoot } from '../config/config.store.ts';

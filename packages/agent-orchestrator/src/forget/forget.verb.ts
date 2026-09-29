@@ -7,10 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from './runtime-client.ts';
-import type { Workflow } from './step/step.ts';
-import { isGitRun, namesInOrder } from './record/record.ts';
-import { approvedFirst } from './status/status.ts';
+import type { Engine } from '../runtime-client.ts';
+import type { Workflow } from '../step/step.ts';
+import { isGitRun, namesInOrder } from '../record/record.ts';
+import { approvedFirst } from '../status/status.ts';
 import {
   branchFates,
   checkLogsOf,
@@ -23,7 +23,7 @@ import {
   type BranchFate,
   type ForgetHow,
   type Forgot,
-} from './forget/forget.ts';
+} from './forget.ts';
 import {
   HOME,
   askFile,
@@ -39,12 +39,13 @@ import {
   runFile,
   runsDir,
   stepsOf,
-} from './record/record.store.ts';
-import { gitSays, handOff } from './worktree.ts';
-import { standingsOf } from './branches.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from './views.ts';
-import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from './tick.ts';
-import { Invalid } from './refusal/refusal.ts';
+} from '../record/record.store.ts';
+import { gitSays, handOff } from '../workspace/worktree.store.ts';
+import { standingsOf } from '../branches.ts';
+import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
+import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick.ts';
+import { Invalid } from '../refusal/refusal.ts';
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is

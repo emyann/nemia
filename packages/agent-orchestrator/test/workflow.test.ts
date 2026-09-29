@@ -1579,14 +1579,15 @@ test('`input:` names steps this one waits on — directly, or through `resume` �
   );
 
   const notAfter =
-    /respond: `input: review`, but respond does not wait on review — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
+    /respond: `input: review`, but respond does not wait on review, directly or through the steps between — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
   assert.match(refusal(respond('after: implement\ninput: review')), notAfter);
   assert.match(refusal(respond('input: review')), notAfter, 'a root reads nothing');
   const implementDeclares = { 'implement.md': '---\noutput: review.schema.json\n---\nimplement it\n' };
-  assert.match(
-    refusal({ ...implementDeclares, ...respond('after: review\ninput: implement') }),
-    /respond: `input: implement`, but respond does not wait on implement/,
-    'directly: a step two back has finished too, but the key names what this step waits on',
+  assert.deepEqual(
+    loadWorkflows(outputFolder({ ...implementDeclares, ...respond('after: review\ninput: implement') })).find((s) => s.name === 'respond')!
+      .input,
+    ['implement'],
+    'through the steps between: a step two back has finished too, so a reviewer in a loop reads what was specified before the work',
   );
 });
 

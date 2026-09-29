@@ -31,9 +31,9 @@ export function validate(steps: readonly Workflow[]): void {
       const producer = steps.find((x) => x.name === from);
       if (!producer)
         throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
-      if (!s.after.includes(from) && s.resume !== from) {
+      if (!upstreamOf(steps, s.name).has(from) && s.resume !== from) {
         throw new WorkflowError(
-          `${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`,
+          `${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from}, directly or through the steps between — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`,
         );
       }
       if (!producer.output) {

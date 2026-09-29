@@ -702,8 +702,8 @@ Review the change in this workspace as a second engineer would, and look at it a
   and out with `..` — before it is read. Each refusal names the fix.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
   brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
-  artifacts. The producer must be a step this one waits on, directly or through `resume`, and must
-  declare an `output:`. Anything else is refused at load: a step cannot read the product of work that
+  artifacts. The producer must be a step this one waits on — directly, through the steps between, or
+  through `resume` — and must declare an `output:`. Anything else is refused at load: a step cannot read the product of work that
   has not finished.
 - **A producer whose closeout lacks a declared field, or cannot be read, is `unsigned`.** It did not
   say what it was asked to say, and nothing that waits on it is filed.

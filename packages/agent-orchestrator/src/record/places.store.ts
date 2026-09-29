@@ -9,7 +9,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { GIVEN, givenPlan, type FolderRun, type WorkspacePlan } from '../run.ts';
+import type { FolderRun } from './record.ts';
+import { GIVEN, givenPlan, type WorkspacePlan } from '../workspace/workspace.ts';
 import { Conflict } from '../refusal/refusal.ts';
 
 /** What a kind of workspace does for a run: make a step's directory, and hand a finished step's work on. */

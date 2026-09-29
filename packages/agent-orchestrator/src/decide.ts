@@ -5,6 +5,12 @@
  * (`runtime-client.ts`).
  */
 import { nameFor, unreadableJournal, type Engine, type Usage } from './runtime-client.ts';
+import type { CheckoutHold, RunSlot } from './cap/cap.ts';
+import type { ToDecide } from './ending/ending.ts';
+import type { Run } from './record/record.ts';
+import type { SaidTo } from './say/say.ts';
+import type { BranchStanding, Round } from './status/status.ts';
+import { hasStarted, holdsOf, waitsOf, type Wait } from './wait/wait.ts';
 import {
   acceptedLines,
   answerLines,
@@ -14,8 +20,6 @@ import {
   deniedWords,
   gateLines,
   harnessWaitLine,
-  hasStarted,
-  holdsOf,
   listing,
   overBudgetLine,
   retriesDue,
@@ -25,17 +29,8 @@ import {
   runCostLines,
   runTasks,
   unjudgedWords,
-  waitsOf,
-  type BranchStanding,
-  type CheckoutHold,
   type Decision,
   type Listing,
-  type Round,
-  type Run,
-  type RunSlot,
-  type SaidTo,
-  type ToDecide,
-  type Wait,
 } from './run.ts';
 import { parseCloseout, type Closeout } from './closeout/closeout.ts';
 import { answerOf, type Retry } from './retry.ts';

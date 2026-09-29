@@ -19,8 +19,13 @@
  *   is copied.
  * - **`.worktreeinclude`**, the gitignored paths a repository says a new worktree needs, the file
  *   Claude Code's `--worktree` reads. `worktreeInclude` parses it.
+ *
+ * The same file says where a step works (`workspacePlan`, `givenPlan`) and which finished steps hand their work off on a pass
+ * (`handOffDue`).
  */
 import path from 'node:path';
+import type { Workflow } from '../step/step.ts';
+import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
 export type DepEntry = { name: string; link?: string };
@@ -259,3 +264,138 @@ export function worktreeInclude(text: string): WorktreeInclude {
 
 /** A refusal as a person reads it: `"../x" is outside the repository`. */
 export const refusalLines = (refused: WorktreeInclude['refused']): string[] => refused.map((r) => `"${r.line}" ${r.why}`);
+
+/**
+ * The steps whose leftovers the run commits on this pass. Pure.
+ *
+ * Every FINISHED step — succeeded, failed or stopped. A failed step still blocks what follows; handing
+ * it off keeps its work on its branch, where `wf decide` can show it, instead of only in a worktree
+ * that gets removed (engine open issue 2).
+ *
+ * And only until its check is filed. The check judges the tree the step handed on; whatever the suite
+ * leaves behind — coverage, a cache, a temp file — is the suite's, and committing it on a later pass
+ * would put it on the branch under the step's name.
+ *
+ * Nor once a step that waits on it has been filed in the same workspace — a follower that inherits it,
+ * or every later step of a `--no-worktree` run. The directory is that step's now: its work in progress,
+ * and later its own check's litter, are in it. Handing the step off before its follower is filed is
+ * enough, and `advance` does that in the same pass that files the follower.
+ *
+ * Never a step that works in the repository's own checkout (`workspace: main`): what lies in a person's
+ * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
+ * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
+ * the next step's, and not this step's to sign.
+ */
+export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+  const finished = ['succeeded', 'failed', 'stopped'];
+  return Object.entries(run.steps)
+    .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
+    .filter(
+      ([name, s]) =>
+        s.taskId &&
+        s.workspace &&
+        !s.check &&
+        s.handedOff !== s.taskId &&
+        finished.includes(phaseOf(s.taskId)) &&
+        ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace),
+    )
+    .map(([name]) => name);
+}
+
+/** Every step that waits on `name`, directly or through another. */
+function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+  const found = new Set<string>();
+  const queue = [name];
+  while (queue.length) {
+    const current = queue.pop()!;
+    for (const s of steps) {
+      if (s.after.includes(current) && !found.has(s.name)) {
+        found.add(s.name);
+        queue.push(s.name);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Which workspace a step needs. Pure — it reads the shape of the workflow, nothing else.
+ *
+ * The rule is git's, not ours:
+ *
+ *   - **inherit** — a step that is the only thing following its only predecessor is the same line
+ *     of work continuing. Same directory, same branch, no git operation. This is the sequential
+ *     case, and it is why `resume:` still makes sense: the author comes back to their own desk.
+ *   - **fork** — a step that runs beside a sibling gets its own worktree, branched from wherever
+ *     it starts. Two agents editing one directory at once is the arrangement we are avoiding, and
+ *     for an agent a worktree costs nothing, so there is no reason to share one.
+ *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
+ *     of their work combined. `after: a, b` means "wait for both" and "give me both". Nobody has
+ *     to learn a new key for the thing they already asked for.
+ *   - **main** — the one a step says rather than the shape: `workspace: main`, the repository's own
+ *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
+ *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
+ *     theirs, and the step commits its own work as they would.
+ *
+ * Conflicts are not an error here. A merge that conflicts leaves the markers in place and the
+ * step is told about it, because resolving them is exactly the work a fan-in step exists to do.
+ */
+export type WorkspacePlan =
+  | { kind: 'inherit'; from: string }
+  | { kind: 'fork'; from: string | null }
+  | { kind: 'merge'; from: string; also: string[] }
+  | { kind: 'main' };
+
+/** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
+export const GIVEN = 'given';
+
+/** One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it came from. */
+export type GivenFrom = { step: string; dir: string; source: string };
+
+/** What a folder step is given: the run's inputs, and a copy of each folder it waits on. Both by their path from the step's own folder. */
+export type Given = { inputs: string | null; from: readonly GivenFrom[] };
+
+/**
+ * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
+ * both, so the brief never names a path the fence denies.
+ *
+ * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow/validate.ts): a call outside the step's own directory is denied with no
+ * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of the
+ * steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
+ * harness. `artifactsContract`'s folder branch goes the same way round.
+ *
+ * Keyed on the workspace plan, so what is copied is what the step DECLARED it waits on — a fork's parent, a fan-in's parents — and never
+ * `composeBrief`'s "every step filed so far" fallback, which no `make` copies. Every folder of a folder run holds the run's inputs, so a
+ * step that continues another's folder (`inherit`) is given nothing more: it is standing in the folder that was given it, and an
+ * `inherit` chain ends at a step that made one. Pure.
+ */
+export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
+  if (placeOf(run) !== 'folder' || plan.kind === 'main') return { inputs: null, from: [] };
+  const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
+  if (plan.kind === 'inherit') return { inputs, from: [] };
+  const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
+  return {
+    inputs,
+    from: parents.flatMap((name) => {
+      const source = run.steps[name]?.workspace;
+      return source ? [{ step: name, dir: `${GIVEN}/from/${name}`, source }] : [];
+    }),
+  };
+}
+
+/**
+ * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: main`), never read off the shape; a fan-in
+ * merges onto the first of its parents by name.
+ */
+export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
+  if (step.workspace === 'main') return { kind: 'main' };
+  if (step.after.length === 0) return { kind: 'fork', from: null };
+  if (step.after.length > 1) {
+    const [first, ...also] = [...step.after].sort();
+    return { kind: 'merge', from: first, also };
+  }
+
+  const parent = step.after[0];
+  const siblings = steps.filter((s) => s.after.includes(parent));
+  return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
+}

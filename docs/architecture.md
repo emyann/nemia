@@ -56,8 +56,9 @@ name: `x.store.ts` is a store, `x.verb.ts` a controller, any other name pure, an
 A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — cap, check, closeout, daemon,
-  feed, inbox, meter, plan, rest, timeline, workspace.
+  kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
+  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
+  rest, say, skills, status, step, timeline, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   workflow-store, worktree, branches, artifacts and authoring at the top, and record.store, agents.store, daemon.store,
   feed.store, inbox.store, tally.store, places.store and a2a.store in the folders. They load as a tree. At the bottom are

@@ -49,7 +49,7 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **A new step status is `working` on the board until `stepState` knows it**, and `git-runs-before.json` pins every `Decision`.
 - **A word from outside is made one line before it is measured into a column** (`waitingWords`).
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
-  verb's refusal itself (each producer in `run.ts` reads `run.pruned`).
+  verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.
 - **A fake closeout is flat, as a harness writes it** (`parseCloseout` nests fields under `output`); one written by hand carries every
   field its agent's `output:` schema requires.

@@ -9,17 +9,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
-import {
-  spentAcceptances,
-  spentApprovals,
-  spentRoundAsks,
-  type Acceptance,
-  type Approval,
-  type Hold,
-  type Pruned,
-  type RoundAsk,
-  type Run,
-} from '../run.ts';
+import type { Acceptance, Approval, Hold, Pruned, Run } from './record.ts';
+import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { spentRoundAsks } from '../run.ts';
 import { spentAsks, type RetryAsk } from '../retry.ts';
 import { asNamed, orderSteps, type Workflow } from '../workflow.ts';
 import { FrozenStepSchema, loadWorkflows } from '../workflow-store.ts';

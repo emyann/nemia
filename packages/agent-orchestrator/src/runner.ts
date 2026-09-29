@@ -236,7 +236,7 @@ export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, 
 export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
-export { artifactFiles, missingArtifacts } from './artifacts.ts';
+export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export {
   artifacts,
   branchReader,
@@ -250,7 +250,7 @@ export {
   sensitiveDiff,
   touchedBy,
   type BranchReader,
-} from './branches.ts';
+} from './branches/branches.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, agentPlaces, agentSkillsFound, findAgent, listAgents, removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';

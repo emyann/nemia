@@ -19,7 +19,7 @@ import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from '../record/record.store.ts';
-import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches.ts';
+import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
 

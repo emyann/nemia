@@ -20,7 +20,7 @@ import { inputRefusal, type InputFile } from './inputs.ts';
 import { HOME, inputsDir, runId, runsDir, writeRun } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
-import { parentRecord } from '../branches.ts';
+import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /**

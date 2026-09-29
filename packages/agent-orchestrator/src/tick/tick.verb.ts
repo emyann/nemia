@@ -16,7 +16,7 @@ import { listRuns, restStamps, stepsOf } from '../record/record.store.ts';
 import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile, recordFeed } from '../feed/feed.store.ts';
-import { headsOf } from '../branches.ts';
+import { headsOf } from '../branches/branches.store.ts';
 import { evictedBy } from '../rest/rest.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';

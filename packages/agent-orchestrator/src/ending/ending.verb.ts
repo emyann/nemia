@@ -18,11 +18,11 @@ import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { listRuns, readAsks, runFile, stepsOf } from '../record/record.store.ts';
 import { abortMerge, commitMerge, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
-import { dropLandedPictures, LANDED_PICTURES } from '../artifacts.ts';
+import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentsOf, spendReader, taskPhases } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { runSlots } from '../cap/cap.verb.ts';
-import { resultTips } from '../branches.ts';
+import { resultTips } from '../branches/branches.store.ts';
 
 /**
  * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,

@@ -262,6 +262,37 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
     },
     "a step a wf before 4612aa2a froze, the former name beside the new one on the step and in its agent's `given`, reads under the new",
   );
+
+  const allowed = aRecord('r-allow');
+  (allowed.workflow as Array<Record<string, unknown>>)[0] = {
+    name: 'implement',
+    after: [],
+    body: 'do it',
+    allow: ['Edit(**)'],
+    agent: { name: 'implementer', keys: ['allow'], body: '', given: { allow: 'Edit(**)' } },
+  };
+  put('r-allow', allowed);
+  assert.deepEqual(
+    readRun('r-allow').workflow![0],
+    {
+      name: 'implement',
+      after: [],
+      body: 'do it',
+      allowedTools: ['Edit(**)'],
+      agent: { name: 'implementer', keys: ['allowedTools'], body: '', given: { allowedTools: 'Edit(**)' } },
+    },
+    'an agent that gave a key under its former name reads with the new one among its `keys`, and is listed',
+  );
+  assert.ok(listRuns(() => undefined).some((r) => r.id === 'r-allow'));
+
+  const text = aRecord('r-disallow-text');
+  (text.workflow as Array<Record<string, unknown>>)[0].disallow = 'SendMessage';
+  put('r-disallow-text', text);
+  assert.ok(
+    refusalOf('r-disallow-text').includes('its `workflow.0.disallow` is "SendMessage", where wf writes array'),
+    'a field under a former name is checked as the key it is now',
+  );
+  fs.rmSync(runFile('r-disallow-text'));
 });
 
 test('a marker that does not read still holds its run: a prune marker is pruned, a hold holds, whatever their fields say', () => {

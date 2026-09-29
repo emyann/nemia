@@ -2930,6 +2930,23 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
   return [...order, ...pending];
 }
 
+/** A step as a record holds it: a `Workflow` whose agent's `keys` may still name a key by its former name (`FORMER_KEYS`). */
+export type FrozenStep = Omit<Workflow, 'agent'> & { agent?: Omit<StepAgent, 'keys'> & { keys: string[] } };
+
+/** Whether a frozen step names no key by a former name (`FORMER_KEYS`): on its fields, in its agent's `keys` or in its agent's `given`. */
+function isNamed(step: FrozenStep): step is Workflow {
+  return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
+}
+
+/** A step's fields, or its agent's `given`, under the names their keys have now (`FORMER_KEYS`): a field under both keeps the new one's. */
+function renamedFields(fields: object) {
+  return Object.fromEntries(
+    Object.entries(fields)
+      .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(fields, keyNamed(key)))
+      .map(([key, value]) => [keyNamed(key), value]),
+  );
+}
+
 /**
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
@@ -2937,33 +2954,13 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
  * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
  * value. A step with no former name is returned as it is. Pure.
  */
-export function asNamed(step: Workflow): Workflow {
-  const fields = Object.keys(step);
-  const agent = step.agent;
-  const given = agent?.given ? Object.keys(agent.given) : [];
-  if (![...fields, ...(agent?.keys ?? []), ...given].some((key) => keyNamed(key) !== key)) return step;
-  const renamed = Object.fromEntries(
-    Object.entries(step)
-      .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(step, keyNamed(key)))
-      .map(([key, value]) => [keyNamed(key), value]),
-  ) as Workflow;
-  if (!agent) return renamed;
-  return {
-    ...renamed,
-    agent: {
-      ...agent,
-      keys: [...new Set(agent.keys.map((key) => keyNamed(key) as StepKey))],
-      ...(agent.given
-        ? {
-            given: Object.fromEntries(
-              Object.entries(agent.given)
-                .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(agent.given, keyNamed(key)))
-                .map(([key, value]) => [keyNamed(key), value]),
-            ),
-          }
-        : {}),
-    },
-  };
+export function asNamed(step: FrozenStep): Workflow {
+  if (isNamed(step)) return step;
+  const renamed = renamedFields(step) as Workflow;
+  if (!step.agent) return renamed;
+  const { keys, given } = step.agent;
+  const agent = { ...step.agent, keys: [...new Set(keys.map((key) => keyNamed(key) as StepKey))], given: renamedFields(given) };
+  return { ...renamed, agent };
 }
 
 /** Every step `name` waits on, directly or through another. */

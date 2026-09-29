@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, loadWorkflows, workflowsIn, type FrozenStepFields } from '../src/workflow-store.ts';
-import type { Workflow } from '../src/workflow.ts';
+import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -107,9 +107,31 @@ test('a step with every key the parser types, its agent and its output reads as 
   );
 });
 
-test('the decoded step is a `Workflow`, and a `Workflow` is a decoded step', () => {
+test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now, on a step and in its agent, and read under the new', () => {
+  for (const [former, now] of Object.entries(FORMER_KEYS)) {
+    const step = {
+      name: 'implement',
+      after: [],
+      body: '',
+      [former]: ['SendMessage'],
+      agent: { name: 'implementer', keys: [former], body: '', given: { [former]: 'SendMessage' } },
+    };
+    const decoded = decode(step);
+    assert.ok(Result.isSuccess(decoded), `${former}: ${Result.isFailure(decoded) ? String(decoded.failure) : ''}`);
+    assert.deepEqual(asNamed(decoded.success), {
+      name: 'implement',
+      after: [],
+      body: '',
+      [now]: ['SendMessage'],
+      agent: { name: 'implementer', keys: [now], body: '', given: { [now]: 'SendMessage' } },
+    });
+    assert.ok(Result.isFailure(decode({ ...step, [former]: 'SendMessage' })), `${former} as text is refused, as ${now} is`);
+  }
+});
+
+test('the decoded step, read under the names its keys have now, is a `Workflow`, and a `Workflow` is a decoded step', () => {
   type Decoded = typeof FrozenStepSchema.Type;
-  const toWorkflow = (step: Decoded): Workflow => step;
+  const toWorkflow = (step: Decoded): Workflow => asNamed(step);
   const fromWorkflow = (step: Workflow): Decoded => step;
   const step: Workflow = { name: 'implement', after: [], body: '' };
   assert.deepEqual(toWorkflow(fromWorkflow(step)), step);

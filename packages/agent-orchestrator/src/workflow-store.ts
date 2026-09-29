@@ -481,11 +481,14 @@ const OutputSchemaSchema = Schema.StructWithRest(
   Rest,
 );
 
-/** The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`), every other key kept. */
+/**
+ * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
+ * every other key kept.
+ */
 const StepAgentSchema = Schema.StructWithRest(
   Schema.Struct({
     name: Schema.String,
-    keys: Schema.mutable(Schema.Array(Schema.Literals(STEP_KEYS))),
+    keys: Schema.mutable(Schema.Array(Schema.Literals([...STEP_KEYS, 'disallow', 'allow']))),
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
@@ -529,10 +532,13 @@ const frozenStepFields = {
   rounds: Schema.optionalKey(Schema.Finite),
 } satisfies FrozenStepFields;
 
+/** A field under each former name of a key (`FORMER_KEYS`), checked as the key it is now: what `asNamed` moves onto that key. */
+const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: frozenStepFields.allowedTools };
+
 /**
- * A step as the run froze it at `wf start`: the parser's output (`Workflow`), each key of `STEP_KEYS` checked for the type the parser gives
- * it. It checks the shape, not the vocabulary: a harness, a model or a mode is any text, a count any number, judged when the step is filed,
- * so a word retired since the run started does not lose the run. Every key it does not name is kept, as a record a newer `wf` wrote keeps
- * it; a former key name (`FORMER_KEYS`) is one, read under its new name by `asNamed`.
+ * A step as the run froze it at `wf start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, and each under its former name
+ * (`FORMER_KEYS`), checked for the type the parser gives it. It checks the shape, not the vocabulary: a harness, a model or a mode is any
+ * text, a count any number, judged when the step is filed, so a word retired since the run started does not lose the run. Every key it
+ * does not name is kept, as a record a newer `wf` wrote keeps it. Read under the names its keys have now by `asNamed`.
  */
-export const FrozenStepSchema = Schema.StructWithRest(Schema.Struct(frozenStepFields), Rest);
+export const FrozenStepSchema = Schema.StructWithRest(Schema.Struct({ ...frozenStepFields, ...formerStepFields }), Rest);

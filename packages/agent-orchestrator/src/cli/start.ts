@@ -1,7 +1,36 @@
 /**
- * The verbs that start work — `wf start`, `wf plan` and `wf inbox` — as their flags and help: what each takes, read off the command line.
+ * The verbs that start work — `wf start`, `wf plan` and `wf inbox` — their flags and help, read off the command line, and what each prints.
  */
-import { usage, readFlags } from './flags.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  addToInbox,
+  approvedFirst,
+  cardToStart,
+  dropFromInbox,
+  endingSteps,
+  formerKeyLines,
+  fromNote,
+  gatesOf,
+  ignoredRepoLine,
+  inboxDir,
+  inboxLines,
+  inboxNameAt,
+  inputsDir,
+  isGitRun,
+  noCardLine,
+  planLines,
+  planStopped,
+  queueInInbox,
+  readInbox,
+  start,
+  startFromInbox,
+  startPlan,
+  stepsOf,
+  workflowAt,
+  workflowFolder,
+} from '../runner.ts';
+import { HELP, usage, readFlags } from './flags.ts';
 
 export const PLAN_HELP = `wf plan <folder> [--repo .]
 
@@ -162,4 +191,188 @@ export function inboxAddHow(argv: string[]): { workflow?: string; repo?: string 
     twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
   });
   return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
+}
+
+/** What `wf start` prints of a run it started: its steps, where it came from when said, where it works, and what it waits on and ends at. */
+function printStarted(run: ReturnType<typeof start>, from?: string): void {
+  const steps = stepsOf(run);
+  console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`);
+  if (from) console.log(from);
+  console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
+  if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
+  if (run.after?.length)
+    console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
+  const gates = gatesOf(steps, run);
+  const ends = endingSteps(steps, run)
+    .filter((s) => approvedFirst(s, run))
+    .map((s) => s.name);
+  const held = gates.filter((name) => !ends.includes(name));
+  if (held.length)
+    console.log(
+      `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`,
+    );
+  if (ends.length)
+    console.log(
+      `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
+    );
+  console.log(`run 'wf tick' (or 'wf up') to start it`);
+  for (const line of formerKeyLines(run.workflowDir)) console.log(line);
+}
+
+/** `wf start` of the inbox's card `inboxName`: its body, or `--brief` in its place — a file's text, or the words — started and said. */
+function startInboxCard(inboxName: string, how: StartHow): void {
+  const brief =
+    how.brief === undefined
+      ? undefined
+      : fs.statSync(how.brief, { throwIfNoEntry: false })?.isFile()
+        ? fs.readFileSync(how.brief, 'utf8')
+        : how.brief;
+  const started = startFromInbox({
+    name: inboxName,
+    ...(brief !== undefined ? { brief } : {}),
+    ...(how.workflows !== undefined ? { workflow: how.workflows } : {}),
+    ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
+    callerRepo: path.resolve('.'),
+    isolate: how.isolate,
+    after: how.after,
+    inputs: how.inputs,
+    gates: how.gates,
+  });
+  printStarted(
+    started.run,
+    started.removed
+      ? `${fromNote(started.run)} — removed from the inbox`
+      : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`,
+  );
+  if (started.ignoredRepo) console.log(ignoredRepoLine(started.ignoredRepo));
+}
+
+/**
+ * `wf start`: a run of a brief, a plan's card or an inbox card, and what it prints of it. A file that is not a plan's card
+ * (`cardToStart`) is the whole brief, frontmatter and all, and a card's own `workflow:` is found from its plan folder.
+ */
+export function startVerb(rest: string[]): void {
+  const arg = rest[0];
+  if (!arg || arg.startsWith('--')) return console.log(HELP);
+  const how = startHow(rest.slice(1));
+  const inboxName = inboxNameAt(arg);
+  if (inboxName !== null) return startInboxCard(inboxName, how);
+  if (how.brief !== undefined)
+    usage(
+      `wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`,
+    );
+  const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
+  const card = text === undefined ? null : cardToStart(arg, text, how.after);
+  const repo = path.resolve(how.repo ?? '.');
+  const run = start({
+    brief: card ? card.body : (text?.trim() ?? arg),
+    repo,
+    repoNamed: how.repo !== undefined,
+    workflowDir:
+      how.workflows === undefined && card?.workflow !== undefined
+        ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
+        : workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
+    isolate: how.isolate,
+    after: how.after,
+    inputs: how.inputs,
+    gates: how.gates,
+  });
+  printStarted(run);
+}
+
+/** `wf plan`: a run per card of a plan folder, a line each; a card that did not start stops the rest, and fails with what it was told. */
+export function planVerb(rest: string[]): void {
+  if (rest.includes('--help')) return console.log(PLAN_HELP);
+  const folder = rest[0];
+  if (!folder || folder.startsWith('--')) return console.log(HELP);
+  const plan = { dir: path.resolve(folder), repo: path.resolve(planHow(rest.slice(1)).repo ?? '.') };
+  const { started, stopped, folderOf } = startPlan(plan);
+  for (const line of planLines(started)) console.log(line);
+  if (stopped) {
+    const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });
+    throw Object.assign(new Error(told), { exitCode: stopped.error.exitCode ?? 1 });
+  }
+  console.log(`run 'wf tick' (or 'wf up') to start them`);
+}
+
+/** `wf inbox`: each card, a line each, and how to start, queue or drop one; or that the inbox is empty. */
+function inboxList(): void {
+  const listing = readInbox();
+  if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
+  for (const line of inboxLines(listing)) console.log(line);
+  console.log(
+    `\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
+  );
+}
+
+/** `wf inbox add`: an idea, the words or a file's text, filed as a card, with a `--workflow` path read from where it is typed (`workflowAt`). */
+function inboxAdd(args: string[]): void {
+  const idea = args[0];
+  if (idea === undefined || idea.startsWith('--'))
+    usage(
+      'wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>], or a file: wf inbox add ./idea.md. Nothing was filed.',
+    );
+  const how = inboxAddHow(args.slice(1));
+  const at = fs.statSync(idea, { throwIfNoEntry: false });
+  if (at?.isDirectory())
+    usage(
+      `${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`,
+    );
+  const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
+  const { card, file } = addToInbox({
+    text: at ? fs.readFileSync(idea, 'utf8') : idea,
+    ...(at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
+    ...(workflow !== undefined ? { workflow } : {}),
+    ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
+  });
+  console.log(
+    `${card.name}  ${card.body.split('\n')[0].slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}`,
+  );
+  console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
+}
+
+/** `wf inbox queue`: a card marked to start on its own, or with `--off` the mark taken back; a `--workflow` path is written absolute (`workflowAt`). */
+function inboxQueue(args: string[]): void {
+  const [name, ...more] = args;
+  if (name === undefined || name.startsWith('--'))
+    usage('wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].');
+  const how = inboxQueueHow(more);
+  const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
+  const queued = queueInInbox(name, { off: how.off, ...(workflow !== undefined ? { workflow } : {}) });
+  if (queued.was === 'not queued') return console.log(`${name}  not queued — nothing to take back`);
+  if (queued.was === 'taken back')
+    return console.log(`${name}  taken back: it no longer starts on its own — start it with wf start ${queued.file}`);
+  console.log(
+    `${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}`,
+  );
+  console.log(
+    `the tick starts it on its own once its turn comes and a run slot is free${queued.card.repo ? '' : ', on the repository wf up runs in'} — take it back with wf inbox queue ${name} --off`,
+  );
+}
+
+/** `wf inbox rm`: one card dropped without starting it, or, for a name with no card, which cards there are. */
+function inboxRm(args: string[]): void {
+  const [name, ...more] = args;
+  if (name === undefined || name.startsWith('--'))
+    usage('wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.');
+  if (more.length) usage(`wf inbox rm drops one card, and ${more[0]} is a second: wf inbox rm <name>, once per card.`);
+  const dropped = dropFromInbox(name);
+  return console.log(
+    dropped.removed
+      ? `${name}  dropped, and nothing started — ${dropped.file} removed`
+      : `${noCardLine(name, dropped.cards)} Nothing to drop.`,
+  );
+}
+
+/** `wf inbox` and its subcommands `add`, `queue` and `rm`; anything else is refused, naming the four. */
+export function inboxVerb(rest: string[]): void {
+  const [sub, ...args] = rest;
+  if (sub === '--help') return console.log(INBOX_HELP);
+  if (sub === undefined) return inboxList();
+  if (sub === 'add') return inboxAdd(args);
+  if (sub === 'queue') return inboxQueue(args);
+  if (sub === 'rm') return inboxRm(args);
+  return usage(
+    `wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name> (wf inbox --help).`,
+  );
 }

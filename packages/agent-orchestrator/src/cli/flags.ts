@@ -1,9 +1,184 @@
 /**
- * The flag reader every verb's parser calls, and what the families share beneath the verbs: a usage refusal, a person's yes, an amount.
+ * The flag reader every verb's parser calls, and what the families share beneath the verbs: the help, a verb's shape, a usage refusal, a
+ * person's yes, an amount.
  */
 import readline from 'node:readline/promises';
-import { Invalid } from '../runner.ts';
+import { Invalid, type engine } from '../runner.ts';
 import { dollarsOf } from '../workflow.ts';
+
+/** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
+export type Engine = ReturnType<typeof engine>;
+
+/** A verb: it takes what follows it on the command line and the engine, and prints what it did, or throws a refusal. */
+export type Verb = (rest: string[], e: Engine) => void | Promise<void>;
+
+/** What `wf` prints for no verb, for a verb it does not know, and for a verb given too little to act on. */
+export const HELP = `wf — run a workflow of agent steps
+
+  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--brief "<brief>"]
+                               --after <runId>: file nothing of this run until wf decide says that
+                               run has shipped — finished, and its result branch on the base
+                               branch — and start from the base as it is then; once per run.
+                               --gate <step>: that step's closeout waits for wf approve before
+                               anything after it is filed, as a step's own gate: true does; once
+                               per step. An inbox card's gate: <step> is one more
+                               --workflows takes a folder, or a name under <repo>/workflows/: dev
+                               a card of a plan (wf plan --help) starts its body: --workflows is its
+                               workflow: unless given, and its after: needs an --after for each
+                               --input <file>: copied into the run's own inputs/ directory, and named
+                               on every step's brief under what was asked for; once per file
+                               a card of the inbox (wf inbox --help) starts its body, or --brief
+                               "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
+                               unless given, --repo its repo:
+  wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
+                               --after the runs of the cards its after: names (wf plan --help)
+  wf inbox                     the cards parked before they are started: name, first line, workflow
+                               and repo when set, and started as <runId> (wf inbox --help)
+  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
+                               park an idea as a card in the inbox, named from its first line
+  wf inbox queue <name> [--workflow <w>] [--off]
+                               mark a card to start on its own: the tick starts the oldest queued
+                               card once a run slot is free; --off takes the mark back
+  wf inbox rm <name>           drop a card without starting it
+  wf tick [--stats]            one pass: tick the engine, file what became ready — refused while a
+                               wf up ticks the store, since it runs the same pass (daemon.json);
+                               --stats says after it what the pass cost, phase by phase
+  wf up [ms]                   the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),
+                               holding the store: a second wf up is refused while this one ticks,
+                               and takes the store over once its process is gone or it has been
+                               silent for 10 intervals, at least 15 minutes; it writes
+                               WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;
+                               once a minute, a line of what its passes cost (tick-stats.json)
+  wf up --stats                what the last pass cost, phase by phase — read, not run, so it fits
+                               while a wf up holds the store; where none does, wf tick --stats
+  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
+                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in
+                               flight); what each step's tries and the run have cost, where measured;
+                               last, whether a wf up ticks the store and when its last pass was
+  wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
+                               step's word as wf ls says it, and what a person's word changed — then
+                               cursor: <n>, to read on from with wf feed <n>; from the start with none
+  wf watch [cursor]            the same, followed as the tick writes it, until ^C
+  wf cancel <runId>            stop what it has in flight; file nothing more
+  wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
+                               forget runs that are over, a line each: a run's worktrees removed
+                               through git, what one held uncommitted committed first, then its
+                               record and every file under WF_ROOT keyed by its id. Refused while
+                               a task of it is in flight, anything is due to be filed or asked
+                               for, or a run waiting on it has not started. Its branches are kept:
+                               --delete-branches deletes those merged into the run's base branch,
+                               and --force-unmerged beside it the others, with their work
+  wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes]
+                               free the space runs that are over hold: their worktrees, removed
+                               through git, and nothing else — each run's record, branches and
+                               files are kept, and it stays on wf ls, wf decide and the board,
+                               marked pruned. --artifacts removes its files too (runs/<id>/
+                               artifacts/: screenshots, logs), of a run whose worktrees are
+                               already gone as well; its record and branches are still kept.
+                               Lists what it would remove, with its size, and removes it on
+                               --yes, or on y at the prompt. With no run, every run. Refused
+                               while a run is not over, owes a hand-off, is a folder run, or has
+                               a worktree locked, on no branch, or with changes no commit has;
+                               and a finished run not merged unless --unmerged, with --artifacts
+                               as without: its files are what a person reads to decide it
+  wf hold <runId> --until <runId> [--until <runId> ...]
+                               file nothing more of a run until other runs ship, as --after would
+                               have: what is in flight finishes, nothing new is filed, and nothing
+                               is asked of you — wf ls and wf decide say held until <run> ships, and
+                               what a step asks is asked once the hold lifts. The tick lifts it when
+                               every run named has shipped. Refused of a run cancelled, pruned,
+                               finished or already held, and of a run named that is unknown, the run
+                               itself, or one that already waits on it, through --after or a hold
+  wf hold <runId> --off        lift the hold now: the next tick goes on as if it had never been put
+  wf decide <runId> [--sensitive <globs>]
+                               what the run produced, and the choice it leaves you (wf decide --help)
+  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
+                               try a step waiting on you again, once, on the next tick:
+                               --nudge (default) continues its session, told what happened;
+                               --fresh a new session on its branch; --model <m> the same, on m;
+                               --recheck runs its check again, and files no session;
+                               --message "<answer>" goes into the try's brief, as ## Your answer:
+                               for a step that signed off blocked, the answer to its needs — or
+                               what you have to say to any step you try again; not with --recheck.
+                               The next argument is the answer, whatever it starts with; an answer
+                               that is only one of these flags' names goes as --message=<answer>;
+                               --budget <amount>: for a step over budget or budget exhausted, its
+                               cap raised to that many dollars, above what its tries have cost
+  wf approve <runId> <step> [--message "<words>"]
+                               let a step waiting at its gate hand on: what waits on it is filed on
+                               the next tick, and every step after the gate is handed your words
+                               under ## Approved. To send it back instead, with what to change:
+                               wf retry <runId> <step> --message "<objection>"
+  wf round <runId> [<step>] [--budget <amount>]
+                               once more: a loop out of rounds goes round again, once, on the
+                               next tick — the step it loops to continued, then a new reviewer;
+                               --budget raises the cap of a step of the loop over its budget
+  wf accept <runId> [<step>] --message "<why>"
+                               enough: a loop out of rounds ends on your word, with its findings
+                               open. What waits on the looping step is filed on the next tick as
+                               if it had said again: false — a gated ending goes to its gate —
+                               and every step after the loop is handed your words and those
+                               findings under ## Accepted. The other answer to wf round
+  wf say <runId> <step> "<words>"
+                               tell a step's running session something, through its harness: the
+                               engine journals the words on the step's task, wf ls notes the step
+                               said to, and wf decide prints them under it. A try that continues
+                               the session is handed them again, as ## Said to your session
+  wf show <runId>              the run, and what each step was told
+  wf logs <runId> <step>       that step's session output
+  wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
+                               for, what it says it can do (an entry for each skill, read off its
+                               SKILL.md), and the skills it is given (its skills:)
+  wf agents card <name> [--repo .] [--from repo|yours]
+                               that agent in the shape of an A2A Agent Card, JSON on stdout and
+                               nothing else — every field the protocol marks REQUIRED but
+                               supportedInterfaces, which is left out because nothing here serves an
+                               agent over A2A. The card describes; it is not an address
+
+A workflow is a folder of markdown files. One file is one step:
+
+    ---
+    harness: codex        # claude (default) | codex | claude-detached
+    after: implement      # what must finish first: verified, or unverified if it has no check
+    output: review.json   # what its closeout declares for a later step: a JSON Schema beside it
+    loop: implement       # again: true in its closeout runs implement again, then this step
+    rounds: 3             # at most this many rounds (3 unless set), then a person decides
+    ---
+    Review the change in this workspace as a second engineer would.
+
+No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
+tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
+\`denials\` holds one whose try the harness denied a call, \`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
+and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
+permissionMode on Claude Code, sandbox on Codex, tools, disallowedTools, allowedTools, background, remote, deadlineSeconds, budget) say who does the work, with
+what, who may drive it, for how long and for how much. Everything else the agent is told is prose.
+
+  wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
+  · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
+  output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
+  · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
+  it on the run's word) · budget exhausted (its harness ended its session at its budget:)
+  · denied (its harness denied its try a call, and the step says denials: fail: nothing after it is filed)
+  · awaiting approval (at its gate: nothing after it is filed until wf approve — and, on an ending step
+  that runs in the repository's checkout, nothing of it at all until then).
+
+  → to decide names a run at its result that nobody has decided: its ending step's gate, in the folder's
+  words, with the wf approve that runs it — or, in a folder with no ending step, its branch ahead of the
+  base branch with nothing having merged it.
+
+  WF_ROOT            where runs and the engine's board live, an absolute path (default ~/.agent-workflows)
+  WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude and
+                     claude-detached one pool, codex and checks their own; a blocked session holds no
+                     slot; one run's review competes with another run's implement
+  WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
+                     slot, oldest first; a run waiting on --after counts once it is filed; a run of a
+                     one-step workflow that says slot: none is not counted and never waits for one
+
+wf watch follows what the workflow decides: a step at its gate, one blocked, a run waiting on another,
+done. To follow what the engine does under it — each attempt started, ended, settled — use the engine:
+a run's task ids carry the run and the step, so its output already names the work. Point it at this board:
+
+    AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
 export const usage = (message: string): never => {
   throw new Invalid({ message });

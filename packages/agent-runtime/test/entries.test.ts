@@ -18,6 +18,7 @@ const PINNED: Record<string, string[]> = {
     'codex',
     'createEngine',
     'denialText',
+    'lifecycleGraph',
     'nameFor',
     'refusedText',
     'remoteConfigRefusal',

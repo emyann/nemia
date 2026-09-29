@@ -1,0 +1,65 @@
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import { MachineCanvas } from '../components/MachineCanvas';
+import { machineQuery, machinesQuery, type MachineListing } from '../lib/api';
+
+export const Route = createFileRoute('/machines')({
+  loader: async ({ context }) => {
+    const { machines } = await context.queryClient.ensureQueryData(machinesQuery);
+    await Promise.all(machines.map(({ name }) => context.queryClient.ensureQueryData(machineQuery(name))));
+  },
+  component: MachinesPage,
+  staticData: { fullBleed: true },
+  pendingComponent: () => <p className="px-6 py-6 text-sm text-neutral-500">Reading the state machines off their code…</p>,
+  errorComponent: ({ error }) => (
+    <p className="px-6 py-6 text-sm text-red-600">
+      Could not load the state machines: {error instanceof Error ? error.message : String(error)}. Is the api running (
+      <code>npm run dev</code>)?
+    </p>
+  ),
+});
+
+/** Every state machine of the code, each drawn from the graph the api reads off it, with how to read the drawing. */
+function MachinesPage() {
+  const { data } = useSuspenseQuery(machinesQuery);
+  return (
+    <article className="space-y-8 px-6 py-6">
+      <div className="max-w-4xl space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+        <p>
+          Each state machine as its code has it, drawn from the code and never by hand. A box is a state; an arrow joins two states, and
+          lists the events that take it, each with its guard in brackets, and under them <span className="font-mono text-xs">→</span> the
+          action they take. What a box lists under its name are the events it stays in its state on.
+        </p>
+      </div>
+      {data.machines.map((machine) => (
+        <Machine key={machine.name} listing={machine} />
+      ))}
+    </article>
+  );
+}
+
+/** One machine: its title, the file it is drawn from, and its drawing. */
+function Machine({ listing }: { listing: MachineListing }) {
+  const { data } = useSuspenseQuery(machineQuery(listing.name));
+  return (
+    <section aria-label={listing.title} className="space-y-3">
+      <h2 className="text-sm font-medium">
+        {listing.title}{' '}
+        <span className="font-normal text-neutral-500 dark:text-neutral-400">
+          — drawn from <code className="font-mono text-xs">{listing.source}</code>
+        </span>
+      </h2>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        {data.states.length} states, {data.edges.length} edges; it starts in <span className="font-mono">{data.initial}</span> and ends in{' '}
+        {data.final.map((state, i) => (
+          <span key={state}>
+            {i > 0 && (i === data.final.length - 1 ? ' or ' : ', ')}
+            <span className="font-mono">{state}</span>
+          </span>
+        ))}
+        .
+      </p>
+      <MachineCanvas machine={data} />
+    </section>
+  );
+}

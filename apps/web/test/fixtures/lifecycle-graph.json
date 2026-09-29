@@ -1,0 +1,307 @@
+{
+  "initial": "submitted",
+  "states": [
+    "submitted",
+    "starting",
+    "working",
+    "input-required",
+    "stopping",
+    "ending",
+    "completed",
+    "failed",
+    "canceled"
+  ],
+  "final": [
+    "completed",
+    "failed",
+    "canceled"
+  ],
+  "edges": [
+    {
+      "from": "submitted",
+      "event": "READY",
+      "to": "starting",
+      "action": "start"
+    },
+    {
+      "from": "submitted",
+      "event": "QUEUED",
+      "to": "submitted",
+      "action": "nothing"
+    },
+    {
+      "from": "submitted",
+      "event": "PREVIOUS_LIVE",
+      "to": "submitted",
+      "action": "stop"
+    },
+    {
+      "from": "submitted",
+      "event": "NO_SESSION_TO_CONTINUE",
+      "to": "failed",
+      "action": "settle"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_LIVE",
+      "to": "starting",
+      "action": "nothing"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_BLOCKED",
+      "to": "starting",
+      "action": "nothing"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_QUIET",
+      "guard": "holds",
+      "to": "input-required",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_QUIET",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_ENDED",
+      "guard": "holds",
+      "to": "input-required",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_ENDED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "SESSION_STOPPED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "DEADLINE_PASSED",
+      "guard": "live",
+      "to": "starting",
+      "action": "stop"
+    },
+    {
+      "from": "starting",
+      "event": "DEADLINE_PASSED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "starting",
+      "event": "UNSPAWNED",
+      "to": "working",
+      "action": "spawn"
+    },
+    {
+      "from": "starting",
+      "event": "UNREAD",
+      "to": "starting",
+      "action": "nothing"
+    },
+    {
+      "from": "starting",
+      "event": "SPAWN_REFUSED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_LIVE",
+      "to": "working",
+      "action": "nothing"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_BLOCKED",
+      "to": "working",
+      "action": "nothing"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_QUIET",
+      "guard": "holds",
+      "to": "input-required",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_QUIET",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_ENDED",
+      "guard": "holds",
+      "to": "input-required",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_ENDED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "SESSION_STOPPED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "DEADLINE_PASSED",
+      "guard": "live",
+      "to": "working",
+      "action": "stop"
+    },
+    {
+      "from": "working",
+      "event": "DEADLINE_PASSED",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "working",
+      "event": "UNSEEN_IN_GRACE",
+      "to": "working",
+      "action": "nothing"
+    },
+    {
+      "from": "working",
+      "event": "UNREAD",
+      "to": "working",
+      "action": "nothing"
+    },
+    {
+      "from": "working",
+      "event": "LOST",
+      "to": "ending",
+      "action": "record-end"
+    },
+    {
+      "from": "input-required",
+      "event": "AWAITING_INPUT",
+      "to": "input-required",
+      "action": "nothing"
+    },
+    {
+      "from": "stopping",
+      "event": "SESSION_LIVE",
+      "to": "stopping",
+      "action": "stop"
+    },
+    {
+      "from": "stopping",
+      "event": "SESSION_BLOCKED",
+      "to": "stopping",
+      "action": "stop"
+    },
+    {
+      "from": "stopping",
+      "event": "SESSION_QUIET",
+      "to": "stopping",
+      "action": "stop"
+    },
+    {
+      "from": "stopping",
+      "event": "SESSION_ENDED",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "SESSION_STOPPED",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "UNSPAWNED",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "UNSEEN_IN_GRACE",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "LOST",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "UNREAD",
+      "guard": "overdue",
+      "to": "stopping",
+      "action": "record-end"
+    },
+    {
+      "from": "stopping",
+      "event": "UNREAD",
+      "to": "stopping",
+      "action": "nothing"
+    },
+    {
+      "from": "stopping",
+      "event": "NOTHING_OPEN",
+      "to": "canceled",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "CLOSED",
+      "guard": "lastDone",
+      "to": "completed",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "CLOSED",
+      "to": "failed",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "DEADLINE_SPENT",
+      "to": "failed",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "ATTEMPT_ENDED",
+      "guard": "endedDone",
+      "to": "completed",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "ATTEMPT_ENDED",
+      "guard": "endedStopped",
+      "to": "canceled",
+      "action": "settle"
+    },
+    {
+      "from": "ending",
+      "event": "ATTEMPT_ENDED",
+      "to": "failed",
+      "action": "settle"
+    }
+  ]
+}

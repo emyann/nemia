@@ -30,6 +30,7 @@ import {
   diagram,
   edgesOf,
   FINAL,
+  lifecycleGraph,
   machineWithout,
   STATES,
   statesOf,
@@ -294,6 +295,20 @@ test('the diagram is drawn from the machine: an edge taken away takes exactly it
   assert.deepEqual(
     diagram(machineWithout('working', 'LOST')).split('\n'),
     whole.filter((l) => l !== line),
+  );
+});
+
+test('the graph a board draws is the machine read as plain data, and a fresh copy on every call', () => {
+  const graph = lifecycleGraph();
+  assert.deepEqual(graph, { initial: 'submitted', states: statesOf(), final: [...FINAL], edges: edgesOf() });
+  assert.deepEqual(graph.states, [...STATES]);
+  assert.deepEqual(JSON.parse(JSON.stringify(graph)), graph, 'plain data: a JSON round trip changes nothing');
+  graph.edges.pop();
+  graph.states.pop();
+  assert.deepEqual(lifecycleGraph().edges, edgesOf(), 'a caller that changes its copy changes no other');
+  assert.ok(
+    lifecycleGraph().edges.some((e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed'),
+    'a guarded edge keeps its guard',
   );
 });
 

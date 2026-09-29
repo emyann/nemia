@@ -6,14 +6,25 @@
 import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect, Exit } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 process.env.WF_ROOT = scratch('hkb-api-capabilities-');
 const { app } = await import('../src/app.ts');
-const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } =
-  await import('../src/capabilities/capabilities.ts');
+const {
+  HOME_REPO,
+  MEASURED_TOOLS,
+  READ_ONLY_COMMANDS,
+  capabilitiesOf,
+  dated,
+  denyingRule,
+  frontmatterOf,
+  readOnlyCommands,
+  repoOf,
+  serverAsk,
+} = await import('../src/capabilities/capabilities.ts');
 const { DISALLOW, askDenierOf, bashCovers } = await import('../src/capabilities/reach.ts');
 type CapabilitiesWithSteps = import('../src/capabilities/reach.ts').CapabilitiesWithSteps;
 type StepReach = import('../src/capabilities/reach.ts').StepReach;
@@ -229,6 +240,24 @@ test('a server that never answers is an error once its time is up, and it is sto
   assert.equal(server.tools, null);
   assert.match(server.error!, /did not list its tools: it did not list its tools within 0\.5 s\./);
   const [pid] = startsIn(starts);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
+});
+
+test('REFUSED: a server asked, whose ask is interrupted before it answers, is stopped before the interruption returns', async () => {
+  const starts = path.join(scratch('hkb-api-starts-'), 'starts');
+  const repo = scratch('hkb-api-repo-');
+  const args = [FIXTURE_SERVER];
+  const env = { ...(process.env as Record<string, string>), HKB_TEST_MODE: 'silent', HKB_TEST_STARTS: starts };
+  const stop = new AbortController();
+  const exit = Effect.runPromiseExit(
+    serverAsk(repo, { name: 'silent', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
+    { signal: stop.signal },
+  );
+  for (const bound = Date.now() + 5_000; startsIn(starts).length === 0 && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
+  const [pid] = startsIn(starts);
+  assert.ok(pid, 'the server started');
+  stop.abort();
+  assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
 });
 

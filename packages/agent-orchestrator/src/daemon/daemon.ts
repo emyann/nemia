@@ -9,7 +9,7 @@
  * anything else — no file, a file that does not read, a holder that stopped, is gone or has been silent for a long while — is free, and
  * `wf up` takes it over.
  */
-import { durationWord } from '../radius.ts';
+import { durationWord } from '../status/status.ts';
 
 /** What `wf up` writes into `daemon.json`: who it is, where and how often it ticks, and when its last pass completed — none yet is `null`. */
 export type DaemonFile = {

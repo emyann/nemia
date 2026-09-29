@@ -19,7 +19,7 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { answerLines, answerOf, overBudgetLine, retriesDue, retryLines, type Retry } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/timeline.ts';
 import { readAnswers, readAsks, readRun, stepsOf } from '../record/record.store.ts';
-import { branchReader, shippedOf, standingsOf } from '../branches.ts';
+import { branchReader, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import {
   checkReports,
   closeoutAsked,

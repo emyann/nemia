@@ -9,7 +9,7 @@ import { runTasks, unjudgedWords, type Run } from '../record/record.ts';
 import { holdsOf, waitsOf } from '../wait/wait.ts';
 import { listing, type Listing } from './list.ts';
 import { readAnswers, readAsks, stepsOf } from '../record/record.store.ts';
-import { branchReader, standingsOf, type BranchReader } from '../branches.ts';
+import { branchReader, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import {
   checkReports,
   closeoutAsked,

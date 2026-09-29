@@ -83,7 +83,7 @@ export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
  *
  * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it ships.
  * @param askAt Where an ask's file is, for the command that takes it back.
- * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.ts): an
+ * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
  * @param verb The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`.
  * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.store.ts), for an ending that lands on

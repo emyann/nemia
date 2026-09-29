@@ -10,7 +10,6 @@ import {
   LESSON,
   ROOT_GROUP,
   branchesToRead,
-  count,
   deepWorkspaces,
   groupOf,
   inFullLines,
@@ -24,15 +23,9 @@ import {
   radiusLines,
   sensitiveHeading,
   sensitivePaths,
-  sumUsage,
   touchedLines,
-  usedLines,
-  budgetWord,
-  dollars,
-  peakMark,
-  readWords,
-  rebuiltCache,
-} from '../src/radius.ts';
+} from '../src/branches/branches.ts';
+import { count, sumUsage, usedLines, budgetWord, dollars, peakMark, readWords, rebuiltCache } from '../src/status/status.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
 const numstat = (...lines: string[]) => `${lines.join('\n')}\n`;

@@ -44,6 +44,7 @@ import {
   waitsAtGate,
   type Raise,
   type SpendOf,
+  budgetWord,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
 import {
@@ -60,7 +61,6 @@ import { isRemoteHarness, remoteRetryRefusal } from '../harness/harness.ts';
 import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
-import { budgetWord } from '../radius.ts';
 import type { Decision } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
 import { allowRuleOf, disallowedBy, type DeniedAt } from '../keys/index.ts';

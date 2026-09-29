@@ -12,7 +12,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
 import { loadWorkflows, skillsFor } from '../src/folder/folder.store.ts';
-import { briefBody, pluginOf, unrendered } from '../src/rendering.ts';
+import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
 

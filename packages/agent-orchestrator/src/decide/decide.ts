@@ -16,11 +16,14 @@ import {
   stepSpend,
   type RoundAsk,
   type SpendOf,
+  budgetWord,
+  dollars,
+  readWords,
+  type Consumed,
 } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/branches.ts';
-import { budgetWord, dollars, readWords, type Consumed } from '../radius.ts';
 
 /**
  * What is left for a person to do about this run.
@@ -76,7 +79,7 @@ export type Decision =
     };
 
 /**
- * Whether a result branch is on the run's base branch, as git says it (`isShipped` in branches.ts):
+ * Whether a result branch is on the run's base branch, as git says it (`isShipped` in branches.store.ts):
  *
  *   false        it is not
  *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut

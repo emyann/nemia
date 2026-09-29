@@ -66,8 +66,8 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'wf 
  * result already on the base branch (`resultOnBase`), where nothing is left to merge.
  *
  * @param asks What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for.
- * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.ts). Left out, git is not
- *   asked, and the gate alone speaks.
+ * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
+ *   not asked, and the gate alone speaks.
  */
 export function approvalRefusal(
   steps: readonly Workflow[],

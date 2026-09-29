@@ -144,7 +144,7 @@ test("a folder run's decision reads, with nothing to merge and nothing about git
   assert.deepEqual(
     decision.commands,
     [{ label: 'forget it', command: 'wf rm f-notes', said: 'forgets the run with its folders and files' }],
-    'what `wf decide` offers instead: the one command, and nothing to merge or delete (cli.ts, !git)',
+    'what `wf decide` offers instead: the one command, and nothing to merge or delete (cli/main.ts, !git)',
   );
   for (const said of [...decision.commands.flatMap((c) => [c.command, c.said ?? '']), decision.overBudget ?? '']) {
     assert.doesNotMatch(said, GIT_WORD, `a sentence the board shows out of this answer names no git: ${said}`);

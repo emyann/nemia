@@ -2780,7 +2780,9 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
-| `src/cli.ts` | the verbs |
+| `src/cli/main.ts` | the verbs: `main`, which parses, calls and prints, the help, and `runMain`, which runs `wf up` and `wf watch` as Effects |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb's flags, read off the command line, and its help, by family: the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf rm`, `wf prune`, `wf hold` and `wf agents`; `wf decide`, `wf retry`, `wf approve`, `wf round` and `wf accept` |
+| `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),
 `agent-orchestrator/workflow` (`src/workflow.ts`) and `agent-orchestrator/effect` (`src/effect.ts`, the refusals by kind, which
@@ -2822,9 +2824,9 @@ no runtime, never a controller and not the client, and load as a tree — `recor
 `folder/write.store.ts` on `record.store.ts` and `folder.store.ts` — and outside the store only the client and the
 controllers beneath the CLI import them. **Controllers** use the runtime through the client: `runner.ts`, the root, which
 re-exports; the tick (`tick/tick.verb.ts`, `tick/advance.verb.ts`) and the verbs, one feature each (`start/start.verb.ts`,
-`decide/decide.verb.ts` and the rest), which import one another one way, with no cycle; and `cli.ts` and
-`bin/wf.ts` — `cli.ts` reaches the package only through `runner.ts` and `workflow.ts`, and `bin/wf.ts` only through
-`cli.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
+`decide/decide.verb.ts` and the rest), which import one another one way, with no cycle; and `src/cli/` and
+`bin/wf.ts` — a file of `src/cli/` reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts`
+only through `cli/main.ts` and `cli/exit.ts`, which it imports first, so a refusal thrown as the package loads exits 2 too. **The client**, `runtime-client.ts`, alone imports agent-runtime, a type included: the runtime is reached
 through one client (`CLIENT` in the same test), which every controller beneath the CLI reaches, itself or through a
 controller it imports, and which imports no controller. `test/layout.test.ts` holds the folders: at most six source
 files in one, no folder named `utils` or the like, no two files that need each other's values, no source file that

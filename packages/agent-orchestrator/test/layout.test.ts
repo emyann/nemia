@@ -276,6 +276,17 @@ test('REFUSED on the source: a value import from a part cut out of run.ts back t
   assert.deepEqual(cycles(valueGraph(files)), []);
 });
 
+test("REFUSED on the source: a value import from the flag reader back to the verbs' table closes a cycle; the type is let through", () => {
+  const files = new Map(sourceFiles().map((f) => [f, read(f)]));
+  const flags = files.get('src/cli/flags.ts')!;
+  files.set('src/cli/flags.ts', `${flags}\nimport { main } from './main.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), [
+    ['src/cli/asks.ts', 'src/cli/flags.ts', 'src/cli/main.ts', 'src/cli/runs.ts', 'src/cli/start.ts'],
+  ]);
+  files.set('src/cli/flags.ts', `${flags}\nimport type { main } from './main.ts';`);
+  assert.deepEqual(cycles(valueGraph(files)), []);
+});
+
 test('REFUSED: a source file that imports a test or test support; a barrel that re-exports a whole module', () => {
   assert.deepEqual(testImports('src/check/check.ts', importsIn("import { corpus } from './check.test.ts';")), [
     'src/check/check.ts imports src/check/check.test.ts: nothing but a test imports a test — move what both need into the source',
@@ -310,6 +321,18 @@ test('REFUSED: a seventh source file in a folder, and a folder or a file named f
     'src/utils/words.ts is named utils, which says no feature: put each part beside the feature that uses it',
   ]);
   assert.deepEqual(folderBreaks(['src/common-words/words.ts', 'src/feed/sharedness.ts']), [], 'a name that only starts so: let through');
+});
+
+test("REFUSED on the source: a seventh source file in the CLI's folder", () => {
+  const files = sourceFiles();
+  assert.deepEqual(
+    files.filter((f) => f.startsWith('src/cli/') && !f.endsWith('.test.ts')),
+    ['asks', 'exit', 'flags', 'main', 'runs', 'start'].map((f) => `src/cli/${f}.ts`),
+    "the CLI's folder holds its six today",
+  );
+  assert.deepEqual(folderBreaks([...files, 'src/cli/extra.ts']), [
+    'src/cli/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
+  ]);
 });
 
 test('each feature folder holds at most six source files, and every name says a feature', () => {

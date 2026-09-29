@@ -202,7 +202,7 @@ type AtGate = { step: string; back: string[] };
  * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each step
  * waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch — which
  * has nothing to merge, nor a branch to delete. A folder run has none of those: its work stays where it is until a person is done with it,
- * and forgetting it is the one command `wf decide` prints (cli.ts, `!git`), and nothing about git.
+ * and forgetting it is the one command `wf decide` prints (cli/main.ts, `!git`), and nothing about git.
  *
  * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
  * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
@@ -211,7 +211,7 @@ type AtGate = { step: string; back: string[] };
  * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
  * that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
  * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
- * decides it (cli.ts, `!merges(steps)`).
+ * decides it (cli/main.ts, `!merges(steps)`).
  */
 function commandsOf(
   run: Run,

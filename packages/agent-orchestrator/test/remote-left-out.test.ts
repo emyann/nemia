@@ -28,7 +28,7 @@ const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 
 const FILE = path.join(ROOT, 'a2a-agents.json');
 

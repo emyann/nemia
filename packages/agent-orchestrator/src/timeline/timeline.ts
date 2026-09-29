@@ -3,7 +3,7 @@
  * their tasks and the filing times on its feed.
  *
  * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.verb.ts` reads the views and the feed (`readFilings`) and
- * hands them here, `cli.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
+ * hands them here, `cli/main.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
  */
 import { dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../radius.ts';
 import type { Run } from '../record/record.ts';

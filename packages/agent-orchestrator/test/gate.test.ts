@@ -22,7 +22,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { advance, approve, cancel, forget, inboxDir, list, markCancelled, parentOf, readRun, retry, start, startFromInbox } =
   await import('../src/runner.ts');
-const { main } = await import('../src/cli.ts');
+const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */

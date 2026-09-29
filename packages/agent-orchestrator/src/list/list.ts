@@ -337,7 +337,7 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
  * wrong for `permission prompt`.
  *
  * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
- * would run, say — and `wf ls` pads each status to the width of the widest (`cli.ts`): a status with a newline in it breaks its row in
+ * would run, say — and `wf ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row in
  * two and mis-aligns every other row of that run, and `wf decide` splits the same way. So every run of whitespace becomes one space
  * before the word is measured or clipped.
  */

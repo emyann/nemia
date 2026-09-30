@@ -110,6 +110,10 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `Engine.layer(options)`.
 - `agent-runtime/effect` (`src/index.ts`) is the one door that hands out Effect values, and it does not export `decide`.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
+- A controller's program is an `Effect.fn` that requires the Promise engine as a service (`EngineService`) and lifts each read
+  with `tried` or `awaited` (`packages/agent-orchestrator/src/runtime-client.ts`): it fails with a `Refusal` and dies of anything
+  else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
+  `decideRun` and `decide`, `forgetRun` and `forget`.
 
 ## Tests
 

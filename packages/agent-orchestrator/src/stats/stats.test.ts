@@ -145,7 +145,10 @@ test('a loop that has not ended accepted counts no rounds: its reviewer asked ag
 });
 
 test('first-try landings read the `workspace: main` step: landed on try 1 counts both, on try 2 only landed, and no ending is absent', () => {
-  const first = twoRounds('first');
+  const first = twoRounds(
+    'first',
+    TEAM.map((s) => (s.name === 'land' ? { ...s, name: 'ship' } : s)),
+  );
   const second = withLanded(
     readOf('second', TEAM, {
       design: [{ end: at(1) }],
@@ -163,7 +166,11 @@ test('first-try landings read the `workspace: main` step: landed on try 1 counts
   const folderish = readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] });
   const facts = factsOfAll(first, second, folderish);
   const byId = new Map(facts.runs.map((r) => [r.run, r]));
-  assert.deepEqual([byId.get('first')?.landed, byId.get('first')?.firstTry], [true, true]);
+  assert.deepEqual(
+    [byId.get('first')?.landed, byId.get('first')?.firstTry],
+    [true, true],
+    'the ending is found by `workspace: main`, not by its name',
+  );
   assert.deepEqual([byId.get('second')?.landed, byId.get('second')?.firstTry], [true, false]);
   assert.deepEqual([byId.get('none')?.landed, byId.get('none')?.firstTry], [null, null]);
   const total = statsOf(facts, {}, NOW).all.total;

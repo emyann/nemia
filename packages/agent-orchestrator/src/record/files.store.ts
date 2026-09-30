@@ -3,7 +3,7 @@
  * `record.store.ts`; and `runStore`, the one binding every controller reads it through, where another implementation would be swapped in.
  */
 import fs from 'node:fs';
-import type { RunStore } from './run-store.ts';
+import type { RunStore } from './record.ts';
 import {
   cancelFile,
   consumeAsks,

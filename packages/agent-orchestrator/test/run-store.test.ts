@@ -1,5 +1,5 @@
 /**
- * The run store's interface (`RunStore`, `src/record/run-store.ts`), held to what its files implementation (`filesStore`) answers: a record
+ * The run store's interface (`RunStore`, `src/record/record.ts`), held to what its files implementation (`filesStore`) answers: a record
  * made, read with a person's files composed onto it, written back with none of them and no byte moved, refused once it is gone; whether a
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
  * lifted only as it was read.
@@ -254,7 +254,7 @@ function refusals(sources: Record<string, string>, direct: readonly string[]): s
     if (names.length && !direct.includes(file))
       out.push(
         `${file} imports ${names.join(', ')} from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ` +
-          'the method to RunStore (src/record/run-store.ts)',
+          'the method to RunStore (src/record/record.ts)',
       );
   }
   for (const file of direct)
@@ -278,7 +278,7 @@ test('a file not on the list that imports a run function from record.store.ts is
   const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };
   assert.deepEqual(refusals(sources, []), [
     'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
-      'the method to RunStore (src/record/run-store.ts)',
+      'the method to RunStore (src/record/record.ts)',
   ]);
 });
 

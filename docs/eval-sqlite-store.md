@@ -81,7 +81,7 @@ In order, each small enough for one card, none before the one above it.
    already is. Files stay the only implementation. This is P7's first item, useful whether or not SQLite follows, and it
    makes the rest a swap rather than a rewrite.
 
-   Begun 2026-09-30 as `RunStore` (`packages/agent-orchestrator/src/record/run-store.ts`), files its only implementation
+   Begun 2026-09-30 as `RunStore` (`packages/agent-orchestrator/src/record/record.ts`), files its only implementation
    (`filesStore`, bound as `runStore` in `src/record/files.store.ts`), the tick's pass first. The person's verbs, the
    readers and the api, and the inbox follow; `test/run-store.test.ts` lists the files still reaching the files directly.
 2. **SQLite as a second journal for the engine.** The engine's journal is already an interface with a file

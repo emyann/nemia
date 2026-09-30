@@ -157,6 +157,7 @@ test('wf factory ls: a file that does not read is listed with why, the others st
   fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{"repos": [');
   fs.writeFileSync(path.join(FACTORIES, 'none.json'), '{"repos": []}\n');
   fs.writeFileSync(path.join(FACTORIES, '.pipao.json.123.abcd'), '{"repos": ["/x"]}\n');
+  fs.writeFileSync(path.join(FACTORIES, '.hidden.json'), '{"repos": ["/x"]}\n');
   const listed = await printedBy(t, 'factory', 'ls');
   assert.equal(listed[0].split(' ')[0], 'default');
   assert.match(listed[1], /^empty {4}\S*empty\.json does not read as a factory: `repos` is missing\. wf factory rm empty/);

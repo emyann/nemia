@@ -1,7 +1,7 @@
 /**
  * The board's reads of the api: a GET answered with JSON, decoded with the schema kept beside the type it reads (`get`), refused in the
- * api's words (`ReadRefusal`), or refused as an answer this board does not read (`UnreadAnswer`). `getUndecoded` is the read of the files
- * not decoded yet, a list `test/read.test.ts` holds and only shrinks.
+ * api's words (`ReadRefusal`), or refused as an answer this board does not read (`UnreadAnswer`). `test/read.test.ts` refuses a read that
+ * passes no schema.
  */
 import { Result, Schema, SchemaIssue } from 'effect';
 
@@ -93,11 +93,4 @@ export async function get<T>(path: string, schema: Schema.Decoder<T>, init?: Req
   if (Result.isSuccess(decoded)) return decoded.success;
   const route = `GET ${path}`;
   throw new UnreadAnswer(route, unreadWords(route, value, decoded.failure.issue));
-}
-
-/**
- * Reads `path` from the api as `get` does, and takes its JSON to be a `T` unread: the read of a file not decoded yet (`test/read.test.ts`).
- */
-export async function getUndecoded<T>(path: string, init?: RequestInit): Promise<T> {
-  return (await answer(path, init)) as T;
 }

@@ -98,8 +98,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
 - A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type (`satisfies Schema.Schema<T>`), which the barrel
   never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a schema narrower than
-  its type (a word left out, a `null` refused, a `?` key required) and a `Schema.Any`: read the schema against the type. `getUndecoded`
-  is a list that only shrinks (`test/read.test.ts`).
+  its type (a word left out, a `null` refused, a `?` key required) and a `Schema.Any`: read the schema against the type. A read that passes
+  no schema — a GET by bare `fetch`, a `get` of `Schema.Unknown` — is refused by `unschemedReads` (`test/read.test.ts`).
 - A mirror narrower than the api's type drops the key on decode, and a write that sends the read back loses it (the builder's save, a
   step's `workspace` and `slot`): diff the mirror against the api's type, key by key, before writing its schema.
 - `Schema.Union` takes the first member that decodes and drops the keys it does not know: put a member that owns more keys before one it

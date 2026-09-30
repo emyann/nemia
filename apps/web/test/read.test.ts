@@ -1,20 +1,18 @@
 /**
  * The board's reads decode the api's answers where they enter (`get`, src/lib/api/read.ts): an answer that does not decode is refused with
  * the route, the first wrong key, what was there and the fix; a key the board does not know is dropped; a refusal of the api's stays in its
- * words. The reads not yet decoded call `getUndecoded`, from a list of files that only shrinks, and no schema leaves through the barrel.
+ * words. No read in the board's source passes no schema (`unschemedReads`), and no schema leaves through the barrel.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import * as api from '../src/lib/api.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { runsQuery, type RunSummary } from '../src/lib/api/runs.ts';
 
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
-
-/** The files under src/lib/api/ whose reads are not decoded yet. A file leaves the list when its reads are; none joins it. */
-const UNDECODED = ['capabilities.ts', 'ceilings.ts', 'daemon.ts', 'inbox.ts', 'quota.ts'] as const;
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -173,38 +171,152 @@ test("a read the api refused still rejects in the api's words and status, not as
   assert.equal(err.message, 'no run x');
 });
 
-/** What the list of undecoded files gets wrong, given each file's text: one line a fault, each saying what to do. */
-export function undecodedFaults(texts: ReadonlyMap<string, string>, listed: readonly string[]): string[] {
-  const calling = [...texts].filter(([f, text]) => f !== 'read.ts' && /\bgetUndecoded\b\s*[<(]/.test(text)).map(([f]) => f);
-  return [
-    ...calling
-      .filter((f) => !listed.includes(f))
-      .map((f) => `${f} calls getUndecoded: decode the read with a schema beside its type and \`get\`, which the list only shrinks for`),
-    ...listed
-      .filter((f) => !calling.includes(f))
-      .map((f) => `${f} no longer calls getUndecoded: strike it from UNDECODED in test/read.test.ts`),
-  ];
+/** What `unschemedReads` found: a line per read that passes no schema, and how many reads through `get` pass one. */
+type ReadScan = { faults: string[]; schemed: number };
+
+/** Whether `module` names read.ts, as a file under src/ imports it: `./read.ts`, `./api/read`, `@/lib/api/read`. */
+const isReadModule = (module: string) => /(^|\/)read(\.ts)?$/.test(module);
+
+/** Whether `call` is a `fetch`, called bare or off an object (`globalThis.fetch`, `window.fetch`). */
+const isFetch = (call: ts.CallExpression) =>
+  (ts.isIdentifier(call.expression) && call.expression.text === 'fetch') ||
+  (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === 'fetch');
+
+/** Whether a `fetch` is a write: its options an object literal whose `method` is a variable, or a word other than GET. */
+const isWrite = (call: ts.CallExpression) => {
+  const options = call.arguments[1];
+  if (!options || !ts.isObjectLiteralExpression(options)) return false;
+  return options.properties.some(
+    (p) =>
+      (ts.isShorthandPropertyAssignment(p) && p.name.text === 'method') ||
+      (ts.isPropertyAssignment(p) &&
+        ts.isIdentifier(p.name) &&
+        p.name.text === 'method' &&
+        !(ts.isStringLiteralLike(p.initializer) && p.initializer.text.toUpperCase() === 'GET')),
+  );
+};
+
+/** Whether `schema` decodes nothing: `Schema.Unknown` or `Schema.Any`, which take any answer as read. */
+const decodesNothing = (schema: ts.Expression | undefined) =>
+  !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
+
+/** The names `get` of read.ts is bound to in `source`: `get`, or what `import { get as … }` calls it. */
+function readNames(source: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  for (const s of source.statements) {
+    if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier) || !isReadModule(s.moduleSpecifier.text)) continue;
+    const bindings = s.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const e of bindings.elements) if ((e.propertyName ?? e.name).text === 'get') names.add(e.name.text);
+  }
+  return names;
 }
 
-test('REFUSED: a file calling getUndecoded off the list, with a type argument or without, and a listed file that no longer calls it', () => {
+/**
+ * Every read in `texts` (a file's path under src/ to its text) that passes no schema: a GET by `fetch` outside read.ts, a `get` of read.ts
+ * with no schema or one that decodes nothing, and any `getUndecoded`. Each fault names the file and the line, and says to decode through
+ * `get(path, schema)`.
+ */
+export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
+  const scan: ReadScan = { faults: [], schemed: 0 };
+  for (const [file, text] of texts) {
+    const source = ts.createSourceFile(
+      file,
+      text,
+      ts.ScriptTarget.Latest,
+      true,
+      file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    const gets = readNames(source);
+    const fault = (node: ts.Node, what: string) =>
+      scan.faults.push(
+        `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${what}: decode the read through \`get(path, schema)\` (lib/api/read.ts), with a schema beside its type`,
+      );
+    const visit = (node: ts.Node): void => {
+      if (ts.isIdentifier(node) && node.text === 'getUndecoded') fault(node, 'getUndecoded reads an answer undecoded');
+      if (ts.isCallExpression(node) && isFetch(node) && file !== 'lib/api/read.ts' && !isWrite(node))
+        fault(node, 'a GET by fetch reads an answer undecoded');
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && gets.has(node.expression.text)) {
+        if (decodesNothing(node.arguments[1]))
+          fault(node, 'a get that passes no schema, or one that decodes nothing, reads an answer undecoded');
+        else scan.schemed += 1;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return scan;
+}
+
+test('REFUSED: a GET by fetch, bare or off globalThis, a get with no schema or one decoding nothing, and getUndecoded', () => {
   const texts = new Map([
-    ['read.ts', 'export async function getUndecoded<T>(path: string) {}'],
-    ['runs.ts', "queryFn: () => getUndecoded<RunSummary[]>('/api/runs'),"],
-    ['steps.ts', "queryFn: () => getUndecoded('/api/runs/r-1/steps/plan/path'),"],
-    ['quota.ts', "queryFn: () => get('/api/quota', QuotaSchema),"],
+    ['lib/api/a.ts', "export const a = () => fetch('/api/x').then((r) => r.json());"],
+    ['lib/api/b.ts', 'export const b = (path: string, headers: Headers) => fetch(path, { headers });'],
+    ['lib/api/c.ts', "export const c = (path: string) => fetch(path, { method: 'GET' });"],
+    ['lib/d.ts', "export const d = () => globalThis.fetch('/api/x');"],
+    ['lib/api/e.ts', "import { get } from './read.ts';\nexport const e = () => get('/api/x');"],
+    [
+      'lib/api/f.ts',
+      "import { get as read } from './read.ts';\nimport { Schema } from 'effect';\nexport const f = () => read('/api/x', Schema.Unknown);",
+    ],
+    [
+      'routes/g.tsx',
+      "import { get } from '@/lib/api/read';\nimport { Schema } from 'effect';\nexport const g = () => get('/api/x', Schema.Any);",
+    ],
+    ['lib/api/h.ts', "import { getUndecoded } from './read.ts';"],
+    ['lib/api/i.ts', "export const i = () => getUndecoded<X>('/api/x');"],
   ]);
-  assert.deepEqual(undecodedFaults(texts, ['quota.ts']), [
-    'runs.ts calls getUndecoded: decode the read with a schema beside its type and `get`, which the list only shrinks for',
-    'steps.ts calls getUndecoded: decode the read with a schema beside its type and `get`, which the list only shrinks for',
-    'quota.ts no longer calls getUndecoded: strike it from UNDECODED in test/read.test.ts',
-  ]);
+  const { faults } = unschemedReads(texts);
+  assert.deepEqual(
+    faults.map((f) => f.slice(0, f.indexOf(': decode'))),
+    [
+      'lib/api/a.ts:1: a GET by fetch reads an answer undecoded',
+      'lib/api/b.ts:1: a GET by fetch reads an answer undecoded',
+      'lib/api/c.ts:1: a GET by fetch reads an answer undecoded',
+      'lib/d.ts:1: a GET by fetch reads an answer undecoded',
+      'lib/api/e.ts:2: a get that passes no schema, or one that decodes nothing, reads an answer undecoded',
+      'lib/api/f.ts:3: a get that passes no schema, or one that decodes nothing, reads an answer undecoded',
+      'routes/g.tsx:3: a get that passes no schema, or one that decodes nothing, reads an answer undecoded',
+      'lib/api/h.ts:1: getUndecoded reads an answer undecoded',
+      'lib/api/i.ts:1: getUndecoded reads an answer undecoded',
+    ],
+  );
+  assert.ok(
+    faults.every((f) => f.endsWith(': decode the read through `get(path, schema)` (lib/api/read.ts), with a schema beside its type')),
+    faults.join('\n'),
+  );
 });
 
-test('the files whose reads are not decoded are the list, and it only shrinks', () => {
-  const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.ts'));
-  assert.ok(files.includes('runs.ts') && files.includes('read.ts'), files.join(', '));
-  const texts = new Map(files.map((f) => [f, fs.readFileSync(path.join(DIR, f), 'utf8')]));
-  assert.deepEqual(undecodedFaults(texts, UNDECODED), []);
+test('a write by fetch, a get with its schema, and the fetch inside read.ts are no unschemed read', () => {
+  const texts = new Map([
+    ['lib/api/a.ts', 'export const a = (route: string, method: string, headers: Headers) => fetch(route, { method, headers });'],
+    ['lib/api/b.ts', "export const b = (route: string) => fetch(route, { method: 'POST' });"],
+    ['lib/api/c.ts', "import { get } from './read.ts';\nexport const c = () => get('/api/x', XSchema);"],
+    ['lib/api/read.ts', 'export const answer = (path: string, init?: RequestInit) => fetch(path, init);'],
+    ['lib/api/d.ts', "import { get } from '@tanstack/whatever';\nexport const d = () => get('/api/x');"],
+  ]);
+  assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1 });
+});
+
+/** Every `.ts` and `.tsx` under `dir`, by its path from src/. */
+const sources = (dir: string, under = ''): Array<[string, string]> =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((e): Array<[string, string]> => {
+    const at = path.join(dir, e.name);
+    const name = under ? `${under}/${e.name}` : e.name;
+    if (e.isDirectory()) return sources(at, name);
+    return /\.tsx?$/.test(e.name) ? [[name, fs.readFileSync(at, 'utf8')]] : [];
+  });
+
+test("every read the board's source makes passes a schema", () => {
+  const texts = new Map(sources(path.resolve(DIR, '..', '..')));
+  assert.ok(texts.has('lib/api/runs.ts') && texts.has('lib/api/read.ts') && texts.has('routes/__root.tsx'), [...texts.keys()].join(', '));
+  const { faults, schemed } = unschemedReads(texts);
+  assert.ok(schemed >= 15, `the walk counted ${schemed} reads through get with a schema`);
+  assert.deepEqual(faults, []);
+});
+
+test('read.ts hands out its read and its two refusals, and no other read', async () => {
+  assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), ['ReadRefusal', 'UnreadAnswer', 'get']);
 });
 
 test('the barrel hands out no schema: the mirror stays types, queries and writes', () => {

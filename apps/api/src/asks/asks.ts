@@ -19,17 +19,22 @@ import {
 import { isRefusal } from 'agent-orchestrator/effect';
 import { acceptWordsRefusal, approvalWordsRefusal } from 'agent-orchestrator/run';
 import { NotBlank, readBody, type BodyIssue } from '../body.ts';
+import { answeredHow } from './answers.ts';
 import { type Guarded, type Refusal, refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
-const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount> }`';
+const RETRY_SHAPE =
+  '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount>, "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
 const RETRY_BODY = Schema.Struct({
   mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
   model: Schema.optionalKey(NotBlank),
   message: Schema.optionalKey(Schema.String),
   budget: Schema.optionalKey(Schema.Number),
+  answers: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ question: Schema.String, chose: Schema.Array(Schema.String), own: Schema.optionalKey(Schema.String) })),
+  ),
 });
 
 /** The body `POST …/round` takes: `wf round`'s arguments, as JSON. */
@@ -120,6 +125,8 @@ const retryWords = ({ path: [key], input }: BodyIssue): string => {
   if (key === 'message')
     return `\`message\` is what to tell the step, as \`wf retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}.`;
   if (key === 'budget') return budgetWords(input, 'wf retry', RETRY_SHAPE);
+  if (key === 'answers')
+    return `\`answers\` are a person's answers to the questions the step asks: a list of { "question": its title, "chose": the labels chosen, "own"?: words of their own }, or left out. This request's was ${JSON.stringify(input)}: ${RETRY_SHAPE}.`;
   return `POST …/retry takes a JSON object: ${RETRY_SHAPE}.`;
 };
 
@@ -167,7 +174,9 @@ const roundWords =
  *   (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read, and a
  *   step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing
  *   signed, is taken as `wf retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
- *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try.
+ *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try. A person's
+ *   `answers` to the questions the step's current closeout asks are checked against them and written as the try's message, the message
+ *   given beside them its note (`answeredHow`): answers that do not fit, or on a recheck, are refused with 400.
  * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
  *   cap raised. Made by `round()`, `wf round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with 400,
  *   before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go, or a
@@ -204,7 +213,9 @@ export const asks = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const read = await readBody(c.req, RETRY_BODY, `POST …/retry takes a JSON body: ${RETRY_SHAPE}.`, retryWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      const how = howOf(read.body, `wf retry ${id} ${step}`);
+      const { answers, ...body } = read.body;
+      const shaped = howOf(body, `wf retry ${id} ${step}`);
+      const how = answers && !('status' in shaped) ? await answeredHow(e, found.run, step, shaped, answers, home) : shaped;
       if ('status' in how) return c.json({ error: how.error }, how.status);
       const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
       if (wrong) return c.json({ error: wrong }, 422);

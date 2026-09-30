@@ -98,6 +98,7 @@ const blockedCloseout = {
   missing: [],
   replies: null,
   schema: {},
+  questions: [],
   raw: blocked,
 };
 
@@ -1817,6 +1818,7 @@ test('a step on its third try, in the second round of its loop, carries every tr
     missing: [],
     replies: null,
     schema: {},
+    questions: [],
     raw,
     ...more,
   });

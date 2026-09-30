@@ -1,0 +1,163 @@
+/**
+ * The questions a closeout asks, on a run's detail (`StepCloseout.questions`), and a person's answers to them on POST …/retry
+ * (`answeredHow`): checked against the questions the step's current closeout asks, written as the words the package gives them
+ * (`answerText`), and refused (400) when they do not fit or ride on a recheck. A closeout that asks in free text is answered as before.
+ */
+import { root } from '../../test/harness.ts';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { RunDetail } from '../detail/detail.ts';
+import { app } from '../app.ts';
+import { askFile } from 'agent-orchestrator';
+import { answerText, type Question } from 'agent-orchestrator/run';
+import { parseWorkflow } from 'agent-orchestrator/workflow';
+
+const T0 = Date.parse('2026-09-30T06:00:00.000Z');
+const at = (s: number) => new Date(T0 + s * 1000).toISOString();
+const write = (file: string, text: string) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+};
+
+/** A step's task that ran once on Codex and signed off with `closeout`. */
+const signedOff = (taskId: string, closeout: object) =>
+  write(
+    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
+    [
+      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(1), attempt: 1 },
+      { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: at(9), outcome: 'succeeded' },
+    ]
+      .map((line) => `${JSON.stringify(line)}\n`)
+      .join(''),
+  );
+
+/** A step declaring `open` in `schema`, as the loader reads it and the run freezes it. */
+const declaring = (name: string, open: object) =>
+  parseWorkflow(name, '---\noutput: spec.schema.json\n---\nDesign it.\n', () =>
+    JSON.stringify({ type: 'object', properties: { open }, required: ['open'], additionalProperties: false }),
+  );
+const QUESTIONS = { 'x-shape': 'questions', description: 'What is undecided.' };
+
+const cut: Question = {
+  title: 'How is the card cut?',
+  body: 'It is big.',
+  options: [
+    { label: 'a', meaning: 'The shape and the board first.' },
+    { label: 'b', meaning: 'All of it at once.' },
+  ],
+  recommended: 'a',
+  multiple: false,
+};
+const where: Question = {
+  title: 'Where do the answers go?',
+  body: 'Either or both.',
+  options: [
+    { label: 'retry', meaning: 'Into the next try.' },
+    { label: 'gate', meaning: 'With the approval.' },
+  ],
+  recommended: null,
+  multiple: true,
+};
+
+const R = 'r-answers';
+const closeout = (outcome: string, open: unknown) => ({ outcome, summary: 'Half.', needs: 'Two questions.', artifacts: [], open });
+write(
+  path.join(root, 'runs', `${R}.json`),
+  JSON.stringify({
+    id: R,
+    repo: '/code/app',
+    workspace: '/code/app',
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: true,
+    brief: 'Ask by choices',
+    workflowDir: path.join(root, 'no-such-workflow'),
+    createdAt: at(0),
+    workflow: [
+      declaring('design', QUESTIONS),
+      declaring('spec', QUESTIONS),
+      declaring('broken', QUESTIONS),
+      declaring('plain', { type: 'array', items: { type: 'string' } }),
+    ],
+    steps: {
+      design: { taskId: 't-a-design' },
+      spec: { taskId: 't-a-spec' },
+      broken: { taskId: 't-a-broken' },
+      plain: { taskId: 't-a-plain' },
+    },
+  }),
+);
+signedOff('t-a-design', closeout('blocked', [cut, where]));
+signedOff('t-a-spec', closeout('done', [cut]));
+signedOff('t-a-broken', closeout('blocked', [{ ...cut, recommended: 'z' }]));
+signedOff('t-a-plain', closeout('blocked', ['Postgres or MySQL?']));
+
+const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' };
+const ask = (step: string, body: unknown) =>
+  app.request(`/api/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+const asksDir = path.join(root, 'runs', `${R}.asks`);
+const asked = (): string[] => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
+const refused = async (res: Response): Promise<string> => {
+  assert.equal(res.status, 400, await res.clone().text());
+  return ((await res.json()) as { error: string }).error;
+};
+
+test("a closeout's questions are on the run's detail, blocked or done; a field that asks in free text, or does not decode, has none", async () => {
+  const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
+  const questions = (name: string) => run.steps.find((s) => s.name === name)!.closeout!.questions;
+  assert.deepEqual(questions('design'), [{ field: 'open', questions: [cut, where] }]);
+  assert.deepEqual(questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
+  assert.deepEqual(questions('plain'), []);
+  assert.deepEqual(questions('broken'), [], 'drawn as any other field');
+  assert.equal(run.steps.find((s) => s.name === 'design')!.needs, 'Two questions.', '`needs` stays the one line it was');
+});
+
+test('REFUSED: answers that do not fit the questions the step asks now, and answers on a recheck, are 400s — and nothing is written', async () => {
+  const error = await refused(
+    await ask('design', {
+      mode: 'nudge',
+      answers: [
+        { question: cut.title, chose: ['c'] },
+        { question: where.title, chose: ['gate'] },
+      ],
+    }),
+  );
+  assert.match(error, /"How is the card cut\?" offers no "c": its options are "a", "b"\. Read the step's questions again/);
+  assert.match(
+    await refused(await ask('design', { mode: 'nudge', answers: [{ question: cut.title, chose: ['a'] }] })),
+    /"Where do the answers go\?" is not answered/,
+  );
+  assert.match(
+    await refused(await ask('plain', { mode: 'nudge', answers: [{ question: 'Postgres or MySQL?', chose: [] }] })),
+    /The step does not ask "Postgres or MySQL\?" now/,
+    'a step that asks in free text asks no question answers can name',
+  );
+  assert.match(
+    await refused(await ask('design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] })),
+    /a recheck files no session to read them/,
+  );
+  assert.match(await refused(await ask('design', { mode: 'nudge', answers: 'a' })), /^`answers` are a person's answers/);
+  assert.deepEqual(asked(), []);
+});
+
+test('answers that fit are the try’s message, in the package’s words, their note the message beside them; a free-text question still takes a message', async () => {
+  const answers = [
+    { question: cut.title, chose: [], own: 'Three ways.' },
+    { question: where.title, chose: ['retry', 'gate'] },
+  ];
+  const res = await ask('design', { mode: 'nudge', message: 'Thanks.', answers });
+  assert.equal(res.status, 202, await res.clone().text());
+  const written = JSON.parse(fs.readFileSync(askFile(R, 'design', 2), 'utf8')) as { mode: string; message: string };
+  assert.equal(written.mode, 'nudge');
+  assert.equal(written.message, answerText([cut, where], answers, 'Thanks.'));
+  assert.ok(written.message.endsWith('Answered by: person, on the board'), written.message);
+
+  const plain = await ask('plain', { mode: 'nudge', message: 'Postgres.' });
+  assert.equal(plain.status, 202, await plain.clone().text());
+  assert.equal((JSON.parse(fs.readFileSync(askFile(R, 'plain', 2), 'utf8')) as { message: string }).message, 'Postgres.');
+});

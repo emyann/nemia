@@ -2,6 +2,8 @@
 import { endWords, type RetryAsk } from 'agent-orchestrator';
 import {
   answerOf,
+  type Asked,
+  askedQuestions,
   declaredOutput,
   type EarlierTry,
   parseCloseout,
@@ -29,6 +31,10 @@ export type StepReply = { finding: string; answer: string; why: string };
  * `schema` is the JSON Schema of each field asked about — given or missing — off the workflow the run froze, so the board can
  * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
  * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
+ *
+ * `questions` is what it asks a person through its question fields (`askedQuestions`): each field whose schema is the package's shape
+ * of questions and whose value decodes as them, in the schema's order. Empty for a closeout that asks none; a field that does not decode
+ * is in `output` alone, drawn as any other.
  */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
@@ -39,6 +45,7 @@ export type StepCloseout = {
   missing: string[];
   replies: StepReply[] | null;
   schema: Record<string, unknown>;
+  questions: Asked[];
   raw: unknown;
 };
 
@@ -132,6 +139,7 @@ export function closeoutIn(
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
     schema: Object.fromEntries(fields.map((field) => [field, declared[field]])),
+    questions: askedQuestions(step, c),
     raw: said,
   };
 }

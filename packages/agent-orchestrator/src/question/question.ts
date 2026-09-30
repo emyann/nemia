@@ -3,8 +3,8 @@
  * choosing among its options or in the person's own words, and turned into the words the step's next try reads.
  *
  * Pure. A field is a question field because its schema is `QUESTIONS_SCHEMA`, never because of its name or its agent: an output schema
- * asks for it with `"x-shape": "questions"`, which the loader expands (`expandShapes`) before it checks the schema is strict, so the harness
- * is handed standard JSON Schema only.
+ * asks for it with `"x-shape": "questions"`, which the loader expands (`expandShapes`) before it checks the schema is strict, so the
+ * harness is handed standard JSON Schema only.
  */
 import type { Closeout } from '../closeout/closeout.ts';
 import { isObject, type Workflow } from '../step/step.ts';
@@ -13,8 +13,8 @@ import { isObject, type Workflow } from '../step/step.ts';
 export type QuestionOption = { label: string; meaning: string };
 
 /**
- * One question: its `title`, which an answer names and which is unique among its field's questions; its `body`; its `options`, at least one,
- * each label unique; the label it `recommended`, or null; and whether `multiple` options may be chosen together.
+ * One question: its `title`, which an answer names and which is unique among its field's questions; its `body`; its `options`, at least
+ * one, each label unique; the label it `recommended`, or null; and whether `multiple` options may be chosen together.
  */
 export type Question = { title: string; body: string; options: QuestionOption[]; recommended: string | null; multiple: boolean };
 
@@ -22,7 +22,7 @@ export type Question = { title: string; body: string; options: QuestionOption[];
 export type Asked = { field: string; questions: Question[] };
 
 /** A person's answer to one question, named by its title: the labels they `chose`, and their `own` words, either or both. */
-export type Answer = { question: string; chose: string[]; own?: string };
+export type Answer = { question: string; chose: readonly string[]; own?: string };
 
 /** The marker an output schema writes for a field of questions: `{ "x-shape": "questions", "description": "…" }`. */
 export const SHAPE_KEY = 'x-shape';
@@ -193,8 +193,8 @@ function oneAnswerRefusal(q: Question, a: Answer): string | null {
 }
 
 /**
- * Why `answers` do not answer `asked`, or null: an answer to a question not asked, two to one question, a label its question does not offer,
- * several labels where one is taken, and a question left with neither a choice nor words of the person's own.
+ * Why `answers` do not answer `asked`, or null: an answer to a question not asked, two to one question, a label its question does not
+ * offer, several labels where one is taken, and a question left with neither a choice nor words of the person's own.
  */
 export function answerRefusal(asked: readonly Question[], answers: readonly Answer[]): string | null {
   const seen = new Set<string>();

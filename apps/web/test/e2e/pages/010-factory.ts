@@ -90,7 +90,7 @@ export default {
    * step's inspector; and the loop's arrow back.
    */
   name: 'factory',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     await sidebar(page);
     const floor = page.locator('.react-flow');
@@ -300,7 +300,7 @@ export default {
       `a loop out of rounds waits on a person: its card is on the floor by default (${LOOPING.id})`,
     );
     await expectVisible(
-      page.getByText('4 in flight · 12 finished · 2 to decide · 6 waiting on you'),
+      page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
       "the Factory counts the runs in flight (NEIGHBOUR, HELD, the diamond's running side and its bottom), the finished, those nobody has decided (ENDING and UNMERGED), and those waiting on you (FAKE, LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off)",
     );
     await expectVisible(
@@ -360,14 +360,11 @@ export default {
       );
     }
     await expectCount(page.locator('[data-pruned]'), 1, 'and no other card says pruned: SHIPPED is the one run pruned');
-    const inFolders = cardOf(page, FOLDER.id).getByText('folders', { exact: true });
-    await expectVisible(inFolders, `a folder run's card says folders, and names no repository (${FOLDER.id})`);
-    const where = await inFolders.getAttribute('title');
-    if (!new RegExp(String.raw`^Its steps work in folders under .+[\\/]runs[\\/]${FOLDER.id}[\\/]work$`).test(where ?? '')) {
-      throw new Refused(
-        `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
-      );
-    }
+    await expectCount(
+      cardOf(page, FOLDER.id),
+      0,
+      `a run started in the factory ${FOLDER.factory} is on its floor, not the default factory's, finished runs shown (${FOLDER.id})`,
+    );
     await expectVisible(
       cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
       `${orphan.id}'s card says ${DIAMOND.words.orphan}, amber`,

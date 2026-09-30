@@ -12,7 +12,10 @@ const nodeTypes = { factory: FactoryBlockNode };
 const COLUMNS = 3;
 const GAP = 48;
 
-/** The blocks as React Flow's nodes, laid out on a grid in their order, `COLUMNS` a row: none dragged, none selected. */
+/**
+ * The blocks as React Flow's nodes, laid out on a grid in their order, `COLUMNS` a row: none dragged, none selected. React Flow takes the
+ * pointer off a node that is neither, so each is given it back: a block is a link.
+ */
 const nodesOf = (blocks: readonly FactoryBlock[]): FactoryFlowNode[] =>
   blocks.map((block, i) => ({
     id: block.name,
@@ -23,6 +26,7 @@ const nodesOf = (blocks: readonly FactoryBlock[]): FactoryFlowNode[] =>
     height: BLOCK_SIZE.height,
     draggable: false,
     selectable: false,
+    style: { pointerEvents: 'all' },
   }));
 
 /**

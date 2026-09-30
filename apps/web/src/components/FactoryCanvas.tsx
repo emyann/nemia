@@ -215,7 +215,7 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
  *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
- * - The floor fills the box its page gives it. The queue lane sits at its left, off while a step's inspector is open. The
+ * - The floor fills the screen under the root's header. The queue lane sits at its left, off while a step's inspector is open. The
  *   floor's hint shows only where the floor is wide enough beside its buttons, and the legend wraps short of the minimap when there is
  *   one; arrowheads take their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, opens or closes it; a click or Enter on a link or a button in it does only what
@@ -455,7 +455,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   const inspected = inspectedRun?.steps.find((step) => step.name === selected?.step);
 
   return (
-    <div className="flex h-full min-h-96 flex-col">
+    <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className="text-sm text-muted-foreground">

@@ -17,7 +17,7 @@ export default {
    * legend, then the popover's. The approval is written, then taken back, so every page after reads the store as seeded.
    */
   name: 'factory-mid-gate',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, gated } = GATED;
     const asks = path.join(store!, 'runs', `${id}.asks`);
@@ -63,7 +63,7 @@ export default {
       `the page is scrolled to ${gated}'s inspector, below the first screen under the banners and Decide, and stays there once Decide has read its decision`,
     );
     await photograph(page, path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`));
-    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');
 

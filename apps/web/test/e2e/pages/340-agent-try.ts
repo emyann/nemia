@@ -164,7 +164,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `agent-try-started-${await themeOf(page)}.png`), { fullPage: true });
 
-      await goto(page, '/');
+      await goto(page, '/factories/default');
       await expectVisible(
         page.locator(`.react-flow__node[data-id="${id}"] [data-try-tag="${seeded.name}"]`),
         'the Factory, where a try in flight is on the floor, tags its card try',

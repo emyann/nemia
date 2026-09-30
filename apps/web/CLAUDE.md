@@ -53,6 +53,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - Drag with `page.mouse` (down, `move(…, { steps: 12 })`, up), never `dragTo`: React Flow moves a node from the second pointer move, and a
   handle has `pointer-events: none` until a drag starts (`drawEdge` in `canvas.ts`). In the browser tools, synthesize mouse events a few
   milliseconds apart from `browser_evaluate`.
+- React Flow sets `pointer-events: none` on a node neither draggable nor selectable, and a click on it lands on the pane: a node that is
+  a link gives them back in its `style` (`nodesOf` in `FactoriesCanvas.tsx`).
 - React Flow's `nodeTypes` and `edgeTypes` are module constants, and each `ReactFlow` has an `id` of its own, which scopes its marker
   ids; `defaultMarkerColor={null}` lets the stylesheet colour a marker.
 - Chromium writes a console error, `Failed to load resource`, for every 4xx: a page expecting one refusal allows that line too.

@@ -1,13 +1,10 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { ChevronLeft } from 'lucide-react';
-import { RouteLink } from '@/components/AgentParts';
 import { FactoryCanvas } from '@/components/FactoryCanvas';
 import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { daemonQuery, factoriesQuery, inboxQuery, quotaQuery, runsQuery, type Factory } from '@/lib/api';
-import { repoName } from '@/lib/factory';
+import { daemonQuery, factoriesQuery, inboxQuery, quotaQuery, runsQuery } from '@/lib/api';
 import { runsIn } from '@/lib/factories';
 
 export const Route = createFileRoute('/factories/$factory')({
@@ -35,8 +32,8 @@ export const Route = createFileRoute('/factories/$factory')({
 });
 
 /**
- * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), under a line back to the Factories naming
- * it and its repositories, or why its file does not read. A name the api lists no factory by says so: no route of the api is asked about it.
+ * Inside a factory: its floor, the runs it holds and the cards queued in it (`FactoryCanvas`), named in the root's header
+ * (`FactoryCrumb`). A name the api lists no factory by says so: no route of the api is asked about it.
  */
 function FactoryPage() {
   const { factory: name } = Route.useParams();
@@ -44,39 +41,7 @@ function FactoryPage() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   const factory = factories.find((f) => f.name === name);
   if (!factory) return <NoSuchFactory name={name} />;
-  return (
-    <div className="flex h-[calc(100svh-3rem)] flex-col" data-factory={factory.name}>
-      <FactoryLine factory={factory} />
-      <div className="min-h-0 flex-1">
-        <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} />
-      </div>
-    </div>
-  );
-}
-
-/** The line over a factory's floor: back to the Factories, the factory's name, and the repositories it works on, whole on hover. */
-function FactoryLine({ factory }: { factory: Factory }) {
-  return (
-    <nav aria-label="Factory" className="flex items-center gap-2 border-b px-4 py-1.5 text-sm">
-      <RouteLink
-        to="/"
-        className="flex items-center gap-1 text-muted-foreground outline-none hover:text-foreground focus-visible:underline"
-      >
-        <ChevronLeft className="size-4" />
-        Factories
-      </RouteLink>
-      <span className="text-muted-foreground">/</span>
-      <h1 className="font-medium">{factory.name}</h1>
-      <span className="truncate text-muted-foreground" title={factory.repos.join('\n')}>
-        on {factory.repos.map(repoName).join(', ') || 'no repository'}
-      </span>
-      {factory.error && (
-        <span className="truncate text-destructive" title={factory.error}>
-          Its file does not read: {factory.error}
-        </span>
-      )}
-    </nav>
-  );
+  return <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} />;
 }
 
 /** A button to a route, as the router draws its links (`routeLink`). */

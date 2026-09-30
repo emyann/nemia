@@ -20,6 +20,7 @@
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
  * lists, in the store's `inbox/`: CARDS, and the queued ones the Factory draws as ghosts, with the cap the daemon last ran with: QUEUE.
+ * And the factories the Factories canvas draws, in the store's `factories/`: FACTORIES, FOLDER's run started in one of them.
  *
  * Written by hand rather than through agent-orchestrator: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
@@ -529,6 +530,8 @@ export const FOLDER = {
   verdict: 'The note holds: nothing in it is claimed beyond what it says it is unsure of.',
   /** The one command `wf decide` offers a run with no repository, which the board offers too. */
   forget: 'wf rm a-note-on-the-tides-e2e15',
+  /** The factory it was started in, FACTORIES' `hiring`: the one run not in the default factory. */
+  factory: 'nemia',
 } as const;
 
 /**
@@ -593,6 +596,7 @@ export function seedFolder(root: string, now = Date.now()): void {
             permissionMode: 'dontAsk',
           },
         ],
+        factory: FOLDER.factory,
         createdAt: ago(20),
         steps: { write: { taskId: `${id}-write`, workspace: wrote }, review: { taskId: `${id}-review`, workspace: wrote } },
       },
@@ -624,6 +628,28 @@ export function seedFolder(root: string, now = Date.now()): void {
     needs: null,
     artifacts: [],
   });
+}
+
+/**
+ * The factories in the store, each a file in `factories/` as `wf factory add` writes it. `hiring` holds FOLDER's run, is offered WORKFLOWS'
+ * `dev` and hires its agent into `implement`; `bare` names only a folder, and so do `others`, which are there so the menu has more
+ * factories than it shows; `broken`'s file names no repository, so it does not read as a factory. Listed by name, as the api lists them.
+ */
+export const FACTORIES = {
+  hiring: { name: FOLDER.factory, hire: 'dev/implement' },
+  bare: 'pipao',
+  others: ['harbour', 'lighthouse'],
+  broken: 'broken',
+} as const;
+
+/** Write FACTORIES into the store at `root`: `hiring` on `repo`, the others each on a folder beside it, and `broken` with no `repos`. */
+export function seedFactories(root: string, repo: string): void {
+  const dir = path.join(root, 'factories');
+  const { hiring, bare, others, broken } = FACTORIES;
+  const hires = { [hiring.hire]: WORKFLOWS.good.agent.name };
+  write(path.join(dir, `${hiring.name}.json`), JSON.stringify({ repos: [repo], workflows: [WORKFLOWS.good.name], hires }, null, 2));
+  for (const name of [bare, ...others]) write(path.join(dir, `${name}.json`), JSON.stringify({ repos: [path.join(root, name)] }, null, 2));
+  write(path.join(dir, `${broken}.json`), JSON.stringify({ workflows: [WORKFLOWS.good.name] }, null, 2));
 }
 
 /** The diamond's runs, oldest first. */

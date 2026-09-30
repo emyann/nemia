@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { createRootRouteWithContext, Outlet, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet, useMatch, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Workflow } from 'lucide-react';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
+import { FactoryCrumb } from '@/components/FactoryCrumb';
 import { NAV } from '@/components/nav';
 import { routeLink } from '@/components/routeLink';
 import {
@@ -34,8 +35,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 /**
- * The frame of every page: the sidebar, a header naming the section, and the page, in a centred column unless a matched route's
- * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself. It follows the workflow feed once
+ * The frame of every page: the sidebar, a header naming the section — and the factory, inside one (`FactoryCrumb`) — and the page, in
+ * a centred column unless a matched route's `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above
+ * itself. It follows the workflow feed once
  * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
  * every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
@@ -43,6 +45,7 @@ function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
   const section = NAV.find((item) => item.active(path))?.label;
+  const factory = useMatch({ from: '/factories/$factory', shouldThrow: false })?.params.factory;
   const router = useRouter();
   const feed = useFeed();
 
@@ -53,7 +56,7 @@ function Root() {
         <SidebarInset className="min-w-0">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3" data-feed={feed}>
             <SidebarTrigger />
-            {section && <span className="text-sm font-medium">{section}</span>}
+            {factory !== undefined ? <FactoryCrumb name={factory} /> : section && <span className="text-sm font-medium">{section}</span>}
           </header>
           {fullBleed ? (
             <Outlet />

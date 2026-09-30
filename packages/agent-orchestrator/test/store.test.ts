@@ -1583,7 +1583,10 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   );
 });
 
-/** A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the mutants' `wf mutants:` lines, then a tail longer than 20 lines. */
+/**
+ * A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the mutants' `wf mutants:` lines, then a tail longer than
+ * 20 lines.
+ */
 const mutantLog = (killed: readonly string[]): string =>
   [
     'agent-orchestrator:test: ✔ files a step (12 ms)',

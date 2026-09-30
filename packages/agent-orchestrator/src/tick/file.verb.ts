@@ -43,17 +43,8 @@ import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, typ
 import { roundFiled } from '../round/round.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
-import {
-  artifactsDir,
-  cancelFile,
-  checkStderr,
-  holdFile,
-  inputsDir,
-  pruneFile,
-  readRun,
-  runFile,
-  stepsOf,
-} from '../record/record.store.ts';
+import { artifactsDir, checkStderr, inputsDir, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
@@ -118,7 +109,7 @@ export async function parentCloseouts(e: Engine, ids: readonly string[]): Promis
     let record: Run;
     let steps: Workflow[];
     try {
-      record = readRun(id);
+      record = runStore.runs.read(id);
       steps = stepsOf(record);
     } catch (err) {
       out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}` });
@@ -191,12 +182,7 @@ export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; ma
  */
 export const mayFileOf = (run: Run): (() => boolean) => {
   let calledOff = false;
-  return () =>
-    !(calledOff ||=
-      !fs.existsSync(runFile(run.id)) ||
-      fs.existsSync(cancelFile(run.id)) ||
-      fs.existsSync(pruneFile(run.id)) ||
-      fs.existsSync(holdFile(run.id)));
+  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
 };
 
 /** The step of this name, which the pass's assessment named. */

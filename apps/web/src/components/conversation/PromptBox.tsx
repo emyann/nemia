@@ -17,10 +17,10 @@ type Props = {
 
 /**
  * The chat input under a step's conversation, in the conversation layer's look: a rounded field that grows with what is written, and a send
- * button in its corner. Enter sends; Shift+Enter breaks the line. Sending posts the words to the api (`sayToStep`), which calls `wf say`'s own
- * `say()`: the words go to the session through its harness, and onto the step's record. A refusal shows under the box as the api said it —
- * the package's words or the engine's — and the words stay in the box, to send again. Closed, with the reason and where to go instead, when
- * the step has no session in flight. Once said, the box is emptied only if it still holds what was sent, keeping what a person wrote
+ * button in its corner. Enter sends; Shift+Enter breaks the line. Sending posts the words to the api (`sayToStep`), which calls `wf say`'s
+ * own `say()`: the words go to the session through its harness, and onto the step's record. A refusal shows under the box as the api said
+ * it — the package's words or the engine's — and the words stay in the box, to send again. Closed, with the reason and where to go instead,
+ * when the step has no session in flight. Once said, the box is emptied only if it still holds what was sent, keeping what a person wrote
  * meanwhile, and the run's record alone is read again (`exact`): nothing said to a session changes what there is to decide, and a decision
  * is keyed by the state it was read for.
  */

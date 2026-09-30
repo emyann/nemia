@@ -7,13 +7,13 @@
  *
  * A card's page reads one card: as the inbox lists it, as its file is written, and its keys (`GET /api/inbox/:name`).
  *
- * A card is queued to start on its own, and taken off the queue, as `wf inbox queue <name>` and `wf inbox queue <name> --off` do (`POST` and
- * `DELETE /api/inbox/:name/queue`, through `queueInInbox`): the tick starts the next card in the queue's order when a run slot is free. The
- * listing already says where each queued card stands — `queued`, its time and place, and `tried`, the tick's last start of it that did not
- * happen — since each entry is the package's.
+ * A card is queued to start on its own, and taken off the queue, as `wf inbox queue <name>` and `wf inbox queue <name> --off` do (`POST`
+ * and `DELETE /api/inbox/:name/queue`, through `queueInInbox`): the tick starts the next card in the queue's order when a run slot is free.
+ * The listing already says where each queued card stands — `queued`, its time and place, and `tried`, the tick's last start of it that did
+ * not happen — since each entry is the package's.
  *
- * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and dropping
- * are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
+ * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and
+ * dropping are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,15 +41,16 @@ import { folderOf, type KeyRow } from '../workflows/workflows.ts';
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
  * the runs it was `startedAs`, and, for an entry that does not read as a card, why — with two things the listing does not carry.
  *
- * `body` is the card's text below its frontmatter, the brief a start is prefilled with: null for an entry that does not read. `filedAt` is when
- * its file was last written — when it was filed, unless a person has edited it since — which is what the board orders the cards by, newest
- * first: a card carries no time of its own. Null for an entry gone between the listing and the read.
+ * `body` is the card's text below its frontmatter, the brief a start is prefilled with: null for an entry that does not read. `filedAt` is
+ * when its file was last written — when it was filed, unless a person has edited it since — which is what the board orders the cards by,
+ * newest first: a card carries no time of its own. Null for an entry gone between the listing and the read.
  */
 export type InboxEntry = InboxListing & { body: string | null; filedAt: string | null };
 
 /**
- * What a card's page shows: the card as the inbox lists it (`InboxEntry`), its file as written — frontmatter and all — and each key an inbox
- * card may set, a row each, with its value and what it means. No keys for an entry that does not read as a card: its `error` says why.
+ * What a card's page shows: the card as the inbox lists it (`InboxEntry`), its file as written — frontmatter and all — and each key an
+ * inbox card may set, a row each, with its value and what it means. No keys for an entry that does not read as a card: its `error` says
+ * why.
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
@@ -57,9 +58,9 @@ export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null
 export type InboxFiled = { name: string; file: string; workflow: string | null; repo: string | null; body: string };
 
 /**
- * What `POST` and `DELETE /api/inbox/:name/queue` answer: what `wf inbox queue` did (the package's `InboxQueued`) — `queued`, `taken back`, or
- * `not queued` for a card taken off a queue it was not in, which writes nothing — the card's `queued:` as it now reads, and, once queued, its
- * place in the queue's order and how many are in it.
+ * What `POST` and `DELETE /api/inbox/:name/queue` answer: what `wf inbox queue` did (the package's `InboxQueued`) — `queued`, `taken back`,
+ * or `not queued` for a card taken off a queue it was not in, which writes nothing — the card's `queued:` as it now reads, and, once
+ * queued, its place in the queue's order and how many are in it.
  */
 export type InboxQueueAnswer = {
   name: string;
@@ -94,8 +95,8 @@ const FILE_SHAPE =
   '`{ "body": "<the idea>" }`, with `"workflow": "<name>"` for what runs it — `"from": "repo"` or `"yours"` when both have a workflow of that name — and `"repo": "<absolute path>"` for the repository it is about';
 
 /**
- * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, and `from` says where it is
- * read from only beside one (`filingOf`).
+ * `POST /api/inbox`'s body, its keys in the order they are refused: a workflow is a folder's name, never a path, and `from` says where it
+ * is read from only beside one (`filingOf`).
  */
 const FILE_BODY = Schema.Struct({
   body: Schema.String,
@@ -167,9 +168,9 @@ const queueGuard = (name: string, off: boolean): Guarded =>
 const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
 
 /**
- * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the api does
- * not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a `workflow` sent is
- * refused by name rather than read as nothing.
+ * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the
+ * api does not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a
+ * `workflow` sent is refused by name rather than read as nothing.
  */
 function queueBodyRefusal(route: string, text: string): Refusal | null {
   if (!text.trim()) return null;
@@ -190,13 +191,13 @@ function queueBodyRefusal(route: string, text: string): Refusal | null {
 }
 
 /**
- * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders a
- * start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
+ * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders
+ * a start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
  *
- * A repository's workflow is written by name, as `wf inbox add --workflow dev` writes it, when the card starts on the api's repository: a name
- * is found under the repository's `workflows/` at start. Yours, or any workflow on a card about another repository, is written as the folder
- * found, absolute, since its name would be looked for where it is not. Whether the idea, the workflow and the repo make a card is the package's
- * to say (`addToInbox`).
+ * A repository's workflow is written by name, as `wf inbox add --workflow dev` writes it, when the card starts on the api's repository: a
+ * name is found under the repository's `workflows/` at start. Yours, or any workflow on a card about another repository, is written as the
+ * folder found, absolute, since its name would be looked for where it is not. Whether the idea, the workflow and the repo make a card is
+ * the package's to say (`addToInbox`).
  *
  * An absolute `repo` is written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start
  * records names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is, for
@@ -315,8 +316,8 @@ export const inbox = new Hono<ApiEnv>()
  * against (`Conflict`); 422 for a card that does not read, or a card to queue that names no workflow (`Invalid`).
  *
  * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
- * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken back
- * would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
+ * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken
+ * back would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
  * A time that cannot be set back leaves the queue written all the same: the card lists at the time of the queue, until it is written again.
  */
 async function queueRoute(c: Context, off: boolean) {

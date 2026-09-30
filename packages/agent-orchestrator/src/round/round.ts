@@ -52,7 +52,8 @@ import type { Decision } from '../decide/decide.ts';
  * round, which names it, so it is honoured once. `again: false`, blocked, unsigned, a check that did not pass: nothing is due.
  *
  * A loop with a step over its budget goes round on nobody's word but a person's raising the cap: its looping step reads `over budget`, so
- * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has cost.
+ * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has
+ * cost.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  */
@@ -135,8 +136,8 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
  * with no loop, or several and none named; a round already asked for; a step of the loop that stopped in this round, which `wf retry` is
  * for; a round the run files itself; a loop that ended without asking again; and a round still running.
  *
- * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget` above
- * what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
+ * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget`
+ * above what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
  *
  * A loop a person ended themselves (`wf accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the loop
  * is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that ran
@@ -298,7 +299,10 @@ export function roundAsk(
   );
 }
 
-/** Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing or empty. */
+/**
+ * Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing
+ * or empty.
+ */
 export const acceptWordsRefusal = (message: string | undefined, command: string): string | null =>
   message === undefined
     ? `--message says why the work is good enough with its findings open, and is what the steps after the loop are handed — the shipper, and whoever reads the merge, have nothing else. Say it: ${command} --message "<why>".`
@@ -313,10 +317,10 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
  * thing `wf decide` could offer was another paid round — may be ended on a person's word: what waits on the looping step is then filed as
  * if it had said `again: false`, and its findings stay on the record and travel on the next step's brief (`acceptedSection`).
  *
- * Refused: words that are missing or empty; a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow with
- * no loop, or several and none named; a try already accepted; a round already asked for, which the next tick files; a round the run files
- * itself, below the cap, and one held on a step's budget below the cap — each named with the `wf round` that is the way on; a loop that ended
- * `again: false`, which handed on by itself; and a round still running.
+ * Refused: words that are missing or empty; a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow
+ * with no loop, or several and none named; a try already accepted; a round already asked for, which the next tick files; a round the run
+ * files itself, below the cap, and one held on a step's budget below the cap — each named with the `wf round` that is the way on; a loop
+ * that ended `again: false`, which handed on by itself; and a round still running.
  *
  * @param asks What people asked for with `wf round`, and the run has not consumed yet: a round already asked for.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
@@ -412,7 +416,9 @@ export function acceptAsk(
   );
 }
 
-/** A loop a person ended as it stands, beside its looping step's line: the round it was on, that it asked again, and when they said enough. */
+/**
+ * A loop a person ended as it stands, beside its looping step's line: the round it was on, that it asked again, and when they said enough.
+ */
 export const acceptedNote = (step: Workflow, run: Run, a: Acceptance): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — accepted as it stands at ${a.at}, its findings open`;
 
@@ -425,13 +431,17 @@ export function roundDueNote(steps: readonly Workflow[], r: Round): string {
 }
 
 /**
- * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a step's.
- * On a pruned run, where it stands and why there is no more: `wf round` is refused there (`prunedRefusal`), and a note never offers a refused verb.
+ * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a
+ * step's. On a pruned run, where it stands and why there is no more: `wf round` is refused there (`prunedRefusal`), and a note never offers
+ * a refused verb.
  */
 export const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
 
-/** A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the round — or, pruned, why there is none. */
+/**
+ * A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the
+ * round — or, pruned, why there is none.
+ */
 export const heldNote = (step: Workflow, run: Run): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: wf round ${run.id} ${step.name} --budget <amount>`}`;
 
@@ -449,8 +459,8 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
   over.map((o) => `${o.name} has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ');
 
 /**
- * What `wf decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `wf round` that takes it once more,
- * with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
+ * What `wf decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `wf round` that takes it once
+ * more, with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
  * is `retryLines`' to offer. `wf accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a

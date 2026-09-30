@@ -58,8 +58,9 @@ function WorkflowsPage() {
 }
 
 /**
- * A workflow's card: what it is, drawn, its steps' pages and a start — or, for one of yours, its builder in their place (`WorkflowBuilder`).
- * `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api writes nothing into a checkout.
+ * A workflow's card: what it is, drawn, its steps' pages and a start — or, for one of yours, its builder in their place
+ * (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api
+ * writes nothing into a checkout.
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
@@ -143,7 +144,9 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
   );
 }
 
-/** Each step's page — what it is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard. */
+/**
+ * Each step's page — what it is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard.
+ */
 function StepLinks({ workflow }: { workflow: WorkflowListing }) {
   return (
     <nav aria-label={`Steps of ${workflow.name}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">

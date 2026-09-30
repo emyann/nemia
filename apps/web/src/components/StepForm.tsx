@@ -319,7 +319,9 @@ function Meaning({ children }: { children: string }) {
 
 const asIs = (value: string) => value;
 
-/** A select of `options`, `unset` first; a value the options lack is kept as one, said by `stray`, so what the file says is never hidden. */
+/**
+ * A select of `options`, `unset` first; a value the options lack is kept as one, said by `stray`, so what the file says is never hidden.
+ */
 function Choose({
   id,
   value,
@@ -349,9 +351,9 @@ function Choose({
 }
 
 /**
- * A field typed into: what is typed stays as typed — `Read, ` on its way to `Read, Grep` — and each keystroke is committed to the draft as the
- * key reads it. `value` is the draft's, as `canon` writes what is typed: when the draft changes under the field — a loop drawn gives it rounds —
- * the field shows the draft's.
+ * A field typed into: what is typed stays as typed — `Read, ` on its way to `Read, Grep` — and each keystroke is committed to the draft as
+ * the key reads it. `value` is the draft's, as `canon` writes what is typed: when the draft changes under the field — a loop drawn gives it
+ * rounds — the field shows the draft's.
  */
 function Typed({
   id,
@@ -391,8 +393,8 @@ function Typed({
 }
 
 /**
- * `output:`: a schema beside the step, picked from the folder's — or pasted, with the file it is written to, which is written when the draft is
- * saved and replaces a file of that name. Picking a file or none takes a paste back.
+ * `output:`: a schema beside the step, picked from the folder's — or pasted, with the file it is written to, which is written when the
+ * draft is saved and replaces a file of that name. Picking a file or none takes a paste back.
  */
 function SchemaInput({
   id,

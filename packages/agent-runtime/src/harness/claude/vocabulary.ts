@@ -33,7 +33,8 @@ export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhig
 /**
  * The context windows Claude Code takes, in tokens: `--autocompact`'s range, both ends included. The CLI refuses any other
  * value while it parses its arguments ("It must be 'auto', or between 100k and 1M"), so a `--bg` spawn given one would fail
- * on every pass; `file()` asks first. 100000 and 1000000 are taken, 99999 and 1000001 refused. A value is handed over as its digits, never `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
+ * on every pass; `file()` asks first. 100000 and 1000000 are taken, 99999 and 1000001 refused. A value is handed over as its digits, never
+ * `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
  */
 export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
 
@@ -157,7 +158,8 @@ export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | u
 /**
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
  * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
- * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than carried; `claude -p` keeps one.
+ * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than
+ * carried; `claude -p` keeps one.
  */
 export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??

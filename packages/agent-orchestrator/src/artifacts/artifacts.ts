@@ -25,8 +25,8 @@ import { filesPrunedWords, type Pruned } from '../record/record.ts';
  * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  *
  * `inFolder` for a step of a folder run (`workspace: folder`): there the *first* way is the one that does harm. Such a step runs in
- * `dontAsk` (`validateFolderMode` in workflow/validate.ts), fenced to its own folder, and that directory sits beside the folder, outside the
- * fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
+ * `dontAsk` (`validateFolderMode` in workflow/validate.ts), fenced to its own folder, and that directory sits beside the folder, outside
+ * the fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
  * the same. So it too is told one way, and neither mentions a branch, since a folder run has none.
  */
 export const artifactsContract = (dir: string, inMain = false, inFolder = false): string =>

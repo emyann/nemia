@@ -24,7 +24,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 const { lastPassCost, listRuns, readRun, start, tick } = await import('../runner.ts');
-const { metered, within } = await import('./tally.store.ts');
+const { metered, meteredPass, metering, within } = await import('./tally.store.ts');
+const { Effect, Fiber } = await import('effect');
+const { Invalid } = await import('../refusal/refusal.ts');
 
 /** A spin, so a fake's time is spent on the thread the meter measures, not handed to a timer that may fire late. */
 const busy = (ms: number) => {
@@ -34,11 +36,11 @@ const busy = (ms: number) => {
 
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
- * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
- * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word,
- * and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the pass reads
- * it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a
- * runtime that counts none.
+ * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that
+ * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has
+ * each word, and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the
+ * pass reads it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the
+ * fake is a runtime that counts none.
  */
 const fake = ({
   passMs = 0,
@@ -310,4 +312,49 @@ test('the word that admits a queued task is charged to act, and `wf tick --stats
     assert.ok(Number(ms) >= 25, `the breakdown's act row carries the admit's time: ${row}`);
     assert.equal(Number(calls), cost.phases.act.calls, `the breakdown's act row carries act's calls: ${row}`);
   }
+});
+
+test("a program metered as a pass counts as a Promise metered does: its reads, its kinds, and a program inside another's meter no counts", async () => {
+  emptyStore();
+  const [run] = started(1);
+  const alone = await Effect.runPromise(
+    meteredPass(
+      Effect.sync(() => {
+        readRun(run.id);
+        within('act', () => busy(2));
+        return 'read';
+      }),
+    ),
+  );
+  assert.equal(alone.value, 'read');
+  assert.ok(alone.tallies, 'a pass alone is counted');
+  assert.equal(alone.tallies.records, 1, 'the one read counted');
+  assert.ok(alone.tallies.kinds.act.ms >= 2 && alone.ms >= alone.tallies.kinds.act.ms, 'act charged, within the pass');
+  assert.equal(metering(), false, 'the meter closed with the pass');
+  const outer = await metered(async () => {
+    const inner = await Effect.runPromise(meteredPass(Effect.sync(() => readRun(run.id))));
+    assert.equal(inner.tallies, undefined, "a program inside another's meter carries no counts of its own");
+    assert.equal(metering(), true, 'and leaves the outer meter open');
+    return 'done';
+  });
+  assert.equal(outer.tallies?.records, 1, 'the outer meter counted the inner read');
+});
+
+test('REFUSED: a metered program leaves no meter open, whether it fails, dies or is interrupted', async () => {
+  const refusal = new Invalid({ message: 'x' });
+  const failed = await Effect.runPromise(Effect.flip(meteredPass(Effect.fail(refusal))));
+  assert.equal(failed, refusal, 'the failure is the one it failed with');
+  assert.equal(metering(), false, 'no meter open after a failure');
+  const boom = new Error('y');
+  const died = await Effect.runPromise(meteredPass(Effect.die(boom))).then(
+    () => assert.fail('a defect resolved'),
+    (err: unknown) => err,
+  );
+  assert.equal(died, boom, 'the defect is rethrown as itself');
+  assert.equal(metering(), false, 'no meter open after a defect');
+  const fiber = Effect.runFork(meteredPass(Effect.never));
+  await Effect.runPromise(Effect.yieldNow);
+  assert.equal(metering(), true, 'the meter open while the program runs');
+  await Effect.runPromise(Fiber.interrupt(fiber));
+  assert.equal(metering(), false, 'no meter open after an interruption');
 });

@@ -37,11 +37,11 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
  * answers the wait: in Claude Code, and never from here. A session the harness blocked is continued from here, as `wf retry` continues it
  * (`Continue`); once that try is asked, the banner says what the tick does with it, in `wf ls`'s words: the step's note.
  *
- * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate, `approve plan`,
- * linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner says (`onYouOf`),
- * which is above this one and names it: `wf ls` does not ask for the same step twice. A run whose whole `waiting on you` was that step has
- * no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation. A step at its gate is said in the
- * line alone: its approval is no question to list under it.
+ * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate,
+ * `approve plan`, linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner
+ * says (`onYouOf`), which is above this one and names it: `wf ls` does not ask for the same step twice. A run whose whole `waiting on you`
+ * was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation. A step at its
+ * gate is said in the line alone: its approval is no question to list under it.
  *
  * A question is answered from the Decide section; a session the harness blocked, here. Under such a session, what a person does about the
  * wait, in the package's words (`answerIn`): the harness answers it, and this board does not — Continue only asks the tick for another try.

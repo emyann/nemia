@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process';
 
 /**
- * Whether a result branch still merges onto the base branch as it is now, as `git merge-tree --write-tree` answers it: a merge made in git's
- * object store alone, which touches no checkout, no index and no ref. `clean` when it would merge with no conflict; the files it would
- * conflict in otherwise, as git names them; `error` where git could not say — a branch it no longer has, or a git older than 2.38, which has
- * no `--write-tree` — never a guess either way.
+ * Whether a result branch still merges onto the base branch as it is now, as `git merge-tree --write-tree` answers it: a merge made in
+ * git's object store alone, which touches no checkout, no index and no ref. `clean` when it would merge with no conflict; the files it
+ * would conflict in otherwise, as git names them; `error` where git could not say — a branch it no longer has, or a git older than 2.38,
+ * which has no `--write-tree` — never a guess either way.
  *
- * The api's and not the package's: nothing in agent-orchestrator asks it, and an ending step that merges does its own trial merge when it runs.
- * This is what a person reads before approving that step, so a conflict is seen at the gate rather than as the ending's abort. A git call a
- * branch, so read on a run's decision, which is read once for a state of the run, never on the list the Factory polls.
+ * The api's and not the package's: nothing in agent-orchestrator asks it, and an ending step that merges does its own trial merge when it
+ * runs. This is what a person reads before approving that step, so a conflict is seen at the gate rather than as the ending's abort. A git
+ * call a branch, so read on a run's decision, which is read once for a state of the run, never on the list the Factory polls.
  */
 export type MergeWord = { clean: true } | { clean: false; conflicts: string[] } | { error: string };
 

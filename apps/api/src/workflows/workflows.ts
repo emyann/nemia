@@ -65,9 +65,15 @@ export type WorkflowStepSpec = {
   after: string[];
   resume: string | null;
   input: string[];
-  /** `workspace: main`: the step runs in the repository's own checkout; `folder`: in a folder the run makes, in a run with no repository. Null for a step without the line. */
+  /**
+   * `workspace: main`: the step runs in the repository's own checkout; `folder`: in a folder the run makes, in a run with no repository.
+   * Null for a step without the line.
+   */
   workspace: 'main' | 'folder' | null;
-  /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can say. */
+  /**
+   * `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can
+   * say.
+   */
   slot: 'none' | null;
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
   agent: string | null;
@@ -81,9 +87,14 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallowedTools:`): empty where the step denies nothing. */
   disallowedTools: string[];
-  /** What the session may do without being asked, in the same rules (`allowedTools:`): empty where the step allows nothing beyond its mode. */
+  /**
+   * What the session may do without being asked, in the same rules (`allowedTools:`): empty where the step allows nothing beyond its mode.
+   */
   allowedTools: string[];
-  /** `denials: fail`: a try the harness denied a call reads `denied` and waits on a person. Null for a step without the line, whose denials decide nothing. */
+  /**
+   * `denials: fail`: a try the harness denied a call reads `denied` and waits on a person. Null for a step without the line, whose denials
+   * decide nothing.
+   */
   denials: 'fail' | null;
   /** `background:` as written, `true` or `false`: null where the step has no line, and runs as a job (`claude -p`). */
   background: boolean | null;
@@ -94,7 +105,9 @@ export type WorkflowStepSpec = {
   budget: number | null;
   check: string | null;
   retries: number | null;
-  /** `gate: true`: the step's closeout waits for a person. Null for a step without the line, which is the only other thing a step can say. */
+  /**
+   * `gate: true`: the step's closeout waits for a person. Null for a step without the line, which is the only other thing a step can say.
+   */
   gate: true | null;
   /** The schema file `output:` names, beside the step. */
   output: string | null;
@@ -103,10 +116,10 @@ export type WorkflowStepSpec = {
 };
 
 /**
- * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is told:
- * the shape the builder puts a folder back in (builder.ts). `graph` is `graphOf` its steps, as a run of it would be drawn. `schemas` are the
- * `.json` files beside the steps, which an `output:` may name. `error` is the loader's refusal of a folder that does not read as a workflow,
- * whose `steps` are then none.
+ * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is
+ * told: the shape the builder puts a folder back in (builder.ts). `graph` is `graphOf` its steps, as a run of it would be drawn. `schemas`
+ * are the `.json` files beside the steps, which an `output:` may name. `error` is the loader's refusal of a folder that does not read as a
+ * workflow, whose `steps` are then none.
  */
 export type WorkflowListing = {
   name: string;
@@ -137,7 +150,9 @@ export type WorkflowListing = {
  */
 export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
 
-/** What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it). */
+/**
+ * What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it).
+ */
 export type StepOwn = { keys: StepKey[]; body: string };
 
 /**
@@ -148,9 +163,9 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /**
  * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
- * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds` is
- * the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can do,
- * generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
+ * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds`
+ * is the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can
+ * do, generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
  */
 export type WorkflowStepPage = {
   workflow: string;
@@ -175,7 +190,10 @@ function keyValue(step: Workflow, key: StepKey): string | null {
   return String(value);
 }
 
-/** Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it does. */
+/**
+ * Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it
+ * does.
+ */
 export const keyRows = (step: Workflow): KeyRow[] =>
   STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
@@ -193,9 +211,9 @@ export function listWorkflows(repo: string, home: string): WorkflowListing[] {
 }
 
 /**
- * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the repository's
- * `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so the board shows a
- * folder as a start would read it.
+ * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the
+ * repository's `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so
+ * the board shows a folder as a start would read it.
  */
 export const placesOf = (repo: string, home: string): Places => ({ repo, home });
 
@@ -244,14 +262,14 @@ const listedStep = (step: Workflow): ListedStep => ({
 });
 
 /**
- * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
- * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
- * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
- * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its file, where the load
- * finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill folder its `skills:` gives:
- * what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as the step's, and an agent edited
- * after the listing is a step the board does not show as it is.
+ * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what
+ * a save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and
+ * `writeWorkflow` removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or
+ * removed changes it, and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as
+ * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its
+ * file, where the load finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill
+ * folder its `skills:` gives: what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as
+ * the step's, and an agent edited after the listing is a step the board does not show as it is.
  */
 export function versionOf(dir: string, places: Places): string {
   let names: string[];
@@ -311,7 +329,9 @@ function frontmatterValue(text: string, key: 'agent'): string[] {
   return [];
 }
 
-/** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */
+/**
+ * The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed.
+ */
 function schemasIn(dir: string): string[] {
   try {
     return fs
@@ -459,7 +479,10 @@ export function folderOf(name: string, from: WorkflowSource | undefined, repo: s
   };
 }
 
-/** What `POST /api/runs` starts: a workflow's folder, with a brief — or, for an inbox card, the card and the brief given in place of its body. */
+/**
+ * What `POST /api/runs` starts: a workflow's folder, with a brief — or, for an inbox card, the card and the brief given in place of its
+ * body.
+ */
 export type Asked =
   | { dir: string; brief: string; after: string[] | undefined; card?: undefined }
   | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
@@ -472,8 +495,8 @@ export type Asked =
  * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
  *
  * `card` names an inbox card to start, as `wf inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`, 400,
- * in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a card the
- * brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as
+ * in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a card
+ * the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as
  * `wf start <card> --brief ""` is.
  */
 function startOf(body: typeof START_BODY.Type, repo: string, home: string): Asked | Refusal {

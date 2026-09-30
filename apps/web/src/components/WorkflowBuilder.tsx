@@ -42,9 +42,10 @@ const INPUT =
   'block w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 
 /**
- * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand dot
- * to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`, with its
- * rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its form.
+ * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
+ * dot to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`,
+ * with its rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its
+ * form.
  *
  * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`) in
  * one write, judged whole by the api before any of it is written, at the version the draft was read from. The api answers the folder read
@@ -281,12 +282,12 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 /**
  * What a save that did not go through says, by what the api answered.
  *
- * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it writes
- * nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and an answer
- * with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered without what it wrote
- * (`build` in lib/api/builder.ts), which is why the words for it are what the api did not say rather than that it said nothing. None of them says
- * nothing was written, and each offers to read the folder again, as a 409 does — the one way back to what is on disk, since the draft is a
- * folder read at a version the api no longer has.
+ * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it
+ * writes nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and
+ * an answer with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered without
+ * what it wrote (`build` in lib/api/builder.ts), which is why the words for it are what the api did not say rather than that it said
+ * nothing. None of them says nothing was written, and each offers to read the folder again, as a 409 does — the one way back to what is on
+ * disk, since the draft is a folder read at a version the api no longer has.
  */
 export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRefusal; rereading: boolean; onReread: () => void }) {
   const nothingWritten = refusal.status !== null && refusal.status < 500;

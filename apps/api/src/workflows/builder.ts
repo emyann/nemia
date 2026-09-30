@@ -1,6 +1,6 @@
 /**
- * The workflow builder, for the board: a folder of yours put back from its steps as the Workflows page lists them, a new folder with a first
- * step, a schema beside the steps, and what a step's form is drawn from.
+ * The workflow builder, for the board: a folder of yours put back from its steps as the Workflows page lists them, a new folder with a
+ * first step, a schema beside the steps, and what a step's form is drawn from.
  *
  * A folder is written by the package's `writeWorkflow` (agent-orchestrator's folder/write.store.ts), which judges the whole folder before a
  * byte is written: each refusal is the parser's sentence, naming the step, and the api answers it with a 422 carrying the steps it names
@@ -14,8 +14,8 @@
  * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder holds something else: a step
  * edited, added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
  *
- * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes nothing
- * into a checkout. Every write passes the guard (guard.ts) before its body is read.
+ * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes
+ * nothing into a checkout. Every write passes the guard (guard.ts) before its body is read.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,19 +51,20 @@ import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
- * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
- * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key: codex no `permissionMode`, Claude Code no `sandbox`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
- * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
- * `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`).
- * `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a
- * `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
+ * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
+ * `step`, one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
+ * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key: codex no `permissionMode`,
+ * Claude Code no `sandbox`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
+ * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false`
+ * as `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`). `workspace` is a `choice` of its
+ * words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing.
+ * `agent` is a `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
 /**
- * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`, which it
- * does not export: `builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
+ * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`,
+ * which it does not export: `builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   after: 'steps',
@@ -94,17 +95,26 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   rounds: 'count',
 };
 
-/** What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a step without the line. */
+/**
+ * What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a
+ * step without the line.
+ */
 const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = {
   background: ['true', 'false'],
   remote: ['true', 'false'],
   gate: ['true'],
 };
 
-/** The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The parser's, which it does not export. */
+/**
+ * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The
+ * parser's, which it does not export.
+ */
 export const DEFAULT_HARNESS = 'claude';
 
-/** One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are some. */
+/**
+ * One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are
+ * some.
+ */
 export type KeyField = {
   key: StepKey;
   meaning: string;
@@ -114,16 +124,16 @@ export type KeyField = {
 };
 
 /**
- * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default harness.
- * `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from it unless
- * its file sets them itself: the form shows those as the agent's until one is changed.
+ * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default
+ * harness. `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from
+ * it unless its file sets them itself: the form shows those as the agent's until one is changed.
  *
- * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to one
- * on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
+ * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to
+ * one on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
  *
- * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves off
- * it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local harnesses;
- * `byHarness` has none of them, since a remote agent takes none of those words.
+ * `remote` is how a step names a remote A2A agent, `harness: <prefix><name>`, and the keys such a step may not set, which the form leaves
+ * off it (`REMOTE_REFUSED_KEYS`). The harness's `choices` offer each agent the store's `a2a-agents.json` declares beside the local
+ * harnesses; `byHarness` has none of them, since a remote agent takes none of those words.
  */
 export type KeyForm = {
   keys: KeyField[];
@@ -141,12 +151,16 @@ const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
   (key): key is Exclude<typeof key, (typeof AGENT_OWN_KEYS)[number]> => !(AGENT_OWN_KEYS as readonly string[]).includes(key),
 );
 
-/** The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in its words. */
+/**
+ * The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in
+ * its words.
+ */
 const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
 
 /**
- * What each agent of yours gives a step it is attached to: a step that names it and sets nothing, read by the parser and shown as the listing
- * shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step saved naming it is refused in its words.
+ * What each agent of yours gives a step it is attached to: a step that names it and sets nothing, read by the parser and shown as the
+ * listing shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step saved naming it is refused in
+ * its words.
  */
 function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
   const agents = loadAgents(path.join(home, 'workflows', AGENTS_FOLDER));
@@ -166,9 +180,9 @@ function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
 }
 
 /**
- * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read afresh).
- * An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents — the form is still drawn, a step already naming one keeps its word, and `wf start`
- * and `wf up` say what is wrong with the file.
+ * The harnesses a step may name: the package's, then each remote A2A agent the store declares, as `a2a:<name>` (`remoteAgents`, read
+ * afresh). An entry the runtime refuses is not offered, and a file refused as it stands offers none of its agents — the form is still
+ * drawn, a step already naming one keeps its word, and `wf start` and `wf up` say what is wrong with the file.
  */
 function harnessChoices(): readonly string[] {
   let names: string[];
@@ -205,7 +219,9 @@ export const keyForm = (home: string): KeyForm => ({
   remote: { prefix: REMOTE_PREFIX, refuses: [...REMOTE_REFUSED_KEYS] },
 });
 
-/** What a write answers: the folder read back from disk, as the listing has it, and its files by name — written, left as they were, removed. */
+/**
+ * What a write answers: the folder read back from disk, as the listing has it, and its files by name — written, left as they were, removed.
+ */
 export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
 
 /** A refusal of the package's, and the steps it names: one, several for a cycle, or none for a refusal of the folder. */
@@ -237,8 +253,8 @@ const PUT_SHAPE = `\`{ "version": "<as GET /api/workflows lists it>", "steps": [
 const POST_SHAPE = `\`{ "name": "<workflow>", "step": <step>, "readme"?: "<README.md>" }\`, the step ${STEP_SHAPE}`;
 
 /**
- * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its kind (`KINDS`, in `draftOf`), and
- * a key no step has is passed on as it came, for the package to refuse in its words.
+ * A step as a request sends it, its keys in the order they are refused. Each key of `spec` is typed by its kind (`KINDS`, in `draftOf`),
+ * and a key no step has is passed on as it came, for the package to refuse in its words.
  */
 const STEP_BODY = Schema.Struct({
   name: Schema.String,
@@ -384,9 +400,9 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
 })();
 
 /**
- * A step of a request as `writeWorkflow` takes it, or why it is not one (400). Each key the listing has is typed as it lists it, null or left
- * out for unset; whether a value is one the step may have is the package's to say. A key no step has is passed on as it came, so the package
- * refuses it in its words, naming the step. `output` names its file: the schema is the folder's.
+ * A step of a request as `writeWorkflow` takes it, or why it is not one (400). Each key the listing has is typed as it lists it, null or
+ * left out for unset; whether a value is one the step may have is the package's to say. A key no step has is passed on as it came, so the
+ * package refuses it in its words, naming the step. `output` names its file: the schema is the folder's.
  *
  * A step with an agent (`spec.agent`) is written as `agent:`, its own keys and its own note. Sent as the listing has it — `own` with the
  * keys its file sets and its note — a role key `own.keys` does not name is its agent's, and is not written, since written it would pin the
@@ -415,7 +431,10 @@ function draftOf(step: StepBody, at: string, route: string, shape: string): Step
 
 const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
 
-/** Why `name` cannot be a folder of yours (400), or undefined: a name the listing would show, one folder directly in the store's `workflows/`. */
+/**
+ * Why `name` cannot be a folder of yours (400), or undefined: a name the listing would show, one folder directly in the store's
+ * `workflows/`.
+ */
 export function workflowNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its folder is named — dev, say.';
   if (typeof name !== 'string' || !name.trim()) return `A workflow has no name, and a workflow is named by its folder. ${fix}`;
@@ -450,8 +469,9 @@ export function schemaNameRefusal(file: string): string | undefined {
 export type SchemaFile = { file: string; text: string };
 
 /**
- * The schemas a PUT carries, or why not: not a list of `{ file, text }` (400), a file that is not a schema's (400, `schemaNameRefusal`) or given
- * twice (400). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged with the steps.
+ * The schemas a PUT carries, or why not: not a list of `{ file, text }` (400), a file that is not a schema's (400, `schemaNameRefusal`) or
+ * given twice (400). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged with the
+ * steps.
  */
 function schemasOf(schemas: typeof PUT_BODY.Type.schemas, route: string): SchemaFile[] | Refusal {
   const out: SchemaFile[] = [];
@@ -471,9 +491,10 @@ const namingSchema = (steps: readonly StepDraft[], file: string): string[] =>
   steps.filter((s) => s.output?.file === file).map((s) => s.name);
 
 /**
- * Why the folder at `dir` would not read with `steps` and `schemas` written, or null: each schema a JSON object, then each step rendered and
- * the folder parsed in memory as `writeWorkflow` parses it, with the schemas read as given and every other file as it is on disk. The package's
- * words, naming the steps. A step's name `writeWorkflow` refuses first is left to it (`unnamed`), which writes nothing on it either.
+ * Why the folder at `dir` would not read with `steps` and `schemas` written, or null: each schema a JSON object, then each step rendered
+ * and the folder parsed in memory as `writeWorkflow` parses it, with the schemas read as given and every other file as it is on disk. The
+ * package's words, naming the steps. A step's name `writeWorkflow` refuses first is left to it (`unnamed`), which writes nothing on it
+ * either.
  */
 function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly SchemaFile[], places: Places): BuildRefused | null {
   for (const { file, text } of schemas) {
@@ -522,7 +543,10 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
   }
 }
 
-/** Whether `writeWorkflow` refuses the steps by their names — none, one not a file's, one twice — before it renders any: its words, not these. */
+/**
+ * Whether `writeWorkflow` refuses the steps by their names — none, one not a file's, one twice — before it renders any: its words, not
+ * these.
+ */
 const unnamed = (steps: readonly StepDraft[]): boolean =>
   !steps.length || steps.some((s) => stepNameRefusal(s.name) !== undefined) || new Set(steps.map((s) => s.name)).size < steps.length;
 
@@ -530,11 +554,11 @@ const unnamed = (steps: readonly StepDraft[]): boolean =>
 export type SchemaWas = { file: string; was: string | undefined };
 
 /**
- * The schemas a save wrote put back as the folder held them: removed where it had no such file, and written back where what the file holds now
- * is not what it held. Then a file the failing write never opened is not written to — a read-only one, which putting back would refuse in turn —
- * and one a write truncated and did not finish is put back all the same. `fs.writeFileSync` truncates before it writes, so a write that fails
- * after the open (the disk full, a read that broke) leaves a file shorter than it was, and no bookkeeping of which writes returned can tell.
- * A file gone, or that cannot be read, is written back.
+ * The schemas a save wrote put back as the folder held them: removed where it had no such file, and written back where what the file holds
+ * now is not what it held. Then a file the failing write never opened is not written to — a read-only one, which putting back would refuse
+ * in turn — and one a write truncated and did not finish is put back all the same. `fs.writeFileSync` truncates before it writes, so a
+ * write that fails after the open (the disk full, a read that broke) leaves a file shorter than it was, and no bookkeeping of which writes
+ * returned can tell. A file gone, or that cannot be read, is written back.
  *
  * Exported for the test, which reads and refuses each of those three.
  */
@@ -554,13 +578,14 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
 }
 
 /**
- * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from disk.
+ * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from
+ * disk.
  *
- * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and the
- * steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
+ * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and
+ * the steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
  * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was; and so it is when the
- * disk refuses a schema itself, whether it refuses the open (a file read-only among them) or the write after it (the disk full), which leaves
- * the save no more written than a refusal does.
+ * disk refuses a schema itself, whether it refuses the open (a file read-only among them) or the write after it (the disk full), which
+ * leaves the save no more written than a refusal does.
  *
  * Every schema the save has reached is put back, the one it was writing among them, should that write fail, or a later one, or the folder:
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.

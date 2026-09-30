@@ -9,7 +9,8 @@
  *
  * Read when a process makes its engine (`engine()` in runtime-client.ts), which is also where each address is judged by the runtime's own
  * rule (`readRemote`) and what is refused is left out, when `wf start` checks the names its steps give, and when the api lists what a step
- * may run on: an edit reaches a running `wf up` or api when it restarts. A store file at the bottom of the tree: it reads one file, and imports no other store file.
+ * may run on: an edit reaches a running `wf up` or api when it restarts. A store file at the bottom of the tree: it reads one file, and
+ * imports no other store file.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,9 +33,9 @@ export type RemoteAgents = ReadonlyMap<string, RemoteEntry>;
 const envWord = (word: string): string => word.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
 /**
- * The environment variable that holds the secret for the scheme `scheme` of the agent the file declares as `name`: `WF_A2A_<NAME>_<SCHEME>`,
- * each upper case with anything but a letter or a digit made `_` — `reviewer`'s `bearer` is `WF_A2A_REVIEWER_BEARER`. The scheme is the name
- * the agent's card gives it.
+ * The environment variable that holds the secret for the scheme `scheme` of the agent the file declares as `name`:
+ * `WF_A2A_<NAME>_<SCHEME>`, each upper case with anything but a letter or a digit made `_` — `reviewer`'s `bearer` is
+ * `WF_A2A_REVIEWER_BEARER`. The scheme is the name the agent's card gives it.
  */
 export const envNameOf = (name: string, scheme: string): string => `WF_A2A_${envWord(name)}_${envWord(scheme)}`;
 
@@ -100,8 +101,9 @@ export function readRemoteAgents(file: string): RemoteAgents {
 }
 
 /**
- * Two names whose variables can be one, or `undefined`: `WF_A2A_<NAME>_<SCHEME>` of one is another's for some scheme exactly when one name is
- * the other, a dash and more (`acme` and `acme-internal`), since a dash and an underscore are both `_` there and a name holds no underscore.
+ * Two names whose variables can be one, or `undefined`: `WF_A2A_<NAME>_<SCHEME>` of one is another's for some scheme exactly when one name
+ * is the other, a dash and more (`acme` and `acme-internal`), since a dash and an underscore are both `_` there and a name holds no
+ * underscore.
  */
 function meetingOf(names: readonly string[]): [string, string] | undefined {
   for (const short of names) {

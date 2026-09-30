@@ -18,16 +18,16 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 export type Approved = { run: Run; approval: Approval; file: string };
 
 /**
- * Approve a step waiting at its gate — `wf approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`, whole and
- * exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run (`readRun`) and files
- * what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is the person's own file, and the
- * verb never writes the run's json.
+ * Approve a step waiting at its gate — `wf approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`,
+ * whole and exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run
+ * (`readRun`) and files what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is the
+ * person's own file, and the verb never writes the run's json.
  *
  * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
- * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, a send-back already asked for, and
- * an ending that merges whose result is already on the base branch. Where the result stands is read off git (`standingsOf`) only for such
- * an ending (`approvedFirst`): no other gate's approval turns on it. An approval written by someone else between the look and the write is
- * refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
+ * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, a send-back already asked for,
+ * and an ending that merges whose result is already on the base branch. Where the result stands is read off git (`standingsOf`) only for
+ * such an ending (`approvedFirst`): no other gate's approval turns on it. An approval written by someone else between the look and the
+ * write is refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
  *
  * Sending back is not this verb's: `wf retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
  * Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).

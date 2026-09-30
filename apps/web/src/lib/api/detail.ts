@@ -186,14 +186,18 @@ export type StepFiled = {
   effort: string | null;
   /** The context window the try was filed with, in tokens: null for the model's whole window. */
   contextTokens: number | null;
-  /** The fence the try was filed with, as the engine's task names it: Claude Code's permission mode, or Codex's sandbox (a step's `sandbox:`). */
+  /**
+   * The fence the try was filed with, as the engine's task names it: Claude Code's permission mode, or Codex's sandbox (a step's
+   * `sandbox:`).
+   */
   permissionMode: string | null;
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
   /**
    * The remote A2A agent a step on `harness: a2a:<name>` was sent to: its name, and its address as the store's `a2a-agents.json` gives it
-   * now — origin and path, never a query string, which can carry a key — or null where the file does not declare it. Null on a harness of ours.
+   * now — origin and path, never a query string, which can carry a key — or null where the file does not declare it. Null on a harness of
+   * ours.
    */
   remote: { name: string; address: string | null } | null;
 };
@@ -325,9 +329,10 @@ export type RunDetail = {
 };
 
 /**
- * Mirrors `TaskSpan` in agent-orchestrator's timeline.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the engine's
- * feed, and null where the feed has none; `spawnedAt` its first attempt's spawn; `endedAt` its last attempt's end once it settled. `at` is
- * where it stands, and `queued` (filed → spawned, the wait for a slot) and `ran` (spawned → ended) the package's words for its two times.
+ * Mirrors `TaskSpan` in agent-orchestrator's timeline.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the
+ * engine's feed, and null where the feed has none; `spawnedAt` its first attempt's spawn; `endedAt` its last attempt's end once it settled.
+ * `at` is where it stands, and `queued` (filed → spawned, the wait for a slot) and `ran` (spawned → ended) the package's words for its two
+ * times.
  */
 export type TaskSpan = {
   taskId: string;
@@ -499,7 +504,9 @@ const RunDetailSchema = Schema.Struct({
  */
 export const runGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
 
-/** Every failure is tried again three times, as react-query does by default, but a run gone from the store: said at once, not seconds later. */
+/**
+ * Every failure is tried again three times, as react-query does by default, but a run gone from the store: said at once, not seconds later.
+ */
 export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
 
 /** A run's detail, decoded (`RunDetailSchema`). Read again every 5 s while the feed is not followed — every minute while it is. */

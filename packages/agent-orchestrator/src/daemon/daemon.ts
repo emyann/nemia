@@ -1,17 +1,19 @@
 /**
- * Who ticks the store — pure: `$WF_ROOT/daemon.json`, the file `wf up` takes the store with, judged against a clock and a liveness answer the
- * caller brings, and the words a refusal, a takeover and `wf ls` say of it. `daemon.store.ts` reads the file, asks the process table and
- * writes it; nothing here reads a disk or signals a process.
+ * Who ticks the store — pure: `$WF_ROOT/daemon.json`, the file `wf up` takes the store with, judged against a clock and a liveness answer
+ * the caller brings, and the words a refusal, a takeover and `wf ls` say of it. `daemon.store.ts` reads the file, asks the process table
+ * and writes it; nothing here reads a disk or signals a process.
  *
- * One `wf up` per store, since the tick keeps one writer per file and two ticks are two writers. The file is the daemon's alone: it writes it
- * as it takes the store, after every pass it completes, on a beat of its interval while it lives — a pass in flight included — and as it
+ * One `wf up` per store, since the tick keeps one writer per file and two ticks are two writers. The file is the daemon's alone: it writes
+ * it as it takes the store, after every pass it completes, on a beat of its interval while it lives — a pass in flight included — and as it
  * stops. A second `wf up`, and a `wf tick` by hand, read it and are refused while it names a live process heard from recently (`ticking`);
  * anything else — no file, a file that does not read, a holder that stopped, is gone or has been silent for a long while — is free, and
  * `wf up` takes it over.
  */
 import { durationWord } from '../status/status.ts';
 
-/** What `wf up` writes into `daemon.json`: who it is, where and how often it ticks, and when its last pass completed — none yet is `null`. */
+/**
+ * What `wf up` writes into `daemon.json`: who it is, where and how often it ticks, and when its last pass completed — none yet is `null`.
+ */
 export type DaemonFile = {
   pid: number;
   startedAt: string;
@@ -20,8 +22,8 @@ export type DaemonFile = {
   every: number;
   passedAt: string | null;
   /**
-   * The daemon's beat: written on a timer of its interval whatever the pass is doing, so a pass that runs long — installs in several worktrees
-   * one after another — still shows its process at work. Absent before the first beat.
+   * The daemon's beat: written on a timer of its interval whatever the pass is doing, so a pass that runs long — installs in several
+   * worktrees one after another — still shows its process at work. Absent before the first beat.
    */
   beatAt?: string;
   /**
@@ -35,10 +37,10 @@ export type DaemonFile = {
 };
 
 /**
- * What the process table says of the file's pid, as the caller finds it: the process that wrote the file (`same` — the pid alive and started
- * when `procStart` says); another under the pid reused (`other`), which holds nothing; a live pid whose start could not be compared (`unknown`
- * — no `/proc`, or a file with no `procStart`), which holds the store, since two writers are the worse mistake, but is never told to a person
- * as a process to kill without a way to check it first; or no process (`gone`).
+ * What the process table says of the file's pid, as the caller finds it: the process that wrote the file (`same` — the pid alive and
+ * started when `procStart` says); another under the pid reused (`other`), which holds nothing; a live pid whose start could not be compared
+ * (`unknown` — no `/proc`, or a file with no `procStart`), which holds the store, since two writers are the worse mistake, but is never
+ * told to a person as a process to kill without a way to check it first; or no process (`gone`).
  */
 export type Identity = 'same' | 'other' | 'unknown' | 'gone';
 
@@ -88,10 +90,10 @@ export function everyOf(arg: string | undefined): { every: number } | { refusal:
 export type DaemonRead = { text: string; file: DaemonFile | undefined };
 
 /**
- * Where the store stands: nobody has held it (`none`); a file that does not read as a holder (`unreadable`); a holder that stopped and said so
- * (`stopped`); one whose process is gone (`gone`), its pid dead or now another process's; one alive that has been silent for longer than
- * `staleAfterMs` of its interval (`stalled`); or one ticking. `last` is when it last showed life — the latest of its start, its last pass and
- * its beat — `quiet` how long ago that was, and `identity` what the process table said of its pid.
+ * Where the store stands: nobody has held it (`none`); a file that does not read as a holder (`unreadable`); a holder that stopped and said
+ * so (`stopped`); one whose process is gone (`gone`), its pid dead or now another process's; one alive that has been silent for longer than
+ * `staleAfterMs` of its interval (`stalled`); or one ticking. `last` is when it last showed life — the latest of its start, its last pass
+ * and its beat — `quiet` how long ago that was, and `identity` what the process table said of its pid.
  */
 export type Standing = {
   kind: 'stopped' | 'gone' | 'stalled' | 'ticking';
@@ -146,8 +148,9 @@ export function lastPassWords(file: DaemonFile, now: number): string {
 }
 
 /**
- * How to stop a daemon, said wherever one is named: its own pid, since an `npm exec` wrapper killed leaves the node child ticking — and, when
- * the pid could not be confirmed as the process that wrote the file, how to check it first, since a pid is reused once its process ends.
+ * How to stop a daemon, said wherever one is named: its own pid, since an `npm exec` wrapper killed leaves the node child ticking — and,
+ * when the pid could not be confirmed as the process that wrote the file, how to check it first, since a pid is reused once its process
+ * ends.
  */
 const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): string =>
   identity === 'same'
@@ -156,8 +159,8 @@ const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): str
       `and a pid is reused once its process ends — if ps -p ${file.pid} -o lstart=,args= shows a wf up started at ${file.startedAt}, kill ${file.pid}`;
 
 /**
- * Why `wf up` or a `wf tick` by hand may not tick `store`, held by `holder`: which pid, where and since when, its last pass, how to stop it,
- * and when it would be taken over on its own. A hand tick has no force: a live daemon runs the same pass within its interval.
+ * Why `wf up` or a `wf tick` by hand may not tick `store`, held by `holder`: which pid, where and since when, its last pass, how to stop
+ * it, and when it would be taken over on its own. A hand tick has no force: a live daemon runs the same pass within its interval.
  */
 export function holdRefusal(standing: Standing, verb: 'up' | 'tick', store: string, now: number): string {
   const holder = standing.file;

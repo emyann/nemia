@@ -43,7 +43,9 @@ export const StepReplySchema = Schema.Struct({
   why: Schema.String,
 }) satisfies Schema.Schema<StepReply>;
 
-/** Mirrors `QuestionOption` in agent-orchestrator's question/question.ts: one option of a question, its label and what choosing it means. */
+/**
+ * Mirrors `QuestionOption` in agent-orchestrator's question/question.ts: one option of a question, its label and what choosing it means.
+ */
 export type QuestionOption = { label: string; meaning: string };
 
 /** Decodes a `QuestionOption`. */

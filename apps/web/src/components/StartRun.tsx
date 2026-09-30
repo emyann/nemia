@@ -10,21 +10,21 @@ import { afterFor, ignoredRepoNote } from '../lib/inbox';
  * its page, or the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait on), or its own
  * about the brief.
  *
- * Given a `card`, it starts that inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the card's body,
- * to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told of a
- * start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives none,
- * and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to wait on are listed
- * from. A card's start sits under the workflow it picks, with no rule of its own above it.
+ * Given a `card`, it starts that inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the card's
+ * body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told
+ * of a start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives
+ * none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to wait on are
+ * listed from. A card's start sits under the workflow it picks, with no rule of its own above it.
  *
- * A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one, since there is no branch to wait
- * on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks (`afterFor`), none for such
- * a team. A card that names a repository for such a team is started all the same, its repository unread; the package says so afterwards,
- * and this form says it before, while the choice is still a person's (`ignoredRepoNote`). A start reads the list of runs again alone
- * (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
+ * A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one, since there is no branch to
+ * wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks (`afterFor`), none
+ * for such a team. A card that names a repository for such a team is started all the same, its repository unread; the package says so
+ * afterwards, and this form says it before, while the choice is still a person's (`ignoredRepoNote`). A start reads the list of runs again
+ * alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a key of its own.
  *
- * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back — a
- * 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it outlives
- * the form, told the api's words, and null when the start is asked again; the form then shows none of its own.
+ * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back —
+ * a 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it
+ * outlives the form, told the api's words, and null when the start is asked again; the form then shows none of its own.
  */
 export function StartRun({
   workflow,

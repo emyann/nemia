@@ -28,8 +28,8 @@ const LONG_NAMES = {
 } as const;
 
 /**
- * Writes LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to take
- * back.
+ * Writes LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to
+ * take back.
  */
 function seedLongNames(root: string, createdAt: string, now = Date.now()): string[] {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();

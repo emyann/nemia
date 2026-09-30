@@ -11,9 +11,9 @@ import { OUT, store } from '../world.ts';
 export default {
   /**
    * A hold lifted on the board, as `wf hold <run> --off` lifts it (`DELETE /api/runs/:id/hold`): GATED held until HELD, as the `hold` page
-   * holds it, lifted once from its card on the Factory and once from its page, each asked twice. The lift removes the hold's file — the page
-   * does not — and the board reads the run again of itself: no hold said, no hold edge, and plan's gate offered again. What the api refuses
-   * is proven in its own tests (`apps/api/test/hold.test.ts`), since the e2e's watch counts every 4xx.
+   * holds it, lifted once from its card on the Factory and once from its page, each asked twice. The lift removes the hold's file — the
+   * page does not — and the board reads the run again of itself: no hold said, no hold edge, and plan's gate offered again. What the api
+   * refuses is proven in its own tests (`apps/api/test/hold.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'lift',
   route: '/',

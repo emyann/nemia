@@ -174,8 +174,9 @@ export default {
    * A run whose steps ask questions as data. A done step's are drawn read-only on its Output tab, the recommended option marked. A blocked
    * step's are a form under Decide: an option for each answer, radios where it takes one and checkboxes where several, nothing chosen, and
    * `Answer and continue` held until each question has an answer. `Choose the recommended answers` chooses the one recommended and leaves
-   * the question without one as it was; a box ticked there and words of the person's own beside it, the answers go to the api, which writes them as the next try's message, in the
-   * package's words. The page leaves the run before it takes it back, so no poll asks for a run that is gone.
+   * the question without one as it was; a box ticked there and words of the person's own beside it, the answers go to the api, which writes
+   * them as the next try's message, in the package's words. The page leaves the run before it takes it back, so no poll asks for a run that
+   * is gone.
    */
   name: 'questions',
   route: '/runs',

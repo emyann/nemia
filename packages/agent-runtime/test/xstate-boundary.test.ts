@@ -27,7 +27,9 @@ const withoutComments = (text: string): string =>
     .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
     .join('\n');
 
-/** Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()` (as `a2a-boundary.test.ts`). */
+/**
+ * Every module a piece of source names: imports and re-exports, type-only included, `import()` and `require()` (as `a2a-boundary.test.ts`).
+ */
 function specifiersIn(text: string): string[] {
   const found = new Set<string>();
   for (const m of text.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/gm)) found.add(m[1]);
@@ -183,7 +185,10 @@ function exportBreaches(entry: string, exported: Record<string, unknown>, inside
   );
 }
 
-/** Every name and value XState exports, and every value `src/core/lifecycle.ts` does (its names are too common to refuse by: `transition`, `STATES`). */
+/**
+ * Every name and value XState exports, and every value `src/core/lifecycle.ts` does (its names are too common to refuse by: `transition`,
+ * `STATES`).
+ */
 const insides = async () => {
   const names = new Set<string>();
   const values = new Set<unknown>();

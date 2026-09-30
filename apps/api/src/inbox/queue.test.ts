@@ -1,8 +1,8 @@
 /**
- * The queue, as the board reads and writes it: GET /api/inbox's `queued` and `tried`; POST and DELETE /api/inbox/:name/queue (inbox.ts), a card
- * queued and taken off the queue through the package's `queueInInbox`; and GET /api/ceilings (app.ts), the cap the daemon's last pass ran with
- * and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch repository; and
- * the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
+ * The queue, as the board reads and writes it: GET /api/inbox's `queued` and `tried`; POST and DELETE /api/inbox/:name/queue (inbox.ts), a
+ * card queued and taken off the queue through the package's `queueInInbox`; and GET /api/ceilings (app.ts), the cap the daemon's last pass
+ * ran with and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch
+ * repository; and the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
  */
 import { observations, root } from '../../test/harness.ts';
 import { test } from 'node:test';

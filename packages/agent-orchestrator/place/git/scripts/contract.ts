@@ -2,8 +2,8 @@
  * What every verb script of the git place shares: reading its one request, answering it, and running git.
  *
  * A script is run by the orchestrator as `node scripts/<verb>.ts`, with one JSON request on stdin that carries `v`, the contract's
- * version. It prints one JSON document on stdout at exit 0: its answer, or `{ "refused": "<words>" }`. A request it cannot read exits 2 with
- * the reason on stderr, and any other failure exits 1: both are unread. Standalone: node's built-ins only, in TypeScript node strips.
+ * version. It prints one JSON document on stdout at exit 0: its answer, or `{ "refused": "<words>" }`. A request it cannot read exits 2
+ * with the reason on stderr, and any other failure exits 1: both are unread. Standalone: node's built-ins only, in TypeScript node strips.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

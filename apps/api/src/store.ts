@@ -37,8 +37,8 @@ export type Views = ReadonlyMap<string, TaskView>;
 export type Unreadable = ReadonlyMap<string, string>;
 
 /**
- * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
- * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the
+ * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for
+ * its decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in the
  * package's views.verb.ts). A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness
  * — a scan of the detached runs' files for a job, a `claude agents` call for a background session. Read through `reader`, a request's own
  * (`viewsFor`), a task two runs read is viewed once.
@@ -60,9 +60,9 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
 }
 
 /**
- * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): a task of its own
- * the read left out (`unreadableOf`), or one of a run it waits on, whose view rejects in the runtime's words (`unreadableJournal`). As the tick
- * leaves such a run unjudged and counts it in flight. Any other failure rejects.
+ * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): a task of its
+ * own the read left out (`unreadableOf`), or one of a run it waits on, whose view rejects in the runtime's words (`unreadableJournal`). As
+ * the tick leaves such a run unjudged and counts it in flight. Any other failure rejects.
  */
 export async function judgedUnlessUnreadable<T>(
   run: Run,
@@ -181,8 +181,8 @@ export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
 
 /**
  * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
- * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor on
- * each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
+ * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor
+ * on each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
  * since. A read's cache, one for an app, of its engine's feed (`ReadMemo`, layer.ts): a fresh app reads the feed from the start.
  */
 export type Filings = { filed: Map<string, string>; cursor: number };

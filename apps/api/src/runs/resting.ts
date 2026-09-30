@@ -9,8 +9,8 @@
  * else takes the run out, and the next request judges it afresh. In memory alone: nothing is written for it, and a restarted api starts
  * with none.
  *
- * `WF_VERIFY_REST=1`, which every api test sets (`test/harness.ts`), judges each run the memo answers in full too, and a request whose answer
- * differs fails: a change the memo missed is a bug in what it watches. Off in normal runs, since it spends all that the memo saves.
+ * `WF_VERIFY_REST=1`, which every api test sets (`test/harness.ts`), judges each run the memo answers in full too, and a request whose
+ * answer differs fails: a change the memo missed is a bug in what it watches. Off in normal runs, since it spends all that the memo saves.
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -35,9 +35,9 @@ export type RestingRead<T> = {
   /**
    * Keep `answer` for `run`, judged on its record as read and on the tips of `branches`, the result branches git was asked about for it —
    * and its base branch with them, since whether a branch is on it moves when the base does — as `heads` gives them: the listing the answer
-   * was read from. Nothing is kept for a run the store has no stamp for, for a memo that could not read the feed, or once another request has
-   * read the feed on past where this one read to: a line it read concerned no run then kept, and this answer may be judged on a journal from
-   * before it.
+   * was read from. Nothing is kept for a run the store has no stamp for, for a memo that could not read the feed, or once another request
+   * has read the feed on past where this one read to: a line it read concerned no run then kept, and this answer may be judged on a journal
+   * from before it.
    */
   keep(run: Run, answer: T, branches: readonly string[], heads: (repo: string) => ReadonlyMap<string, string>): void;
   /** Take `run` out: judged afresh, it was not at rest. */
@@ -51,9 +51,9 @@ export type RestingRead<T> = {
 /**
  * The memo brought up to the engine's feed — every run a task of which appended since is taken out — and the store stamped: made before the
  * request reads a record, so what changes between the two is read as changed on the next request, never missed. A memo that has read
- * nothing reads the feed from its end, and holds nothing a line before could concern; a feed that went back — a journal replaced or cut — or
- * that cannot be read empties the memo, and a read made while it cannot be read keeps nothing. The read keeps where it read the feed to: a
- * line past it is read by the next request, unless another request reads it first, and then its `keep` keeps nothing. The feed is read
+ * nothing reads the feed from its end, and holds nothing a line before could concern; a feed that went back — a journal replaced or cut —
+ * or that cannot be read empties the memo, and a read made while it cannot be read keeps nothing. The read keeps where it read the feed to:
+ * a line past it is read by the next request, unless another request reads it first, and then its `keep` keeps nothing. The feed is read
  * through `e`, and `verify` is `WF_VERIFY_REST` as the app's environment gives it (`verifiesRest`).
  */
 export async function restingRead<T>(e: Engine['Service'], memo: RestingMemo<T>, verify: boolean): Promise<RestingRead<T>> {

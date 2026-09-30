@@ -70,8 +70,8 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *
  * Once nothing refuses, a task held open that waits for a word is closed, as no pass reads the run again to close it; one the engine
  * refuses to close, answered, settled or stopped since it was read, waits for nothing. A folder run's folders are under its own directory,
- * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `wf rm` can finish when it is interrupted and
- * run again:
+ * and go with its record: no worktree, no branch, and no git asked. A git run goes in an order `wf rm` can finish when it is interrupted
+ * and run again:
  *
  * 1. **Its worktrees, through git**: each git lists inside `worktrees/<id>` (`runWorktrees`), by its real path, so the run's directory and
  *    the record's are read the same way (`resolved`). One whose directory is gone, or is no worktree git can read, and is not locked, is
@@ -82,8 +82,8 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *    `held`, and nothing else is removed, so its record is there for `wf rm` to find it by once a person has dealt with them.
  * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as git says it, or forced.
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
- *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`). The engine's tasks, journal and sessions are
- *    the engine's, and are not touched.
+ *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`). The engine's tasks, journal and sessions
+ *    are the engine's, and are not touched.
  *
  * A run whose record is gone is normal: what is left under its id, its files, is removed and named — never a worktree, since nothing says
  * whose they are — and a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
@@ -301,8 +301,9 @@ function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
 
 /**
  * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: its record first, then its
- * cancellation, its pruning, its asks, its own directory (inputs, artifacts), its check logs (`checkLogsOf`, by the steps `names`, or without them any
- * under its id that is no other stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the engine's.
+ * cancellation, its pruning, its asks, its own directory (inputs, artifacts), its check logs (`checkLogsOf`, by the steps `names`, or
+ * without them any under its id that is no other stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the
+ * engine's.
  */
 function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
   const removed: string[] = [];

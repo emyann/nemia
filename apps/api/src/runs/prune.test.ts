@@ -1,8 +1,8 @@
 /**
- * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `wf prune <run> --yes` prunes it: its worktrees removed, and its files
- * with `artifacts`, its record and every branch kept; the list and the page say it was pruned in the package's words. And every refusal
- * refused, in `wf prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a run pruned
- * already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the board.
+ * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `wf prune <run> --yes` prunes it: its worktrees removed, and its
+ * files with `artifacts`, its record and every branch kept; the list and the page say it was pruned in the package's words. And every
+ * refusal refused, in `wf prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a run
+ * pruned already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the board.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
  * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, git runs of

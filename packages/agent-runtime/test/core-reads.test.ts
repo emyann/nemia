@@ -1,9 +1,9 @@
 /**
  * The runtime's core never opens a task's harness arguments.
  *
- * `domain.ts` decides, `lifecycle.ts` holds the edges it decides by, and `engine.ts` applies; how a session is started — its model, its tools, its window — is the
- * adapter's, carried on the task as one `config` (`src/harness/args.ts`) and handed to the runner at spawn and release.
- * A read of one in the core is the second workload leaking in: the day `decide` branches on a model, the engine knows
+ * `domain.ts` decides, `lifecycle.ts` holds the edges it decides by, and `engine.ts` applies; how a session is started — its model, its
+ * tools, its window — is the adapter's, carried on the task as one `config` (`src/harness/args.ts`) and handed to the runner at spawn and
+ * release. A read of one in the core is the second workload leaking in: the day `decide` branches on a model, the engine knows
  * about a harness. So this reads the three files' code, comments left out, and refuses a harness argument named there,
  * and `config` opened — by a member, an index, a destructuring, a spread, `in` or an `Object.*` walk. Passing it on whole
  * is the one use it has.

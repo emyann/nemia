@@ -60,7 +60,8 @@ const PRE =
 
 /**
  * A block of `code` in `language`, highlighted once shiki has it: the highlight is kept with the code and language it was made for, and
- * shown only while they are still what is drawn. A highlight that fails leaves the code as plain text. `children` sit in its top right corner.
+ * shown only while they are still what is drawn. A highlight that fails leaves the code as plain text. `children` sit in its top right
+ * corner.
  */
 export const CodeBlock = ({ code, language, className, children, ...props }: CodeBlockProps) => {
   const [highlight, setHighlight] = useState<{ code: string; language: CodeLanguage; html: readonly [light: string, dark: string] } | null>(
@@ -117,8 +118,8 @@ export type CodeBlockCopyButtonProps = ComponentProps<typeof Button> & {
 
 /**
  * The block's copy button, pressed with `onPress` (React Aria's `Button`): it writes the block's code to the clipboard, shows a check for
- * `timeout` milliseconds and calls `onCopy`; a page with no clipboard, or a write refused, calls `onError`, the refusal taken on the write's
- * promise.
+ * `timeout` milliseconds and calls `onCopy`; a page with no clipboard, or a write refused, calls `onError`, the refusal taken on the
+ * write's promise.
  */
 export const CodeBlockCopyButton = ({ onCopy, onError, timeout = 2000, children, className, ...props }: CodeBlockCopyButtonProps) => {
   const [isCopied, setIsCopied] = useState(false);

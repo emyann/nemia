@@ -5,10 +5,10 @@ import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box, which
-   * ends the window — the prompt, the calls with nothing said between them folded into one line, thoughts folded, the session's words from
-   * their markdown, a system line and the closeout. The session has ended, so the prompt box is closed, with why and where to go instead.
-   * The conversation is photographed from its start, scrolled up as a reader scrolls to it.
+   * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box,
+   * which ends the window — the prompt, the calls with nothing said between them folded into one line, thoughts folded, the session's words
+   * from their markdown, a system line and the closeout. The session has ended, so the prompt box is closed, with why and where to go
+   * instead. The conversation is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,

@@ -1,7 +1,7 @@
 /**
  * The run page's reads decode the api's answers where they enter (`get`): a run's detail (`runQuery`), its decision (`decisionQuery`), a
- * step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each reads back what the api gave, every union in its shapes;
- * each refuses an answer it does not read, at the key, with the fix; a key the board does not know is dropped.
+ * step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each reads back what the api gave, every union in its
+ * shapes; each refuses an answer it does not read, at the key, with the fix; a key the board does not know is dropped.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

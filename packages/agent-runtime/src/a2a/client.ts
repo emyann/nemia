@@ -185,10 +185,10 @@ export type SeamOps = RunnerOps & {
 /**
  * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
  * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
- * lists every page, and a listed Task that carries no sighting fails the read. `stop` cancels the session by name, read off the last listing (`observe`'s or `observeFor`'s), since
- * the engine stops by session id: a session the listing left out is listed in full when a stop asks for it, and one no
- * listing has is not stopped blindly but refused in words. The engine stops only a session the pass has just seen live,
- * so it never asks for that. A session that ended between the listing and the stop has nothing to stop, as a driver's
+ * lists every page, and a listed Task that carries no sighting fails the read. `stop` cancels the session by name, read off the last
+ * listing (`observe`'s or `observeFor`'s), since the engine stops by session id: a session the listing left out is listed in full when a
+ * stop asks for it, and one no listing has is not stopped blindly but refused in words. The engine stops only a session the pass has just
+ * seen live, so it never asks for that. A session that ended between the listing and the stop has nothing to stop, as a driver's
  * stop of an ended session does nothing: the next pass reads how it ended. `say` is a follow-up message on the session's
  * Task. `find`, `logs`, `release`, `transcript`, `transcriptOf` and `observeFor` are the extension's methods; the names
  * `observeFor`'s driver could not look for cross as it said them, names and nothing more. By id, a transcript is always

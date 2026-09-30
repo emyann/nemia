@@ -793,7 +793,10 @@ test("CONTRACT: every attempt a task settles over is ended — with the statemen
 });
 
 const N3 = nameFor(TASK, 3);
-/** A task held open whose first attempt signed at 3 s, `extra` on the filing: held open, a signed end waits on a person, an answer is a turn, and a close settles. */
+/**
+ * A task held open whose first attempt signed at 3 s, `extra` on the filing: held open, a signed end waits on a person, an answer is a
+ * turn, and a close settles.
+ */
 const held = (extra: Partial<Extract<Event, { kind: 'filed' }>> = {}): Event[] => [
   {
     kind: 'filed',

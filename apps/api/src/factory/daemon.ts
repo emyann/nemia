@@ -63,7 +63,7 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
 }
 
 /**
- * Whether a daemon ticks the store now: the file read and the process table asked, as `wf ls` asks them. Throws what the package throws of a
- * file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
+ * Whether a daemon ticks the store now: the file read and the process table asked, as `wf ls` asks them. Throws what the package throws of
+ * a file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
  */
 export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(now), now);

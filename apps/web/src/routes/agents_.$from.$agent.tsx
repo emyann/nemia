@@ -32,10 +32,10 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
 /**
  * One agent: the nodes it is attached to, each linked, and its form — to edit, when it is yours; to read, with its Source, when it is the
  * repository's, which the board does not write. Yours has no Source, whose toggle would drop what was typed. The form is drawn under
- * `formKeyOf`'s key, so a new version is a new form. Save puts it back against the version it was read at, and Remove takes it away while no
- * node names it. Once the form copies a skill, the page reads the agent past the cache, before the copy's invalidation lands, to keep the
- * form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, the Try panel
- * for an agent of yours; the repository's is not tried, since a try runs with no repository, where its agents are not read.
+ * `formKeyOf`'s key, so a new version is a new form. Save puts it back against the version it was read at, and Remove takes it away while
+ * no node names it. Once the form copies a skill, the page reads the agent past the cache, before the copy's invalidation lands, to keep
+ * the form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, the Try
+ * panel for an agent of yours; the repository's is not tried, since a try runs with no repository, where its agents are not read.
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();

@@ -71,11 +71,11 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
 }
 
 /**
- * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and the
- * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
- * here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET line says why
- * each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. A folder run
- * has no branch and nothing to merge, so nothing is said of one: where its work is instead, as `wf decide` says.
+ * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and
+ * the lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run
+ * from here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET line says
+ * why each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. A folder
+ * run has no branch and nothing to merge, so nothing is said of one: where its work is instead, as `wf decide` says.
  */
 export function DecideSection({
   runId,
@@ -157,7 +157,9 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
   );
 }
 
-/** A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which `wf decide` puts before it. */
+/**
+ * A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which `wf decide` puts before it.
+ */
 function Asks({ step, needs, ...data }: { step?: string; needs: string; 'data-asks'?: boolean; 'data-said'?: boolean }) {
   return (
     <div {...data} className="space-y-1">
@@ -191,10 +193,10 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
  * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
  * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`; a step waiting on you again later starts afresh.
  *
- * As `wf decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step gets a new
- * session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries no message
- * (`messageRefusal` refuses one) and the box is closed while it is chosen. An answer goes as it was typed, as `--message` takes it; something
- * to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still holds.
+ * As `wf decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step gets a
+ * new session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries no
+ * message (`messageRefusal` refuses one) and the box is closed while it is chosen. An answer goes as it was typed, as `--message` takes it;
+ * something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still holds.
  */
 export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
   const [message, setMessage] = useState('');
@@ -295,18 +297,18 @@ const AMOUNT =
   'w-24 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
 
 /**
- * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes (`raise`):
- * its word, with the amounts; a box for the cap to raise it to, started at the first whole dollar above what the package says it has to pass
- * (`raiseTo`); and the button that asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or with its loop's
- * round, as `wf round --budget` does. The box takes any amount: the package refuses one not above what was spent, and its sentence shows
- * beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it, until the run is read again and the
- * step's note says it.
+ * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
+ * (`raise`): its word, with the amounts; a box for the cap to raise it to, started at the first whole dollar above what the package says it
+ * has to pass (`raiseTo`); and the button that asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or
+ * with its loop's round, as `wf round --budget` does. The box takes any amount: the package refuses one not above what was spent, and its
+ * sentence shows beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it, until the run is
+ * read again and the step's note says it.
  *
- * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer, which
- * the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second ask
- * carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its check
- * again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box closed: it
- * files no session, so it takes no budget and carries no message, which `messageRefusal` refuses on one.
+ * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer,
+ * which the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second
+ * ask carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its
+ * check again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box
+ * closed: it files no session, so it takes no budget and carries no message, which `messageRefusal` refuses on one.
  *
  * The amount goes as typed: one the package refuses is refused in its words, and an empty box sends none, which it refuses too. An answer
  * goes as it was typed, as `--message` takes it; something to tell a try is optional, and none is sent when nothing was written.
@@ -498,8 +500,9 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
 }
 
 /**
- * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the list the
- * Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a key of its own.
+ * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the
+ * list the Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a
+ * key of its own.
  */
 function useAccept(runId: string, step: string) {
   const queryClient = useQueryClient();
@@ -526,7 +529,9 @@ function useRound(runId: string) {
   });
 }
 
-/** What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any. */
+/**
+ * What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any.
+ */
 export function TouchedBranch({ touched: { branch, radius } }: { touched: Touched }) {
   return (
     <div data-touched={branch} className="space-y-2">
@@ -601,7 +606,10 @@ export function GroupBar({ group, most }: { group: Pick<Group, 'added' | 'remove
 const AGENT_FACING = 'the next agent reads this';
 const CHECK_AFFECTING = 'could make its check pass';
 
-/** The files an agent reads as instructions (amber), and those that decide what a check means (red outline). Nothing for a list that is empty. */
+/**
+ * The files an agent reads as instructions (amber), and those that decide what a check means (red outline). Nothing for a list that is
+ * empty.
+ */
 export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly string[]; checkAffecting: readonly string[] }) {
   if (!agentFacing.length && !checkAffecting.length) return null;
   const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
@@ -704,8 +712,8 @@ const LINE_CLASS: Record<DiffLine, string> = {
 };
 
 /**
- * One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. Its summary is a
- * flex row, which draws no marker of its own: a chevron says it opens, and turns when it has.
+ * One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. Its summary is
+ * a flex row, which draws no marker of its own: a chevron says it opens, and turns when it has.
  */
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
@@ -748,8 +756,8 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
 }
 
 /**
- * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but `wf accept`, which a
- * person who never opens a terminal has no other way to give: its row also takes their reason and presses it (`AcceptCommand`).
+ * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but `wf accept`, which
+ * a person who never opens a terminal has no other way to give: its row also takes their reason and presses it (`AcceptCommand`).
  */
 export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
   return (
@@ -793,9 +801,9 @@ function CommandLine({ command: c }: { command: DecideCommand }) {
 
 /**
  * `wf accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the button
- * waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls the package's `accept()`.
- * What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api has it, what the tick does with it,
- * until the run is read again and the loop is offered no more.
+ * waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls
+ * the package's `accept()`. What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api has
+ * it, what the tick does with it, until the run is read again and the loop is offered no more.
  */
 export function AcceptCommand({ runId, step, command }: { runId: string; step: string; command: DecideCommand }) {
   const [message, setMessage] = useState('');

@@ -23,11 +23,16 @@ export type McpServer = {
   source: string;
   /** `.mcp.json`'s `type`: `stdio` for a server with a command and none given. */
   type: string;
-  /** `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the page. */
+  /**
+   * `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the
+   * page.
+   */
   command: string | null;
   args: string[];
   url: string | null;
-  /** Whether `.claude/settings.json` enables it: `enabledMcpjsonServers` or `enableAllProjectMcpServers`, and not `disabledMcpjsonServers`. */
+  /**
+   * Whether `.claude/settings.json` enables it: `enabledMcpjsonServers` or `enableAllProjectMcpServers`, and not `disabledMcpjsonServers`.
+   */
   enabled: boolean;
   /** What it listed, or null when it was not asked or did not answer. */
   tools: McpTool[] | null;
@@ -50,13 +55,13 @@ export type Capabilities = {
   mcp: McpServer[];
   denied: DeniedRule[];
   /**
-   * `permissions.ask` in `.claude/settings.json`, in its order: what asks whatever an allow rule or the harness's own leave says — Claude Code
-   * reads them after the deny rules and before the allow rules. In `dontAsk`, where nothing asks, what they match is denied.
+   * `permissions.ask` in `.claude/settings.json`, in its order: what asks whatever an allow rule or the harness's own leave says — Claude
+   * Code reads them after the deny rules and before the allow rules. In `dontAsk`, where nothing asks, what they match is denied.
    */
   asked: DeniedRule[];
   /**
-   * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude Code's
-   * read-only commands (`READ_ONLY_COMMANDS`) among it. In `dontAsk`, all it runs of what asks.
+   * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude
+   * Code's read-only commands (`READ_ONLY_COMMANDS`) among it. In `dontAsk`, all it runs of what asks.
    */
   allowed: DeniedRule[];
   /** A file that is there and does not read: what was left out because of it, and the fix. */
@@ -66,7 +71,9 @@ export type Capabilities = {
 /** The checkout this api's source is in: the repository a person started it from. */
 export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
-/** The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — and its own checkout otherwise. */
+/**
+ * The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — and its own checkout otherwise.
+ */
 export const repoOf = (env: NodeJS.ProcessEnv): string => path.resolve(env.HKB_REPO?.trim() || HOME_REPO);
 
 /** How long a server has to start and list its tools before it is reported as not answering. */
@@ -78,8 +85,8 @@ const MCP_JSON = '.mcp.json';
 /**
  * Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning.
  * A server not enabled is not started: a GET does not run a command the person has not turned on, which is what enabling a project
- * server is for. Each server enabled is asked through `asker`, the app's `McpAsker` on a request; with none, through an asker of this call's
- * own, which asks each afresh.
+ * server is for. Each server enabled is asked through `asker`, the app's `McpAsker` on a request; with none, through an asker of this
+ * call's own, which asks each afresh.
  */
 export async function capabilitiesOf(
   repo: string,
@@ -154,7 +161,10 @@ export async function capabilitiesOf(
   };
 }
 
-/** What a measurement carries so that it is never read as current: the harness it was taken on, that harness's version, the day, and where it is recorded. */
+/**
+ * What a measurement carries so that it is never read as current: the harness it was taken on, that harness's version, the day, and where
+ * it is recorded.
+ */
 export type Dated = { harness: string; version: string; measuredAt: string; source: string };
 
 /**
@@ -186,8 +196,8 @@ export function dated<T extends Dated>(name: string, measurement: T): T {
 }
 
 /**
- * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with none
- * listed twice and none both measured and documented, and `docs` saying when the docs were read.
+ * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with
+ * none listed twice and none both measured and documented, and `docs` saying when the docs were read.
  */
 export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(
   name: string,
@@ -211,7 +221,9 @@ export function readOnlyCommands<T extends Dated & { measured: readonly string[]
   throw Object.assign(new Error(`${name} has ${wrong.join(', ')}. Fix the list where it is declared.`), { exitCode: 2 });
 }
 
-/** Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it. */
+/**
+ * Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it.
+ */
 const ON_THE_FENCED =
   "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
 /** Why Edit and Write are taken to be in it: nothing measured names them. */
@@ -223,11 +235,11 @@ const EDITS_WITH = 'Not named by any measurement. Every implement step of this r
  * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version
  * this was measured, and never that it is current.
  *
- * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's test
- * refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no unfenced
- * measurement names, each with why, which the page marks as inferred and never as measured. `lacks` are the ones the measurement found absent.
- * MCP tools are in neither: the checkout's servers reach a step whatever its `tools:` (packages/agent-orchestrator/docs/features.md, measured),
- * and each lists its own.
+ * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's
+ * test refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no
+ * unfenced measurement names, each with why, which the page marks as inferred and never as measured. `lacks` are the ones the measurement
+ * found absent. MCP tools are in neither: the checkout's servers reach a step whatever its `tools:`
+ * (packages/agent-orchestrator/docs/features.md, measured), and each lists its own.
  */
 export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
   harness: 'Claude Code',
@@ -261,14 +273,15 @@ export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
 
 /**
  * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
- * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
+ * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing
+ * here asks the harness again, and the page never says it is current.
  *
  * `measured` are what a session in `dontAsk` ran, under this repository's settings of the day `measuredAt` names, which allowed none of
  * them, recorded where `source` says: `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. That is
  * what was measured, and it stays so whatever the settings allow: a rule allowing `ls` proves nothing of that day's run, and takes nothing
  * from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its
- * date, and the page says the day. `documented` are the rest of what Claude Code's docs name, which say the set includes them, not that it is
- * all of it; `git` is its read-only forms, which they do not list.
+ * date, and the page says the day. `documented` are the rest of what Claude Code's docs name, which say the set includes them, not that it
+ * is all of it; `git` is its read-only forms, which they do not list.
  */
 export const READ_ONLY_COMMANDS = readOnlyCommands('READ_ONLY_COMMANDS', {
   harness: 'Claude Code',
@@ -314,7 +327,10 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
   }
 }
 
-/** A skill or an agent from its file: named by its frontmatter, or by `fallback` when that does not name it. Null when there is no such file. */
+/**
+ * A skill or an agent from its file: named by its frontmatter, or by `fallback` when that does not name it. Null when there is no such
+ * file.
+ */
 function describedAt(repo: string, source: string, fallback: string, warnings: string[]): Described | null {
   let text: string;
   try {
@@ -384,7 +400,10 @@ type Json = Record<string, unknown>;
 
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** A JSON object from a file in the checkout. Null when the file is absent; null and a warning saying what is left out when it does not read. */
+/**
+ * A JSON object from a file in the checkout. Null when the file is absent; null and a warning saying what is left out when it does not
+ * read.
+ */
 function jsonAt(repo: string, file: string, warnings: string[], leftOut: string): Json | null {
   let text: string;
   try {
@@ -475,7 +494,9 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
 /** What starts a stdio server: the command, its args, and the whole environment it is given. */
 type Launch = { command: string; args: string[]; env: Record<string, string> };
 
-/** The api's own settings, which a server is not given: they mean nothing to it, and an inherited `PORT` could have it bind the api's port. */
+/**
+ * The api's own settings, which a server is not given: they mean nothing to it, and an inherited `PORT` could have it bind the api's port.
+ */
 const API_ONLY = new Set(['PORT', 'HKB_REPO']);
 
 /**
@@ -538,10 +559,10 @@ type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 
 /**
  * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Succeeds with the tools, or with why
- * not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never fails. The client and its server are
- * taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an answer,
- * `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given no
- * abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
+ * not and what it printed (after `STDERR_SETTLE_MS`), quoting the entry as `.mcp.json` writes it; never fails. The client and its server
+ * are taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an
+ * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given
+ * no abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
  */
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {

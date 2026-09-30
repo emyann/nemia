@@ -163,7 +163,10 @@ export type Pruning = {
   left: Array<{ path: string; git: string } | { path: string; files: string }>;
   /** When the run was pruned, on `pruned`. */
   at?: string;
-  /** Given `--unmerged`: the command a kept line offers repeats it (`pruneAgain`), since a run nobody has decided is refused its files without it. */
+  /**
+   * Given `--unmerged`: the command a kept line offers repeats it (`pruneAgain`), since a run nobody has decided is refused its files
+   * without it.
+   */
   unmerged?: true;
 };
 

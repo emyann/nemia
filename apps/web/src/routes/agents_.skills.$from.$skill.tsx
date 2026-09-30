@@ -28,9 +28,9 @@ export const Route = createFileRoute('/agents_/skills/$from/$skill')({
 const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
 /**
- * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit, when
- * it is yours; to read, when it is the repository's or one Nemia ships, which the board does not write. Save and the switch each write it
- * back against the version it was read at, and each changes every agent that gives it.
+ * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit,
+ * when it is yours; to read, when it is the repository's or one Nemia ships, which the board does not write. Save and the switch each write
+ * it back against the version it was read at, and each changes every agent that gives it.
  *
  * The form is drawn from the skill as read, but for a file that moved under unsaved words (`drawnSkill`), and drawn anew under each new
  * version a save or the switch brings. A write of the page is read back at once as the form's own, so its words do not read as unsaved. A

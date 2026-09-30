@@ -24,8 +24,9 @@ export function costWords(cost: SkillCost): string {
 }
 
 /**
- * The skills the form gives, one row each in its order: where an agent of yours finds each now (`places`, the picker's list, read again after
- * a copy), else as the agent was read (`given`). A name found in neither is said to be missing once the list is read; before, it is only named.
+ * The skills the form gives, one row each in its order: where an agent of yours finds each now (`places`, the picker's list, read again
+ * after a copy), else as the agent was read (`given`). A name found in neither is said to be missing once the list is read; before, it is
+ * only named.
  */
 export function givenRows(names: readonly string[], given: readonly GivenSkill[], places: readonly SkillPlace[] | undefined): GivenSkill[] {
   const found = (places ?? []).filter((place) => place.from !== 'shipped').flatMap((place) => place.skills);
@@ -41,8 +42,8 @@ export function givenRows(names: readonly string[], given: readonly GivenSkill[]
 
 /**
  * What the picker offers for a skill: to add it; to copy it into your library and add it, for one Nemia ships that an agent of yours finds
- * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a shipped skill your library or the repository has, so a
- * copy would write over yours or hide the repository's; or why no agent can be given it, and nothing to press.
+ * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a shipped skill your library or the repository has,
+ * so a copy would write over yours or hide the repository's; or why no agent can be given it, and nothing to press.
  */
 export type SkillOffer =
   | { kind: 'add' }
@@ -58,8 +59,8 @@ export function offerOf(row: SkillRow, given: readonly string[]): SkillOffer {
 }
 
 /**
- * A skill's form as a person types it: its name (its folder), a title, what it does, and its instructions, each a line or a text as written;
- * its tags and examples one a line. What the page sends is `draftOfForm`'s reading of it.
+ * A skill's form as a person types it: its name (its folder), a title, what it does, and its instructions, each a line or a text as
+ * written; its tags and examples one a line. What the page sends is `draftOfForm`'s reading of it.
  */
 export type SkillForm = { name: string; title: string; description: string; tags: string; examples: string; body: string };
 
@@ -92,8 +93,9 @@ const lines = (text: string): string[] | null => {
 };
 
 /**
- * What the form sends: its name and description as typed, trimmed; a blank title as none; its tags and examples one a non-blank line, or none;
- * its instructions as written. `preload` is left out, so a save keeps the line the file has — the page's switch writes it, on its own.
+ * What the form sends: its name and description as typed, trimmed; a blank title as none; its tags and examples one a non-blank line, or
+ * none; its instructions as written. `preload` is left out, so a save keeps the line the file has — the page's switch writes it, on its
+ * own.
  */
 export function draftOfForm(form: SkillForm): SkillDraft {
   return {
@@ -120,7 +122,9 @@ export function preloadWords(cost: SkillCost): string {
   return `On, its instructions are loaded every turn too — about ${cost.body.toLocaleString('en')} tokens more a turn, cached.`;
 }
 
-/** Who a change of the skill — its switch included — reaches: every agent that gives it, by name, from the next run started; or none yet. */
+/**
+ * Who a change of the skill — its switch included — reaches: every agent that gives it, by name, from the next run started; or none yet.
+ */
 export function reachWords(users: readonly SkillUser[]): string {
   if (!users.length) return 'No agent gives it yet: a change reaches none.';
   const names = users.map((user) => (user.from === 'repo' ? `${user.name} (this repository)` : user.name));
@@ -129,9 +133,9 @@ export function reachWords(users: readonly SkillUser[]): string {
 
 /**
  * The skill the page's form is drawn from, given the one it was drawn from and the one read now. A form with nothing unsaved follows the
- * read; one holding unsaved words keeps what it was drawn from, so a read that finds the file changed — a focus refetch, or the read after a
- * stale refusal — does not remount it and throw the words away. The page then says the file moved (`drawn.version !== now.version`). Another
- * skill read on the same page (its params changed) is never held.
+ * read; one holding unsaved words keeps what it was drawn from, so a read that finds the file changed — a focus refetch, or the read after
+ * a stale refusal — does not remount it and throw the words away. The page then says the file moved (`drawn.version !== now.version`).
+ * Another skill read on the same page (its params changed) is never held.
  */
 export function drawnSkill(drawn: SkillDetail, now: SkillDetail, changed: boolean): SkillDetail {
   return drawn.version === now.version || !changed || drawn.skill.dir !== now.skill.dir ? now : drawn;

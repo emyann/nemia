@@ -67,11 +67,11 @@ function SessionPage() {
 }
 
 /**
- * The session of `step` in `run`: its header, its Debug panel, its conversation, and the box to say more. The transcript is told whether the step waits on a
- * person's word — its session over, nothing of it running — and never whether the run is held: a hold (`wf hold`) answers nothing, and the
- * session runs or rests as it did. What this page said that the run, as last read, does not have yet is kept with the task it was said to,
- * so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what was said, where they reached it
- * (`heardIn`).
+ * The session of `step` in `run`: its header, its Debug panel, its conversation, and the box to say more. The transcript is told whether
+ * the step waits on a person's word — its session over, nothing of it running — and never whether the run is held: a hold (`wf hold`)
+ * answers nothing, and the session runs or rests as it did. What this page said that the run, as last read, does not have yet is kept with
+ * the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what was said,
+ * where they reached it (`heardIn`).
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;

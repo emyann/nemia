@@ -1,6 +1,6 @@
 /**
- * What a pass costs, in words (`meter.ts`): the totals, the heaviest phases, the line `wf up` says once an interval, the breakdown `--stats`
- * prints, and a cost read back off disk. Pure: the counting is `tally.store.ts`'s, proven on a store in tally.store.test.ts.
+ * What a pass costs, in words (`meter.ts`): the totals, the heaviest phases, the line `wf up` says once an interval, the breakdown
+ * `--stats` prints, and a cost read back off disk. Pure: the counting is `tally.store.ts`'s, proven on a store in tally.store.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -135,7 +135,10 @@ export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts
   return { by: 'nobody', words: none };
 }
 
-/** An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, `unreadable`, the machine's reason, or `no closeout`. */
+/**
+ * An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, `unreadable`, the machine's reason, or
+ * `no closeout`.
+ */
 export const outcomeWord = (o: Outcome): string =>
   o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';
 

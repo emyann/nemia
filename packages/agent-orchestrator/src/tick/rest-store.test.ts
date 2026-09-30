@@ -3,11 +3,11 @@
  * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
  * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
- * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
- * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in
- * full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import; no
- * cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is built
- * in a few passes.
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does.
+ * A file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered
+ * in full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import;
+ * no cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is
+ * built in a few passes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +47,9 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs. */
+/**
+ * A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs.
+ */
 const folder = (...steps: string[]) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   steps.forEach((name, k) =>
@@ -375,6 +377,28 @@ test('a run forgotten leaves the memo, and passes over runs at rest write nothin
   await forget(h.e, run.id);
   await rested();
   assert.equal(MEMO.runs.has(run.id), false, 'gone from the memo with its record');
+});
+
+test('a feed that cannot be read empties the memo and costs the pass nothing: every run is judged in full, and the next pass reads the feed from its end', async () => {
+  const before = await rested();
+  assert.ok(before > 0 && MEMO.cursor !== undefined, 'the memo holds runs at rest, and where on the feed it read to');
+  const unread = {
+    ...h.e,
+    feed: async () => {
+      throw new Error('the journal cannot be read');
+    },
+  };
+  const pass = await tick(unread, { repo: ROOT, memo: MEMO, verifyRest: true });
+  assert.equal(pass.cost?.rested, 0, 'no run answered from memory');
+  assert.deepEqual(
+    pass.runs.map((a) => a.run.id),
+    listRuns().map((r) => r.id),
+    'every run judged, in the store order',
+  );
+  assert.deepEqual([MEMO.runs.size, MEMO.cursor], [0, undefined], 'the memo emptied, and its place on the feed forgotten');
+  assert.equal(await rested(), 0, 'the next pass reads the feed from its end, and judges every run afresh');
+  assert.notEqual(MEMO.cursor, undefined);
+  assert.equal(await rested(), before, 'and the pass after answers from memory what it answered before');
 });
 
 test('REFUSED: a file in the asks directory that no reader reads still takes its run out — the stamp reads the asks, not only the record', async () => {

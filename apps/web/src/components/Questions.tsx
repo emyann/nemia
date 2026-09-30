@@ -22,7 +22,10 @@ export const recommendedDraft = (questions: readonly Question[], draft: Draft): 
     ...questions.flatMap((q) => (q.recommended === null ? [] : [[q.title, { ...said(draft, q), chose: [q.recommended] }]])),
   ]);
 
-/** `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes several. */
+/**
+ * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes
+ * several.
+ */
 export const chosenDraft = (draft: Draft, q: Question, label: string, on: boolean): Draft => {
   const before = said(draft, q).chose.filter((l) => q.multiple && l !== label);
   return { ...draft, [q.title]: { ...said(draft, q), chose: on ? [...before, label] : before } };

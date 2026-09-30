@@ -89,9 +89,10 @@ const isSaved = (answer: Record<string, unknown>): boolean =>
 export type SchemaFile = { file: string; text: string };
 
 /**
- * Put a folder of yours back from its steps and the schemas pasted for them, as the builder saves it: the api judges the two together, calls the
- * package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects with a
- * `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about the request.
+ * Put a folder of yours back from its steps and the schemas pasted for them, as the builder saves it: the api judges the two together,
+ * calls the package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects
+ * with a `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about
+ * the request.
  */
 export const saveWorkflow = (
   name: string,
@@ -104,6 +105,8 @@ export const saveWorkflow = (
     isSaved,
   );
 
-/** Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses. */
+/**
+ * Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses.
+ */
 export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step }, isSaved);

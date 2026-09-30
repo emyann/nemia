@@ -2,9 +2,9 @@
  * The board's agents (`agents/` beside each place it lists workflows from): each listed with the steps that name it, one read, and one of
  * yours made, put back or removed through the package's `writeAgent` and `removeAgent`.
  *
- * A step is a node of a workflow, and an agent is one thing a node may have attached (`agent:`): what the node's work is told first and runs
- * with. So an agent lists the nodes that name it, and an edit of one changes each of them — in what a later `wf start` freezes, and nothing
- * else: a run froze its folder and the agents its steps name when it started.
+ * A step is a node of a workflow, and an agent is one thing a node may have attached (`agent:`): what the node's work is told first and
+ * runs with. So an agent lists the nodes that name it, and an edit of one changes each of them — in what a later `wf start` freezes, and
+ * nothing else: a run froze its folder and the agents its steps name when it started.
  *
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
  */
@@ -48,10 +48,10 @@ import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows
 export type AgentUser = { from: WorkflowSource; workflow: string; step: string };
 
 /**
- * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names as that file holds it,
- * the skills its `skills:` gives its sessions and its `systemPrompt:`, each as written, what its card says it can do, the file's text, its
- * version (`agentVersion`, what a write carries), and the nodes that name it. `error` is the parser's refusal of a file that does not read,
- * whose keys are then its lines as written, so the form can show what to fix.
+ * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names as that file holds
+ * it, the skills its `skills:` gives its sessions and its `systemPrompt:`, each as written, what its card says it can do, the file's text,
+ * its version (`agentVersion`, what a write carries), and the nodes that name it. `error` is the parser's refusal of a file that does not
+ * read, whose keys are then its lines as written, so the form can show what to fix.
  */
 export type AgentListing = {
   name: string;
@@ -66,17 +66,20 @@ export type AgentListing = {
   schema: AgentSchema | null;
   /**
    * What its card says it can do, generated (`cardSkills`): an A2A skill for each skill its `skills:` gives, read off the
-   * skill's SKILL.md, or one made from its description when it gives none. Nobody writes it: the board shows it, read-only. Null when there is
-   * none — a file that does not read (`error` says why), or a card the package refuses (`cardError`).
+   * skill's SKILL.md, or one made from its description when it gives none. Nobody writes it: the board shows it, read-only. Null when there
+   * is none — a file that does not read (`error` says why), or a card the package refuses (`cardError`).
    */
   card: AgentSkill[] | null;
-  /** Why the agent has no card when it reads — no description, a skill no place has, a SKILL.md with no description — in the package's words. */
+  /**
+   * Why the agent has no card when it reads — no description, a skill no place has, a SKILL.md with no description — in the package's
+   * words.
+   */
   cardError: string | null;
   /** The skills its steps are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
   skills: string | null;
   /**
-   * Each skill its `skills:` gives, in its order: where a start finds it — your library, the repository, or none — its card entry or why it has
-   * none, and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
+   * Each skill its `skills:` gives, in its order: where a start finds it — your library, the repository, or none — its card entry or why it
+   * has none, and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
    */
   given: GivenSkill[];
   /** What becomes of Claude Code's system prompt, as written: `default`, `no-coding` or `own`; null for none, which is `default`. */
@@ -93,8 +96,8 @@ export type AgentListing = {
 };
 
 /**
- * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the repository's
- * `.claude/skills/`, then the store's. What its version digests and its card is read from.
+ * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the
+ * repository's `.claude/skills/`, then the store's. What its version digests and its card is read from.
  */
 const skillsOfPlace = (dir: string, repo: string, home: string): SkillsFound =>
   skillsFor(path.join(path.dirname(dir), '_'), placesOf(repo, home));
@@ -353,7 +356,8 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
 /**
  * The agents' routes. A name in a path is refused in the package's words (400) before a file is read, so none reaches outside the folder,
  * and a place that is neither `repo` nor `yours` is 400 (`placeOf`). Each write is guarded (guard.ts) and writes only yours (`yoursOnly`:
- * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind (`app.onError`).
+ * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind
+ * (`app.onError`).
  *
  * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is
  *   now.

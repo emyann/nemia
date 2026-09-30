@@ -2769,7 +2769,7 @@ holding a concurrency slot forever.
 | `src/start/start.verb.ts` | a run started (`wf start`), refused before a byte is written: the program `startRun`, and `start`, its plain face |
 | `src/plan/plan.verb.ts` | a plan's cards started (`startPlan`) |
 | `src/inbox/inbox.verb.ts` | an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
-| `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first (`tick`), and the memo of runs at rest (`RestMemo`) |
+| `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first: the program `tickRun`, and `tick`, its plain face; and the memo of runs at rest (`RestMemo`) |
 | `src/tick/advance.verb.ts` | a pass over one run (`advance`), which writes its record, and what a pass filed and never wrote down, adopted |
 | `src/tick/file.verb.ts` | what a pass files a step with: the first steps given their parents' closeouts (`parentCloseouts`), and the step as it is told (`toldOf`) |
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |

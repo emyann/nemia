@@ -58,7 +58,9 @@ const SHIP_MD = fs.readFileSync(path.join(TEAM_DEV, 'ship.md'), 'utf8');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: true });
 fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 
-/** What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete and the browser's unsafe tool. */
+/**
+ * What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete and the browser's unsafe tool.
+ */
 const SHIPPER_DENIED = [
   'SendMessage',
   'CronCreate',

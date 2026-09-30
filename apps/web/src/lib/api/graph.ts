@@ -1,4 +1,7 @@
-/** A run's steps as a graph, as the api draws it off the workflow (apps/api/src/runs/graph.ts), each type with the schema `get` decodes it with. */
+/**
+ * A run's steps as a graph, as the api draws it off the workflow (apps/api/src/runs/graph.ts), each type with the schema `get` decodes it
+ * with.
+ */
 import { Schema } from 'effect';
 
 /** Mirrors `GraphEdge` in apps/api/src/runs/graph.ts: `after`, `to` waits on `from`; `loop`, `from` runs `to` again. */

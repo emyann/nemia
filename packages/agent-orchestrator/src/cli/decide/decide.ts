@@ -115,16 +115,16 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
 }
 
 /**
- * `wf decide`: what a run produced and the choice it leaves a person. It refuses a flag before the run, which would otherwise print the help
- * and exit 0. Every screen names the files a person gave the run under its line, as its steps were handed them. A run waiting on others
- * (`--after`), held (`wf hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a hold beside
- * a wait says that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for, and the tries
- * and rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said there and on the
- * deciding screen. A shipped run whose ending never ran says so, as `wf ls` still shows it at its gate. A pruned run waits on nobody
- * (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read fails with the
- * runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the engine's record, never
- * a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines at most. The git
- * commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base branch itself
+ * `wf decide`: what a run produced and the choice it leaves a person. It refuses a flag before the run, which would otherwise print the
+ * help and exit 0. Every screen names the files a person gave the run under its line, as its steps were handed them. A run waiting on
+ * others (`--after`), held (`wf hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a
+ * hold beside a wait says that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for,
+ * and the tries and rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said
+ * there and on the deciding screen. A shipped run whose ending never ran says so, as `wf ls` still shows it at its gate. A pruned run waits
+ * on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read fails
+ * with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the engine's
+ * record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines at most.
+ * The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base branch itself
  * (`--no-worktree`), and a folder run is offered `wf rm` alone.
  */
 export async function decideVerb(rest: string[], e: Engine): Promise<void> {
@@ -167,7 +167,10 @@ type HeldOut = { ending?: Steps[number]; heldOut: string };
 /** A step's closeout as `decide` read it, or why it could not be read. */
 type Closeout = NonNullable<Decided['closeouts'][string]>;
 
-/** The first line of every screen: the run's id and its brief's first line, then its inbox card, its inputs and its pruning, each when it has one. */
+/**
+ * The first line of every screen: the run's id and its brief's first line, then its inbox card, its inputs and its pruning, each when it
+ * has one.
+ */
 function headOf(run: Decided['run']): string {
   const given = inputsNote(inputsDir(run), run.inputs);
   const from = fromNote(run);
@@ -305,7 +308,10 @@ function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], 
     );
 }
 
-/** What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in full. */
+/**
+ * What each branch to read touched, the lesson line, and each branch's files `sensitive` names — the check-affecting ones by default — in
+ * full.
+ */
 function printTouched(git: GitRun, branches: string[], steps: Steps, sensitive: string[] | undefined): void {
   const touched = branchesToRead(
     branches,

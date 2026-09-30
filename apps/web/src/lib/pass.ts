@@ -1,6 +1,7 @@
 /**
- * The words of what the last pass cost, beside the cap over the Factory's floor (`PassCost`, served with the ceilings): `a pass takes 212 ms`,
- * and the breakdown `wf up --stats` prints, as its title. Pure: the time and the time zone are handed in, the browser's own on the page.
+ * The words of what the last pass cost, beside the cap over the Factory's floor (`PassCost`, served with the ceilings):
+ * `a pass takes 212 ms`, and the breakdown `wf up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
+ * browser's own on the page.
  */
 import type { PassCost, PassPhase } from './api';
 import { clockWord } from './quota.ts';
@@ -21,8 +22,8 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 export const passLine = (pass: Pick<PassCost, 'ms'>): string => `a pass takes ${msWord(pass.ms)} ms`;
 
 /**
- * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness observed,
- * and what measuring it took — the breakdown `wf up --stats` prints.
+ * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness
+ * observed, and what measuring it took — the breakdown `wf up --stats` prints.
  */
 export function passTitle(pass: PassCost, now: Date, timeZone?: string): string {
   const phases = PASS_PHASES.map((p) => {

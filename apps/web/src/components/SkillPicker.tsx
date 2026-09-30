@@ -13,8 +13,8 @@ import { GivenSkills, SkillSourceBadge } from './AgentParts';
  * name — and the skills Nemia ships, each copied into your library before it is given, since an agent of yours finds none where Nemia keeps
  * them.
  *
- * Adding and removing edit the form's `skills:` line, saved with the agent. The copy does not wait for Save: it writes your library at once,
- * and the sheet says so.
+ * Adding and removing edit the form's `skills:` line, saved with the agent. The copy does not wait for Save: it writes your library at
+ * once, and the sheet says so.
  */
 export function SkillPicker({
   skills,

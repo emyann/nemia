@@ -1,6 +1,6 @@
 /**
- * The run store under `$WF_ROOT`: a run's id and its record, the files a person owns beside it — its cancellation, its pruning, each ask, approval
- * and acceptance — and the directories a step's check stderr, artifacts and inputs are kept in, outside every workspace.
+ * The run store under `$WF_ROOT`: a run's id and its record, the files a person owns beside it — its cancellation, its pruning, each ask,
+ * approval and acceptance — and the directories a step's check stderr, artifacts and inputs are kept in, outside every workspace.
  *
  * Beneath the controllers, as `retry/retry-ask.ts` is beneath `retry/retry.ts`: this file imports neither the engine nor a controller,
  * `runner.ts` re-exports what the package exports of it, and no pure file imports it (`test/boundary.test.ts`). `HOME` is read as this
@@ -191,8 +191,8 @@ export const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
 export const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
 
 /**
- * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its files
- * directory went and what that freed — a person's fact, in a file of its own
+ * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk, and, under `--artifacts`, when its
+ * files directory went and what that freed — a person's fact, in a file of its own
  * for the reason `cancelFile` is. Written by `prune` alone, before it removes anything, so a pass that reads the run while the worktrees
  * go files nothing more (`advance`), and composed onto the run on read (`readRun`) as `pruned`. `wf rm` removes it with the run.
  */
@@ -369,7 +369,10 @@ export const roundAskFile = (id: string, step: string, round: number): string =>
 export const approvalFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `approve-${step}-${n}`);
 export const acceptFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `accept-${step}-${n}`);
 
-/** The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named as one that cannot be read as one. */
+/**
+ * The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named
+ * as one that cannot be read as one.
+ */
 export function readApprovals(id: string): { approvals: Approval[]; notes: string[] } {
   return within('asks', () => readApprovalsNow(id));
 }
@@ -460,7 +463,10 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
   return { step, try: n, at, ...(message === undefined ? {} : { message }) };
 }
 
-/** The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named as one that cannot be read as one. */
+/**
+ * The acceptances of a run's loops, waiting in its asks directory — each ends the loop of the try it names — and a line for each file named
+ * as one that cannot be read as one.
+ */
 export function readAcceptances(id: string): { acceptances: Acceptance[]; notes: string[] } {
   return within('asks', () => readAcceptancesNow(id));
 }
@@ -696,11 +702,11 @@ export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
 
 /**
  * Each run's files in the store, stamped: what the tick's memo of runs at rest (`rest.ts`) compares, so that a run whose files are as they
- * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the record,
- * `.cancelled`, `.pruned`, `.hold`, and any other marker, as every name of that form is stamped — and of every
+ * were is not read again off the engine or git. One `readdir` of the store, and a `stat` of every file named `<id>.<anything>` — the
+ * record, `.cancelled`, `.pruned`, `.hold`, and any other marker, as every name of that form is stamped — and of every
  * entry of a directory so named and of the directories in it: the asks, with the approvals and acceptances among them, and `done/`, where
- * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and made again moves
- * its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
+ * each goes once it is spent. Its inode, size and modification time to the nanosecond, so a file written in place, moved, or removed and
+ * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
  *
  * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
  */
@@ -754,8 +760,8 @@ export const writeRun = (run: Run) => {
  * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
  * after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning and hold `readRun` composed onto it: they are a person's files, and a copy in the record would
- * outlive the file it was read from.
+ * Without the approvals, acceptances, pruning and hold `readRun` composed onto it: they are a person's files, and a copy in the record
+ * would outlive the file it was read from.
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 

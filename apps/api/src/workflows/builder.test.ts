@@ -1,7 +1,7 @@
 /**
- * The workflow builder's api (builder.ts): a folder of yours put back from its steps and the schemas pasted for them, made with a first step,
- * and the form a step's keys are drawn in — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
- * refuse, with the folder asserted as it was.
+ * The workflow builder's api (builder.ts): a folder of yours put back from its steps and the schemas pasted for them, made with a first
+ * step, and the form a step's keys are drawn in — in a scratch store and a scratch repository. Every write is read back from disk, and
+ * every refusal is made to refuse, with the folder asserted as it was.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -67,7 +67,10 @@ const snapshot = (dir: string): Record<string, string> =>
       )
     : {};
 
-/** A copy of the tests' team's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names beside it. */
+/**
+ * A copy of the tests' team's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names
+ * beside it.
+ */
 function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });

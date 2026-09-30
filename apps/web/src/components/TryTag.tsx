@@ -15,8 +15,8 @@ export function TryTag({ agent }: { agent: string }) {
 }
 
 /**
- * What a run was started from: its workflow, linked to the Workflows page — or, for a try, the tag and the agent it tried, linked to the agent's
- * page. A try's folder is the store's own and is listed on no page (`tries/<agent>`).
+ * What a run was started from: its workflow, linked to the Workflows page — or, for a try, the tag and the agent it tried, linked to the
+ * agent's page. A try's folder is the store's own and is listed on no page (`tries/<agent>`).
  */
 export function StartedFrom({ run }: { run: { workflowDir: string; try: { agent: string } | null } }) {
   if (!run.try) return <WorkflowLink dir={run.workflowDir} />;

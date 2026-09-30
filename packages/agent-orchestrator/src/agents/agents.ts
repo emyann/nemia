@@ -46,10 +46,11 @@ import type { AgentSkill } from '../skills/skills.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
 /**
- * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line; the skills it is given (`skills:`), which are also what its card says it can do and what becomes of Claude Code's own system prompt (`systemPrompt:`); and who does the work and how. A step that names the
- * agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins. Everything else a step sets is wiring — where
- * the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is
- * refused by name.
+ * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line;
+ * the skills it is given (`skills:`), which are also what its card says it can do and what becomes of Claude Code's own system prompt
+ * (`systemPrompt:`); and who does the work and how. A step that names the agent (`agent:`) takes the last of those as its own defaults, and
+ * a key it sets itself wins. Everything else a step sets is wiring — where the step sits in its workflow, what it reads, how it is judged
+ * and for how long — and belongs on the step: an agent file that sets one is refused by name.
  */
 export const AGENT_KEYS = [
   'role',
@@ -70,7 +71,8 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its system prompt. A step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
+ * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its system prompt. A
+ * step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
@@ -95,7 +97,9 @@ export type SystemPrompt = (typeof SYSTEM_PROMPTS)[number];
 /** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as Claude Code names one. */
 export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name. */
+/**
+ * Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name.
+ */
 export function skillNameRefusal(name: unknown): string | undefined {
   if (typeof name === 'string' && SKILL_NAME.test(name) && name.length <= 64) return undefined;
   const shown = typeof name === 'string' ? `\`${name}\`` : JSON.stringify(name);
@@ -105,8 +109,8 @@ export function skillNameRefusal(name: unknown): string | undefined {
 /**
  * What a skill costs an agent's sessions, in tokens, estimated at four characters a token (the page says "about"): `listed`, its name and
  * description, which Claude Code lists to every session of an agent that gives it; `body`, its SKILL.md's body, which a session reads when
- * it loads the skill — or, for a skill that says `preload: true`, which the run appends to the system prompt, so it is carried on every turn
- * (cached). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
+ * it loads the skill — or, for a skill that says `preload: true`, which the run appends to the system prompt, so it is carried on every
+ * turn (cached). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
  * SKILL.md that does not read costs what its text would.
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
@@ -287,8 +291,8 @@ function systemPromptOf(file: string, written: string | undefined): SystemPrompt
 }
 
 /**
- * An agent as it is written back: what `renderAgent` takes, and what `parseAgent` reads — its name, the file's, its description, its keys as
- * written (`200k`, `Read, Grep`), and its instructions. A key unset is left out, or `null`.
+ * An agent as it is written back: what `renderAgent` takes, and what `parseAgent` reads — its name, the file's, its description, its keys
+ * as written (`200k`, `Read, Grep`), and its instructions. A key unset is left out, or `null`.
  */
 export type AgentDraft = {
   name: string;
@@ -302,13 +306,13 @@ export type AgentDraft = {
 };
 
 /**
- * An agent as its file: the frontmatter, its own lines first (`AGENT_OWN_KEYS`) and then each role key it sets, in `AGENT_KEYS`' order, as written; then its
- * instructions. The inverse of `parseAgent`: an agent it read renders to a file it reads back as the same agent, which
+ * An agent as its file: the frontmatter, its own lines first (`AGENT_OWN_KEYS`) and then each role key it sets, in `AGENT_KEYS`' order, as
+ * written; then its instructions. The inverse of `parseAgent`: an agent it read renders to a file it reads back as the same agent, which
  * `test/write-agent.test.ts` holds over every shipped agent. Pure. A file's comments are not on the agent, so a render has none.
  *
- * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what it
- * rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one no
- * agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; one of its own lines
+ * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what
+ * it rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one
+ * no agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; one of its own lines
  * among the keys, where it would be written twice; a card file (`cardRetired`), which a stale page sends as `card` or as a `skills:` naming
  * one, and which is written nowhere; and a line break in a value, which would make what follows it a line of its own — a key, even.
  */
@@ -368,8 +372,8 @@ export function renderAgent(draft: AgentDraft): string {
  *
  * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here
  * fills them honestly. `capabilities` in A2A are protocol features, not reach: streaming, push notifications, an extended card. None of the
- * three exists here, so all three are false. What an agent can do is its card's `skills`: an entry for each skill `skills:` gives its sessions,
- * read off the skill's SKILL.md (`skillEntryOf`), or one made from the agent's own description when it gives none (`ownSkill`).
+ * three exists here, so all three are false. What an agent can do is its card's `skills`: an entry for each skill `skills:` gives its
+ * sessions, read off the skill's SKILL.md (`skillEntryOf`), or one made from the agent's own description when it gives none (`ownSkill`).
  */
 export type AgentCardShape = {
   name: string;
@@ -385,13 +389,13 @@ export type AgentCardShape = {
  * The card-shaped description of `agent`, at `version` — what `wf agents card` prints and the api answers with, one builder so the two can
  * never disagree. Pure. The JSON is spelled as the specification's sample card spells it, camelCase.
  *
- * `defaultInputModes` is `text/plain`: a step is handed a composed brief and nothing else. `defaultOutputModes` is `application/json`: every
- * closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema — there
- * is no field for it, so it contributes the media type and nothing more.
+ * `defaultInputModes` is `text/plain`: a step is handed a composed brief and nothing else. `defaultOutputModes` is `application/json`:
+ * every closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema —
+ * there is no field for it, so it contributes the media type and nothing more.
  *
  * `skills` are the card's entries, generated from the skills the agent is given (`cardSkills` in `folder.store.ts`, which reads their
- * SKILL.md files). Refused, rather than printed hollow: an agent with no `description:`, and a card with no entry, both of which the protocol
- * marks REQUIRED.
+ * SKILL.md files). Refused, rather than printed hollow: an agent with no `description:`, and a card with no entry, both of which the
+ * protocol marks REQUIRED.
  */
 export function agentCard(agent: Agent, version: string, skills: readonly AgentSkill[]): AgentCardShape {
   const named = `${AGENTS_FOLDER}/${agent.name}.md`;
@@ -460,11 +464,11 @@ export const NO_CODING_STYLE = 'no-coding';
 export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /**
- * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and takes no
- * system prompt — whose record gives its agent instructions, skills or a system prompt other than `default` (`StepAgent.instructions`,
- * `skills`, `systemPrompt`; a record without them renders nothing), and which starts a session of its own. A step that continues another's
- * session keeps that session's system prompt, so it is told its agent's instructions in its brief (and may give no skills, nor a system
- * prompt: `composedRefusal`).
+ * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
+ * takes no system prompt — whose record gives its agent instructions, skills or a system prompt other than `default`
+ * (`StepAgent.instructions`, `skills`, `systemPrompt`; a record without them renders nothing), and which starts a session of its own. A
+ * step that continues another's session keeps that session's system prompt, so it is told its agent's instructions in its brief (and may
+ * give no skills, nor a system prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
@@ -475,15 +479,18 @@ export const rendersAgent = (step: Workflow): boolean => {
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
 export const briefBody = (step: Workflow): string => (rendersAgent(step) ? step.agent!.body : step.body);
 
-/** A skill as a step whose rendered folder is gone is told it: its SKILL.md's body, read again where the load finds it, or why it cannot be. */
+/**
+ * A skill as a step whose rendered folder is gone is told it: its SKILL.md's body, read again where the load finds it, or why it cannot be.
+ */
 export type SkillAgain = { name: string; text: string } | { name: string; missing: string };
 
 /**
  * A step as it is told when its rendered folder is not there — removed by hand, or never written — with its agent's instructions in its
  * brief and no flags: filing it with a flag naming a file that is not there would end the session at
  * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
- * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare name,
- * as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `wf start` reaches it).
+ * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare
+ * name, as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `wf start` reaches
+ * it).
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;

@@ -1,7 +1,10 @@
 import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm } from './api';
 import { remoteRefuses } from './builder.ts';
 
-/** The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, systemPrompt): the order an agent's file writes them. */
+/**
+ * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, systemPrompt): the order an agent's
+ * file writes them.
+ */
 export const ROLE_KEYS: readonly AgentRoleKey[] = [
   'harness',
   'model',
@@ -33,9 +36,9 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
 
 /**
  * An agent's form as it is being edited: each field as typed, `''` for a key unset. `schemaText` is the result schema's text, read from the
- * file its `output:` names, and `schemaWas` what that file held when read — a schema is sent with a save only when it changed. `skills` — the
- * skills its sessions are given, by name, which its card is generated from — and `systemPrompt` are its own lines as typed. None of those
- * is a role key.
+ * file its `output:` names, and `schemaWas` what that file held when read — a schema is sent with a save only when it changed. `skills` —
+ * the skills its sessions are given, by name, which its card is generated from — and `systemPrompt` are its own lines as typed. None of
+ * those is a role key.
  */
 export type AgentForm = {
   name: string;
@@ -73,7 +76,8 @@ export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
 
 /**
  * The draft a save sends: each field trimmed, an empty one unset (null). A schema pasted with no `output:` is named after the agent, and
- * its text travels only when it or the file's name changed since it was read — one another agent shares is then left alone. Nothing is judged here that the package judges on save.
+ * its text travels only when it or the file's name changed since it was read — one another agent shares is then left alone. Nothing is
+ * judged here that the package judges on save.
  */
 export function draftOf(form: AgentForm): AgentDraft {
   const keys = Object.fromEntries(ROLE_KEYS.map((key) => [key, form.keys[key].trim() || null])) as Record<AgentRoleKey, string | null>;
@@ -112,8 +116,8 @@ export function choicesOf(form: KeyForm | undefined, key: AgentRoleKey, harness:
 /**
  * Whether the harness the agent names has the key at all: a key whose words are the harness's is had only on a harness that has some. Each
  * harness has one fence — Claude Code its `permissionMode`, codex its `sandbox` — and the form draws the other only where it is written, as
- * free text, to be taken off. A remote A2A agent has none of the keys the package refuses on it (`remoteRefuses`). Any other harness the form
- * does not know is not judged here: its keys are typed, and the package judges them on save.
+ * free text, to be taken off. A remote A2A agent has none of the keys the package refuses on it (`remoteRefuses`). Any other harness the
+ * form does not know is not judged here: its keys are typed, and the package judges them on save.
  */
 export function hasKey(form: KeyForm | undefined, key: AgentRoleKey, harness: string): boolean {
   const field = form?.keys.find((k) => k.key === key);
@@ -146,8 +150,8 @@ export const withSkill = (line: string, name: string): string =>
 export const withoutSkill = (line: string, name: string): string => skillLine(skillList(line).filter((given) => given !== name));
 
 /**
- * Why the skills given reach nothing, as the package refuses it on save — `tools:` set without `Skill`, or `Skill` denied — or null. A tool is
- * read as the package reads it, one entry of the comma-separated list, exactly `Skill`.
+ * Why the skills given reach nothing, as the package refuses it on save — `tools:` set without `Skill`, or `Skill` denied — or null. A tool
+ * is read as the package reads it, one entry of the comma-separated list, exactly `Skill`.
  */
 export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' | 'disallowedTools' | null {
   if (!skillList(form.skills).length) return null;
@@ -165,8 +169,8 @@ export const deniedWithoutSkill = (denied: string): string => skillLine(skillLis
 
 /**
  * What each `systemPrompt:` word does, as the form offers it: a plain choice, what it costs or drops, and whether it is kept behind For
- * experts. Claude Code's own prompt is about 6.5k tokens, cached across turns; `no-coding` drops its coding section, about 750 of them; `own`
- * drops the lot, safety rules included, leaving the agent's instructions alone.
+ * experts. Claude Code's own prompt is about 6.5k tokens, cached across turns; `no-coding` drops its coding section, about 750 of them;
+ * `own` drops the lot, safety rules included, leaving the agent's instructions alone.
  */
 export const SYSTEM_PROMPT_CHOICES: ReadonlyArray<{
   value: (typeof SYSTEM_PROMPTS)[number];
@@ -199,8 +203,8 @@ export const systemPromptShown = (value: string): string => value.trim() || 'def
 
 /**
  * The form's system prompt once `picked` is chosen, from `was`, what the file said as read. The default is written only where it was: an
- * agent whose file said nothing, or `default`, gets back what it said, and one moved to the default from another word is left unset, which is
- * the default — so picking a choice and then the default again is no edit.
+ * agent whose file said nothing, or `default`, gets back what it said, and one moved to the default from another word is left unset, which
+ * is the default — so picking a choice and then the default again is no edit.
  */
 export function pickSystemPrompt(picked: string, was: string): string {
   if (picked !== 'default') return picked;
@@ -218,9 +222,9 @@ export type KeptForm = { key: string; version: string };
 export const formKeyOf = (version: string, kept: KeptForm | null): string => (kept && kept.version === version ? kept.key : version);
 
 /**
- * What the page keeps once its copy of a skill is written: the form under `key`, at the version the agent reads at now (`now`) — but only when
- * its file and its schema read as they did when the form was drawn (`was`). A change to either since is someone else's, and the form is drawn
- * again from it, as for any other change, rather than saved over it.
+ * What the page keeps once its copy of a skill is written: the form under `key`, at the version the agent reads at now (`now`) — but only
+ * when its file and its schema read as they did when the form was drawn (`was`). A change to either since is someone else's, and the form
+ * is drawn again from it, as for any other change, rather than saved over it.
  */
 export function keptAfterCopy(
   was: Pick<AgentListing, 'source' | 'schema'>,
@@ -232,8 +236,8 @@ export function keptAfterCopy(
 }
 
 /**
- * What the page keeps once a save has been read back: the form a copy kept is let go only when the agent reads at another version than the one
- * the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form would be drawn again from the
+ * What the page keeps once a save has been read back: the form a copy kept is let go only when the agent reads at another version than the
+ * one the copy moved it to (`now`), which the save's own read brings. Let go before that read lands, the form would be drawn again from the
  * file as it was before the save, and would stay so where the read failed.
  */
 export const keptAfterSave = (kept: KeptForm | null, now: string | undefined): KeptForm | null =>

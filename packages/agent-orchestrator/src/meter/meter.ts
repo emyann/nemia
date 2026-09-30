@@ -8,10 +8,10 @@
 /**
  * The phases of a pass. `records`: the run records, with the cancellation, pruning and hold beside each. `asks`: a person's asks,
  * approvals, acceptances and answers. `journals`: the runtime's journals, read through the engine (`view`, `feed`, `logs`), less the
- * observing a view does. `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time. `runtime`: the
- * runtime's own pass, less its observe. `git`: every git command, whether it judged (is a branch shipped) or acted (a worktree, a hand-off).
- * `assess`: the judgement — which queued tasks to admit among it — and any time not counted as another phase. `act`: filing, admitting,
- * stopping, collecting a step's artifacts, and writing the run's record, the feed and the ceilings.
+ * observing a view does. `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time. `runtime`:
+ * the runtime's own pass, less its observe. `git`: every git command, whether it judged (is a branch shipped) or acted (a worktree, a
+ * hand-off). `assess`: the judgement — which queued tasks to admit among it — and any time not counted as another phase. `act`: filing,
+ * admitting, stopping, collecting a step's artifacts, and writing the run's record, the feed and the ceilings.
  */
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'] as const;
 export type Phase = (typeof PHASES)[number];
@@ -26,10 +26,10 @@ export type PhaseCost = { ms: number; calls: number; bytes: number; reads: numbe
 export type HarnessCost = { calls: number; ms: number; listed: number; spawned: number; unread?: number };
 
 /**
- * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass. `records`
- * is the run records it read, `bytes` and `spawned` its totals, and `overheadMs` what measuring took — the counting inside the pass, and
- * composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass answered from
- * its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them.
+ * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass.
+ * `records` is the run records it read, `bytes` and `spawned` its totals, and `overheadMs` what measuring took — the counting inside the
+ * pass, and composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass
+ * answered from its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them.
  */
 export type PassCost = {
   at: string;

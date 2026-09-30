@@ -1,6 +1,6 @@
 /**
- * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`wf inbox queue`), judged by the tick
- * over every run and card in a store of its own.
+ * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`wf inbox queue`), judged by the
+ * tick over every run and card in a store of its own.
  *
  * What the cap and the queue decide is pure, and lives in run.test.ts and inbox.test.ts. This is the part that is not: a pass over the
  * whole store, which advances the runs that have started first, admits the rest oldest first, then starts a queued card while a slot is
@@ -41,9 +41,9 @@ const refusedAs = (tag: string, pattern: RegExp) => (err: Error & { exitCode?: n
   err._tag === tag && refusedWith(pattern)(err);
 
 /**
- * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is settled
- * `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says, and `later` moves that clock on, in
- * minutes.
+ * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is
+ * settled `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says, and `later` moves that clock on,
+ * in minutes.
  */
 const board = () => {
   const tasks = new Map<
@@ -117,7 +117,9 @@ const board = () => {
   return { e, tasks, filings, settle, later };
 };
 
-/** A store with no runs, no cards, no tries of the queue and no ceilings of a last pass in it, and the cap as given: `undefined` unsets it. */
+/**
+ * A store with no runs, no cards, no tries of the queue and no ceilings of a last pass in it, and the cap as given: `undefined` unsets it.
+ */
 const emptyStore = (cap: string | undefined) => {
   for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(RUNS, { recursive: true });
@@ -143,8 +145,8 @@ const oneStep = (() => {
 })();
 
 /**
- * `wf start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the record as the
- * test's to say.
+ * `wf start`, for real, of a one-step run over a repository of its own unless given one — created at `createdAt`, written over the record
+ * as the test's to say.
  */
 const started = (brief: string, createdAt: string, opts: { isolate?: boolean; after?: string[]; repo?: string } = {}): Run => {
   const run = start({

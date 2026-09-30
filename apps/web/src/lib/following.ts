@@ -27,23 +27,23 @@ export const animationFrames: Frames = {
 const CLOSED = 2;
 
 /**
- * How long a stream that has said it is over — `settled`, or a read that will not work again — is given to end its response, before the page
- * closes it all the same. The api ends it right after that last event.
+ * How long a stream that has said it is over — `settled`, or a read that will not work again — is given to end its response, before the
+ * page closes it all the same. The api ends it right after that last event.
  */
 export const END_GRACE_MS = 2_000;
 
 /**
  * What each of a step's stream events does to what a page holds of its conversation (`update`), apart from React, so it is tested without a
  * browser: `useStepTranscript` opens the stream and hands it here. Each `transcript` event is merged in, a frame's worth at once; `settled`
- * ends it; a read that failed and is tried again every second is said, and one that will not be is the end; `readable` clears the error, and
- * so does each connection made — the first, or one the EventSource made again after a drop — since a fresh server stream never sends
- * `readable`. A dropped connection is the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what stops
- * following.
+ * ends it; a read that failed and is tried again every second is said, and one that will not be is the end; `readable` clears the error,
+ * and so does each connection made — the first, or one the EventSource made again after a drop — since a fresh server stream never sends
+ * `readable`. A dropped connection is the EventSource's to resume; one it closes, because the api refused it, is the end. Returns what
+ * stops following.
  *
  * A stream that said it is over is closed once the api has ended its response — the `error` an EventSource fires then, before it would
- * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on its
- * way, the browser aborts a request that was answered in full (`net::ERR_ABORTED`), which the e2e's watch counts as a failed request. The page
- * stops following at once all the same.
+ * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on
+ * its way, the browser aborts a request that was answered in full (`net::ERR_ABORTED`), which the e2e's watch counts as a failed request.
+ * The page stops following at once all the same.
  */
 export function follow(stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames): () => void {
   let arrived: TranscriptEvent[] = [];

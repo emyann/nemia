@@ -7,7 +7,9 @@ import { END_GRACE_MS, type Frames, type StreamLike } from './following.ts';
  */
 export type FeedStatus = 'connecting' | 'open' | 'down';
 
-/** What the feed's stream names each event, as the api's `feedEventOf` does: a step's word, a run gone from the store, or a run's own word. */
+/**
+ * What the feed's stream names each event, as the api's `feedEventOf` does: a step's word, a run gone from the store, or a run's own word.
+ */
 export type FeedEvent = 'run' | 'step' | 'removed';
 
 /** How often what the feed answers for is read all the same while its stream is open: a slow fallback, in case an event is ever missed. */
@@ -24,8 +26,8 @@ export const REOPEN_MS = 5_000;
  * be a queued card started — the feed carries no card events, so the inbox is read again on it. A run removed is gone from the list and
  * from the cap, and its record is read again too: the read that finds none is how a page open on the run learns it is gone (`runGone`).
  *
- * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, so a daemon started
- * while the board says none does is seen on its first line, not on the fallback a minute later.
+ * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, so a daemon
+ * started while the board says none does is seen on its first line, not on the fallback a minute later.
  */
 export function keysOf(event: FeedEvent, run: string): QueryKey[] {
   switch (event) {
@@ -39,8 +41,8 @@ export function keysOf(event: FeedEvent, run: string): QueryKey[] {
 }
 
 /**
- * Whether a query is one the board polls at `pace`, and reads again when the stream goes down: what the feed says — the runs, a run's record,
- * and the cap — and whether a daemon ticks the store (`daemonQuery`), which every event reads again but none can say is gone.
+ * Whether a query is one the board polls at `pace`, and reads again when the stream goes down: what the feed says — the runs, a run's
+ * record, and the cap — and whether a daemon ticks the store (`daemonQuery`), which every event reads again but none can say is gone.
  */
 export const polled = (key: QueryKey): boolean =>
   (key.length === 1 && (key[0] === 'runs' || key[0] === 'ceilings' || key[0] === 'daemon')) ||
@@ -73,8 +75,8 @@ const CLOSED = 2;
  *
  * A dropped connection is the EventSource's own to resume: it reconnects with the id of the last event it was sent, and misses nothing.
  * One the api refused — or a proxy's 5xx while the api restarts — is closed for good by the EventSource, and opened again here after
- * `REOPEN_MS` from the last event's id; if that is refused too, before it ever opened, from the start, since a cursor the api refuses (a 400)
- * cannot be told apart from an api that is not there. A read the api failed and tries again every second (`unreadable`, `retrying`) is
+ * `REOPEN_MS` from the last event's id; if that is refused too, before it ever opened, from the start, since a cursor the api refuses (a
+ * 400) cannot be told apart from an api that is not there. A read the api failed and tries again every second (`unreadable`, `retrying`) is
  * said `down` and still followed, and `open` again once the api says `readable`. A feed cut under the stream's cursor is said once
  * (`unreadable`, not `retrying`) and the api ends the response: closed then, on the `error` fired as the response ends, or after
  * `END_GRACE_MS` — never on the event itself, which aborts a request answered in full (`follow`) — and opened again from the start.

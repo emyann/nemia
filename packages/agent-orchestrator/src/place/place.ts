@@ -32,7 +32,9 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
 /** What `open` answers at `wf start`: the repository, the commit a run starts from, and the line of work it is on. */
 export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string };
 
-/** What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for its brief. */
+/**
+ * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for its brief.
+ */
 export type Made = {
   readonly workspace: string;
   readonly branch: string;
@@ -43,7 +45,9 @@ export type Made = {
 /** What `handoff` answers: the commit it made of what a step left, or null when there was nothing to commit. */
 export type HandedOff = { readonly commit: string | null };
 
-/** One file a result branch changed: its path, where it came `from` when renamed, how, and its lines added and removed (null for binary). */
+/**
+ * One file a result branch changed: its path, where it came `from` when renamed, how, and its lines added and removed (null for binary).
+ */
 export type ChangedFile = {
   readonly path: string;
   readonly from?: string;
@@ -71,7 +75,10 @@ export type Changes = {
   readonly atBase: Readonly<Record<string, string | null>>;
 };
 
-/** One result branch as `standing` reads it: its tip, whether it is on its base, whether it holds work past the run's base, and how far ahead. */
+/**
+ * One result branch as `standing` reads it: its tip, whether it is on its base, whether it holds work past the run's base, and how far
+ * ahead.
+ */
 export type BranchStood = {
   readonly branch: string;
   readonly tip: string | null;

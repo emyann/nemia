@@ -1,6 +1,6 @@
 /**
- * GET, POST and DELETE /api/inbox (inbox.ts), and POST /api/runs with `card` (workflows.ts): the inbox listed, a card filed and dropped, and
- * a card started — in a scratch store and a scratch repository, through the package's own inbox.
+ * GET, POST and DELETE /api/inbox (inbox.ts), and POST /api/runs with `card` (workflows.ts): the inbox listed, a card filed and dropped,
+ * and a card started — in a scratch store and a scratch repository, through the package's own inbox.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';

@@ -66,10 +66,10 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
 }
 
 /**
- * What an agent says it can do: each A2A skill on its card, generated from the skills it gives, in their order — the name a caller would read,
- * what it is for, and the tags it carries. `compact`, as a character card shows them: the name on its line, what it is for cut to two lines,
- * and no tags; the whole of it is on the agent's page, a click away. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is
- * drawn at all where `none` is left out.
+ * What an agent says it can do: each A2A skill on its card, generated from the skills it gives, in their order — the name a caller would
+ * read, what it is for, and the tags it carries. `compact`, as a character card shows them: the name on its line, what it is for cut to two
+ * lines, and no tags; the whole of it is on the agent's page, a click away. `none` is what stands there when there is no card, its refusal
+ * shown elsewhere; nothing is drawn at all where `none` is left out.
  */
 export function Skills({
   skills,
@@ -159,7 +159,10 @@ export function AgentFace({ name, size, follows, plate, className }: FaceProps) 
   );
 }
 
-/** An agent's face, alive at all times, whose eyes follow the pointer: Blobatar's gaze driver on its drawing, three units of a hundred at most. */
+/**
+ * An agent's face, alive at all times, whose eyes follow the pointer: Blobatar's gaze driver on its drawing, three units of a hundred at
+ * most.
+ */
 function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follows'>) {
   const { ref } = useGaze({ travel: 3, lookAt: 'pointer' });
   return (
@@ -279,8 +282,9 @@ export function SkillSourceBadge({ from }: { from: SkillSource | null }) {
 }
 
 /**
- * The skills an agent gives, one row each in its order: its name, linked to its page where it is found, where it is found, what it is for, and what it costs a turn — or why no
- * session can be given it, in the package's words. `action` draws what a row offers beside it (the picker's Remove); read-only, nothing.
+ * The skills an agent gives, one row each in its order: its name, linked to its page where it is found, where it is found, what it is for,
+ * and what it costs a turn — or why no session can be given it, in the package's words. `action` draws what a row offers beside it (the
+ * picker's Remove); read-only, nothing.
  */
 export function GivenSkills({
   rows,

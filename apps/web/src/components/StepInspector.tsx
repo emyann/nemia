@@ -11,7 +11,9 @@ import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, readRows, specRows, spentRows, Told, when } from './Facts';
 import { Asked } from './GateBrief';
 
-/** A step's conversation, loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas. */
+/**
+ * A step's conversation, loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas.
+ */
 const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
 import { StatusChip, StepNote } from './StatusChip';
 
@@ -158,9 +160,9 @@ type DetailsProps = {
 };
 
 /**
- * The Details tab: what the run asks of you here first (`Asked`), above the step's own state, which is the reason it waits and not what to do
- * about it; then its facts, its tries, its check, its spec and what it was told. A step not filed has run nothing, so in place of a row of
- * dashes it says so once, above its spec.
+ * The Details tab: what the run asks of you here first (`Asked`), above the step's own state, which is the reason it waits and not what to
+ * do about it; then its facts, its tries, its check, its spec and what it was told. A step not filed has run nothing, so in place of a row
+ * of dashes it says so once, above its spec.
  *
  * Its facts: the try the attempts are of, once there is more than one, since each round and each try within one is a task of its own; how
  * long the latest attempt took, only where its end is on the record; what its current try consumed, in `wf decide`'s words — `not measured`

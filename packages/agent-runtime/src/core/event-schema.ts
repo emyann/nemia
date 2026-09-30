@@ -61,7 +61,9 @@ const harnessArgs = {
   codex: Schema.optional(Schema.StructWithRest(Schema.Struct({ trustFrom: Schema.optional(Schema.String) }), Rest)),
 };
 
-/** `FORMER_ARGS`: a former harness argument that Claude Code's flag of the same key replaces, which `upgrade` moves into `config.claude`. */
+/**
+ * `FORMER_ARGS`: a former harness argument that Claude Code's flag of the same key replaces, which `upgrade` moves into `config.claude`.
+ */
 const formerArgs = { remoteControl: Schema.optional(Schema.Boolean) };
 
 export const HarnessArgsSchema = Schema.StructWithRest(Schema.Struct({ ...harnessArgs, ...formerArgs }), Rest);

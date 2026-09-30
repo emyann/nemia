@@ -11,10 +11,10 @@ import { POPOVER } from './CardGate';
 import { Refusal } from './Ask';
 
 /**
- * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and, for
- * a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in words
- * that say what goes. The api prunes through the package's `prune`, as `wf prune <run> --yes` does, and refuses in its words, shown here.
- * Nothing is offered where the package would prune nothing (`prunable`).
+ * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and,
+ * for a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in
+ * words that say what goes. The api prunes through the package's `prune`, as `wf prune <run> --yes` does, and refuses in its words, shown
+ * here. Nothing is offered where the package would prune nothing (`prunable`).
  */
 export function PruneRun({ run }: { run: RunDetail }) {
   if (!prunable(run)) return null;
@@ -65,8 +65,8 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
 }
 
 /**
- * The choice and the two presses. The run is read again once pruned, its record and the list each alone (`exact`), as an approval reads them;
- * the popover closes, unless `wf prune` kept something it could not remove, which its lines then say.
+ * The choice and the two presses. The run is read again once pruned, its record and the list each alone (`exact`), as an approval reads
+ * them; the popover closes, unless `wf prune` kept something it could not remove, which its lines then say.
  */
 function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onClose: () => void }) {
   const [key, setKey] = useState<PruneChoice['key']>(firstChoice(offer).key);

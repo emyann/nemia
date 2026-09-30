@@ -8,7 +8,8 @@ const INPUT =
 
 /**
  * A new workflow of yours: its name — its folder's — and a first step, a name and what it is told (`POST /api/workflows/yours`). Once
- * made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a name taken, or a step the package refuses.
+ * made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a name taken, or a step the package
+ * refuses.
  */
 export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }) {
   const queryClient = useQueryClient();

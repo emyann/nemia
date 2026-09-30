@@ -4,16 +4,17 @@
  * feed (`evictedBy`). Whether its result branches still stand where it saw them is `tipsSeen`'s, as a full pass asks it.
  *
  * The memo is a cache of a pure function, never a source of truth: a pass answers a run at rest from it only while the run's inputs are as
- * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its tasks'
- * journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and judges every run afresh. Nothing
- * is written for it, and no verb, `wf ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no runtime.
+ * they were when a pass last judged it — its record and every file a person keeps beside it (`restStamps` in record.store.ts), each of its
+ * tasks' journals (the engine's feed), and its result branches' tips — and a restarted daemon starts with none, and judges every run
+ * afresh. Nothing is written for it, and no verb, `wf ls` or the api reads it. Pure: it reads no disk, spawns nothing and imports no
+ * runtime.
  */
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 
 /**
- * What one pass of a run read and did, as `advance` knows it once it has decided — every fact that says the next pass, with the same inputs,
- * would decide the same and do nothing.
+ * What one pass of a run read and did, as `advance` knows it once it has decided — every fact that says the next pass, with the same
+ * inputs, would decide the same and do nothing.
  */
 export type RestFacts = {
   run: Pick<Run, 'workflow' | 'pruned' | 'hold'>;
@@ -27,14 +28,17 @@ export type RestFacts = {
   /** Its notes, which `wf up` prints on every pass that has them. */
   notes: readonly string[];
   /**
-   * Steps whose hand-off is still due (`handOffOwed`): one git refused is tried again on the next pass, with no note. Never one whose workspace
-   * is gone, which nothing hands off from: whether a workspace is on disk is read by the pass and not watched by the memo, since nothing but
-   * a filing, which writes the record, makes a step's workspace again.
+   * Steps whose hand-off is still due (`handOffOwed`): one git refused is tried again on the next pass, with no note. Never one whose
+   * workspace is gone, which nothing hands off from: whether a workspace is on disk is read by the pass and not watched by the memo, since
+   * nothing but a filing, which writes the record, makes a step's workspace again.
    */
   handOffDue: readonly string[];
   /** Whether an ending that lands on its check has not written down how it landed: a merge in the checkout that is not its own waits. */
   landingOwed: boolean;
-  /** Whether the pass read other runs' claims on the repository's checkout (`checkoutHold`): what they say moves with them, not with this run. */
+  /**
+   * Whether the pass read other runs' claims on the repository's checkout (`checkoutHold`): what they say moves with them, not with this
+   * run.
+   */
   checkoutAsked: boolean;
   /** The runs it waits on (`waitsOf`): whether they shipped is theirs. */
   waiting: readonly unknown[];
@@ -49,8 +53,8 @@ const FINAL: ReadonlySet<Assessment['status']> = new Set(['succeeded', 'failed',
 /**
  * Whether a run is at rest after the pass that read `f`: its status is final — succeeded, failed (a gate waiting on a person included) or
  * cancelled — or it is pruned; its workflow is frozen on its record (a record without one reads its folder, which is not an input the
- * memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is another
- * run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
+ * memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and nothing it was judged by is
+ * another run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
 
@@ -79,9 +83,9 @@ export function restBlockers(f: RestFacts): string[] {
 
 /**
  * The runs among `ids` whose tasks the engine's feed names: a task's id is its run's id and a dash, then the step (`stepTaskId`,
- * `checkTaskId`), so every id a run's task could have — a try, a check, one a pass filed and died before writing down — starts with it. Each
- * prefix of the task id that ends before a dash is looked up, so a run whose id is a prefix of another's (`a-b`, `a-b-c`) is evicted by
- * that one's tasks too: more work, never less. Pure.
+ * `checkTaskId`), so every id a run's task could have — a try, a check, one a pass filed and died before writing down — starts with it.
+ * Each prefix of the task id that ends before a dash is looked up, so a run whose id is a prefix of another's (`a-b`, `a-b-c`) is evicted
+ * by that one's tasks too: more work, never less. Pure.
  */
 export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): Set<string> {
   const out = new Set<string>();

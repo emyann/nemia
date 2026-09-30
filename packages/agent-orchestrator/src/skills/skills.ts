@@ -26,15 +26,18 @@ export type AgentSkill = {
   outputModes?: string[];
 };
 
-/** The keys of a SKILL.md's frontmatter its card entry is read from (`skillEntryOf`). The others are Claude Code's, or the run's (`preload`). */
+/**
+ * The keys of a SKILL.md's frontmatter its card entry is read from (`skillEntryOf`). The others are Claude Code's, or the run's
+ * (`preload`).
+ */
 const ENTRY_KEYS = ['name', 'title', 'description', 'tags', 'examples'] as const;
 type EntryKey = (typeof ENTRY_KEYS)[number];
 /** Of those, the ones whose value is a list of words. */
 const ENTRY_LISTS: readonly EntryKey[] = ['tags', 'examples'];
 
 /**
- * The card entry of one composed skill: its `AgentSkill`, read off its SKILL.md's frontmatter (`text`). `id` is the skill's folder, `name` its
- * `title:` — a key Claude Code ignores, for the card alone — or else its frontmatter `name`, or else the id, as Claude Code names a
+ * The card entry of one composed skill: its `AgentSkill`, read off its SKILL.md's frontmatter (`text`). `id` is the skill's folder, `name`
+ * its `title:` — a key Claude Code ignores, for the card alone — or else its frontmatter `name`, or else the id, as Claude Code names a
  * skill; `description` is the frontmatter's, which the A2A protocol and Claude Code's listing both need, so a skill with none is refused;
  * `tags` are the frontmatter's, or the id when it gives none (the protocol marks them REQUIRED, and a skill written for Claude Code alone
  * has none); `examples` only when given. Pure: `file` is what a refusal calls the SKILL.md.
@@ -63,8 +66,8 @@ export function skillEntryOf(file: string, id: string, text: string): AgentSkill
 }
 
 /**
- * The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one line of text, or a list — and refused as it refuses:
- * a line that goes on from a card key's — indented, or a list's `- item` — is refused with the one-line form.
+ * The card keys of a SKILL.md's frontmatter, each read as `skillEntryOf` reads it — one line of text, or a list — and refused as it
+ * refuses: a line that goes on from a card key's — indented, or a list's `- item` — is refused with the one-line form.
  */
 function entryValuesOf(
   file: string,
@@ -118,10 +121,11 @@ function entryValuesOf(
 }
 
 /**
- * A skill as it is written: what `renderSkill` takes, and what `skillDraftOf` reads off a SKILL.md. `name` is its folder, and the frontmatter's
- * `name:`; `title` the human name its card entry is given (`title:`, which Claude Code ignores); `description` what it does, one line, which
- * Claude Code lists it by; `tags` and `examples` its card entry's, each a list of one-line items; `preload`, whether the run appends it whole to
- * the system prompt, so it is carried on every turn; and `body`, its instructions. A key unset is left out, or `null`.
+ * A skill as it is written: what `renderSkill` takes, and what `skillDraftOf` reads off a SKILL.md. `name` is its folder, and the
+ * frontmatter's `name:`; `title` the human name its card entry is given (`title:`, which Claude Code ignores); `description` what it does,
+ * one line, which Claude Code lists it by; `tags` and `examples` its card entry's, each a list of one-line items; `preload`, whether the
+ * run appends it whole to the system prompt, so it is carried on every turn; and `body`, its instructions. A key unset is left out, or
+ * `null`.
  */
 export type SkillDraft = {
   name: string;
@@ -138,8 +142,9 @@ export type SkillDraft = {
 const SKILL_WRITES = ['name', 'title', 'description', 'tags', 'examples', 'preload'];
 
 /**
- * The draft of the skill `id` from its SKILL.md's `text`: what the board's form is filled from. Its title, tags and examples as written — none
- * where the file writes none, not the card's fallbacks — and refused, in `skillEntryOf`'s words, where the card reader refuses the file.
+ * The draft of the skill `id` from its SKILL.md's `text`: what the board's form is filled from. Its title, tags and examples as written —
+ * none where the file writes none, not the card's fallbacks — and refused, in `skillEntryOf`'s words, where the card reader refuses the
+ * file.
  */
 export function skillDraftOf(file: string, id: string, text: string): SkillDraft {
   const { words, list } = entryValuesOf(file, text);
@@ -158,8 +163,8 @@ export function skillDraftOf(file: string, id: string, text: string): SkillDraft
 
 /**
  * A skill as its SKILL.md: `name:` its folder, `title:` and `description:` as JSON strings, `tags:` and `examples:` as one-line JSON lists,
- * each only where set; then every other key `was` — the file as it is, on an edit — has, line for line, its lines that go on from it with it;
- * `preload: true` where it is set, or, left out of the draft, where `was` says so; and its instructions. The shape of the skills Nemia
+ * each only where set; then every other key `was` — the file as it is, on an edit — has, line for line, its lines that go on from it with
+ * it; `preload: true` where it is set, or, left out of the draft, where `was` says so; and its instructions. The shape of the skills Nemia
  * ships, and what the card reader reads (`skillEntryOf`), which judges the result before it is returned: a draft the reader would refuse —
  * no description, an empty list — is refused here, in its words. Refused before that: a name that is not a skill's (`skillNameRefusal`),
  * and a line break in a value, which would make what follows it a line of its own. Pure.
@@ -202,8 +207,8 @@ export function renderSkill(draft: SkillDraft, was?: string): string {
 }
 
 /**
- * The lines of `text`'s frontmatter `renderSkill` does not write, as they are: each other key with the lines that go on from it — an indented
- * line, a list's `- item` — and a comment. None for a file with no frontmatter, or one that never closes.
+ * The lines of `text`'s frontmatter `renderSkill` does not write, as they are: each other key with the lines that go on from it — an
+ * indented line, a list's `- item` — and a comment. None for a file with no frontmatter, or one that never closes.
  */
 function keptLines(text: string): string[] {
   let block: string | null;
@@ -234,10 +239,10 @@ function keptLines(text: string): string[] {
 }
 
 /**
- * `text`, a SKILL.md, with its `preload:` line alone changed: `preload: true` when `on`, and no line when not — each line of its frontmatter
- * that sets the key taken out, with the lines that go on from it, and the body as it was. What the board's switch writes, so a skill whose
- * other keys a render would not keep is changed in that one line. Refused, naming the fix, for a file with no frontmatter; and judged by the
- * reader after (`frontmatterKey`), so a file it would read otherwise is refused rather than written.
+ * `text`, a SKILL.md, with its `preload:` line alone changed: `preload: true` when `on`, and no line when not — each line of its
+ * frontmatter that sets the key taken out, with the lines that go on from it, and the body as it was. What the board's switch writes, so a
+ * skill whose other keys a render would not keep is changed in that one line. Refused, naming the fix, for a file with no frontmatter; and
+ * judged by the reader after (`frontmatterKey`), so a file it would read otherwise is refused rather than written.
  */
 export function withPreload(file: string, text: string, on: boolean): string {
   const { block } = splitFrontmatter(file, text);
@@ -271,10 +276,10 @@ const oneLine = (file: string, key: EntryKey): string =>
     : `${file}: \`${key}\` goes on over several lines, and a card reads each of its keys off one line. Write it on one: \`${key}: "<${key === 'description' ? 'what it does' : key}>"\`.`;
 
 /**
- * One value of a card key, as YAML reads it where the two agree: a plain value, one in double quotes (JSON's escapes, which are YAML's), one in
- * single quotes (`''` a quote), or a one-line list in JSON. Refused: a block scalar, a flow map, an anchor, an alias or a tag, a plain value
- * YAML would read as a map (a colon and a space) and a quote or a list never closed — each with the one-line form. A plain value ends at
- * ` #`, where YAML's comment begins. `undefined` for none.
+ * One value of a card key, as YAML reads it where the two agree: a plain value, one in double quotes (JSON's escapes, which are YAML's),
+ * one in single quotes (`''` a quote), or a one-line list in JSON. Refused: a block scalar, a flow map, an anchor, an alias or a tag, a
+ * plain value YAML would read as a map (a colon and a space) and a quote or a list never closed — each with the one-line form. A plain
+ * value ends at ` #`, where YAML's comment begins. `undefined` for none.
  */
 function entryValue(file: string, key: EntryKey, written: string): string | string[] | undefined {
   if (!written) return undefined;

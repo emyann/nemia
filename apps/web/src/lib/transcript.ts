@@ -30,7 +30,10 @@ export type ThinkingTurn = { kind: 'thinking'; key: string; at: string; text: st
 export type ToolTurn = { kind: 'tool'; key: string; call: ToolCall };
 export type SystemTurn = { kind: 'system'; key: string; at: string; text: string };
 export type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
-/** Words a person said to the session (`wf say`, or the session page's prompt box), off the engine's journal of the step's task: "you said" — and when the session's transcript shows them reaching it (`heardIn`). */
+/**
+ * Words a person said to the session (`wf say`, or the session page's prompt box), off the engine's journal of the step's task: "you said"
+ * — and when the session's transcript shows them reaching it (`heardIn`).
+ */
 export type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null };
 /** What a fold holds, in order: its calls, and the thoughts and system lines between them. */
 export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
@@ -170,8 +173,8 @@ const ARRIVAL_SLACK_MS = 5_000;
 
 /**
  * Whether a transcript event is the session's own record of `said` reaching it: a system line whose text is the words, as a working session
- * writes them when it reads them between calls — or ends with them, after Claude Code's line saying another session sent them ("Another Claude
- * session sent a message:"), as an idle one starts its next turn with them — written no earlier than the words were handed over.
+ * writes them when it reads them between calls — or ends with them, after Claude Code's line saying another session sent them ("Another
+ * Claude session sent a message:"), as an idle one starts its next turn with them — written no earlier than the words were handed over.
  */
 const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
   if (!(event.kind === 'system' || (event.kind === 'text' && event.role === 'system'))) return false;
@@ -182,10 +185,11 @@ const arrivalOf = (event: TranscriptEvent, said: Said): boolean => {
 };
 
 /**
- * What was said to a session, each with the first of the session's events that shows its words reaching it (`arrived`), and the events without
- * those. The session's line for words it was handed is the same words, so a person reads them once, as what they said (`withSaid`), where they
- * reached the session. Matched in the order said, each thing said to one event at most: words said twice are two arrivals. Words the transcript
- * does not show — queued behind a prompt nobody answers, or set aside — have none, and every other line stays the session's. Nothing said leaves the events as they were.
+ * What was said to a session, each with the first of the session's events that shows its words reaching it (`arrived`), and the events
+ * without those. The session's line for words it was handed is the same words, so a person reads them once, as what they said (`withSaid`),
+ * where they reached the session. Matched in the order said, each thing said to one event at most: words said twice are two arrivals. Words
+ * the transcript does not show — queued behind a prompt nobody answers, or set aside — have none, and every other line stays the session's.
+ * Nothing said leaves the events as they were.
  */
 export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[]): { events: TranscriptEvent[]; said: Heard[] } {
   const taken = new Set<number>();
@@ -201,10 +205,10 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
 }
 
 /**
- * The turns, with what a person said to the session laid in among them (off the engine's journal of the step's task, through `heardIn`): each a
- * turn of its own, "you said", placed where its words reached the session when its transcript shows that, and otherwise when they were said —
- * before the first turn that came after, and after a fold that began before, since a fold is one line. Words after everything the transcript has
- * are last. Nothing said leaves the turns as they were.
+ * The turns, with what a person said to the session laid in among them (off the engine's journal of the step's task, through `heardIn`):
+ * each a turn of its own, "you said", placed where its words reached the session when its transcript shows that, and otherwise when they
+ * were said — before the first turn that came after, and after a fold that began before, since a fold is one line. Words after everything
+ * the transcript has are last. Nothing said leaves the turns as they were.
  */
 export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);
@@ -227,7 +231,10 @@ export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { ar
   return [...out, ...told.slice(next)];
 }
 
-/** A stretch as it is drawn: what comes before its first call and after its last on its own, and between them one fold — or the call itself, when there is one. */
+/**
+ * A stretch as it is drawn: what comes before its first call and after its last on its own, and between them one fold — or the call itself,
+ * when there is one.
+ */
 function drawn(stretch: FoldedTurn[]): Turn[] {
   let first = -1;
   let last = -1;
@@ -260,8 +267,9 @@ const onePath = (input: Record<string, unknown>) => {
 };
 
 /**
- * How each tool's calls are counted and said, by the tool's name: Claude Code's, and Codex's two items, `CommandExecution` and `FileChange`.
- * The same act under another name is said the same: `Glob` as `Grep`, `Write`, `MultiEdit` and `NotebookEdit` as `Edit`, `Agent` as `Task`.
+ * How each tool's calls are counted and said, by the tool's name: Claude Code's, and Codex's two items, `CommandExecution` and
+ * `FileChange`. The same act under another name is said the same: `Glob` as `Grep`, `Write`, `MultiEdit` and `NotebookEdit` as `Edit`,
+ * `Agent` as `Task`.
  */
 const VERBS: Record<string, Verb> = {
   Bash: { group: 'command', one: 'ran a command', many: (n) => `ran ${n} commands` },

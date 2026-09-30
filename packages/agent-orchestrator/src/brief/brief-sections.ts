@@ -58,7 +58,10 @@ export type RetryBriefing = {
   model?: string;
   /** Whether this try continues the last one's session. A nudge whose last try left no session to continue starts a new one. */
   resumed: boolean;
-  /** Where the last try stood on its own work (`ownStatus`): why it is being tried again. Not `over budget`, which is why nothing was filed — `budget` says a person raised it. */
+  /**
+   * Where the last try stood on its own work (`ownStatus`): why it is being tried again. Not `over budget`, which is why nothing was filed
+   * — `budget` says a person raised it.
+   */
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
@@ -69,8 +72,8 @@ export type RetryBriefing = {
   /** The cap the person who asked for this try raised the step's budget to (`wf retry --budget`). */
   budget?: number;
   /**
-   * What a person said to the last try's session while it ran (`wf say`): the engine's `said` on its task, in the order said. Given again to
-   * a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
+   * What a person said to the last try's session while it ran (`wf say`): the engine's `said` on its task, in the order said. Given again
+   * to a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
    */
   said?: readonly Said[];
   /**
@@ -208,10 +211,11 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
 }
 
 /**
- * `## Said to your session`, inside `## Try <n>` or `## Round <n>`, on a try or a round that continues a session: what a person said to that
- * session while it ran (`wf say`), each with its time, the words as they gave them in a fence (`fenced`). Carried because a session may never
- * have read them: one blocked on a permission prompt keeps words queued, and a session continued from it does not have them (agent-runtime's
- * open issue 16). Nothing when nothing was said; and a new session is given none, as it is given none of the last one's conversation.
+ * `## Said to your session`, inside `## Try <n>` or `## Round <n>`, on a try or a round that continues a session: what a person said to
+ * that session while it ran (`wf say`), each with its time, the words as they gave them in a fence (`fenced`). Carried because a session
+ * may never have read them: one blocked on a permission prompt keeps words queued, and a session continued from it does not have them
+ * (agent-runtime's open issue 16). Nothing when nothing was said; and a new session is given none, as it is given none of the last one's
+ * conversation.
  */
 function saidSection(said: readonly Said[] | undefined): string[] {
   if (!said?.length) return [];
@@ -359,8 +363,8 @@ export function loopSection(
 }
 
 /**
- * `## Replies from <target>`: a loop's target's `replies`, and nothing else of its closeout, as data — through `declaredOutput`, so round 1's
- * empty list, which every closeout of a loop's target carries, is never handed on as an answer.
+ * `## Replies from <target>`: a loop's target's `replies`, and nothing else of its closeout, as data — through `declaredOutput`, so round
+ * 1's empty list, which every closeout of a loop's target carries, is never handed on as an answer.
  */
 function repliesSection(step: Workflow, closeoutOf: (step: string) => Closeout | undefined): string {
   const target = step.name;
@@ -416,10 +420,10 @@ export function fromSection(
 }
 
 /**
- * `## Approved`: what a person approved at each gate this step comes after, directly or through another (`hasGate`, `upstreamOf`), in the order
- * the steps run — the step, the try, when, and the words given with it (`wf approve --message`), fenced as data. Nothing for a step after no
- * approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is given its own
- * approval too: the words a person gave with it are the terms it acts on.
+ * `## Approved`: what a person approved at each gate this step comes after, directly or through another (`hasGate`, `upstreamOf`), in the
+ * order the steps run — the step, the try, when, and the words given with it (`wf approve --message`), fenced as data. Nothing for a step
+ * after no approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is given
+ * its own approval too: the words a person gave with it are the terms it acts on.
  *
  * It travels as a parent run's closeout does, one level down: a person read what the gated step handed on and said it may go on, and their
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
@@ -461,9 +465,9 @@ export function approvedSection(step: Workflow, run: Run, steps: readonly Workfl
 }
 
 /**
- * `## Accepted`: what a person accepted of each loop this step comes after (`acceptanceOf`, `upstreamOf`) — the looping step, the try, when,
- * and the words they gave, fenced as data — and then, under *From <loop>*, what that step declared: the findings the loop ended with open.
- * Nothing for a step after no accepted loop, so a run where no loop ran out of rounds composes no such section.
+ * `## Accepted`: what a person accepted of each loop this step comes after (`acceptanceOf`, `upstreamOf`) — the looping step, the try,
+ * when, and the words they gave, fenced as data — and then, under *From <loop>*, what that step declared: the findings the loop ended with
+ * open. Nothing for a step after no accepted loop, so a run where no loop ran out of rounds composes no such section.
  *
  * It is on the brief because this step is the only one that can carry it anywhere. A loop ended by a person is a decision about scope: the
  * change is good enough, and what the reviewer found is somebody's later work. An ending step that merges without knowing that writes a
@@ -500,8 +504,9 @@ export function acceptedSection(
 }
 
 /**
- * What `wf decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the try it
- * is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no gate. Pure.
+ * What `wf decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the try
+ * it is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no
+ * gate. Pure.
  *
  * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
  * `wf approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until the

@@ -19,7 +19,9 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
  */
 export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
 
-/** The runs in `after` that have not shipped, in the order they were given. Pure; none, and `shipped` never called, for a run not `gated`. */
+/**
+ * The runs in `after` that have not shipped, in the order they were given. Pure; none, and `shipped` never called, for a run not `gated`.
+ */
 export function waitingOn(run: Run, shipped: (runId: string) => boolean): string[] {
   if (!gated(run)) return [];
   return run.after!.filter((id) => !shipped(id));
@@ -124,7 +126,8 @@ export function holdWord(waits: readonly Wait[]): string {
 /**
  * What a held run leaves a person to do, in one line, for `wf decide` and `wf ls`. Pure. Nothing, while each run it waits on may still
  * ship: the tick lifts the hold when they have, and what the run's steps ask is asked then. For a run that never will without a person —
- * no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or cancel the run.
+ * no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or cancel the
+ * run.
  */
 export function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `wf hold ${run.id} --off`;

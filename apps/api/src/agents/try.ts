@@ -45,9 +45,9 @@ export const tryText = (name: string, version: string): string =>
   ].join('\n');
 
 /**
- * Why an agent's try cannot be started from `tries/<name>`, or null. A try's folder is one level under `tries/`, so `tries/` is its root, where a
- * start looks for `agents/` and `skills/` before the store's (`lookupRoots`): a folder named either is no workflow (`agentsFolderRefusal`), and
- * one agent's try would stand where every other try looks for agents or skills.
+ * Why an agent's try cannot be started from `tries/<name>`, or null. A try's folder is one level under `tries/`, so `tries/` is its root,
+ * where a start looks for `agents/` and `skills/` before the store's (`lookupRoots`): a folder named either is no workflow
+ * (`agentsFolderRefusal`), and one agent's try would stand where every other try looks for agents or skills.
  */
 export function tryNameRefusal(name: string, home: string): string | null {
   if (name !== AGENTS_FOLDER && name !== SKILLS_FOLDER) return null;

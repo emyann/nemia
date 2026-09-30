@@ -1,9 +1,9 @@
 /**
  * The board's mirror of the api is one file per concern under src/lib/api/, which src/lib/api.ts re-exports. None of them may reach the
  * re-exporting file at run time, and a sibling only one level deep: a file may import values from a sibling that imports values from no
- * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type crosses
- * by `import type`, which is erased; the other values they import are react-query's, effect's, the feed's pace and their reads (read.ts),
- * and read.ts imports effect alone.
+ * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type
+ * crosses by `import type`, which is erased; the other values they import are react-query's, effect's, the feed's pace and their reads
+ * (read.ts), and read.ts imports effect alone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

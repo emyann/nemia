@@ -1,8 +1,8 @@
 /**
- * A skill written (`writeSkill`, `renderSkill`, `withPreload`): what the board's skill page does, a person writing a skill of their own in the
- * store's library. What is written is read back as the card reader reads it and as YAML does, each refusal is made to refuse at shipped
- * defaults — asserted on its message, its kind, and with the library as it was — and a write of a skill is proven to move the version of every
- * agent that gives it. `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * A skill written (`writeSkill`, `renderSkill`, `withPreload`): what the board's skill page does, a person writing a skill of their own in
+ * the store's library. What is written is read back as the card reader reads it and as YAML does, each refusal is made to refuse at shipped
+ * defaults — asserted on its message, its kind, and with the library as it was — and a write of a skill is proven to move the version of
+ * every agent that gives it. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

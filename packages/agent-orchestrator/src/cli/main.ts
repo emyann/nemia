@@ -41,7 +41,9 @@ import { decideVerb } from './decide/decide.ts';
 import { agentsVerb, cancelVerb, holdVerb, logsVerb, lsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
 
-/** The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number. */
+/**
+ * The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number.
+ */
 const SIGNALS = [
   ['SIGINT', 130],
   ['SIGTERM', 143],
@@ -50,9 +52,9 @@ const SIGNALS = [
 
 /**
  * Runs `program` as the process's command. SIGINT, SIGTERM and SIGHUP interrupt it, and once its finalizers have run the process exits 130,
- * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that very
- * value, so a refusal's `exitCode` reaches `bin/wf.ts`. The handlers are its own, taken off as it ends: a second signal while the finalizers
- * run is Node's to handle.
+ * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that
+ * very value, so a refusal's `exitCode` reaches `bin/wf.ts`. The handlers are its own, taken off as it ends: a second signal while the
+ * finalizers run is Node's to handle.
  *
  * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
  * handles no SIGHUP, and it hands no failure back to the caller.
@@ -79,8 +81,8 @@ export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
 }
 
 /**
- * The cursor `wf feed` and `wf watch` read from: 0 when none is given, a whole number of bytes otherwise, and nothing more. Whether the feed
- * has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
+ * The cursor `wf feed` and `wf watch` read from: 0 when none is given, a whole number of bytes otherwise, and nothing more. Whether the
+ * feed has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
  */
 function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
   if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) {
@@ -95,8 +97,8 @@ function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
  * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
  * said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
  *
- * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it —
- * finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
+ * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
+ * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
  */
 export function watchPrinted(from: number): { stop(): void } {
   const watch = watchFeed({

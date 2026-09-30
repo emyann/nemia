@@ -1,8 +1,8 @@
 /**
  * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: `GET /api/runs` answers every other
  * run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in runs.ts) — as the
- * tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to see if it shipped.
- * A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them.
+ * tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to see if it
+ * shipped. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */

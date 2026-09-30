@@ -81,8 +81,8 @@ const STORE_BOTTOM = ['src/record/places.store.ts', 'src/folder/folder.store.ts'
 
 /**
  * The store files another store file may import, each with the store files it may import itself: the bottom, then the run store on it, then
- * git and a workflow folder written on both. No other store file is imported by another, so the tree has no cycle; outside the store, the client and the controllers
- * beneath the CLI alone import them.
+ * git and a workflow folder written on both. No other store file is imported by another, so the tree has no cycle; outside the store, the
+ * client and the controllers beneath the CLI alone import them.
  */
 const STORE_SHARED: Record<string, readonly string[]> = {
   'src/record/places.store.ts': [],
@@ -182,8 +182,8 @@ function impurities(sources: Sources): string[] {
 
 /**
  * A store file imports no runtime, no controller and not the client, and store files import each other only as the tree has it; outside
- * the store, only the client and the controllers beneath the CLI import a store file — never `bin/wf.ts` or a file of `src/cli/`, which reach
- * the package through the root — and some one of them imports each.
+ * the store, only the client and the controllers beneath the CLI import a store file — never `bin/wf.ts` or a file of `src/cli/`, which
+ * reach the package through the root — and some one of them imports each.
  */
 function treeBreaks(sources: Sources): string[] {
   const { STORE: stores, CONTROLLER: controllers } = kinds(sources);
@@ -213,7 +213,10 @@ function treeBreaks(sources: Sources): string[] {
   return out;
 }
 
-/** The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts` only through the CLI and what it exits with. */
+/**
+ * The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts` only through the CLI and what it
+ * exits with.
+ */
 function cliBreaks(sources: Sources): string[] {
   const reaching = (file: string, reaches: readonly string[], own: (m: string) => boolean) =>
     (sources[file] ?? [])

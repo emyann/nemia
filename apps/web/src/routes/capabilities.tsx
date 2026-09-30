@@ -274,7 +274,8 @@ const OWN = "the harness's own";
  * load, the tools of each server the checkout enables, the deny and ask rules that hold for it, and what it runs without asking: Claude
  * Code's read-only commands, and what the settings allow it. A server's tool is refused where a rule denies it, where the step runs in
  * `dontAsk` and no rule allows it, and where an ask rule makes it ask while something denies an ask without a prompt (`askDenier`:
- * `dontAsk`, or a job). A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
+ * `dontAsk`, or a job). A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not
+ * measured.
  */
 function StepRow({ step, measured, readOnly }: { step: StepReach; measured: MeasuredTools; readOnly: ReadOnlyCommands }) {
   const { fence, tools, skills, mcp, denied, asked, allowed } = step;

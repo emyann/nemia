@@ -75,8 +75,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
  *   (`fromRunSection`), gathered by file.verb.ts. Given to no other step: a run without `after`, and every step after a root, is composed
  *   without it.
- * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`, under
- *   what was asked for.
+ * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`,
+ *   under what was asked for.
  */
 export function composeBrief(
   step: Workflow,
@@ -220,13 +220,15 @@ export function composeBrief(
 }
 
 /**
- * The brief of a step on a remote A2A agent (`harness: a2a:<name>`): its note, what was asked for, what the runs this one waited on concluded,
- * what a person approved or accepted before it, what the steps it reads declared, and, on a try, which try it is and what a person said with it.
+ * The brief of a step on a remote A2A agent (`harness: a2a:<name>`): its note, what was asked for, what the runs this one waited on
+ * concluded, what a person approved or accepted before it, what the steps it reads declared, and, on a try, which try it is and what a
+ * person said with it.
  *
- * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts directory,
- * the run's inputs, a workspace — names nothing it can open, and none is said: files given with `wf start --input` are named, never located.
- * Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in harness/harness.ts), and it is done when its
- * Task completes. A try is a new Task, never a turn of the last one, so it is told what any first try is, and then which try it is.
+ * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts
+ * directory, the run's inputs, a workspace — names nothing it can open, and none is said: files given with `wf start --input` are named,
+ * never located. Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in
+ * harness/harness.ts), and it is done when its Task completes. A try is a new Task, never a turn of the last one, so it is told what any
+ * first try is, and then which try it is.
  */
 export function remoteBrief(
   step: Workflow,
@@ -261,7 +263,9 @@ export function remoteBrief(
   ].join('\n');
 }
 
-/** `## Try <n>` of a step on a remote A2A agent: who asked for it, how the last try ended, and what a person said with it, fenced as data. */
+/**
+ * `## Try <n>` of a step on a remote A2A agent: who asked for it, how the last try ended, and what a person said with it, fenced as data.
+ */
 function remoteTrySection(step: Workflow, r: RetryBriefing): string {
   const who =
     r.by === 'retries'

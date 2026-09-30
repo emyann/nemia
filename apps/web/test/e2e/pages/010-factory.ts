@@ -49,7 +49,10 @@ import {
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of its sides. */
+/**
+ * The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of
+ * its sides.
+ */
 async function expectDiamond(page: Page, when: string): Promise<void> {
   const { top, shipped, running, bottom } = DIAMOND;
   await settled(page);
@@ -73,8 +76,9 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
 }
 
 /**
- * The runs in flight against the cap, as the package counts them in the seeded store: NEIGHBOUR's session at work, HELD's the harness blocked,
- * and the diamond's running side — not its bottom, which waits on runs and has filed nothing, though the Factory has it on the floor.
+ * The runs in flight against the cap, as the package counts them in the seeded store: NEIGHBOUR's session at work, HELD's the harness
+ * blocked, and the diamond's running side — not its bottom, which waits on runs and has filed nothing, though the Factory has it on the
+ * floor.
  */
 const IN_FLIGHT_BY_CAP = 3;
 
@@ -82,8 +86,8 @@ export default {
   /**
    * The Factory: the queue's ghosts at the floor's left edge and the run slots over it; the runs in flight, to decide and waiting on you
    * as cards on the floor, the finished ones once asked for; the diamond drawn as a graph of cards, whose picture is the floor as a person
-   * first finds it; each card dragged alone and kept where it was put down; a card opened on its steps, a press on a tile opening the step's
-   * inspector; and the loop's arrow back.
+   * first finds it; each card dragged alone and kept where it was put down; a card opened on its steps, a press on a tile opening the
+   * step's inspector; and the loop's arrow back.
    */
   name: 'factory',
   route: '/',

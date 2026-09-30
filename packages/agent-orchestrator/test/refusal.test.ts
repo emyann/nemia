@@ -2,7 +2,8 @@
  * The orchestrator's refusals (`src/refusal/refusal.ts`): `Missing`, `Conflict` and `Invalid`, each an `Error` with its words and
  * `exitCode` 2, tagged so an Effect picks it out by kind, and `isRefusal`, which tells one from any other error. What loads them is held
  * too: `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect`, which the api loads, take `effect/Data`
- * and never the `effect` barrel, pinned by the modules a fresh `node` loads for each; and no file under `src` sets `exitCode: 2` on an object of its own, so a refusal is thrown as one of the classes.
+ * and never the `effect` barrel, pinned by the modules a fresh `node` loads for each; and no file under `src` sets `exitCode: 2` on an
+ * object of its own, so a refusal is thrown as one of the classes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

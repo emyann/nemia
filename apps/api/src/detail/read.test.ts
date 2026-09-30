@@ -1,7 +1,7 @@
 /**
- * What a session read, by price, as the board reads it on a step's `used`: the cache's reads and writes and the peak context in `wf decide`'s
- * words (`read`), the peak against the step's `context:` cap (`peak`), and the resumed sessions that rebuilt their cache (`rebuilt`) — and
- * nothing where the runner measured none of it.
+ * What a session read, by price, as the board reads it on a step's `used`: the cache's reads and writes and the peak context in
+ * `wf decide`'s words (`read`), the peak against the step's `context:` cap (`peak`), and the resumed sessions that rebuilt their cache
+ * (`rebuilt`) — and nothing where the runner measured none of it.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` first on PATH (test/harness.ts).
  */

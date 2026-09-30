@@ -1,7 +1,8 @@
 /**
  * Two runs that change the board side by side merge without a hand, in a throwaway repository: two that each add a page to the e2e (its
  * file and its line in `pages/NAMES`), and two that each add a lesson to CLAUDE.md. Each beside the shape that conflicts — one array of
- * pages, NAMES and CLAUDE.md merged as code — so the test shows the structure is what stops it. No browser: `npm test` runs it. Git with no config of this machine's: no hooks, no signing, no one's defaults.
+ * pages, NAMES and CLAUDE.md merged as code — so the test shows the structure is what stops it. No browser: `npm test` runs it. Git with no
+ * config of this machine's: no hooks, no signing, no one's defaults.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

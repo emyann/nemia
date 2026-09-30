@@ -12,11 +12,11 @@ const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
 export default {
   /**
    * The board's second write: an answer refused, shown in the package's words, and then one taken, asked for through the api, with the
-   * step's row saying what `wf ls` says. The refusal comes first, in a page of its own whose one refusal is the point: a file `wf retry` did
-   * not write sits at the name try 2's ask goes under, which no tick honours, so the step still waits on you and its box is there, and the
-   * package refuses to write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence is beside the box, word for
-   * word, the answer still in the box, and nothing written. Each file is taken back, so every page after this one, in either theme, reads
-   * the store as seeded.
+   * step's row saying what `wf ls` says. The refusal comes first, in a page of its own whose one refusal is the point: a file `wf retry`
+   * did not write sits at the name try 2's ask goes under, which no tick honours, so the step still waits on you and its box is there, and
+   * the package refuses to write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence is beside the box, word
+   * for word, the answer still in the box, and nothing written. Each file is taken back, so every page after this one, in either theme,
+   * reads the store as seeded.
    */
   name: 'answer',
   route: `/runs/${FAKE.id}`,

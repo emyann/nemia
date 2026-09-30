@@ -56,9 +56,9 @@ const FENCE_ELSEWHERE = {
 } as const;
 
 /**
- * A permission mode, a sandbox or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. A harness with
- * no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other key. A
- * word of the other fence — a sandbox written as a mode, or the other way round — is named as such in the refusal.
+ * A permission mode, a sandbox or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. A harness
+ * with no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other
+ * key. A word of the other fence — a sandbox written as a mode, or the other way round — is named as such in the refusal.
  */
 export function wordOf(
   step: string,
@@ -95,9 +95,9 @@ export function wordOf(
 }
 
 /**
- * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it
- * either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a word.
- * Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in
+ * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading
+ * it either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a
+ * word. Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in
  * start.verb.ts).
  */
 export function remoteOf(step: string, remote: string | undefined): boolean | undefined {
@@ -111,8 +111,8 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
 
 /**
  * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons — and `true` refused on a harness other than `claude`,
- * as the engine refuses `config.background` there (agent-runtime's `file()`), here so a folder is refused at `wf start` and not on its first
- * pass. `codex exec` and `claude-detached`'s `claude -p` each run one way.
+ * as the engine refuses `config.background` there (agent-runtime's `file()`), here so a folder is refused at `wf start` and not on its
+ * first pass. `codex exec` and `claude-detached`'s `claude -p` each run one way.
  */
 export function backgroundOf(step: string, background: string | undefined, harness: string | undefined): boolean | undefined {
   if (background === undefined) return undefined;
@@ -160,7 +160,10 @@ export function tokensOf(written: string): number | undefined {
   return Number.isSafeInteger(n) && n > 0 ? n : undefined;
 }
 
-/** A context window as `renderStep` writes it, whatever the file said: thousands with `k` when it is a whole number of them, digits otherwise. */
+/**
+ * A context window as `renderStep` writes it, whatever the file said: thousands with `k` when it is a whole number of them, digits
+ * otherwise.
+ */
 export const contextText = (tokens: number): string =>
   Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
 
@@ -303,7 +306,9 @@ export const WORKSPACES: readonly string[] = ['main', 'folder'];
  * `workspace:` as written: `main`, `folder`, or refused. A step without the line works where the shape of the workflow puts it
  * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
  * a directory the run would have to invent. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
- * stages, and commits or aborts that merge onto the base branch on its word (`landingDue`); and not on codex, which cannot be denied the commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
+ * stages, and commits or aborts that merge onto the base branch on its word (`landingDue`); and not on codex, which cannot be denied the
+ * commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for. `folder` takes a check and a
+ * `resume:` as a worktree does: its folder is the run's, and the session's.
  */
 export function workspaceOf(
   step: string,
@@ -510,10 +515,10 @@ export const DEFAULT_PERMISSION_MODE = 'auto';
 
 /**
  * Why an agent's skills or system prompt cannot reach the sessions of a step that runs as `step` does — its harness, tools and deny list —
- * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`), and
- * again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or `harness:`
- * can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a system prompt other than `default`
- * are refused: a session continued keeps the system prompt it was started with, and the plugins with it.
+ * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`),
+ * and again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or
+ * `harness:` can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a system prompt other than
+ * `default` are refused: a session continued keeps the system prompt it was started with, and the plugins with it.
  */
 export function composedRefusal(
   named: string,

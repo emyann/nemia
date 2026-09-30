@@ -22,12 +22,12 @@ import {
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 
 /**
- * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on this
- * pass. Pure. Open while a person's word is what moves the step, so that word reaches the session that signed as its next turn (`e.answer`)
- * rather than a new task: the step signed off `blocked`, or it is gated and the try it is on is not approved — checking, or at its gate.
- * Anything else closes it (`e.close`), which settles it as it signed: an ungated step that signed off, a gated one once approved, a check
- * that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned, whose
- * steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`.
+ * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on
+ * this pass. Pure. Open while a person's word is what moves the step, so that word reaches the session that signed as its next turn
+ * (`e.answer`) rather than a new task: the step signed off `blocked`, or it is gated and the try it is on is not approved — checking, or at
+ * its gate. Anything else closes it (`e.close`), which settles it as it signed: an ungated step that signed off, a gated one once approved,
+ * a check that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned,
+ * whose steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`.
  */
 export function holdsOpen(
   step: Workflow,
@@ -45,7 +45,9 @@ export function holdsOpen(
   return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
 }
 
-/** Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty. */
+/**
+ * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.
+ */
 export const approvalWordsRefusal = (message: string | undefined, command = 'wf approve <runId> <step>'): string | null =>
   message !== undefined && !message.trim()
     ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${command} --message "<words>" — or leave --message out.`
@@ -54,11 +56,11 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'wf 
 /**
  * Why `wf approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
  *
- * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that is
- * not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on, each
- * said so; a send-back already asked for — the try after this one, which would spend an approval of this one at once — or one asked with no
- * words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why and what to
- * do instead.
+ * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that
+ * is not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on,
+ * each said so; a send-back already asked for — the try after this one, which would spend an approval of this one at once — or one asked
+ * with no words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why
+ * and what to do instead.
  *
  * An ending approved before it is filed (`approvedFirst`) is judged on the work it would act on, not on its own closeout: refused while a
  * send-back of that work is asked for, which would change what is approved; while a step its gate waits on has not handed on

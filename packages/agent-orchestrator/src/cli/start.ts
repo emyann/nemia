@@ -106,8 +106,8 @@ const START_TAKES = {
 } as const;
 
 /**
- * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on, `--input <file>`
- * as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, and `--no-worktree`.
+ * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on,
+ * `--input <file>` as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, and `--no-worktree`.
  */
 export function startHow(argv: string[]): StartHow {
   const { values, switches } = readFlags(argv, {
@@ -193,7 +193,9 @@ export function inboxAddHow(argv: string[]): { workflow?: string; repo?: string 
   return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
 }
 
-/** What `wf start` prints of a run it started: its steps, where it came from when said, where it works, and what it waits on and ends at. */
+/**
+ * What `wf start` prints of a run it started: its steps, where it came from when said, where it works, and what it waits on and ends at.
+ */
 function printStarted(run: ReturnType<typeof start>, from?: string): void {
   const steps = stepsOf(run);
   console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`);
@@ -305,7 +307,10 @@ function inboxList(): void {
   );
 }
 
-/** `wf inbox add`: an idea, the words or a file's text, filed as a card, with a `--workflow` path read from where it is typed (`workflowAt`). */
+/**
+ * `wf inbox add`: an idea, the words or a file's text, filed as a card, with a `--workflow` path read from where it is typed
+ * (`workflowAt`).
+ */
 function inboxAdd(args: string[]): void {
   const idea = args[0];
   if (idea === undefined || idea.startsWith('--'))
@@ -331,7 +336,10 @@ function inboxAdd(args: string[]): void {
   console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
 }
 
-/** `wf inbox queue`: a card marked to start on its own, or with `--off` the mark taken back; a `--workflow` path is written absolute (`workflowAt`). */
+/**
+ * `wf inbox queue`: a card marked to start on its own, or with `--off` the mark taken back; a `--workflow` path is written absolute
+ * (`workflowAt`).
+ */
 function inboxQueue(args: string[]): void {
   const [name, ...more] = args;
   if (name === undefined || name.startsWith('--'))

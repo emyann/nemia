@@ -48,10 +48,10 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
 export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
 
 /**
- * What `wf decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`wf say`), in the order
- * given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any run of
- * backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was said. Pure.
- * None when nothing was said, so the screen of a step nobody spoke to is what it was.
+ * What `wf decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`wf say`), in the
+ * order given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any run
+ * of backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was
+ * said. Pure. None when nothing was said, so the screen of a step nobody spoke to is what it was.
  */
 export function saidLines(said: readonly SaidTo[]): string[] {
   return said.flatMap((s) => [

@@ -46,10 +46,10 @@ function refuse(why: string): never {
 }
 
 /**
- * A plan folder's cards, sorted by name, from its files — or refused, naming the file and the fix: a file that is not markdown, a folder with
- * no card, a key a card does not have (or set twice, or to nothing), a card with no `workflow:` or an empty body, and an `after:` naming a
- * card twice. Edges are `planOrder`'s: an `after:` naming a card the folder does not have, or the card itself, and a cycle. `where` is what a
- * refusal calls the folder.
+ * A plan folder's cards, sorted by name, from its files — or refused, naming the file and the fix: a file that is not markdown, a folder
+ * with no card, a key a card does not have (or set twice, or to nothing), a card with no `workflow:` or an empty body, and an `after:`
+ * naming a card twice. Edges are `planOrder`'s: an `after:` naming a card the folder does not have, or the card itself, and a cycle.
+ * `where` is what a refusal calls the folder.
  *
  * Whether each card's workflow loads is not read here, since that is a folder on disk: `startPlan` in plan.verb.ts asks, card by card,
  * before the first run is started.
@@ -122,15 +122,16 @@ function afterOf(file: string, after: string | undefined): string[] {
 export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
 
 /**
- * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:`, or an inbox card's
- * `repo:`, so a card carried out of the inbox reads as a card and is refused by name — or null when it is not: no frontmatter, one with
- * any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the file's whole text is the
+ * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:`, or an inbox
+ * card's `repo:`, so a card carried out of the inbox reads as a card and is refused by name — or null when it is not: no frontmatter, one
+ * with any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the file's whole text is the
  * brief, so a brief that happens to start with `---` is not eaten. Pure.
  *
  * `wf plan` prints `wf start <card> --after …` for each card it did not start, and this is what makes that command start the card's body.
- * Read as a card, a file is held to what `wf plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no card or
- * one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `wf start` was given no `--after` (`after`):
- * started so, it would not wait for the runs it was written to wait for. Which runs those are is `wf start --after`'s to check, as it does.
+ * Read as a card, a file is held to what `wf plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no
+ * card or one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `wf start` was given no `--after`
+ * (`after`): started so, it would not wait for the runs it was written to wait for. Which runs those are is `wf start --after`'s to check,
+ * as it does.
  */
 export function cardToStart(file: string, text: string, after: readonly string[]): StartCard | null {
   let split: { block: string | null; body: string };
@@ -287,8 +288,8 @@ const quoted = (p: string): string => `'${p.replace(/'/g, `'\\''`)}'`;
 /**
  * Why `wf plan` stopped part-way, and what to do: the card whose `wf start` refused and its refusal, the runs already started — which
  * stand, and the tick files as their edges allow — and a `wf start` for each card not started, parents first, with `--after` the runs its
- * parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir` is
- * the plan folder. `wf start` on a card file starts its body (`cardToStart`).
+ * parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir`
+ * is the plan folder. `wf start` on a card file starts its body (`cardToStart`).
  */
 export function planStopped(
   stopped: { card: Card; why: string; rest: readonly Card[] },

@@ -10,7 +10,8 @@ import { photograph } from './board.ts';
 
 /**
  * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
- * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for ever.
+ * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for
+ * ever.
  */
 export async function showFinished(page: Page): Promise<void> {
   const toggle = page.getByRole('switch', { name: 'Show finished' });
@@ -51,7 +52,9 @@ export const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
     return { x: Number(m[1]), y: Number(m[2]) };
   });
 
-/** How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units. */
+/**
+ * How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units.
+ */
 export const zoomOf = (page: Page): Promise<number> =>
   page
     .locator('.react-flow__viewport')
@@ -121,7 +124,10 @@ export async function photographCard(page: Page, card: Locator, file: string): P
   await settled(page);
 }
 
-/** Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how wide and tall it is drawn. */
+/**
+ * Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how wide and tall it is
+ * drawn.
+ */
 export const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; width: number; height: number }>> => {
   const zoom = await zoomOf(page);
   return page.locator('.react-flow__node[data-id]').evaluateAll(
@@ -196,10 +202,10 @@ export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
   page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
 
 /**
- * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` — or,
- * with `loop`, from the violet dot under `from` to the one under `to`, which makes `from` loop back to `to`. With the mouse, not `dragTo`: a
- * handle a drag cannot start from takes no pointer events until a drag is under way, so `dragTo`'s check that the target is what the pointer
- * would hit finds the node over it, and waits for ever.
+ * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` —
+ * or, with `loop`, from the violet dot under `from` to the one under `to`, which makes `from` loop back to `to`. With the mouse, not
+ * `dragTo`: a handle a drag cannot start from takes no pointer events until a drag is under way, so `dragTo`'s check that the target is
+ * what the pointer would hit finds the node over it, and waits for ever.
  */
 export async function drawEdge(page: Page, builder: Locator, from: string, to: string, loop = false): Promise<void> {
   await settled(page);

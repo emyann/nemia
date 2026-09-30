@@ -1,7 +1,7 @@
 /**
- * `wf retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A controller,
- * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`retryRun`, over
- * `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
+ * `wf retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A
+ * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
+ * (`retryRun`, over `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
  */
 import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
@@ -12,7 +12,10 @@ import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict } from '../refusal/refusal.ts';
 
-/** A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files the try. */
+/**
+ * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
+ * the try.
+ */
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
 /**

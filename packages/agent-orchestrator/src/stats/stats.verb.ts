@@ -13,7 +13,9 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { closeoutReader, everyTryOf, taskPhases, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { factsOf, statsOf, type CheckVerdict, type Facts, type StatsQuery } from './stats.ts';
+import { renderedSkillVersions } from '../agents/agents.store.ts';
+import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type StatsQuery } from './stats.ts';
+import { frozenOf, type RunFrozen } from './marks.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -24,17 +26,31 @@ function verdictOf(view: TaskView | undefined): CheckVerdict {
   return refusedCheck(phase, code) ? 'refused' : 'unfinished';
 }
 
-/**
- * One run's facts (`factsOf`), off the engine's view of every task of every try: none for a run whose frozen steps do not read. Rejects
- * with what a view rejected with, a journal that does not read among it.
- */
-async function runFacts(e: Engine, run: Run): Promise<Facts> {
-  let steps: Workflow[];
+/** A run's frozen steps (`stepsOf`), or null where they do not read. */
+function stepsRead(run: Run): Workflow[] | null {
   try {
-    steps = stepsOf(run);
+    return stepsOf(run);
   } catch {
-    return { tries: [], runs: [] };
+    return null;
   }
+}
+
+/**
+ * What a run froze (`frozenOf`): its steps, and each skill by the version of its rendered copy (`renderedSkillVersions`), where the copy
+ * is there.
+ */
+const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
+  frozenOf(
+    { ...keysOf(run), day: dayOf(run.createdAt), at: run.createdAt, workflowDir: run.workflowDir },
+    steps,
+    new Map(steps.map((step) => [step.name, renderedSkillVersions(run, step)])),
+  );
+
+/**
+ * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try. Rejects with what a view rejected
+ * with, a journal that does not read among it.
+ */
+async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Facts, 'tries' | 'runs'>> {
   const { views } = await taskPhases(e, run);
   const everyTry = await Effect.runPromise(everyTryOf(e, run, views));
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
@@ -50,14 +66,18 @@ async function runFacts(e: Engine, run: Run): Promise<Facts> {
 
 /**
  * The stats of every run in the store for `query`, as of `now` (`statsOf`), over `e` viewed once. A run a journal of which does not read
- * is left out whole and named in `unreadable`; a record that does not read is left out by the store's list, which says so on stderr.
+ * is left out of the facts and named in `unreadable`, and what it froze is still compared (`frozenRun`); a run whose frozen steps do not
+ * read gives nothing; a record that does not read is left out by the store's list, which says so on stderr.
  */
 async function statsOver(e: Engine, query: StatsQuery, now: Date) {
-  const facts: Facts = { tries: [], runs: [] };
+  const facts: Facts = { tries: [], runs: [], frozen: [] };
   const unreadable: string[] = [];
   for (const run of runStore.runs.list()) {
+    const steps = stepsRead(run);
+    if (!steps) continue;
+    facts.frozen.push(frozenRun(run, steps));
     try {
-      const of = await runFacts(e, run);
+      const of = await runFacts(e, run, steps);
       facts.tries.push(...of.tries);
       facts.runs.push(...of.runs);
     } catch (err) {

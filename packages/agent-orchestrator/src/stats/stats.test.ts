@@ -116,6 +116,7 @@ function withLanded<R extends ReturnType<typeof readOf>>(r: R, ending: string, l
 const factsOfAll = (...reads: ReturnType<typeof readOf>[]): Facts => ({
   tries: reads.flatMap((r) => factsOf(r).tries),
   runs: reads.flatMap((r) => factsOf(r).runs),
+  frozen: [],
 });
 
 test('rounds are the rounds of the step with `loop:`, whatever it is called, and absent — null, not 0 — in a workflow with no loop', () => {
@@ -127,7 +128,7 @@ test('rounds are the rounds of the step with `loop:`, whatever it is called, and
   const noLoop = TEAM.map(({ loop: _loop, rounds: _rounds, ...s }) => s as Workflow);
   const loopless = factsOf(twoRounds('r3', noLoop));
   assert.deepEqual(loopless.runs[0].rounds, []);
-  assert.equal(statsOf(loopless, {}, NOW).all.total.rounds, null);
+  assert.equal(statsOf({ ...loopless, frozen: [] }, {}, NOW).all.total.rounds, null);
   assert.equal(statsOf(factsOfAll(twoRounds('r1'), twoRounds('r2', renamed)), {}, NOW).all.total.rounds, 2);
 });
 
@@ -277,7 +278,7 @@ test('a try falls on the UTC day it ended: 23:59Z and 00:01Z the next morning ar
   const late = '2026-09-10T23:59:00.000Z';
   const early = '2026-09-11T00:01:00.000Z';
   const r = readOf('d', [step('implement', [])], { implement: [{ end: late, then: 'retries' }, { end: early }] });
-  const s = statsOf(factsOf(r), {}, new Date('2026-09-11T12:00:00.000Z'));
+  const s = statsOf(factsOfAll(r), {}, new Date('2026-09-11T12:00:00.000Z'));
   assert.deepEqual(
     s.all.days.map((d) => [d.day, d.tries]),
     [
@@ -291,7 +292,7 @@ test('the tiles are the last 14 days to today and the 14 before: a try on today-
   const r = readOf('t', [step('implement', [])], {
     implement: [{ end: at(12, '2026-09-17'), then: 'retries' }, { end: at(12, '2026-09-16') }],
   });
-  const { last, before } = statsOf(factsOf(r), {}, new Date('2026-09-30T08:00:00.000Z')).all.tiles;
+  const { last, before } = statsOf(factsOfAll(r), {}, new Date('2026-09-30T08:00:00.000Z')).all.tiles;
   assert.deepEqual([last.from, last.to, last.tries], ['2026-09-17', '2026-09-30', 1]);
   assert.deepEqual([before.from, before.to, before.tries], ['2026-09-03', '2026-09-16', 1]);
 });
@@ -327,7 +328,7 @@ test('a query refuses a key to go by it does not know, a day that is not one, an
 });
 
 test('the recap line is one line, and says — where nothing was measured', () => {
-  const line = statsLine(statsOf({ tries: [], runs: [] }, {}, NOW));
+  const line = statsLine(statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW));
   assert.equal(line.split('\n').length, 1);
   assert.match(line, /— \(—\) rounds/);
   assert.match(line, /— \(—\) landed/, 'a fortnight with no run finished recorded no landing');
@@ -364,5 +365,5 @@ test('a day whose runs never recorded their landing has no landed count, printed
   const mixed = statsOf(factsOfAll(old('old-1'), old('old-2'), twoRounds('landed')), {}, NOW);
   assert.deepEqual([mixed.all.total.runs, mixed.all.total.landed], [3, 1], 'one run of the day recorded its landing');
   const aborted = twoRounds('aborted', TEAM, { aborted: 'its check refused' });
-  assert.equal(statsOf(factsOf(aborted), {}, NOW).all.total.landed, 0, 'a run recorded as not landing is counted: 0, not —');
+  assert.equal(statsOf(factsOfAll(aborted), {}, NOW).all.total.landed, 0, 'a run recorded as not landing is counted: 0, not —');
 });

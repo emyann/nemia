@@ -143,6 +143,12 @@ wf stats --json                            # what GET /api/stats answers
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
   non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
 - **A run whose journal does not read is left out whole**, and named on the last line.
+- **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
+  instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what
+  the run of the same workflow folder created just before it froze for the same item. It falls on the
+  UTC day the later run was created, names the run it is compared with, and respects the filters and
+  the days. Where either run does not say — a record without its agent's instructions, a rendered
+  folder gone — and on an item's first appearance, there is no mark.
 
 ## Where this stops
 

@@ -1,9 +1,11 @@
 /**
- * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per step, and the one line the morning recap quotes. A number
+ * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per change to what the runs froze, a row per step, and the one
+ * line the morning recap quotes. A number
  * with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Group, Headline, Stats, StepRow } from './stats.ts';
+import type { Mark } from './marks.ts';
 
 const NONE = '—';
 
@@ -57,6 +59,12 @@ function dayLines(g: Group, label?: string): string[] {
   ]);
 }
 
+/** A row per change (`Mark`): its day, what changed, the run that changed it and the run it is compared with; none without a change. */
+function markLines(marks: readonly Mark[]): string[] {
+  if (!marks.length) return [];
+  return table([['day', 'changed', 'run', 'since'], ...marks.map((m) => [m.day, `${m.kind} ${m.name}`, m.run, m.since])]);
+}
+
 /** A step's cost in words: the sum of its measured tries, and how many were, where not all. */
 const costWord = (s: StepRow): string =>
   s.costUsd === null ? NONE : s.costTries === s.tries ? dollars(s.costUsd) : `${dollars(s.costUsd)} (${s.costTries} of ${s.tries})`;
@@ -80,7 +88,10 @@ function stepLines(steps: readonly StepRow[]): string[] {
   ]);
 }
 
-/** What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per step, and the runs left out. */
+/**
+ * What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
+ * and the runs left out.
+ */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
   const groups = s.by ? s.groups.flatMap((g) => ['', `${s.by} ${g.key ?? NONE}`, ...dayLines(g)]) : ['', ...dayLines(s.all)];
@@ -90,6 +101,7 @@ export function statsLines(s: Stats): string[] {
     '',
     s.from ? `${s.from} → ${s.to}` : 'no try has ended, and no run has finished',
     ...groups,
+    ...(s.all.marks.length ? ['', ...markLines(s.all.marks)] : []),
     ...(s.all.steps.length ? ['', ...stepLines(s.all.steps)] : []),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (wf ls says why): ${s.unreadable.join(', ')}`] : []),
   ];

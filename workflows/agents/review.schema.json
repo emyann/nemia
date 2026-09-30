@@ -17,7 +17,7 @@
     },
     "mutants": {
       "type": "array",
-      "description": "Every `wf mutants:` line handed to you under What implement's check said, in its `reported`, each quoted whole, with your judgement of it. Empty only when the check reported none.",
+      "description": "Every `wf mutants:` line handed to you under What implement's check said, in its `reported`, each quoted whole, with your judgement of it. Empty only when the check reported none, or when the section says `reported` is partial: then say so in a finding rather than list none.",
       "items": {
         "type": "object",
         "properties": {

@@ -45,7 +45,7 @@ import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/clos
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, checkStderr, inputsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { writeCheckCloseout } from '../check/check.store.ts';
+import { checkStdout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { checksHandedOf, closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
@@ -541,6 +541,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
           ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
           WF_WORKSPACE: workspace,
           WF_STDERR: checkStderr(taskId),
+          WF_STDOUT: checkStdout(taskId),
           WF_ARTIFACTS: files,
           ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
         },

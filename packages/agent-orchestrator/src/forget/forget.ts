@@ -499,10 +499,10 @@ export function branchFates(
 }
 
 /**
- * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, for each step the
- * record names (`checkStderr` in record.store.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could
- * be another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
- * `r-xyz-implement-check.stderr` is `r-xyz`'s.
+ * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, and each `.stdout`
+ * beside them, for each step the record names (`checkStderr` in record.store.ts, `checkStdout` in check.store.ts). Pure. With no record
+ * to name the steps, any `<id>-…-check.stderr` or `.stdout` — but none that could be another stored run's: one whose id starts with this
+ * one's, or whose id this one starts with — `r-xyz-implement` is no run, and `r-xyz-implement-check.stderr` is `r-xyz`'s.
  */
 export function checkLogsOf(
   id: string,
@@ -510,14 +510,15 @@ export function checkLogsOf(
   listing: readonly string[],
   otherIds: readonly string[] = [],
 ): string[] {
-  const suffix = '-check.stderr';
+  const suffix = /-check\.std(err|out)$/;
   return listing
     .filter((file) => {
-      if (!file.endsWith(suffix)) return false;
+      const end = suffix.exec(file)?.index;
+      if (end === undefined) return false;
       if (names) {
         return names.some((name) => {
           const prefix = `${id}-${name}`;
-          return file.startsWith(prefix) && /^(-try\d+)?$/.test(file.slice(prefix.length, -suffix.length));
+          return file.startsWith(prefix) && /^(-try\d+)?$/.test(file.slice(prefix.length, end));
         });
       }
       return file.startsWith(`${id}-`) && !otherIds.some((o) => o !== id && file.startsWith(`${o}-`));

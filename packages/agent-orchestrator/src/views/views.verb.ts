@@ -23,6 +23,7 @@ import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/timeline.ts';
 import { checkStderr, readAsks, stepsOf } from '../record/record.store.ts';
+import { checkStdout } from '../check/check.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
@@ -353,9 +354,11 @@ export const refusalOf = (e: Engine, command: string, taskId: string): Promise<C
   Effect.runPromise(refusalRead(command, taskId).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
- * What a checked step's check said, for the step filed after it (`checkHandedSection`): one read of its log for the verdict, the stdout's
- * tail and the lines it marked (`reportedLines`), and the tail of its stderr file. A log whose read rejects, with anything, is
- * `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read of the log throws.
+ * What a checked step's check said, for the step filed after it (`checkHandedSection`): one read of its log for the verdict and the
+ * stdout's tail, the lines it marked (`reportedLines`) from its whole stdout file (`checkStdout`), and the tail of its stderr file. With
+ * no stdout file that reads, the marked lines come from the log, which keeps only the end, and are `partial`. A log whose read rejects,
+ * with anything, is `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read of
+ * the log throws.
  */
 export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
   const e = yield* EngineService;
@@ -368,8 +371,10 @@ export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string,
     } satisfies CheckHanded;
   const log = read.success;
   const stderr = yield* tried(() => lastLines(tailOf(checkStderr(taskId))));
-  const { lines, cut } = reportedLines(log);
-  return { step, command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr, reported: lines, cut } satisfies CheckHanded;
+  const whole = wholeOf(checkStdout(taskId));
+  const { lines, cut } = reportedLines(whole ?? log);
+  const said = { verdict: readVerdict(log), stdout: stdoutTail(log), stderr, reported: lines, cut, partial: whole === undefined };
+  return { step, command, ...said } satisfies CheckHanded;
 });
 
 /**
@@ -389,6 +394,15 @@ export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, s
 /** What a step is told its checked steps' checks said (`checksHandedRead`), in a Promise over `e`. */
 export const checksHandedOf = (e: Engine, run: Run, steps: readonly Workflow[], step: Workflow): Promise<CheckHanded[]> =>
   Effect.runPromise(checksHandedRead(run, steps, step).pipe(Effect.provide(EngineService.layer(e))));
+
+/** A whole file, or nothing where it is absent or does not read — a check filed without `WF_STDOUT` keeps none. */
+function wholeOf(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
 
 /** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
 function tailOf(file: string, bytes = 64_000): string {

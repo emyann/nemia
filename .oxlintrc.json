@@ -105,7 +105,12 @@
         "apps/web/src/lib/api/skills.ts",
         "apps/web/src/lib/api/workflows.ts",
         "apps/web/src/lib/api/builder.ts",
-        "apps/web/src/lib/api/machines.ts"
+        "apps/web/src/lib/api/machines.ts",
+        "apps/web/src/lib/api/inbox.ts",
+        "apps/web/src/lib/api/capabilities.ts",
+        "apps/web/src/lib/api/quota.ts",
+        "apps/web/src/lib/api/ceilings.ts",
+        "apps/web/src/lib/api/daemon.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",

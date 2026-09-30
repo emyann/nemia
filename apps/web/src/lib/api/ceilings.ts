@@ -1,7 +1,8 @@
 /** The cap on runs in flight (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
-import { getUndecoded } from './read.ts';
+import { Schema } from 'effect';
+import { get } from './read.ts';
 
 /** The phases of a pass (`PHASES` in agent-orchestrator's meter.ts; `PASS_PHASES` in lib/pass.ts keeps their order). */
 export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'git' | 'assess' | 'act';
@@ -23,6 +24,40 @@ export type PassCost = {
   rested: number;
 };
 
+/** Decodes one phase's cost. */
+const PhaseCostSchema = Schema.Struct({
+  ms: Schema.Number,
+  calls: Schema.Number,
+  bytes: Schema.Number,
+  reads: Schema.Number,
+  spawned: Schema.Number,
+});
+
+/** Decodes a `PassCost`: every phase a key of its own, so a pass that leaves one out is refused at it. */
+const PassCostSchema = Schema.Struct({
+  at: Schema.String,
+  ms: Schema.Number,
+  phases: Schema.Struct({
+    records: PhaseCostSchema,
+    asks: PhaseCostSchema,
+    journals: PhaseCostSchema,
+    observe: PhaseCostSchema,
+    runtime: PhaseCostSchema,
+    git: PhaseCostSchema,
+    assess: PhaseCostSchema,
+    act: PhaseCostSchema,
+  }),
+  harnesses: Schema.Record(
+    Schema.String,
+    Schema.Struct({ calls: Schema.Number, ms: Schema.Number, listed: Schema.Number, spawned: Schema.Number }),
+  ),
+  records: Schema.Number,
+  bytes: Schema.Number,
+  spawned: Schema.Number,
+  overheadMs: Schema.Number,
+  rested: Schema.Number,
+}) satisfies Schema.Schema<PassCost>;
+
 /**
  * Mirrors `Ceilings` in apps/api/src/factory/ceilings.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before
  * any pass wrote it), the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none —
@@ -36,9 +71,20 @@ export type Ceilings = {
   pass: PassCost | null;
 };
 
+/** Decodes `Ceilings`. */
+const CeilingsSchema = Schema.Struct({
+  last: Schema.NullOr(Schema.Struct({ sessions: Schema.Number, runs: Schema.Number })),
+  cap: Schema.Number,
+  inFlight: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
+  held: Schema.mutable(
+    Schema.Array(Schema.Struct({ run: Schema.String, inFlight: Schema.Number, cap: Schema.Number, word: Schema.String })),
+  ),
+  pass: Schema.NullOr(PassCostSchema),
+}) satisfies Schema.Schema<Ceilings>;
+
 /** The cap on runs in flight, read again as the runs are, on a run's event: what the Factory says over its floor. */
 export const ceilingsQuery = queryOptions({
   queryKey: ['ceilings'],
-  queryFn: () => getUndecoded<Ceilings>('/api/ceilings'),
+  queryFn: () => get('/api/ceilings', CeilingsSchema),
   refetchInterval: () => pace(5_000),
 });

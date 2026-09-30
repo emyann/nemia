@@ -198,6 +198,16 @@ test('wf stats --line prints one line, and wf stats prints the tiles and the day
   assert.match(words, /left out, a journal of each not reading \(wf ls says why\): spoilt/);
 });
 
+test('wf stats --help prints each flag and what it takes, and is refused nothing', async (t) => {
+  const help = await printedBy(t, ['stats', '--help']);
+  assert.match(help, /^wf stats \[--from <day>\]/);
+  for (const flag of ['from', 'to', 'by', 'agent', 'step', 'factory', 'workflow', 'repo', 'line', 'json']) {
+    assert.match(help, new RegExp(`^\\s+--${flag}\\s+\\S`, 'm'), `--${flag} is said with what it takes`);
+  }
+  assert.match(help, /what the rows go by: agent, step, factory, workflow, repo/);
+  assert.match(help, /never 0/);
+});
+
 test('wf stats refuses a key to go by it does not know, and a day that is not one, with exit 2 and what it takes', async (t) => {
   for (const [argv, want] of [
     [['--by', 'colour'], /^--by takes one of agent, step, factory, workflow, repo, not "colour"\.$/],

@@ -14,6 +14,21 @@ const TAKES = {
   repo: "a repository's path, as a run's record names it: only its runs",
 } as const;
 
+/** What `wf stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
+const STATS_HELP = `wf stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [--line|--json]
+
+The flow numbers of every run in the store, of every factory and repository: the runs finished and landed, the rounds
+a loop took to be accepted, the share of landed runs that landed on their first try, the cost and wall time of a landed
+run, and per step its tries, their time and cost, its checks' verdicts and its waits at a gate. It prints tiles, the
+last 14 days against the 14 before, a row per UTC day, and a row per step and agent. A number nothing measured is
+absent, "—" in words and null in JSON, never 0.
+
+${Object.entries(TAKES)
+  .map(([key, takes]) => `  --${key.padEnd(10)}${takes}`)
+  .join('\n')}
+  --line      one line, for a recap
+  --json      the whole answer, as GET /api/stats gives it`;
+
 /** `wf stats`'s flags read into a query (`statsQueryOf`), and how it prints: refused with the flag it does not take, or a bad value. */
 function statsHow(argv: string[]) {
   const { values, switches } = readFlags(argv, {
@@ -31,6 +46,7 @@ function statsHow(argv: string[]) {
 
 /** `wf stats`: what it prints — tiles and rows, `--line` the recap's one line, `--json` the whole answer. */
 export async function statsVerb(rest: string[], e: Engine): Promise<void> {
+  if (rest.includes('--help')) return console.log(STATS_HELP);
   const how = statsHow(rest);
   const s = await stats(e, how.query);
   if (how.json) return console.log(JSON.stringify(s, null, 2));

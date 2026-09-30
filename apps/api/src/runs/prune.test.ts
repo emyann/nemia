@@ -20,7 +20,7 @@ import type { Pruning } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import type { RunSummary } from './runs.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, readRun } from 'agent-orchestrator';
+import { engine, prune, prunedKept, prunedWords, runStore } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -241,7 +241,7 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
   assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
 
-  const pruned = readRun('p-merged').pruned!;
+  const pruned = runStore.runs.read('p-merged').pruned!;
   assert.ok(pruned.artifacts, 'the marker says the files went');
   const run = (await listed()).get('p-merged')!;
   assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
@@ -298,7 +298,7 @@ test('a finished run nobody merged, pruned with `unmerged`, loses its worktree a
   assert.equal(fs.existsSync(worktreeOf('p-unmerged')), false, 'its worktree is gone');
   assert.ok(hasBranch(branchOf('p-unmerged')), 'its branch is kept');
   assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
-  const pruned = readRun('p-unmerged').pruned!;
+  const pruned = runStore.runs.read('p-unmerged').pruned!;
   assert.equal(pruned.artifacts, undefined);
   assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
   assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);

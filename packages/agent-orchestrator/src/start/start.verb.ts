@@ -18,12 +18,13 @@ import { gateRefusal } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
-import { HOME, inputsDir, runId, runsDir, writeRun } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { HOME, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { DEFAULT_FACTORY, fillsOf, unfilledRefusal, type Factory } from '../factory/factory.ts';
+import { DEFAULT_FACTORY, fillsOf, unattachedRefusal, unfilledRefusal, type Factory } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { Effect } from 'effect';
 
@@ -62,13 +63,16 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`fillsOf`, by the folder's name) resolved against
- * the agent hired, as if its file named it. Refused: every step then left with no agent (`unfilledRefusal`), since a factory's steps are
- * filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default — a step that
- * names no agent is a plain session, as it always was.
+ * the agent hired, as if its file named it. Refused: first, a workflow the factory has not attached (`unattachedRefusal`), before its
+ * folder is read, since a factory offers only its workflows; then every step left with no agent (`unfilledRefusal`), since a factory's
+ * steps are filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default —
+ * every workflow is offered, and a step that names no agent is a plain session, as it always was.
  */
 function stepsIn(workflowDir: string, places: Places, factory: Factory | undefined): Workflow[] {
   if (!factory) return loadWorkflows(workflowDir, places);
   const workflow = path.basename(path.resolve(workflowDir));
+  const unattached = unattachedRefusal(factory, workflow);
+  if (unattached) throw new Invalid({ message: unattached });
   const steps = loadWorkflows(workflowDir, places, { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow) });
   const unfilled = unfilledRefusal(steps, factory.name, workflow);
   if (unfilled) throw new Invalid({ message: unfilled });
@@ -78,7 +82,8 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
 /**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
- * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a step its hires leave unfilled or fill twice (`stepsIn`);
+ * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a workflow it has not attached, or a step its hires leave
+ *   unfilled or fill twice (`stepsIn`);
  * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
@@ -318,8 +323,8 @@ const factoryNamed = (name: string | undefined): Factory | undefined =>
  *
  * `factory` names the factory the run is started in (`wf start --factory`): its hires fill the workflow's steps (`stepsToStart`), read as
  * they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
- * no factory, or one whose file does not read (`readFactory`). Left out, or the default factory, nothing is read. The factory is not
- * frozen on the record.
+ * no factory, or one whose file does not read (`readFactory`), and when it has not attached the workflow (`stepsIn`). Left out, or the
+ * default factory, nothing is read. The factory is not frozen on the record.
  *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
  * else, the copy's and the render's `Error` included (`tried`).
@@ -343,7 +348,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
   yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
-  yield* tried(() => writeRun(run));
+  yield* tried(() => runStore.runs.create(run));
   return run;
 });
 

@@ -35,12 +35,12 @@ const {
   isGitRun,
   isShipped,
   list,
-  readRun,
   retry,
   round,
   start,
   toDecideWords,
 } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
 

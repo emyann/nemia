@@ -15,7 +15,8 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { addFactory, factoriesDir, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
+const { addFactory, attachWorkflow, detachWorkflow, factoriesDir, fireAgent, hireAgent, readFactories, readFactory } =
+  await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { FACTORY_HELP } = await import('../cli/factory/factory.ts');
 
@@ -209,12 +210,12 @@ test("wf factory rm removes that factory's file alone, and one that does not rea
   assert.deepEqual(filed(), ['nemia.json']);
 });
 
-test('REFUSED: wf factory with a subcommand it does not have names the five; --help prints its help', async (t) => {
+test('REFUSED: wf factory with a subcommand it does not have names the seven; --help prints its help', async (t) => {
   await assert.rejects(
     main(['factory', 'frob'], NO_ENGINE),
     refusedWith(
       'Invalid',
-      /^wf factory does not take frob\. .*wf factory ls.*wf factory add <name> --repo <path>.*wf factory hire <factory> <agent> --step <workflow>\/<step>.*wf factory fire <factory> --step <workflow>\/<step>.*wf factory rm <name>/,
+      /^wf factory does not take frob\. .*wf factory ls.*wf factory add <name> --repo <path>.*wf factory attach <factory> <workflow>.*wf factory detach <factory> <workflow>.*wf factory hire <factory> <agent> --step <workflow>\/<step>.*wf factory fire <factory> --step <workflow>\/<step>.*wf factory rm <name>/,
     ),
   );
   await assert.rejects(main(['factory', 'add', 'pipao', '--rep', '/x'], NO_ENGINE), refusedWith('Invalid', /does not take --rep\./));
@@ -228,6 +229,7 @@ test('wf factory hire files one agent a step, keeping repos and a key a later wf
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
   const file = path.join(FACTORIES, 'pipao.json');
+  attachWorkflow({ factory: 'pipao', workflow: 'build' });
   fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
   assert.deepEqual(await printedBy(t, 'factory', 'hire', 'pipao', 'otto', '--step', 'build/implement'), [
     'pipao  build/implement ← otto',
@@ -240,18 +242,30 @@ test('wf factory hire files one agent a step, keeping repos and a key a later wf
   assert.deepEqual(hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' }), { file });
   assert.deepEqual(fileOf('pipao'), {
     repos: [repo],
+    workflows: ['build'],
     later: { kept: true },
     hires: { 'build/implement': 'ada', 'build/review': 'agora' },
   });
   assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
-  assert.deepEqual(readFactory('pipao'), { name: 'pipao', repos: [repo], hires: { 'build/implement': 'ada', 'build/review': 'agora' } });
+  assert.deepEqual(readFactory('pipao'), {
+    name: 'pipao',
+    repos: [repo],
+    workflows: ['build'],
+    hires: { 'build/implement': 'ada', 'build/review': 'agora' },
+  });
   const listed = await printedBy(t, 'factory', 'ls');
-  assert.deepEqual(listed.slice(1, 4), [`pipao    ${repo}`, '         build/implement ← ada', '         build/review ← agora']);
+  assert.deepEqual(listed.slice(1, 5), [
+    `pipao    ${repo}`,
+    '         workflows: build',
+    '         build/implement ← ada',
+    '         build/review ← agora',
+  ]);
 });
 
 test('wf factory fire takes one hire back and keeps the rest; a step it hires no one into is Missing, naming its hires', async (t) => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  attachWorkflow({ factory: 'pipao', workflow: 'build' });
   hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
   hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' });
   const file = path.join(FACTORIES, 'pipao.json');
@@ -259,7 +273,7 @@ test('wf factory fire takes one hire back and keeps the rest; a step it hires no
     'pipao  build/implement  fired ada',
     `fired: ${file}`,
   ]);
-  assert.deepEqual(fileOf('pipao'), { repos: [repo], hires: { 'build/review': 'agora' } });
+  assert.deepEqual(fileOf('pipao'), { repos: [repo], workflows: ['build'], hires: { 'build/review': 'agora' } });
   const before = fs.readFileSync(file);
   assert.throws(
     () => fireAgent({ factory: 'pipao', step: 'build/implement' }),
@@ -352,6 +366,160 @@ test('REFUSED: wf factory hire and fire with a --step missing or twice, an unkno
     [['fire', 'pipao'], /^wf factory fire names the step with --step: .* Nothing was fired\.$/],
     [['fire', 'pipao', 'ada', '--step', 'build/a'], /^wf factory fire takes <factory>, and ada is one more/],
     [['fire', '--step', 'build/a'], /^wf factory fire takes the factory first/],
+  ];
+  for (const [argv, pattern] of refusals)
+    await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));
+  assert.deepEqual(fileOf('pipao'), { repos: [repo] });
+});
+
+test('wf factory attach adds a workflow by name, sorted and once, keeping every other key; detach takes it back and keeps the rest', async (t) => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  const file = path.join(FACTORIES, 'pipao.json');
+  fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
+  assert.deepEqual(await printedBy(t, 'factory', 'attach', 'pipao', 'intake'), ['pipao  attached intake', `attached: ${file}`]);
+  attachWorkflow({ factory: 'pipao', workflow: 'build' });
+  hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
+  assert.deepEqual(fileOf('pipao'), {
+    repos: [repo],
+    later: { kept: true },
+    workflows: ['build', 'intake'],
+    hires: { 'build/implement': 'ada' },
+  });
+  const before = fs.readFileSync(file);
+  assert.deepEqual(await printedBy(t, 'factory', 'attach', 'pipao', 'build'), ['pipao  already attached build', `unchanged: ${file}`]);
+  assert.deepEqual(attachWorkflow({ factory: 'pipao', workflow: 'build' }), { file, already: true });
+  assert.deepEqual(fs.readFileSync(file), before, 'an attach of one attached already writes nothing');
+  assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
+  assert.deepEqual(readFactory('pipao').workflows, ['build', 'intake']);
+  assert.deepEqual((await printedBy(t, 'factory', 'ls')).slice(1, 4), [
+    `pipao    ${repo}`,
+    '         workflows: build, intake',
+    '         build/implement ← ada',
+  ]);
+  assert.deepEqual(await printedBy(t, 'factory', 'detach', 'pipao', 'intake'), ['pipao  detached intake', `detached: ${file}`]);
+  assert.deepEqual(fileOf('pipao'), { repos: [repo], later: { kept: true }, workflows: ['build'], hires: { 'build/implement': 'ada' } });
+  assert.deepEqual(filed(), ['pipao.json']);
+});
+
+test('a factory file with no workflows key reads as one that has attached none', () => {
+  const repo = fresh();
+  addFactory({ name: 'nemia', repos: [repo] });
+  assert.deepEqual(fileOf('nemia'), { repos: [repo] }, 'an add writes no workflows key');
+  assert.deepEqual(readFactory('nemia'), { name: 'nemia', repos: [repo], workflows: [], hires: {} });
+  const listed = readFactories().find((f) => f.name === 'nemia');
+  assert.ok(listed && !('error' in listed) && listed.workflows.length === 0);
+});
+
+test('REFUSED: a hire into a step of a workflow the factory has not attached is Invalid, naming the attach, and writes nothing', () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  attachWorkflow({ factory: 'pipao', workflow: 'intake' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  assert.throws(
+    () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' }),
+    refusedWith(
+      'Invalid',
+      /^pipao does not offer the workflow build, so it hires no one into its steps\. Attach it first — wf factory attach pipao build — then hire\. Nothing was hired\.$/,
+    ),
+  );
+  assert.throws(
+    () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'intak/x' }),
+    refusedWith('Invalid', /wf factory attach pipao intak /),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  hireAgent({ factory: 'pipao', agent: 'ada', step: 'intake/frame' });
+  assert.deepEqual(fileOf('pipao').hires, { 'intake/frame': 'ada' });
+});
+
+test('REFUSED: a detach of a workflow the factory still hires into is Invalid, naming each fire; one it has not attached is Missing', () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  for (const workflow of ['build', 'builder']) attachWorkflow({ factory: 'pipao', workflow });
+  hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' });
+  hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
+  hireAgent({ factory: 'pipao', agent: 'otto', step: 'builder/x' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  assert.throws(
+    () => detachWorkflow({ factory: 'pipao', workflow: 'build' }),
+    refusedWith(
+      'Invalid',
+      /^pipao hires into build's steps: build\/implement, build\/review\. Fire each first — wf factory fire pipao --step build\/implement; wf factory fire pipao --step build\/review — then detach it\. Nothing was detached\.$/,
+    ),
+  );
+  assert.throws(
+    () => detachWorkflow({ factory: 'pipao', workflow: 'intake' }),
+    refusedWith('Missing', /^pipao has not attached intake\. It offers: build, builder\. Nothing was detached\.$/),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  fireAgent({ factory: 'pipao', step: 'build/implement' });
+  fireAgent({ factory: 'pipao', step: 'build/review' });
+  detachWorkflow({ factory: 'pipao', workflow: 'build' });
+  assert.deepEqual(
+    fileOf('pipao'),
+    { repos: [repo], workflows: ['builder'], hires: { 'builder/x': 'otto' } },
+    "builder's hire does not hold build",
+  );
+  fireAgent({ factory: 'pipao', step: 'builder/x' });
+  detachWorkflow({ factory: 'pipao', workflow: 'builder' });
+  assert.throws(
+    () => detachWorkflow({ factory: 'pipao', workflow: 'builder' }),
+    refusedWith('Missing', /^pipao has not attached builder\. It offers none\. Nothing was detached\.$/),
+  );
+});
+
+test('REFUSED: attach and detach on the default factory, on no factory, with a name no workflow has, or on a file that does not read', async () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  for (const verb of ['attach', 'detach'] as const) {
+    const done = verb === 'attach' ? 'attached' : 'detached';
+    const change = verb === 'attach' ? attachWorkflow : detachWorkflow;
+    await assert.rejects(
+      main(['factory', verb, 'default', 'build'], NO_ENGINE),
+      refusedWith('Conflict', new RegExp(`^\`default\` is the default factory: .* wf factory ${verb} does not take it\\. `)),
+    );
+    await assert.rejects(
+      main(['factory', verb, 'nope', 'build'], NO_ENGINE),
+      refusedWith('Missing', new RegExp(`^no factory nope in the store\\. Its factories are: pipao\\. Nothing was ${done}\\.$`)),
+    );
+    for (const workflow of ['', '.git', 'a/b', 'agents', 'skills'])
+      assert.throws(
+        () => change({ factory: 'pipao', workflow }),
+        refusedWith('Invalid', new RegExp(`(is not a workflow's name|holds the agents or the skills).* Nothing was ${done}\\.$`)),
+        `${verb} ${JSON.stringify(workflow)}`,
+      );
+  }
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.deepEqual(filed(), ['pipao.json']);
+  const bent = path.join(FACTORIES, 'bent.json');
+  fs.writeFileSync(bent, '{"repos": ["/x"], "workflows": 3}\n');
+  const bentBefore = fs.readFileSync(bent);
+  const listed = readFactories().find((f) => f.name === 'bent');
+  assert.ok(listed && 'error' in listed, 'listed with why');
+  assert.match(listed.error, /^does not read as a factory: `workflows` /);
+  assert.throws(
+    () => readFactory('bent'),
+    refusedWith('Invalid', /^the factory bent: \S*bent\.json does not read as a factory: `workflows` /),
+  );
+  assert.throws(() => attachWorkflow({ factory: 'bent', workflow: 'build' }), refusedWith('Invalid', /It was left as it is/));
+  assert.throws(() => detachWorkflow({ factory: 'bent', workflow: 'build' }), refusedWith('Invalid', /It was left as it is/));
+  assert.deepEqual(fs.readFileSync(bent), bentBefore);
+});
+
+test('REFUSED: wf factory attach and detach with no workflow, a second one, or a flag, each by name, writing nothing', async () => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  const refusals: Array<[string[], RegExp]> = [
+    [['attach', 'pipao'], /^wf factory attach takes the factory, then the workflow, by its folder's name: .* Nothing was attached\.$/],
+    [['attach'], /^wf factory attach takes the factory, then the workflow/],
+    [['attach', 'pipao', 'build', 'extra'], /^wf factory attach takes one workflow, and extra is a second/],
+    [['attach', 'pipao', 'build', '--x'], /^wf factory attach does not take --x\./],
+    [['detach', 'pipao'], /^wf factory detach takes the factory, then the workflow, .* Nothing was detached\.$/],
+    [['detach', '--step', 'build'], /^wf factory detach does not take --step\./],
   ];
   for (const [argv, pattern] of refusals)
     await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));

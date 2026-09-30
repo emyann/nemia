@@ -11,7 +11,9 @@ import {
   fillsOf,
   hireRefusal,
   noFactoryLine,
+  unattachedRefusal,
   unfilledRefusal,
+  workflowNameRefusal,
 } from './factory.ts';
 
 test('REFUSED: a name that is empty, not lowercase, climbs, is hidden, starts with a dash or is past 40 characters', () => {
@@ -39,9 +41,9 @@ test('wf factory ls: the default first, then each factory by name with its repos
   assert.deepEqual(factoryLines([]), ['default  every run and card that names no factory — read, never written']);
   assert.deepEqual(
     factoryLines([
-      { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], hires: {} },
+      { name: 'pipao', file: '/s/factories/pipao.json', repos: ['/code/pipao'], workflows: [], hires: {} },
       { name: 'broken', file: '/s/factories/broken.json', error: 'does not read as a factory: `repos` is missing' },
-      { name: 'abc', file: '/s/factories/abc.json', repos: ['/code/a', '/code/b'], hires: {} },
+      { name: 'abc', file: '/s/factories/abc.json', repos: ['/code/a', '/code/b'], workflows: [], hires: {} },
     ]),
     [
       'default  every run and card that names no factory — read, never written',
@@ -64,6 +66,7 @@ test("wf factory ls: a factory's hires under its line, sorted by step, whatever 
         name: 'pipao',
         file: '/s/factories/pipao.json',
         repos: ['/code/pipao'],
+        workflows: [],
         hires: { 'build/review': 'agora', 'build/implement': 'ada' },
       },
     ]),
@@ -122,4 +125,47 @@ test('REFUSED: every step no agent fills, naming the factory and the hire line f
 test('the default factory is refused to hire and fire, since it is never written', () => {
   assert.match(defaultFactoryRefusal('hire'), /wf factory hire does not take it/);
   assert.match(defaultFactoryRefusal('fire'), /wf factory fire does not take it/);
+});
+
+test('wf factory ls: the workflows a factory offers on one line under its own, by name, before its hires; no such line when it has none', () => {
+  assert.deepEqual(
+    factoryLines([
+      { name: 'pipao', file: '/s/pipao.json', repos: ['/code/pipao'], workflows: ['intake', 'build'], hires: { 'build/implement': 'ada' } },
+      { name: 'nemia', file: '/s/nemia.json', repos: ['/code/nemia'], workflows: [], hires: {} },
+    ]),
+    [
+      'default  every run and card that names no factory — read, never written',
+      'nemia    /code/nemia',
+      'pipao    /code/pipao',
+      '         workflows: build, intake',
+      '         build/implement ← ada',
+    ],
+  );
+});
+
+test("REFUSED: a workflow's name that is empty, hidden, holds a slash, or is the agents' or the skills' folder", () => {
+  for (const name of ['', '.git', 'a/b', 'a\\b', 'agents', 'skills'])
+    assert.ok(workflowNameRefusal(name), `refused: ${JSON.stringify(name)}`);
+  assert.match(workflowNameRefusal('.git')!, /^`\.git` is not a workflow's name/);
+  assert.match(workflowNameRefusal('skills')!, /^skills\/ holds the agents or the skills/);
+  for (const name of ['build', 'intake', 'dev-planned']) assert.equal(workflowNameRefusal(name), undefined, name);
+  assert.match(hireRefusal('.git/x', 'ada')!, /^--step \.git\/x: `\.git` is not a workflow's name/);
+});
+
+test('REFUSED: a start of a workflow its factory has not attached, saying what it offers, or that it offers none yet', () => {
+  assert.equal(unattachedRefusal({ name: 'pipao', workflows: ['intake', 'build'] }, 'build'), undefined);
+  assert.equal(
+    unattachedRefusal({ name: 'pipao', workflows: [] }, 'build'),
+    'build: the factory pipao does not offer this workflow — it offers none yet. Attach it — wf factory attach pipao build — or start it in the default factory, which offers every workflow. Nothing was started.',
+  );
+  assert.match(
+    unattachedRefusal({ name: 'pipao', workflows: ['intake', 'dev'] }, 'build')!,
+    /^build: the factory pipao does not offer this workflow — it offers: dev, intake\. Attach it — wf factory attach pipao build — /,
+  );
+  assert.match(unattachedRefusal({ name: 'pipao', workflows: ['builder'] }, 'build')!, /it offers: builder\./);
+});
+
+test('the default factory is refused to attach and detach, since it offers every workflow and is never written', () => {
+  assert.match(defaultFactoryRefusal('attach'), /wf factory attach does not take it\. It offers every workflow found already/);
+  assert.match(defaultFactoryRefusal('detach'), /wf factory detach does not take it\. It offers every workflow found/);
 });

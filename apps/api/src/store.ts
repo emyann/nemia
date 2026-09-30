@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import { Context, Layer } from 'effect';
-import { engine, HOME, listRuns, loadWorkflows, readFilings, unreadableJournal } from 'agent-orchestrator';
+import { engine, HOME, loadWorkflows, readFilings, unreadableJournal, runStore } from 'agent-orchestrator';
 import { isGitRun, runTasks, type Run, unjudgedWords } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
@@ -22,7 +22,7 @@ export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()
 /**
  * The store's root as the api's own reads and writes take it: your workflows, agents and skills, and a try's folder, looked for and written
  * under it. Live, the package's `HOME`, which it fixes as it loads (`WF_ROOT`). What the package reads by itself is under its `HOME`
- * whatever this says: the runs (`listRuns`, `findRun`), the inbox and the queue, the daemon's file, and every verb a route calls. So a
+ * whatever this says: the runs (`runStore`, `findRun`), the inbox and the queue, the daemon's file, and every verb a route calls. So a
  * test that gives another root moves where the api looks for yours, and nothing of the package's.
  */
 export class StoreRoot extends Context.Service<StoreRoot, string>()('api/StoreRoot') {
@@ -95,7 +95,7 @@ export async function judgedUnlessUnreadable<T>(
 export async function viewsFor(
   e: Reader,
   runs: readonly Run[],
-  store: () => readonly Run[] = listRuns,
+  store: () => readonly Run[] = () => runStore.runs.list(),
 ): Promise<{ views: Views; reader: Reader; unreadable: Unreadable }> {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
@@ -205,7 +205,7 @@ export async function filedTimes(e: Reader, filings: Filings): Promise<ReadonlyM
 export const workFolderOf = (run: Run, step: string): string | null => (isGitRun(run) ? null : (run.steps[step]?.workspace ?? null));
 
 /** Found among the runs the store has, not read by path, so no id can name a file outside it. */
-export const findRun = (id: string): Run | undefined => listRuns().find((r) => r.id === id);
+export const findRun = (id: string): Run | undefined => runStore.runs.list().find((r) => r.id === id);
 
 export const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`wf ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;

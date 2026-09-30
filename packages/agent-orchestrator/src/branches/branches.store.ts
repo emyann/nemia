@@ -4,9 +4,9 @@
  * and what a branch holds against the run's base — the files it added, one file's text, its diff stat, what it touched and the diff of
  * what decides a check.
  *
- * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`, whose `git` helpers it reads through: it imports neither the
- * engine nor a controller, and `runner.ts` re-exports most of what it exports. What asks the engine as well — `parentOf`, `decide` — is
- * the controllers' (`views.verb.ts`, `decide.verb.ts`).
+ * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`, whose `git` helpers it reads through, and reading a run
+ * through `runStore` (`files.store.ts`): it imports neither the engine nor a controller, and `runner.ts` re-exports most of what it
+ * exports. What asks the engine as well — `parentOf`, `decide` — is the controllers' (`views.verb.ts`, `decide.verb.ts`).
  */
 import { execCounted } from '../meter/tally.store.ts';
 import { resultSteps, radius, sensitivePaths, type Radius, type Touched } from './branches.ts';
@@ -14,7 +14,8 @@ import { isGitRun, type GitRun, type Run } from '../record/record.ts';
 import type { BranchStanding } from '../status/status.ts';
 import type { ParentRun } from '../wait/wait.ts';
 import type { Shipped } from '../decide/decide.ts';
-import { readRun, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { git, gitSays } from '../workspace/worktree.store.ts';
 
 /**
@@ -270,7 +271,7 @@ export function branchReader(): BranchReader {
 export function parentRecord(id: string, git: BranchReader = oneByOne): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
   try {
-    record = readRun(id);
+    record = runStore.runs.read(id);
   } catch {
     return {};
   }

@@ -12,7 +12,8 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advance, readRun, start } = await import('../runner.ts');
+const { advance, start } = await import('../runner.ts');
+const { readRun } = await import('../record/record.store.ts');
 const { main, VERBS } = await import('./main.ts');
 const { HELP } = await import('./flags.ts');
 

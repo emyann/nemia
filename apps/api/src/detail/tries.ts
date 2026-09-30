@@ -171,7 +171,7 @@ export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
  * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose
  * word, check, closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its
  * own: an earlier refused check's stderr is a file, and its output is not read. What a person said to each try is off the
- * answers the request read (`readAnswers`).
+ * answers the request read (the answers `runStore` keeps).
  *
  * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id,
  * and a recheck replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them). Its status is

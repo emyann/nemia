@@ -9,7 +9,7 @@ import {
   budgetRefusal,
   budgetWord,
   messageRefusal,
-  readRun,
+  runStore,
   retry,
   round,
   saidLines,
@@ -174,7 +174,7 @@ export async function approveVerb(rest: string[], e: Engine): Promise<void> {
   const [runId, stepName, ...more] = rest;
   if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
   const { approval, file } = await approve(e, runId, stepName, approveHow(more));
-  const after = readRun(runId);
+  const after = runStore.runs.read(runId);
   const waited = stepsOf(after).some((s) => s.after.includes(stepName));
   const files = !after.steps[stepName]?.taskId;
   console.log(
@@ -203,7 +203,7 @@ export async function acceptVerb(rest: string[], e: Engine): Promise<void> {
   if (!runId || runId.startsWith('--')) return console.log(HELP);
   const { stepName, message } = acceptHow(more);
   const { acceptance, file } = await accept(e, runId, stepName, message);
-  const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(acceptance.step));
+  const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
   console.log(
     `${runId}  accepted: try ${acceptance.try} of ${acceptance.step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
   );

@@ -17,12 +17,12 @@ import {
   lessonLine,
   merges,
   phaseOfView,
-  readAsks,
   resultSteps,
   runCostLines,
   sendBackTo,
   sensitiveDiff,
   touchedBy,
+  runStore,
 } from 'agent-orchestrator';
 import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
 import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from '../runs/judged.ts';
@@ -306,7 +306,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string): 
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdicts = exitVerdicts(views, run);
-  const { asks, rounds } = readAsks(run.id);
+  const { asks, rounds } = runStore.asks.read(run.id);
   const { spendOf } = judged;
   const d = decision(
     steps,

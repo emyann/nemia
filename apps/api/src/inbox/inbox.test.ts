@@ -17,8 +17,8 @@ import {
   inboxDir,
   inboxNameRefusal,
   noCardLine,
-  readRun,
   startFromInbox,
+  runStore,
 } from 'agent-orchestrator';
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
@@ -186,7 +186,7 @@ test("POST /api/inbox writes an absolute repo as `wf inbox add --repo` does — 
   const started = await startCard({ workflow: 'dev', card: name });
   assert.equal(started.status, 201, await started.clone().text());
   assert.equal(
-    readRun(((await started.json()) as CardStarted).id).repo,
+    runStore.runs.read(((await started.json()) as CardStarted).id).repo,
     repo,
     'started, the run names the repository as the api does, so the board lists it with the runs on it',
   );
@@ -546,7 +546,7 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
   assert.deepEqual(answered, { id: answered.id, card: card.name, removed: true });
   assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
-  const run = readRun(answered.id);
+  const run = runStore.runs.read(answered.id);
   assert.deepEqual(
     { from: run.from, brief: run.brief, workflowDir: run.workflowDir, repo: run.repo, after: run.after },
     {
@@ -564,7 +564,7 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
   const { card: plain } = addToInbox({ text: 'Keep the brief\n\nAs the card says it.' });
   const bodied = await startCard({ workflow: 'mine', card: plain.name });
   assert.equal(bodied.status, 201, await bodied.clone().text());
-  const bodiedRun = readRun(((await bodied.json()) as CardStarted).id);
+  const bodiedRun = runStore.runs.read(((await bodied.json()) as CardStarted).id);
   assert.deepEqual(
     [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
     ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }],
@@ -586,7 +586,7 @@ test(
       assert.deepEqual(Object.keys(answered).sort(), ['card', 'id', 'removed', 'why']);
       assert.deepEqual([answered.card, answered.removed], [card.name, false]);
       assert.ok(answered.why?.startsWith(`${cardFile} could not be removed — `), answered.why);
-      assert.deepEqual(readRun(answered.id).from, { inbox: card.name });
+      assert.deepEqual(runStore.runs.read(answered.id).from, { inbox: card.name });
       assert.deepEqual(cards(), [`${card.name}.md`], 'the card is still there');
       assert.deepEqual((await listed()).find((e) => e.name === card.name)?.startedAs, [answered.id]);
 
@@ -611,7 +611,7 @@ test("GET /api/runs/:id says a run came from a card — the record's `from`, and
   assert.equal(res.status, 200, await res.clone().text());
   const detail = (await res.json()) as RunDetail;
   assert.deepEqual(detail.from, { inbox: card.name });
-  assert.equal(detail.fromNote, fromNote(readRun(id)));
+  assert.equal(detail.fromNote, fromNote(runStore.runs.read(id)));
   assert.equal(detail.fromNote, `from inbox card ${card.name}`);
 
   const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });

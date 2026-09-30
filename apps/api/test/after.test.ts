@@ -21,7 +21,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { decide, engine, list, readRun, waitAdvice, waitWord } from 'agent-orchestrator';
+import { decide, engine, list, waitAdvice, waitWord, runStore } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -214,7 +214,7 @@ test("the list's words and waits are `list`'s, run by run — and `advice` is `w
     'c-cancelled',
   ]) {
     const api = runs.get(id)!;
-    const cli = await list(e, readRun(id));
+    const cli = await list(e, runStore.runs.read(id));
     assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
     assert.deepEqual(
       api.steps.map((s) => s.status),
@@ -223,10 +223,10 @@ test("the list's words and waits are `list`'s, run by run — and `advice` is `w
     );
     if (cli.waiting.length) {
       assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-      assert.equal(api.waiting?.advice, waitAdvice(readRun(id), cli.waiting), id);
+      assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
       assert.equal(
         api.waiting?.onYou,
-        !waitAdvice(readRun(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+        !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
         `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still ship`,
       );
     }

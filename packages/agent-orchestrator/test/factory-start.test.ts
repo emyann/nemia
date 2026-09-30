@@ -1,7 +1,7 @@
 /**
- * `wf start --factory`: a run started in a factory, whose hires fill the workflow's steps. Refused while a step is left unfilled, or filled
- * twice — by its own `agent:` and a hire — before anything is written; started in the default factory, a step that names no agent is a
- * plain session, as it always was.
+ * `wf start --factory`: a run started in a factory, of a workflow attached to it, whose hires fill the workflow's steps. Refused, before
+ * anything is written: a workflow the factory has not attached, first; then a step left unfilled, or filled twice — by its own `agent:` and
+ * a hire. Started in the default factory, every workflow is offered, and a step that names no agent is a plain session, as it always was.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -17,7 +17,7 @@ import { teamCopy } from './team.ts';
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, hireAgent, inboxDir, start } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent, inboxDir, start } = await import('../src/runner.ts');
 const { startHow } = await import('../src/cli/start.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -39,9 +39,9 @@ function aRepo(): string {
 
 /**
  * The tests' team with one more workflow, `build`: `implement` and `review` name no agent, and `named` names its own, `reviewer`. The
- * factory `pipao` is filed afresh, hiring no one.
+ * factory `pipao` is filed afresh, hiring no one, with `attached` attached to it: `build`, unless another list is given.
  */
-function fresh(): { repo: string; build: string; dev: string } {
+function fresh(attached: readonly string[] = ['build']): { repo: string; build: string; dev: string } {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
   const team = teamCopy();
   const build = path.join(team, 'build');
@@ -51,11 +51,50 @@ function fresh(): { repo: string; build: string; dev: string } {
   fs.writeFileSync(path.join(build, 'named.md'), '---\nafter: review\nagent: reviewer\n---\nSay what you found.\n');
   const repo = aRepo();
   addFactory({ name: 'pipao', repos: [repo] });
+  for (const workflow of attached) attachWorkflow({ factory: 'pipao', workflow });
   return { repo, build, dev: path.join(team, 'dev') };
 }
 
 /** The runs written under the store: none after a refusal. */
 const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
+
+test('REFUSED: a start in a factory that has attached no workflow offers none, names the attach, and writes no run', () => {
+  const { repo, build } = fresh([]);
+  const before = runsWritten();
+  assert.throws(
+    () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
+    refusedWith(
+      'Invalid',
+      /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it — wf factory attach pipao build — or start it in the default factory, which offers every workflow\. Nothing was started\.$/,
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('REFUSED: a start of a workflow its factory has not attached, before its steps are judged, naming what it offers', () => {
+  const { repo, build, dev } = fresh(['dev']);
+  const before = runsWritten();
+  assert.throws(
+    () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
+    refusedWith(
+      'Invalid',
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it — wf factory attach pipao build — /,
+    ),
+    'the unattached refusal, not the unfilled one, though build has steps no one fills',
+  );
+  attachWorkflow({ factory: 'pipao', workflow: 'build' });
+  assert.throws(
+    () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
+    refusedWith('Invalid', /^build: in the factory pipao, 2 steps name no agent/),
+    'once attached, its steps are judged',
+  );
+  fresh(['build']);
+  assert.throws(
+    () => start({ brief: 'dev it', repo, workflowDir: dev, isolate: false, factory: 'pipao' }),
+    refusedWith('Invalid', /^dev: the factory pipao does not offer this workflow — it offers: build\. /),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
 
 test('REFUSED: a start in a factory that hires no one into its steps names each unfilled step and the hire for it, and writes no run', () => {
   const { repo, build } = fresh();
@@ -86,9 +125,12 @@ test('once a factory hires into each step, a start in it runs each as its hire, 
   assert.equal(record.workflow[0].agent.name, 'implementer', 'frozen as started');
 });
 
-test('in the default factory — no --factory, or default — a step that names no agent runs as a plain session, and nothing is read', () => {
+test('in the default factory — no --factory, or default — every workflow is offered, a step that names no agent runs as a plain session, and nothing is read', () => {
   const { repo, build } = fresh();
-  hireAgent({ factory: 'pipao', agent: 'implementer', step: 'build/implement' });
+  fs.writeFileSync(
+    path.join(ROOT, 'factories', 'pipao.json'),
+    `${JSON.stringify({ repos: [repo], hires: { 'build/implement': 'implementer' } })}\n`,
+  );
   fs.writeFileSync(path.join(ROOT, 'factories', 'default.json'), '{"repos": ["/x"], "hires": {"build/implement": "shipper"}}\n');
   for (const factory of [undefined, 'default']) {
     const run = start({ brief: 'build it', repo, workflowDir: build, isolate: false, ...(factory ? { factory } : {}) });
@@ -100,7 +142,7 @@ test('in the default factory — no --factory, or default — a step that names 
 });
 
 test("REFUSED: a factory's hires into another workflow's steps of the same names fill none of this one's", () => {
-  const { repo, build } = fresh();
+  const { repo, build } = fresh(['build', 'builder', 'other']);
   hireAgent({ factory: 'pipao', agent: 'implementer', step: 'other/implement' });
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'builder/review' });
   hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });

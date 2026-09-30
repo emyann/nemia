@@ -17,13 +17,13 @@ import {
   agentUsers,
   agentVersion,
   cardSkills,
-  listRuns,
   loadAgents,
   removeAgent,
   skillsFor,
   start,
   writeAgent,
   type AgentSchema,
+  runStore,
 } from 'agent-orchestrator';
 import {
   AGENTS_FOLDER,
@@ -513,7 +513,7 @@ export const agents = new Hono<ApiEnv>()
             422,
           );
         }
-        const tries = listRuns().filter((run) => tryOf(run, home)?.agent === name);
+        const tries = runStore.runs.list().filter((run) => tryOf(run, home)?.agent === name);
         const moving = (await judgedNow(e, home, tries)).find((run) => run.moving);
         if (moving)
           return c.json(

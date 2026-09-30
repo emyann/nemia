@@ -365,31 +365,24 @@ const GUARDED = [
 const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
 
 /** The files of `src` that still import a guarded function directly, until the card that moves them onto `runStore`. */
-const DIRECT = [
-  'src/branches/branches.store.ts',
-  'src/cap/cap.verb.ts',
-  'src/cli/asks.ts',
-  'src/cli/decide/decide.ts',
-  'src/cli/runs.ts',
-  'src/decide/decide.verb.ts',
-  'src/ending/ending.verb.ts',
-  'src/inbox/inbox.store.ts',
-  'src/inbox/inbox.verb.ts',
-  'src/list/list.verb.ts',
-  'src/runner.ts',
-  'src/start/start.verb.ts',
-  'src/views/views.verb.ts',
-];
+const DIRECT = ['src/inbox/inbox.store.ts', 'src/inbox/inbox.verb.ts'];
 
 /** `record.store.ts`, and `runner.ts`, which re-exports some of its functions. */
 const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
 
+/** The module a store import names, as a refusal says it: `record.store.ts` or `runner.ts`. */
+const moduleOf = (spec: string): string => (/(?:^|\/)runner(?:\.ts)?$/.test(spec) ? 'runner.ts' : 'record.store.ts');
+
 /**
- * The guarded functions a source text imports or re-exports from `record.store.ts` or through `runner.ts`, by name across line breaks;
- * `*` for a namespace or a dynamic import of either, which reaches every one.
+ * The guarded functions a source text imports or re-exports from `record.store.ts` or through `runner.ts`, by name across line breaks,
+ * each by the module it came from; `*` for a namespace or a dynamic import of either, which reaches every one.
  */
-function directImports(text: string): string[] {
-  const found = new Set<string>();
+function importsFrom(text: string): Map<string, string[]> {
+  const found = new Map<string, Set<string>>();
+  const add = (spec: string, name: string): void => {
+    const from = moduleOf(spec);
+    found.set(from, (found.get(from) ?? new Set()).add(name));
+  };
   for (const m of text.matchAll(/\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)) {
     if (!STORE_MODULE.test(m[2])) continue;
     for (const part of m[1].split(',')) {
@@ -397,22 +390,28 @@ function directImports(text: string): string[] {
         .trim()
         .replace(/^type\s+/, '')
         .split(/\s+as\s+/)[0];
-      if (GUARDED.includes(name)) found.add(name);
+      if (GUARDED.includes(name)) add(m[2], name);
     }
   }
   for (const m of text.matchAll(/\bimport\s*\*\s*as\s+\w+\s+from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g))
-    if (STORE_MODULE.test(m[1] ?? m[2])) found.add('*');
-  return [...found].sort();
+    if (STORE_MODULE.test(m[1] ?? m[2])) add(m[1] ?? m[2], '*');
+  return new Map([...found].sort(([a], [b]) => a.localeCompare(b)).map(([from, names]) => [from, [...names].sort()]));
 }
 
-/** What each file imports directly, among `sources`, and a line for each file not on `direct` and each entry that imports nothing. */
+/** The guarded functions a source text imports, whichever module they came from (`importsFrom`). */
+const directImports = (text: string): string[] => [...new Set([...importsFrom(text).values()].flat())].sort();
+
+/**
+ * What each file imports directly, among `sources`, and a line for each file not on `direct`, naming the module each import came from,
+ * and each entry that imports nothing.
+ */
 function refusals(sources: Record<string, string>, direct: readonly string[]): string[] {
   const out: string[] = [];
   for (const [file, text] of Object.entries(sources)) {
-    const names = directImports(text);
-    if (names.length && !direct.includes(file))
+    if (direct.includes(file)) continue;
+    for (const [from, names] of importsFrom(text))
       out.push(
-        `${file} imports ${names.join(', ')} from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ` +
+        `${file} imports ${names.join(', ')} from ${from}: read and write through runStore (src/record/files.store.ts), adding ` +
           'the method to RunStore (src/record/record.ts)',
       );
   }
@@ -450,10 +449,19 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
   assert.deepEqual(directImports("import { readRun } from '../other/other.store.ts';\nimport { stepsOf } from './record.store.ts';\n"), []);
 });
 
-test('a run function imported through runner.ts is refused as one imported from record.store.ts', () => {
+test('a run function imported through runner.ts is refused, naming runner.ts as the module it came from', () => {
   const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
   assert.deepEqual(refusals(sources, []), [
-    'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
+    'src/new/new.verb.ts imports readRun from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
+      'the method to RunStore (src/record/record.ts)',
+  ]);
+  const both = {
+    'src/new/new.verb.ts': "import { listRuns } from '../runner.ts';\nimport { readAsks } from '../record/record.store.ts';\n",
+  };
+  assert.deepEqual(refusals(both, []), [
+    'src/new/new.verb.ts imports readAsks from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
+      'the method to RunStore (src/record/record.ts)',
+    'src/new/new.verb.ts imports listRuns from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
   ]);
   assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);

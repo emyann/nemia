@@ -30,10 +30,10 @@ import {
   holdAdvice,
   holdWord,
   list,
-  readRun,
   retry,
   round,
   unhold,
+  runStore,
 } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
@@ -286,7 +286,7 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
   const e = engine();
   for (const id of HELD) {
     const api = runs.get(id)!;
-    const run = readRun(id);
+    const run = runStore.runs.read(id);
     const cli = await list(e, run);
     assert.deepEqual(api.heldUntil, run.hold!.until, id);
     assert.ok(api.holding, id);
@@ -442,7 +442,7 @@ test("REFUSED at shipped defaults: every verb the board sends for a held run —
         : route.endsWith('round')
           ? 'a round'
           : 'an acceptance';
-    assert.equal(error, heldRefusal(readRun(id), what), route);
+    assert.equal(error, heldRefusal(runStore.runs.read(id), what), route);
     assert.deepEqual(asked(id), [], `nothing written: ${route}`);
   }
 });
@@ -509,7 +509,7 @@ test('a held run called off reads as called off: no hold, nothing waiting on you
   const page = await detail(CANCELLED);
   assert.deepEqual([page.heldUntil, page.holding], [[], null]);
   assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
-  assert.equal((await list(engine(), readRun(CANCELLED))).holding, undefined);
+  assert.equal((await list(engine(), runStore.runs.read(CANCELLED))).holding, undefined);
 });
 
 test('a run waiting on runs and held as well is both, as `wf decide` says both: its decision carries the wait and the hold', async () => {
@@ -666,7 +666,7 @@ signedOff(`${SAID}-plan`, DONE);
 test("a hold's why and who put it are in `holding.word` on the list and the detail, and in the note of the gate it holds back — the package's words, never the api's — and a lift answers them", async () => {
   holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
   const words = 'held until p-live ships (why: merge conflicts in five files; by operator)';
-  const run = readRun(SAID);
+  const run = runStore.runs.read(SAID);
   const cli = await list(engine(), run);
   const api = (await listed()).get(SAID)!;
   assert.equal(api.holding?.word, words);

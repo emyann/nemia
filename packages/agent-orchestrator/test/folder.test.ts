@@ -80,8 +80,8 @@ process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT_ASKED, 'utf8').trim().split('\n') : []);
 
 process.env.WF_ROOT = ROOT;
-const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, readRun, retry, start, startQueued } =
-  await import('../src/runner.ts');
+const { addToInbox, advance, decide, forget, list, queueInInbox, queueLine, retry, start, startQueued } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { forgetLine, sentBack, stepTaskId } = await import('../src/run.ts');
 const { main } = await import('../src/cli/main.ts');
 

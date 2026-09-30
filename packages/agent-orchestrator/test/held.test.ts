@@ -33,7 +33,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { advance, approve, cancel, decide, forget, list, readAsks, readRun, retry, start } = await import('../src/runner.ts');
+const { advance, approve, cancel, decide, forget, list, retry, start } = await import('../src/runner.ts');
+const { readAsks, readRun } = await import('../src/record/record.store.ts');
 const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
 

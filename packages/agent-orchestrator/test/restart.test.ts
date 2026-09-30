@@ -32,7 +32,8 @@ const ROOT = scratch('wf-restart-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { engine, readRun, start, tick } = await import('../src/runner.ts');
+const { engine, start, tick } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
 
 /** The engine's journals, one file a task, where `engine()` keeps them (`$WF_ROOT/engine`); `scratch` reaps what is left after the file. */

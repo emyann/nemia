@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, approve, askFile, engine, list, readRun, retry } from 'agent-orchestrator';
+import { approvalFile, approve, askFile, engine, list, retry, runStore } from 'agent-orchestrator';
 import { approvalWordsRefusal, onYouWords } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
@@ -160,7 +160,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   assert.deepEqual(run.waitingOnYou, ['plan']);
   assert.deepEqual(run.onYou, ['approve plan']);
 
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   assert.deepEqual(run.onYou, onYouWords(words), "as `wf ls` has it: the words after `→ waiting on you:` are the package's");
   const listed = await summary();
   assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
@@ -314,7 +314,7 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
   assert.equal(plan.approve, null);
   assert.deepEqual([run.waitingOnYou, run.onYou], [[], []]);
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   assert.equal(
     plan.status,
     words.steps.find((s) => s.name === 'plan')?.status,

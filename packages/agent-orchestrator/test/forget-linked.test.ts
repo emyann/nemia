@@ -16,7 +16,8 @@ const ROOT = path.join(scratch('wf-link-'), 'store');
 fs.mkdirSync(path.join(REAL, 'store'));
 fs.symlinkSync(path.join(REAL, 'store'), ROOT);
 process.env.WF_ROOT = ROOT;
-const { advance, forget, readRun, start } = await import('../src/runner.ts');
+const { advance, forget, start } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

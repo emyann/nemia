@@ -8,7 +8,8 @@ import { heldRuns, slotNeed, type RunSlot } from './cap.ts';
 import type { Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
-import { listRuns, readAsks, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { lastCeilings } from '../daemon/daemon.store.ts';
 import { maxRuns } from '../config/config.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentsOf, spendReader, taskPhases } from '../views/views.verb.ts';
@@ -24,7 +25,7 @@ const UNJUDGED = { inFlight: true, wants: false } as const;
  * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
  * any pass has written it, the caller's own (`WF_MAX_RUNS`, `maxRuns`, refused by name when it is not a count).
  */
-export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Promise<Map<string, RunSlot>> {
+export async function runSlots(e: Engine, runs: readonly Run[] = runStore.runs.list()): Promise<Map<string, RunSlot>> {
   const cap = lastCeilings()?.runs ?? maxRuns();
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map();
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
@@ -38,7 +39,7 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
     let need: { inFlight: boolean; wants: boolean };
     try {
       const { views, phaseOf } = await taskPhases(e, run);
-      const { asks, rounds } = readAsks(run.id);
+      const { asks, rounds } = runStore.asks.read(run.id);
       const a = assess(
         steps,
         run,

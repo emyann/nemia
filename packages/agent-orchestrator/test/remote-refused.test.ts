@@ -17,7 +17,7 @@ delete process.env.WF_MAX_RUNS;
 const BIN = scratch('wf-remote-refused-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const { readRun } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const FILE = path.join(ROOT, 'a2a-agents.json');

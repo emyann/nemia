@@ -1,9 +1,11 @@
 /**
- * `wf cancel`: call a run off (`cancel`). It stops what the run has in flight, then writes the person's own file, never the run's record,
- * which the tick owns. A controller, reaching the runtime through the client (`runtime-client.ts`); it adopts what a pass filed and never
- * wrote down as the tick does (`tick/advance.verb.ts`).
+ * `wf cancel`: call a run off. It stops what the run has in flight, then writes the person's own file, never the run's record, which the
+ * tick owns. A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a
+ * service (`cancelRun`, over `EngineService`), and `cancel`, its plain face in a Promise, over the engine it is handed. It adopts what a
+ * pass filed and never wrote down as the tick does (`tick/advance.verb.ts`).
  */
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
 import { markCancelled, readAsks, readRun, stepsOf } from '../record/record.store.ts';
@@ -26,25 +28,36 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  * refuses is the next pass's to make again.
  *
  * Never writes the run's json: a tick may be halfway through a pass over the same run. The cancellation goes in a file only this verb
- * writes (`markCancelled`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was taken.
+ * writes (`markCancelled`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was taken. Fails
+ * with a refusal a read threw; dies of anything else, a stop the engine rejects included (`tried`, `awaited`).
  */
-export async function cancel(e: Engine, id: string): Promise<Cancelled> {
-  const run = readRun(id);
-  const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run);
-  const { asks, rounds } = readAsks(id);
+export const cancelRun = Effect.fn('cancel')(function* (id: string) {
+  const e = yield* EngineService;
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { asks, rounds } = yield* tried(() => readAsks(id));
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
-  await adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf);
-  await adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, spendOf);
-  await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendOf);
+  yield* awaited(() => adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf));
+  yield* awaited(() =>
+    adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, spendOf),
+  );
+  yield* awaited(() => adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendOf));
 
   const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds, spendOf);
-  if (plan.kind === 'finished') return { run, plan };
+  if (plan.kind === 'finished') return { run, plan } satisfies Cancelled;
 
-  for (const { taskId } of plan.stop) await e.stop(taskId);
-  await closeWaitingTasks(e, run, views);
-  if (plan.kind === 'already-cancelled') return { run, plan };
+  for (const { taskId } of plan.stop) yield* awaited(() => e.stop(taskId));
+  yield* awaited(() => closeWaitingTasks(e, run, views));
+  if (plan.kind === 'already-cancelled') return { run, plan } satisfies Cancelled;
 
-  return { run: { ...run, cancelledAt: markCancelled(id) }, plan };
-}
+  return { run: { ...run, cancelledAt: yield* tried(() => markCancelled(id)) }, plan } satisfies Cancelled;
+});
+
+/**
+ * `wf cancel` (`cancelRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
+ */
+export const cancel = (e: Engine, id: string): Promise<Cancelled> =>
+  Effect.runPromise(cancelRun(id).pipe(Effect.provide(EngineService.layer(e))));

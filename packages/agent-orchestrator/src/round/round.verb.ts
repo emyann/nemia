@@ -1,10 +1,12 @@
 /**
- * `wf round` and `wf accept`: go round a loop once more (`round`), and end a loop as it stands (`accept`). Each refuses before anything is
- * written, and writes a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the
- * client (`runtime-client.ts`).
+ * `wf round` and `wf accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and writes a
+ * person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
+ * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), and
+ * `round` and `accept`, their plain faces in a Promise, over the engine they are handed.
  */
 import fs from 'node:fs';
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
 import { acceptAsk, roundAsk } from './round.ts';
@@ -34,17 +36,19 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one loop.
  * `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps it.
  * An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
- * name that does not read as one is named (`strayAsk`).
+ * name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a read threw; dies of anything else
+ * (`tried`, `awaited`).
  */
-export async function round(e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> {
-  const run = readRun(id);
-  const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run);
+export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
+  const e = yield* EngineService;
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const answer = (asks: readonly RoundAsk[]) =>
     roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
 
-  const first = answer(readAsks(id).rounds);
-  if ('refusal' in first) throw new Conflict({ message: first.refusal });
+  const first = answer((yield* tried(() => readAsks(id))).rounds);
+  if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const ask: RoundAsk = {
     step: first.step,
     round: first.round,
@@ -52,22 +56,27 @@ export async function round(e: Engine, id: string, stepName?: string, budget?: n
     at: new Date().toISOString(),
   };
   const file = roundAskFile(id, ask.step, ask.round);
-  if (!writeAsk(file, ask)) {
-    const now = answer(readAsks(id).rounds);
-    throw new Conflict({
-      message:
-        'refusal' in now
-          ? now.refusal
-          : (strayAsk(
-              file,
-              roundAskIn(file, ask.step, ask.round),
-              `round ${ask.round} of ${ask.step}'s loop`,
-              `wf round ${id} ${ask.step}`,
-            ) ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`),
-    });
+  if (!(yield* tried(() => writeAsk(file, ask)))) {
+    const now = answer((yield* tried(() => readAsks(id))).rounds);
+    const why =
+      'refusal' in now
+        ? now.refusal
+        : yield* tried(() =>
+            strayAsk(file, roundAskIn(file, ask.step, ask.round), `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`),
+          );
+    return yield* Effect.fail(
+      new Conflict({ message: why ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.` }),
+    );
   }
-  return { run, ask, file };
-}
+  return { run, ask, file } satisfies RoundAsked;
+});
+
+/**
+ * `wf round` (`roundRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
+ */
+export const round = (e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> =>
+  Effect.runPromise(roundRun(id, stepName, budget).pipe(Effect.provide(EngineService.layer(e))));
 
 export type Accepted = { run: Run; acceptance: Acceptance; file: string };
 
@@ -82,34 +91,49 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
  * have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
- * Going round once more is not this verb's: `wf round <run> [<step>]` — and the two are offered side by side (`roundLines`).
+ * Going round once more is not this verb's: `wf round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with a
+ * refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
  */
-export async function accept(e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> {
-  if (!fs.existsSync(runFile(id)))
-    throw new Missing({
-      message: `no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`,
-    });
-  const run = readRun(id);
-  const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run);
+export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
+  const e = yield* EngineService;
+  if (!(yield* tried(() => fs.existsSync(runFile(id)))))
+    return yield* Effect.fail(
+      new Missing({
+        message: `no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`,
+      }),
+    );
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
     acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
 
-  const first = answer(run, readAsks(id).rounds);
-  if ('refusal' in first) throw new Conflict({ message: first.refusal });
+  const first = answer(run, (yield* tried(() => readAsks(id))).rounds);
+  if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
   const file = acceptFile(id, acceptance.step, acceptance.try);
-  if (!writeAsk(file, acceptance)) {
-    const now = answer(readRun(id), readAsks(id).rounds);
-    const read = acceptanceIn(file, acceptance.step, acceptance.try);
-    throw new Conflict({
-      message:
-        'refusal' in now
-          ? now.refusal
-          : typeof read === 'string' && lstatOf(file)
-            ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${read}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
-            : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`,
-    });
+  if (!(yield* tried(() => writeAsk(file, acceptance)))) {
+    const why = yield* tried(() => acceptedAlready(file, acceptance, answer(readRun(id), readAsks(id).rounds), id));
+    return yield* Effect.fail(new Conflict({ message: why }));
   }
-  return { run, acceptance, file };
+  return { run, acceptance, file } satisfies Accepted;
+});
+
+/**
+ * `wf accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
+ */
+export const accept = (e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> =>
+  Effect.runPromise(acceptRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * Why `acceptance` could not be written at `file` of the run `id`, read again: the refusal the look would now give (`now`), else the
+ * file there that is not an acceptance, named with how to clear it, else the acceptance someone else wrote first.
+ */
+function acceptedAlready(file: string, acceptance: Acceptance, now: ReturnType<typeof acceptAsk>, id: string): string {
+  if ('refusal' in now) return now.refusal;
+  const read = acceptanceIn(file, acceptance.step, acceptance.try);
+  return typeof read === 'string' && lstatOf(file)
+    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${read}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
+    : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`;
 }

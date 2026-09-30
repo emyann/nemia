@@ -27,22 +27,8 @@ import {
   type GitWorktree,
   type Forgot,
 } from './forget.ts';
-import {
-  HOME,
-  askFile,
-  asksDir,
-  cancelFile,
-  holdFile,
-  listRuns,
-  lstatOf,
-  pruneFile,
-  readAsks,
-  readRun,
-  roundAskFile,
-  runFile,
-  runsDir,
-  stepsOf,
-} from '../record/record.store.ts';
+import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { gitSays, handOff } from '../workspace/worktree.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
@@ -94,7 +80,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const refusedId = idRefusal(id);
   if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
   const dir = path.join(HOME, 'worktrees', id);
-  if (!(yield* tried(() => fs.existsSync(runFile(id))))) return yield* tried(() => forgetMissing(id, dir));
+  if (!(yield* tried(() => runStore.runs.exists(id)))) return yield* tried(() => forgetMissing(id, dir));
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
@@ -150,10 +136,10 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
  * every check, try, round and step a pass filed and never wrote down, adopted onto the record in memory.
  */
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const { steps, unfrozen } = frozenSteps(run);
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
-  const { asks, rounds } = yield* tried(() => readAsks(id));
+  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
@@ -176,8 +162,8 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
  */
 function refusalOf(id: string, f: Forgetting): string | null {
   const { run, steps } = f;
-  const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
-  const others = listRuns().filter((o) => o.id !== id);
+  const askAt = (a: AskName) => runStore.asks.where(id, a);
+  const others = runStore.runs.list().filter((o) => o.id !== id);
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
   const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
   return forgetRefusal(
@@ -300,20 +286,19 @@ function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
 }
 
 /**
- * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: its record first, then its
- * cancellation, its pruning, its asks, its own directory (inputs, artifacts), its check logs (`checkLogsOf`, by the steps `names`, or
- * without them any under its id that is no other stored run's), and `worktrees/<id>` once it is empty. Nothing else, and never the
- * engine's.
+ * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: what the run store keeps under it
+ * first (`runStore.runs.forget`: its record, cancellation, pruning, hold, asks and own directory of inputs and artifacts), its check
+ * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
+ * it is empty. Nothing else, and never the engine's.
  */
 function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
-  const removed: string[] = [];
+  const removed = runStore.runs.forget(id);
   const remove = (at: string) => {
     const st = lstatOf(at);
     if (!st) return;
     fs.rmSync(at, { recursive: true, force: true });
     removed.push(`${path.relative(HOME, at)}${st.isDirectory() ? '/' : ''}`);
   };
-  for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), asksDir(id), path.join(runsDir(), id)]) remove(at);
   const checks = path.join(HOME, 'checks');
   let logs: string[] = [];
   try {

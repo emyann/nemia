@@ -2,25 +2,44 @@
  * The run store's interface (`RunStore`, `src/record/record.ts`), held to what its files implementation (`filesStore`) answers: a record
  * made, read with a person's files composed onto it, written back with none of them and no byte moved, refused once it is gone; whether a
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
- * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`).
+ * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
+ * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
+ * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file.
  *
  * And the refusal that keeps the interface the one way in: a file of `src` that imports a run's or a person's file functions from
- * `record.store.ts` directly is refused, unless `DIRECT` still names it, and an entry of `DIRECT` that imports none of them is refused too,
- * so the list only shrinks. `WF_ROOT` is set before the store is imported, since it is read as the module loads.
+ * `record.store.ts`, or through `runner.ts`, is refused, unless `DIRECT` still names it, and an entry of `DIRECT` that imports none of them
+ * is refused too, so the list only shrinks. `WF_ROOT` is set before the store is imported, since it is read as the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../src/run.ts';
+import type { PersonAsk } from '../src/record/record.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
 const { mayFileOf } = await import('../src/tick/file.verb.ts');
-const { acceptFile, approvalFile, askFile, asksDir, holdFile, markCancelled, pruneFile, runFile, runsDir, writeAsk, writeHold } =
-  await import('../src/record/record.store.ts');
+const {
+  acceptFile,
+  acceptanceIn,
+  approvalFile,
+  approvalIn,
+  askFile,
+  askIn,
+  asksDir,
+  holdFile,
+  markCancelled,
+  pruneFile,
+  roundAskFile,
+  roundAskIn,
+  runFile,
+  runsDir,
+  writeAsk,
+  writeHold,
+} = await import('../src/record/record.store.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
@@ -196,6 +215,132 @@ test('a pass files nothing for a run whose record is gone', () => {
   assert.equal(mayFileOf(run)(), false);
 });
 
+/** One ask of each kind a person writes, with the path the tick reads it at and its reader's words for a file there that is not one. */
+const asksOfEachKind = (id: string): Array<{ asked: PersonAsk; file: string; stray: (file: string) => unknown }> => [
+  {
+    asked: { kind: 'retry', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
+    file: askFile(id, 'implement', 2),
+    stray: (file) => askIn(file, 'implement', 2),
+  },
+  {
+    asked: { kind: 'round', ask: { step: 'review', round: 3, at } },
+    file: roundAskFile(id, 'review', 3),
+    stray: (file) => roundAskIn(file, 'review', 3),
+  },
+  {
+    asked: { kind: 'approve', ask: { step: 'implement', try: 1, at, message: 'yes' } },
+    file: approvalFile(id, 'implement', 1),
+    stray: (file) => approvalIn(file, 'implement', 1),
+  },
+  {
+    asked: { kind: 'accept', ask: { step: 'review', try: 1, at, message: 'good enough' } },
+    file: acceptFile(id, 'review', 1),
+    stray: (file) => acceptanceIn(file, 'review', 1),
+  },
+];
+
+test('an ask of each kind is written at the name the tick reads it by, holding the ask alone, and answered where it is', () => {
+  const run = made('r-write-asks');
+  for (const { asked, file } of asksOfEachKind(run.id)) {
+    const n = asked.kind === 'round' ? asked.ask.round : asked.ask.try;
+    assert.equal(filesStore.asks.where(run.id, { kind: asked.kind, step: asked.ask.step, n }), file);
+    assert.deepEqual(filesStore.asks.write(run.id, asked), { written: true, where: file });
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), asked.ask, `${asked.kind} is written as the ask alone`);
+  }
+  const read = filesStore.asks.read(run.id);
+  assert.equal(read.asks.length, 1);
+  assert.equal(read.rounds.length, 1);
+  assert.deepEqual(read.notes, []);
+});
+
+test('an ask written over one already there is refused as no stray, and the first stays byte for byte', () => {
+  const run = made('r-write-twice');
+  for (const { asked, file } of asksOfEachKind(run.id)) {
+    filesStore.asks.write(run.id, asked);
+    const first = fs.readFileSync(file, 'utf8');
+    const again = { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonAsk;
+    assert.deepEqual(filesStore.asks.write(run.id, again), { written: false, where: file, stray: null });
+    assert.equal(fs.readFileSync(file, 'utf8'), first);
+  }
+});
+
+test("an ask written where a file that is not one stands is refused with the tick's words for it", () => {
+  const run = made('r-write-stray');
+  for (const { asked, file, stray } of asksOfEachKind(run.id)) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'not json');
+    const words = stray(file);
+    assert.equal(typeof words, 'string');
+    assert.deepEqual(filesStore.asks.write(run.id, asked), { written: false, where: file, stray: words });
+  }
+});
+
+test('a hold is put once: a second put answers null and the first stands', () => {
+  const run = made('r-put');
+  const hold = filesStore.holds.put(run.id, ['other-run'], { why: 'wait for it', by: 'ann' });
+  assert.ok(hold);
+  assert.deepEqual(hold.until, ['other-run']);
+  assert.equal(filesStore.holds.put(run.id, ['third-run'], {}), null);
+  assert.deepEqual(filesStore.runs.read(run.id).hold, hold);
+});
+
+test('a hold file stands while it is there, read as a hold or not, and not once it is gone', () => {
+  const run = made('r-stands');
+  assert.equal(filesStore.holds.stands(run.id), false);
+  fs.writeFileSync(holdFile(run.id), 'not json');
+  assert.equal(filesStore.holds.stands(run.id), true);
+  fs.rmSync(holdFile(run.id));
+  assert.equal(filesStore.holds.stands(run.id), false);
+});
+
+test('a run cancelled twice keeps the first time, and is read with it', () => {
+  const run = made('r-cancel');
+  const first = filesStore.runs.cancel(run.id);
+  assert.equal(filesStore.runs.cancel(run.id), first);
+  assert.equal(filesStore.runs.read(run.id).cancelledAt, first);
+});
+
+test('a prune marker put is read back and calls the run off, and taken back it does neither', () => {
+  const run = made('r-prune');
+  const marker = { at, worktrees: [{ path: '/w/implement', bytes: 12 }], artifacts: { at, bytes: 3 } };
+  filesStore.runs.prune(run.id, marker);
+  assert.deepEqual(filesStore.runs.read(run.id).pruned, marker);
+  assert.equal(filesStore.runs.calledOff(run.id), true);
+  filesStore.runs.prune(run.id, undefined);
+  assert.equal(filesStore.runs.read(run.id).pruned, undefined);
+  assert.equal(filesStore.runs.calledOff(run.id), false);
+});
+
+test("a run forgotten loses its record and every person's file and its directory, in order, and another run keeps its own", () => {
+  const run = made('r-forget');
+  const other = made('r-forget-other');
+  for (const id of [run.id, other.id]) {
+    filesStore.runs.cancel(id);
+    pruned(id);
+    filesStore.holds.put(id, ['x'], {});
+    filesStore.asks.write(id, { kind: 'approve', ask: { step: 'implement', try: 1, at } });
+    fs.mkdirSync(path.join(runsDir(), id, 'artifacts'), { recursive: true });
+    fs.writeFileSync(path.join(runsDir(), id, 'artifacts', 'x'), 'x');
+  }
+  assert.deepEqual(filesStore.runs.forget(run.id), [
+    `runs/${run.id}.json`,
+    `runs/${run.id}.cancelled`,
+    `runs/${run.id}.pruned`,
+    `runs/${run.id}.hold`,
+    `runs/${run.id}.asks/`,
+    `runs/${run.id}/`,
+  ]);
+  assert.deepEqual(
+    fs.readdirSync(runsDir()).filter((name) => name === run.id || name.startsWith(`${run.id}.`)),
+    [],
+  );
+  assert.equal(filesStore.runs.exists(other.id), true);
+  const kept = filesStore.runs.read(other.id);
+  assert.ok(kept.cancelledAt && kept.pruned && kept.hold && kept.approvals);
+  assert.equal(fs.existsSync(path.join(runsDir(), other.id, 'artifacts', 'x')), true);
+  assert.deepEqual(filesStore.runs.forget(run.id), []);
+});
+
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
 const GUARDED = [
   'readRun',
@@ -222,30 +367,26 @@ const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
 /** The files of `src` that still import a guarded function directly, until the card that moves them onto `runStore`. */
 const DIRECT = [
   'src/branches/branches.store.ts',
-  'src/cancel/cancel.verb.ts',
   'src/cap/cap.verb.ts',
+  'src/cli/asks.ts',
+  'src/cli/decide/decide.ts',
+  'src/cli/runs.ts',
   'src/decide/decide.verb.ts',
   'src/ending/ending.verb.ts',
-  'src/forget/forget.verb.ts',
-  'src/gate/gate.verb.ts',
   'src/inbox/inbox.store.ts',
   'src/inbox/inbox.verb.ts',
   'src/list/list.verb.ts',
-  'src/prune/prune.verb.ts',
-  'src/retry/retry.verb.ts',
-  'src/round/round.verb.ts',
   'src/runner.ts',
-  'src/say/say.verb.ts',
   'src/start/start.verb.ts',
   'src/views/views.verb.ts',
-  'src/wait/wait.verb.ts',
 ];
 
-const STORE_MODULE = /(?:^|\/)record\.store(?:\.ts)?$/;
+/** `record.store.ts`, and `runner.ts`, which re-exports some of its functions. */
+const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
 
 /**
- * The guarded functions a source text imports or re-exports from `record.store.ts`, by name across line breaks; `*` for a namespace or a
- * dynamic import of it, which reaches every one.
+ * The guarded functions a source text imports or re-exports from `record.store.ts` or through `runner.ts`, by name across line breaks;
+ * `*` for a namespace or a dynamic import of either, which reaches every one.
  */
 function directImports(text: string): string[] {
   const found = new Set<string>();
@@ -307,6 +448,15 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
   assert.deepEqual(directImports("import * as store from '../record/record.store.ts';\n"), ['*']);
   assert.deepEqual(directImports("const store = await import('../record/record.store.ts');\n"), ['*']);
   assert.deepEqual(directImports("import { readRun } from '../other/other.store.ts';\nimport { stepsOf } from './record.store.ts';\n"), []);
+});
+
+test('a run function imported through runner.ts is refused as one imported from record.store.ts', () => {
+  const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
+  assert.deepEqual(refusals(sources, []), [
+    'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
+      'the method to RunStore (src/record/record.ts)',
+  ]);
+  assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
 });
 
 test('an entry on the list that imports none of them is refused, naming the entry to delete', () => {

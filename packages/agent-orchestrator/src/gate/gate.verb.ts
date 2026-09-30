@@ -3,13 +3,13 @@
  * A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`approveRun`, over `EngineService`), and `approve`, its plain face in a Promise, over the engine it is handed.
  */
-import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
-import { approvalFile, approvalIn, lstatOf, readAsks, readRun, runFile, stepsOf, writeAsk } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -34,11 +34,11 @@ export type Approved = { run: Run; approval: Approval; file: string };
  */
 export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
   const e = yield* EngineService;
-  if (!(yield* tried(() => fs.existsSync(runFile(id)))))
+  if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({ message: `no such run: ${id}. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.` }),
     );
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const standings = yield* tried(() => (steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? standingsOf(run) : []));
@@ -52,7 +52,7 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
       closeoutReader(views, now),
       closeoutAsked(views),
       exitVerdicts(views, now),
-      readAsks(id).asks,
+      runStore.asks.read(id).asks,
       spendReader(views),
       standings,
     );
@@ -64,14 +64,15 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
   };
-  const file = approvalFile(id, stepName, approval.try);
-  if (!(yield* tried(() => writeAsk(file, approval)))) {
-    const read = yield* tried(() => approvalIn(file, stepName, approval.try));
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'approve', ask: approval }));
+  const file = written.where;
+  if (!written.written) {
+    const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(readRun(id)) ??
-        (typeof read === 'string' && lstatOf(file)
-          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${read}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
+        refusal(runStore.runs.read(id)) ??
+        (stray !== null
+          ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${stray}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
           : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: wf ls ${id}.`),
     );
     return yield* Effect.fail(new Conflict({ message: why }));

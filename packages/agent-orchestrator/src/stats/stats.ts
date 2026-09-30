@@ -297,7 +297,7 @@ export function headlineOf(f: Facts): Headline {
   };
 }
 
-/** Each step's totals, per agent (`StepRow`), in the order the steps first ended. */
+/** Each step's totals, per agent (`StepRow`), in the order of the tries: run by run, and a run's steps in its workflow's order. */
 function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
   const rows = new Map<string, TryFact[]>();
   for (const t of tries) {
@@ -367,8 +367,8 @@ const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a =
 
 /**
  * The stats of a store's facts for a query (`Stats`), as of `now`. The facts are filtered by each key the query gives a value, then kept
- * between its days: `from` defaults to the first fact's day, `to` to `now`'s. With `by`, one group per value of that key, in the order the
- * values first come; a step with no agent, and a run with no repository, are a group of their own (`key` null). The tiles are always the
+ * between its days: `from` defaults to the first fact's day, `to` to `now`'s. With `by`, one group per value of that key, sorted by key
+ * (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles are always the
  * last 14 days to `now`'s day and the 14 before.
  */
 export function statsOf(facts: Facts, query: StatsQuery, now: Date, unreadable: readonly string[] = []): Stats {

@@ -2246,22 +2246,27 @@ run 'wf tick' (or 'wf up') to start it
 
 ## Factories: a named grouping in the store — `wf factory`
 
-A factory names the repositories a body of work is on, and the agents it hires into workflows' steps, as a file of its own in
-the store. No record carries a factory yet: runs and inbox cards name none, so all of them are in the one default factory.
+A factory names the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps, as a
+file of its own in the store. No record carries a factory yet: runs and inbox cards name none, so all of them are in the one default factory.
 
 ```
 $ wf factory add pipao --repo ~/code/pipao
 pipao  /home/me/code/pipao
 filed: /home/me/.agent-workflows/factories/pipao.json
+$ wf factory attach pipao build
+pipao  attached build
+attached: /home/me/.agent-workflows/factories/pipao.json
 $ wf factory hire pipao ada --step build/implement
 pipao  build/implement ← ada
 hired: /home/me/.agent-workflows/factories/pipao.json
 $ wf factory
 default  every run and card that names no factory — read, never written
 pipao    /home/me/code/pipao
+         workflows: build
          build/implement ← ada
 $ wf start "add a flag" --workflows build --factory pipao
 $ wf factory fire pipao --step build/implement
+$ wf factory detach pipao build
 $ wf factory rm pipao
 ```
 
@@ -2277,12 +2282,35 @@ $ wf factory rm pipao
   already filed; and an rm of a name with no factory, naming those there are. A file that does not read as a factory is
   listed with why, and `wf factory rm` removes it.
 
+### Attaching: a factory offers only its workflows
+
+A workflow is a factory's process, attached by reference: **`wf factory attach <factory> <workflow>`** adds its folder's name
+to the factory's file, `"workflows": ["build", "intake"]`, kept sorted and named once — the same name a hire's
+`<workflow>/<step>` uses. Attaching one already there says `already attached` and writes nothing. Only the name is stored:
+a step that names its own agent is filled already, and whether the workflow exists is the start's to judge, so a workflow can
+be attached before it is committed. **`wf factory detach <factory> <workflow>`** takes it back. Both write the whole file
+through a hidden file renamed onto it, keeping every other key.
+
+- **A factory offers only the workflows attached to it, and none until one is**: a file with no `workflows` key has attached
+  none. `wf start --factory <name>` of a workflow it has not attached is refused (`Invalid`, `unattachedRefusal`), before
+  the folder is read and so before its steps are judged, saying what the factory offers and naming the `wf factory attach`
+  that adds it. The reference is the folder's name only: any folder of that name is the workflow.
+- **A hire into a workflow not attached is refused**, naming the attach; **a detach while the factory hires into that
+  workflow's steps is refused**, naming each `wf factory fire` (`Invalid`), so no hire outlives its workflow in the file. A
+  detach of a workflow not attached is `Missing`, naming those attached.
+- **Refused by name**, and nothing written: `attach` and `detach` on the default factory (`Conflict`) or on a name with no
+  factory (`Missing`); and a workflow's name that is empty, hidden, holds a slash, or is `agents` or `skills`
+  (`workflowNameRefusal`).
+- **The default factory offers every workflow found**, as it always has: it reads no file, and `attach` and `detach` refuse it.
+- A detach reaches no run already started: its steps were frozen at `wf start`.
+
 ### Hiring: a factory's agents fill a workflow's steps
 
 A step need not name an agent: a factory hires one into it. Any agent fills any step, found where the step's own `agent:` would
 be (the workflow's `agents/`, the repository's, the store's).
 
-- **`wf factory hire <factory> <agent> --step <workflow>/<step>`** records one agent a step, in the factory's file:
+- **`wf factory hire <factory> <agent> --step <workflow>/<step>`** records one agent a step of a workflow attached to it, in
+  the factory's file:
   `"hires": { "build/implement": "ada" }`, the workflow by its folder's name and the step by its file's. Hiring into a step
   again replaces its hire, and says which it replaced; **`wf factory fire <factory> --step <workflow>/<step>`** takes it back.
   Both write the whole file through a hidden file renamed onto it, keeping `repos` and any other key. The hire checks the shape
@@ -2793,7 +2821,7 @@ holding a concurrency slot forever.
 | `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
-| `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
+| `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and what stopped a finished run (`stoppedOnWord`) |
 | `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `wf round` and `wf accept` ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
@@ -2837,7 +2865,7 @@ holding a concurrency slot forever.
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox on disk (`inboxDir`): read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files |
-| `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), hired into and fired from, the file rewritten whole (`hireAgent`, `fireAgent`), removed (`removeFactory`) |
+| `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflow`, `detachWorkflow`, `hireAgent`, `fireAgent`), removed (`removeFactory`) |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `test/engine-board.ts` gives one), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
 | `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`, and `taskPhases`, `checkReports`, `refusalOf`, `parentOf`, `parentsOf` and `readFilings`, their plain faces; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/views/views-words.ts` | a step's phase off its view (`phaseOfView`), and the words `wf ls` and `wf decide` say of how its session ended (`endWords`, `wordOfView`) — pure |
@@ -2861,7 +2889,7 @@ holding a concurrency slot forever.
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the verb in `VERBS` and runs it, or prints the help; the daemon's verbs, `wf tick`, `wf up`, `wf feed` and `wf watch`; and `runMain`, which runs `wf up` and `wf watch` as Effects |
 | `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb, its flags, read off the command line, and its help, by family: the help, a verb's shape (`Verb`) and the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents`; `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
-| `src/cli/factory/factory.ts` | `wf factory`: its help, the flags of `add`, `hire` and `fire`, and what `ls`, `add`, `hire`, `fire` and `rm` print (`factoryVerb`) |
+| `src/cli/factory/factory.ts` | `wf factory`: its help, the arguments of `add`, `attach`, `detach`, `hire` and `fire`, and what `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` print (`factoryVerb`) |
 | `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),
@@ -2884,7 +2912,7 @@ for the same reason, and so does the `wf` command.
 | `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/`, each given a copy of what its brief names in `work/<step>/given/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
-| `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "hires": {...} }`, `wf factory add`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
+| `factories/` | a factory each, `<name>.json` holding `{ "repos": [...], "workflows": [...], "hires": {...} }`, `wf factory add`, `attach`, `detach`, `hire` and `fire`'s to write and `wf factory rm`'s to remove; the default factory is no file |
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, and `stoppedAt` once it stopped (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, the tick's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `wf feed` reads and `wf watch` follows, and nothing decides on |

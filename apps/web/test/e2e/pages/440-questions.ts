@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -199,7 +199,7 @@ export default {
       );
       await expectCount(asked.locator('input, textarea, button'), 0, 'with nothing to answer it with: design is done');
       await settled(page);
-      await inspector.screenshot({ path: path.join(OUT, `questions-asked-${theme}.png`) });
+      await photograph(inspector, path.join(OUT, `questions-asked-${theme}.png`));
 
       const row = page.locator(`section[aria-label="Decide"] li[data-offer="answer"][data-questions][data-step="spec"]`);
       const form = row.getByRole('form', { name: 'Answer spec' });
@@ -234,7 +234,7 @@ export default {
       await whereField.locator('textarea[data-own]').fill(QUESTIONS.own);
       await expectVisible(form.locator('button[type="submit"]:enabled'), 'every question answered, Answer and continue is offered');
       await settled(page);
-      await row.screenshot({ path: path.join(OUT, `questions-form-${theme}.png`) });
+      await photograph(row, path.join(OUT, `questions-form-${theme}.png`));
 
       const [response] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/spec/retry`, {

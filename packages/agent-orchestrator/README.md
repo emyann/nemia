@@ -2206,13 +2206,15 @@ run 'wf tick' (or 'wf up') to start it
   its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`. A third key, `queued:`, marks a card to start on its
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
-  `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)).
+  `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
+  the factory the card is started in ([below](#factories-a-named-grouping-in-the-store--wf-factory)); a card that names none is
+  the default factory's, read as it is.
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
 - **`wf inbox add "<idea>"`, or `wf inbox add <file>`, files one.** Its name is the slug a run id makes of the idea's first
-  line, suffix included, so two ideas alike are two cards. `--workflow <name>` and `--repo <path>` write the keys, over a
-  file's own. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the body whole, as
+  line, suffix included, so two ideas alike are two cards. `--workflow <name>`, `--repo <path>` and `--factory <name>` write
+  the keys, over a file's own; a factory's name is checked for its shape, and the start judges the factory. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the body whole, as
   `wf start` takes a brief that is not a card. A repo, and a workflow given as a path, are written absolute: the flag's from
   where `wf inbox add` is typed, and a file's own `workflow:` from the file's folder, as a plan card's is read from its plan
   folder. Left relative, `../workflows/dev` in `~/code/myapp/plans/idea.md` would be read from the inbox at start, and name
@@ -2231,7 +2233,9 @@ run 'wf tick' (or 'wf up') to start it
   - the workflow is `--workflows`, else the card's `workflow:`, else refused, naming the repository's workflows. A card's
     `workflow:` is found from the inbox folder, as a plan card's is from its plan folder: a name is `<repo>/workflows/<name>`,
     and a relative path written into a card by hand is read from the inbox, so `../workflows/mine` is one of yours in the store;
-  - the repository is `--repo`, else the card's `repo:`, else `.`;
+  - the factory is `--factory`, else the card's `factory:`, else the default;
+  - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
+    `workflow:` is found in it;
   - `--after`, `--input` and `--no-worktree` are `wf start`'s, as for any brief.
 - **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
   prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
@@ -2240,13 +2244,15 @@ run 'wf tick' (or 'wf up') to start it
 - **Refused by name**, exit 2, with the fix, before anything is written:
   - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead: for a file
     `wf inbox add` is given, delete the line, file the idea, and give `--after` when starting the card;
-  - `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not an absolute path to a directory, a `queued:` that is
+  - `workflow:`, `repo:` or `factory:` set to nothing or twice, a `factory:` that is not a factory's name, a `repo:` that is not an absolute path to a directory, a `queued:` that is
     not an ISO time or is on a card with no `workflow:`, and an empty body; and a `queued:` in a file given to `wf inbox add`;
   - `wf inbox add` with no idea, or one with nothing in it;
   - a name that would leave the folder — a slash, `..` — or a hidden one, given to `wf inbox rm` or a start;
   - a start naming a card that is not there, with the cards that are: any path under the inbox, a file there that is not a
     card and one in a folder inside it included;
   - a start with no workflow from the card or the flag, and a card's workflow that does not load, behind the card;
+  - a start in a factory the store does not have, one that does not offer the workflow, or, for a git run, one the repository is
+    not one of, as `wf start --factory` refuses each;
   - an empty `--brief`, and `--brief` on anything but an inbox card.
 
 ## Factories: a named grouping in the store — `wf factory`
@@ -2328,7 +2334,7 @@ be (the workflow's `agents/`, the repository's, the store's).
   runs on no remote agent (`harness: a2a:<name>`) — every such step named with the `wf factory hire` that fills it
   (`unfilledRefusal`); a hire into a step whose file names its own agent, which fills it in every factory, naming both and the
   `wf factory fire` that takes the hire back; a hired agent that is not there, in the factory's words; a factory the store
-  does not have (`Missing`), or whose file does not read; and `--factory` on an inbox card, which names no factory yet.
+  does not have (`Missing`), or whose file does not read.
 - **In the default factory** — no `--factory`, or `--factory default` — nothing is read, and a step that names no agent runs
   as a plain session, as it always has. The default factory is never written, so it hires no one: `hire` and `fire` refuse it.
 
@@ -2340,6 +2346,8 @@ be (the workflow's `agents/`, the repository's, the store's).
 - **A factory with one repository gives the run its repository**: `wf start "add a flag" --workflows build --factory pipao`
   runs on pipao's repository from any directory, and resolves `--workflows build` there. `--repo` still names one.
 - **With several, the one named**, else the directory `wf start` is typed in, when it is one of them.
+- **An inbox card starts in its factory**: its `factory:`, or `--factory` over it, on the repository its `repo:` names, else the
+  factory's one repository, else the one it is started in (`repoFor`) — for a queued card, the one `wf up` runs in.
 - **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a git run on a repository that is not one of
   the factory's, naming them and the `--repo` that starts it in one. Paths are compared as `path.resolve` spells them, so a
   symlink to a repository is not that repository. A team that says `workspace: folder` works on no repository: it records its
@@ -2432,7 +2440,8 @@ up — every 4000ms, ^C to stop
   board that orders its cards by it would put a card queued at the top of the list. A queue is no edit of the idea.
 - **Each pass, after every run has been advanced, the tick starts the oldest queued card** while a run slot is free — always,
   with no cap. By `queued:`, then by name (`queueOrder`), through `startFromInbox`, the start any card has: its `workflow:`,
-  its `repo:` or else the repository `wf up` runs in, as `wf start` takes `.`. Its base is its base branch as it is at that
+  its `factory:`, its `repo:`, else its factory's one repository, else the repository `wf up` runs in, as `wf start` takes `.`
+  (`queueRepo`). Its base is its base branch as it is at that
   moment, and its brief is frozen then. One card a pass: its run has nothing filed, and the next pass counts it against the cap
   before another card is started. `--after` stays for cards that depend on one another.
 - **Started, the card leaves the inbox** as any start removes it, and `wf up` and `wf tick` log `started <card> as <runId>`. A
@@ -2441,8 +2450,8 @@ up — every 4000ms, ^C to stop
   `startFromInbox` refuses by name (exit 2): `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside
   the card's place, and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's
   text and the repository it was tried on, and passes over the card while both are the same: one try, no hot loop, and the card
-  behind it has its turn. Edit the card, or take it back and queue it again — or, for a card that names no `repo:`, run `wf up`
-  in another repository — and the next pass tries it again.
+  behind it has its turn. Edit the card, or take it back and queue it again — or, for a card whose repository neither its
+  `repo:` nor its factory names, run `wf up` in another repository — and the next pass tries it again.
 - **A start that fails otherwise is tried again.** Git failing on the repository, a file that cannot be read: no verdict on the
   card, so the next pass tries it again, where it keeps its place and the card behind it waits. `wf up` says it once, and again
   only if it fails differently — once by each `wf up`, which goes by what it has said itself rather than by what the pass before it

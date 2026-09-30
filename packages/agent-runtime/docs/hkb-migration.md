@@ -99,7 +99,7 @@ export const prismaJournal = (boardId: number): JournalOps => { /* four methods 
 ```
 
 Or, with the Promise facade, four plain `async` functions and no Effect in hkb at all —
-`createEngine({ journal: { append, read, list, feed } })`.
+`promiseEngine(Engine.layer({ journal: { append, read, list, feed } }))`.
 
 Three details that make it fit:
 

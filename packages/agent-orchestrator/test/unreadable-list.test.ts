@@ -1,8 +1,8 @@
 /**
  * A journal that does not read is a check's, or an earlier try's: `wf ls` says the run it belongs to is unreadable, in the words the
  * board's list says it with (`unjudgedWords`), marks `unreadable` the step whose check or try it is, and lists every other run — a run
- * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `wf decide` of such a run refuses in those words. Walked
- * through the runtime itself, `createEngine` over an in-memory journal that hands back what was put in it, as a store does.
+ * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `wf decide` of such a run refuses in those words. Walked through the
+ * runtime itself, `promiseEngine` over an in-memory journal that hands back what was put in it, as a store does.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `wf ls` reads
  * the slots.
@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type PromiseJournal, type PromiseRunner } from 'agent-runtime';
+import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-unreadable-list-');
@@ -89,12 +90,14 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = createEngine({
-  root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-  journal,
-  harnesses: { claude: runner, codex: runner, check: runner },
-  defaultHarness: 'claude',
-});
+const e = promiseEngine(
+  Engine.layer({
+    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+    journal,
+    harnesses: { claude: runner, codex: runner, check: runner },
+    defaultHarness: 'claude',
+  }),
+);
 
 function writeRun(id: string, steps: Record<string, object>, more: object = {}) {
   fs.writeFileSync(

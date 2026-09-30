@@ -7,7 +7,8 @@
 import { afterEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { createEngine, type Engine, type EngineOptions, type TaskSpec, type TaskView } from '../src/facade.ts';
+import type { Engine, EngineOptions, TaskSpec, TaskView } from '../src/facade.ts';
+import { Engine as EngineService, promiseEngine } from '../src/index.ts';
 import { remoteOps } from '../src/a2a/remote.ts';
 import { apiKey, bearer, remoteServer, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
@@ -31,7 +32,7 @@ const task: TaskSpec = { brief: 'paint the fence', cwd: '/nowhere/in/particular'
 
 /** The first attempt of a task filed on an engine whose harness is `s`, once the task has settled. */
 const attemptOn = async (s: RemoteServer, o: Partial<EngineOptions> = {}) => {
-  const e: Engine = createEngine({ root: scratch('ae-quote-'), harnesses: { remote: { url: s.url } }, ...o });
+  const e: Engine = promiseEngine(EngineService.layer({ root: scratch('ae-quote-'), harnesses: { remote: { url: s.url } }, ...o }));
   const id = await e.file(task);
   let v: TaskView | undefined;
   for (let i = 0; i < 60 && v?.state.settled == null; i++) {

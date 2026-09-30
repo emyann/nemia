@@ -1,9 +1,10 @@
 /**
- * The engine, without Effect.
+ * The engine, without Effect: its types and plain helpers.
  *
- * Effect is how this engine is written, not how it is used. Everything here takes and returns
- * plain values and Promises, so a consumer needs to know three functions and no library: `file`
- * what you want done, `tick` to move it along, `feed` to react to what happened.
+ * Effect is how this engine is written, not how it is used. The engine is built with
+ * `promiseEngine(Engine.layer(options))` from `agent-runtime/effect`, and everything it gives takes and returns plain values and
+ * Promises, so a consumer needs to know three functions and writes no Effect: `file` what you want done, `tick` to move it along,
+ * `feed` to react to what happened.
  *
  * The Effect API is there for anyone who wants `Layer` composition and typed error channels
  * — `import { ... } from 'agent-runtime/effect'`. Keeping it behind a subpath is deliberate: two
@@ -12,7 +13,7 @@
  *
  * This file names what the door gives, and holds nothing of its own: what a consumer writes and the adapters over it are
  * in `facade/consumer.ts`, the engine it gets in `facade/engine.ts` (the `Engine` service of `service/engine.ts`, each verb run as a
- * Promise), and a harness written in Promises in `facade/promise.ts`.
+ * Promise, whose `promiseEngine` the Effect face exports), and a harness written in Promises in `facade/promise.ts`.
  */
 export type {
   PromiseJournal,
@@ -24,7 +25,6 @@ export type {
   EngineIo,
   Engine,
 } from './facade/consumer.ts';
-export { createEngine } from './facade/engine.ts';
 export type { PromiseRunner, PromiseSighting } from './facade/promise.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
@@ -33,10 +33,7 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts';
-/**
- * Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `createEngine` refuses, for a caller that reads entries
- * from a file of its own and words the refusal there.
- */
+/** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { denialText, nameFor } from './core/index.ts';
 /** The task's lifecycle as plain data — states, edges, first and final states — for a board to draw; never the machine or its move. */

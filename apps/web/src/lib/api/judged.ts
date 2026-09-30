@@ -1,10 +1,17 @@
 /**
  * What a run established, as the api judges it (apps/api/src/runs/judged.ts): where it stands, who it waits on, what it cost, what to
- * decide.
+ * decide. Each type has its schema beside it, which `get` decodes the api's answer with.
  */
+import { Schema } from 'effect';
+
+/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
+export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /** Mirrors `RunStatus` in apps/api/src/runs/judged.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+/** Decodes a `RunStatus`. */
+export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled']) satisfies Schema.Schema<RunStatus>;
 
 /**
  * Mirrors `RunToDecide` in apps/api/src/runs/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on
@@ -31,12 +38,35 @@ export type RunToDecide =
     }
   | { kind: 'git'; branches: string[]; said: string; command: string };
 
+/** Decodes a `RunToDecide`, either kind. */
+export const RunToDecideSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal('approve'),
+    step: Schema.String,
+    says: Schema.NullOr(Schema.String),
+    filed: Schema.Boolean,
+    back: StringsSchema,
+    onto: Schema.NullOr(Schema.String),
+    said: Schema.String,
+    command: Schema.String,
+  }),
+  Schema.Struct({ kind: Schema.Literal('git'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
+]) satisfies Schema.Schema<RunToDecide>;
+
 /**
  * Mirrors `Spent` in apps/api/src/runs/judged.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended
  * with a cost on them, how many did and how many ended with none — and `said`, its word for it: `$4.20`, or `≥$4.20` where an ended attempt
  * has no cost on it.
  */
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
+
+/** Decodes a `Spent`. */
+export const SpentSchema = Schema.Struct({
+  usd: Schema.Number,
+  measured: Schema.Number,
+  unmeasured: Schema.Number,
+  said: Schema.String,
+}) satisfies Schema.Schema<Spent>;
 
 /**
  * Mirrors `RunWaiting` in apps/api/src/runs/judged.ts: what a run started `--after` still waits on, in the package's words. `runs` are each
@@ -49,6 +79,18 @@ export type RunWaiting = {
   advice: string;
   onYou: boolean;
 };
+
+/** Decodes a `RunWaiting`. */
+export const RunWaitingSchema = Schema.Struct({
+  runs: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({ run: Schema.String, missing: Schema.Boolean, cancelledAt: Schema.NullOr(Schema.String), gone: StringsSchema }),
+    ),
+  ),
+  word: Schema.String,
+  advice: Schema.String,
+  onYou: Schema.Boolean,
+}) satisfies Schema.Schema<RunWaiting>;
 
 /**
  * Mirrors `RunHolding` in apps/api/src/runs/judged.ts: a person's hold on a run (`wf hold <run> --until <run>`), in the package's words.
@@ -64,6 +106,25 @@ export type RunHolding = {
   advice: string;
   onYou: boolean;
 };
+
+/** Decodes a `RunHolding`. */
+export const RunHoldingSchema = Schema.Struct({
+  at: Schema.String,
+  runs: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        run: Schema.String,
+        missing: Schema.Boolean,
+        cancelledAt: Schema.NullOr(Schema.String),
+        gone: StringsSchema,
+        shipped: Schema.Boolean,
+      }),
+    ),
+  ),
+  word: Schema.String,
+  advice: Schema.String,
+  onYou: Schema.Boolean,
+}) satisfies Schema.Schema<RunHolding>;
 
 /**
  * Mirrors `StepNeeds` in apps/api/src/runs/judged.ts. `needs`: the closeout's, for a step whose current try signed off blocked.
@@ -81,4 +142,13 @@ export type StepNeeds = {
   waitingFor: { words: string; advice: string } | null;
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
+};
+
+/** The fields of a `StepNeeds`, for the schema of a step that carries them to take in with its own (`RunSummarySchema` in runs.ts). */
+export const StepNeedsFields = {
+  needs: Schema.NullOr(Schema.String),
+  blockedByHarness: Schema.Boolean,
+  waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
+  approve: Schema.NullOr(Schema.String),
+  denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: StringsSchema })),
 };

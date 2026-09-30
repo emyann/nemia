@@ -1,6 +1,6 @@
 /** The subscription's quota (`GET /api/quota`, apps/api/src/factory/quota.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /**
  * Mirrors `QuotaWindow` in apps/api/src/factory/quota.ts: one limit of the subscription as Claude Code reported it — `key` Claude Code's,
@@ -34,6 +34,6 @@ export type Quota = {
  */
 export const quotaQuery = queryOptions({
   queryKey: ['quota'],
-  queryFn: () => get<Quota>('/api/quota'),
+  queryFn: () => getUndecoded<Quota>('/api/quota'),
   refetchInterval: (query) => (query.state.data?.state === 'asking' ? 2_000 : 60_000),
 });

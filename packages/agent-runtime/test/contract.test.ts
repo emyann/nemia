@@ -136,7 +136,7 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
 
 test('and what is not a route is not refused: the entries, the CLI spawned, and prose that names a file in src', () => {
   const text = [
-    "import { createEngine } from 'agent-runtime';",
+    "import { codex } from 'agent-runtime';",
     "import type { Event } from 'agent-runtime/effect';",
     "const { fold } = await import('agent-runtime/effect');",
     "execFileSync(process.execPath, [path.join(ROOT, 'packages', 'agent-runtime', 'bin', 'ae.ts'), 'ls']);",

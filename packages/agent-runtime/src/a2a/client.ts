@@ -346,7 +346,7 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
 
 /**
  * The same seam beneath the Effect door: a runner's session verbs through the A2A client, its agent answering off the
- * `Journal` the program provides. `Runner.layer(ops)` calls the driver directly; this is the one to use for the path `createEngine`
+ * `Journal` the program provides. `Runner.layer(ops)` calls the driver directly; this is the one to use for the path `Engine.layer`
  * takes. A function beside `Runner`, as `sdkRunner` is, rather than a static on it: `harness/seam.ts` would then import
  * this file, which imports `harness/seam.ts`.
  */

@@ -1,7 +1,7 @@
 /**
  * A task whose journal holds an entry no runtime wrote, beside a run whose tasks read: the runtime leaves the task out of its pass and says
  * why (`TickReport.unreadable`), and the tick leaves the run it belongs to unjudged and says so, while every other run advances — through
- * `tick` and `wf tick`, never a throw that stops the daemon. Walked through the runtime itself, `createEngine` over an in-memory journal
+ * `tick` and `wf tick`, never a throw that stops the daemon. Walked through the runtime itself, `promiseEngine` over an in-memory journal
  * that hands back what was put in it, as a store does, and a harness the test signs by hand, as rest-store.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` admits sessions enough for both
@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
+import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-unreadable-');
@@ -74,12 +75,14 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = createEngine({
-  root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-  journal,
-  harnesses: { claude: runner, codex: runner, check: runner },
-  defaultHarness: 'claude',
-});
+const e = promiseEngine(
+  Engine.layer({
+    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+    journal,
+    harnesses: { claude: runner, codex: runner, check: runner },
+    defaultHarness: 'claude',
+  }),
+);
 const signAll = () => {
   for (const [name, s] of sessions)
     if (s.state === 'working')

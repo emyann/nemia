@@ -6,7 +6,7 @@
  * So what is checked is what a poller sees: every event dated by the harness's own record and
  * given a role; a tool result paired to its call; the closeout a call like any other; a second read
  * emitting only what was appended; and a cursor from a file that shrank, or was replaced, reading again
- * rather than nothing for ever. Then the same through `createEngine()` at shipped defaults, with a fake
+ * rather than nothing for ever. Then the same through the Promise engine at shipped defaults, with a fake
  * `claude` or `codex` on PATH: `logs` beside it, and each refusal made to refuse.
  *
  * Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set before the
@@ -28,6 +28,8 @@ process.env.CLAUDE_CONFIG_DIR = config;
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
 const { claudeOps } = await import('../src/harness/claude/bg.ts');
+const { RunnerError } = await import('../src/harness/error.ts');
+const { readTranscript } = await import('../src/harness/transcript.ts');
 const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
 const { detachedOps } = await import('../src/harness/detached/detached.ts');
 const { codex } = await import('../src/harness/codex/codex.ts');
@@ -362,6 +364,52 @@ test("words the session's own user said while it worked — typed into it, or a 
     [],
     "Claude Code's notice that a background task ended is not anyone's words",
   );
+});
+
+/** A Claude transcript as `claudeLines` writes it, with the line at `at` replaced by `line`. */
+const claudeWith = (sessionId: string, at: number, line: object) => {
+  const lines = claudeLines(sessionId);
+  lines[at] = { ...lines[at], ...line };
+  return jsonl(lines);
+};
+
+test("REFUSED: a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its file, its offset, its field and the fix", async () => {
+  const sessionId = randomUUID();
+  const text = claudeWith(sessionId, 3, { message: { id: 'msg_1', content: [{ type: 'thinking', thinking: 7 }] } });
+  writeClaude(sessionId, text);
+  const offset = Buffer.byteLength(text.split('\n').slice(0, 3).join('\n')) + 1;
+  const words =
+    `the line at byte ${offset} of the transcript \`${claudeFile(sessionId)}\` is an \`assistant\` line whose` +
+    ' `message.content.0.thinking` is 7, where Claude Code writes string.';
+  await assert.rejects(readTranscript(claudeFile(sessionId), undefined, claudeTranscriptEvents), (e: Error) => e.message.startsWith(words));
+  await assert.rejects(claudeRead(sessionId), (e: unknown) => {
+    assert.ok(e instanceof RunnerError, String(e));
+    assert.equal(e.verb, 'transcript');
+    assert.ok(e.message.startsWith(words), e.message);
+    assert.ok(e.message.includes('`harness/claude/lines.ts`'), e.message);
+    return true;
+  });
+
+  const aside = randomUUID();
+  writeClaude(aside, claudeWith(aside, 3, { isSidechain: true, message: { content: [{ type: 'tool_use', id: 7 }] } }));
+  await assert.rejects(
+    claudeRead(aside),
+    (e: Error) => e.message.includes('is an `assistant` line whose `message.content.0.id` is 7'),
+    "a subagent's line is decoded before it is left out",
+  );
+});
+
+test('a torn line, a line that is no JSON object, and a line of a type not read pass the Claude transcript unchecked', async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));
+  const unread = [
+    '{"type":"assistant","message":{"content":[{"type":"text","text":7',
+    '["assistant"]',
+    JSON.stringify({ type: 'file-history-snapshot', timestamp: 'never', snapshot: 7 }),
+    JSON.stringify({ type: 'summary', summary: 3, leafUuid: 4 }),
+  ];
+  writeClaude(sessionId, `${[...lines.slice(0, 2), ...unread, ...lines.slice(2)].join('\n')}\n`);
+  assert.deepEqual((await claudeRead(sessionId)).events, CLAUDE_EVENTS);
 });
 
 test('read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read', async () => {
@@ -717,7 +765,7 @@ test("claude-detached reads the transcript `claude --bg` would, once its run has
   assert.equal(detachedOps({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
 });
 
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 type PromiseRunner = import('../src/facade.ts').PromiseRunner;
 type Sighting = import('../src/facade.ts').Sighting;
 
@@ -793,7 +841,7 @@ const fakeCodex = (thread: string) => {
 test("at shipped defaults, a Claude background session's transcript is its session's, read through its own harness from the cursor given — and logs is as it was", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       brief: 'Write the word to WORD.txt, then give your closeout.',
       cwd: tmp('cwd'),
@@ -847,7 +895,7 @@ test("at shipped defaults, a Codex task's transcript is read from its rollout, b
   const thread = randomUUID();
   writeRollout(thread, jsonl(rolloutLines(thread)));
   await onPath(fakeCodex(thread), async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' });
     await engine.tick();
     let read = await engine.transcript(id);
@@ -873,7 +921,7 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
 
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     await assert.rejects(
       engine.transcript('t-nope'),
       refusal(/^transcript: `t-nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/),
@@ -905,14 +953,16 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
       return 'what it printed';
     },
   };
-  const own = createEngine({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' });
+  const own = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' }));
   const ownId = await own.file({ brief: 'the prompt', cwd: '/repo' });
   await assert.rejects(
     own.transcript(ownId),
     refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/),
     'a harness brought as a PromiseRunner with no `transcript`',
   );
-  const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
+  const sh = promiseEngine(
+    Engine.layer({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } }),
+  );
   await assert.rejects(
     sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })),
     refusal(/^transcript: the `sh` harness keeps no conversation/),
@@ -941,7 +991,7 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
       return { events: [said(page)], cursor: `page-${page + 1}` };
     },
   };
-  const engine = createEngine({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' });
+  const engine = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' }));
   const id = await engine.file({ brief: 'the prompt', cwd: '/repo' });
 
   const nothing = await engine.transcript(id);
@@ -970,7 +1020,7 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
 test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       brief: 'Write the word to WORD.txt, then give your closeout.',
       cwd: tmp('cwd'),
@@ -1004,4 +1054,25 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
     assert.equal(claude.agentsCalls(), before, 'and the registry was not asked');
     assert.match(await engine.logs(id), /Write the word to WORD\.txt/, 'as logs reads it');
   });
+});
+
+test("REFUSED: a finished background session whose statement's line does not decode fails `observe` at shipped readers, naming the transcript, its line and field", async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId);
+  const call = lines.findIndex((l) => JSON.stringify(l).includes('StructuredOutput'));
+  writeClaude(sessionId, claudeWith(sessionId, call, { timestamp: 'yesterday' }));
+  const bin = tmp('bin');
+  const rows = JSON.stringify([{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background' }]);
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${rows}\nJSON\n`, { mode: 0o755 });
+
+  const e = await onPath(bin, () => Effect.runPromise(Effect.flip(claudeOps({ transcriptTime: async () => 0 }).observe)));
+  assert.ok(e instanceof RunnerError, String(e));
+  assert.equal(e.verb, 'observe');
+  assert.ok(e.message.includes("`ae/t/1`'s transcript cannot be read"), e.message);
+  assert.ok(
+    e.message.includes(
+      `line ${call + 1} of the transcript \`${claudeFile(sessionId)}\` is an \`assistant\` line whose \`timestamp\` is "yesterday"`,
+    ),
+    e.message,
+  );
 });

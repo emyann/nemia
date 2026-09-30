@@ -70,14 +70,15 @@
   "overrides": [
     {
       // The two rules left off above, on where what comes from outside is decoded by a schema before it is typed (Effect Schema: a
-      // journal, a detached run file, a Codex `exec --json` stream, a run record and a person's asks, daemon.json and tick stats, a
-      // queue try, a line of the feed, the api's request bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
+      // journal, a detached run file, a Codex `exec --json` stream, a Claude Code transcript line, a run record and a person's asks, daemon.json and tick stats, a
+      // queue try, a line of the feed, the api's request bodies, the board's reads of the api): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
       // value such a file still takes by a cast keeps its guard with an `oxlint-disable-next-line` saying why.
       "files": [
         "packages/agent-runtime/src/core/event-schema.ts",
         "packages/agent-runtime/src/core/engine/journal.ts",
         "packages/agent-runtime/src/harness/detached/detached.ts",
         "packages/agent-runtime/src/harness/codex/stream.ts",
+        "packages/agent-runtime/src/harness/claude/lines.ts",
         "packages/agent-orchestrator/src/record/record.store.ts",
         "packages/agent-orchestrator/src/daemon/daemon.store.ts",
         "packages/agent-orchestrator/src/inbox/inbox.store.ts",
@@ -89,7 +90,11 @@
         "apps/api/src/inbox/inbox.ts",
         "apps/api/src/runs/runs.ts",
         "apps/api/src/agents/skills.ts",
-        "apps/api/src/workflows/workflows.ts"
+        "apps/api/src/workflows/workflows.ts",
+        "apps/web/src/lib/api/read.ts",
+        "apps/web/src/lib/api/judged.ts",
+        "apps/web/src/lib/api/graph.ts",
+        "apps/web/src/lib/api/runs.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",
@@ -655,14 +660,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/start/start.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 21]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.verb.ts"],
       "rules": {
         "complexity": ["error", { "max": 24 }],
@@ -674,12 +671,6 @@
       "rules": {
         "max-lines": ["error", { "max": 553, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/tick/tick.verb.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 21]
       }
     },
     {
@@ -782,7 +773,7 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 130, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 53 }],
         "sonarjs/cognitive-complexity": ["error", 59]
       }
@@ -840,14 +831,6 @@
       "rules": {
         "complexity": ["error", { "max": 22 }],
         "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/harness/claude/transcript.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 98, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 47 }],
-        "sonarjs/cognitive-complexity": ["error", 70]
       }
     },
     {

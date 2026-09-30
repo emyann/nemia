@@ -205,7 +205,7 @@ test('every entry on the history list is there: a moved file never widens what i
 test('REFUSED: a former name in an import, a path, a sentence or a dependency', () => {
   const [engine, workflows] = FORMER as [string, string];
   for (const line of [
-    `import { createEngine } from '${engine}';`,
+    `import { codex } from '${engine}';`,
     `const { tick } = await import('${workflows}/run');`,
     `import { codex } from '../../${engine}/src/runner-codex.ts';`,
     `See packages/${workflows}/docs/features.md, section 3.`,

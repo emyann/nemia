@@ -1,6 +1,6 @@
 /** The state machines the board draws (`GET /api/machines`, apps/api/src/machines/machines.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /**
  * Mirrors `MachineListing` in apps/api/src/machines/machines.ts: a machine's name, what a person calls it, and the file it is drawn from.
@@ -19,12 +19,12 @@ export type MachineGraph = MachineListing & { initial: string; states: string[];
 /** The machines there are, by name. Read again on each visit: a machine changes only with the code. */
 export const machinesQuery = queryOptions({
   queryKey: ['machines'],
-  queryFn: () => get<{ machines: MachineListing[] }>('/api/machines'),
+  queryFn: () => getUndecoded<{ machines: MachineListing[] }>('/api/machines'),
 });
 
 /** One machine's graph, read off its code by the api. */
 export const machineQuery = (name: string) =>
   queryOptions({
     queryKey: ['machines', name],
-    queryFn: () => get<MachineGraph>(`/api/machines/${encodeURIComponent(name)}`),
+    queryFn: () => getUndecoded<MachineGraph>(`/api/machines/${encodeURIComponent(name)}`),
   });

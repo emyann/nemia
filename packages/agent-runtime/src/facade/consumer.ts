@@ -53,12 +53,12 @@ export type PromiseJournal = {
  *
  * None is counted under a ceiling: the runtime starts what it is given, and a layer above that pools its harnesses under
  * one rate limit files them `queued` and `admit`s them. A harness brought as an object that names a `pool` is refused
- * (`createEngine`).
+ * (`Engine.layer`).
  */
 export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | RemoteAgent | PromiseRunner;
 
 /**
- * What `createEngine` builds an engine from. It takes no `maxConcurrent`: given, at any value, it is refused, since the runtime keeps
+ * What `Engine.layer` builds an engine from. It takes no `maxConcurrent`: given, at any value, it is refused, since the runtime keeps
  * no ceiling and starts every task it is given; how many run at once is the layer above's, which files `queued` and `admit`s.
  */
 export type EngineOptions = {
@@ -78,7 +78,7 @@ export type EngineOptions = {
   /**
    * What to do when `credentials` gives no secret for a scheme, in words: the end of the refusal a task on that agent is
    * refused with, `unstartable`. A caller that keeps its secrets somewhere of its own names the place — the variable to
-   * set, say. Absent, the refusal says to give `createEngine` a `credentials` that answers for the scheme.
+   * set, say. Absent, the refusal says to give `Engine.layer` a `credentials` that answers for the scheme.
    */
   missingCredential?: MissingCredential;
 };

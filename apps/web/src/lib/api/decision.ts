@@ -1,6 +1,6 @@
 /** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`, apps/api/src/decide/decision.ts). */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { RunHolding, RunWaiting } from './judged.ts';
 import type { StepUsed } from './usage.ts';
 
@@ -99,7 +99,7 @@ export type RunDecision =
 export const decisionQuery = (id: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'decision', stamp],
-    queryFn: () => get<RunDecision>(`/api/runs/${encodeURIComponent(id)}/decision`),
+    queryFn: () => getUndecoded<RunDecision>(`/api/runs/${encodeURIComponent(id)}/decision`),
     placeholderData: keepPreviousData,
     staleTime: Infinity,
     refetchOnWindowFocus: false,

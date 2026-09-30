@@ -1178,7 +1178,7 @@ test("a pass's views are what `view` reads after it: an attempt's measure, writt
 });
 
 /**
- * A harness behind the composite, as `createEngine` puts every harness, whose reads fail on the passes a test chooses: the
+ * A harness behind the composite, as `Engine.layer` puts every harness, whose reads fail on the passes a test chooses: the
  * failure the composite answers for, as a `claude agents` timing out is. Lists only what it is told to look for. A read that
  * fails fails whole, as a registry that timed out does, and the composite says the names it was to find unread.
  */

@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type PromiseJournal, type Sighting } from '../src/facade.ts';
+import type { PromiseJournal, Sighting } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 /** A harness whose sessions are what the test says, counting its observes. */
@@ -34,7 +35,7 @@ const harness = () => {
 const board = async () => {
   const h = harness();
   const root = scratch('ae-list-some-root-');
-  const engine = createEngine({ root, harnesses: { mine: h.runner } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { mine: h.runner } }));
   const cwd = scratch('ae-list-some-cwd-');
   const settled = [await engine.file({ brief: 'a', cwd }), await engine.file({ brief: 'b', cwd }), await engine.file({ brief: 'c', cwd })];
   await engine.tick();
@@ -133,7 +134,7 @@ test('any other failure of a read fails `list()`: a store that cannot be listed'
       return { entries: [], cursor: 0 };
     },
   };
-  const engine = createEngine({ journal, harnesses: { mine: harness().runner } });
+  const engine = promiseEngine(Engine.layer({ journal, harnesses: { mine: harness().runner } }));
   await assert.rejects(engine.list(), (err: Error) => err.message.includes('fake: the store is gone'));
 });
 

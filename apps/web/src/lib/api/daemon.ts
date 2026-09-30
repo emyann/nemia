@@ -1,7 +1,7 @@
 /** Whether a `wf up` ticks the store (`GET /api/daemon`, apps/api/src/factory/daemon.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /**
  * Mirrors `Daemon` in apps/api/src/factory/daemon.ts: whether a `wf up` ticks the store, as the package judges `daemon.json` — `ticking`
@@ -29,6 +29,6 @@ export type Daemon = {
  */
 export const daemonQuery = queryOptions({
   queryKey: ['daemon'],
-  queryFn: () => get<Daemon>('/api/daemon'),
+  queryFn: () => getUndecoded<Daemon>('/api/daemon'),
   refetchInterval: () => pace(5_000),
 });

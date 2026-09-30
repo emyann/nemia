@@ -1,15 +1,30 @@
 /** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs/runs.ts). */
 import { queryOptions } from '@tanstack/react-query';
+import { Schema } from 'effect';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
-import type { RunGraph } from './graph.ts';
-import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
+import { RunGraphSchema, type RunGraph } from './graph.ts';
+import {
+  RunHoldingSchema,
+  RunStatusSchema,
+  RunToDecideSchema,
+  RunWaitingSchema,
+  SpentSchema,
+  StepNeedsFields,
+  StringsSchema,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  type StepNeeds,
+} from './judged.ts';
 
-/**
- * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders
- * the run makes.
- */
+/** Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
+
+/** Decodes a `PlaceKind`. */
+const PlaceKindSchema = Schema.Literals(['git', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
 /** Mirrors `RunSummary` in apps/api/src/runs/runs.ts. */
 export type RunSummary = {
@@ -32,18 +47,15 @@ export type RunSummary = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what
-   * it kept — for the mark beside its status; null on a run never pruned.
+   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what it
+   * kept — for the mark beside its status; null on a run never pruned.
    */
   pruned: { said: string } | null;
   /** The runs this one waits on (`wf start --after`), as its record froze them: the edges from their cards to its card on the Factory. */
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
-  /**
-   * The runs a person holds this one until (`wf hold`), as its hold file names them: the edges from their cards to its card, as `after`'s
-   * are. None for a run nobody holds.
-   */
+  /** The runs a person holds this one until (`wf hold`), as its hold file names them: the edges from their cards to its card, as `after`'s are. None for a run nobody holds. */
   heldUntil: string[];
   /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
   holding: RunHolding | null;
@@ -67,9 +79,7 @@ export type RunSummary = {
    * budget. Empty on a cancelled run.
    */
   waitingOnYou: string[];
-  /**
-   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve plan`.
-   */
+  /** `waitingOnYou` as `wf ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve plan`. */
   onYou: string[];
   /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
   toDecide: RunToDecide | null;
@@ -80,19 +90,55 @@ export type RunSummary = {
   unreadable: string | null;
 };
 
-/**
- * Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while
- * it is.
- */
+/** Decodes a `RunSummary`: each key the board reads, of its type and words; a key it does not know is dropped. */
+const RunSummarySchema = Schema.Struct({
+  id: Schema.String,
+  repo: Schema.NullOr(Schema.String),
+  place: PlaceKindSchema,
+  work: Schema.NullOr(Schema.String),
+  brief: Schema.String,
+  workflowDir: Schema.String,
+  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
+  createdAt: Schema.String,
+  startedAt: Schema.NullOr(Schema.String),
+  cancelledAt: Schema.NullOr(Schema.String),
+  pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
+  after: StringsSchema,
+  waiting: Schema.NullOr(RunWaitingSchema),
+  heldUntil: StringsSchema,
+  holding: Schema.NullOr(RunHoldingSchema),
+  status: RunStatusSchema,
+  moving: Schema.Boolean,
+  cost: Schema.NullOr(SpentSchema),
+  steps: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        taskId: Schema.NullOr(Schema.String),
+        branch: Schema.NullOr(Schema.String),
+        status: Schema.String,
+        note: Schema.NullOr(Schema.String),
+        ...StepNeedsFields,
+      }),
+    ),
+  ),
+  graph: RunGraphSchema,
+  waitingOnYou: StringsSchema,
+  onYou: StringsSchema,
+  toDecide: Schema.NullOr(RunToDecideSchema),
+  unreadable: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<RunSummary>;
+
+/** Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while it is. */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
-  queryFn: () => get<RunSummary[]>('/api/runs'),
+  queryFn: () => get('/api/runs', Schema.mutable(Schema.Array(RunSummarySchema))),
   refetchInterval: () => pace(5_000),
 });
 
 /**
- * Remove a try's run, as `wf rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still in
- * flight; rejects with its refusal in full — the package's words, which say to cancel it first — or the api's own about the request.
+ * Remove a try's run, as `wf rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still in flight;
+ * rejects with its refusal in full — the package's words, which say to cancel it first — or the api's own about the request.
  */
 export async function removeRun(id: string): Promise<{ id: string; removed: true }> {
   const route = `/api/runs/${encodeURIComponent(id)}`;
@@ -114,18 +160,16 @@ export async function liftHold(id: string): Promise<{ id: string; lifted: true }
   throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
 }
 
-/**
- * What a prune gives back beyond the run's worktrees, as `wf prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody merged.
- */
+/** What a prune gives back beyond the run's worktrees, as `wf prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody merged. */
 export type PruneHow = { artifacts: boolean; unmerged: boolean };
 
 /** What the api answers a prune with: `wf prune`'s lines, and how many places it could not remove (`left`), which those lines name. */
 export type Pruned = { id: string; pruned: true; lines: string[]; left: number };
 
 /**
- * Prune a finished run, as `wf prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged only
- * with `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already
- * pruned, or one nobody merged — or its own about the request.
+ * Prune a finished run, as `wf prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged only with
+ * `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already pruned, or
+ * one nobody merged — or its own about the request.
  */
 export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
   const route = `/api/runs/${encodeURIComponent(id)}/prune`;

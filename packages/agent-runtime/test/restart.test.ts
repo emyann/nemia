@@ -11,7 +11,8 @@ import { Effect } from 'effect';
 import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a/client.ts';
 import { sightingOf } from '../src/a2a/map.ts';
-import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest } from '../src/facade.ts';
+import type { Event, PromiseJournal, PromiseRunner, Sighting, SpawnRequest } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import type { RunnerOps } from '../src/harness/seam.ts';
 
 /**
@@ -59,7 +60,7 @@ const world = (o: { spawnHangs?: boolean } = {}) => {
       return '';
     },
   } satisfies PromiseRunner;
-  const runtime = () => createEngine({ journal, harnesses: { fake } });
+  const runtime = () => promiseEngine(Engine.layer({ journal, harnesses: { fake } }));
   const ops: RunnerOps = {
     spawn: (r) => Effect.promise(() => fake.spawn(r)),
     observe: Effect.promise(() => fake.observe()),

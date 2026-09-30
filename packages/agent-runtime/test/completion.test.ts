@@ -16,7 +16,8 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { claudeOps, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
-import { createEngine } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
+import { RunnerError } from '../src/harness/error.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import type { Event } from '../src/core/domain.ts';
 
@@ -428,6 +429,51 @@ test('a statement is the LAST WORD when the conversation ends with its result â€
   assert.equal(lastStructuredOutput(noResult)?.lastWord, false, 'the call alone is not the result: the turn has not closed');
 });
 
+test('REFUSED: the StructuredOutput call read as the statement, or the line its result is looked for on, that does not decode is refused by its line and field', () => {
+  const at = '2026-09-17T02:53:00.160Z';
+  const call = (id: unknown, timestamp = at) =>
+    entry({ type: 'assistant', timestamp, message: { content: [{ type: 'tool_use', id, name: 'StructuredOutput', input: {} }] } });
+  const refusedBy = (words: string) => (e: Error) => {
+    assert.ok(e.message.startsWith(words), e.message);
+    assert.ok(e.message.includes('`harness/claude/lines.ts`'), e.message);
+    return true;
+  };
+  const said = entry({ type: 'user', timestamp: at, message: { content: 'carry on' } });
+  assert.throws(
+    () => lastStructuredOutput([said, call(7)].join('\n'), '/t/s.jsonl'),
+    refusedBy(
+      'line 2 of the transcript `/t/s.jsonl` is an `assistant` line whose `message.content.0.id` is 7, where Claude Code writes string.',
+    ),
+  );
+  assert.throws(
+    () => lastStructuredOutput([said, call('toolu_1', 'yesterday')].join('\n')),
+    refusedBy(
+      'line 2 of the transcript is an `assistant` line whose `timestamp` is "yesterday", where Claude Code writes a date and time.',
+    ),
+  );
+  const answered = entry({ type: 'user', timestamp: at, message: { content: [{ type: 'tool_result', tool_use_id: 7 }] } });
+  assert.throws(
+    () => lastStructuredOutput([call('toolu_1'), answered].join('\n')),
+    refusedBy('line 2 of the transcript is a `user` line whose `message.content.0.tool_use_id` is 7, where Claude Code writes string.'),
+    "the line a call's result is looked for on is read, so it is decoded",
+  );
+});
+
+test("a call before the statement is never read, so never decoded: a resumed transcript's inherited call does not refuse the new one", () => {
+  const at = '2026-09-17T02:53:00.160Z';
+  const inherited = entry({
+    type: 'assistant',
+    timestamp: 'yesterday',
+    message: { content: [{ type: 'tool_use', id: 7, name: 'StructuredOutput' }] },
+  });
+  const closed = closingTurn(at, 'toolu_1', { outcome: 'done' });
+  assert.deepEqual(lastStructuredOutput([inherited, ...closed].join('\n')), {
+    payload: { outcome: 'done' },
+    at: Date.parse(at),
+    lastWord: true,
+  });
+});
+
 test('an idle session reports what it said; a busy one is not even asked', async () => {
   const said = { payload: { outcome: 'done' }, at: 5 };
   let asked = 0;
@@ -450,6 +496,40 @@ test('an idle session reports what it said; a busy one is not even asked', async
     const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
     assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
     assert.equal(seen.get('ae/t-1/1')?.state, 'working', 'reported, not acted on â€” whose it is, the engine decides');
+  } finally {
+    restore();
+  }
+});
+
+test('REFUSED: a transcript whose statement does not decode fails `observe` as a RunnerError, never a defect or no statement, and is not read again while it is unchanged', async () => {
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    let asked = 0;
+    let written = 0;
+    let t = 10 * QUIESCENT_AFTER_MS;
+    const ops = claudeOps({
+      now: () => t,
+      transcriptTime: async () => written,
+      closeoutFrom: async () => {
+        asked++;
+        throw new Error('line 2 of the transcript is an `assistant` line whose `message.content.0.id` is 7');
+      },
+    });
+    const refused = async () => {
+      const e = await Effect.runPromise(Effect.flip(ops.observe));
+      assert.ok(e instanceof RunnerError, String(e));
+      assert.equal(e.verb, 'observe');
+      assert.ok(e.message.includes("`ae/t-1/1`'s transcript cannot be read, so every background session of ours stays unread"), e.message);
+      assert.ok(e.message.endsWith('whose `message.content.0.id` is 7'), e.message);
+    };
+    await refused();
+    await refused();
+    assert.equal(asked, 1, 'a transcript nothing has written since it was refused is refused again, not read again');
+
+    written = t;
+    t += QUIESCENT_AFTER_MS;
+    await refused();
+    assert.equal(asked, 2, 'written since the refusal: read again');
   } finally {
     restore();
   }
@@ -616,7 +696,7 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const root = scratch('ae-remote-');
-    const engine = createEngine({ root });
+    const engine = promiseEngine(Engine.layer({ root }));
     await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } });
     await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
     const at = new Date().toISOString();

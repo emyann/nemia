@@ -63,12 +63,12 @@ export type HarnessSpec = {
   /**
    * Where the harness keeps its own record of a session's conversation, and what one line of it says —
    * for a harness that keeps one. `file` is given the harness's own session id, the run's `nativeId`,
-   * and may read the disk to find it, as `prepare` does; `events` is pure, given the line parsed and the
-   * byte offset it starts at. Absent, the runner has no `transcript`, and `logs` is what it gives.
+   * and may read the disk to find it, as `prepare` does; `events` is pure, given the line parsed, the
+   * byte offset it starts at, and the file, for a refusal to name. Absent, the runner has no `transcript`, and `logs` is what it gives.
    */
   transcript?: {
     file: (nativeId: string) => string | undefined;
-    events: (entry: unknown, offset: number) => TranscriptEvent[];
+    events: (entry: unknown, offset: number, file: string) => TranscriptEvent[];
   };
   /**
    * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to

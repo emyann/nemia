@@ -485,7 +485,7 @@ const verifyKept = Effect.fn('verifyKept')(function* (
  * for as long as its journal and its session say the same — so it is reported on every pass it persists, off the steps
  * this pass took, and never stalls quietly. A settled task is never asked (`settledQuiet`) and is never on it.
  *
- * With a memo (`TickMemo`, which `createEngine` gives each engine), a settled task already folded is not read again until
+ * With a memo (`TickMemo`, which `Engine.layer` gives each engine), a settled task already folded is not read again until
  * the feed names it: the pass reads the feed on from where the last one stopped, and folds only the tasks not settled, the
  * tasks it names, and those the memo has never folded — which, on an engine's first pass, is every task. Its finished
  * sessions are still let go off what the memo kept (`releaseFinished`). Without one, every task is folded on every pass.

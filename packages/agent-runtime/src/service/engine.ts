@@ -1,6 +1,6 @@
 /**
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
- * are Effects with typed errors. `createEngine` (`facade/engine.ts`) is this service with each verb run as a Promise.
+ * are Effects with typed errors. `promiseEngine` (`facade/engine.ts`) runs each verb of this service as a Promise.
  */
 import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
 import path from 'node:path';
@@ -190,7 +190,7 @@ const startOf =
     });
 
 /**
- * The engine over `options`, as `createEngine` describes it: the file-backed store under `root` (`~/.agent-engine` by default) or the
+ * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
  * - the store, and for the file store its `subscribe`, which pushes to `watch`;
@@ -522,8 +522,10 @@ const make = (options: EngineOptions) =>
   });
 
 /**
- * The engine, as a service. `Engine.layer(options)` builds one from the options `createEngine` takes, failing with `EngineRefused` for
- * what it refuses; a test provides its own with `Layer.succeed(Engine)(Engine.of({ ... }))`.
+ * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, failing with `EngineRefused` for what
+ * `optionsRefusalOf` refuses; a test provides its own with `Layer.succeed(Engine)(Engine.of({ ... }))`. The default harness,
+ * `defaultHarness` or else the first, takes a task that names none, and answers `logs`, `transcript` and `say` for a task whose
+ * harness this engine does not have, whose `view` asks no harness.
  */
 export class Engine extends Context.Service<Engine, EngineShape>()('agent-runtime/Engine') {
   static readonly layer = (options: EngineOptions = {}): Layer.Layer<Engine, EngineRefused> => Layer.effect(Engine, make(options));

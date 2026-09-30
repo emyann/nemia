@@ -10,7 +10,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type PromiseRunner } from '../src/facade.ts';
+import type { PromiseRunner } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 const refusing: PromiseRunner = {
@@ -31,7 +32,7 @@ const N = 40;
 const settledStore = async () => {
   const root = scratch('ae-memo-root-');
   const cwd = scratch('ae-memo-cwd-');
-  const engine = createEngine({ root, harnesses: { refusing } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { refusing } }));
   const ids: string[] = [];
   for (let i = 0; i < N; i++) ids.push(await engine.file({ brief: `task ${i}`, cwd }));
   const first = await engine.tick();
@@ -90,7 +91,7 @@ test("a task filed again under a settled task's id is folded again on the next p
 
 test('a fresh engine on the same store folds every task on its first pass, and reads the whole feed once to learn where it ends', async () => {
   const { root } = await settledStore();
-  const engine = createEngine({ root, harnesses: { refusing } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { refusing } }));
   const before = engine.io();
   await engine.tick();
   const first = engine.io().bytesRead - before.bytesRead;

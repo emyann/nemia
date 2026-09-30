@@ -1,6 +1,6 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
- * nothing of A2A, of the engine service or of the doors, and the CLI reaches the runtime through `src/facade.ts` alone. No two files
+ * nothing of A2A, of the engine service or of the doors, and the CLI reaches the runtime through its two faces alone. No two files
  * need each other's values, no source file imports a test, a face re-exports by name, and only the two entries sit flat in `src/`.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
@@ -65,7 +65,7 @@ const SEAM = ['src/harness/seam.ts', 'src/harness/args.ts', 'src/harness/index.t
 const WHY = {
   core: `the core knows a harness only by ${SEAM.join(', ')} — put what it needs in the seam`,
   below: 'the core and the harnesses sit below A2A, the engine service and the doors — move what both need down',
-  cli: 'the CLI reaches the runtime through src/facade.ts alone — export what it needs there',
+  cli: `the CLI reaches the runtime through its two faces, ${DOORS.join(' and ')}, alone — export what it needs there`,
 };
 
 /** Where `file` imports what its folder may not: each breach, worded with what to do instead. */
@@ -79,7 +79,7 @@ function pathBreaches(file: string, imports: Import[]): string[] {
       out.push(`${file} imports ${target}: ${WHY.core}`);
     } else if ((under(file, 'core') || under(file, 'harness')) && above) {
       out.push(`${file} imports ${target}: ${WHY.below}`);
-    } else if (under(file, 'cli') && target !== 'src/facade.ts' && !under(target, 'cli')) {
+    } else if (under(file, 'cli') && !DOORS.includes(target) && !under(target, 'cli')) {
       out.push(`${file} imports ${target}: ${WHY.cli}`);
     }
   }
@@ -146,7 +146,7 @@ const starExports = (file: string, text: string): string[] =>
     (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
   );
 
-test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a harness reaching A2A, the service or a door; the CLI reaching past the facade', () => {
+test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a harness reaching A2A, the service or a door; the CLI reaching past its two faces', () => {
   const planted: Array<[string, string, string, string]> = [
     ['src/core/engine/engine.ts', "import { claudeOps } from '../../harness/claude/bg.ts';", 'src/harness/claude/bg.ts', WHY.core],
     [
@@ -156,14 +156,15 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a 
       WHY.core,
     ],
     ['src/core/domain.ts', "import { nameParts } from '../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
-    ['src/core/engine/filing.ts', "import { createEngine } from '../../facade/engine.ts';", 'src/facade/engine.ts', WHY.below],
+    ['src/core/engine/filing.ts', "import { promiseEngine } from '../../facade/engine.ts';", 'src/facade/engine.ts', WHY.below],
     ['src/core/engine/filing.ts', "import { Engine } from '../../service/index.ts';", 'src/service/index.ts', WHY.below],
     ['src/core/lifecycle.ts', "const cli = await import('../cli/main.ts');", 'src/cli/main.ts', WHY.below],
     ['src/harness/claude/code.ts', "import { nameParts } from '../../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
     ['src/harness/seam.ts', "export { promiseOps } from '../facade/promise.ts';", 'src/facade/promise.ts', WHY.below],
     ['src/harness/sdk.ts', "import type { Engine } from '../facade.ts';", 'src/facade.ts', WHY.below],
     ['src/cli/main.ts', "import { fold } from '../core/domain.ts';", 'src/core/domain.ts', WHY.cli],
-    ['src/cli/main.ts', "import type { Event } from '../index.ts';", 'src/index.ts', WHY.cli],
+    ['src/cli/main.ts', "import { promiseEngine } from '../facade/engine.ts';", 'src/facade/engine.ts', WHY.cli],
+    ['src/cli/main.ts', "import { Engine } from '../service/index.ts';", 'src/service/index.ts', WHY.cli],
   ];
   for (const [file, line, target, why] of planted) {
     assert.deepEqual(
@@ -178,7 +179,9 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a 
     ['src/core/engine/engine.ts', "import { Runner } from '../../harness/index.ts';"],
     ['src/harness/detached/detached.ts', "import { countSpawn } from '../../core/engine/tally.ts';"],
     ['src/a2a/client.ts', "import { claudeOps } from '../harness/claude/bg.ts';"],
-    ['src/cli/main.ts', "import { createEngine } from '../facade.ts';"],
+    ['src/cli/main.ts', "import { promiseEngine } from '../index.ts';"],
+    ['src/cli/main.ts', "import type { Event } from '../index.ts';"],
+    ['src/cli/main.ts', "import { denialText } from '../facade.ts';"],
     ['src/cli/main.ts', "import { BRIEF_KEYS } from './brief.ts';"],
     ['src/core/domain.ts', "// import { nameParts } from '../a2a/map.ts';"],
   ];

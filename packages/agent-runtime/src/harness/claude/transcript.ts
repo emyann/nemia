@@ -9,6 +9,7 @@ import path from 'node:path';
 import type { Usage } from '../../core/index.ts';
 import type { TranscriptEvent } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
+import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
 
 /** The folder Claude Code writes its transcripts under, one folder per project: `projects` in `CLAUDE_CONFIG_DIR` or `~/.claude`. */
 const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
@@ -34,6 +35,29 @@ export const transcriptFile = (sessionId: string): string | undefined => {
   return undefined;
 };
 
+/** Where line `i` of a transcript is, in a refusal's words: in `file` when it is given. */
+const lineAt = (i: number, file?: string) => `line ${i + 1} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
+
+type BlockOf<T extends string> = Extract<ContentBlock, { type: T }>;
+
+/** Whether a content block is of `type`, as its schema decoded it. */
+const isBlock =
+  <T extends string>(type: T) =>
+  (block: ContentBlock): block is BlockOf<T> =>
+    block.type === type;
+
+/** The last StructuredOutput call an `assistant` line makes, with the line's time and the call's id; `undefined` with no such call or no time. */
+const callOf = (line: Line<'assistant'>): { payload: unknown; at: number; id?: string } | undefined => {
+  const at = Date.parse(line.timestamp ?? '');
+  const content = line.message.content;
+  if (!Number.isFinite(at) || !Array.isArray(content)) return undefined;
+  const call = content
+    .filter(isBlock('tool_use'))
+    .filter((b) => b.name === 'StructuredOutput')
+    .at(-1);
+  return call && { payload: call.input, at, ...(call.id !== undefined ? { id: call.id } : {}) };
+};
+
 /**
  * The LAST StructuredOutput call in a transcript, when it was made, and whether the conversation ends
  * with its result — `lastWord`: the session gave its closeout and has said nothing since.
@@ -47,28 +71,22 @@ export const transcriptFile = (sessionId: string): string | undefined => {
  * so it is read here, off the same file, rather than by a second pass over it. Only a line that names
  * `StructuredOutput` is parsed: most lines are not it, and the tool's own definition names it too, so
  * only an `assistant` line's `tool_use` block counts.
+ *
+ * Backwards, from the end: the `assistant` lines that name it are decoded (`lines.ts`) from the last until one makes the call,
+ * and none before it, so a resumed transcript's inherited calls are not read. Throws an `Error` naming the line, in `file` when it
+ * is given, its field and the fix, when a line read here does not decode: never read as no statement.
  */
-export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: number; lastWord: boolean } | undefined => {
+export const lastStructuredOutput = (jsonl: string, file?: string): { payload: unknown; at: number; lastWord: boolean } | undefined => {
   const lines = jsonl.split('\n');
-  let found: { payload: unknown; at: number; id?: string } | undefined;
-  for (const line of lines) {
-    if (!line.includes('StructuredOutput')) continue;
-    let entry: { type?: string; timestamp?: string; message?: { content?: unknown } };
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const content = entry.message?.content;
-    if (entry.type !== 'assistant' || !Array.isArray(content)) continue;
-    for (const block of content as Array<{ type?: string; id?: unknown; name?: string; input?: unknown }>) {
-      if (block?.type !== 'tool_use' || block.name !== 'StructuredOutput') continue;
-      const at = Date.parse(entry.timestamp ?? '');
-      if (Number.isFinite(at)) found = { payload: block.input, at, ...(typeof block.id === 'string' ? { id: block.id } : {}) };
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!lines[i].includes('StructuredOutput')) continue;
+    const line = lineOf(lines[i], ['assistant'], lineAt(i, file));
+    const found = line && callOf(line);
+    if (found) {
+      return { payload: found.payload, at: found.at, lastWord: found.id !== undefined && endsWithResultOf(lines, found.id, file) };
     }
   }
-  if (!found) return undefined;
-  return { payload: found.payload, at: found.at, lastWord: found.id !== undefined && endsWithResultOf(lines, found.id) };
+  return undefined;
 };
 
 /**
@@ -81,27 +99,15 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
  * written `assistant`(tool_use) · `attachment` · `user`(tool_result) · `system`.
  *
  * Backwards, because only the end matters and a transcript runs to tens of megabytes. A line still
- * being written, or one that is not JSON, is skipped.
+ * being written, or one that is not JSON, is skipped; the last conversation line is decoded, and throws when it does not.
  */
-const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
+const endsWithResultOf = (lines: readonly string[], id: string, file?: string): boolean => {
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    if (!line.trim() || !line.includes('"type"')) continue;
-    let entry: { type?: string; message?: { content?: unknown } };
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (entry?.type !== 'user' && entry?.type !== 'assistant') continue;
-    const content = entry.message?.content;
-    return (
-      Array.isArray(content) &&
-      content.some((b) => {
-        const block = b as { type?: unknown; tool_use_id?: unknown } | null;
-        return block?.type === 'tool_result' && block.tool_use_id === id;
-      })
-    );
+    if (!lines[i].includes('"type"')) continue;
+    const line = lineOf(lines[i], ['user', 'assistant'], lineAt(i, file));
+    if (!line) continue;
+    const content = line.message.content;
+    return Array.isArray(content) && content.filter(isBlock('tool_result')).some((b) => b.tool_use_id === id);
   }
   return false;
 };
@@ -110,17 +116,52 @@ const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
 export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
 
 /** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
-const resultText = (content: unknown): string =>
+const resultText = (content: BlockOf<'tool_result'>['content']): string =>
   typeof content === 'string'
     ? content
     : Array.isArray(content)
-      ? content
-          .map((b) => {
-            const block = b as { type?: unknown; text?: unknown } | null;
-            return block?.type === 'text' && typeof block.text === 'string' ? block.text : `[${String(block?.type)}]`;
-          })
-          .join('\n')
+      ? content.map((b) => (b.type === 'text' && 'text' in b && typeof b.text === 'string' ? b.text : `[${b.type}]`)).join('\n')
       : '';
+
+/** One content block of a conversation line said by `role` at `at` as events, its id the line's `id` and its place `i` when it has none. */
+const blockEvents = (block: ContentBlock, i: number, id: string, at: string, role: TranscriptEvent['role']): TranscriptEvent[] => {
+  const said = (text: string): TranscriptEvent => ({ id: `${id}:${i}`, at, role, kind: role === 'system' ? 'system' : 'text', text });
+  if (isBlock('text')(block)) return [said(block.text ?? '')];
+  if (isBlock('thinking')(block) || isBlock('redacted_thinking')(block)) {
+    return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(block.thinking ? { text: block.thinking } : {}) }];
+  }
+  if (isBlock('tool_use')(block)) {
+    return [{ id: block.id ?? `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } }];
+  }
+  if (isBlock('tool_result')(block)) {
+    return [
+      {
+        id: block.tool_use_id ?? `${id}:${i}`,
+        at,
+        role,
+        kind: 'tool_result',
+        result: { text: resultText(block.content), isError: block.is_error === true },
+      },
+    ];
+  }
+  return [said(`[${block.type}]`)];
+};
+
+/** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
+const queuedEvents = (line: Line<'attachment'>, id: string, at: string): TranscriptEvent[] => {
+  const a = line.attachment;
+  if (a === undefined || !isQueued(a) || typeof a.prompt !== 'string') return [];
+  const from = a.origin?.kind;
+  if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
+  return a.commandMode === 'prompt' && (from === 'human' || from === undefined)
+    ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
+    : [];
+};
+
+type Attached = NonNullable<Line<'attachment'>['attachment']>;
+
+/** Whether an attachment is a queued command, as its schema decoded it. */
+const isQueued = (a: Attached): a is Extract<Attached, { type: 'queued_command' }> => a.type === 'queued_command';
 
 /**
  * One line of a Claude Code transcript as events. A `user` or `assistant` line gives one per content
@@ -149,104 +190,26 @@ const resultText = (content: unknown): string =>
  * Code renders to the model as "The user sent a new message while you were working"). Read as a `user`
  * text event, as the words that started the turn are. A queued command that is not a prompt — Claude Code's notice that
  * a task it ran in the background ended (`task-notification`) — gives nothing.
+ *
+ * A line of those four types is decoded (`lines.ts`) before anything is read of it, a subagent's included, and one that does not
+ * decode throws an `Error` naming the line by its offset, in `file` when it is given, its field and the fix: the transcript is refused, never read as saying
+ * nothing. Any other value — another type, no object — gives nothing, unread.
  */
-export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
-  const line = entry as {
-    type?: unknown;
-    uuid?: unknown;
-    timestamp?: unknown;
-    subtype?: unknown;
-    content?: unknown;
-    isMeta?: unknown;
-    isSidechain?: unknown;
-    message?: { content?: unknown } | null;
-    attachment?: { type?: unknown; prompt?: unknown; commandMode?: unknown; origin?: { kind?: unknown } | null } | null;
-  } | null;
-  const at = isoTime(line?.timestamp);
-  if (!line || !at || line.isSidechain === true) return [];
-  const id = typeof line.uuid === 'string' && line.uuid ? line.uuid : `@${offset}`;
-  if (line.type === 'system') {
-    return [
-      {
-        id,
-        at,
-        role: 'system',
-        kind: 'system',
-        text: typeof line.content === 'string' ? line.content : typeof line.subtype === 'string' ? line.subtype : 'system',
-      },
-    ];
-  }
-  if (line.type === 'attachment') {
-    const a = line.attachment;
-    if (a?.type !== 'queued_command' || typeof a.prompt !== 'string') return [];
-    const from = a.origin?.kind;
-    if (from === 'peer') return [{ id, at, role: 'system', kind: 'system', text: a.prompt }];
-    return a.commandMode === 'prompt' && (from === 'human' || from === undefined)
-      ? [{ id, at, role: 'user', kind: 'text', text: a.prompt }]
-      : [];
-  }
-  if (line.type !== 'user' && line.type !== 'assistant') return [];
+export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
+  const where = `the line at byte ${offset} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
+  const read = decodeLine(entry, ['user', 'assistant', 'system', 'attachment'], where);
+  if (read === undefined) return [];
+  if ('wrong' in read) throw new Error(read.wrong);
+  const { line } = read;
+  const at = isoTime(line.timestamp);
+  if (!at || line.isSidechain === true) return [];
+  const id = line.uuid || `@${offset}`;
+  if (line.type === 'system') return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }];
+  if (line.type === 'attachment') return queuedEvents(line, id, at);
   const role = line.isMeta === true ? 'system' : line.type;
-  const said = (i: number, text: string): TranscriptEvent => ({
-    id: `${id}:${i}`,
-    at,
-    role,
-    kind: role === 'system' ? 'system' : 'text',
-    text,
-  });
-  const content = line.message?.content;
-  if (typeof content === 'string') return [said(0, content)];
-  if (!Array.isArray(content)) return [];
-  return content.flatMap((b: unknown, i): TranscriptEvent[] => {
-    const block = b as {
-      type?: unknown;
-      text?: unknown;
-      thinking?: unknown;
-      id?: unknown;
-      name?: unknown;
-      input?: unknown;
-      tool_use_id?: unknown;
-      content?: unknown;
-      is_error?: unknown;
-    } | null;
-    switch (block?.type) {
-      case 'text':
-        return [said(i, typeof block.text === 'string' ? block.text : '')];
-      case 'thinking':
-      case 'redacted_thinking':
-        return [
-          {
-            id: `${id}:${i}`,
-            at,
-            role,
-            kind: 'thinking',
-            ...(typeof block.thinking === 'string' && block.thinking ? { text: block.thinking } : {}),
-          },
-        ];
-      case 'tool_use':
-        return [
-          {
-            id: typeof block.id === 'string' ? block.id : `${id}:${i}`,
-            at,
-            role,
-            kind: 'tool_use',
-            tool: { name: String(block.name), input: block.input },
-          },
-        ];
-      case 'tool_result':
-        return [
-          {
-            id: typeof block.tool_use_id === 'string' ? block.tool_use_id : `${id}:${i}`,
-            at,
-            role,
-            kind: 'tool_result',
-            result: { text: resultText(block.content), isError: block.is_error === true },
-          },
-        ];
-      default:
-        return [said(i, `[${String(block?.type)}]`)];
-    }
-  });
+  const content = line.message.content;
+  if (typeof content === 'string') return [{ id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content }];
+  return (content ?? []).flatMap((block, i) => blockEvents(block, i, id, at, role));
 };
 
 /**
@@ -265,43 +228,29 @@ type CostState = {
 type Tokens = { inputTokens?: number; uncachedTokens?: number; cacheWriteTokens?: number; cacheReadTokens?: number; outputTokens?: number };
 
 /** The tokens of a `cost-state`'s `modelUsage`, every model's together — or none, when any model's count is not all there. */
-const tokensOf = (modelUsage: unknown): Tokens => {
-  if (typeof modelUsage !== 'object' || modelUsage === null || Array.isArray(modelUsage)) return {};
+const tokensOf = (modelUsage: Line<'cost-state'>['modelUsage']): Tokens => {
+  if (modelUsage === undefined) return {};
   const sum = { uncachedTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 };
-  for (const m of Object.values(modelUsage as Record<string, unknown>)) {
-    const n = (key: string) => {
-      const v = (m as Record<string, unknown> | null)?.[key];
-      return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-    };
-    const counts = [n('inputTokens'), n('cacheReadInputTokens'), n('cacheCreationInputTokens'), n('outputTokens')];
-    if (counts.some((c) => c === undefined)) return {};
-    sum.uncachedTokens += counts[0]!;
-    sum.cacheReadTokens += counts[1]!;
-    sum.cacheWriteTokens += counts[2]!;
-    sum.outputTokens += counts[3]!;
+  for (const m of Object.values(modelUsage)) {
+    if (m.inputTokens === undefined || m.cacheReadInputTokens === undefined) return {};
+    if (m.cacheCreationInputTokens === undefined || m.outputTokens === undefined) return {};
+    sum.uncachedTokens += m.inputTokens;
+    sum.cacheReadTokens += m.cacheReadInputTokens;
+    sum.cacheWriteTokens += m.cacheCreationInputTokens;
+    sum.outputTokens += m.outputTokens;
   }
   return { inputTokens: sum.uncachedTokens + sum.cacheReadTokens + sum.cacheWriteTokens, ...sum };
 };
 
-/** A transcript line read as a `cost-state` — or `undefined` for any other line, or one that is not JSON. */
-const costStateOf = (line: string): CostState | undefined => {
-  let e: Record<string, unknown> | null;
-  try {
-    e = JSON.parse(line);
-  } catch {
-    return undefined;
-  }
-  if (e?.type !== 'cost-state') return undefined;
-  const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? e[key] : undefined);
-  return {
-    costUsd: n('totalCostUSD'),
-    apiMs: n('totalAPIDuration'),
-    toolMs: n('totalToolDuration'),
-    ...tokensOf(e.modelUsage),
-    startTime: n('startTime'),
-    unpriced: e.hasUnknownModelCost === true,
-  };
-};
+/** A decoded `cost-state` line as what it says the session cost. */
+const costStateOf = (line: Line<'cost-state'>): CostState => ({
+  costUsd: line.totalCostUSD,
+  apiMs: line.totalAPIDuration,
+  toolMs: line.totalToolDuration,
+  ...tokensOf(line.modelUsage),
+  startTime: line.startTime,
+  unpriced: line.hasUnknownModelCost === true,
+});
 
 /**
  * How far before the session's start in the registry a `cost-state`'s `startTime` may be and still be the count this
@@ -386,80 +335,12 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * says it reached it. And the attempt's first response is kept apart — its context and its cache write — since that is
  * where a continuation either reads its parent's conversation from the cache or writes it there again.
  *
- * A line that is not JSON is skipped.
+ * A line that is not JSON is skipped. Each line read here of a kind `lines.ts` decodes — a `cost-state`, an `agent-name`, a
+ * `compact_boundary`, an attempt's `assistant` line, and the `timestamp` of a line before the attempt begins — is decoded, and one
+ * that does not decode throws an `Error` naming the line, in `file` when it is given, its field and the fix: never read as nothing.
  */
-export const transcriptUsage = (jsonl: string, since: number): Usage => {
-  const responses = new Map<string, { uncached: number; write: number; read: number; output: number } | null>();
-  const toolCalls = new Set<string>();
-  let before: CostState | undefined;
-  let after: CostState | undefined;
-  let begun = false;
-  let compactions = 0;
-  let summarised = 0;
-  let name: string | undefined;
-  for (const line of jsonl.split('\n')) {
-    if (line.includes('"cost-state"')) {
-      const state = costStateOf(line);
-      if (state) {
-        if (begun) after = state;
-        else before = state;
-        continue;
-      }
-    }
-    if (line.includes('"agent-name"')) {
-      let entry: { type?: unknown; agentName?: unknown } | null = null;
-      try {
-        entry = JSON.parse(line);
-      } catch {}
-      if (entry?.type === 'agent-name' && typeof entry.agentName === 'string') {
-        if (begun && name !== undefined && entry.agentName !== name) break;
-        name = entry.agentName;
-        continue;
-      }
-    }
-    if (!begun && line.includes('"timestamp"')) {
-      try {
-        begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since;
-      } catch {}
-    }
-    if (begun && line.includes('"compact_boundary"')) {
-      try {
-        const entry = JSON.parse(line) as { subtype?: unknown; compactMetadata?: { preTokens?: unknown } } | null;
-        if (entry?.subtype === 'compact_boundary') {
-          compactions += 1;
-          const pre = entry.compactMetadata?.preTokens;
-          if (typeof pre === 'number' && Number.isFinite(pre)) summarised = Math.max(summarised, pre);
-        }
-      } catch {}
-    }
-    if (!line.includes('"assistant"')) continue;
-    let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const message = entry.message;
-    if (entry.type !== 'assistant' || !message?.id || !(Date.parse(entry.timestamp ?? '') >= since)) continue;
-    const u = message.usage;
-    const n = (key: string) => (typeof u?.[key] === 'number' ? u[key] : 0);
-    responses.set(
-      message.id,
-      typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'
-        ? {
-            uncached: n('input_tokens'),
-            write: n('cache_creation_input_tokens'),
-            read: n('cache_read_input_tokens'),
-            output: n('output_tokens'),
-          }
-        : null,
-    );
-    if (Array.isArray(message.content)) {
-      for (const block of message.content as Array<{ type?: string; id?: string }>) {
-        if (block?.type === 'tool_use' && block.id) toolCalls.add(block.id);
-      }
-    }
-  }
+export const transcriptUsage = (jsonl: string, since: number, file?: string): Usage => {
+  const { responses, toolCalls, before, after, compactions, summarised } = attemptIn(jsonl, since, file);
   const counted = [...responses.values()];
   const measured = counted.filter((c) => c !== null);
   const all = measured.length === counted.length;
@@ -484,6 +365,73 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     ...(compacted ? { compactions } : {}),
     ...costOf(before, after, since, compacted),
   };
+};
+
+/** One response's counts, or `null` when it was written without its input and output tokens. */
+type Response = { uncached: number; write: number; read: number; output: number } | null;
+
+/** The counts of a decoded `assistant` line's response (`Response`). */
+const responseOf = ({ message: { usage: u } }: Line<'assistant'>): Response =>
+  u?.input_tokens !== undefined && u.output_tokens !== undefined
+    ? { uncached: u.input_tokens, write: u.cache_creation_input_tokens ?? 0, read: u.cache_read_input_tokens ?? 0, output: u.output_tokens }
+    : null;
+
+/**
+ * What `transcriptUsage` reads of an attempt: its responses by id and its tool calls by id, the `cost-state` lines before and after
+ * it began, whether it has begun, its compactions with the largest context one of them summarised, and the name it runs under.
+ */
+type Attempt = {
+  responses: Map<string, Response>;
+  toolCalls: Set<string>;
+  before?: CostState;
+  after?: CostState;
+  begun: boolean;
+  compactions: number;
+  summarised: number;
+  name?: string;
+};
+
+/** What `transcriptUsage` reads of an attempt (`Attempt`), in one pass over its transcript, from its first line to its last. */
+const attemptIn = (jsonl: string, since: number, file?: string): Attempt => {
+  const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, compactions: 0, summarised: 0 };
+  for (const [i, text] of jsonl.split('\n').entries()) if (!took(attempt, text, since, () => lineAt(i, file))) break;
+  return attempt;
+};
+
+/**
+ * One transcript line taken into `a`, `where` it is: `false` when it says the session was continued under another name, which
+ * ends the attempt, and `true` otherwise.
+ */
+const took = (a: Attempt, text: string, since: number, where: () => string): boolean => {
+  const state = text.includes('"cost-state"') ? lineOf(text, ['cost-state'], where()) : undefined;
+  if (state) {
+    if (a.begun) a.after = costStateOf(state);
+    else a.before = costStateOf(state);
+    return true;
+  }
+  const named = text.includes('"agent-name"') ? lineOf(text, ['agent-name'], where())?.agentName : undefined;
+  if (named !== undefined) {
+    if (a.begun && a.name !== undefined && named !== a.name) return false;
+    a.name = named;
+    return true;
+  }
+  if (!a.begun && text.includes('"timestamp"')) a.begun = (writtenAt(text, where()) ?? NaN) >= since;
+  if (a.begun) tookSaid(a, text, since, where);
+  return true;
+};
+
+/** A line of a begun attempt taken into `a`, `where` it is: a `compact_boundary`, or a response made at or after `since`. */
+const tookSaid = (a: Attempt, text: string, since: number, where: () => string): void => {
+  const boundary = text.includes('"compact_boundary"') ? lineOf(text, ['system'], where()) : undefined;
+  if (boundary?.subtype === 'compact_boundary') {
+    a.compactions += 1;
+    a.summarised = Math.max(a.summarised, boundary.compactMetadata?.preTokens ?? 0);
+  }
+  const response = text.includes('"assistant"') ? lineOf(text, ['assistant'], where()) : undefined;
+  if (!response?.message.id || !(Date.parse(response.timestamp ?? '') >= since)) return;
+  a.responses.set(response.message.id, responseOf(response));
+  const content = response.message.content;
+  for (const call of Array.isArray(content) ? content.filter(isBlock('tool_use')) : []) if (call.id) a.toolCalls.add(call.id);
 };
 
 /** One line per message of the Agent SDK's. Its messages vary in shape, so every field is read as one that may be absent. */

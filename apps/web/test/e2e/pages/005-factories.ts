@@ -10,16 +10,19 @@ import { OUT } from '../world.ts';
 /** The menu's sub-items under the Factories, by the factory each leads to. */
 const subItems = (page: Page) => page.locator('[data-sidebar="sidebar"] [data-sidebar="menu-sub"] a[data-sidebar="menu-sub-button"]');
 
-/** The factories FACTORIES seeds, listed as the api lists them: the default first, then the store's by name. */
-const LISTED = ['default', FACTORIES.broken, ...FACTORIES.others, FACTORIES.hiring.name, FACTORIES.bare];
+/** The factories FACTORIES seeds, listed as the api lists them, by name: the default factory is no block once a factory is filed. */
+const LISTED = [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORIES.hiring.name, FACTORIES.bare, FACTORIES.others[2]];
+/** The factory the menu leaves behind 'Show 1 more', last by name. */
+const PAST = LISTED[LISTED.length - 1];
 
 export default {
   /**
-   * The Factories at `/`: every factory a block on a canvas, the default one first — it holds every run started in no factory — and a
-   * file that does not read a block that says why. The menu's Factories lists the first five under it and a button for the rest. A block
-   * pressed opens its factory's floor, at `/factories/<name>`, with only its runs on it: FOLDER's, in `hiring`, once finished runs are
-   * shown. A name no factory has says so, answered with no 4xx, and leads back. The default block counts its runs as the default floor
-   * does, the two read a moment apart: the store the pages leave moves between the themes.
+   * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
+   * none, in the canvas or the menu, once a factory is filed, though it holds runs. The menu's Factories lists the first five under it and
+   * a button for the rest; a factory past them, opened by its address, is lit in the menu as a sixth. A block pressed opens its factory's
+   * floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — and a start in its
+   * header. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
+   * with no start in its header.
    */
   name: 'factories',
   route: '/',
@@ -31,14 +34,14 @@ export default {
       'the menu lights the Factories at /',
     );
     const blocks = page.locator('.react-flow__node a[data-factory]');
-    await expectCount(blocks, LISTED.length, 'a block for each factory, the default one among them: it holds runs');
+    await expectCount(blocks, LISTED.length, 'a block for each factory filed');
     await expectTexts(
       page.locator('.react-flow__node a[data-factory] > span:first-child'),
-      LISTED.map((name) => (name === 'default' ? 'defaultdefault' : name)),
-      'the blocks in the order the api lists them, the default one first and badged',
+      LISTED,
+      'the blocks in the order the api lists them, by name',
     );
     const block = (name: string) => page.locator(`.react-flow__node a[data-factory="${name}"]`);
-    await expectVisible(block('default').locator('[data-offer]', { hasText: /^every workflow · no hires$/ }), 'and offers every workflow');
+    await expectCount(block('default'), 0, 'and none for the default factory, which holds runs, once a factory is filed');
     const hiring = block(FACTORIES.hiring.name);
     await expectVisible(hiring.locator('[data-runs]', { hasText: /^0 in flight · 1 run$/ }), `${FACTORIES.hiring.name} holds FOLDER's run`);
     await expectVisible(
@@ -58,8 +61,17 @@ export default {
     await expectTexts(subItems(page), LISTED.slice(0, 5), 'the menu lists the first five factories under the Factories');
     const more = menu.getByRole('button', { name: 'Show 1 more' });
     await expectVisible(more, 'and a button saying how many more there are');
+    await expectCount(menu.locator('[data-factory="default"]'), 0, 'and no item for the default factory');
     await settled(page);
     await photograph(page, path.join(OUT, `factories-canvas-${await themeOf(page)}.png`));
+
+    await page.goto(new URL(`/factories/${PAST}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectTexts(subItems(page), LISTED, `${PAST}'s floor opened by its address, the menu lists it after the first five`);
+    await expectVisible(subItems(page).and(page.locator(`[data-factory="${PAST}"][data-active="true"]`)), 'lit');
+    await expectCount(menu.getByRole('button', { name: /^Show \d+ more$/ }), 0, 'with no factory left behind the button');
+    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
     await more.click();
     await expectTexts(subItems(page), LISTED, 'pressed, the menu lists every factory');
     await expectCount(more, 0, 'and the button is gone');
@@ -93,6 +105,8 @@ export default {
         `the card says where its steps work on hover, not in a row of its own, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`,
       );
     }
+    const header = page.locator('header');
+    await expectVisible(header.getByRole('button', { name: 'Start a run' }), `and ${FACTORIES.hiring.name}'s header offers a start`);
     await settled(page);
     await photograph(page, path.join(OUT, `factories-floor-${await themeOf(page)}.png`));
 
@@ -108,16 +122,19 @@ export default {
     await page.waitForURL((url) => url.pathname === '/', { timeout: WAIT_MS });
     await expectCount(blocks, LISTED.length, 'and leads back to the Factories');
 
-    await block('default').click();
-    await page.waitForURL((url) => url.pathname === '/factories/default', { timeout: WAIT_MS });
-    const tally = page.getByText(/^\d+ in flight · \d+ finished · \d+ to decide · \d+ waiting on you$/);
-    await expectVisible(tally, "the default block opens the default factory's floor, which counts its runs");
-    const [flying, finished, , waiting] = ((await tally.textContent()) ?? '').match(/\d+/g)!.map(Number);
+    await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(
+      page.getByText(/^\d+ in flight · \d+ finished · \d+ to decide · \d+ waiting on you$/),
+      "the default factory's floor answers its address, and counts its runs",
+    );
+    await expectCount(
+      header.getByRole('button', { name: 'Start a run' }),
+      0,
+      'with no start in its header: a run from a floor names its factory',
+    );
     await page.locator('nav[aria-label="Factory"]').getByRole('link', { name: 'Factories' }).click();
     await page.waitForURL((url) => url.pathname === '/', { timeout: WAIT_MS });
-    await expectVisible(
-      block('default').locator('[data-runs]', { hasText: `${flying} in flight · ${waiting} waiting on you · ${flying + finished} runs` }),
-      "the header's Factories leads back, and the default block counts its runs as its floor does: in flight, waiting on you, and all",
-    );
+    await expectCount(blocks, LISTED.length, "and the header's Factories leads back");
   },
 } satisfies PageSpec;

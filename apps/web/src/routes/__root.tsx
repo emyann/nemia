@@ -131,8 +131,9 @@ const SubLink = routeLink(SidebarMenuSubButton);
 
 /**
  * The factories under the Factories item, one a block (`factoryBlocks`): the first `MENU_SHOWN`, and a button that shows the rest in place.
- * Each is lit on its own floor, and the one named `open`, whose floor is open, is listed past the first five too. It reads the runs without polling them — a page that shows none must not read them every 5 s — so they are
- * read again only on the feed's events and when a page that polls them is open. Nothing is listed while either read has no answer.
+ * Each is lit on its own floor, and the one named `open`, whose floor is open, is listed past the first five too. It reads the runs
+ * without polling them — a page that shows none must not read them every 5 s — so they are read again only on the feed's events and when
+ * a page that polls them is open. Nothing is listed while either read has no answer.
  */
 function FactoriesMenu({ path, open, onPick }: { path: string; open?: string; onPick: () => void }) {
   const [all, setAll] = useState(false);

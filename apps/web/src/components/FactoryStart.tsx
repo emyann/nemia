@@ -118,7 +118,7 @@ function Workflows({ place }: { place: Place }) {
   );
 }
 
-/** One workflow the factory offers, a radio of the group `group`: its name, whether it is yours, its description, and why it cannot start. */
+/** One workflow the factory offers, a radio in the group `group`: its name, whether it is yours, its description, why it cannot start. */
 function WorkflowRow({
   workflow,
   group,

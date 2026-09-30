@@ -1,16 +1,18 @@
 import type { AgentListing, AgentRoleKey } from '../lib/api';
 import { AgentFace, FromBadge, personOf, RouteLink, Skills, UsedBy } from './AgentParts';
+import { FactoryTags } from './FactoryTag';
 
 /** The keys a character card shows, as its stats: what its sessions think with, how hard, and where they run. */
 const STATS: readonly AgentRoleKey[] = ['model', 'effort', 'harness'];
 
 /**
  * One agent as a character card: its face large on its own plate, its name as a person's with the job it holds, what it is for, what it
- * can do, its model, effort and harness where it sets them, and the nodes that name it. The whole card opens the agent's page, where every
- * other key, the skills it gives and its system prompt are; its name is the one link there, stretched over the card, and the nodes' links
- * sit above it.
+ * can do, its model, effort and harness where it sets them, the factories it fills a step in, each linked to its floor — nothing for none,
+ * or where the listing does not say — and the nodes that name it. The whole card opens the agent's page, where every other key, the skills
+ * it gives and its system prompt are; its name is the link there, stretched over the card, and the factories' and the nodes' links sit
+ * above it.
  */
-export function AgentCard({ agent }: { agent: AgentListing }) {
+export function AgentCard({ agent }: { agent: AgentListing & { factories?: readonly string[] } }) {
   return (
     <section
       aria-label={`Agent ${agent.name}`}
@@ -36,7 +38,10 @@ export function AgentCard({ agent }: { agent: AgentListing }) {
           <p data-agent-role className="text-xs text-muted-foreground">
             {agent.role ?? 'No role yet'} · <span className="font-mono">{agent.name}</span>
           </p>
-          <FromBadge from={agent.from} />
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            <FromBadge from={agent.from} />
+            <FactoryTags names={agent.factories ?? []} linked className="relative z-10" />
+          </div>
         </header>
         {agent.description && <p className="text-center text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
         {agent.error === null &&

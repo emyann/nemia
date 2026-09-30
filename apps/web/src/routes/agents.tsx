@@ -5,7 +5,7 @@ import { LinkButton } from '@/components/ui/button';
 import { AgentCard } from '../components/AgentCard';
 import { SkillLink } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
-import { agentsQuery, skillsQuery, type AgentListing, type SkillPlace } from '../lib/api';
+import { agentsQuery, skillsQuery, type LibraryAgent, type SkillPlace } from '../lib/api';
 import { PLACE_LABELS } from '../lib/skills';
 
 export const Route = createFileRoute('/agents')({
@@ -60,7 +60,8 @@ function AgentsPage() {
   );
 }
 
-function Place({ title, agents, empty }: { title: string; agents: AgentListing[]; empty: React.ReactNode }) {
+/** One place's agents, a card each with the factories it fills a step in; `empty` where it has none. */
+function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]; empty: React.ReactNode }) {
   return (
     <section aria-label={title} className="space-y-3">
       <h2 className="text-sm font-semibold">{title}</h2>

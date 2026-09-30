@@ -488,8 +488,8 @@
     {
       "files": ["apps/web/src/routes/inbox.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 162, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 27 }]
+        "max-lines-per-function": ["error", { "max": 145, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 24 }]
       }
     },
     {

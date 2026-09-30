@@ -7,13 +7,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { agentQuery, agentsQuery, readAgent, type AgentListing } from '../src/lib/api/agents.ts';
+import { agentQuery, agentsQuery, readAgent, type AgentListing, type LibraryAgent } from '../src/lib/api/agents.ts';
 import { skillQuery, skillsQuery, type SkillDetail, type SkillPlace } from '../src/lib/api/skills.ts';
 import { repositoryQuery, stepQuery, workflowsQuery, type WorkflowListing, type WorkflowStepPage } from '../src/lib/api/workflows.ts';
 import { keyFormQuery, type KeyForm } from '../src/lib/api/builder.ts';
 import { machineQuery, machinesQuery, type MachineGraph, type MachineListing } from '../src/lib/api/machines.ts';
 import { StepKeySchema, WorkflowStepSpecSchema } from '../src/lib/api/library.ts';
-import { agent, keyForm, machine, skillDetail, skillEntry, skillPlace, stepPage, stepSpec, workflow } from './library-fixtures.ts';
+import {
+  agent,
+  keyForm,
+  listedAgent,
+  machine,
+  skillDetail,
+  skillEntry,
+  skillPlace,
+  stepPage,
+  stepSpec,
+  workflow,
+} from './library-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {
@@ -24,7 +35,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
   });
 }
 
-const readAgents = agentsQuery.queryFn as unknown as () => Promise<AgentListing[]>;
+const readAgents = agentsQuery.queryFn as unknown as () => Promise<LibraryAgent[]>;
 const readAgentPage = agentQuery('yours', 'agora').queryFn as unknown as () => Promise<AgentListing>;
 const readSkills = skillsQuery.queryFn as unknown as () => Promise<SkillPlace[]>;
 const readSkill = skillQuery('yours', 'review-a-change').queryFn as unknown as () => Promise<SkillDetail>;
@@ -54,8 +65,8 @@ const without = <T extends object>(value: T, ...keys: string[]): T =>
   Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k))) as T;
 
 test('each read of the library decodes an answer the api gives, as it gave it', async (t) => {
-  answering(t, [agent()]);
-  assert.deepEqual(await readAgents(), [agent()]);
+  answering(t, [listedAgent()]);
+  assert.deepEqual(await readAgents(), [listedAgent()]);
   answering(t, agent());
   assert.deepEqual(await readAgentPage(), agent());
   assert.deepEqual(await readAgent('yours', 'agora'), agent());
@@ -79,10 +90,10 @@ test('each read of the library decodes an answer the api gives, as it gave it', 
 
 test('what the api leaves out stays out: a card entry without examples, a draft without preload, an edge without a guard', async (t) => {
   const { examples: _, ...bare } = skillEntry();
-  answering(t, [agent({ card: [bare], untried: null })]);
+  answering(t, [listedAgent({ card: [bare], untried: null })]);
   const [read] = await readAgents();
   assert.equal(Object.hasOwn(read.card?.[0] ?? {}, 'examples'), false);
-  assert.deepEqual(read, agent({ card: [bare], untried: null }));
+  assert.deepEqual(read, listedAgent({ card: [bare], untried: null }));
 
   const draft = without(skillDetail().draft ?? assert.fail('the fixture has a draft'), 'preload', 'title');
   answering(t, skillDetail({ draft }));
@@ -117,10 +128,10 @@ test('the step keys the board reads are every key of a step it reads, no fewer a
 });
 
 test('a key the board does not know is dropped, not refused', async (t) => {
-  answering(t, [{ ...agent(), colour: 'blue' }]);
+  answering(t, [{ ...listedAgent(), colour: 'blue' }]);
   const [read] = await readAgents();
   assert.equal(Object.hasOwn(read, 'colour'), false);
-  assert.deepEqual(read, agent());
+  assert.deepEqual(read, listedAgent());
 
   const [step] = workflow().steps;
   answering(t, [workflow({ steps: [{ ...step, spec: { ...step.spec, mood: 'calm' } as never }] })]);
@@ -129,8 +140,18 @@ test('a key the board does not know is dropped, not refused', async (t) => {
   assert.deepEqual(listed, workflow());
 });
 
+test("REFUSED, the agents' list: an agent without the factories it fills a step in; one agent's page and a write's answer carry none", async (t) => {
+  answering(t, [listedAgent({}, [])]);
+  assert.deepEqual(await readAgents(), [listedAgent({}, [])]);
+  answering(t, [agent()]);
+  await assert.rejects(readAgents(), unread('/api/agents', '[0].factories', 'is missing'));
+  answering(t, agent());
+  assert.deepEqual(await readAgent('yours', 'agora'), agent());
+  assert.equal(Object.hasOwn(await readAgent('yours', 'agora'), 'factories'), false);
+});
+
 test('REFUSED, the agents: one from no place the board knows, and a skill it gives whose cost has no turn', async (t) => {
-  answering(t, [agent({ from: 'elsewhere' as never })]);
+  answering(t, [listedAgent({ from: 'elsewhere' as never })]);
   await assert.rejects(readAgents(), unread('/api/agents', '[0].from', '"elsewhere", where the board reads "repo" | "yours"'));
 
   const [given] = agent().given;

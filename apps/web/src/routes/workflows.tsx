@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { FactoryTags } from '../components/FactoryTag';
 import { Markdown } from '../components/Markdown';
 import { NewWorkflow } from '../components/NewWorkflow';
 import { StartRun } from '../components/StartRun';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { workflowsQuery, type WorkflowListing } from '../lib/api';
+import { factoriesQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
+import { workflowFactories } from '../lib/factories';
 
 export const Route = createFileRoute('/workflows')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(workflowsQuery),
+  loader: ({ context }) =>
+    Promise.all([context.queryClient.ensureQueryData(workflowsQuery), context.queryClient.prefetchQuery(factoriesQuery)]),
   component: WorkflowsPage,
   errorComponent: ({ error }) => (
     <p className="text-sm text-red-600">
@@ -58,13 +61,15 @@ function WorkflowsPage() {
 }
 
 /**
- * A workflow's card: what it is, drawn, its steps' pages and a start — or, for one of yours, its builder in their place
+ * A workflow's card: what it is, the factories it is in (`workflowFactories`), each linked to its floor — nothing while they are unread or
+ * for one in none — drawn, its steps' pages and a start — or, for one of yours, its builder in their place
  * (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api
  * writes nothing into a checkout.
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
   const [building, setBuilding] = useState(opened && from === 'yours' && !error);
+  const { data: factories } = useQuery(factoriesQuery);
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
     if (opened) card.current?.scrollIntoView({ block: 'start' });
@@ -89,6 +94,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
           >
             {from === 'yours' ? 'yours' : 'this repository'}
           </span>
+          <FactoryTags names={workflowFactories(workflow, factories ?? [])} linked />
           {!error && (
             <span className="text-xs text-neutral-500">
               {steps.length} {steps.length === 1 ? 'step' : 'steps'}

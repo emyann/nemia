@@ -111,10 +111,22 @@ const AgentListingSchema = Schema.Struct({
   untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Schema.NullOr(Schema.String) })),
 }) satisfies Schema.Schema<AgentListing>;
 
-/** Every agent of the repository's and of yours, read from disk on each request. */
+/**
+ * Mirrors `LibraryAgent` in apps/api/src/agents/fills.ts, as the Agents page reads it: an agent's listing, and the names of the factories
+ * it fills a step in, sorted; the default factory is never one of them.
+ */
+export type LibraryAgent = AgentListing & { factories: string[] };
+
+/** Decodes a `LibraryAgent`: an `AgentListing` and its factories. */
+const LibraryAgentSchema = Schema.Struct({
+  ...AgentListingSchema.fields,
+  factories: Schema.mutable(Schema.Array(Schema.String)),
+}) satisfies Schema.Schema<LibraryAgent>;
+
+/** Every agent of the repository's and of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: () => get('/api/agents', Schema.mutable(Schema.Array(AgentListingSchema))),
+  queryFn: () => get('/api/agents', Schema.mutable(Schema.Array(LibraryAgentSchema))),
 });
 
 /** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */

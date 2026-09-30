@@ -119,9 +119,15 @@ export const DEFAULT_NAME = 'default';
 /** The factory a run or a card is tagged with: the one it names, or `default` for one naming none. */
 export const factoryOf = (item: { factory: string | null }): string => item.factory ?? DEFAULT_NAME;
 
-/** The runs or cards of the factory `filter` names (`factoryOf`), in their order; every one when `filter` names none. */
+/** Whether a run or a card is kept by the filter on the factory `filter` names (`factoryOf`): every one is when it names none. */
+export const keptBy =
+  (filter: string | undefined) =>
+  (item: { factory: string | null }): boolean =>
+    filter === undefined || factoryOf(item) === filter;
+
+/** The runs or cards of the factory `filter` names (`keptBy`), in their order; every one when `filter` names none. */
 export const shownIn = <T extends { factory: string | null }>(items: readonly T[], filter: string | undefined): T[] =>
-  filter === undefined ? [...items] : items.filter((item) => factoryOf(item) === filter);
+  items.filter(keptBy(filter));
 
 /** Each factory `items` are tagged with (`factoryOf`) and how many of them are, the default factory first, then by name. */
 export const factoryCounts = (items: readonly { factory: string | null }[]): { name: string; count: number }[] => {
@@ -144,3 +150,7 @@ export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from
     .map((f) => f.name)
     .sort();
 };
+
+/** The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string. */
+export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>
+  typeof search.factory === 'string' && search.factory ? { factory: search.factory } : {};

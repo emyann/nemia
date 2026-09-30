@@ -1,35 +1,27 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart } from '../components/FactoryCardStart';
+import { FactoryFilter } from '../components/FactoryTag';
+import { CardMeta, GoneItem, PageLink, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { StartRun } from '../components/StartRun';
 import { FIELD, WorkflowOptions } from '../components/WorkflowOptions';
-import {
-  dropCard,
-  fileCard,
-  inboxQuery,
-  queueCard,
-  repositoryQuery,
-  workflowNameOf,
-  workflowsQuery,
-  type InboxEntry,
-  type Started,
-} from '../lib/api';
+import { dropCard, fileCard, inboxQuery, queueCard, repositoryQuery, workflowsQuery, type InboxEntry, type Started } from '../lib/api';
+import { factorySearch, keptBy, shownIn } from '../lib/factories';
 import {
   cardLines,
-  hasPage,
   namedElsewhere,
   newestCardsFirst,
   presetOf,
   queueable,
   queuedWord,
   queueOf,
-  triedLine,
   workflowKey,
   type CardRefusal,
 } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
+  validateSearch: factorySearch,
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
   component: InboxPage,
   errorComponent: ({ error }) => (
@@ -41,23 +33,24 @@ export const Route = createFileRoute('/inbox')({
 
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
-const PRIMARY =
-  'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
-const SECONDARY =
-  'rounded border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-900';
-
 /**
  * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
  * refused with, by card, since the inbox is read again after each answer: a card gone behind the page's back leaves the list, and its
  * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
  * file beside it answer to one name, and a refusal is of one of them.
+ *
+ * Every factory's cards are listed, each tagged with its own, and a filter over them keeps one factory's (`FactoryFilter`), kept in the
+ * address as `?factory=<name>`; the counts are of the cards it keeps, and a filter that keeps none says so and how to clear it.
  */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
+  const { factory } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [refusals, setRefusals] = useState<CardRefusal[]>([]);
-  const cards = newestCardsFirst(entries);
-  const queue = queueOf(entries).length;
-  const lines = cardLines(entries, refusals);
+  const all = newestCardsFirst(entries);
+  const cards = shownIn(all, factory);
+  const queue = queueOf(cards).length;
+  const lines = cardLines(entries, refusals).filter(({ entry }) => keptBy(factory)(entry));
   const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
     setRefusals((kept) => [...kept.filter((r) => r.entry.file !== entry.file), ...(refusal ? [{ ...refusal, entry }] : [])]);
 
@@ -70,6 +63,11 @@ function InboxPage() {
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
+        <FactoryFilter
+          items={all}
+          factory={factory}
+          onChange={(picked) => void navigate({ search: picked === undefined ? {} : { factory: picked }, replace: true })}
+        />
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards{' '}
           <span data-count className="text-xs font-normal text-neutral-500">
@@ -92,7 +90,16 @@ function InboxPage() {
             )}
           </ul>
         )}
-        {cards.length === 0 && (
+        {cards.length === 0 && all.length > 0 && (
+          <p data-filtered-out className="text-sm text-neutral-500">
+            No card of the factory <span className="font-mono">{factory}</span>.{' '}
+            <Link to="/inbox" search={{}} replace className="underline underline-offset-2">
+              Show every factory&apos;s
+            </Link>
+            .
+          </p>
+        )}
+        {all.length === 0 && (
           <p data-empty className="text-sm text-neutral-500">
             The inbox is empty. File an idea in the box above, or from the command line: {code('wf inbox add "<idea>"')}.
           </p>
@@ -205,7 +212,7 @@ function FileCard() {
 }
 
 /**
- * A card: its first line, linked to its page, its workflow and repository when it names them, and when it was filed; Start, which opens its
+ * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start, which opens its
  * start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it was queued, and
  * Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps it. A card a
  * run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card shows
@@ -274,24 +281,7 @@ function CardItem({
               </PageLink>
             </p>
           )}
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
-            <span className="font-mono">{entry.name}</span>
-            {entry.workflow && (
-              <span data-workflow={entry.workflow} title={entry.workflow}>
-                workflow <span className="font-mono text-neutral-700 dark:text-neutral-300">{workflowNameOf(entry.workflow)}</span>
-              </span>
-            )}
-            {entry.repo && (
-              <span data-repo className="font-mono break-all">
-                {entry.repo}
-              </span>
-            )}
-            {entry.filedAt && (
-              <time dateTime={entry.filedAt} title="When its file was last written">
-                {new Date(entry.filedAt).toLocaleString()}
-              </time>
-            )}
-          </p>
+          <CardMeta entry={entry} />
           {entry.queued && (
             <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-neutral-500">
               <span
@@ -385,86 +375,6 @@ function CardItem({
       )}
       {refusal && <Refused refusal={refusal} />}
     </li>
-  );
-}
-
-/** An entry's words, linked to its page where it has one among the entries listed with it (`hasPage`). */
-function PageLink({ entry, entries, children }: { entry: InboxEntry; entries: readonly InboxEntry[]; children: ReactNode }) {
-  if (!hasPage(entry, entries)) return <>{children}</>;
-  return (
-    <Link
-      to="/inbox/$name"
-      params={{ name: entry.name }}
-      className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600"
-    >
-      {children}
-    </Link>
-  );
-}
-
-/**
- * A card the inbox no longer lists, kept in its place for what its start or its drop was refused with: dropped or started behind the page's
- * back. Its first line and name, that it is gone, the refusal, and Dismiss, which takes the line away.
- */
-function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; refusal: CardRefusal; onDismiss: () => void }) {
-  return (
-    <li
-      aria-label={`Card ${entry.name}, no longer in the inbox`}
-      data-gone={entry.name}
-      className="space-y-3 rounded-lg border border-dashed border-neutral-300 p-4 dark:border-neutral-700"
-    >
-      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
-        <div className="min-w-0 flex-1 space-y-1">
-          <p data-title className="font-medium break-words text-neutral-500">
-            {entry.title ?? entry.file}
-          </p>
-          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
-            <span className="font-mono">{entry.name}</span>
-            <span>Gone from the inbox since this page listed it.</span>
-          </p>
-        </div>
-        <button type="button" onClick={onDismiss} className={`${SECONDARY} shrink-0`}>
-          Dismiss
-        </button>
-      </div>
-      <Refused refusal={refusal} />
-    </li>
-  );
-}
-
-/**
- * The tick's last try of a queued card's start, which did not start it (`triedLine`): refused, in amber — it stays queued and waits for
- * you; failed otherwise, muted — the tick tries it again on the next pass.
- */
-function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
-  const { refused } = entry.tried;
-  return (
-    <p
-      data-tried={refused ? 'refused' : 'failed'}
-      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-400'}`}
-    >
-      {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
-    </p>
-  );
-}
-
-const NOT_DONE: Record<CardRefusal['action'], string> = {
-  start: 'Not started',
-  remove: 'Not removed',
-  queue: 'Not queued',
-  unqueue: 'Not taken off the queue',
-};
-
-/** What a start, a drop, a queue or its taking back was refused with, in the api's words. */
-function Refused({ refusal }: { refusal: CardRefusal }) {
-  return (
-    <div
-      data-refused={refusal.action}
-      className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-    >
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">{NOT_DONE[refusal.action]}. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
-    </div>
   );
 }
 

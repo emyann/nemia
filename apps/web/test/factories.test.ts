@@ -11,6 +11,7 @@ import {
   factoryBlocks,
   factoryCounts,
   factoryOf,
+  factorySearch,
   floorPlace,
   MENU_SHOWN,
   menuFactories,
@@ -236,4 +237,11 @@ test("REFUSED: a workflow is tagged only with the factories that attach it where
   assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
   assert.deepEqual(workflowFactories({ name: 'intake', from: 'yours' }, factories), []);
   assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
+});
+
+test("a page's address filters by the factory it names, and by none when it names none, an empty one or not one string", () => {
+  assert.deepEqual(factorySearch({ factory: 'nemia' }), { factory: 'nemia' });
+  assert.deepEqual(factorySearch({ factory: 'default', step: 'x' }), { factory: 'default' });
+  for (const none of [{}, { factory: '' }, { factory: ['nemia'] }, { factory: 7 }])
+    assert.equal(Object.hasOwn(factorySearch(none), 'factory'), false);
 });

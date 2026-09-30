@@ -24,7 +24,10 @@ const refusing: PromiseRunner = {
 
 const N = 40;
 
-/** A store of `N` tasks that settled on the first pass, and an engine whose second pass has folded each once more: the feed names each settling. */
+/**
+ * A store of `N` tasks that settled on the first pass, and an engine whose second pass has folded each once more: the feed names each
+ * settling.
+ */
 const settledStore = async () => {
   const root = scratch('ae-memo-root-');
   const cwd = scratch('ae-memo-cwd-');

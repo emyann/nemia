@@ -364,8 +364,8 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
  * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
  * a continuation would report its parent's work as its own. A response is written as one line per
- * content block, each repeating its `message.id` and `usage`, so responses are counted once, by id. Tokens are given only when every counted response carried
- * them.
+ * content block, each repeating its `message.id` and `usage`, so responses are counted once, by id. Tokens are given only when every
+ * counted response carried them.
  *
  * The attempt's lines begin at the first line whose own time is at or after `since`, and end where the session was
  * continued under another name (an `agent-name` line naming another): a session its registry still lists after it

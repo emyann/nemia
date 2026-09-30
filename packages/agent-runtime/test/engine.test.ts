@@ -732,7 +732,9 @@ test('what a release reads once it has stopped a session is written on the attem
     Journal.test(),
     Runner.layer({
       ...ops,
-      /** Stops the session on the first call, as Claude Code writes a session's cost only then; it stays listed, as a worktree task's does. */
+      /**
+       * Stops the session on the first call, as Claude Code writes a session's cost only then; it stays listed, as a worktree task's does.
+       */
       release: () => Effect.sync(() => (++asked === 1 ? { turns: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
     }),
   );

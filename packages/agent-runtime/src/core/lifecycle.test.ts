@@ -220,7 +220,10 @@ test('a settled task is decided nothing before anything is observed of it, on an
   assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned)), false);
 });
 
-/** Every entry a writer can append to a settled task: the verbs' (`requestStop`, `say`, `file` again under its id), a pass's (`measured`, an end), a hand's. */
+/**
+ * Every entry a writer can append to a settled task: the verbs' (`requestStop`, `say`, `file` again under its id), a pass's (`measured`, an
+ * end), a hand's.
+ */
 const LATER: Record<string, Event[]> = {
   nothing: [],
   'asked to stop': [{ kind: 'stop-requested', at: at(4 * S) }],

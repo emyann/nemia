@@ -153,7 +153,10 @@ test("agent-runtime's exports are . (facade.ts) and ./effect (index.ts), and not
   assert.deepEqual(exports, { '.': './src/facade.ts', './effect': './src/index.ts', './package.json': './package.json' });
 });
 
-/** `decide` is the runtime's judgement, pure and not for a consumer to call (src/index.ts says why); `fold` is exported beside it on purpose. */
+/**
+ * `decide` is the runtime's judgement, pure and not for a consumer to call (src/index.ts says why); `fold` is exported beside it on
+ * purpose.
+ */
 function exportBreaches(entries: Record<string, readonly string[]>): string[] {
   const out = Object.entries(entries)
     .filter(([, names]) => names.includes('decide'))

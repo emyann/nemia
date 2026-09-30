@@ -17,7 +17,9 @@ const DIRECTIVE = /^\s*(?:(?:oxlint|eslint)-(?:disable|enable)\S*|@ts-expect-err
 /** The reason a directive keeps after it: ` -- ` and at least a word. */
 const REASON = /\s--\s+\S/;
 
-/** A TypeScript directive that is never allowed: it hides every error of a line or a file, where `@ts-expect-error` fails once none is left. */
+/**
+ * A TypeScript directive that is never allowed: it hides every error of a line or a file, where `@ts-expect-error` fails once none is left.
+ */
 const SILENCER = /^\s*@ts-(?:ignore|nocheck)\b/;
 
 /** The nodes a JSDoc documents: a declaration or a member, found at the token that follows the comment. */
@@ -88,7 +90,10 @@ const DEFERRAL: RegExp[] = [
   /\bfor now\b(?:\W+\w+){0,4}?\W+(?:leave|leaves|left|keep|keeps|kept|skip|skips|skipped|ignore|ignores|ignored|disable|disables|disabled|defer|defers|deferred|stub|stubs|stubbed|hardcode|hardcodes|hardcoded|until)\b/i,
 ];
 
-/** `//` and `/* *\/` refused, JSX's `{/* *\/}` included, but a directive with a reason; a JSDoc only on a file's head, a declaration or a member. */
+/**
+ * `//` and `/* *\/` refused, JSX's `{/* *\/}` included, but a directive with a reason; a JSDoc only on a file's head, a declaration or a
+ * member.
+ */
 const noCodeComments: Rule = {
   meta: {
     type: 'suggestion',

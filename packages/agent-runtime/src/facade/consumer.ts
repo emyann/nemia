@@ -115,7 +115,8 @@ export type TaskSpec = {
    * Hold the task open when an attempt signs, rather than settle it: the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
    * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
-   * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`, waiting or not. Refused unless `true`.
+   * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`,
+   * waiting or not. Refused unless `true`.
    */
   holdOpen?: true;
   /**
@@ -168,8 +169,8 @@ export type ObserveCount = { calls: number; ms: number; listed: number; spawned:
 
 /**
  * What this engine's reads and spawns have cost since the process started, as running totals: the runtime's own reads and spawns
- * (`IoCounts`, per process), and each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). A caller
- * that wants one call's cost takes the difference before and after it.
+ * (`IoCounts`, per process), and each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). A
+ * caller that wants one call's cost takes the difference before and after it.
  */
 export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
 
@@ -182,17 +183,17 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
-   * a `cwd` that is not absolute; a `priority`, whatever its value, which is retired: the runtime chooses no order. And in its `config`: a key that is no harness
-   * argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
-   * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers
-   * in a `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own
-   * `refuses`, or Claude Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any
-   * on a harness with no context window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's
-   * flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in
-   * a task whose `background` is not true); a `background` that is not true or false, or `true` on any harness not
-   * brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; a `codex` that is not
-   * an object holding only `trustFrom`, an absolute path, or one on any harness but a `HarnessSpec` with `codexArgs`, which is
-   * Codex; and, on `'claude'`, a
+   * a `cwd` that is not absolute; a `priority`, whatever its value, which is retired: the runtime chooses no order. And in its `config`: a
+   * key that is no harness argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above
+   * 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a `disallowedTools` or
+   * `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; a word its
+   * harness does not take (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a `contextTokens`
+   * that is not a whole number of tokens its harness takes, or any on a harness with no context window to set (`codex`); a `remoteControl`
+   * under `config` or beside it, which is Claude Code's flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no
+   * such flag (any but one brought as `'claude-bg'` or a `PromiseRunner`, and one brought as `'claude'` in a task whose `background` is not
+   * true); a `background` that is not true or false, or `true` on any harness not brought as `'claude'`; a `claude` on a `HarnessSpec`
+   * without `claudeFlags`, which is not Claude Code; a `codex` that is not an object holding only `trustFrom`, an absolute path, or one on
+   * any harness but a `HarnessSpec` with `codexArgs`, which is Codex; and, on `'claude'`, a
    * `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a `PromiseRunner` is asked
    * nothing of its own.
    */

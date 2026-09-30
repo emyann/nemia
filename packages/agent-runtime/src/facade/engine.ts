@@ -18,7 +18,9 @@ const REFUSALS = new Set([
   'EngineRefused',
 ]);
 
-/** What `verb` rejects with at this door for `e`, what its Effect failed with: a refusal or `SayUnsent` in words, anything else as it is. */
+/**
+ * What `verb` rejects with at this door for `e`, what its Effect failed with: a refusal or `SayUnsent` in words, anything else as it is.
+ */
 const plainOf =
   (verb: string) =>
   (e: unknown): unknown => {

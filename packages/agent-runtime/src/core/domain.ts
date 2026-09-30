@@ -88,8 +88,8 @@ export type Sighting = {
    * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
    * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` does not
    * read it, and nothing here turns it into a state — `state` already says a session waits on a person
-   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a sighting: read afresh each pass, so a
-   * session that stops waiting simply stops carrying it.
+   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a
+   * sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;
   /**
@@ -156,7 +156,10 @@ export type Usage = {
    */
   firstContextTokens?: number;
   firstCacheWriteTokens?: number;
-  /** How many times the attempt compacted its conversation: past about its window, a session summarises and carries on. Absent where none was seen. */
+  /**
+   * How many times the attempt compacted its conversation: past about its window, a session summarises and carries on. Absent where none
+   * was seen.
+   */
   compactions?: number;
   outputTokens?: number;
   /**
@@ -350,7 +353,10 @@ export type Attempt = {
   nativeId: string | null;
   /** What this attempt was told to continue, decided when it started and never re-derived. */
   resumeFrom?: string;
-  /** What it was told instead of the task's brief: a later turn's answer (in a journal an older runtime wrote, also why an unsigned session was back). Carried, never read. */
+  /**
+   * What it was told instead of the task's brief: a later turn's answer (in a journal an older runtime wrote, also why an unsigned session
+   * was back). Carried, never read.
+   */
   nudge?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
   closeout?: unknown;
@@ -531,7 +537,10 @@ export function turnOf(state: State, n = state.inputs.length) {
   };
 }
 
-/** A task held open, its current turn ended `done` (with its statement or without), not closed and not settled: it waits on a person's answer, with no process running. */
+/**
+ * A task held open, its current turn ended `done` (with its statement or without), not closed and not settled: it waits on a person's
+ * answer, with no process running.
+ */
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
   return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;

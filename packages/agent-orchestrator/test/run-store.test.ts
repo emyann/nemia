@@ -4,11 +4,12 @@
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
  * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
  * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
- * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file.
+ * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file. And the inbox: its entries, a
+ * card filed exclusively, rewritten keeping its filing time, dropped, and the tick's tries put, read and dropped.
  *
- * And the refusal that keeps the interface the one way in: a file of `src` that imports a run's or a person's file functions from
- * `record.store.ts`, or through `runner.ts`, is refused, unless `DIRECT` still names it, and an entry of `DIRECT` that imports none of them
- * is refused too, so the list only shrinks. `WF_ROOT` is set before the store is imported, since it is read as the module loads.
+ * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
+ * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
+ * the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -436,9 +437,6 @@ const GUARDED = [
 /** The files the interface is built from, which alone may import them for good. */
 const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
 
-/** The files of `src` that still import a guarded function directly, until the card that moves them onto `runStore`. */
-const DIRECT = ['src/inbox/inbox.store.ts', 'src/inbox/inbox.verb.ts'];
-
 /** `record.store.ts`, and `runner.ts`, which re-exports some of its functions. */
 const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
 
@@ -473,23 +471,16 @@ function importsFrom(text: string): Map<string, string[]> {
 /** The guarded functions a source text imports, whichever module they came from (`importsFrom`). */
 const directImports = (text: string): string[] => [...new Set([...importsFrom(text).values()].flat())].sort();
 
-/**
- * What each file imports directly, among `sources`, and a line for each file not on `direct`, naming the module each import came from,
- * and each entry that imports nothing.
- */
-function refusals(sources: Record<string, string>, direct: readonly string[]): string[] {
+/** A line for each file among `sources` that imports a guarded function directly, naming the module each import came from. */
+function refusals(sources: Record<string, string>): string[] {
   const out: string[] = [];
   for (const [file, text] of Object.entries(sources)) {
-    if (direct.includes(file)) continue;
     for (const [from, names] of importsFrom(text))
       out.push(
         `${file} imports ${names.join(', ')} from ${from}: read and write through runStore (src/record/files.store.ts), adding ` +
           'the method to RunStore (src/record/record.ts)',
       );
   }
-  for (const file of direct)
-    if (!directImports(sources[file] ?? '').length)
-      out.push(`${file} imports nothing of record.store.ts that runStore says: delete its entry from DIRECT in test/run-store.test.ts`);
   return out;
 }
 
@@ -504,9 +495,9 @@ function sourcesOfSrc(): Record<string, string> {
   return out;
 }
 
-test('a file not on the list that imports a run function from record.store.ts is refused, naming the file and the function', () => {
+test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {
   const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };
-  assert.deepEqual(refusals(sources, []), [
+  assert.deepEqual(refusals(sources), [
     'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
   ]);
@@ -523,14 +514,14 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
 
 test('a run function imported through runner.ts is refused, naming runner.ts as the module it came from', () => {
   const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
-  assert.deepEqual(refusals(sources, []), [
+  assert.deepEqual(refusals(sources), [
     'src/new/new.verb.ts imports readRun from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
   ]);
   const both = {
     'src/new/new.verb.ts': "import { listRuns } from '../runner.ts';\nimport { readAsks } from '../record/record.store.ts';\n",
   };
-  assert.deepEqual(refusals(both, []), [
+  assert.deepEqual(refusals(both), [
     'src/new/new.verb.ts imports readAsks from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
     'src/new/new.verb.ts imports listRuns from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
@@ -539,18 +530,6 @@ test('a run function imported through runner.ts is refused, naming runner.ts as 
   assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
 });
 
-test('an entry on the list that imports none of them is refused, naming the entry to delete', () => {
-  const sources = { 'src/tick/tick.verb.ts': "import { stepsOf } from '../record/record.store.ts';\n" };
-  assert.deepEqual(refusals(sources, ['src/tick/tick.verb.ts']), [
-    'src/tick/tick.verb.ts imports nothing of record.store.ts that runStore says: delete its entry from DIRECT in test/run-store.test.ts',
-  ]);
-});
-
-test("the files of src that import a run's functions directly are exactly the list", () => {
-  const sources = sourcesOfSrc();
-  const found = Object.keys(sources)
-    .filter((file) => directImports(sources[file]).length)
-    .sort();
-  assert.deepEqual(found, DIRECT);
-  assert.deepEqual(refusals(sources, DIRECT), []);
+test("no file of src but the store's own imports a run's functions from record.store.ts or through runner.ts", () => {
+  assert.deepEqual(refusals(sourcesOfSrc()), []);
 });

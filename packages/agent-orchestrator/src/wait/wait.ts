@@ -3,7 +3,7 @@
  * (`holdsOf`), with their words, their advice and the refusals they give (`holdRefusal`, `afterRefusal`). Pure.
  */
 import path from 'node:path';
-import { prunedWords, type Run } from '../record/record.ts';
+import { prunedWords, type Hold, type Run } from '../record/record.ts';
 
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
@@ -102,15 +102,32 @@ export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[
   return waits.length ? waits : run.hold.until.map((id) => ({ run: id, shipped: true as const }));
 }
 
+/** Words as a shell reads them back whole: in single quotes, each `'` in them closed, escaped and opened again. */
+const shellQuoted = (words: string): string => `'${words.replaceAll("'", `'\\''`)}'`;
+
+/** The command that holds `id` on `until`, with the words `why` a hold had: `wf hold r-1 --until a-1 --why 'merge conflicts'`. */
+const holdAgain = (id: string, until: readonly string[], why?: string): string =>
+  `wf hold ${id} ${until.map((u) => `--until ${u}`).join(' ')}${why ? ` --why ${shellQuoted(why)}` : ''}`;
+
 /** `a` and `b`, or `a, b and c`, of runs. */
 const runList = (ids: readonly string[]): string => (ids.length > 1 ? `${ids.slice(0, -1).join(', ')} and ${ids.at(-1)}` : (ids[0] ?? ''));
 
+/** What the person who put a hold said of it, as it follows `held until …`: ` (why: …; by …)`, ` (why: …)`, ` (by …)`, or nothing. */
+const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
+  const parts = [...(why ? [`why: ${why}`] : []), ...(by ? [`by ${by}`] : [])];
+  return parts.length ? ` (${parts.join('; ')})` : '';
+};
+
 /**
  * A held run, as `wf ls` and `wf decide` say it: `held until a-1x2y ships`, each run it waits on with why it may never, as `waitWord` names
- * them. Pure. Never `waiting on you`: a hold is a person's word already given, and nothing is asked of anyone while it stands.
+ * them, then what the person who put the hold said of it when `said` is given: `held until a-1x2y ships (why: merge conflicts; by
+ * operator)`. Pure. Never `waiting on you`: a hold is a person's word already given, and nothing is asked of anyone while it stands.
+ *
+ * @param said The hold's `why` and `by`, each shown when it is there; a hold file older code wrote has neither, and shows the plain line.
  */
-export function holdWord(waits: readonly Wait[]): string {
-  if (!waits.length) return 'held, on a hold that names no run';
+export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> = {}): string {
+  const words = saidWord(said);
+  if (!waits.length) return `held, on a hold that names no run${words}`;
   const named = runList(
     waits.map(
       (w) =>
@@ -118,9 +135,9 @@ export function holdWord(waits: readonly Wait[]): string {
     ),
   );
   const one = waits.length === 1;
-  if (waits.every((w) => w.shipped))
-    return `held until ${named} ${one ? 'ships' : 'ship'} — ${one ? 'it has' : 'they have'} shipped, and the next tick lifts the hold`;
-  return `held until ${named} ${one ? 'ships' : 'ship'}`;
+  const held = `held until ${named} ${one ? 'ships' : 'ship'}${words}`;
+  if (waits.every((w) => w.shipped)) return `${held} — ${one ? 'it has' : 'they have'} shipped, and the next tick lifts the hold`;
+  return held;
 }
 
 /**
@@ -179,7 +196,7 @@ export function holdRefusal(
   }
   if (run.hold) {
     const all = [...new Set([...run.hold.until, ...until])];
-    return `${id} is already ${holdWord(run.hold.until.map((u) => ({ run: u })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — wf hold ${id} --off, then wf hold ${id} ${all.map((u) => `--until ${u}`).join(' ')}.`;
+    return `${id} is already ${holdWord(run.hold.until.map((u) => ({ run: u })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}). A hold is put once, whole: lift it, and hold the run again on every run it waits on — wf hold ${id} --off, then ${holdAgain(id, all, run.hold.why)}.`;
   }
   if (run.repo === undefined) {
     return `${id}'s team works in folders (workspace: folder), and a hold waits for runs to ship onto its git branch, which a folder run has none of. Cancel it (wf cancel ${id}) and start it again once the work it waits on is done.`;

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
@@ -14,7 +15,8 @@ export default {
    * Its card says the hold's word where its gate was, with how to lift it on hover, no Approve and not waiting on you; its steps read held;
    * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
    * offers no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every
-   * page after reads the store as seeded — and the card, read again, offers its gate as it did.
+   * page after reads the store as seeded — and the card, read again, offers its gate as it did. That hold is one older code wrote, with
+   * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`).
    */
   name: 'hold',
   route: '/',
@@ -39,7 +41,8 @@ export default {
       const said = card.locator('[data-holding="on-runs"]');
       await expectVisible(said.filter({ hasText: new RegExp(`^${word}$`) }), `the card says ${word}`);
       const title = await said.getAttribute('title');
-      if (title !== advice) throw new Refused(`the card's hold says how to lift it on hover — it says ${JSON.stringify(title)}`);
+      if (title !== `${word}\n${advice}`)
+        throw new Refused(`the card's hold says itself whole and how to lift it on hover — it says ${JSON.stringify(title)}`);
       await expectCount(card.locator('[data-answer="Approve"]'), 0, 'and offers no Approve: the package refuses it on a held run');
       await expectCount(card.locator(`[data-gate-line="${gated}"]`), 0, 'nor says what approving would do');
       await expectCount(card.getByText('waiting on you', { exact: true }), 0, 'and does not say it waits on you');
@@ -65,10 +68,7 @@ export default {
       await idle(page);
       const section = page.locator('section[aria-label="Held"]');
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${word}$`) }), `the run's page says ${word}`);
-      await expectVisible(
-        section.locator('[data-advice]', { hasText: new RegExp(`^${advice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }),
-        'and how to lift it',
-      );
+      await expectVisible(section.locator('[data-advice]', { hasText: new RegExp(`^${literal(advice)}$`) }), 'and how to lift it');
       await expectVisible(section.getByRole('link', { name: until, exact: true }), `and links ${until}`);
       const step = page.locator(`article > section#step-${gated}`);
       await expectVisible(step.locator('[data-state="held"]'), `${gated}'s chip is held on its page`);
@@ -92,5 +92,63 @@ export default {
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
     await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
     await expectCount(edge, 0, 'and no hold edge comes into it');
+    await heldWithWords(page);
   },
 } satisfies PageSpec;
+
+/** `text` as a regular expression that matches it and nothing else. */
+const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * GATED held until HELD as `wf hold --why … --by operator` writes it: its card on the Factory, its row on Runs, its page and its gate's
+ * note each say the hold's why and who put it beside `held until`, in the package's words, the card clamped to its two lines and whole
+ * on hover. The hold is then taken back, and the run's page says no hold.
+ */
+async function heldWithWords(page: Page): Promise<void> {
+  const { id, gated } = GATED;
+  const hold = path.join(store!, 'runs', `${id}.hold`);
+  const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
+  const word = `held until ${HELD.id} ships (why: ${why}; by operator)`;
+  const whole = new RegExp(`^${literal(word)}$`);
+  try {
+    if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one with words — ${hold} is there`);
+    fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [HELD.id], why, by: 'operator' }, null, 2), {
+      flag: 'wx',
+    });
+    fed(id, 'held');
+    const theme = await themeOf(page);
+
+    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    const card = cardOf(page, id);
+    const said = card.locator('[data-holding="on-runs"]');
+    await expectVisible(said.filter({ hasText: whole }), `the card says ${word}`);
+    const title = await said.getAttribute('title');
+    if (!title?.startsWith(`${word}\n`))
+      throw new Refused(`the card's hold says its why whole on hover — it says ${JSON.stringify(title)}`);
+    await settled(page);
+    await photographCard(page, card, path.join(OUT, `hold-said-card-${theme}.png`));
+
+    await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(page.locator('[data-holding="on-runs"]', { hasText: whole }), `${id}'s row on Runs says ${word}`);
+    await settled(page);
+    await photograph(page, path.join(OUT, `hold-said-runs-${theme}.png`), { fullPage: true });
+
+    await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    await expectVisible(page.locator('section[aria-label="Held"] p.font-mono', { hasText: whole }), `the run's page says ${word}`);
+    await expectVisible(
+      page.locator(`article > section#step-${gated} [data-note]`, {
+        hasText: new RegExp(`^${literal(`${word}; its approval is asked once the hold lifts`)}$`),
+      }),
+      `and ${gated}'s note, at the gate the hold keeps back, says it too`,
+    );
+    await settled(page);
+    await photograph(page, path.join(OUT, `hold-said-run-${theme}.png`), { fullPage: true });
+  } finally {
+    fs.rmSync(hold, { force: true });
+    fed(id, gated, 'awaiting approval');
+  }
+  await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold with words lifted, the run page says no hold');
+}

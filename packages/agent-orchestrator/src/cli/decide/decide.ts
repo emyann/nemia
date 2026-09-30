@@ -207,14 +207,14 @@ function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Await
 function printWaiting({ run, waiting, holding }: Decided, head: string): void {
   const never = run.hold && (!holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length));
   const alsoHeld = run.hold
-    ? `\n  ${holdWord(holding)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}`
+    ? `\n  ${holdWord(holding, run.hold)} as well — ${never ? holdAdvice(run, holding) : `wf hold ${run.id} --off lifts the hold, and not the wait above`}`
     : '';
   console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}${alsoHeld}`);
 }
 
 /** The screen of a run a person held (`wf hold`): the hold, what still runs and what each blocked step waits for, and how to lift it. */
 function printHold({ run, decision, holding, waitingOn }: Decided, head: string): void {
-  console.log(`${head}\n\n  ${holdWord(holding)}`);
+  console.log(`${head}\n\n  ${holdWord(holding, run.hold)}`);
   if (decision.kind === 'running' && decision.waiting.length) console.log(`  still running: ${decision.waiting.join(', ')}`);
   for (const [name, line] of Object.entries(waitingOn)) console.log(`  ${name}: ${line}`);
   console.log(`  ${holdAdvice(run, holding)}`);

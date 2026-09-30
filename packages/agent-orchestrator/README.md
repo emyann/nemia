@@ -2036,6 +2036,7 @@ above). To start a whole graph of runs at once, write it as a folder of cards: `
 ```bash
 wf hold b-3z4w --until a-1x2y                  # nothing more of b-3z4w is filed until a-1x2y ships
 wf hold d-7t8s --until b-3z4w --until c-5v6u   # once for each run to wait on
+wf hold b-3z4w --until a-1x2y --why "merge conflicts in five files" --by operator   # say why, and who
 wf hold b-3z4w --off                           # changed your mind: it goes on at the next tick
 ```
 
@@ -2057,17 +2058,28 @@ command, and a pass files nothing on an ask written by hand while the hold stand
 never ship without a person (`(cancelled)`, `(no such run)`, `(<branch> gone)`) is said beside the hold,
 with the two ways out: lift the hold, or `wf cancel` the run.
 
-The hold is a person's fact in a file of its own, `runs/<id>.hold`, beside the record, as `.cancelled`
-is. `wf hold` writes it, the tick removes it when it lifts the hold (only the hold it read: one put again
-since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
+A hold can say why, and says who put it: `--why "<words>"` gives the reason, and `--by <name>` the person,
+by default the OS user the command runs as. Every screen that says the hold says them on the same line,
+before anything after it: `held until a-1x2y ships (why: merge conflicts in five files; by operator)`
+on `wf ls`, on the note of a step whose gate the hold keeps back, on `wf decide` and on the board. A hold
+with no why says who put it, `held until a-1x2y ships (by operator)`. A hold file older code wrote, with no
+`by`, says the plain `held until a-1x2y ships`. The words are one line, whatever was typed or written into
+the file: the reason is cut at 200 characters with `…`, the name at 64.
+
+The hold is a person's fact in a file of its own, `runs/<id>.hold`, `{ at, until, why?, by }`, beside
+the record, as `.cancelled` is. `wf hold` writes it, the tick removes it when it lifts the hold (only the
+hold it read: one put again since stays), `wf hold --off` removes it, and `wf rm` removes it with the run. `wf rm` of a run another run
 is held until says so and names the `wf hold … --off` that lets it go.
 
 `wf hold` refuses the following before anything is written, and names the fix for each:
 
 - no `--until`, `--until` and `--off` together, a flag it does not take, or `--until` with no run
+- `--why` or `--by` with no value, given twice, with `--off`, only blanks, or over its cap (200 characters
+  for the reason, 64 for the name)
 - a run the store does not have, and `--off` of a run nobody holds
 - a run cancelled, pruned, shipped, or succeeded with only a person's merge left: nothing is left to file
-- a run already held. A hold is put once, whole: `--off`, then hold it again with every run it waits on
+- a run already held. A hold is put once, whole: `--off`, then hold it again with every run it waits on,
+  and its `--why`, which the fix quotes back
 - a folder run, which ships nothing git could see merged
 - of each run named, what `--after` refuses: given twice, the run itself, a run the store does not have, a
   folder run, another repository or base branch, a run started `--no-worktree`, a cancelled run, and one

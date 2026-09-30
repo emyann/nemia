@@ -145,7 +145,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
           {run.holding && (
             <p
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
-              title={run.holding.advice}
+              title={`${run.holding.word}\n${run.holding.advice}`}
               className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.holding.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-violet-800 dark:text-violet-300'}`}
             >
               {run.holding.word}

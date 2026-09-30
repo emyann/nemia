@@ -116,6 +116,28 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
   }).map((call) => `${step.name}: ${shown(call)}`);
 }
 
+/**
+ * The check commands a repository skill names: every backticked `npm …` or `npx …` span in its paragraph that starts at `from`, up to
+ * the next blank line or numbered item. Throws, naming the skill, when `from` is not in it.
+ */
+function checksOf(skill: string, from: string): string[] {
+  const text = fs.readFileSync(path.join(REPO, '.claude', 'skills', skill, 'SKILL.md'), 'utf8');
+  const start = text.indexOf(from);
+  if (start < 0) throw new Error(`${skill}: no "${from}" to read its checks from; name the line its checks are on, here`);
+  const rest = text.slice(start);
+  const end = /\n\s*\n|\n\d+\.\s/.exec(rest)?.index ?? rest.length;
+  return [...rest.slice(0, end).matchAll(/`(np[mx]\s[^`]*)`/g)].map((span) => span[1].replace(/\s+/g, ' '));
+}
+
+/** The commands a step's fence would refuse: reached by no allow of its own or of the settings, or by a deny of its own. */
+function unallowed(step: Step, commands: string[]): string[] {
+  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? [])];
+  return commands.filter((command) => {
+    const call = { tool: 'Bash', command } as const;
+    return !allows.some((rule) => reaches(rule, call)) || (step.disallowedTools ?? []).some((rule) => reaches(rule, call));
+  });
+}
+
 /** Every step of every shipped folder, by its folder. */
 const shipped = (): { dir: string; step: Step }[] =>
   FOLDERS.flatMap((dir) => loadWorkflows(dir, placesOf(dir)).map((step) => ({ dir, step })));
@@ -189,6 +211,46 @@ test('the settings deny none of them: the refusal is each worker’s own, and a 
       [],
       `${shown(call)} is denied by .claude/settings.json, which binds a person's own session too`,
     );
+});
+
+/** The shipped step an agent runs, as `wf start` freezes it. */
+const shippedStepOf = (agent: string): Step => {
+  const found = shipped().find(({ step }) => step.agent?.name === agent);
+  assert.ok(found, `no shipped step runs ${agent}`);
+  return found.step;
+};
+
+/** Each dontAsk agent whose skill names the checks it runs, with the line those checks are on. */
+const CHECKERS = [
+  { agent: 'seldon', skill: 'write-a-spec', from: 'Run each check bare' },
+  { agent: 'agora', skill: 'review-a-change', from: '**Run the suite yourself**' },
+];
+
+test('every check the skills of Seldon and Agora name is one their fence allows', () => {
+  for (const { agent, skill, from } of CHECKERS) {
+    const step = shippedStepOf(agent);
+    assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
+    const checks = checksOf(skill, from);
+    assert.ok(checks.length >= 3, `${skill} names its checks: ${checks.join(', ')}`);
+    assert.deepEqual(unallowed(step, checks), [], `${agent}'s fence refuses a check ${skill} names`);
+  }
+});
+
+test("REFUSED: a skill's check the agent's fence does not allow is named", () => {
+  const seldon = shippedStepOf('seldon');
+  const agora = shippedStepOf('agora');
+  const without = (step: Step, rule: string): Step => ({ ...step, allowedTools: step.allowedTools?.filter((r) => r !== rule) });
+  assert.deepEqual(unallowed(without(seldon, 'Bash(npm run lint)'), checksOf('write-a-spec', 'Run each check bare')), ['npm run lint']);
+  assert.deepEqual(
+    unallowed(without(agora, 'Bash(npx turbo run typecheck --force)'), checksOf('review-a-change', '**Run the suite yourself**')),
+    ['npx turbo run typecheck --force'],
+  );
+  assert.deepEqual(unallowed(seldon, checksOf('review-a-change', '**Run the suite yourself**')), ['npx turbo run typecheck --force']);
+  assert.deepEqual(unallowed({ ...agora, disallowedTools: ['Bash(npm run lint)'] }, ['npm run lint']), ['npm run lint'], 'a deny wins');
+  assert.throws(
+    () => checksOf('write-a-spec', 'Run no check'),
+    (err: Error) => err.message.includes('write-a-spec: no "Run no check"'),
+  );
 });
 
 test('REFUSED: an auto step without its own deny, and a dontAsk step an allow reaches, are open', () => {

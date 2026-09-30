@@ -69,11 +69,15 @@ export type RunFact = RunKeys & {
 /** What a store's runs give: a fact per try that ended, and one per run that finished. */
 export type Facts = { tries: TryFact[]; runs: RunFact[] };
 
-/** A run's timeline and record, and what `factsOf` reads beyond them: each check's verdict, and the looping steps' closeouts. */
+/**
+ * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, and each step's
+ * closeout.
+ */
 export type RunRead = {
   run: Run;
   steps: readonly Workflow[];
   timeline: Timeline;
+  succeeded: (taskId: string) => boolean;
   verdictOf: (checkTaskId: string) => CheckVerdict | null;
   closeoutOf: (step: string) => Closeout | undefined;
 };
@@ -163,8 +167,19 @@ function runCostOf(t: Timeline): number | null {
 }
 
 /**
- * Whether a run is finished, and the time it finished: its ending's last try's end once the ending landed or declined, or, with no ending,
- * its last task's end once every step is filed and nothing is in flight. Null for a run cancelled, or still going.
+ * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked, and its check, where the
+ * step has one, passed.
+ */
+function doneStep(r: RunRead, step: Workflow): boolean {
+  const record = r.run.steps[step.name];
+  if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
+  return record.check ? r.verdictOf(record.check.taskId) === 'passed' : step.check === undefined;
+}
+
+/**
+ * Whether a run is finished, and the time it finished: its ending's last try's end once the ending's landing settled, or, with no ending,
+ * its last task's end once every step's current try is done (`doneStep`) and nothing is in flight. Null for a run cancelled, a run that
+ * waits on a person — a check refused, a session failed or blocked — and a run still going.
  */
 function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
   if (r.run.cancelledAt) return null;
@@ -172,7 +187,7 @@ function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
     const last = r.timeline.steps[ending.name]?.at(-1);
     return r.run.steps[ending.name]?.landed && last ? endOf(last) : null;
   }
-  if (r.timeline.run.inFlight || r.steps.some((s) => !r.run.steps[s.name]?.taskId)) return null;
+  if (r.timeline.run.inFlight || !r.steps.every((s) => doneStep(r, s))) return null;
   return (
     Object.values(r.timeline.steps)
       .flat()

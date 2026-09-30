@@ -28,17 +28,17 @@ const TEAM = [
 ];
 
 /**
- * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one, and
- * why the try after it was filed.
+ * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
+ * why the try after it was filed, and whether its session failed.
  */
-type Try = { end: string; cost?: number | null; check?: CheckVerdict; then?: 'round' | 'retries' };
+type Try = { end: string; cost?: number | null; check?: CheckVerdict; then?: 'round' | 'retries'; failed?: true };
 
-/** A session or a check that ran an hour, filed ten minutes before, and ended at `end`. */
-const ended = (end: string, cost: number | null): TaskClock => ({
-  phase: 'succeeded',
+/** A session or a check that ran an hour, filed ten minutes before, and ended at `end`: succeeded, unless `failed`. */
+const ended = (end: string, cost: number | null, failed = false): TaskClock => ({
+  phase: failed ? 'failed' : 'succeeded',
   state: {
     brief: 'x',
-    settled: 'succeeded',
+    settled: failed ? 'failed' : 'succeeded',
     attempts: [
       {
         startedAt: minus(end, 60 * MIN),
@@ -64,7 +64,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     const ids = list.map((t, i) => {
       const taskId = `${id}-${name}-${i + 1}`;
       const sessionEnd = t.check ? minus(t.end, 10 * MIN) : t.end;
-      views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost));
+      views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
       filed.set(taskId, minus(sessionEnd, 70 * MIN));
       if (t.check) {
         views.set(`${taskId}-check`, ended(t.end, null));
@@ -81,6 +81,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     run,
     steps,
     timeline: timeline(run, views, filed, steps),
+    succeeded: (taskId: string) => views.get(taskId)?.phase === 'succeeded',
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
     closeoutOf: (name: string) =>
       steps.find((s) => s.name === name)?.loop ? { outcome: 'done' as const, summary: '', artifacts: [], output: { again } } : undefined,
@@ -177,6 +178,24 @@ test('first-try landings read the `workspace: main` step: landed on try 1 counts
   assert.equal(total.firstTry, 0.5);
   assert.equal(total.landed, 2);
   assert.equal(total.runs, 3);
+});
+
+test('a run with no ending finishes once each step is done; a check refused or unfinished, or a session failed, leaves it waiting', () => {
+  const plain = [step('implement', []), step('document', ['implement'])];
+  const finished = (last: Try) => factsOf(readOf('p', plain, { implement: [{ end: at(1) }], document: [last] })).runs.length;
+  assert.equal(finished({ end: at(2), check: 'passed' }), 1);
+  assert.equal(finished({ end: at(2) }), 1);
+  assert.equal(finished({ end: at(2), check: 'refused' }), 0, 'a refused check waits for wf retry');
+  assert.equal(finished({ end: at(2), check: 'unfinished' }), 0, 'an unfinished check waits for wf retry --recheck');
+  assert.equal(finished({ end: at(2), failed: true }), 0, 'a failed session waits for wf retry');
+});
+
+test('a cancelled run never finishes: its tries are counted, and the run is not', () => {
+  const cancelled = twoRounds('c', TEAM, { commit: 'abc' }, { cancelledAt: at(8) });
+  const facts = factsOf(cancelled);
+  assert.equal(facts.runs.length, 0);
+  assert.equal(facts.tries.length, 6);
+  assert.equal(factsOf(twoRounds('c')).runs.length, 1, 'the same run, not cancelled, finished');
 });
 
 test("a landed run's cost is absent when one session of it was not measured, and the mean is taken over the others only", () => {

@@ -1,7 +1,8 @@
 /**
  * `wf stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
  * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), and the refusals of
- * a key and a day it does not take. A run whose journal does not read is left out whole, and named.
+ * a key and a day it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out
+ * whole, and named.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads.
  */
@@ -157,9 +158,10 @@ const printedBy = async (t: TestContext, argv: string[]) => {
 
 test('wf stats --json answers the numbers of the store: a landing on its first try, its cost and rounds, and each check by its verdict', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--from', DAY, '--to', DAY])) as Stats;
+  assert.equal(s.all.total.runs, 1, 'a run whose check did not finish waits for wf retry --recheck: it has not finished');
   assert.deepEqual(
     [s.all.total.runs, s.all.total.landed, s.all.total.firstTry, s.all.total.rounds, s.all.total.costPerLanded, s.all.total.timePerLanded],
-    [2, 1, 1, 1, 3.5, 4 * 3_600_000],
+    [1, 1, 1, 1, 3.5, 4 * 3_600_000],
   );
   assert.equal(s.all.total.tries, 5);
   const build = s.all.steps.find((row) => row.step === 'build');
@@ -192,7 +194,7 @@ test('wf stats --line prints one line, and wf stats prints the tiles and the day
   assert.match(line, /^stats, last 14 days/);
   const words = await printedBy(t, ['stats', '--from', DAY, '--to', DAY]);
   assert.match(words, /^last 14 days \(/);
-  assert.match(words, new RegExp(`^${DAY}\\s+2\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
+  assert.match(words, new RegExp(`^${DAY}\\s+1\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
   assert.match(words, /left out, a journal of each not reading \(wf ls says why\): spoilt/);
 });
 

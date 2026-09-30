@@ -42,6 +42,7 @@ async function runFacts(e: Engine, run: Run): Promise<Facts> {
     run,
     steps,
     timeline: timeline(run, everyTry, filed, steps),
+    succeeded: (taskId) => phaseOfView(everyTry.get(taskId)) === 'succeeded',
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
     closeoutOf: closeoutReader(views, run),
   });

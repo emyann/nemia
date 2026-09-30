@@ -119,15 +119,15 @@ const COPY_WAIT_SECONDS = 2;
 
 /**
  * `wf_copied`: the command run with its stdout copied whole into `$wf_stdout` and on to the log, by a `tee` in the background reading a
- * FIFO made in a directory of its own, so the shell waits for the command and never for the copy. A child the command left behind holding
- * its stdout keeps the FIFO open: the copy is waited for `COPY_WAIT_SECONDS` at most, then ended by a watchdog that holds none of the
- * script's streams. Answers the command's own status. Where no FIFO can be made, the command runs uncopied; a file `tee` cannot open
- * still leaves the copy to the log.
+ * FIFO made in a directory of its own, removed once both ends are open, so none is left by a check killed at its deadline; the shell waits
+ * for the command and never for the copy. A child the command left behind holding its stdout keeps the FIFO open: the copy is waited for
+ * `COPY_WAIT_SECONDS` at most, then ended by a watchdog that holds none of the script's streams. Answers the command's own status. Where
+ * no FIFO can be made, the command runs uncopied; a file `tee` cannot open still leaves the copy to the log.
  */
 const COPY = [
   'wf_copied() {',
   '  wf_dir=$(mktemp -d 2>/dev/null) && mkfifo "$wf_dir/stdout" 2>/dev/null || { [ -z "$wf_dir" ] || rm -rf "$wf_dir"; wf_run; return; }',
-  '  tee "$wf_stdout" <"$wf_dir/stdout" &',
+  '  { rm -rf "$wf_dir"; exec tee "$wf_stdout"; } <"$wf_dir/stdout" &',
   '  wf_tee=$!',
   '  wf_run >"$wf_dir/stdout"',
   '  wf_c=$?',
@@ -135,7 +135,6 @@ const COPY = [
   '  wf_dog=$!',
   '  wait "$wf_tee"',
   '  kill "$wf_dog" 2>/dev/null',
-  '  rm -rf "$wf_dir"',
   '  return "$wf_c"',
   '}',
 ];

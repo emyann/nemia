@@ -397,6 +397,23 @@ test('LIVE: a child the command leaves behind holding its stdout does not hold t
   assert.equal(fs.readFileSync(path.join(root, 'left.stdout'), 'utf8'), 'done\n');
 });
 
+test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a check that finishes or one killed at its deadline', async (t) => {
+  const { root, e, file } = rig();
+  const tmp = scratch('wf-check-tmpdir-');
+  const TMPDIR = process.env.TMPDIR;
+  t.after(() => {
+    if (TMPDIR === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = TMPDIR;
+  });
+  process.env.TMPDIR = tmp;
+  const done = await file('done', 'echo done');
+  const hung = await file('hung', 'echo started; sleep 60', 1);
+  assert.equal((await settled(e, done)).state.settled, 'succeeded');
+  assert.equal((await settled(e, hung)).state.settled, 'failed');
+  assert.equal(fs.readFileSync(path.join(root, 'hung.stdout'), 'utf8'), 'started\n', 'the copy was made, through a FIFO under TMPDIR');
+  assert.deepEqual(fs.readdirSync(tmp), [], "the worker inherits this process's TMPDIR when a tick starts it");
+});
+
 test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async () => {
   const { e, file } = rig();
   const hung = await file('hung', 'sleep 60', 1);

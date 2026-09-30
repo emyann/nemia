@@ -13,6 +13,9 @@
  *
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
  * the page itself has on the board.
+ *
+ * Each is answered in the factory the request names (`served`, factories/place.ts): a factory offers only the workflows attached to it,
+ * each step its hires fill read with the agent hired, and a run is started in it. The default factory offers every workflow, as it is.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -23,13 +26,19 @@ import {
   agentsFor,
   agentVersion,
   cardSkills,
+  fillsOf,
   inboxNameRefusal,
+  Invalid,
   loadWorkflows,
   lookupRoots,
   skillsFor,
   start,
   startFromInbox,
+  unattachedRefusal,
+  unfilledRefusal,
   workflowDescription,
+  Missing,
+  type Factory,
   type Places,
 } from 'agent-orchestrator';
 import {
@@ -119,7 +128,7 @@ export type WorkflowStepSpec = {
  * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is
  * told: the shape the builder puts a folder back in (builder.ts). `graph` is `graphOf` its steps, as a run of it would be drawn. `schemas`
  * are the `.json` files beside the steps, which an `output:` may name. `error` is the loader's refusal of a folder that does not read as a
- * workflow, whose `steps` are then none.
+ * workflow, whose `steps` are then none. Listed in a factory, each step its hires fill is read with the agent hired.
  */
 export type WorkflowListing = {
   name: string;
@@ -141,6 +150,11 @@ export type WorkflowListing = {
    */
   version: string;
   error: string | null;
+  /**
+   * Why a run of it cannot start in the factory it is listed in, in the package's words (`unfilledRefusal`): the steps its hires leave with
+   * no agent, and the hire that fills each. Null where every step has one, in the default factory, and for a folder that does not load.
+   */
+  unfilled: string | null;
 };
 
 /**
@@ -203,12 +217,21 @@ export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSou
   { from: 'yours', dir: path.join(home, 'workflows') },
 ];
 
-/** Every workflow `repo` and `home` have: each folder in each source, by name. Loads every folder, so each can say whether it reads. */
-export function listWorkflows(repo: string, home: string): WorkflowListing[] {
+/**
+ * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
+ * it. Loads every folder, so each can say whether it reads, and, in a factory, which steps its hires leave unfilled.
+ */
+export function listWorkflows(repo: string, home: string, factory?: Factory): WorkflowListing[] {
   return sourcesOf(repo, home).flatMap(({ from, dir }) =>
-    foldersIn(dir).map((name) => listed(name, from, path.join(dir, name), { repo, home })),
+    foldersIn(dir)
+      .filter((name) => !factory || factory.workflows.includes(name))
+      .map((name) => listed(name, from, path.join(dir, name), { repo, home }, factory)),
   );
 }
+
+/** What the loader fills the steps of the workflow `workflow` with in `factory`: its hires into them (`fillsOf`); none with no factory. */
+const fillsIn = (factory: Factory | undefined, workflow: string) =>
+  factory && { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow) };
 
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the
@@ -217,14 +240,17 @@ export function listWorkflows(repo: string, home: string): WorkflowListing[] {
  */
 export const placesOf = (repo: string, home: string): Places => ({ repo, home });
 
-/** One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. */
-export function listed(name: string, from: WorkflowSource, dir: string, places: Places): WorkflowListing {
+/**
+ * One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. In
+ * `factory`, its steps are read with the factory's hires, and those left with no agent named (`unfilled`).
+ */
+export function listed(name: string, from: WorkflowSource, dir: string, places: Places, factory?: Factory): WorkflowListing {
   const description = workflowDescription(dir);
   const schemas = schemasIn(dir);
   const version = versionOf(dir, places);
   let steps: Workflow[];
   try {
-    steps = loadWorkflows(dir, places);
+    steps = loadWorkflows(dir, places, fillsIn(factory, name));
   } catch (err) {
     return {
       name,
@@ -237,6 +263,7 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
       folderTeam: false,
       version,
       error: err instanceof Error ? err.message : String(err),
+      unfilled: null,
     };
   }
   return {
@@ -250,6 +277,7 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
     folderTeam: isFolderTeam(steps),
     version,
     error: null,
+    unfilled: (factory && unfilledRefusal(steps, factory.name, name)) ?? null,
   };
 }
 
@@ -439,6 +467,12 @@ function startWords({ path: [key], input }: BodyIssue, body: unknown): string | 
   return `POST /api/runs takes a JSON object: ${SHAPE}.`;
 }
 
+/**
+ * Why a card is not started in the factory `factory`: a card names no factory yet, and is started in the default one, as `wf start` says.
+ */
+const cardInFactory = (factory: string): string =>
+  `POST /api/runs?factory=${factory} starts a run in a factory, and a card of the inbox is started in the default factory for now: a card does not name its factory yet. Start its brief in the factory instead — \`{ "workflow": "<name>", "brief": "<what to do>" }\` — or start the card without ?factory=.`;
+
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
   route: 'POST /api/runs',
@@ -510,19 +544,57 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
 }
 
 /**
+ * What the agent a step is read with says it can do, generated from its skills, found where the load found them (`cardSkills`): null for a
+ * step with no agent, one the folder's places do not have, and one whose card the package refuses.
+ */
+function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[] | null {
+  const attached = step.agent ? agentsFor(dir, places).get(step.agent.name) : undefined;
+  if (attached === undefined || attached instanceof Error) return null;
+  try {
+    return cardSkills(attached, skillsFor(dir, places));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's, and what `POST /api/runs` answers:
+ * the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run did not look at.
+ */
+function cardStarted(asked: Extract<Asked, { card: string }>, repo: string) {
+  const started = startFromInbox({
+    name: asked.card,
+    callerRepo: repo,
+    workflow: asked.dir,
+    ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
+    ...(asked.after ? { after: asked.after } : {}),
+  });
+  return {
+    id: started.run.id,
+    card: started.card.name,
+    removed: started.removed,
+    ...(started.removed ? {} : { why: started.why }),
+    ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+  };
+}
+
+/**
  * The workflows' routes, and the board's first write.
  *
  * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
- *   it is now. 500 for a folder that could not be listed.
+ *   it is now; in a factory (`?factory=`), only those attached to it, read with its hires, each saying what they leave `unfilled`. 500 for
+ *   a folder that could not be listed.
  * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
  *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
  *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
  *   the loader's refusal, word for word (an `Invalid`, answered by `app.onError`), with which the folder is listed and has no step to show;
- *   404 for a step the folder does not have.
+ *   404 for a step the folder does not have. In a factory, the step is read with its hires, and a workflow the factory has not attached
+ *   is a 404 in the package's words (`unattachedRefusal`, a `Missing`).
  *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
  *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
  *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
- * - `GET /api/repository` — the repository a start runs in: what the start form lists the runs of, for a run to wait on.
+ * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
+ *   lists the runs of, for a run to wait on.
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder>
  *   --repo <repo> --after <runId>`, or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
  *   Guarded (guard.ts); the body is refused as `startWords` and `startOf` say. 201 with the run's `Location` once its record is written.
@@ -536,12 +608,15 @@ function startOf(body: typeof START_BODY.Type, repo: string, home: string): Aske
  *   what `start()` refuses. A run started when the card could not be
  *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
- *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
+ *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory (`?factory=`),
+ *   the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a
+ *   repository outside it, each an `Invalid`; a card is refused, 422 (`cardInFactory`), before the inbox is read: a card names no factory
+ *   yet.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) => served(c, ({ repo, home }) => c.json(listWorkflows(repo, home))))
+  .get('/api/workflows', (c) => served(c, ({ repo, home, factory }) => c.json(listWorkflows(repo, home, factory))))
   .get('/api/workflows/:from/:name/:step', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ repo, home, factory }) => {
       const { from, name, step } = c.req.param();
       if (from !== 'repo' && from !== 'yours') {
         return c.json(
@@ -551,9 +626,11 @@ export const workflows = new Hono<ApiEnv>()
           400,
         );
       }
+      const unattached = factory && unattachedRefusal(factory, name);
+      if (unattached) throw new Missing({ message: unattached });
       const folder = folderOf(name, from, repo, home);
       if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-      const steps = loadWorkflows(folder.dir, placesOf(repo, home));
+      const steps = loadWorkflows(folder.dir, placesOf(repo, home), fillsIn(factory, name));
       const found = steps.find((s) => s.name === step);
       if (!found) {
         return c.json(
@@ -562,16 +639,7 @@ export const workflows = new Hono<ApiEnv>()
         );
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      const places = placesOf(repo, home);
-      const attached = found.agent ? agentsFor(folder.dir, places).get(found.agent.name) : undefined;
-      let agentSkills: AgentSkill[] | null = null;
-      if (attached !== undefined && !(attached instanceof Error)) {
-        try {
-          agentSkills = cardSkills(attached, skillsFor(folder.dir, places));
-        } catch {
-          agentSkills = null;
-        }
-      }
+      const agentSkills = agentSkillsOf(found, folder.dir, placesOf(repo, home));
       return c.json({
         workflow: name,
         from,
@@ -586,34 +654,26 @@ export const workflows = new Hono<ApiEnv>()
   )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ repo, home, factory }) => {
       const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
+      if (factory && read.body.card !== undefined) throw new Invalid({ message: cardInFactory(factory.name) });
       const asked = startOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       if (asked.card !== undefined) {
-        const started = startFromInbox({
-          name: asked.card,
-          callerRepo: repo,
-          workflow: asked.dir,
-          ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
-          ...(asked.after ? { after: asked.after } : {}),
-        });
-        c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
-        return c.json(
-          {
-            id: started.run.id,
-            card: started.card.name,
-            removed: started.removed,
-            ...(started.removed ? {} : { why: started.why }),
-            ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-          },
-          201,
-        );
+        const started = cardStarted(asked, repo);
+        c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
+        return c.json(started, 201);
       }
-      const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
+      const { id } = start({
+        brief: asked.brief,
+        repo,
+        workflowDir: asked.dir,
+        ...(asked.after ? { after: asked.after } : {}),
+        ...(factory ? { factory: factory.name } : {}),
+      });
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);
     }),

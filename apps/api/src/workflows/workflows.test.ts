@@ -146,6 +146,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       folderTeam: false,
       version: versionOf(broken),
       error: refused,
+      unfilled: null,
     },
     {
       name: 'good',
@@ -183,6 +184,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       folderTeam: false,
       version: versionOf(good),
       error: null,
+      /** Listed in the default factory, whose steps are never unfilled. */
+      unfilled: null,
     },
     {
       name: 'mine',
@@ -195,6 +198,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       folderTeam: false,
       version: versionOf(mine),
       error: null,
+      unfilled: null,
     },
   ]);
 });

@@ -2166,6 +2166,42 @@ test("a codex step's `sandbox:` is filed as the engine's `permissionMode`, and a
   assert.equal(tasks.get(`${claudeRun.id}-implement`)!.spec.config?.permissionMode, 'dontAsk');
 });
 
+test("a codex step of a repository run is filed with `codex.trustFrom` the real path of its repository, on its first filing, a try and a round; a Claude Code step and a folder run's codex step with none", async () => {
+  const real = aRepo();
+  const link = path.join(scratch('wf-linked-'), 'repo');
+  fs.symlinkSync(real, link);
+  const run = gitRunOf(start({ brief: 'add a flag', repo: link, workflowDir: looped('', 'harness: codex\nretries: 1\n'), isolate: false }));
+  assert.equal(run.repo, link, 'the record keeps the path the run was started with');
+  const trusted = { trustFrom: fs.realpathSync(real) };
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(b.tasks.get(`${run.id}-implement`)!.spec.config?.codex, trusted, 'the first filing');
+
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).checked, ['implement']);
+  b.settle(`${run.id}-implement-check`, 'failed', undefined, 1);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  assert.deepEqual(b.tasks.get(`${run.id}-implement-try2`)!.spec.config?.codex, trusted, 'the try `retries:` files');
+
+  b.settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).checked, ['implement']);
+  b.settle(`${run.id}-implement-try2-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['review']);
+  b.settle(`${run.id}-review`, 'succeeded', reviewSays(true));
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  assert.deepEqual(b.tasks.get(`${run.id}-implement-try3`)!.spec.config?.codex, trusted, 'the round review asks for');
+  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.config?.codex, undefined, "the review, a Claude Code step, names no Codex's trust");
+
+  const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\nharness: codex\n---\nwrite the note\n');
+  const inFolders = start({ brief: 'a note', repo: scratch('wf-not-a-repo-'), workflowDir: team });
+  assert.equal(isGitRun(inFolders), false);
+  await advance(b.e, readRun(inFolders.id));
+  const written = b.tasks.get(`${inFolders.id}-write`)!.spec;
+  assert.equal(written.harness, 'codex');
+  assert.equal(written.config?.codex, undefined, 'a folder run has no repository to extend trust from');
+});
+
 test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallowedTools: Edit(**), Bash(npm test)', 'failed', 1);

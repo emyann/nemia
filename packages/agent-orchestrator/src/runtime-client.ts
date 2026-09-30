@@ -30,7 +30,7 @@ import { HOME } from './record/record.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
-export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
+export type { ClaudeFlags, CodexArgs, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api serves at `/api/machines`. */

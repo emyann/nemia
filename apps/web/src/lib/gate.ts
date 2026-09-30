@@ -89,9 +89,9 @@ export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
  * The inspector's opening: which step waits, what approving does and what sending back does, each a sentence off the record.
  *
  * Approving an ending runs it — in the repository's own checkout, on the base branch — and it is handed the approval's words as its terms;
- * what it does there is the folder's own first line (`says`), quoted, never the board's guess. Approving any other gate files the steps that
- * wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the person's words, and the gate holds
- * again once that try signs off.
+ * what it does there is the package's `toDecide.says`, the first line of the step's own note, quoted, never the board's guess. Approving
+ * any other gate files the steps that wait on it (`next`), handed the words. Sending back asks a new try of the step it goes to with the
+ * person's words, and the gate holds again once that try signs off.
  */
 export function gateBrief(
   gate: GateAsk,
@@ -111,13 +111,6 @@ export function gateBrief(
       : `Sending back asks ${gate.step} for a new try, told your words; it waits at its gate again once it signs off.`;
   return { waits, approving, sendingBack };
 }
-
-/** The first line of a step's prose, which is what a gate's folder says the step does: `toDecide.says`, off the detail. */
-export const firstLine = (body: string | null): string | null =>
-  body
-    ?.split('\n')
-    .map((line) => line.trim())
-    .find(Boolean) ?? null;
 
 /**
  * What the card says once a person's word is taken, until the run is read again and moves: `approved — the next pass files ship`, or

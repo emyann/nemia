@@ -64,8 +64,9 @@ export type RunStatus = Assessment['status'];
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or at
  * a gate — as the package decides it (`toDecide`) and words it (`toDecideWords`):
  *
- *   approve  the run is at its result and the gate on a last step has nobody's approval. `step` is that step, and `says` what it would do,
- *            the first line of the folder's own prose — null for a gated step that has signed off, whose closeout is what to read
+ *   approve  the run is at its result and the gate on a last step has nobody's approval. `step` is that step, `filed` whether it has run,
+ *            and `says` what it would do, the first line of the step's own note (`ownNote`) — null where it has none, and for a gated step
+ *            that has signed off, whose closeout is what to read
  *   git      nothing waits at such a gate, every step finished, no step of the workflow merges, and `branches` are ahead of the base branch:
  *            merging or dropping them is a person's, by hand
  *

@@ -31,6 +31,7 @@ import {
   namesInOrder,
   outputLines,
   owedFields,
+  ownNote,
   prunedKept,
   prunedWords,
   readArtifact,
@@ -436,13 +437,16 @@ function printChoice({ run, toDecide }: Decided, decision: Awaiting, steps: Step
   }
 }
 
-/** The step at its gate: that it signed off, or that it is the ending not yet run, with its folder's first paragraph; then approve and send back. */
+/**
+ * The step at its gate: that it signed off, or that it is the ending not yet run, with the first paragraph of its own note (`ownNote`)
+ * where it has one; then approve and send back.
+ */
 function printApprove(run: Decided['run'], toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>, steps: Steps): void {
   const step = steps.find((s) => s.name === toDecide.step)!;
-  console.log(
-    `\n  to decide  ${step.name}${toDecide.says === null ? ' has signed off and waits for your word' : " has not run: this workflow's ending, and your approval is what runs it"}:`,
-  );
-  if (toDecide.says !== null) for (const line of step.body.split(/\n[ \t]*\n/)[0].split('\n')) console.log(`    ${line}`);
+  const unrun = ` has not run: this workflow's ending, and your approval is what runs it${toDecide.says === null ? '' : ':'}`;
+  console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
+  const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
+  for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
   console.log(`\n  approve it    wf approve ${run.id} ${step.name} [--message "<words>"]`);
   for (const back of sendBackTo(step, run)) console.log(`  send it back  wf retry ${run.id} ${back} --message "<objection>"`);
 }

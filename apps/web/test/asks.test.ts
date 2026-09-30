@@ -115,6 +115,7 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
       kind: 'approve',
       step: 'ship',
       says: 'Merge it.',
+      filed: false,
       back: ['implement'],
       onto: 'main',
       said: 'Merge it. — wf approve r ship',

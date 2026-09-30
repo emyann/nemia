@@ -179,6 +179,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
       kind: 'approve',
       step: 'ship',
       says: SHIPS,
+      filed: false,
       /** What the card answers it with: a send-back goes to the work ship waits on (`sendBackTo`), and the result is on its way to main. */
       back: ['implement'],
       onto: 'main',

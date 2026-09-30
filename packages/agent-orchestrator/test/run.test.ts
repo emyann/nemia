@@ -160,7 +160,7 @@ import {
 } from '../src/timeline/timeline.ts';
 import type { TaskView } from 'agent-runtime';
 import type { Verdict } from '../src/check/check.ts';
-import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
+import { CLOSEOUT_FIELDS, parseAgent, parseWorkflow, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
 const STEPS = [step('implement'), step('review', ['implement'])];
@@ -7824,6 +7824,7 @@ test("an ending step's gate holds it BEFORE it is filed: at its result the run r
       kind: 'approve',
       step: 'ship',
       says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.",
+      filed: false,
     });
   }
   const approved = assess(ENDS, atEnd({ approvals: [approval('ship', 1)] }), DONE, signedDone, asked);
@@ -7838,6 +7839,41 @@ test("an ending step's gate holds it BEFORE it is filed: at its result the run r
     'unverified',
     'once it has run, its gate holds nothing more: it was approved before it was filed',
   );
+});
+
+/** An agent whose instructions open by saying who it is, as every agent's do: what a gate must never quote as the decision. */
+const OTTO = parseAgent(
+  'otto',
+  "---\nmodel: opus\n---\nYou are Otto, a release engineer. You land a run's result: in the repository's own checkout, you stage its merge.\n\nNever push.\n",
+);
+const LANDS = "Land this run's result on the base branch: stage the merge of its branch and sign off with the commit message.";
+/** `implement → review → land`, land an ending led by `otto`, with the note `note` below its frontmatter. */
+const landing = (note: string): Workflow[] => [
+  step('implement'),
+  step('review', ['implement']),
+  parseWorkflow('land', `---\nafter: review\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`, undefined, new Map([['otto', OTTO]])),
+];
+const atOtto = (land: string | null = null) =>
+  run({}, { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, land: { taskId: land } } });
+
+test("REFUSED: a gate's `to decide` never quotes its step's agent — an ending led by an agent that says `You are …` is said in the step's own note, or from facts where it has none", () => {
+  const noted = assess(landing(`${LANDS}\n\nAbort on a conflict.\n`), atOtto(), DONE, signedDone, asked);
+  assert.deepEqual(
+    noted.toDecide,
+    { kind: 'approve', step: 'land', says: LANDS, filed: false },
+    "the step's own note says what approving does",
+  );
+  assert.equal(toDecideWords(atOtto(), noted.toDecide), `${LANDS} — wf approve r-1 land`);
+
+  const bare = assess(landing(''), atOtto(), DONE, signedDone, asked);
+  assert.deepEqual(
+    bare.toDecide,
+    { kind: 'approve', step: 'land', says: null, filed: false },
+    'a step with no note of its own quotes nothing',
+  );
+  assert.equal(toDecideWords(atOtto(), bare.toDecide), 'land has not run: approving runs it — wf approve r-1 land');
+
+  for (const t of [noted.toDecide, bare.toDecide]) assert.doesNotMatch(toDecideWords(atOtto(), t), /You are/);
 });
 
 test("REFUSED before the work is done: an ending step's gate does not hold while what it acts on is still running, and `wf approve` says so at shipped defaults", () => {
@@ -7947,6 +7983,7 @@ test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfil
     kind: 'approve',
     step: 'ship',
     says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.",
+    filed: false,
   });
   assert.equal(
     toDecideWords(atEnd(), l.toDecide),
@@ -8178,7 +8215,7 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
       () => undefined,
       ON,
     ).toDecide,
-    { kind: 'approve', step: 'review', says: null },
+    { kind: 'approve', step: 'review', says: null, filed: true },
     "a gate on a last step that has run and merges nothing is acceptance of what it did, not a merge: git's standing does not answer it",
   );
   assert.equal(
@@ -8321,6 +8358,7 @@ test('`to decide` in a folder with no ending step: a finished run whose branch i
       kind: 'approve',
       step: 'ship',
       says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.",
+      filed: false,
     },
     'a gated ending is the decision, not git: its branch ahead says nothing more than its gate does',
   );
@@ -8711,7 +8749,7 @@ test("a gate on the last step of a folder that merges nothing: approving accepts
   );
   assert.deepEqual(
     held.toDecide,
-    { kind: 'approve', step: 'review', says: null },
+    { kind: 'approve', step: 'review', says: null, filed: true },
     "at the gate: the word, and nothing of the step's own prose; approving accepts what it handed on",
   );
   assert.equal(toDecideWords(r, held.toDecide), 'review has signed off at its gate — wf approve r-1 review');

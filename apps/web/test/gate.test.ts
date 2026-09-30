@@ -6,7 +6,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   decideLine,
-  firstLine,
   gateBrief,
   gateCardLine,
   gateFacts,
@@ -43,6 +42,7 @@ const ENDING_DECIDE = {
   kind: 'approve',
   step: 'ship',
   says: 'Merge this run onto the base branch, or abort on any failure.',
+  filed: false,
   back: ['review'],
   onto: 'main',
   said: 'Merge this run onto the base branch, or abort on any failure.',
@@ -120,7 +120,7 @@ test("the inspector's gate is read off the step: an ending with no task runs on 
   const run = detail([ship]);
   const gate = gateOfStep(run, ship);
   assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
-  const brief = gateBrief(gate, firstLine('\nMerge this run onto the base branch.\n\nMore.'), []);
+  const brief = gateBrief(gate, 'Merge this run onto the base branch.', []);
   assert.equal(brief.waits, 'ship waits at its gate: it has not run, and it runs only on your approval.');
   assert.equal(
     brief.approving,

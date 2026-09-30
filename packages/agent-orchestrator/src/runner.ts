@@ -80,6 +80,7 @@ export {
   endingSteps,
   firstLine,
   merges,
+  ownNote,
   resultSteps,
   sendBackTo,
   toDecideWords,

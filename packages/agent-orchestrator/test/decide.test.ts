@@ -682,6 +682,48 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   indexOf(said, /^   ship {11}awaiting approval/);
 });
 
+test("REFUSED: an ending led by an agent that says `You are …` — `wf decide` and `wf ls` say the step's own note, or with none, that approving runs it, and never quote the agent", async (t) => {
+  const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  fs.mkdirSync(path.join(team, 'agents'));
+  fs.writeFileSync(
+    path.join(team, 'agents', 'otto.md'),
+    "---\nmodel: opus\n---\nYou are Otto, a release engineer. You land a run's result in the repository's own checkout.\n\nNever push.\n",
+  );
+  const LANDS = "Land this run's result on main: stage the merge of its branch, and sign off with the commit message.";
+  const atGate = async (note: string) => {
+    const dir = fs.mkdtempSync(path.join(team, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'land.md'), `---\nafter: implement\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`);
+    const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: dir });
+    const { e, settle } = board();
+    await advance(e, readRun(run.id));
+    const work = readRun(run.id).steps.implement;
+    write(work.workspace!, 'packages/x/src/add.ts', 'export const sub = (a, b) => a - b;\n');
+    git(work.workspace!, 'commit', '-qam', 'add sub');
+    settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await advance(e, readRun(run.id));
+    return { id: run.id, lines: await screen(t, e, run.id), said: await listed(t, e, run.id) };
+  };
+
+  const noted = await atGate(`${LANDS}\n\nAbort on a conflict.\n`);
+  const decide = indexOf(noted.lines, "  to decide  land has not run: this workflow's ending, and your approval is what runs it:");
+  assert.deepEqual(noted.lines.slice(decide + 1, decide + 4), [
+    `    ${LANDS}`,
+    '',
+    `  approve it    wf approve ${noted.id} land [--message "<words>"]`,
+  ]);
+  indexOf(noted.said, `   → to decide: ${LANDS} — wf approve ${noted.id} land`);
+
+  const bare = await atGate('');
+  const heading = indexOf(bare.lines, "  to decide  land has not run: this workflow's ending, and your approval is what runs it");
+  assert.deepEqual(bare.lines.slice(heading + 1, heading + 3), ['', `  approve it    wf approve ${bare.id} land [--message "<words>"]`]);
+  indexOf(bare.said, `   → to decide: land has not run: approving runs it — wf approve ${bare.id} land`);
+
+  for (const shown of [noted.lines, noted.said, bare.lines, bare.said]) {
+    assert.ok(!shown.some((l) => l.includes('You are')), shown.join('\n'));
+  }
+});
+
 test('a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its git commands', async (t) => {
   const repo = aRepo();
   const run = start({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });

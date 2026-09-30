@@ -248,7 +248,7 @@ export const stopsFollowers = (s: StepStatus): boolean =>
   s === 'failed' ||
   s === 'stopped';
 
-/** The first line of a step's prose, trimmed: what a folder says its ending step would do, on `wf ls` and `wf decide`. Pure. */
+/** The first line of some prose that is not blank, trimmed; empty where there is none. Pure. */
 export const firstLine = (body: string): string =>
   body
     .split('\n')

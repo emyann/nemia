@@ -1,15 +1,17 @@
 /**
  * Forgetting a run that is over (`forget`, `wf rm`): it reads a run as `cancel` does, adopting what a pass filed and never wrote down
  * (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime through
- * the client (`runtime-client.ts`); it never stops anything. `wf rm` closes a task held open that waits for a word, which runs nothing and
- * is settled as it signed: no pass reads the run again to close it.
+ * the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`forgetRun`, over `EngineService`), and
+ * `forget`, its plain face in a Promise, over the engine it is handed. It never stops anything. `wf rm` closes a task held open that
+ * waits for a word, which runs nothing and is settled as it signed: no pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
-import { isGitRun, namesInOrder } from '../record/record.ts';
+import { isGitRun, namesInOrder, type GitRun, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import {
   branchFates,
@@ -22,6 +24,7 @@ import {
   type AskName,
   type BranchFate,
   type ForgetHow,
+  type GitWorktree,
   type Forgot,
 } from './forget.ts';
 import {
@@ -46,6 +49,15 @@ import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
+
+/** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
+const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
+
+/** What `wf rm` is left with once a run's record is read and what a pass filed and never wrote down is adopted onto it. */
+type Forgetting = Effect.Success<ReturnType<typeof readForgetting>>;
+
+/** What was done to a git run's worktrees (`removeWorktrees`). */
+type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
 
 /**
  * Forget a run that is over — `wf rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
@@ -75,45 +87,100 @@ import { Invalid } from '../refusal/refusal.ts';
  *
  * A run whose record is gone is normal: what is left under its id, its files, is removed and named — never a worktree, since nothing says
  * whose they are — and a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
- * that is not a name (`idRefusal`).
+ * that is not a name (`idRefusal`). Fails with a refusal a read threw; dies of anything else (`tried`, `awaited`).
  */
-export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> {
+export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow) {
+  const e = yield* EngineService;
   const refusedId = idRefusal(id);
-  if (refusedId) throw new Invalid({ message: refusedId });
-  const nothing = { removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
+  if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
   const dir = path.join(HOME, 'worktrees', id);
-  if (!fs.existsSync(runFile(id))) {
-    const files = removeKeyed(id, undefined);
-    return { id, kind: 'missing', ...nothing, files, left: lstatOf(dir) ? [{ path: dir, orphaned: true }] : [] };
+  if (!(yield* tried(() => fs.existsSync(runFile(id))))) return yield* tried(() => forgetMissing(id, dir));
+  const f = yield* readForgetting(e, id);
+  const { run, steps, unfrozen } = f;
+  const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
+  const refusal = yield* tried(() => refusalOf(id, f));
+  if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
+  yield* awaited(() => closeWaitingTasks(e, run, f.views));
+  if (!isGitRun(run)) {
+    return {
+      ...said,
+      folder: true,
+      kind: 'forgotten',
+      ...nothing(),
+      files: yield* tried(() => removeKeyed(id, Object.keys(run.steps))),
+    } satisfies Forgot;
   }
+  const worktrees = yield* tried(() => removeWorktrees(run, steps, dir));
+  if (worktrees.left.length) return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
+  const branches = yield* tried(() => deleteBranches(id, run, how));
+  const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
+  return { ...said, kind: 'forgotten', ...worktrees, branches, files } satisfies Forgot;
+});
 
-  const run = readRun(id);
-  let steps: Workflow[] | undefined;
-  let unfrozen: string | undefined;
+/**
+ * `wf rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed with,
+ * or with whatever else it died of, as it was thrown.
+ */
+export const forget = (e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> =>
+  Effect.runPromise(forgetRun(id, how).pipe(Effect.provide(EngineService.layer(e))));
+
+/** A run whose record is gone: what is left under its id removed and named, and `worktrees/<id>` named as orphaned, never removed. */
+const forgetMissing = (id: string, dir: string): Forgot => ({
+  id,
+  kind: 'missing',
+  ...nothing(),
+  files: removeKeyed(id, undefined),
+  left: lstatOf(dir) ? [{ path: dir, orphaned: true }] : [],
+});
+
+/**
+ * A run's frozen steps, or, for a record with no frozen workflow whose folder does not read, why (`unfrozen`): whatever reading it throws,
+ * a plain `ENOENT` included, so the run is judged without its steps.
+ */
+function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
   try {
-    steps = stepsOf(run);
+    return { steps: stepsOf(run) };
   } catch (err) {
-    unfrozen = (err as Error).message;
+    return { unfrozen: (err as Error).message };
   }
-  const { views, phaseOf } = await taskPhases(e, run);
-  const { asks, rounds } = readAsks(id);
+}
+
+/**
+ * Read the run `id` as `cancel` does: its record, its frozen steps (`frozenSteps`), the engine's view of its tasks, and its asks; then every
+ * check, try, round and step a pass filed and never wrote down, adopted onto the record in memory.
+ */
+const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
+  const run = yield* tried(() => readRun(id));
+  const { steps, unfrozen } = frozenSteps(run);
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { asks, rounds } = yield* tried(() => readAsks(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
   if (steps) {
-    await adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-    await adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-    await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-    for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
-      run.steps[name] = { ...run.steps[name], taskId };
-    }
+    yield* awaited(() => adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf));
+    yield* awaited(() => adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf));
+    yield* awaited(() => adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf));
+    const unrecorded = yield* awaited(() =>
+      unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf),
+    );
+    for (const { name, taskId } of unrecorded) run.steps[name] = { ...run.steps[name], taskId };
   }
+  return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
+});
+
+/**
+ * Why `wf rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result stands
+ * for an ending that has not run, and a merge the ending staged.
+ */
+function refusalOf(id: string, f: Forgetting): string | null {
+  const { run, steps } = f;
   const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
   const others = listRuns().filter((o) => o.id !== id);
-  const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
-  const refusal = forgetRefusal(
+  const { phaseOf, reader, asked, verdictOf, asks, rounds, spendOf } = f;
+  return forgetRefusal(
     steps,
     run,
     phaseOf,
@@ -129,10 +196,13 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
     'rm',
     merging(run, steps),
   );
-  if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
-  await closeWaitingTasks(e, run, views);
-  if (!isGitRun(run)) return { ...said, folder: true, kind: 'forgotten', ...nothing, files: removeKeyed(id, Object.keys(run.steps)) };
+}
 
+/**
+ * Remove a git run's worktrees through git (`runWorktrees`, `removeWorktree`), then prune git's list, and answer what was removed, handed
+ * off, already gone and left — a directory in `dir` git does not know among what is left (`strays`).
+ */
+function removeWorktrees(run: GitRun, steps: readonly Workflow[] | undefined, dir: string): Worktrees {
   const within = resolved(dir);
   const recorded = {
     ...run,
@@ -146,46 +216,66 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
     within,
     parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''),
   );
-  const removed: string[] = [];
-  const handedOff: Forgot['handedOff'] = [];
-  const gone = unlisted.filter((p) => !lstatOf(p));
-  const left: Forgot['left'] = [];
-  for (const w of worktrees) {
-    if (w.prunable && w.locked === undefined) {
-      if (!lstatOf(w.path)) gone.push(w.path);
-      continue;
-    }
-    const status = w.detached && w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
-    const onBranch =
-      w.detached && w.head && w.locked === undefined
-        ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
-        : false;
-    const hold = heldWorktree(w, { clean: status !== undefined && !status.trim(), onBranch });
-    if (hold) {
-      left.push({ path: w.path, ...hold });
-      continue;
-    }
-    const handed = handOff(w.path, w.step, ', before its run was forgotten');
-    if (handed && 'error' in handed) {
-      left.push({ path: w.path, step: w.step, uncommitted: handed.error });
-      continue;
-    }
-    if (handed) handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.commit });
-    try {
-      execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-      removed.push(w.path);
-    } catch (err) {
-      left.push({ path: w.path, git: gitWords(err) });
-    }
-  }
+  const done: Worktrees = { removed: [], handedOff: [], gone: unlisted.filter((p) => !lstatOf(p)), left: [] };
+  for (const w of worktrees) removeWorktree(run, w, done);
   if (worktrees.length) gitSays(run.repo, 'worktree', 'prune');
-  let strays: string[] = [];
-  try {
-    strays = fs.readdirSync(within).map((name) => path.join(within, name));
-  } catch {}
-  for (const at of strays) if (!left.some((l) => l.path === at)) left.push({ path: at, unknown: true });
-  if (left.length) return { ...said, kind: 'held', removed, handedOff, gone, left, branches: [], files: [] };
+  for (const at of strays(within)) if (!done.left.some((l) => l.path === at)) done.left.push({ path: at, unknown: true });
+  return done;
+}
 
+/**
+ * Remove one of a git run's worktrees, adding to `done`: one git can prune and nobody locked is gone, or pruned; one held
+ * (`heldWorktree`), or whose hand-off git refuses, is left, as is one `git worktree remove` refuses; otherwise what it holds uncommitted is
+ * handed off first, then it is removed.
+ */
+function removeWorktree(run: GitRun, w: GitWorktree & { step: string }, done: Worktrees): void {
+  if (w.prunable && w.locked === undefined) {
+    if (!lstatOf(w.path)) done.gone.push(w.path);
+    return;
+  }
+  const hold = heldWorktree(w, onNoBranch(run, w));
+  if (hold) {
+    done.left.push({ path: w.path, ...hold });
+    return;
+  }
+  const handed = handOff(w.path, w.step, ', before its run was forgotten');
+  if (handed && 'error' in handed) {
+    done.left.push({ path: w.path, step: w.step, uncommitted: handed.error });
+    return;
+  }
+  if (handed) done.handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.commit });
+  try {
+    execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    done.removed.push(w.path);
+  } catch (err) {
+    done.left.push({ path: w.path, git: gitWords(err) });
+  }
+}
+
+/** For a worktree on no branch that nobody locked: whether it is clean, and whether its HEAD is on a branch; neither, for any other. */
+function onNoBranch(run: GitRun, w: GitWorktree): { clean: boolean; onBranch: boolean } {
+  const status = w.detached && w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
+  const onBranch =
+    w.detached && w.head && w.locked === undefined
+      ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim())
+      : false;
+  return { clean: status !== undefined && !status.trim(), onBranch };
+}
+
+/** What is still in `within`, the run's worktrees' directory, by path: none when it is gone. */
+function strays(within: string): string[] {
+  try {
+    return fs.readdirSync(within).map((name) => path.join(within, name));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Delete the branches of the git run `id`, as asked (`branchFates`): those git has under `wf/<id>/`, merged into the run's base branch as git says it,
+ * or forced. One git refuses to delete is kept, in git's words.
+ */
+function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
   const listed = (gitSays(run.repo, 'for-each-ref', '--format=%(refname)', `refs/heads/wf/${id}/`) ?? '')
     .split('\n')
     .filter(Boolean)
@@ -198,7 +288,7 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
       return false;
     }
   };
-  const branches = branchFates(run, listed, merged, how).map((b): BranchFate => {
+  return branchFates(run, listed, merged, how).map((b): BranchFate => {
     if (!b.deleted) return b;
     try {
       execFileSync('git', ['branch', '-D', b.branch], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -207,8 +297,6 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
       return { branch: b.branch, deleted: false, why: { git: gitWords(err) } };
     }
   });
-
-  return { ...said, kind: 'forgotten', removed, handedOff, gone, left, branches, files: removeKeyed(id, Object.keys(run.steps)) };
 }
 
 /**

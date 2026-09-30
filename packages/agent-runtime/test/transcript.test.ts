@@ -28,6 +28,8 @@ process.env.CLAUDE_CONFIG_DIR = config;
 const codexHome = tmp('codex-home');
 process.env.CODEX_HOME = codexHome;
 const { claudeOps } = await import('../src/harness/claude/bg.ts');
+const { RunnerError } = await import('../src/harness/error.ts');
+const { readTranscript } = await import('../src/harness/transcript.ts');
 const { claudeTranscriptEvents } = await import('../src/harness/claude/transcript.ts');
 const { detachedOps } = await import('../src/harness/detached/detached.ts');
 const { codex } = await import('../src/harness/codex/codex.ts');
@@ -362,6 +364,52 @@ test("words the session's own user said while it worked — typed into it, or a 
     [],
     "Claude Code's notice that a background task ended is not anyone's words",
   );
+});
+
+/** A Claude transcript as `claudeLines` writes it, with the line at `at` replaced by `line`. */
+const claudeWith = (sessionId: string, at: number, line: object) => {
+  const lines = claudeLines(sessionId);
+  lines[at] = { ...lines[at], ...line };
+  return jsonl(lines);
+};
+
+test("REFUSED: a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its offset, its field and the fix", async () => {
+  const sessionId = randomUUID();
+  const text = claudeWith(sessionId, 3, { message: { id: 'msg_1', content: [{ type: 'thinking', thinking: 7 }] } });
+  writeClaude(sessionId, text);
+  const offset = Buffer.byteLength(text.split('\n').slice(0, 3).join('\n')) + 1;
+  const words =
+    `the line at byte ${offset} of the transcript is an \`assistant\` line whose \`message.content.0.thinking\` is 7, where Claude` +
+    ' Code writes string.';
+  await assert.rejects(readTranscript(claudeFile(sessionId), undefined, claudeTranscriptEvents), (e: Error) => e.message.startsWith(words));
+  await assert.rejects(claudeRead(sessionId), (e: unknown) => {
+    assert.ok(e instanceof RunnerError, String(e));
+    assert.equal(e.verb, 'transcript');
+    assert.ok(e.message.startsWith(words), e.message);
+    assert.ok(e.message.includes('`harness/claude/lines.ts`'), e.message);
+    return true;
+  });
+
+  const aside = randomUUID();
+  writeClaude(aside, claudeWith(aside, 3, { isSidechain: true, message: { content: [{ type: 'tool_use', id: 7 }] } }));
+  await assert.rejects(
+    claudeRead(aside),
+    (e: Error) => e.message.includes('is an `assistant` line whose `message.content.0.id` is 7'),
+    "a subagent's line is decoded before it is left out",
+  );
+});
+
+test('a torn line, a line that is no JSON object, and a line of a type not read pass the Claude transcript unchecked', async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));
+  const unread = [
+    '{"type":"assistant","message":{"content":[{"type":"text","text":7',
+    '["assistant"]',
+    JSON.stringify({ type: 'file-history-snapshot', timestamp: 'never', snapshot: 7 }),
+    JSON.stringify({ type: 'summary', summary: 3, leafUuid: 4 }),
+  ];
+  writeClaude(sessionId, `${[...lines.slice(0, 2), ...unread, ...lines.slice(2)].join('\n')}\n`);
+  assert.deepEqual((await claudeRead(sessionId)).events, CLAUDE_EVENTS);
 });
 
 test('read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read', async () => {
@@ -1004,4 +1052,25 @@ test("a registry that cannot be read: an ended attempt's transcript is read by t
     assert.equal(claude.agentsCalls(), before, 'and the registry was not asked');
     assert.match(await engine.logs(id), /Write the word to WORD\.txt/, 'as logs reads it');
   });
+});
+
+test("REFUSED: a finished background session whose statement's line does not decode fails `observe` at shipped readers, naming the transcript, its line and field", async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId);
+  const call = lines.findIndex((l) => JSON.stringify(l).includes('StructuredOutput'));
+  writeClaude(sessionId, claudeWith(sessionId, call, { timestamp: 'yesterday' }));
+  const bin = tmp('bin');
+  const rows = JSON.stringify([{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background' }]);
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${rows}\nJSON\n`, { mode: 0o755 });
+
+  const e = await onPath(bin, () => Effect.runPromise(Effect.flip(claudeOps({ transcriptTime: async () => 0 }).observe)));
+  assert.ok(e instanceof RunnerError, String(e));
+  assert.equal(e.verb, 'observe');
+  assert.ok(e.message.includes("`ae/t/1`'s transcript cannot be read"), e.message);
+  assert.ok(
+    e.message.includes(
+      `line ${call + 1} of the transcript \`${claudeFile(sessionId)}\` is an \`assistant\` line whose \`timestamp\` is "yesterday"`,
+    ),
+    e.message,
+  );
 });

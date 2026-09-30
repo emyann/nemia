@@ -359,6 +359,48 @@ test("a boundary its session wrote before the attempt began is not the attempt's
   assert.equal('compactions' in transcriptUsage(jsonl, since), false, "none of its own: absent, and the parent's does not count");
 });
 
+test('REFUSED: a line usage reads that does not decode is refused by its line and field, never counted as nothing', () => {
+  const at = '2026-09-12T09:00:01Z';
+  const since = Date.parse('2026-09-12T09:00:00Z');
+  const cases: [string, string][] = [
+    [line({ type: 'cost-state', totalCostUSD: '1.20' }), 'a `cost-state` line whose `totalCostUSD` is "1.20"'],
+    [
+      line({ type: 'cost-state', modelUsage: { opus: { outputTokens: 1.5 } } }),
+      'a `cost-state` line whose `modelUsage.opus.outputTokens` is 1.5',
+    ],
+    [line({ type: 'agent-name', agentName: 7 }), 'an `agent-name` line whose `agentName` is 7'],
+    [
+      line({ type: 'system', subtype: 'compact_boundary', timestamp: at, compactMetadata: { preTokens: '83770' } }),
+      'a `system` line whose `compactMetadata.preTokens` is "83770"',
+    ],
+    [response(at, 'msg_1', [], { ...TOKENS, output_tokens: -1 }), 'an `assistant` line whose `message.usage.output_tokens` is -1'],
+    [response(at, 'msg_1', [{ type: 'tool_use', id: 7 }]), 'an `assistant` line whose `message.content.0.id` is 7'],
+  ];
+  for (const [wrong, words] of cases) {
+    assert.throws(
+      () => transcriptUsage([prompt(at), wrong].join('\n'), since, '/t/s.jsonl'),
+      (e: Error) => e.message.startsWith(`line 2 of the transcript \`/t/s.jsonl\` is ${words}, where Claude Code writes`),
+      wrong,
+    );
+  }
+  assert.throws(
+    () => transcriptUsage(line({ type: 'user', timestamp: 'yesterday', message: { content: 'the prompt' } }), since),
+    (e: Error) => e.message.startsWith('line 1 of the transcript is a `user` line whose `timestamp` is "yesterday"'),
+    'a time read to tell whether the attempt has begun is decoded',
+  );
+});
+
+test('usage decodes only the lines it reads: a response before the attempt began, and a line of a type it does not read, are not checked', () => {
+  const since = Date.parse('2026-09-12T09:00:00Z');
+  const jsonl = [
+    response('2026-09-12T08:00:00Z', 'msg_0', [{ type: 'tool_use', id: 7 }], { output_tokens: -1 }),
+    line({ type: 'file-history-snapshot', timestamp: 'never', snapshot: 7 }),
+    prompt('2026-09-12T09:00:01Z'),
+    response('2026-09-12T09:00:02Z', 'msg_1', [{ type: 'text', text: 'done' }]),
+  ].join('\n');
+  assert.equal(transcriptUsage(jsonl, since).turns, 1);
+});
+
 test("an attempt's input is counted in its three classes, which sum to inputTokens, and its peak is the largest any one response read", () => {
   const since = Date.parse('2026-09-18T09:00:00Z');
   const usage = (uncached: number, write: number, read: number) => ({

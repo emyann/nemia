@@ -486,7 +486,9 @@ const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: num
     catch: (cause) =>
       new RunnerError({
         verb: 'observe',
-        message: `claude --bg: ${name} (${sighting.sessionId}): ${cause instanceof Error ? cause.message : String(cause)}`,
+        message:
+          `claude --bg: \`${name}\`'s transcript cannot be read, so every background session of ours stays unread, neither there` +
+          ` nor gone: ${cause instanceof Error ? cause.message : String(cause)}`,
       }),
   });
 

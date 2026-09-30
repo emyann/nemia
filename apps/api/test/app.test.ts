@@ -7,7 +7,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { engine, list, readFilings, readRun, timeline } from 'agent-orchestrator';
+import { engine, list, readFilings, timeline, runStore } from 'agent-orchestrator';
 import { claudeDetached, claudeOps } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
@@ -517,7 +517,7 @@ test('a task the engine has no record of is unknown on both endpoints, not queue
 test('the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued', async () => {
   const e = engine();
   for (const id of ['r-2', 'r-4', 'r-5']) {
-    const words = await list(e, readRun(id));
+    const words = await list(e, runStore.runs.read(id));
     const run = await listed(id);
     assert.deepEqual(
       run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })),
@@ -942,7 +942,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
     ['implement', 'review'],
   );
   assert.deepEqual(
-    (await list(engine(), readRun('r-43'))).steps.map((s: { name: string }) => s.name),
+    (await list(engine(), runStore.runs.read('r-43'))).steps.map((s: { name: string }) => s.name),
     ['implement', 'review'],
     'the steps `wf ls` lists, and no other',
   );
@@ -959,7 +959,11 @@ test('an unknown run is refused with a 404 that says where to look', async () =>
 
 test('a run id cannot name a file outside the run store', async () => {
   writeRun({ ...r2, id: '../escape' });
-  assert.equal(readRun('../escape').id, '../escape', 'the file is a readable run, one directory up: reading the id as a path serves it');
+  assert.equal(
+    runStore.runs.read('../escape').id,
+    '../escape',
+    'the file is a readable run, one directory up: reading the id as a path serves it',
+  );
 
   const res = await app.request('/api/runs/..%2Fescape');
   assert.equal(res.status, 404);
@@ -1283,7 +1287,7 @@ test("each step says what the run established, in `wf ls`'s words, on both endpo
 test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
   const e = engine();
   for (const id of ['r-20', 'r-21']) {
-    const words = await list(e, readRun(id));
+    const words = await list(e, runStore.runs.read(id));
     const detail = await detailOf(id);
     for (const [where, run] of [
       ['list', await listed(id)],
@@ -1450,7 +1454,7 @@ test('a check that refused with `retries:` left reads as the tick has it — run
     ],
   ];
   for (const [id, status, moving, waitingOnYou, word, why] of cases) {
-    assert.deepEqual((await list(e, readRun(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
+    assert.deepEqual((await list(e, runStore.runs.read(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', await detailOf(id)],
@@ -1529,7 +1533,7 @@ type Judgement = [
 async function expectJudged(cases: readonly Judgement[]) {
   const e = engine();
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
-    const words = await list(e, readRun(id));
+    const words = await list(e, runStore.runs.read(id));
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', await detailOf(id)],
@@ -2501,7 +2505,7 @@ test("the detail carries where each step's time went — per try and per check, 
   const e = engine();
   const views = new Map((await e.list()).views.map((view) => [view.id, view]));
   const { filed } = await readFilings(e);
-  const theirs = timeline(readRun('r-60'), views, filed);
+  const theirs = timeline(runStore.runs.read('r-60'), views, filed);
   const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null, 'nobody priced these sessions'), total);
   assert.deepEqual(
     { rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) },

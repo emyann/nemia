@@ -21,7 +21,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { advance, approve, cancel, readRun, start } = await import('../src/runner.ts');
+const { advance, approve, cancel, start } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { meteredEngine } = await import('../src/meter/meter.verb.ts');
 

@@ -3,7 +3,6 @@
  * and the merge an ending staged there, committed or aborted on its check (`landEnding`). A controller, reaching the runtime through the
  * client (`runtime-client.ts`).
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Engine } from '../runtime-client.ts';
 import type { Verdict } from '../check/check.ts';
@@ -16,7 +15,8 @@ import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
-import { listRuns, readAsks, runFile, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { abortMerge, commitMerge, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentsOf, spendReader, taskPhases } from '../views/views.verb.ts';
@@ -38,8 +38,8 @@ import { resultTips } from '../branches/branches.store.ts';
  */
 export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
   const ending = steps.find((s) => s.workspace === 'main');
-  if (!ending || run.cancelledAt || endingAsked(run, ending, readAsks(run.id).asks) === undefined) return undefined;
-  const runs = listRuns();
+  if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
+  const runs = runStore.runs.list();
   const slots = await runSlots(e, runs);
   const mine = await mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
@@ -92,7 +92,7 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
   }
   if (run.cancelledAt) return undefined;
-  const { asks, rounds } = readAsks(run.id);
+  const { asks, rounds } = runStore.asks.read(run.id);
   const at = endingAsked(run, ending, asks);
   if (at === undefined) return undefined;
   const { views, phaseOf } = await taskPhases(e, run);
@@ -141,7 +141,7 @@ export function landEnding(
 ): { notes: string[]; landed: boolean } {
   const ending = steps.find((s) => landsOnCheck(s, run));
   const record = ending && run.steps[ending.name];
-  if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !fs.existsSync(runFile(run.id))) return { notes: [], landed: false };
+  if (!ending || !record?.taskId || record.landed || !isGitRun(run) || !runStore.runs.exists(run.id)) return { notes: [], landed: false };
   const own = ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf);
   const said = signedOff(ending.name)?.output?.message;
   const due = landingDue(

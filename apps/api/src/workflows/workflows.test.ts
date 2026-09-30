@@ -14,7 +14,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { loadWorkflows, parentRecord, readRun } from 'agent-orchestrator';
+import { loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
@@ -364,7 +364,7 @@ test('POST /api/runs starts a run of the workflow it names as `wf start` does: t
   assert.equal(res.headers.get('location'), `/api/runs/${id}`);
 
   assert.deepEqual(runFiles(), [`${id}.json`], 'the record, and nothing beside it');
-  const run = readRun(id);
+  const run = runStore.runs.read(id);
   assert.deepEqual(
     {
       repo: run.repo,
@@ -570,7 +570,7 @@ test('REFUSED: a name both the repository and yours have is a 409 until `from` s
 
   const chosen = await post({ workflow: 'good', from: 'yours', brief: 'Do it my way.' });
   assert.equal(chosen.status, 201);
-  const run = readRun(((await chosen.json()) as { id: string }).id);
+  const run = runStore.runs.read(((await chosen.json()) as { id: string }).id);
   assert.equal(run.workflowDir, yours);
   assert.deepEqual(Object.keys(run.steps), ['implement']);
 });
@@ -615,7 +615,7 @@ test('POST /api/runs takes `after` and passes it to `start()`, which freezes it 
   const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
   assert.equal(res.status, 201, await res.clone().text());
   const { id } = (await res.json()) as { id: string };
-  assert.deepEqual(readRun(id).after, ['p-running']);
+  assert.deepEqual(runStore.runs.read(id).after, ['p-running']);
   assert.deepEqual(filedTasks(), [], 'nothing filed');
 
   const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
@@ -624,7 +624,7 @@ test('POST /api/runs takes `after` and passes it to `start()`, which freezes it 
   const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
   assert.equal(none.status, 201);
   assert.equal(
-    Object.hasOwn(readRun(((await none.json()) as { id: string }).id), 'after'),
+    Object.hasOwn(runStore.runs.read(((await none.json()) as { id: string }).id), 'after'),
     false,
     'none to wait on is a run that waits on none: a record with no `after`, as `wf start` writes without one',
   );

@@ -53,3 +53,5 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
 - **A handle count is waited for, never read once after a close** (`watchers` and `until` in `src/factory/feed.test.ts`): a stream's watch is
   taken a few microtasks after its response, so a test waits for it before it breaks the feed.
+- **A run's record, asks and stamps are read through `runStore`** (`agent-orchestrator`): the root exports no store function of a run
+  (`packages/agent-orchestrator/test/entries.test.ts`).

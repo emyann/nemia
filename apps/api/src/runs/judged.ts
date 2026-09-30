@@ -23,8 +23,6 @@ import {
   parentOf,
   type ParentRun,
   phaseOfView,
-  readAnswers,
-  readAsks,
   resultSteps,
   type Retry,
   type RetryAsk,
@@ -41,6 +39,7 @@ import {
   waitingWords,
   waitWord,
   wordOfView,
+  runStore,
 } from 'agent-orchestrator';
 import {
   assess,
@@ -286,7 +285,7 @@ type Judged = {
   holding: RunHolding | null;
   /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
   asked: ReadonlyMap<string, Retry>;
-  /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a try was answered (`answerOf`). */
+  /** Every ask that carried a message, waiting or consumed (`runStore`): what says a try was answered (`answerOf`). */
   answers: readonly RetryAsk[];
   /** What each task's sessions cost, off the views read (`spendReader`): what holds a step to its `budget:`. */
   spendOf: SpendOf;
@@ -385,7 +384,7 @@ export type Asked = { branches: string[]; failed: boolean };
  * has no record of — and so are the notes beside them. A step and a check are read as the tick reads them, off the package's
  * own `phaseOfView`, `closeoutAsked` and `exitVerdicts`.
  *
- * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`readAsks`): without them a
+ * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`runStore`): without them a
  * step a person asked to try again, or a loop out of rounds a person sent round once more, reads as waiting on them, and the
  * run as not moving, for as long as the tick takes to file what they asked for. Unreadable ask files are notes the tick prints and does
  * not honour; neither does the board. A step the page shows and the tick does not judge — one a record names that has no frozen workflow
@@ -397,7 +396,7 @@ export type Asked = { branches: string[]; failed: boolean };
  * log `wf ls` reads: the check prints the code it exits with, so the two agree, and a `logs` call per refused check would observe every
  * harness again on every poll of the list. `assess` is given it, as the tick is: without it `assess` cannot tell a check that refused,
  * which `retries:` tries again, from one that did not finish, which waits on a person, and the status and `listing`'s words would disagree.
- * What people said with their asks (`readAnswers`): without it a try a person answered reads as one they did not. How many times a person
+ * What people said with their asks (`runStore`): without it a try a person answered reads as one they did not. How many times a person
  * said something to each step's current try (`wf say`, `saidCount`), which the note says. The harness's word (`harnessBlocked`): a
  * person's try of a step whose session the harness blocked is due, the session stopped first; without it that try is in `listing`'s note
  * and neither `asked` nor `moving`. And what each task's sessions cost (`spendReader`), off views that hold every try's task: a step whose
@@ -431,8 +430,8 @@ export function judge(
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = closeoutAsked(views);
   const verdicts = exitVerdicts(views, run);
-  const { asks, rounds } = readAsks(run.id);
-  const answers = readAnswers(run.id);
+  const { asks, rounds } = runStore.asks.read(run.id);
+  const answers = runStore.asks.answers(run.id);
   const spendOf = spendReader(views);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   const judgedOf = (on: Run) =>

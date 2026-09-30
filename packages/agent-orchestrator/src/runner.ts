@@ -11,7 +11,8 @@
  * rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
- * `record.store.ts` (the run store — a run's id and record, a person's files beside it, a step's check stderr, artifacts and inputs),
+ * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
+ * record and a person's files beside it are read and written through, `runStore`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
  * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
@@ -212,18 +213,14 @@ export {
   askFile,
   checkStderr,
   inputsDir,
-  listRuns,
-  markCancelled,
   readAcceptances,
-  readAnswers,
   readApprovals,
-  readAsks,
-  readRun,
-  restStamps,
   roundAskFile,
   runId,
   stepsOf,
 } from './record/record.store.ts';
+export { runStore } from './record/files.store.ts';
+export type { RunStore } from './record/record.ts';
 export {
   alive,
   beat,

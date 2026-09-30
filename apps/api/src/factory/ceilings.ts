@@ -9,16 +9,15 @@ import {
   harnessBlocked,
   lastCeilings,
   lastPassCost,
-  listRuns,
   maxRuns,
   parentOf,
   type ParentRun,
   type PassCost,
   phaseOfView,
-  readAsks,
   slotWord,
   spendReader,
   stepsOf,
+  runStore,
 } from 'agent-orchestrator';
 import { admissionOrder, assess, gated, heldRuns, type Run, slotNeed } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
@@ -65,7 +64,7 @@ export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): 
   const pass = lastPassCost() ?? null;
   const cap = last?.runs ?? maxRuns(env);
   if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
-  const runs = listRuns();
+  const runs = runStore.runs.list();
   const { views, unreadable } = await everyView(e);
   const reader = seenBy(e, views);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
@@ -78,7 +77,7 @@ export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): 
       continue;
     }
     const need = await judgedUnlessUnreadable(run, unreadable, async () => {
-      const { asks, rounds } = readAsks(run.id);
+      const { asks, rounds } = runStore.asks.read(run.id);
       const a = assess(
         steps,
         run,

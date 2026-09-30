@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import type { RunDetail } from '../detail/detail.ts';
 import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
-import { askFile, engine, list, readRun, retry } from 'agent-orchestrator';
+import { askFile, engine, list, retry, runStore } from 'agent-orchestrator';
 import { messageRefusal } from 'agent-orchestrator/run';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
@@ -490,7 +490,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   assert.deepEqual(asked(), ['retry-implement-2']);
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   const run = await detail();
   const implement = run.steps.find((s) => s.name === 'implement')!;
   assert.equal(implement.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
@@ -561,7 +561,7 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   assert.deepEqual({ held: journalOf('t-held'), idle: journalOf('t-idle') }, journals, "nor of the engine's journals");
   assert.equal(stops(), 0, "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's");
 
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
   const run = await detail();
   const held = run.steps.find((s) => s.name === 'held')!;
@@ -644,7 +644,7 @@ test("a try a person answered carries the answer, as `wf decide` prints it — t
   assert.equal(implement.tries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
   assert.equal(implement.needs, null, 'the current try signed off done');
 
-  const words = await list(engine(), readRun(A));
+  const words = await list(engine(), runStore.runs.read(A));
   for (const [where, said] of [
     ['detail', run],
     ['list', await summary(A)],

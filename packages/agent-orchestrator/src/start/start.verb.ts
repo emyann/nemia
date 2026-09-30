@@ -18,7 +18,8 @@ import { gateRefusal } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
-import { HOME, inputsDir, runId, runsDir, writeRun } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { HOME, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
@@ -343,7 +344,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));
   yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
-  yield* tried(() => writeRun(run));
+  yield* tried(() => runStore.runs.create(run));
   return run;
 });
 

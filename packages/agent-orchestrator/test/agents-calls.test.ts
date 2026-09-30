@@ -23,7 +23,8 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
-const { engine, readRun, start, tick } = await import('../src/runner.ts');
+const { engine, start, tick } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 
 const git = (repo: string, ...args: string[]) =>

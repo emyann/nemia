@@ -26,7 +26,8 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approve, forget, isGitRun, listRuns, prune, readRun, retry, start } = await import('../runner.ts');
+const { approve, forget, isGitRun, prune, retry, start } = await import('../runner.ts');
+const { listRuns, readRun } = await import('../record/record.store.ts');
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
   await import('../record/record.store.ts');

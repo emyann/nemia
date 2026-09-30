@@ -20,8 +20,8 @@ const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
-const { advance, approve, cancel, forget, inboxDir, list, markCancelled, parentOf, readRun, retry, start, startFromInbox } =
-  await import('../src/runner.ts');
+const { advance, approve, cancel, forget, inboxDir, list, parentOf, retry, start, startFromInbox } = await import('../src/runner.ts');
+const { markCancelled, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 

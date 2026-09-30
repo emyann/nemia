@@ -62,15 +62,10 @@ const {
   forget,
   forgetLine: forgetLineOf,
   list,
-  listRuns,
-  markCancelled,
   Missing,
   missingArtifacts,
   parentOf,
   phaseOfView,
-  readAnswers,
-  readAsks,
-  readRun,
   retry,
   round,
   say,
@@ -78,6 +73,7 @@ const {
   startPlan,
   stepsOf,
 } = await import('../src/runner.ts');
+const { listRuns, markCancelled, readAnswers, readAsks, readRun } = await import('../src/record/record.store.ts');
 
 /** A run record over `/repo`, without worktrees: a test of the record, not of git. */
 const aRun = (id: string, steps: Run['steps']): Run => ({

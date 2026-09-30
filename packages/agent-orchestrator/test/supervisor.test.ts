@@ -18,7 +18,8 @@ const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
-const { advance, list, readRun, retry, runSlots, start } = await import('../src/runner.ts');
+const { advance, list, retry, runSlots, start } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {

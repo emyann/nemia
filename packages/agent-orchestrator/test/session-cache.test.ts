@@ -31,7 +31,8 @@ import { TEAM } from './team.ts';
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
-const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.ts');
+const { advance, retry, start, stepsOf } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 
 const LOOPED = ['dev'];
 

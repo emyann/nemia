@@ -29,7 +29,6 @@ const {
   holdWord,
   holdsOf,
   prune,
-  readRun,
   retry,
   round,
   say,
@@ -37,6 +36,7 @@ const {
   unhold,
   WHY_CAP,
 } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>

@@ -21,7 +21,8 @@ import { gated, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/timeline.ts';
-import { checkStderr, readAsks, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { checkStderr, stepsOf } from '../record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
@@ -430,7 +431,7 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   const onBase = yield* tried(() => branches.length > 0 && branches.every(shippedOf(record, git)));
   if (!onBase) return { ...known, shipped: false } satisfies ParentRun;
   const { views, phaseOf } = yield* taskPhasesRead(record);
-  const { asks, rounds } = yield* tried(() => readAsks(id));
+  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const said = decision(
     steps,
     record,

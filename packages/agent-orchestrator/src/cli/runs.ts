@@ -21,12 +21,11 @@ import {
   holdWord,
   list,
   listAgents,
-  listRuns,
   onYouWords,
   prune,
   pruneLines,
   pruningBytes,
-  readRun,
+  runStore,
   resultBranches,
   runSlots,
   sizeOf,
@@ -173,7 +172,7 @@ export function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } 
 }
 
 /** A run's record, as `wf ls` reads it. */
-type Run = ReturnType<typeof readRun>;
+type Run = ReturnType<typeof runStore.runs.read>;
 
 /** A run as `wf ls` lists it: judged, or, where a task journal of it does not read, its steps and why (`unjudgedOf`). */
 type Listed = Awaited<ReturnType<typeof list>> | Unjudged;
@@ -223,7 +222,7 @@ function printListed(run: Run, listed: Listed): void {
  * a task journal of which does not read is listed with its steps and `→ unreadable:` in the runtime's words (`unjudgedOf`).
  */
 export async function lsVerb(rest: string[], e: Engine): Promise<void> {
-  const runs = rest[0] ? [readRun(rest[0])] : listRuns();
+  const runs = rest[0] ? [runStore.runs.read(rest[0])] : runStore.runs.list();
   const ticking = () => console.log(daemonLine(daemonStanding(), Date.now()));
   if (!runs.length) {
     console.log('no runs');
@@ -232,7 +231,7 @@ export async function lsVerb(rest: string[], e: Engine): Promise<void> {
   const viewed = viewedOnce(e);
   const git = branchReader();
   git.prime(runs);
-  const held = await runSlots(viewed, rest[0] ? listRuns() : runs);
+  const held = await runSlots(viewed, rest[0] ? runStore.runs.list() : runs);
   for (const run of runs) {
     const listed = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
       const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
@@ -372,7 +371,7 @@ export async function pruneVerb(rest: string[], e: Engine): Promise<void> {
   const { ids, unmerged, yes, artifacts } = pruneHow(rest);
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const found = await judged(e, named ? ids : listRuns().map((r) => r.id), { unmerged, artifacts }, tally);
+  const found = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
   printFound(found, named, tally);
   const prunable = found.filter((p) => p.kind === 'prunable');
   if (!prunable.length) {
@@ -408,7 +407,7 @@ export async function holdVerb(rest: string[], e: Engine): Promise<void> {
 /** `wf show`: the run's record as JSON, its brief and each step's body cut short. */
 export function showVerb(rest: string[]): void {
   if (!rest[0]) return console.log(HELP);
-  const run = readRun(rest[0]);
+  const run = runStore.runs.read(rest[0]);
   const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
   console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…`, workflow }, null, 2));
   return;
@@ -418,7 +417,7 @@ export function showVerb(rest: string[]): void {
 export async function logsVerb(rest: string[], e: Engine): Promise<void> {
   const [runId, stepName] = rest;
   if (!runId || !stepName) return console.log(HELP);
-  const taskId = readRun(runId).steps[stepName]?.taskId;
+  const taskId = runStore.runs.read(runId).steps[stepName]?.taskId;
   if (!taskId) return console.log(`${stepName} has not run yet`);
   return console.log(await e.logs(taskId));
 }

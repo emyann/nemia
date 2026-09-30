@@ -26,8 +26,9 @@ const FEED = path.join(ROOT, 'feed.jsonl');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, readRun, recordFeed, start, tick, watchFeed } =
+const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, start, tick, watchFeed } =
   await import('../runner.ts');
+const { readRun } = await import('../record/record.store.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };

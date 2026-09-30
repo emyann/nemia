@@ -14,8 +14,9 @@ import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-prune-');
 process.env.WF_ROOT = ROOT;
-const { accept, advance, approve, decide, forget, idRefusal, listRuns, prune, pruneLines, readRun, retry, round, sizeOf, start } =
+const { accept, advance, approve, decide, forget, idRefusal, prune, pruneLines, retry, round, sizeOf, start } =
   await import('../src/runner.ts');
+const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
 const git = (cwd: string, ...args: string[]) =>

@@ -19,9 +19,10 @@ import { costLine, decision, runCostLines, type Decision } from './decide.ts';
 import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { answerLines, answerOf, overBudgetLine, retriesDue, retryLines, type Retry } from '../retry/index.ts';
+import { answerLines, answerOf, overBudgetLine, retriesDue, retryLines, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/timeline.ts';
-import { readAnswers, readAsks, readRun, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { branchReader, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import {
   checkReports,
@@ -149,12 +150,7 @@ export type Decided = {
  * For each step whose current try a person answered, the answer beside the `needs` of the try before it, off `views` or, for a try
  * not among them, the engine's view of it (`e`, the call's `viewedOnce`).
  */
-const answersOf = Effect.fn('answersOf')(function* (
-  e: Engine,
-  run: Run,
-  views: ReadonlyMap<string, TaskView>,
-  given: ReturnType<typeof readAnswers>,
-) {
+const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>, given: RetryAsk[]) {
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
@@ -246,14 +242,14 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 export const decideRun = Effect.fn('decide')(function* (id: string) {
   const e = viewedOnce(yield* EngineService);
   const git = yield* tried(() => branchReader());
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
     yield* awaited(() => checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped')),
   );
-  const { asks, rounds } = yield* tried(() => readAsks(id));
+  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = (name: string) => checks[name]?.verdict;
@@ -264,7 +260,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   const standings = yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
-  const answers = yield* answersOf(e, run, views, yield* tried(() => readAnswers(id)));
+  const answers = yield* answersOf(e, run, views, yield* tried(() => runStore.asks.answers(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));

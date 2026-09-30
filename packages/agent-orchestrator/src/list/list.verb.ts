@@ -8,7 +8,8 @@ import type { RunSlot } from '../cap/cap.ts';
 import { runTasks, unjudgedWords, type Run } from '../record/record.ts';
 import { holdsOf, waitsOf } from '../wait/wait.ts';
 import { listing, type Listing } from './list.ts';
-import { readAnswers, readAsks, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { branchReader, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import {
   checkReports,
@@ -37,7 +38,7 @@ export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReade
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
-  const { asks, rounds } = readAsks(run.id);
+  const { asks, rounds } = runStore.asks.read(run.id);
   const standings = standingsOf(run, git);
   const checkout = await checkoutHold(e, run, steps);
   const parent = await parentsOf(e, run, git);
@@ -50,7 +51,7 @@ export async function list(e: Engine, run: Run, slot?: RunSlot, git: BranchReade
     (name) => refused.get(name)?.verdict,
     asks,
     rounds,
-    readAnswers(run.id),
+    runStore.asks.answers(run.id),
     waitsOf(run, parent),
     saidCount(views, run),
     spendReader(views),

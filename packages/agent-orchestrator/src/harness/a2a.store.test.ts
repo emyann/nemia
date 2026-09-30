@@ -19,7 +19,8 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
-const { advance, readRun, remoteAgents, retry, start } = await import('../runner.ts');
+const { advance, remoteAgents, retry, start } = await import('../runner.ts');
+const { readRun } = await import('../record/record.store.ts');
 const { credentials, missingCredential, readRemote } = await import('../runtime-client.ts');
 const { remoteBrief } = await import('../run.ts');
 

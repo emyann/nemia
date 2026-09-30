@@ -35,7 +35,7 @@ import {
   prunedKept,
   prunedWords,
   readArtifact,
-  readRun,
+  runStore,
   roundDueNote,
   saidLines,
   sendBackTo,
@@ -133,7 +133,7 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
   const decided = await decide(e, rest[0]).catch(async (err: unknown) => {
-    const unjudged = await unjudgedOf(e, readRun(rest[0]), err, 'wf decide');
+    const unjudged = await unjudgedOf(e, runStore.runs.read(rest[0]), err, 'wf decide');
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;

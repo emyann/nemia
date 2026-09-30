@@ -49,8 +49,7 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'>
 
 /**
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
- * a listing without `onYou`, the steps by name (`waitingOnYou`). The list is read tolerantly, not refused as a run's detail is
- * (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
+ * a run held without `onYou`, the steps by name (`waitingOnYou`).
  *
  * Without the ending step whose gate the to-decide line already says, as `wf ls` prints it (cli/main.ts): that line is above, it names the step
  * and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what is

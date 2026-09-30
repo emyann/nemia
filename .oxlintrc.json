@@ -94,7 +94,12 @@
         "apps/web/src/lib/api/read.ts",
         "apps/web/src/lib/api/judged.ts",
         "apps/web/src/lib/api/graph.ts",
-        "apps/web/src/lib/api/runs.ts"
+        "apps/web/src/lib/api/runs.ts",
+        "apps/web/src/lib/api/detail.ts",
+        "apps/web/src/lib/api/decision.ts",
+        "apps/web/src/lib/api/steps.ts",
+        "apps/web/src/lib/api/tries.ts",
+        "apps/web/src/lib/api/usage.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",

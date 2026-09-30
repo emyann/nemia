@@ -20,13 +20,10 @@ const UNDECODED = [
   'capabilities.ts',
   'ceilings.ts',
   'daemon.ts',
-  'decision.ts',
-  'detail.ts',
   'inbox.ts',
   'machines.ts',
   'quota.ts',
   'skills.ts',
-  'steps.ts',
   'workflows.ts',
 ] as const;
 
@@ -115,7 +112,10 @@ const unread = (at: string, found: string) => (err: unknown) => {
   assert.ok(err.message.startsWith('GET /api/runs answered what this board does not read'), err.message);
   assert.ok(err.message.includes(`at ${at}, `), err.message);
   assert.ok(err.message.includes(found), err.message);
-  assert.ok(err.message.endsWith('rebuild the board (npm run build) and reload it.'), err.message);
+  assert.ok(
+    err.message.endsWith('restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.'),
+    err.message,
+  );
   assert.equal(err.route, 'GET /api/runs');
   return true;
 };
@@ -186,7 +186,7 @@ test("a read the api refused still rejects in the api's words and status, not as
 
 /** What the list of undecoded files gets wrong, given each file's text: one line a fault, each saying what to do. */
 export function undecodedFaults(texts: ReadonlyMap<string, string>, listed: readonly string[]): string[] {
-  const calling = [...texts].filter(([f, text]) => f !== 'read.ts' && /\bgetUndecoded\s*</.test(text)).map(([f]) => f);
+  const calling = [...texts].filter(([f, text]) => f !== 'read.ts' && /\bgetUndecoded\b\s*[<(]/.test(text)).map(([f]) => f);
   return [
     ...calling
       .filter((f) => !listed.includes(f))
@@ -197,14 +197,16 @@ export function undecodedFaults(texts: ReadonlyMap<string, string>, listed: read
   ];
 }
 
-test('REFUSED: a file calling getUndecoded off the list, and a listed file that no longer calls it', () => {
+test('REFUSED: a file calling getUndecoded off the list, with a type argument or without, and a listed file that no longer calls it', () => {
   const texts = new Map([
     ['read.ts', 'export async function getUndecoded<T>(path: string) {}'],
     ['runs.ts', "queryFn: () => getUndecoded<RunSummary[]>('/api/runs'),"],
+    ['steps.ts', "queryFn: () => getUndecoded('/api/runs/r-1/steps/plan/path'),"],
     ['quota.ts', "queryFn: () => get('/api/quota', QuotaSchema),"],
   ]);
   assert.deepEqual(undecodedFaults(texts, ['quota.ts']), [
     'runs.ts calls getUndecoded: decode the read with a schema beside its type and `get`, which the list only shrinks for',
+    'steps.ts calls getUndecoded: decode the read with a schema beside its type and `get`, which the list only shrinks for',
     'quota.ts no longer calls getUndecoded: strike it from UNDECODED in test/read.test.ts',
   ]);
 });

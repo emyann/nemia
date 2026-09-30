@@ -2,97 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
+import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
-
-/** GET /api/runs/:id answering `body`, for the length of the test. */
-function answering(t: { after: (fn: () => void) => void }, body: object) {
-  const before = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
-  t.after(() => {
-    globalThis.fetch = before;
-  });
-}
-
-const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] };
-/** A run's totals on the clock, with nothing filed, as a detail's `timeline` carries them. */
-const TOTALS = {
-  rounds: [],
-  run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' },
-};
-/** A detail cut to what the check reads: the run as an api that sends no `graph` answers it, give or take the rest. */
-const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, onYou: [], ...extra }) as unknown as RunDetail;
-
-const refusesStale = (err: Error) =>
-  err.message.startsWith("The api answered run 'r-1' without its graph, so it is older than this board") &&
-  /Restart the api/.test(err.message);
-
-test("a run's detail without its graph is refused, naming the fix — an api started before the board drew the graph", async (t) => {
-  answering(t, detail());
-  const read = runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>;
-  await assert.rejects(read(), refusesStale);
-
-  for (const stale of [{ graph: null }, { graph: {} }, { graph: { roots: ['implement'] } }, { graph: { edges: [] } }]) {
-    assert.throws(() => withGraph('r-1', detail(stale)), refusesStale, JSON.stringify(stale));
-  }
-});
-
-test("a run's detail with its graph is read as the api gave it", async (t) => {
-  const given = detail({ graph });
-  answering(t, given);
-  const read = runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>;
-  assert.deepEqual(await read(), given);
-  assert.equal(withGraph('r-1', given), given);
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph: { roots: [], edges: [] } })));
-});
-
-test("a run's detail whose steps come without their tries is refused, naming the step and the fix — an api started before the board showed rounds", async (t) => {
-  const stale = detail({ graph, steps: [{ name: 'implement', tries: [] }, { name: 'review' }] });
-  const refusesTries = (err: Error) =>
-    err.message.startsWith("The api answered run 'r-1' without the tries of its step 'review', so it is older than this board") &&
-    /Restart the api/.test(err.message);
-  assert.throws(() => withGraph('r-1', stale), refusesTries);
-  answering(t, stale);
-  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
-  assert.doesNotThrow(() =>
-    withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null }] })),
-  );
-});
-
-test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
-  const stale = detail({
-    graph,
-    steps: [
-      { name: 'implement', tries: [], said: [] },
-      { name: 'review', tries: [] },
-    ],
-  });
-  const refusesSaid = (err: Error) =>
-    err.message.startsWith("The api answered run 'r-1' without what was said to its step 'review', so it is older than this board") &&
-    /Restart the api/.test(err.message);
-  assert.throws(() => withGraph('r-1', stale), refusesSaid);
-  answering(t, stale);
-  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesSaid);
-});
-
-test("REFUSED: a run's detail without where its time went — a step's timeline, or the run's totals — naming what is missing and the fix", async (t) => {
-  const timed = { name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null };
-  const refuses = (what: string) => (err: Error) =>
-    err.message.startsWith(`The api answered run 'r-1' without ${what}, so it is older than this board`) &&
-    /Restart the api/.test(err.message);
-  const stale = detail({ graph, steps: [timed, { name: 'review', tries: [], said: [] }] });
-  assert.throws(() => withGraph('r-1', stale), refuses("the timeline of its step 'review'"));
-  answering(t, stale);
-  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the timeline of its step 'review'"));
-  for (const totals of [undefined, null, {}, { rounds: [] }, { run: TOTALS.run }]) {
-    assert.throws(
-      () => withGraph('r-1', detail({ graph, steps: [timed], timeline: totals })),
-      refuses('the timeline of the run'),
-      JSON.stringify(totals),
-    );
-  }
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [timed] })));
-});
+import { decidable, detail } from './run-fixtures.ts';
 
 test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
   const before = globalThis.fetch;
@@ -249,7 +161,7 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   const shown: unknown[] = [];
   t.after(observer.subscribe((result) => shown.push(result.data)));
 
-  const first = { touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' } };
+  const first = decidable({ touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' } });
   await until(() => answers.length === 1);
   answers[0](first);
   await until(() => observer.getCurrentResult().data !== undefined);
@@ -274,7 +186,7 @@ test("a run's decision is asked for once while a live step's engine word moves, 
     'until the answer lands, the decision read before is what is shown',
   );
 
-  const second = { touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } };
+  const second = decidable({ touched: [], lesson: { said: 'CLAUDE.md +2 −0', state: 'written' } });
   answers[1](second);
   await until(() => !observer.getCurrentResult().isPlaceholderData);
   assert.deepEqual(observer.getCurrentResult().data, second);
@@ -423,44 +335,6 @@ test("an acceptance is posted as JSON to the looping step's route with the words
   );
 });
 
-test("REFUSED: a run's detail without its gate — who it waits on in wf ls's words, or a step's need and gate — naming what is missing and the fix; an api started before the board approved a step", async (t) => {
-  const gated = { name: 'plan', tries: [], said: [], timeline: [], approve: 'approve plan', gate: { awaiting: true, approval: null } };
-  const refuses = (what: string) => (err: Error) =>
-    err.message ===
-    `The api answered run 'r-1' without ${what}, so it is older than this board, whose run page approves a step at its gate. Restart the api (\`npm run dev\` from the repository, or whatever serves /api), then reload the page.`;
-  const { approve: _approve, gate: _gate, ...before } = gated;
-  const stale = detail({ graph, steps: [before], onYou: undefined });
-  assert.throws(
-    () => withGraph('r-1', stale),
-    refuses("the gate of its step 'plan'"),
-    "a detail with every other field, and none of the gate's",
-  );
-  answering(t, stale);
-  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the gate of its step 'plan'"));
-  assert.throws(
-    () => withGraph('r-1', detail({ graph, steps: [gated, { ...before, name: 'review', approve: null }] })),
-    refuses("the gate of its step 'review'"),
-    'one field of the two is not the gate',
-  );
-  assert.throws(
-    () => withGraph('r-1', detail({ graph, steps: [{ ...before, gate: null }] })),
-    refuses("the gate of its step 'plan'"),
-    'one field of the two is not the gate, whichever it is',
-  );
-  for (const onYou of [undefined, null, 'approve plan']) {
-    assert.throws(
-      () => withGraph('r-1', detail({ graph, steps: [gated], onYou })),
-      refuses("who it waits on in wf ls's words"),
-      `a run whose onYou is ${JSON.stringify(onYou)} is refused, though its steps have their gates`,
-    );
-  }
-  assert.doesNotThrow(
-    () =>
-      withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })),
-    'null is an answer: a step with no gate, and nothing to approve',
-  );
-});
-
 test('a run removed while its page is open is said as gone on the one read that finds none: its last read is kept, and a 404 is not tried again', async (t) => {
   const before = globalThis.fetch;
   const asked: string[] = [];
@@ -474,7 +348,7 @@ test('a run removed while its page is open is said as gone on the one read that 
     globalThis.fetch = before;
     client.clear();
   });
-  const last = detail({ graph });
+  const last = detail();
   client.setQueryData(runQuery('r-1').queryKey, last);
   const observer = new QueryObserver(client, { ...runQuery('r-1'), refetchOnMount: false });
   t.after(observer.subscribe(() => {}));

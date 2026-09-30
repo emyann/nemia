@@ -331,3 +331,17 @@ test('the recap line is one line, and says — where nothing was measured', () =
   assert.equal(line.split('\n').length, 1);
   assert.match(line, /— \(—\) rounds/);
 });
+
+test('a loop that asked for another round leaves a run with no ending waiting, until a person accepts it', () => {
+  const noEnding = TEAM.filter((s) => s.workspace !== 'main');
+  const tries = { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] };
+  assert.equal(factsOf(readOf('settled', noEnding, tries)).runs.length, 1, 'the same run, its loop signed off again: false, finished');
+  const r = readOf('asked', noEnding, tries, {}, true);
+  assert.equal(factsOf(r).runs.length, 0, 'a loop out of rounds that asked again waits on a person');
+  r.run.acceptances = [{ step: 'review', try: 1, at: at(4), message: 'enough' }];
+  assert.deepEqual(
+    factsOf(r).runs.map((run) => run.rounds),
+    [[1]],
+    'an acceptance of the try the loop is on finishes the run',
+  );
+});

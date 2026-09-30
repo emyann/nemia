@@ -1579,6 +1579,15 @@ are skipped unread. Each row of ours is decoded by `RegistryRowSchema`: a non-em
 decode, fails `observe` with a `RunnerError` naming the row, the field, at most 60 characters of what it found, and the fix; so every
 background session it would have listed is unread, never gone, and none is ended `lost` or spawned again until the listing decodes.
 
+A Claude Code transcript line is decoded where the runtime reads it (`decodeLine`, `harness/claude/lines.ts`): a `user`, `assistant`,
+`system` or `attachment` line read as the session's conversation, the `StructuredOutput` call read as its statement and the line after
+it, and the `cost-state`, `agent-name`, `compact_boundary` and response lines read as its usage. Only `type`, and `message` on a `user`
+or `assistant` line, must be there; a field that is there has the shape the runtime reads. A line that does not decode fails the read
+with words naming the transcript, the line, the field, at most 60 characters of what it found, and the fix: the `transcript` verb
+refuses, and a `--bg` `observe` fails with a `RunnerError`, so every background session is unread, never read as having said nothing,
+and the refusal is kept while the transcript is unchanged. A line torn mid-write, one that is no JSON object, and a line of a type the
+reader does not read pass undecoded.
+
 A task whose journal names a harness this engine does not have — filed by an engine that had it, a remote agent whose entry was since
 refused or removed — is routed to none, never to the fallback: the composite reads its names unread, so an attempt in flight is held,
 neither there nor gone, and followed again by an engine that has the harness; a spawn is refused (`unstartable`, in words that name the
@@ -1762,6 +1771,7 @@ of pure code sits beside it.
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
+| `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |

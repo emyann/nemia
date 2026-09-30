@@ -2286,7 +2286,7 @@ The owner approved it at the plan's gate, split into three cards: this one is th
 
 What was built:
 
-- **The mark, `runs/<id>.hold`**, `{ at, until }`, is a person's fact composed on read as `hold` (`readRun`), stripped by `rewriteRun`,
+- **The mark, `runs/<id>.hold`**, `{ at, until, why?, by }`, is a person's fact composed on read as `hold` (`readRun`), stripped by `rewriteRun`,
   and removed by `wf rm`. `writeHold` writes it exclusively (`wx`). `removeHold` removes it only if it is still the hold put at `at`, so a
   lift by the tick never removes a hold a person put again in the meantime.
 - **`assess` pauses a held run**: status `running`, nothing ready, checked, tried or rounded, and the asks dropped as for a pruned run.

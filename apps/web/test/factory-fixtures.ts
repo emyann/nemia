@@ -12,6 +12,7 @@ export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
   title: 'Decode the reads',
   workflow: 'build',
   repo: '/work/repo',
+  factory: 'nemia',
   startedAs: ['r-0'],
   error: null,
   body: 'Decode the reads\n',

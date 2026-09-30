@@ -35,3 +35,4 @@ export * from './api/ceilings.ts';
 export * from './api/daemon.ts';
 export * from './api/quota.ts';
 export * from './api/machines.ts';
+export * from './api/factories.ts';

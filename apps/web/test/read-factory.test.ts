@@ -11,6 +11,7 @@ import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilitie
 import { quotaQuery, type Quota } from '../src/lib/api/quota.ts';
 import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
 import { daemonQuery, type Daemon } from '../src/lib/api/daemon.ts';
+import { factoriesQuery, type Factory } from '../src/lib/api/factories.ts';
 import { capabilities, cardPage, ceilings, codexReach, daemon, inboxEntry, passCost, quota, stepReach } from './factory-fixtures.ts';
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
@@ -28,6 +29,7 @@ const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<C
 const readQuota = quotaQuery.queryFn as unknown as () => Promise<Quota>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
 const readDaemon = daemonQuery.queryFn as unknown as () => Promise<Daemon>;
+const readFactories = factoriesQuery.queryFn as unknown as () => Promise<Factory[]>;
 
 /** Whether `err` is an `UnreadAnswer` of `route` whose message names `at`, what was found there, and the fix. */
 const unread = (route: string, at: string, found: string) => (err: unknown) => {
@@ -178,4 +180,35 @@ test("a card the api refused still rejects in the api's words and status, not as
   assert.ok(err instanceof ReadRefusal && !(err instanceof UnreadAnswer), String(err));
   assert.equal(err.status, 404);
   assert.equal(err.message, 'no card x in the inbox');
+});
+
+/** The factories as `GET /api/factories` answers them: the default one, one attached with a hire, and one whose file does not read. */
+const factories = (): Factory[] => [
+  { name: 'default', default: true, repos: ['/work/repo'], workflows: null, hires: {}, error: null },
+  { name: 'nemia', default: false, repos: ['/work/repo'], workflows: ['build'], hires: { 'build/implement': 'ada' }, error: null },
+  { name: 'broken', default: false, repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' },
+];
+
+test('the factories decode as the api gives them, every key kept: the default offering every workflow, a hire, a file that does not read', async (t) => {
+  answering(t, factories());
+  assert.deepEqual(await readFactories(), factories());
+});
+
+test('REFUSED, the factories: one without its error, and the default offering its workflows as a word', async (t) => {
+  answering(t, [without(factories()[1], 'error')]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].error', 'is missing'));
+
+  answering(t, [{ ...factories()[0], workflows: 'all' }]);
+  await assert.rejects(readFactories(), unread('/api/factories', '[0].workflows', '"all", where'));
+});
+
+test("the inbox keeps each card's factory, null for the default factory's; REFUSED: an entry without it", async (t) => {
+  answering(t, [inboxEntry(), inboxEntry({ factory: null })]);
+  assert.deepEqual(
+    (await readInbox()).map((e) => e.factory),
+    ['nemia', null],
+  );
+
+  answering(t, [without(inboxEntry(), 'factory')]);
+  await assert.rejects(readInbox(), unread('/api/inbox', '[0].factory', 'is missing'));
 });

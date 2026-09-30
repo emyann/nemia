@@ -2,7 +2,7 @@
  * A card's start in the factory it names (`factory:`), on the Inbox page: the repository it starts on, the workflow among those the
  * factory offers there, read with its hires, and `StartRun` sending both, as `wf start <card> --factory` starts it.
  */
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { factoriesQuery, factoryWorkflowsQuery, type InboxEntry, type Place, type Started } from '../lib/api';
 import { cardPlace, presetOf, workflowKey } from '../lib/inbox';
@@ -36,7 +36,18 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
         </p>
       ) : (
         <>
-          {place.repo === null && <RepoPicker factory={place.factory} repos={place.repos} picked={picked} onPick={setPicked} />}
+          {place.repo === null && (
+            <RepoPicker
+              repos={place.repos}
+              picked={picked}
+              onPick={setPicked}
+              note={
+                <>
+                  The card names no repository, and the factory {code(place.factory)} works on {place.repos.length}.
+                </>
+              }
+            />
+          )}
           {repo !== null && (
             <InFactory key={repo} entry={entry} place={{ factory: place.factory, repo }} onStarted={onStarted} onRefused={onRefused} />
           )}
@@ -46,17 +57,17 @@ export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: Inbox
   );
 }
 
-/** The repositories of `factory` to start a card on, when it names none and the factory has several: a person picks one. */
-function RepoPicker({
-  factory,
+/** A factory's repositories to start a run on, when it has several: a person picks one; `note` says, under it, why the pick is theirs. */
+export function RepoPicker({
   repos,
   picked,
   onPick,
+  note,
 }: {
-  factory: string;
   repos: readonly string[];
   picked: string | null;
   onPick: (repo: string) => void;
+  note: ReactNode;
 }) {
   const field = useId();
   return (
@@ -74,9 +85,7 @@ function RepoPicker({
           </option>
         ))}
       </select>
-      <p className="text-xs text-neutral-500">
-        The card names no repository, and the factory {code(factory)} works on {repos.length}.
-      </p>
+      <p className="text-xs text-neutral-500">{note}</p>
     </div>
   );
 }

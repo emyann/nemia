@@ -638,7 +638,7 @@ export function seedFolder(root: string, now = Date.now()): void {
 export const FACTORIES = {
   hiring: { name: FOLDER.factory, hire: 'dev/implement' },
   bare: 'pipao',
-  others: ['harbour', 'lighthouse'],
+  others: ['harbour', 'lighthouse', 'quay'],
   broken: 'broken',
 } as const;
 

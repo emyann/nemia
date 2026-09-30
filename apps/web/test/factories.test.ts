@@ -1,11 +1,22 @@
 /**
- * The factories as the board splits the machine by them (src/lib/factories.ts): a block a factory, the default one only while it holds
- * runs; each run and queued card in the factory its record or card names, the default factory's naming none; and the menu's sub-items.
+ * The factories as the board splits the machine by them (src/lib/factories.ts): a block a factory, the default one only while no factory
+ * is filed and it holds runs; each run and queued card in the factory its record or card names, the default factory's naming none; the
+ * menu's sub-items, the open one among them; and where a floor starts a run.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
-import { factoryBlocks, MENU_SHOWN, menuFactories, queuedIn, runsIn, startRepo, type FactoryRun } from '../src/lib/factories.ts';
+import {
+  factoryBlocks,
+  floorPlace,
+  MENU_SHOWN,
+  menuFactories,
+  queuedIn,
+  runsIn,
+  startRepo,
+  whyNotStarted,
+  type FactoryRun,
+} from '../src/lib/factories.ts';
 import { placeQuery } from '../src/lib/api/workflows.ts';
 
 /** A factory as the api lists it: attached to one repository and one workflow, with one hire. */
@@ -38,12 +49,16 @@ const run = (id: string, factoryName: string | null, extra: Partial<RunSummary> 
 const names = (xs: readonly { name: string }[]) => xs.map((x) => x.name);
 const ids = (xs: readonly { id: string }[]) => xs.map((x) => x.id);
 
-test('the default factory is a block only while a run names no factory, and then the first, whatever the order it is listed in', () => {
+test('the default factory is a block only while no factory is filed and a run names none, whatever the order it is listed in', () => {
   const nemia = factory('nemia');
+  const broken = factory('broken', { repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
+  assert.deepEqual(names(factoryBlocks([fallback], [run('r-2', null)])), ['default']);
+  assert.deepEqual(names(factoryBlocks([fallback], [run('r-1', 'gone')])), []);
+  assert.deepEqual(names(factoryBlocks([fallback], [])), []);
   assert.deepEqual(names(factoryBlocks([fallback, nemia], [run('r-1', 'nemia')])), ['nemia']);
-  assert.deepEqual(names(factoryBlocks([fallback, nemia], [])), ['nemia']);
-  assert.deepEqual(names(factoryBlocks([fallback, nemia], [run('r-1', 'nemia'), run('r-2', null)])), ['default', 'nemia']);
-  assert.deepEqual(names(factoryBlocks([nemia, factory('pipao'), fallback], [run('r-2', null)])), ['default', 'nemia', 'pipao']);
+  assert.deepEqual(names(factoryBlocks([fallback, nemia], [run('r-1', 'nemia'), run('r-2', null)])), ['nemia']);
+  assert.deepEqual(names(factoryBlocks([nemia, factory('pipao'), fallback], [run('r-2', null)])), ['nemia', 'pipao']);
+  assert.deepEqual(names(factoryBlocks([fallback, broken], [run('r-2', null)])), ['broken']);
 });
 
 test("each run is in the factory its record names, the default factory's naming none: a pipao run in neither default nor nemia", () => {
@@ -70,7 +85,8 @@ test('a block counts its runs in flight as the floor does, a held one and one at
     run('done', 'nemia'),
     run('elsewhere', null, { status: 'running', moving: true, waitingOnYou: ['plan'] }),
   ];
-  const [def, nemia] = factoryBlocks([fallback, factory('nemia')], runs);
+  const [nemia] = factoryBlocks([fallback, factory('nemia')], runs);
+  const [def] = factoryBlocks([fallback], runs);
   assert.deepEqual(
     { ...nemia },
     {
@@ -119,6 +135,19 @@ test('the menu shows the first five factories and says how many more there are; 
   assert.deepEqual([six.shown.length, six.hidden], [5, 1]);
 });
 
+test('the open factory is appended as a sixth entry past the first five; one shown already, or none open, leaves the menu as it was', () => {
+  const blocks = Array.from({ length: 7 }, (_, i) => factory(`f-${i}`));
+  const past = menuFactories(blocks, false, 'f-6');
+  assert.deepEqual([names(past.shown), past.hidden], [['f-0', 'f-1', 'f-2', 'f-3', 'f-4', 'f-6'], 1]);
+  const first = ['f-0', 'f-1', 'f-2', 'f-3', 'f-4'];
+  for (const open of ['f-2', 'nope', undefined]) {
+    const menu = menuFactories(blocks, false, open);
+    assert.deepEqual([names(menu.shown), menu.hidden], [first, 2], `open ${open}`);
+  }
+  const all = menuFactories(blocks, true, 'f-6');
+  assert.deepEqual([names(all.shown), all.hidden], [names(blocks), 0]);
+});
+
 test("a card starts on its repo:, else on the factory's one repository; with several and no repo:, on none until a person picks", () => {
   assert.equal(startRepo(factory('solo', { repos: ['/r/a', '/r/b'] }), '/r/b'), '/r/b');
   assert.equal(startRepo(factory('solo'), null), '/code/nemia');
@@ -131,4 +160,26 @@ test("a place is named in a request's query, encoded; the default factory and no
   assert.equal(placeQuery(null), '');
   assert.equal(placeQuery({ factory: 'default', repo: '/code/app' }), '');
   assert.equal(placeQuery({ factory: 'hiring', repo: '/r/x' }), '?factory=hiring&repo=%2Fr%2Fx');
+});
+
+test('the default floor starts no run: every run started from a floor names its factory', () => {
+  assert.equal(floorPlace(fallback), null);
+});
+
+test('a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start', () => {
+  assert.deepEqual(floorPlace(factory('nemia')), { factory: 'nemia', repos: ['/code/nemia'], repo: '/code/nemia' });
+  assert.deepEqual(floorPlace(factory('pair', { repos: ['/r/a', '/r/b'] })), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
+  const broken = floorPlace(factory('broken', { repos: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));
+  assert.ok(broken && 'why' in broken, 'a factory whose file does not read cannot start');
+  assert.match(broken.why, /broken[\s\S]*\/wf\/factories\/broken\.json is not JSON/);
+  const none = floorPlace(factory('bare', { repos: [] }));
+  assert.ok(none && 'why' in none, 'a factory on no repository cannot start');
+  assert.match(none.why, /bare/);
+});
+
+test("a workflow that cannot start says why: its folder's error before the steps its hires leave unfilled", () => {
+  assert.equal(whyNotStarted({ error: null, unfilled: null }), null);
+  assert.equal(whyNotStarted({ error: 'no steps', unfilled: null }), 'no steps');
+  assert.equal(whyNotStarted({ error: null, unfilled: 'hire dev/review' }), 'hire dev/review');
+  assert.equal(whyNotStarted({ error: 'no steps', unfilled: 'hire dev/review' }), 'no steps');
 });

@@ -2256,7 +2256,7 @@ $ wf factory rm pipao
   add` writes it whole to a hidden file and links it onto its name, so a reader never sees half of one and two adds of one
   name file one. A key beside `repos` is kept when the file is read.
 - **The default factory is no file.** It holds everything that names no factory: `wf factory` lists it first, and `add` and
-  `rm` refuse its name, `default`.
+  `rm` refuse its name, `default`. A `default.json` written by hand is listed as a file to remove by hand, never as a factory.
 - **A repository is a directory**, resolved from where `wf` is typed, as `wf start --repo` records one, and named once. Git
   is never asked.
 - **Refused by name**, exit 2, and nothing written: a name that is not a lowercase slug (letters, digits, dashes, 40 at

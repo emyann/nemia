@@ -20,12 +20,21 @@ const FactoryFileSchema = Schema.StructWithRest(Schema.Struct({ repos: Schema.No
   Schema.Record(Schema.String, Schema.Unknown),
 ]);
 
-/** One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one. */
+/**
+ * One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one — a name that is
+ * no slug, and `default.json`, since the default factory is no file, are each listed to be removed by hand.
+ */
 function factoryAt(file: string): FactoryListing {
   const at = path.join(factoriesDir(), file);
   const name = file.slice(0, -'.json'.length);
   const badName = factoryNameRefusal(name);
   if (badName) return { name, file: at, error: `${badName} Remove the file by hand.` };
+  if (name === DEFAULT_FACTORY)
+    return {
+      name,
+      file: at,
+      error: 'is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.',
+    };
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(at, 'utf8'));

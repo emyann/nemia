@@ -168,6 +168,22 @@ test('wf factory ls: a file that does not read is listed with why, the others st
   assert.equal(listed.length, 7);
 });
 
+test('wf factory ls: a default.json written by hand is listed as a file to remove, never as the default factory or as a factory', async (t) => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"]}\n');
+  const listed = await printedBy(t, 'factory', 'ls');
+  assert.deepEqual(listed.slice(0, 3), [
+    'default  every run and card that names no factory — read, never written',
+    `default  ${path.join(FACTORIES, 'default.json')} is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.`,
+    `pipao    ${repo}`,
+  ]);
+  assert.deepEqual(
+    readFactories().flatMap((f) => ('repos' in f ? [f.name] : [])),
+    ['pipao'],
+  );
+});
+
 test('REFUSED: an rm of the default is a Conflict, and of a name with no factory is Missing, naming those there are', async () => {
   const repo = fresh();
   await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);

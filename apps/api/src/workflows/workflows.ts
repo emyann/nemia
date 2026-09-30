@@ -28,7 +28,6 @@ import {
   cardSkills,
   fillsOf,
   inboxNameRefusal,
-  Invalid,
   loadWorkflows,
   lookupRoots,
   skillsFor,
@@ -483,12 +482,6 @@ function startWords({ path: [key], input }: BodyIssue, body: unknown): string | 
   return `POST /api/runs takes a JSON object: ${SHAPE}.`;
 }
 
-/**
- * Why a card is not started in the factory `factory`: a card names no factory yet, and is started in the default one, as `wf start` says.
- */
-const cardInFactory = (factory: string): string =>
-  `POST /api/runs?factory=${factory} starts a run in a factory, and a card of the inbox is started in the default factory for now: a card does not name its factory yet. Start its brief in the factory instead — \`{ "workflow": "<name>", "brief": "<what to do>" }\` — or start the card without ?factory=.`;
-
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
   route: 'POST /api/runs',
@@ -574,13 +567,15 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
 }
 
 /**
- * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's, and what `POST /api/runs` answers:
+ * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's and in the factory `factory` when
+ * one is named, over the card's `factory:`, and what `POST /api/runs` answers:
  * the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run did not look at.
  */
-function cardStarted(asked: Extract<Asked, { card: string }>, repo: string) {
+function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
   const started = startFromInbox({
     name: asked.card,
     callerRepo: repo,
+    ...(factory !== undefined ? { factory } : {}),
     workflow: asked.dir,
     ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
     ...(asked.after ? { after: asked.after } : {}),
@@ -626,8 +621,8 @@ function cardStarted(asked: Extract<Asked, { card: string }>, repo: string) {
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
  *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory (`?factory=`),
  *   the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a
- *   repository outside it, each an `Invalid`; a card is refused, 422 (`cardInFactory`), before the inbox is read: a card names no factory
- *   yet.
+ *   repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`, as
+ *   `wf start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox.
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) => served(c, ({ repo, home, factory }) => c.json(listWorkflows(repo, home, factory))))
@@ -675,11 +670,10 @@ export const workflows = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      if (factory && read.body.card !== undefined) throw new Invalid({ message: cardInFactory(factory.name) });
       const asked = startOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       if (asked.card !== undefined) {
-        const started = cardStarted(asked, repo);
+        const started = cardStarted(asked, repo, factory?.name);
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }

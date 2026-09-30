@@ -408,7 +408,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    beside its plain face (`taskPhases`, `checkReports`, `refusalOf`, `parentOf`, `parentsOf`, `readFilings`). The views'
    callers stay on the faces; switching the Effect ones to yield the programs, keeping `viewedOnce`'s memo, is a card of its own.
    `start` followed: `startRun` requires nothing, since `wf start` reads no engine, and its plain face `start` stays synchronous,
-   running it with `Effect.runSync` and throwing either as it was thrown. That leaves `tick`.
+   running it with `Effect.runSync` and throwing either as it was thrown. `tick` followed, last: `tickRun` beside its plain
+   face `tick`, its pass metered through `meteredPass`, the meter still a module global, and an unreadable journal a value,
+   never a failure. `wf up` stays on the face; switching it to yield the program is a card of its own.
 8. **The api's errors.** One mapping from the union to statuses (under B, checked by the compiler), `app.onError` for the
    rest, and the 6 `messageOf` copies gone. Landed under B. Left for a card of its own: the authoring errors that carry a
    `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their

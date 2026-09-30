@@ -1,11 +1,12 @@
 /**
  * What a pass costs, counted while it runs: the time spent in each kind of work, the calls, the bytes read and the processes started.
  *
- * Open only during a pass (`metered`), and empty outside one: a reader called by a verb, the api or a test between passes runs as it
- * would unmetered, at the price of one comparison. Inside a pass, `within(kind, f)` charges the time until `f` settles to `kind`, and
- * the time of a `within` nested in it to the inner kind instead — so a run record's approvals are asks, and a git call made to file a step
- * is git — and the time in no `within` at all to `assess`, the judgement and whatever else is not counted. So the kinds add up to the
- * pass's time by construction, and the pass's time is measured apart from them, so a test can hold the one against the other.
+ * Open only during a pass (`metered`, or `meteredPass` for an Effect program), and empty outside one: a reader called by a verb, the api
+ * or a test between passes runs as it would unmetered, at the price of one comparison. Inside a pass, `within(kind, f)` charges the time
+ * until `f` settles to `kind`, and the time of a `within` nested in it to the inner kind instead — so a run record's approvals are asks,
+ * and a git call made to file a step is git — and the time in no `within` at all to `assess`, the judgement and whatever else is not
+ * counted. So the kinds add up to the pass's time by construction, and the pass's time is measured apart from them, so a test can hold
+ * the one against the other.
  *
  * A pass is sequential — `tick` awaits each run before the next — which is what makes a stack right here. Something else in the process
  * that reads through these readers while a pass is open (the api's own requests) is charged to the pass: the process is the unit.
@@ -16,6 +17,7 @@
  */
 import fs from 'node:fs';
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
+import { Effect } from 'effect';
 import { PHASES, type Phase, type PhaseCost } from './meter.ts';
 
 /** The kinds of work a pass is counted in: its phases (`PHASES`). `assess` is the time in no other. */
@@ -148,16 +150,8 @@ export function aside<T>(f: () => T): T {
 /** Whether a pass is being metered now. */
 export const metering = (): boolean => meter !== undefined;
 
-/**
- * Run `f` as one metered pass, and answer with what it returned, its time in ms, and its counts. A pass inside a pass is not metered again:
- * it runs as part of the outer one and answers with no counts.
- */
-export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: number; tallies?: Tallies }> {
-  if (meter) {
-    const t0 = performance.now();
-    return { value: await f(), ms: performance.now() - t0 };
-  }
-  const t0 = performance.now();
+/** A meter opened at `t0` with nothing counted, made the one open now. */
+const opened = (t0: number): Meter => {
   const m: Meter = {
     kinds: Object.fromEntries(PHASES.map((k) => [k, empty()])) as Record<Kind, Tally>,
     records: 0,
@@ -167,15 +161,51 @@ export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: n
     mark: t0,
   };
   meter = m;
+  return m;
+};
+
+/** What `m`, opened at `t0`, counted up to now: the pass's time in ms and its counts, the time since the last mark charged first. */
+const counted = (m: Meter, t0: number): { ms: number; tallies: Tallies } => {
+  const end = performance.now();
+  charge(m, end);
+  return { ms: end - t0, tallies: { kinds: m.kinds, records: m.records, rested: m.rested, overheadMs: m.overheadMs } };
+};
+
+/** No meter open, when `m` is the one open: what closes a pass that opened it, whatever it ended with. */
+const closed = (m: Meter): void => {
+  if (meter === m) meter = undefined;
+};
+
+/**
+ * Run `f` as one metered pass, and answer with what it returned, its time in ms, and its counts. A pass inside a pass is not metered again:
+ * it runs as part of the outer one and answers with no counts.
+ */
+export async function metered<T>(f: () => Promise<T>): Promise<{ value: T; ms: number; tallies?: Tallies }> {
+  const t0 = performance.now();
+  if (meter) return { value: await f(), ms: performance.now() - t0 };
+  const m = opened(t0);
   try {
     const value = await f();
-    const end = performance.now();
-    charge(m, end);
-    return { value, ms: end - t0, tallies: { kinds: m.kinds, records: m.records, rested: m.rested, overheadMs: m.overheadMs } };
+    return { value, ...counted(m, t0) };
   } finally {
-    meter = undefined;
+    closed(m);
   }
 }
+
+/**
+ * `program` as one metered pass, as `metered` runs a Promise: what it succeeded with, its time in ms, and its counts; no counts inside a
+ * pass already metered, which counts it as its own. Fails and dies as `program` does, and the meter it opened is closed however the program
+ * ended, interrupted included.
+ */
+export const meteredPass = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<{ value: A; ms: number; tallies?: Tallies }, E, R> =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const t0 = performance.now();
+      return { t0, m: meter ? undefined : opened(t0) };
+    }),
+    ({ t0, m }) => Effect.map(program, (value) => ({ value, ...(m ? counted(m, t0) : { ms: performance.now() - t0 }) })),
+    ({ m }) => Effect.sync(() => m && closed(m)),
+  );
 
 /** `fs.readFileSync(file, 'utf8')`, its bytes counted: throws as it does. */
 export const readText = (file: string): string => {

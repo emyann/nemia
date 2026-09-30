@@ -377,6 +377,28 @@ test('a run forgotten leaves the memo, and passes over runs at rest write nothin
   assert.equal(MEMO.runs.has(run.id), false, 'gone from the memo with its record');
 });
 
+test('a feed that cannot be read empties the memo and costs the pass nothing: every run is judged in full, and the next pass reads the feed from its end', async () => {
+  const before = await rested();
+  assert.ok(before > 0 && MEMO.cursor !== undefined, 'the memo holds runs at rest, and where on the feed it read to');
+  const unread = {
+    ...h.e,
+    feed: async () => {
+      throw new Error('the journal cannot be read');
+    },
+  };
+  const pass = await tick(unread, { repo: ROOT, memo: MEMO, verifyRest: true });
+  assert.equal(pass.cost?.rested, 0, 'no run answered from memory');
+  assert.deepEqual(
+    pass.runs.map((a) => a.run.id),
+    listRuns().map((r) => r.id),
+    'every run judged, in the store order',
+  );
+  assert.deepEqual([MEMO.runs.size, MEMO.cursor], [0, undefined], 'the memo emptied, and its place on the feed forgotten');
+  assert.equal(await rested(), 0, 'the next pass reads the feed from its end, and judges every run afresh');
+  assert.notEqual(MEMO.cursor, undefined);
+  assert.equal(await rested(), before, 'and the pass after answers from memory what it answered before');
+});
+
 test('REFUSED: a file in the asks directory that no reader reads still takes its run out — the stamp reads the asks, not only the record', async () => {
   await evicts('an unread file in the asks', (run) => {
     fs.mkdirSync(asksDir(run.id), { recursive: true });

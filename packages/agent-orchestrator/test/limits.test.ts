@@ -127,7 +127,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/skills/skills.ts': { 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/inbox/inbox.verb.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/tick/tick.verb.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/ending/ending.verb.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/timeline/timeline.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },

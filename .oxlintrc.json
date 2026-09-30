@@ -674,12 +674,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/tick/tick.verb.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 21]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/tick/file.verb.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]

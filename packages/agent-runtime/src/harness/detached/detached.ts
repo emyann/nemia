@@ -56,7 +56,8 @@ export type HarnessSpec = {
    * What the harness says in its own output, for one that prints its final answer rather than
    * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
    * stderr whenever it has changed, and returns what it found there — nothing it did not. A pure
-   * function of the text, as `command` is of the request.
+   * function of the text, as `command` is of the request. A throw refuses the output: `observe` fails in its words, and
+   * every session of the harness is unread until the output changes.
    */
   readOutput?: (output: string) => HarnessOutput;
   /**
@@ -276,6 +277,40 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
  */
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
+/** What a spec's reader says of one output: what it read, or why it refused it (`wrong`, its words). */
+type Said = { read: HarnessOutput } | { wrong: string };
+
+const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
+  try {
+    return { read: reader(text) };
+  } catch (e) {
+    return { wrong: e instanceof Error ? e.message : String(e) };
+  }
+};
+
+/**
+ * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, stamped
+ * with when that output was written; its exit code once it has one, never the worker's -1; and what its output says it used,
+ * reached and was denied.
+ */
+const sightingOf = (
+  name: string,
+  run: RunFile,
+  now: number,
+  statement: Sighting['closeout'],
+  output: { read: HarnessOutput; at: number } | undefined,
+  usage: Usage | undefined,
+): Sighting => ({
+  sessionId: name,
+  state: detachedStateOf(run, now),
+  nativeId: run.nativeId,
+  closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload, at: output.at }),
+  ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
+  ...(usage ? { usage } : {}),
+  ...(output?.read.limit ? { limit: output.read.limit } : {}),
+  ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
+});
+
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
 
 /**
@@ -314,7 +349,7 @@ export const detachedFind =
  *   reader's business, not the runner's.
  * - `outputOf`: what the spec reads in the harness's output, with when that output was last written — the time a statement
  *   found there is reported with, as a closeout file's is its own mtime. Read again only when the capture has changed, so
- *   a finished run's output is read once per process.
+ *   a finished run's output is read once per process, and a refusal of it kept as a read is.
  * - `usageOf`: what a run's output says it used, as the attempt's own. A resumed run of a spec whose totals carry the
  *   parent's (`resumeCostCarried`) has the parent's taken off: the parent is the run under the id it resumed that started
  *   last before it — a resume keeps its parent's id, so a later run under that id is a child, never the parent. No
@@ -346,7 +381,8 @@ export const detachedFind =
  *   resume is best-effort for this kind of harness and exact for one with a registry. The closeout is the file the harness
  *   wrote its answer to, when it wrote one (`statementOf`), otherwise what its output says (`outputOf`). The exit code is
  *   the process's own, once it has one: the worker writes -1 when there is none — killed by a signal, or never started —
- *   and that is reported as no code, not as a code.
+ *   and that is reported as no code, not as a code. A run whose output the spec refuses fails the whole look, in the
+ *   spec's words, naming the run and its output file: every session of the harness is unread, never gone.
  * - `stop`, in order, for a run that is working:
  *   1. Leaves the stop on disk (`.stop`). The run file exists before the worker has written its own pid, and a stop in
  *      that window has no process to signal; the worker reads the stop once its pid is published, before it starts the
@@ -412,8 +448,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return { payload, at };
   };
 
-  const outputs = new Map<string, { size: number; mtimeMs: number; read: HarnessOutput }>();
-  const outputOf = (name: string): { read: HarnessOutput; at: number } | undefined => {
+  const outputs = new Map<string, { size: number; mtimeMs: number; said: Said }>();
+  const outputOf = (name: string): { read: HarnessOutput; at: number } | { wrong: string } | undefined => {
     if (!spec.readOutput) return undefined;
     let size: number;
     let mtimeMs: number;
@@ -430,17 +466,18 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       } catch {
         return undefined;
       }
-      known = { size, mtimeMs, read: spec.readOutput(text) };
+      known = { size, mtimeMs, said: saidOf(spec.readOutput, text) };
       outputs.set(name, known);
     }
-    return { read: known.read, at: known.mtimeMs };
+    return 'wrong' in known.said ? known.said : { read: known.said.read, at: known.mtimeMs };
   };
 
   const usageOf = (all: Array<{ name: string; run: RunFile }>, run: RunFile, usage: Usage | undefined): Usage | undefined => {
     if (!usage || !spec.resumeCostCarried || !run.resumeFrom) return usage;
     const at = (r: RunFile) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN);
     const parent = all.filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run)).sort((a, b) => at(b.run) - at(a.run))[0];
-    const carried = parent && outputOf(parent.name)?.read.usage;
+    const told = parent && outputOf(parent.name);
+    const carried = told && 'read' in told ? told.read.usage : undefined;
     const { costUsd, apiMs, ...own } = usage;
     const less = (mine: number | undefined, theirs: number | undefined) =>
       mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
@@ -550,26 +587,20 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),
 
-    observe: Effect.sync(() => {
-      const now = Date.now();
-      const m = new Map<string, Sighting>();
-      const all = readAll();
-      for (const { name, run } of all) {
-        const output = outputOf(name);
-        const usage = usageOf(all, run, output?.read.usage);
-        const printed = output?.read.closeout && { payload: output.read.closeout.payload, at: output.at };
-        m.set(name, {
-          sessionId: name,
-          state: detachedStateOf(run, now),
-          nativeId: run.nativeId,
-          closeout: statementOf(name) ?? printed,
-          ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
-          ...(usage ? { usage } : {}),
-          ...(output?.read.limit ? { limit: output.read.limit } : {}),
-          ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
-        });
-      }
-      return m;
+    observe: Effect.try({
+      try: () => {
+        const now = Date.now();
+        const all = readAll();
+        const m = new Map<string, Sighting>();
+        for (const { name, run } of all) {
+          const output = outputOf(name);
+          if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
+          m.set(name, sightingOf(name, run, now, statementOf(name), output, usageOf(all, run, output?.read.usage)));
+        }
+        return m;
+      },
+      catch: (cause) =>
+        new RunnerError({ verb: 'observe', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
     }),
 
     stop: (sessionId) =>

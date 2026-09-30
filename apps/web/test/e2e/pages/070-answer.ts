@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -63,7 +63,7 @@ export default {
       if (there.length !== 1 || fs.readFileSync(file, 'utf8') !== '{}\n')
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
@@ -107,7 +107,7 @@ export default {
       throw new Refused(`the ask is written as wf retry writes it, with the answer — ${file} holds ${JSON.stringify(written)}`);
     }
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `answer-asked-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `answer-asked-${await themeOf(page)}.png`), { fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
     fed(FAKE.id, FAKE.blocked, 'blocked');

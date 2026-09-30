@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATH_POLL_MS } from '../../../src/lib/lifecyclePath.ts';
-import { fed, openDebug, sidebar, themeOf } from '../board.ts';
+import { fed, openDebug, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -74,7 +74,7 @@ export default {
       await expectVisible(picker.getByRole('radio', { name: 'try 2 (current)', checked: true }), 'the current try is picked');
       await idle(page);
       await settled(page);
-      await panel.screenshot({ path: path.join(OUT, `debug-live-retried-${await themeOf(page)}.png`) });
+      await photograph(panel, path.join(OUT, `debug-live-retried-${await themeOf(page)}.png`));
 
       await picker.getByRole('radio', { name: 'try 1', exact: true }).click();
       await expectVisible(panel.locator(`[data-path="${first}"]`), 'try 1 picked: its own task');

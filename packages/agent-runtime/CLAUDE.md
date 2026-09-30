@@ -59,6 +59,9 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
 
 - **A stop between two processes that share only files**: each writes its half before it reads the other's (the stop's marker, then the
   pid; the worker's pid, then the marker). A worker installs its signal handlers before it publishes its pid.
+- **A Codex `exec --json` line of a type the runtime reads is decoded by `CodexEventSchema` (`harness/codex/stream.ts`)**: one that
+  does not decode fails the Codex harness's `observe`, so every Codex session is unread, never gone. A field the runtime starts
+  reading is added to the schema; any other line passes undecoded.
 - **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job reading
   `--input-format stream-json` exits only when its stdin ends.
 

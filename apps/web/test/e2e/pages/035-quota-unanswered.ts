@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { recordedUsage, themeOf } from '../board.ts';
+import { photograph, recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
@@ -60,7 +60,7 @@ export default {
       const opacity = Number(await line.locator('[data-quota-last]').evaluate((el) => getComputedStyle(el).opacity));
       if (!(opacity < 1)) throw new Refused(`the last reading is dimmed, so that nobody takes it for now — its opacity is ${opacity}`);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `factory-quota-unanswered-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `factory-quota-unanswered-${await themeOf(page)}.png`), { fullPage: true });
 
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);

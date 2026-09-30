@@ -8,6 +8,8 @@ description: "Review a change in this repository as a second engineer would: aga
 1. **Know what was asked**: the spec handed to you, its goal and constraints. Review the change against that, not against a change you
    would have made.
 2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it.
+   Read a file with Read and search with Grep or Glob, never `head`, `cat`, `grep`, `git grep`, `awk`, `sed` or a pipe in Bash: Bash
+   runs only read-only git (`git diff`, `git log`, `git show`, `git status`) and the checks below.
 3. **Run the suite yourself**, each check bare and one command per call: `npx turbo run test --force --continue`,
    `npx turbo run typecheck --force`, `npm run lint`. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the
    workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run is not a finding.

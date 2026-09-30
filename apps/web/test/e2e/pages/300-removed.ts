@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
 import { SHIPPED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -60,9 +60,9 @@ export default {
         await expectVisible(other.getByRole('link', { name: '← Runs' }), `and ${where} links to the runs the store has`);
       }
       await settled(run.other);
-      await run.other.screenshot({ path: path.join(OUT, `removed-run-${await themeOf(run.other)}.png`), fullPage: true });
+      await photograph(run.other, path.join(OUT, `removed-run-${await themeOf(run.other)}.png`), { fullPage: true });
       await settled(step.other);
-      await step.other.screenshot({ path: path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), fullPage: true });
+      await photograph(step.other, path.join(OUT, `removed-step-${await themeOf(step.other)}.png`), { fullPage: true });
 
       const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
       for (const [{ problems }, where] of [

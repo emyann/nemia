@@ -6,6 +6,7 @@ import type { Locator, Page } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectCount, expectVisible, Refused, settled } from './checks.ts';
 import { FAKE } from './seed.ts';
+import { photograph } from './board.ts';
 
 /**
  * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
@@ -115,7 +116,7 @@ export async function photographCard(page: Page, card: Locator, file: string): P
   );
   await page.mouse.up();
   await settled(page);
-  await card.screenshot({ path: file });
+  await photograph(card, file);
   await page.getByRole('button', { name: 'Fit view' }).click();
   await settled(page);
 }

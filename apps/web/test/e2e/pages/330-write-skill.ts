@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -79,7 +79,7 @@ export default {
       if (fs.readFileSync(clash, 'utf8') !== clashWas)
         throw new Refused(`nothing is written on a refusal — skills/${made.skill.id}/SKILL.md changed`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `write-skill-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `write-skill-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
@@ -112,7 +112,7 @@ export default {
       await form.getByRole('textbox', { name: 'Examples', exact: true }).fill(SKILL.examples.join('\n'));
       await form.getByRole('textbox', { name: 'Instructions', exact: true }).fill(SKILL.body);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `write-skill-new-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `write-skill-new-${await themeOf(page)}.png`), { fullPage: true });
 
       const [created] = await Promise.all([
         wrote(page, 'POST', '/api/skills/yours'),
@@ -173,7 +173,7 @@ export default {
       const preloaded = await versionOfScribe();
       if (preloaded === named) throw new Refused(`the switch moves the version of ${seeded.name}, which gives it — it stayed ${preloaded}`);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `write-skill-page-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `write-skill-page-${await themeOf(page)}.png`), { fullPage: true });
 
       const edit = page.locator(`form[data-skill-form="${SKILL.name}"]`);
       await edit.getByRole('textbox', { name: 'Description', exact: true }).fill(SKILL.edited);
@@ -229,7 +229,7 @@ export default {
             `the unsaved words stay after the read — the description reads ${JSON.stringify(await description.inputValue())}`,
           );
         await settled(stale);
-        await stale.screenshot({ path: path.join(OUT, `write-skill-moved-${await themeOf(stale)}.png`), fullPage: true });
+        await photograph(stale, path.join(OUT, `write-skill-moved-${await themeOf(stale)}.png`), { fullPage: true });
         await moved.getByRole('button', { name: 'Read it again' }).click();
         await expectCount(form.locator('[data-skill-moved]'), 0, 'read again, the notice goes');
         const instructions = await form.getByRole('textbox', { name: 'Instructions', exact: true }).inputValue();

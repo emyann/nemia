@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/harness/claude/transcript.ts';
-import { codexOutput } from '../src/harness/detached/output.ts';
+import { codexOutput } from '../src/harness/codex/stream.ts';
 import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli/main.ts';
 import { fold, type Event } from '../src/core/domain.ts';
 
@@ -798,10 +798,11 @@ test('a Codex stream that cannot say is not made to: a turn cut short gives no t
     'killed mid-turn: the calls seen, no tokens',
   );
   assert.deepEqual(codexOutput(codexStream(TURN, completed(), TURN)).usage, { toolCalls: 0 }, 'the first turn of two is not the whole');
-  assert.deepEqual(
-    codexOutput(codexStream(TURN, completed({ output_tokens: 5 }))).usage,
-    { toolCalls: 0 },
-    'a turn.completed without both counts',
+  assert.throws(
+    () => codexOutput(codexStream(TURN, completed({ output_tokens: 5 }))),
+    (err: Error) =>
+      err.message.startsWith('line 3 of the `codex exec --json` stream is a `turn.completed` event whose `usage.input_tokens` is missing.'),
+    'a turn.completed without its counts is refused, never read as no count',
   );
   assert.deepEqual(
     codexOutput(codexStream(TURN, item('completed', 'item_1', 'mcp_tool_call'), completed())).usage,

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { HELD } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -88,7 +88,7 @@ export default {
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
       if (fs.readFileSync(journal, 'utf8') !== seeded) throw new Refused(`nothing is stopped on a refusal — ${journal} changed`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `held-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `held-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
@@ -150,7 +150,7 @@ export default {
     const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: HELD.blocked, exact: true }) });
     await expectVisible(section.locator('[data-note]', { hasText: note }), `and ${HELD.blocked}'s own section`);
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `held-asked-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `held-asked-${await themeOf(page)}.png`), { fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
     fed(HELD.id, HELD.blocked, 'needs-human');

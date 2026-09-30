@@ -7,7 +7,7 @@ import { DIAMOND } from './seed.ts';
 import { API, store } from './world.ts';
 
 /** The menu's places, in its order: the Inbox first. */
-export const PLACES = ['Inbox', 'Factories', 'Runs', 'Workflows', 'Agents', 'Capabilities', 'Machines'];
+export const PLACES = ['Inbox', 'Factories', 'Runs', 'Stats', 'Workflows', 'Agents', 'Capabilities', 'Machines'];
 
 /** On every page: the menu, with each of its places, in its order. */
 export async function sidebar(page: Page): Promise<void> {

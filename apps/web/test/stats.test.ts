@@ -2,18 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { StatsSchema, type Stats, type StatsDay } from '../src/lib/api/stats.ts';
-import {
-  apiQueryOf,
-  HEADLINES,
-  marksByDay,
-  NONE,
-  periodFrom,
-  repoWord,
-  searchOf,
-  seriesOf,
-  trendOf,
-  wordsOf,
-} from '../src/lib/stats.ts';
+import { apiQueryOf, HEADLINES, marksByDay, NONE, periodFrom, repoWord, searchOf, seriesOf, trendOf, wordsOf } from '../src/lib/stats.ts';
 
 /** A day with nothing measured but what it is given. */
 const day = (d: string, given: Partial<StatsDay> = {}): StatsDay => ({

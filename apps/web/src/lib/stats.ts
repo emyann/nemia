@@ -34,7 +34,12 @@ export function durationWord(ms: number): string {
 /** The headline numbers, in the order the page shows them: how well the runs went first, then how much went on. */
 export const HEADLINES: readonly HeadlineNumber[] = [
   { key: 'rounds', label: 'rounds', about: 'mean rounds to acceptance', words: or((n) => (Math.round(n * 10) / 10).toString()) },
-  { key: 'firstTry', label: 'first try', about: 'share of landed runs landed on the first try', words: or((n) => `${Math.round(n * 100)}%`) },
+  {
+    key: 'firstTry',
+    label: 'first try',
+    about: 'share of landed runs landed on the first try',
+    words: or((n) => `${Math.round(n * 100)}%`),
+  },
   { key: 'costPerLanded', label: 'cost/landed', about: 'mean cost of a landed run', words: or(dollars) },
   { key: 'timePerLanded', label: 'time/landed', about: 'mean wall time of a landed run', words: or(durationWord) },
   { key: 'landed', label: 'landed', about: 'runs that landed', words: or(String) },
@@ -112,7 +117,10 @@ export function apiQueryOf(search: StatsSearch, now: Date, by?: FilterKey): stri
 }
 
 /** One headline number of each day: the values, null kept where nothing was measured, and the largest known value, 0 where none is. */
-export function seriesOf(days: readonly StatsDay[], key: HeadlineKey): { points: Array<{ day: string; value: number | null }>; max: number } {
+export function seriesOf(
+  days: readonly StatsDay[],
+  key: HeadlineKey,
+): { points: Array<{ day: string; value: number | null }>; max: number } {
   const points = days.map((d) => ({ day: d.day, value: d[key] }));
   const max = Math.max(0, ...points.flatMap((p) => (p.value === null ? [] : [p.value])));
   return { points, max };
@@ -127,3 +135,15 @@ export function marksByDay(marks: readonly StatsMark[]): Map<string, StatsMark[]
 
 /** A repository as the page names it: its folder's name. */
 export const repoWord = (path: string): string => path.replace(/\/+$/, '').split('/').pop() || path;
+
+/** `search` with `period` chosen: the default period is left out of the address. */
+export function withPeriod(search: StatsSearch, period: PeriodId): StatsSearch {
+  const { period: _was, ...rest } = search;
+  return period === '28d' ? rest : { ...rest, period };
+}
+
+/** `search` keeping `value` for `key`, or no value of it for null. */
+export function withFilter(search: StatsSearch, key: FilterKey, value: string | null): StatsSearch {
+  const { [key]: _was, ...rest } = search;
+  return value === null ? rest : { ...rest, [key]: value };
+}

@@ -213,6 +213,14 @@ test('an ending that commits in its own prose finishes once done, its landing un
   );
 });
 
+test('a step that signed off blocked leaves its run waiting, though its session succeeded', () => {
+  const plain = [step('implement', []), step('document', ['implement'])];
+  const r = readOf('b', plain, { implement: [{ end: at(1) }], document: [{ end: at(2) }] });
+  const blocked = { outcome: 'blocked' as const, summary: 'Which one?', artifacts: [] };
+  assert.equal(factsOf(r).runs.length, 1);
+  assert.equal(factsOf({ ...r, closeoutOf: (name) => (name === 'document' ? blocked : undefined) }).runs.length, 0);
+});
+
 test('a cancelled run never finishes: its tries are counted, and the run is not', () => {
   const cancelled = twoRounds('c', TEAM, { commit: 'abc' }, { cancelledAt: at(8) });
   const facts = factsOf(cancelled);

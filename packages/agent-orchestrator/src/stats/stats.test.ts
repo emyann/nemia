@@ -199,16 +199,17 @@ test("a landed run's cost is absent when one session of it was not measured, and
 });
 
 test("a gate wait runs from the try's end to its approval; none without one, none for a try whose approval was an earlier try's", () => {
-  const gated = [step('design', [], { gate: true, by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
+  const gated = [step('brief', []), step('design', ['brief'], { gate: true, by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
   const tries = {
+    brief: [{ end: at(0) }],
     design: [{ end: at(1), check: 'passed' as const, then: 'retries' as const }, { end: at(3) }],
     implement: [{ end: at(5) }],
   };
   const approved = readOf('g', gated, tries, { approvals: [{ step: 'design', try: 1, at: minus(at(2), 30 * MIN) }] });
   const [one, two] = factsOf(approved).tries.filter((t) => t.step === 'design');
   assert.equal(one.gateWaitMs, 30 * MIN);
-  assert.equal(two.gateWaitMs, null, 'try 1 was approved, not try 2');
-  assert.equal(factsOf(readOf('n', gated, tries)).tries[0].gateWaitMs, null);
+  assert.equal(two.gateWaitMs, null, 'try 1 was approved, not try 2, though the brief it comes after ended before the approval');
+  assert.equal(factsOf(readOf('n', gated, tries)).tries.find((t) => t.step === 'design')?.gateWaitMs, null);
   const ending = readOf(
     'e',
     TEAM,

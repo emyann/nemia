@@ -36,10 +36,15 @@ const signedOff = (taskId: string, closeout: object) =>
       .join(''),
   );
 
-/** A step declaring `open` in `schema`, as the loader reads it and the run freezes it. */
-const declaring = (name: string, open: object) =>
+/** A step declaring `open` in its schema, and every field of `more`, as the loader reads it and the run freezes it. */
+const declaring = (name: string, open: object, more: Record<string, object> = {}) =>
   parseWorkflow(name, '---\noutput: spec.schema.json\n---\nDesign it.\n', () =>
-    JSON.stringify({ type: 'object', properties: { open }, required: ['open'], additionalProperties: false }),
+    JSON.stringify({
+      type: 'object',
+      properties: { open, ...more },
+      required: ['open', ...Object.keys(more)],
+      additionalProperties: false,
+    }),
   );
 const QUESTIONS = { 'x-shape': 'questions', description: 'What is undecided.' };
 
@@ -83,12 +88,14 @@ write(
       declaring('spec', QUESTIONS),
       declaring('broken', QUESTIONS),
       declaring('plain', { type: 'array', items: { type: 'string' } }),
+      declaring('twice', QUESTIONS, { later: QUESTIONS }),
     ],
     steps: {
       design: { taskId: 't-a-design' },
       spec: { taskId: 't-a-spec' },
       broken: { taskId: 't-a-broken' },
       plain: { taskId: 't-a-plain' },
+      twice: { taskId: 't-a-twice' },
     },
   }),
 );
@@ -96,6 +103,7 @@ signedOff('t-a-design', closeout('blocked', [cut, where]));
 signedOff('t-a-spec', closeout('done', [cut]));
 signedOff('t-a-broken', closeout('blocked', [{ ...cut, recommended: 'z' }]));
 signedOff('t-a-plain', closeout('blocked', ['Postgres or MySQL?']));
+signedOff('t-a-twice', { ...closeout('blocked', [cut]), later: [{ ...where, title: cut.title }] });
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' };
 const ask = (step: string, body: unknown) =>
@@ -114,6 +122,11 @@ test("a closeout's questions are on the run's detail, blocked or done; a field t
   assert.deepEqual(questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');
   assert.deepEqual(questions('plain'), []);
   assert.deepEqual(questions('broken'), [], 'drawn as any other field');
+  assert.deepEqual(
+    questions('twice'),
+    [],
+    'two fields asking one title: an answer names its question by title alone, so it is answered in words',
+  );
   assert.equal(run.steps.find((s) => s.name === 'design')!.needs, 'Two questions.', '`needs` stays the one line it was');
 });
 
@@ -138,6 +151,19 @@ test('REFUSED: answers that do not fit the questions the step asks now, and answ
     'a step that asks in free text asks no question answers can name',
   );
   assert.match(
+    await refused(
+      await ask('twice', {
+        mode: 'nudge',
+        answers: [
+          { question: cut.title, chose: ['a'] },
+          { question: cut.title, chose: ['retry'] },
+        ],
+      }),
+    ),
+    /The step does not ask "How is the card cut\?" now/,
+    'nor one whose fields ask one title twice',
+  );
+  assert.match(
     await refused(await ask('design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] })),
     /a recheck files no session to read them/,
   );
@@ -160,4 +186,6 @@ test('answers that fit are the try’s message, in the package’s words, their 
   const plain = await ask('plain', { mode: 'nudge', message: 'Postgres.' });
   assert.equal(plain.status, 202, await plain.clone().text());
   assert.equal((JSON.parse(fs.readFileSync(askFile(R, 'plain', 2), 'utf8')) as { message: string }).message, 'Postgres.');
+  const twice = await ask('twice', { mode: 'nudge', message: 'Shape first, into the retry.' });
+  assert.equal(twice.status, 202, await twice.clone().text());
 });

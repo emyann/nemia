@@ -152,6 +152,17 @@ test('askedQuestions gives each question field that decodes and holds a question
   assert.deepEqual(askedQuestions(step, { error: 'not an object' }), []);
 });
 
+test('askedQuestions gives none of a closeout whose fields ask one title twice: an answer names its question by title alone', () => {
+  const step = stepWith({ open: { 'x-shape': 'questions' }, later: { 'x-shape': 'questions' } });
+  const said = (later: unknown[]) =>
+    parseCloseout({ outcome: 'blocked', summary: 's', artifacts: [], needs: 'Two questions.', open: [cut], later });
+  assert.deepEqual(askedQuestions(step, said([{ ...where, title: cut.title }])), []);
+  assert.deepEqual(askedQuestions(step, said([where])), [
+    { field: 'open', questions: [cut] },
+    { field: 'later', questions: [where] },
+  ]);
+});
+
 /** The words `answerRefusal` gives, or a failure when it lets the answers through. */
 const answerRefused = (answers: Answer[]): string => {
   const why = answerRefusal([cut, where], answers);

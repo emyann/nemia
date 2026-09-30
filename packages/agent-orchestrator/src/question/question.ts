@@ -165,14 +165,17 @@ export function questionsOf(value: unknown): Question[] | { error: string } {
 
 /**
  * What a closeout asks through its step's question fields: each field it gave that decodes and holds a question, in the schema's order.
- * None for a closeout that is not there or did not read, and none of a field that does not decode: it is drawn as any other field.
+ * None for a closeout that is not there or did not read, and none of a field that does not decode: it is drawn as any other field. None
+ * at all when two fields ask one title: an answer names its question by title alone, so such a closeout is answered in words.
  */
 export function askedQuestions(step: Workflow | undefined, said: Closeout | { error: string } | undefined): Asked[] {
   if (!said || 'error' in said) return [];
-  return questionFields(step).flatMap((field) => {
+  const asked = questionFields(step).flatMap((field) => {
     const questions = questionsOf(said.output?.[field]);
     return Array.isArray(questions) && questions.length ? [{ field, questions }] : [];
   });
+  const titles = asked.flatMap((a) => a.questions.map((q) => q.title));
+  return new Set(titles).size === titles.length ? asked : [];
 }
 
 /** Words that say to read the step again, for an answer that does not fit the questions it asks now. */

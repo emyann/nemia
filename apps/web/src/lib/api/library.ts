@@ -1,6 +1,6 @@
 /**
  * What the library's reads share — an agent's card entry, a skill's place and cost and a skill an agent gives, a schema pasted for a step,
- * and every key of a step — each type with the schema `get` decodes it with.
+ * every key of a step, and a key's row on a card's or a step's page — each type with the schema `get` decodes it with.
  */
 import { Schema, Struct } from 'effect';
 
@@ -198,3 +198,16 @@ export const WorkflowStepSpecSchema = Schema.Struct({
 export const StepSpecPartSchema = WorkflowStepSpecSchema.mapFields(Struct.map(Schema.optionalKey)) satisfies Schema.Schema<
   Partial<WorkflowStepSpec>
 >;
+
+/**
+ * Mirrors `KeyRow` in apps/api/src/workflows/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as
+ * the package read it, null where the file does not set it, and the package's one line of what it means.
+ */
+export type KeyRow = { key: string; value: string | null; meaning: string };
+
+/** Decodes a `KeyRow`. */
+export const KeyRowSchema = Schema.Struct({
+  key: Schema.String,
+  value: Schema.NullOr(Schema.String),
+  meaning: Schema.String,
+}) satisfies Schema.Schema<KeyRow>;

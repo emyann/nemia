@@ -3,10 +3,24 @@
  * reach.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { getUndecoded } from './read.ts';
+import { Schema } from 'effect';
+import { get } from './read.ts';
+
+/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
+const Strings = Schema.mutable(Schema.Array(Schema.String));
+
+/** A list of `item`, as a decoded answer holds it. */
+const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
 
 /** Mirrors `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
+
+/** Decodes a `Described`. */
+const DescribedSchema = Schema.Struct({
+  name: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  source: Schema.String,
+}) satisfies Schema.Schema<Described>;
 
 /** Mirrors `McpServer` in apps/api/src/capabilities/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
 export type McpServer = {
@@ -24,8 +38,28 @@ export type McpServer = {
   checkedAt: string | null;
 };
 
+/** Decodes a `McpServer`. */
+const McpServerSchema = Schema.Struct({
+  name: Schema.String,
+  source: Schema.String,
+  type: Schema.String,
+  command: Schema.NullOr(Schema.String),
+  args: Strings,
+  url: Schema.NullOr(Schema.String),
+  enabled: Schema.Boolean,
+  tools: Schema.NullOr(
+    List(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String), denied: Schema.NullOr(Schema.String) })),
+  ),
+  error: Schema.NullOr(Schema.String),
+  notAsked: Schema.NullOr(Schema.String),
+  checkedAt: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<McpServer>;
+
 /** A permission rule, and where it was read: the settings' file, or a step's `disallowedTools:`. */
 export type Rule = { rule: string; source: string };
+
+/** Decodes a `Rule`. */
+const RuleSchema = Schema.Struct({ rule: Schema.String, source: Schema.String }) satisfies Schema.Schema<Rule>;
 
 /**
  * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on
@@ -43,6 +77,17 @@ export type MeasuredTools = {
   lacks: string[];
 };
 
+/** Decodes `MeasuredTools`. */
+const MeasuredToolsSchema = Schema.Struct({
+  harness: Schema.String,
+  version: Schema.String,
+  measuredAt: Schema.String,
+  source: Schema.String,
+  tools: Strings,
+  inferred: List(Schema.Struct({ name: Schema.String, why: Schema.String })),
+  lacks: Strings,
+}) satisfies Schema.Schema<MeasuredTools>;
+
 /**
  * Mirrors `READ_ONLY_COMMANDS` in apps/api/src/capabilities/capabilities.ts: the Bash commands Claude Code runs without a rule in every
  * mode, unless a deny names them — `measured` running so on `measuredAt` with `version`, the rest only `documented` — data, never claimed
@@ -58,6 +103,17 @@ export type ReadOnlyCommands = {
   documented: string[];
   docs: string;
 };
+
+/** Decodes `ReadOnlyCommands`. */
+const ReadOnlyCommandsSchema = Schema.Struct({
+  harness: Schema.String,
+  version: Schema.String,
+  measuredAt: Schema.String,
+  source: Schema.String,
+  measured: Strings,
+  documented: Strings,
+  docs: Schema.String,
+}) satisfies Schema.Schema<ReadOnlyCommands>;
 
 /**
  * Mirrors `StepReach` in apps/api/src/capabilities/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on
@@ -125,6 +181,77 @@ export type StepReach = {
   readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
 };
 
+/** Decodes what the settings' allow rules give a step (`StepReach.allowed`). */
+const AllowedForSchema = Schema.Struct({
+  rules: Strings,
+  takenBack: List(Schema.Struct({ rule: Schema.String, by: RuleSchema })),
+  asked: List(Schema.Struct({ rule: Schema.String, by: RuleSchema })),
+  unused: Strings,
+  bash: List(Schema.Struct({ rule: Schema.String, command: Schema.String, except: Strings, asks: Strings })),
+  exceptions: List(Schema.Struct({ rule: Schema.String, except: Strings, asks: Strings })),
+  dontAsk: Schema.Boolean,
+  askDenier: Schema.NullOr(Schema.Literals(['dontAsk', 'a job'])),
+  why: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<StepReach['allowed']>;
+
+/** Decodes a `StepReach`. */
+const StepReachSchema = Schema.Struct({
+  workflow: Schema.String,
+  from: Schema.Literals(['repo', 'yours']),
+  step: Schema.String,
+  harness: Schema.String,
+  claudeCode: Schema.Boolean,
+  fence: Schema.Struct({
+    tools: Schema.NullOr(Strings),
+    disallowedTools: Strings,
+    allowedTools: Strings,
+    permissionMode: Schema.NullOr(Schema.String),
+    sandbox: Schema.NullOr(Schema.String),
+    effort: Schema.NullOr(Schema.String),
+    mcp: Schema.Null,
+  }),
+  tools: Schema.NullOr(
+    Schema.Struct({
+      from: Schema.Literals(['declared', 'measured']),
+      names: Strings,
+      inferred: Strings,
+      removed: List(Schema.Struct({ name: Schema.String, rule: Schema.String, source: Schema.String, of: Schema.NullOr(Schema.String) })),
+    }),
+  ),
+  skills: Schema.NullOr(Schema.Struct({ names: Strings, why: Schema.NullOr(Schema.String) })),
+  mcp: Schema.NullOr(
+    List(
+      Schema.Struct({
+        server: Schema.String,
+        tools: Schema.NullOr(
+          List(
+            Schema.Struct({
+              name: Schema.String,
+              denied: Schema.NullOr(RuleSchema),
+              asks: Schema.NullOr(RuleSchema),
+              allowed: Schema.Boolean,
+            }),
+          ),
+        ),
+        why: Schema.NullOr(Schema.String),
+      }),
+    ),
+  ),
+  denied: List(RuleSchema),
+  asked: List(RuleSchema),
+  allowed: AllowedForSchema,
+  readOnly: Schema.NullOr(
+    List(
+      Schema.Struct({
+        command: Schema.String,
+        measured: Schema.Boolean,
+        denied: Schema.NullOr(RuleSchema),
+        asks: Schema.NullOr(RuleSchema),
+      }),
+    ),
+  ),
+}) satisfies Schema.Schema<StepReach>;
+
 /**
  * Mirrors `CapabilitiesWithSteps` in apps/api/src/capabilities/reach.ts: what the repository the api runs in offers a step, and what each
  * step gets.
@@ -145,11 +272,26 @@ export type Capabilities = {
   steps: StepReach[];
 };
 
+/** Decodes `Capabilities`. */
+const CapabilitiesSchema = Schema.Struct({
+  repo: Schema.String,
+  skills: List(DescribedSchema),
+  agents: List(DescribedSchema),
+  mcp: List(McpServerSchema),
+  denied: List(RuleSchema),
+  asked: List(RuleSchema),
+  allowed: List(RuleSchema),
+  warnings: Strings,
+  measured: MeasuredToolsSchema,
+  readOnly: ReadOnlyCommandsSchema,
+  steps: List(StepReachSchema),
+}) satisfies Schema.Schema<Capabilities>;
+
 /**
  * What the repository offers a step. Not polled: it changes when a person edits the checkout, and the api asks
  * each server for its tools once while it runs. Read again on each visit.
  */
 export const capabilitiesQuery = queryOptions({
   queryKey: ['capabilities'],
-  queryFn: () => getUndecoded<Capabilities>('/api/capabilities'),
+  queryFn: () => get('/api/capabilities', CapabilitiesSchema),
 });

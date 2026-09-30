@@ -1,7 +1,9 @@
 /** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox/inbox.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { getUndecoded } from './read.ts';
-import type { KeyRow, WorkflowListing } from './workflows.ts';
+import { Schema } from 'effect';
+import { get } from './read.ts';
+import { KeyRowSchema, type KeyRow } from './library.ts';
+import type { WorkflowListing } from './workflows.ts';
 
 /**
  * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as `wf inbox` lists it — or an entry of the inbox that does not read as one,
@@ -33,13 +35,31 @@ export type InboxEntry = {
   tried?: { at: string; repo: string; why: string; refused: boolean };
 };
 
+/** The keys of an `InboxEntry`, each decoded: a `queued` or a `tried` the api leaves out stays out. */
+const inboxEntryFields = {
+  name: Schema.String,
+  file: Schema.String,
+  title: Schema.NullOr(Schema.String),
+  workflow: Schema.NullOr(Schema.String),
+  repo: Schema.NullOr(Schema.String),
+  startedAs: Schema.mutable(Schema.Array(Schema.String)),
+  error: Schema.NullOr(Schema.String),
+  body: Schema.NullOr(Schema.String),
+  filedAt: Schema.NullOr(Schema.String),
+  queued: Schema.optionalKey(Schema.Struct({ at: Schema.String, place: Schema.NullOr(Schema.Number) })),
+  tried: Schema.optionalKey(Schema.Struct({ at: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean })),
+};
+
+/** Decodes an `InboxEntry`. */
+const InboxEntrySchema = Schema.Struct(inboxEntryFields) satisfies Schema.Schema<InboxEntry>;
+
 /**
  * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and
  * on a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards.
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
-  queryFn: () => getUndecoded<InboxEntry[]>('/api/inbox'),
+  queryFn: () => get('/api/inbox', Schema.mutable(Schema.Array(InboxEntrySchema))),
 });
 
 /**
@@ -48,11 +68,18 @@ export const inboxQuery = queryOptions({
  */
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
+/** Decodes an `InboxCardPage`. */
+const InboxCardPageSchema = Schema.Struct({
+  ...inboxEntryFields,
+  source: Schema.String,
+  keys: Schema.NullOr(Schema.mutable(Schema.Array(KeyRowSchema))),
+}) satisfies Schema.Schema<InboxCardPage>;
+
 /** A card, for its page. Read again on each visit, as the inbox is. */
 export const cardQuery = (name: string) =>
   queryOptions({
     queryKey: ['inbox', name],
-    queryFn: () => getUndecoded<InboxCardPage>(`/api/inbox/${encodeURIComponent(name)}`),
+    queryFn: () => get(`/api/inbox/${encodeURIComponent(name)}`, InboxCardPageSchema),
   });
 
 /**

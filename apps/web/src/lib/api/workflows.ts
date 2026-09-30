@@ -5,9 +5,11 @@ import { get } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import {
   AgentSkillSchema,
+  KeyRowSchema,
   StepKeySchema,
   WorkflowStepSpecSchema,
   type AgentSkill,
+  type KeyRow,
   type StepKey,
   type WorkflowStepSpec,
 } from './library.ts';
@@ -84,19 +86,6 @@ export const workflowsQuery = queryOptions({
   queryKey: ['workflows'],
   queryFn: () => get('/api/workflows', Schema.mutable(Schema.Array(WorkflowListingSchema))),
 });
-
-/**
- * Mirrors `KeyRow` in apps/api/src/workflows/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as
- * the package read it, null where the file does not set it, and the package's one line of what it means.
- */
-export type KeyRow = { key: string; value: string | null; meaning: string };
-
-/** Decodes a `KeyRow`. */
-const KeyRowSchema = Schema.Struct({
-  key: Schema.String,
-  value: Schema.NullOr(Schema.String),
-  meaning: Schema.String,
-}) satisfies Schema.Schema<KeyRow>;
 
 /**
  * Mirrors `WorkflowStepPage` in apps/api/src/workflows/workflows.ts: one step of a workflow — its body, its file as written, and every key

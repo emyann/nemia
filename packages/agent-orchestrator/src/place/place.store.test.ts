@@ -2,8 +2,8 @@
  * A place's verbs heard (`runPlaceVerb`) and its declaration read (`readPlaceJson`), against scripts planted in a scratch skill: each of
  * the nine answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
  * refusal; a non-zero exit, a signal, a stdout that is not JSON or is empty, a script past its deadline and one that is not there are
- * each unread, with their words; a script past its deadline leaves nothing it started running, a child deaf to SIGTERM killed and named;
- * and a `place.json` that does not read as the contract is refused, naming the file and the field.
+ * each unread, with their words; a script past its deadline leaves nothing it started running, children deaf to SIGTERM killed, gone
+ * and named; and a `place.json` that does not read as the contract is refused, naming the file and the field.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -174,11 +174,11 @@ test('a script past its deadline is unread, saying so, and is left running nowhe
   assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
 });
 
-test('a script past its deadline stops its whole group, killing a child that ignores SIGTERM, and says so', (t) => {
+test('a script past its deadline stops its whole group, killing the children that ignore SIGTERM, and says so', (t) => {
   const deaf = [
     "import fs from 'node:fs';",
     "process.on('SIGTERM', () => {});",
-    "fs.writeFileSync(process.argv[2], 'deaf');",
+    'fs.writeFileSync(process.argv[2], String(process.pid));',
     'setInterval(() => {}, 1000);',
   ].join('\n');
   const dir = planted(
@@ -188,9 +188,8 @@ test('a script past its deadline stops its whole group, killing a child that ign
       "import fs from 'node:fs';",
       "import path from 'node:path';",
       "const child = path.resolve('scripts', 'child.mjs');",
-      "const marker = path.resolve('deaf');",
       `fs.writeFileSync(child, ${JSON.stringify(deaf)});`,
-      "spawn(process.execPath, [child, marker], { stdio: 'ignore' });",
+      "for (const n of [1, 2, 3, 4]) spawn(process.execPath, [child, path.resolve(`deaf-${n}`)], { stdio: 'ignore' });",
       'setInterval(() => {}, 1000);',
     ].join('\n'),
   );
@@ -199,7 +198,13 @@ test('a script past its deadline stops its whole group, killing a child that ign
     for (const pid of running(child)) process.kill(pid, 'SIGKILL');
   });
   const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs: 1500 }), 'report');
-  assert.ok(fs.existsSync(path.join(dir, 'deaf')), `the child ignored SIGTERM before the deadline: ${said}`);
+  const markers = [1, 2, 3, 4].map((n) => path.join(dir, `deaf-${n}`));
+  assert.ok(
+    markers.every((marker) => fs.existsSync(marker)),
+    `each child ignored SIGTERM before the deadline: ${said}`,
+  );
+  for (const pid of markers.map((marker) => Number(fs.readFileSync(marker, 'utf8'))))
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
   assert.match(
     said,
     /^it gave no answer within 1\.5 s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, so a lock it held may be left$/,

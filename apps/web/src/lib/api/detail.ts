@@ -1,16 +1,51 @@
 /**
  * A run's detail, as its page reads it (`GET /api/runs/:id`, apps/api/src/detail/detail.ts): each step's spec, filing, gate, tries and
- * timeline.
+ * timeline. Each type has its schema beside it, which `get` decodes the api's answer with.
  */
 import { queryOptions } from '@tanstack/react-query';
+import { Schema } from 'effect';
 import { pace } from '../feed.ts';
-import { ReadRefusal, getUndecoded } from './read.ts';
+import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
-import type { RunGraph } from './graph.ts';
-import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
-import type { PlaceKind } from './runs.ts';
-import type { StepArtifact, StepAttempts, StepCheck, StepCloseout, StepTry, StepUnreadable } from './tries.ts';
-import type { RunRead, StepUsed } from './usage.ts';
+import { RunGraphSchema, type RunGraph } from './graph.ts';
+import {
+  PlaceKindSchema,
+  RunHoldingSchema,
+  RunStatusSchema,
+  RunToDecideSchema,
+  RunWaitingSchema,
+  SpentSchema,
+  StepNeedsFields,
+  StringsSchema,
+  type PlaceKind,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  type StepNeeds,
+} from './judged.ts';
+import {
+  StepArtifactSchema,
+  StepAttemptsSchema,
+  StepCheckSchema,
+  StepCloseoutSchema,
+  StepTrySchema,
+  StepUnreadableSchema,
+  type StepArtifact,
+  type StepAttempts,
+  type StepCheck,
+  type StepCloseout,
+  type StepTry,
+  type StepUnreadable,
+} from './tries.ts';
+import { RunReadSchema, StepUsedSchema, type RunRead, type StepUsed } from './usage.ts';
+
+/** Decodes a `RetryMode` (asks.ts, which hands out writes and so no schema). */
+const RetryModeSchema = Schema.Literals(['nudge', 'fresh', 'recheck']) satisfies Schema.Schema<RetryMode>;
+
+/** Decodes a `Said` (asks.ts). */
+const SaidSchema = Schema.Struct({ at: Schema.String, attempt: Schema.Number, text: Schema.String }) satisfies Schema.Schema<Said>;
 
 /**
  * Mirrors `StepBudget` in apps/api/src/detail/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to
@@ -18,6 +53,14 @@ import type { RunRead, StepUsed } from './usage.ts';
  * the cap or more.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
+
+/** Decodes a `StepBudget`. */
+const StepBudgetSchema = Schema.Struct({
+  usd: Schema.Number,
+  said: Schema.String,
+  of: Schema.NullOr(Schema.String),
+  over: Schema.Boolean,
+}) satisfies Schema.Schema<StepBudget>;
 
 /**
  * Mirrors `StepRaise` in apps/api/src/detail/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its
@@ -28,11 +71,27 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
 
+/** Decodes a `StepRaise`. */
+const StepRaiseSchema = Schema.Struct({
+  by: Schema.Literals(['retry', 'round']),
+  above: Schema.Number,
+  said: Schema.String,
+  modes: Schema.mutable(Schema.Array(RetryModeSchema)),
+  own: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<StepRaise>;
+
 /**
  * Mirrors `StepApproval` in apps/api/src/detail/detail.ts: a person's approval of the try a gated step is on — when, and the words given
  * with it.
  */
 export type StepApproval = { try: number; at: string; message: string | null };
+
+/** Decodes a `StepApproval`. */
+const StepApprovalSchema = Schema.Struct({
+  try: Schema.Number,
+  at: Schema.String,
+  message: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<StepApproval>;
 
 /**
  * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval`
@@ -40,14 +99,36 @@ export type StepApproval = { try: number; at: string; message: string | null };
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
+/** Decodes a `StepGate`. */
+const StepGateSchema = Schema.Struct({
+  awaiting: Schema.Boolean,
+  approval: Schema.NullOr(StepApprovalSchema),
+}) satisfies Schema.Schema<StepGate>;
+
 /** As the api's: a person's acceptance of a loop out of rounds (`wf accept`), on the try its looping step is on. */
 export type StepAcceptance = { try: number; at: string; message: string };
+
+/** Decodes a `StepAcceptance`. */
+const StepAcceptanceSchema = Schema.Struct({
+  try: Schema.Number,
+  at: Schema.String,
+  message: Schema.String,
+}) satisfies Schema.Schema<StepAcceptance>;
 
 /**
  * Mirrors `StepAsked` in apps/api/src/detail/detail.ts: a try a person asked for, which the next tick files — once it has stopped the
  * step's session where `stopFirst`, because the harness blocked it.
  */
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
+
+/** Decodes a `StepAsked`. */
+const StepAskedSchema = Schema.Struct({
+  try: Schema.Number,
+  mode: RetryModeSchema,
+  model: Schema.NullOr(Schema.String),
+  message: Schema.NullOr(Schema.String),
+  stopFirst: Schema.Boolean,
+}) satisfies Schema.Schema<StepAsked>;
 
 /** Mirrors `StepSpec` in apps/api/src/detail/detail.ts. */
 export type StepSpec = {
@@ -74,6 +155,23 @@ export type StepSpec = {
   loop: string | null;
   rounds: number | null;
 };
+
+/** Decodes a `StepSpec`. */
+const StepSpecSchema = Schema.Struct({
+  harness: Schema.NullOr(Schema.String),
+  model: Schema.NullOr(Schema.String),
+  effort: Schema.NullOr(Schema.String),
+  context: Schema.NullOr(Schema.Number),
+  after: StringsSchema,
+  workspace: Schema.NullOr(Schema.String),
+  resume: Schema.NullOr(Schema.String),
+  permissionMode: Schema.NullOr(Schema.String),
+  sandbox: Schema.NullOr(Schema.String),
+  tools: Schema.NullOr(StringsSchema),
+  deadlineSeconds: Schema.NullOr(Schema.Number),
+  loop: Schema.NullOr(Schema.String),
+  rounds: Schema.NullOr(Schema.Number),
+}) satisfies Schema.Schema<StepSpec>;
 
 /**
  * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the
@@ -103,6 +201,19 @@ export type StepFiled = {
    */
   remote: { name: string; address: string | null } | null;
 };
+
+/** Decodes a `StepFiled`. */
+const StepFiledSchema = Schema.Struct({
+  model: Schema.NullOr(Schema.String),
+  askedModel: Schema.NullOr(Schema.String),
+  effort: Schema.NullOr(Schema.String),
+  contextTokens: Schema.NullOr(Schema.Number),
+  permissionMode: Schema.NullOr(Schema.String),
+  runsIn: Schema.NullOr(Schema.Struct({ mode: Schema.String, by: Schema.Literals(['filed', 'default', 'tools']) })),
+  tools: Schema.NullOr(StringsSchema),
+  deadlineSeconds: Schema.NullOr(Schema.Number),
+  remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
+}) satisfies Schema.Schema<StepFiled>;
 
 /** Mirrors `RunDetail` in apps/api/src/detail/detail.ts. */
 export type RunDetail = {
@@ -269,6 +380,123 @@ export type TimelineTotal = {
   cost: Spent | null;
 };
 
+/** Decodes a `TaskSpan`. */
+const TaskSpanSchema = Schema.Struct({
+  taskId: Schema.String,
+  at: Schema.Literals(['unknown', 'queued', 'starting', 'running', 'ended', 'unspawned']),
+  filedAt: Schema.NullOr(Schema.String),
+  spawnedAt: Schema.NullOr(Schema.String),
+  endedAt: Schema.NullOr(Schema.String),
+  attempts: Schema.Number,
+  queuedMs: Schema.NullOr(Schema.Number),
+  ranMs: Schema.NullOr(Schema.Number),
+  queued: Schema.String,
+  ran: Schema.String,
+}) satisfies Schema.Schema<TaskSpan>;
+
+/** Decodes a `StepTimelineTry`. */
+const StepTimelineTrySchema = Schema.Struct({
+  try: Schema.Number,
+  round: Schema.Number,
+  session: Schema.NullOr(TaskSpanSchema),
+  sessionOf: Schema.NullOr(Schema.Number),
+  check: Schema.NullOr(TaskSpanSchema),
+  used: Schema.NullOr(StepUsedSchema),
+}) satisfies Schema.Schema<StepTimelineTry>;
+
+/** Decodes a `TimelineTotal`. */
+const TimelineTotalSchema = Schema.Struct({
+  loop: Schema.NullOr(Schema.String),
+  round: Schema.NullOr(Schema.Number),
+  tasks: Schema.Number,
+  inFlight: Schema.Number,
+  queuedMs: Schema.Number,
+  ranMs: Schema.Number,
+  wallMs: Schema.NullOr(Schema.Number),
+  queued: Schema.String,
+  ran: Schema.String,
+  wall: Schema.String,
+  cost: Schema.NullOr(SpentSchema),
+}) satisfies Schema.Schema<TimelineTotal>;
+
+/** Decodes a step of a `RunDetail`. */
+const DetailStepSchema = Schema.Struct({
+  name: Schema.String,
+  spec: Schema.NullOr(StepSpecSchema),
+  filed: Schema.NullOr(StepFiledSchema),
+  body: Schema.NullOr(Schema.String),
+  told: Schema.NullOr(Schema.String),
+  taskId: Schema.NullOr(Schema.String),
+  workspace: Schema.NullOr(Schema.String),
+  files: Schema.mutable(Schema.Array(StepArtifactSchema)),
+  filesError: Schema.NullOr(Schema.String),
+  branch: Schema.NullOr(Schema.String),
+  status: Schema.String,
+  note: Schema.NullOr(Schema.String),
+  ...StepNeedsFields,
+  gate: Schema.NullOr(StepGateSchema),
+  accepted: Schema.NullOr(StepAcceptanceSchema),
+  lastLine: Schema.NullOr(Schema.String),
+  said: Schema.mutable(Schema.Array(SaidSchema)),
+  asked: Schema.NullOr(StepAskedSchema),
+  closeout: Schema.NullOr(StepCloseoutSchema),
+  unreadable: Schema.NullOr(StepUnreadableSchema),
+  check: Schema.NullOr(StepCheckSchema),
+  attempts: StepAttemptsSchema,
+  used: Schema.NullOr(StepUsedSchema),
+  spent: Schema.NullOr(SpentSchema),
+  budget: Schema.NullOr(StepBudgetSchema),
+  raise: Schema.NullOr(StepRaiseSchema),
+  tries: Schema.mutable(Schema.Array(StepTrySchema)),
+  timeline: Schema.mutable(Schema.Array(StepTimelineTrySchema)),
+}) satisfies Schema.Schema<RunDetail['steps'][number]>;
+
+/**
+ * Decodes a `RunDetail`: each key the run's pages read, of its type and words — its `graph`, each step's gate, tries and timeline, the
+ * run's totals — and a key the board does not know dropped.
+ */
+const RunDetailSchema = Schema.Struct({
+  id: Schema.String,
+  brief: Schema.String,
+  repo: Schema.NullOr(Schema.String),
+  place: PlaceKindSchema,
+  work: Schema.NullOr(Schema.String),
+  workflowDir: Schema.String,
+  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
+  baseRef: Schema.NullOr(Schema.String),
+  branch: Schema.NullOr(Schema.String),
+  isolate: Schema.NullOr(Schema.Boolean),
+  createdAt: Schema.String,
+  startedAt: Schema.NullOr(Schema.String),
+  cancelledAt: Schema.NullOr(Schema.String),
+  pruned: Schema.NullOr(
+    Schema.Struct({
+      at: Schema.String,
+      worktrees: Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, bytes: Schema.Number }))),
+      artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Number })),
+    }),
+  ),
+  onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
+  after: StringsSchema,
+  from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
+  fromNote: Schema.optionalKey(Schema.String),
+  waiting: Schema.NullOr(RunWaitingSchema),
+  heldUntil: StringsSchema,
+  holding: Schema.NullOr(RunHoldingSchema),
+  status: RunStatusSchema,
+  moving: Schema.Boolean,
+  cost: Schema.NullOr(SpentSchema),
+  read: Schema.NullOr(RunReadSchema),
+  waitingOnYou: StringsSchema,
+  onYou: StringsSchema,
+  toDecide: Schema.NullOr(RunToDecideSchema),
+  gates: StringsSchema,
+  warning: Schema.NullOr(Schema.String),
+  graph: RunGraphSchema,
+  steps: Schema.mutable(Schema.Array(DetailStepSchema)),
+  timeline: Schema.Struct({ rounds: Schema.mutable(Schema.Array(TimelineTotalSchema)), run: TimelineTotalSchema }),
+}) satisfies Schema.Schema<RunDetail>;
+
 /**
  * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as `wf rm` leaves it. A page open on the run keeps what it
  * last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's `error`
@@ -281,56 +509,11 @@ export const runGone = (error: unknown): boolean => error instanceof ReadRefusal
  */
 export const retryRun = (failures: number, error: unknown): boolean => !runGone(error) && failures < 3;
 
+/** A run's detail, decoded (`RunDetailSchema`). Read again every 5 s while the feed is not followed — every minute while it is. */
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
-    queryFn: () => getUndecoded<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
+    queryFn: () => get(`/api/runs/${encodeURIComponent(id)}`, RunDetailSchema),
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });
-
-/**
- * A run's detail, as the api answered it, refused unless it carries what the run's pages draw: its `graph`, the only graph the canvases
- * draw (none is worked out from `after`); each step's `tries`, `said`, `timeline`, `approve` and `gate`; the run's `timeline` totals and
- * its `onYou`. A detail without a step's `approve` would offer Approve on a route the api that sent it does not have.
- *
- * An api process older than this board answers without some of them: the refusal names the field missing and says to restart the api
- * and reload the page, so the run's page and the Factory's card show it rather than a render throwing on `undefined`.
- */
-export function withGraph(id: string, detail: RunDetail): RunDetail {
-  const restart = 'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.';
-  const graph = (detail as { graph?: Partial<RunGraph> | null }).graph;
-  if (!graph || !Array.isArray(graph.roots) || !Array.isArray(graph.edges)) {
-    throw new Error(
-      `The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ${restart}`,
-    );
-  }
-  const bare = (detail.steps ?? []).find((step) => !Array.isArray((step as { tries?: unknown }).tries));
-  if (bare) {
-    throw new Error(
-      `The api answered run '${id}' without the tries of its step '${bare.name}', so it is older than this board, which shows every round a step ran. ${restart}`,
-    );
-  }
-  const unsaid = detail.steps.find((step) => !Array.isArray((step as { said?: unknown }).said));
-  if (unsaid) {
-    throw new Error(
-      `The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`,
-    );
-  }
-  const untimed = detail.steps.find((step) => !Array.isArray((step as { timeline?: unknown }).timeline));
-  const totals = (detail as { timeline?: Partial<RunDetail['timeline']> | null }).timeline;
-  if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
-    const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
-    throw new Error(
-      `The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`,
-    );
-  }
-  const ungated = detail.steps.find((step) => !Object.hasOwn(step, 'approve') || !Object.hasOwn(step, 'gate'));
-  if (ungated || !Array.isArray((detail as { onYou?: unknown }).onYou)) {
-    const what = ungated ? `the gate of its step '${ungated.name}'` : "who it waits on in wf ls's words";
-    throw new Error(
-      `The api answered run '${id}' without ${what}, so it is older than this board, whose run page approves a step at its gate. ${restart}`,
-    );
-  }
-  return detail;
-}

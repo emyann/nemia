@@ -7,6 +7,15 @@ import { Schema } from 'effect';
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
+/**
+ * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders
+ * the run makes.
+ */
+export type PlaceKind = 'git' | 'folder';
+
+/** Decodes a `PlaceKind`. */
+export const PlaceKindSchema = Schema.Literals(['git', 'folder']) satisfies Schema.Schema<PlaceKind>;
+
 /** Mirrors `RunStatus` in apps/api/src/runs/judged.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 

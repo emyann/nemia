@@ -5,6 +5,7 @@ import { pace } from '../feed.ts';
 import { get } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import {
+  PlaceKindSchema,
   RunHoldingSchema,
   RunStatusSchema,
   RunToDecideSchema,
@@ -12,6 +13,7 @@ import {
   SpentSchema,
   StepNeedsFields,
   StringsSchema,
+  type PlaceKind,
   type RunHolding,
   type RunStatus,
   type RunToDecide,
@@ -19,15 +21,6 @@ import {
   type Spent,
   type StepNeeds,
 } from './judged.ts';
-
-/**
- * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders
- * the run makes.
- */
-export type PlaceKind = 'git' | 'folder';
-
-/** Decodes a `PlaceKind`. */
-const PlaceKindSchema = Schema.Literals(['git', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
 /** Mirrors `RunSummary` in apps/api/src/runs/runs.ts. */
 export type RunSummary = {

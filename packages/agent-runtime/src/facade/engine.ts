@@ -11,6 +11,7 @@ const REFUSALS = new Set([
   'TickRefused',
   'AdmitRefused',
   'InputRefused',
+  'StopRefused',
   'ListRefused',
   'TranscriptRefused',
   'SayRefused',

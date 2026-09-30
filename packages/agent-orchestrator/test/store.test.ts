@@ -200,6 +200,39 @@ test('a run the engine has already been asked to stop is not asked again every f
   assert.deepEqual(stopped, [], "the engine's record says the stop request is already on the task");
 });
 
+test('REFUSED by the engine: a stop of a task that settled, or was asked to stop, since `wf cancel` or a pass read it is nothing left to do — the run is cancelled all the same, and every pass after it goes on', async () => {
+  const run = aRun('r-late', { implement: { taskId: 't1' }, review: { taskId: null } });
+  writeRun(run);
+  const { e } = engineWith({ t1: 'running' });
+  const asked: string[] = [];
+  e.stop = async (id: string) => {
+    asked.push(id);
+    throw Object.assign(new Error(`stop: \`${id}\` has settled (succeeded): there is nothing left to stop.`), { exitCode: 2 });
+  };
+
+  const { plan } = await cancel(e, run.id);
+  assert.equal(plan.kind, 'cancel');
+  assert.ok(readRun(run.id).cancelledAt, 'the run is called off: what the stop was for is met');
+  const pass = await advance(e, readRun(run.id));
+  assert.equal(pass.status, 'cancelled', 'and the pass that asks again is refused, and goes on');
+  assert.deepEqual(asked, ['t1', 't1']);
+});
+
+test('`wf cancel` does not ask the engine again to stop a task its record says was asked already, as the tick does not', async () => {
+  const run = aRun('r-asked', { implement: { taskId: 't1' }, review: { taskId: null } });
+  writeRun(run);
+  const { e, stopped } = engineWith({ t1: 'running' });
+  const view = e.view.bind(e);
+  e.view = async (id: string) => {
+    const v = (await view(id)) as { state: { stopRequested: boolean } };
+    return { ...v, state: { ...v.state, stopRequested: true } } as Awaited<ReturnType<Engine['view']>>;
+  };
+
+  await cancel(e, run.id);
+  assert.deepEqual(stopped, [], 'the engine would refuse the second ask');
+  assert.ok(readRun(run.id).cancelledAt);
+});
+
 test('`wf ls` takes how each step signed off from the engine — and a task from before closeouts still lists', async () => {
   const run = aRun('r-ls', { implement: { taskId: 't1' }, review: { taskId: 't2' } });
   const blocked = { outcome: 'blocked', summary: 'two readings of the brief', artifacts: [], needs: 'pick one' };
@@ -4827,6 +4860,37 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
     ],
     "the run reads a step's files from its directory, and says what it did not collect",
   );
+});
+
+test("REFUSED by the engine: a try's stop of a session that settled since the pass read it is said, and the pass goes on — it files nothing, and the pass after it, reading it settled, files the try", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.settle(taskId, 'needs-human' as TaskPhase);
+  t.mock.method(console, 'log', () => {});
+  const { main } = await import('../src/cli/main.ts');
+  await main(['retry', run.id, 'implement'], b.e);
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
+
+  const refusing: Engine = {
+    ...b.e,
+    stop: async (id: string) => {
+      throw Object.assign(new Error(`stop: \`${id}\` has settled (stopped): there is nothing left to stop.`), { exitCode: 2 });
+    },
+  };
+  const first = await advance(refusing, readRun(run.id));
+  assert.deepEqual([first.tried, first.filed], [[], []], 'nothing filed on the read the refusal proved stale');
+  assert.ok(
+    first.notes.includes(
+      `implement: try 2 — wf retry --nudge; its harness blocked its session, but the engine did not take the stop (stop: \`${taskId}\` has settled (stopped): there is nothing left to stop.), and the try is filed once it has settled`,
+    ),
+    first.notes.join('\n'),
+  );
+
+  b.settle(taskId, 'stopped');
+  const filed = await advance(refusing, readRun(run.id));
+  assert.deepEqual(filed.tried, ['implement'], 'settled, the try is filed');
 });
 
 test('REFUSED before, now honoured at shipped defaults: `wf retry` on a step whose harness blocked its session, and the session works again before any tick — the tick stops it once, files nothing while it stops, and files the try once it has; `wf ls` says so meanwhile', async (t) => {

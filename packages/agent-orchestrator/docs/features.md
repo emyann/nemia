@@ -4835,8 +4835,9 @@ once in its step): agent-runtime's open issue 33.
   engine folds everything, and `Engine.layer` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on
   `settledQuiet`, `decide`'s first line: a settled task decides nothing in every journal shape, whatever is appended after
   (`test/lifecycle.test.ts`). `TickReport.views` and `refused` never held a settled task, so admission reads what it read.
-- **What could append to a settled task**: `requestStop` (unconditional), a second `file` under its id, `say`, the pass's `measured`
-  and, through the same store, `ae` and the api's engine. `answer`, `close` and `admit` refuse a settled task. Every one goes through
+- **What could append to a settled task**: a second `file` under its id, `say`, the pass's `measured`, a `requestStop` that read the
+  task before a pass settled it, and, through the same store, `ae` and the api's engine. `answer`, `close`, `admit` and `requestStop`
+  refuse a settled task. Every one goes through
   `Journal.append`, which writes the feed; the one gap is a process dying between the task's line and the feed's (open issue 33).
 - **The proof**: a check mode (`tickMemoLayer({ verify: true })`, on in `engine.test.ts`'s `board()`) folds and decides each skipped
   task again and fails the pass with `TickMemoDiverged` on any difference. A test writes an entry past the feed and sees it fire. With

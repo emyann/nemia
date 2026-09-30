@@ -172,8 +172,33 @@ export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
   return admitted;
 });
 
+/** A stop the runtime would not journal, and why, in words that say what to do instead. Nothing was written. */
+export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused', {
+  message: Schema.String,
+}) {}
+
+/**
+ * Why `requestStop` would not journal a stop, or `undefined`: a task it has no record of, one that has settled, and one asked
+ * to stop already, whose next pass stops what runs and settles it. Off the record alone, so it costs no registry call.
+ */
+export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
+  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (state.settled)
+    return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
+  if (state.stopRequested)
+    return `\`${taskId}\` has been asked to stop already: the next pass stops what runs and settles it. \`ae ls\` says when it has.`;
+  return undefined;
+};
+
+/**
+ * A person's word that a task stop: journalled as `stop-requested`, whatever it is doing; the next pass stops its session
+ * and settles it `stopped`. Refused with `StopRefused`, and nothing journalled, for what `stopRefusalOf` refuses.
+ */
 export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
   const journal = yield* Journal;
+  const events = yield* journal.read(taskId);
+  const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined);
+  if (refused) return yield* Effect.fail(new StopRefused({ message: refused }));
   yield* journal.append(taskId, { kind: 'stop-requested', at: new Date().toISOString() });
 });
 

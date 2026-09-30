@@ -1,9 +1,9 @@
 /**
  * What a pass files, and what it files a step with: the tries due (`fileTries`), the rounds (`fileRounds`), the checks (`fileChecks`) and
  * the ready steps (`fileReady`), in the order `advanceRun` calls them, each under the id the run derives and asking the store first
- * whether it may file (`mayFileOf`); a nudge that answers a task held open (`answerHeld`); the fields of a filing that only a local
- * harness reads (`localFields`), the step as it is told (`toldOf`), and what each run it waited on concluded (`parentCloseouts`). A
- * controller, reaching the runtime through the client (`runtime-client.ts`).
+ * whether it may file (`mayFileOf`), a nudge answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
+ * that only a local harness reads (`localFields`), the step as it is told (`toldOf`), and what each run it waited on concluded
+ * (`parentCloseouts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,6 +54,7 @@ import { placesOf } from '../start/start.verb.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { within } from '../meter/tally.store.ts';
+import { answerHeld, stopAsked } from './held.verb.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -192,21 +193,6 @@ const stepNamed = (f: Filing, name: string): Workflow => f.reads.steps.find((s) 
 const closeFirst = async (f: Filing, name: string, taskId: string | null | undefined): Promise<string | undefined> =>
   f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId!) : undefined;
 
-/**
- * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
- * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a nudge's brief, which the runtime hands the session it
- * continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
- */
-async function answerHeld(e: Engine, taskId: string, text: string, budgetUsd: number | undefined): Promise<string | undefined> {
-  try {
-    await e.answer(taskId, text, budgetUsd === undefined ? {} : { config: { budgetUsd } });
-    return undefined;
-  } catch (err) {
-    if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
-    throw err;
-  }
-}
-
 /** The steps a pass tried again, and those of them whose try is a recheck, whose checks are filed with the others. */
 type Tried = { tried: string[]; rechecked: string[] };
 
@@ -220,14 +206,18 @@ export async function fileTries(f: Filing, retry: readonly Retry[]): Promise<Tri
   return out;
 }
 
-/** Ask the engine once to stop a try's session its harness blocked, or that runs on: the try is filed by a pass once it has settled. */
+/**
+ * Ask the engine once to stop a try's session its harness blocked, or that runs on: the try is filed by a pass once it has settled. A stop
+ * the engine refuses (`stopAsked`) is said, and the try waits for the same settling.
+ */
 async function stopFirst(f: Filing, r: Retry, taskId: string): Promise<void> {
   if (f.reads.views.get(taskId)?.state.stopRequested) return;
-  await f.e.stop(taskId);
+  const refused = await stopAsked(f.e, taskId);
   const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
-  f.notes.push(
-    `${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`,
-  );
+  const asked = refused
+    ? `but the engine did not take the stop (${refused}), and the try is filed once it has settled`
+    : 'so the engine is asked to stop it, and the try is filed once it has';
+  f.notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`);
 }
 
 /** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `wf retry` and what it was typed with. */

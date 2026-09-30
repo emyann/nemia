@@ -221,8 +221,8 @@ test('a settled task is decided nothing before anything is observed of it, on an
 });
 
 /**
- * Every entry a writer can append to a settled task: the verbs' (`requestStop`, `say`, `file` again under its id), a pass's (`measured`, an
- * end), a hand's.
+ * Every entry a writer can append to a settled task: the verbs' (`say`, `file` again under its id), a pass's (`measured`, an end), a
+ * hand's, and a stop an older runtime journalled, or one `requestStop` read the task unsettled for and a pass settled before it wrote.
  */
 const LATER: Record<string, Event[]> = {
   nothing: [],

@@ -965,6 +965,37 @@ test('a store of settled tasks, ticked again and again, reports no refusal — a
   for (let pass = 0; pass < 3; pass++) assert.deepEqual((await b.run(tick())).refused, [], `pass ${pass}`);
 });
 
+test('REFUSED: a stop of a settled task, of a task asked to stop already and of a task not on the board is StopRefused, each in its words, and nothing is journalled', async () => {
+  const b = board();
+  for (const id of ['done', 'asked']) await b.run(file({ ...spec, id }));
+  await b.run(tick());
+  b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'completed' });
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf('done')), 'succeeded');
+  await b.run(requestStop('asked'));
+  const entries = (id: string) => b.run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const before = { done: (await entries('done')).length, asked: (await entries('asked')).length };
+
+  const cases: [string, RegExp][] = [
+    [
+      'done',
+      /^`done` has settled \(succeeded\): there is nothing left to stop\. File a task that continues its session \(`resumeFrom`\) to go on\.$/,
+    ],
+    ['asked', /^`asked` has been asked to stop already: the next pass stops what runs and settles it\. `ae ls` says when it has\.$/],
+    ['nope', /^`nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/],
+  ];
+  for (const [id, words] of cases) {
+    const refused = await b.run(Effect.flip(requestStop(id)));
+    assert.equal(refused._tag, 'StopRefused', id);
+    assert.match(refused.message, words, id);
+  }
+  assert.deepEqual(
+    { done: (await entries('done')).length, asked: (await entries('asked')).length, nope: (await entries('nope')).length },
+    { ...before, nope: 0 },
+    'nothing journalled for any of them, and no record made for a task never filed',
+  );
+});
+
 /**
  * A journal in memory, as `Journal.test` keeps one, that counts each task's reads — and the store's mutant: `pastTheFeed`
  * writes an entry to a task's record and not to the feed, which no writer of the runtime's does (`JournalOps.append`).
@@ -1025,7 +1056,11 @@ test('an entry appended to a settled task, through the feed, has the next pass f
   const j = countedJournal();
   const b = await settledBeside(j, { verify: true });
   const before = j.readsOf('done');
-  await b.run(requestStop('done'));
+  await b.run(
+    Effect.flatMap(Journal, (journal) =>
+      journal.append('done', { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } }),
+    ),
+  );
   await b.run(tick());
   assert.equal(j.readsOf('done'), before + 2, 'folded again, and stepped: its decision is nothing');
   await b.run(tick());

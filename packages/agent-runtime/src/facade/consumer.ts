@@ -251,7 +251,11 @@ export type Engine = {
    * cannot be listed or a harness that cannot be observed for `list()`, rejects the call.
    */
   list: (taskIds?: readonly string[]) => Promise<TaskList>;
-  /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
+  /**
+   * Ask a task to stop. Takes effect on the next tick, and confirms on the one after. Refused — rejected with an `Error` whose
+   * `exitCode` is 2, and nothing journalled — for a task this engine has no record of, one that has settled, and one asked to
+   * stop already.
+   */
   stop: (taskId: string) => Promise<void>;
   /**
    * What the task's session printed, asked of the task's own harness rather than of whichever listed the session this pass: a

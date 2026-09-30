@@ -368,6 +368,14 @@ test('a card is read by its file, and a file not there reads as null', () => {
   assert.equal(filesStore.inbox.read('c-never-filed.md'), null);
 });
 
+test('a card that is there and cannot be read is not read as gone: reading it throws', () => {
+  fs.mkdirSync(path.join(ROOT, 'inbox', 'c-folder.md'), { recursive: true });
+  assert.throws(
+    () => filesStore.inbox.read('c-folder.md'),
+    (err: NodeJS.ErrnoException) => err.code === 'EISDIR',
+  );
+});
+
 test('a card filed is written exclusively: a second filing at its name answers false and the first stays byte for byte', () => {
   assert.equal(filesStore.inbox.add('c-twice.md', 'first\n'), true);
   assert.equal(filesStore.inbox.add('c-twice.md', 'second\n'), false);

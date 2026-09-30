@@ -1,15 +1,15 @@
 /**
  * The verbs — and the first consumer of the engine's own public API.
  *
- * This file imports `createEngine` and nothing else from the engine's internals. That is
- * deliberate and it is a test: if the Promise API were not enough to write the CLI with, it would
- * not be enough for anyone else either.
+ * This file reaches the engine through its two faces alone, and imports no `effect`: it builds the engine with `promiseEngine` and
+ * uses it in Promises. That is deliberate and it is a test: if the Promise API were not enough to write the CLI with, it would not
+ * be enough for anyone else either.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { Engine as EngineService, promiseEngine } from '../index.ts';
 import {
-  createEngine,
   denialText,
   refusedText,
   retiredKeyRefusal,
@@ -497,9 +497,8 @@ export const AE_MAX_CONCURRENT_RETIRED =
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
   if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
-  const engine: Engine = createEngine({
-    root: process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine'),
-  });
+  const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
+  const engine: Engine = promiseEngine(EngineService.layer({ root }));
 
   switch (verb) {
     case 'start': {

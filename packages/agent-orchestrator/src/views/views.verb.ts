@@ -3,10 +3,14 @@
  * for one, what its sessions cost, what its check exited with and said, what was said to it, what the runs it waits on concluded
  * (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the engine's word for it are `views-words.ts`'s.
  * A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and files nothing — the
- * tick (`tick.verb.ts`), the verbs and the screens read through it.
+ * tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the engine is an Effect program that requires the engine
+ * as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`, `filingsRead` — and
+ * fails with a refusal and dies of anything else; beside each, its plain face in a Promise over the engine it is handed, which rejects with
+ * either as it was thrown. What reads only views already read is plain.
  */
 import fs from 'node:fs';
-import { denialText, type Engine, type TaskView } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/branches.ts';
@@ -133,26 +137,35 @@ const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unkno
  * them only while a cap is in force, because each is a read off the task's journal — no harness asked, but a read per try per pass — and
  * a step answered without limit — the supervisor, which is answered for as long as a person keeps answering — would otherwise add one
  * journal read per answer to every pass, for ever, buying nothing.
+ *
+ * Reads the tasks one at a time, in the order of the run's steps. Fails with a refusal a view rejected with; dies of anything else.
  */
-export async function taskPhases(
-  e: Engine,
-  run: Run,
-  { earlierTries = true }: { earlierTries?: boolean } = {},
-): Promise<{
-  views: Map<string, TaskView>;
-  phaseOf: (taskId: string) => TaskPhase;
-}> {
+export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { earlierTries = true }: { earlierTries?: boolean } = {}) {
+  const e = yield* EngineService;
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, await e.view(taskId));
-    if (check) views.set(check.taskId, await e.view(check.taskId));
-    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
+    if (taskId) views.set(taskId, yield* awaited(() => e.view(taskId)));
+    if (check) views.set(check.taskId, yield* awaited(() => e.view(check.taskId)));
+    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* awaited(() => e.view(t.taskId)));
   }
   return {
     views,
-    phaseOf: (taskId) => phaseOfView(views.get(taskId)),
+    phaseOf: (taskId: string): TaskPhase => phaseOfView(views.get(taskId)),
   };
-}
+});
+
+/**
+ * The engine's word on every task `run` has filed (`taskPhasesRead`) in a Promise, over `e`: its views, and each task's phase. Rejects
+ * with the refusal the program failed with, or what it died of, as it was thrown.
+ */
+export const taskPhases = (
+  e: Engine,
+  run: Run,
+  how: { earlierTries?: boolean } = {},
+): Promise<{
+  views: Map<string, TaskView>;
+  phaseOf: (taskId: string) => TaskPhase;
+}> => Effect.runPromise(taskPhasesRead(run, how).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
@@ -286,27 +299,55 @@ export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.sta
  */
 export type CheckReport = { command: string; passed: boolean; verdict: Verdict; stdout: string; stderr: string };
 
-export async function checkReports(
+/**
+ * What each step's settled check said, by step name, for each step whose check's phase `want` takes (`refusalRead`), read one at a time
+ * in the order of `steps`. Fails with a refusal a read rejected with; dies of anything else.
+ */
+export const checkReportsRead = Effect.fn('checkReports')(function* (
+  run: Run,
+  steps: readonly Workflow[],
+  phaseOf: (taskId: string) => TaskPhase,
+  want: (phase: TaskPhase) => boolean,
+) {
+  const reports = new Map<string, CheckReport>();
+  for (const step of steps) {
+    const taskId = run.steps[step.name]?.check?.taskId;
+    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
+    reports.set(step.name, { passed: phaseOf(taskId) === 'succeeded', ...(yield* refusalRead(step.check, taskId)) });
+  }
+  return reports;
+});
+
+/**
+ * What each step's settled check said whose phase `want` takes (`checkReportsRead`) in a Promise, over `e`. Rejects with the refusal the
+ * program failed with, or what it died of, as it was thrown.
+ */
+export const checkReports = (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
   phaseOf: (taskId: string) => TaskPhase,
   want: (phase: TaskPhase) => boolean,
-): Promise<Map<string, CheckReport>> {
-  const reports = new Map<string, CheckReport>();
-  for (const step of steps) {
-    const taskId = run.steps[step.name]?.check?.taskId;
-    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
-    reports.set(step.name, { passed: phaseOf(taskId) === 'succeeded', ...(await refusalOf(e, step.check, taskId)) });
-  }
-  return reports;
-}
+): Promise<Map<string, CheckReport>> =>
+  Effect.runPromise(checkReportsRead(run, steps, phaseOf, want).pipe(Effect.provide(EngineService.layer(e))));
 
-/** What a check said, off its log and its stderr file: the verdict, and the last lines of each stream. */
-export async function refusalOf(e: Engine, command: string, taskId: string): Promise<CheckRefusal> {
-  const log = await e.logs(taskId);
-  return { command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr: lastLines(tailOf(checkStderr(taskId))) };
-}
+/**
+ * What a check said, off its log and its stderr file: the verdict, and the last lines of each stream. Fails with a refusal the log's read
+ * rejected with, or the stderr file's read threw; dies of anything else. A stderr file that is not there, or does not read, says nothing.
+ */
+export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string) {
+  const e = yield* EngineService;
+  const log = yield* awaited(() => e.logs(taskId));
+  const stderr = yield* tried(() => lastLines(tailOf(checkStderr(taskId))));
+  return { command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr } satisfies CheckRefusal;
+});
+
+/**
+ * What a check said (`refusalRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of, as it
+ * was thrown.
+ */
+export const refusalOf = (e: Engine, command: string, taskId: string): Promise<CheckRefusal> =>
+  Effect.runPromise(refusalRead(command, taskId).pipe(Effect.provide(EngineService.layer(e))));
 
 /** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
 function tailOf(file: string, bytes = 64_000): string {
@@ -365,23 +406,29 @@ export const closeoutReader =
  * the diamond's first parent merged and cleaned up while the second is still in review still counts. One whose tip git cannot find on
  * the base — dropped unmerged, or deleted before any tick saw its run finish — is `gone`, and not shipped. A run that started before the
  * branch was deleted never asks (`gated`).
+ *
+ * A parent whose frozen steps cannot be read has not shipped: that is its answer, neither a failure nor a defect. Fails with a refusal a
+ * read of the store, git or the engine failed with; dies of anything else.
  */
-export async function parentOf(e: Engine, id: string, git: BranchReader = oneByOne): Promise<ParentRun> {
-  const known = parentRecord(id, git);
+export const parentRead = Effect.fn('parentOf')(function* (id: string, git: BranchReader = oneByOne) {
+  const known = yield* tried(() => parentRecord(id, git));
   const { record } = known;
-  if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
-  let steps: Workflow[];
-  try {
-    steps = stepsOf(record);
-  } catch {
-    return { ...known, shipped: false };
-  }
+  if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false } satisfies ParentRun;
+  const steps = yield* tried((): Workflow[] | undefined => {
+    try {
+      return stepsOf(record);
+    } catch {
+      return undefined;
+    }
+  });
+  if (!steps) return { ...known, shipped: false } satisfies ParentRun;
   const branches = resultSteps(steps)
     .map((s) => record.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
-  if (!branches.length || !branches.every(shippedOf(record, git))) return { ...known, shipped: false };
-  const { views, phaseOf } = await taskPhases(e, record);
-  const { asks, rounds } = readAsks(id);
+  const onBase = yield* tried(() => branches.length > 0 && branches.every(shippedOf(record, git)));
+  if (!onBase) return { ...known, shipped: false } satisfies ParentRun;
+  const { views, phaseOf } = yield* taskPhasesRead(record);
+  const { asks, rounds } = yield* tried(() => readAsks(id));
   const said = decision(
     steps,
     record,
@@ -395,19 +442,34 @@ export async function parentOf(e: Engine, id: string, git: BranchReader = oneByO
     () => false,
     spendReader(views),
   );
-  return { ...known, shipped: said.kind === 'shipped' };
-}
+  return { ...known, shipped: said.kind === 'shipped' } satisfies ParentRun;
+});
 
 /**
- * The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate does not apply to (`gated`).
- * And the runs a person holds it until (`Run.hold`), for as long as the hold stands.
+ * A run another waits on (`parentRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of, as
+ * it was thrown.
  */
-export async function parentsOf(e: Engine, run: Run, git: BranchReader = oneByOne): Promise<(id: string) => ParentRun> {
+export const parentOf = (e: Engine, id: string, git: BranchReader = oneByOne): Promise<ParentRun> =>
+  Effect.runPromise(parentRead(id, git).pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
+ * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. Fails with a refusal a read failed
+ * with; dies of anything else.
+ */
+export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne) {
   const read = new Map<string, ParentRun>();
   const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
-  for (const id of new Set(ids)) read.set(id, await parentOf(e, id, git));
-  return (id) => read.get(id) ?? { shipped: false };
-}
+  for (const id of new Set(ids)) read.set(id, yield* parentRead(id, git));
+  return (id: string): ParentRun => read.get(id) ?? { shipped: false };
+});
+
+/**
+ * The runs this run waits on (`parentsRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died
+ * of, as it was thrown.
+ */
+export const parentsOf = (e: Engine, run: Run, git: BranchReader = oneByOne): Promise<(id: string) => ParentRun> =>
+  Effect.runPromise(parentsRead(run, git).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout
@@ -430,14 +492,23 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
 /**
  * When each task was filed, off the engine's feed from `after`, added to `into`: the one record of a filing time, since a task's view
  * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
- * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. A feed that cannot be read rejects, as the engine's does.
+ * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. Fails with a refusal the feed rejected with; dies
+ * of anything else.
  */
-export async function readFilings(
+export const filingsRead = Effect.fn('readFilings')(function* (after = 0, into = new Map<string, string>()) {
+  const e = yield* EngineService;
+  const { entries, cursor } = yield* awaited(() => e.feed(after));
+  for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
+  return { filed: into, cursor };
+});
+
+/**
+ * When each task was filed (`filingsRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of,
+ * as it was thrown.
+ */
+export const readFilings = (
   e: Engine,
   after = 0,
   into = new Map<string, string>(),
-): Promise<{ filed: Map<string, string>; cursor: number }> {
-  const { entries, cursor } = await e.feed(after);
-  for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
-  return { filed: into, cursor };
-}
+): Promise<{ filed: Map<string, string>; cursor: number }> =>
+  Effect.runPromise(filingsRead(after, into).pipe(Effect.provide(EngineService.layer(e))));

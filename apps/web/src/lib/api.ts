@@ -2,7 +2,7 @@
  * The board's mirror of the api: every type it reads and every query and write it makes, one file per concern under `api/`, named as the
  * api's own files are. Importers read them all from here. No file under `api/` imports this one; their read and write, `get` and `send`,
  * stay theirs, and so do the schemas they decode with: `judged.ts`, `graph.ts`, `tries.ts`, `usage.ts` and `library.ts` hand out their
- * types alone, and `workflows.ts` its types and its reads and writes by name.
+ * types alone, and `workflows.ts` and `stats.ts` their types and their reads and writes by name.
  */
 export { ReadRefusal, UnreadAnswer, WriteRefusal } from './api/read.ts';
 export type * from './api/judged.ts';
@@ -38,3 +38,5 @@ export * from './api/daemon.ts';
 export * from './api/quota.ts';
 export * from './api/machines.ts';
 export * from './api/factories.ts';
+export type * from './api/stats.ts';
+export { statsKeysQuery, statsQuery } from './api/stats.ts';

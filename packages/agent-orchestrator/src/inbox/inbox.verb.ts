@@ -16,6 +16,7 @@ import {
   parseInboxCard,
   startedRefusal,
   type InboxCard,
+  type InboxListing,
   type QueueStarted,
   type QueueTry,
 } from './inbox.ts';
@@ -153,8 +154,21 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   return { run, card, removed: true, ...ignoredRepo };
 }
 
-/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One that does not read is none. */
+/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
 const readableFactories = (): Map<string, Factory> => new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
+
+/**
+ * The tries in `names` of cards `listing` does not list as tried — no longer queued as they were — removed; one that cannot be is left for
+ * a later pass.
+ */
+function dropStaleTries(names: Iterable<string>, listing: readonly InboxListing[]): void {
+  for (const name of names) {
+    if (listing.some((l) => l.name === name && l.tried)) continue;
+    try {
+      runStore.inbox.dropTry(name);
+    } catch {}
+  }
+}
 
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
@@ -169,19 +183,14 @@ const readableFactories = (): Map<string, Factory> => new Map(readFactories().fl
  * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
  * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. A
  * failure is said on one line, its lines joined by ` / `; a try that cannot be written is said all the same, and the next pass tries the
- * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer queued as it was is removed on the way, or
- * on a later pass when it cannot be.
+ * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer
+ * queued as it was is removed on the way, or on a later pass when it cannot be.
  */
 export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.list()): QueueStarted | undefined {
   const files = runStore.inbox.entries();
   const tries = runStore.inbox.tries();
   const listing = inboxListing(files, runs, isDirectory, tries);
-  for (const name of tries.keys()) {
-    if (listing.some((l) => l.name === name && l.tried)) continue;
-    try {
-      runStore.inbox.dropTry(name);
-    } catch {}
-  }
+  dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
   const factories = readableFactories();
   const next = nextQueued(listing, repo, factories);

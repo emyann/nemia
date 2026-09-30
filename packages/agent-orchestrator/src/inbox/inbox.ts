@@ -421,10 +421,11 @@ const definedOf = (given: Partial<Record<InboxKey, string | undefined>>): Partia
  *
  * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or
  * an `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the
- * body whole, as `wf start` takes a brief that is not a card. `workflow`, `repo` and `factory`, when given, are written over the text's own,
- * the keys in `INBOX_KEYS`' order. Refused too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one line, and a `queued:` in the text: a card is queued once it
- * is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with a `---` rule of
- * its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
+ * body whole, as `wf start` takes a brief that is not a card. `workflow`, `repo` and `factory`, when given, are written over the text's
+ * own, the keys in `INBOX_KEYS`' order. Refused too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one
+ * line, and a `queued:` in the text: a card is queued once it is in the inbox, under its own name, and a time carried in from elsewhere
+ * would jump the queue. A body that opens with a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read
+ * as the card's frontmatter.
  *
  * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
@@ -484,9 +485,9 @@ export function ideaCard(
 
 /**
  * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given, its `repo:`,
- * `gate:` and `factory:` kept: what `wf inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card, and
- * a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Pure; the text it
- * gives reads back as a card (`parseInboxCard`), or is refused as one would be.
+ * `gate:` and `factory:` kept: what `wf inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as
+ * `wf inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
+ * `ideaCard` keeps it. Pure; the text it gives reads back as a card (`parseInboxCard`), or is refused as one would be.
  */
 export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
   const keys = { workflow: workflow ?? card.workflow, repo: card.repo, queued: at ?? undefined, gate: card.gate, factory: card.factory };

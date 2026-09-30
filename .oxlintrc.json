@@ -674,13 +674,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/inbox/inbox.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 23 }],
-        "sonarjs/cognitive-complexity": ["error", 19]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
         "max-lines": ["error", { "max": 552, "skipBlankLines": true, "skipComments": true }],

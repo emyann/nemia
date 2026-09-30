@@ -148,6 +148,7 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
       title: 'Cache the views between passes',
       workflow: null,
       repo: null,
+      factory: null,
       startedAs: [],
       error: null,
       body: 'Cache the views between passes\n\nThe tick reads each task twice.',

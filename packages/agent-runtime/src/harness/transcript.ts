@@ -31,8 +31,8 @@ export const isoTime = (t: unknown): string | undefined => {
 
 /**
  * The events in a JSONL file from `after` on, and where to ask again. The one reader behind every
- * harness's `transcript`; what a line means is `eventsOf`'s, given the line parsed and the byte offset
- * it starts at (an id for a record that has none).
+ * harness's `transcript`; what a line means is `eventsOf`'s, given the line parsed, the byte offset
+ * it starts at (an id for a record that has none), and the file, for a refusal to name.
  *
  * Only whole lines are read: a line still being written waits for the next read, and the cursor stops
  * before it. Lines are cut at a newline byte, which never occurs inside a UTF-8 character, so a cut
@@ -44,7 +44,7 @@ export const isoTime = (t: unknown): string | undefined => {
 export const readTranscript = async (
   file: string | undefined,
   after: TranscriptCursor | undefined,
-  eventsOf: (entry: unknown, offset: number) => TranscriptEvent[],
+  eventsOf: (entry: unknown, offset: number, file: string) => TranscriptEvent[],
 ): Promise<Transcript> => {
   if (after !== undefined && !isTranscriptCursor(after)) {
     throw new Error(
@@ -84,7 +84,7 @@ export const readTranscript = async (
       } catch {
         entry = undefined;
       }
-      if (entry !== undefined) events.push(...eventsOf(entry, from + read));
+      if (entry !== undefined) events.push(...eventsOf(entry, from + read, file));
       read = end + 1;
     }
     const offset = from + read;

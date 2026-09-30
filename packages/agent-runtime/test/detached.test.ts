@@ -39,7 +39,7 @@ import {
   type HarnessSpec,
 } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
-import { trustedProjects } from '../src/harness/codex/codex.ts';
+import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
 import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
@@ -753,6 +753,79 @@ test('a task on a harness the composite does not have is spawned nowhere: refuse
     undefined,
     "and no other harness's vocabulary is asked of it",
   );
+});
+
+/** A finished Codex run `name` written into `dir` as its worker leaves it, its output `lines`. */
+const codexRun = (dir: string, name: string, lines: object[]) => {
+  const runs = path.join(dir, 'runs', 'codex');
+  fs.mkdirSync(runs, { recursive: true });
+  const base = path.join(runs, name.replace(/[^a-zA-Z0-9]+/g, '_'));
+  const run = { name, state: 'done', pid: 999999, exitCode: 0, logFile: `${base}.log`, heartbeatAt: new Date().toISOString() };
+  fs.writeFileSync(`${base}.json`, JSON.stringify(run));
+  fs.writeFileSync(`${base}.log`, ['Reading additional input from stdin...', ...lines.map((l) => JSON.stringify(l))].join('\n'));
+  return `${base}.log`;
+};
+const CODEX_USED = { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80 };
+
+test('REFUSED: a Codex run whose stream does not decode fails observe, in words naming the session, the line, the event, the field and the fix', async () => {
+  const dir = root();
+  const log = codexRun(dir, 'ae/c1/1', [
+    { type: 'turn.started' },
+    { type: 'turn.completed', usage: { ...CODEX_USED, input_tokens: 'many' } },
+  ]);
+  const e = await Effect.runPromise(Effect.flip(detachedOps(codex, dir).observe));
+  assert.ok(e instanceof RunnerError, String(e));
+  assert.equal(e.verb, 'observe');
+  assert.equal(
+    e.message,
+    `codex: \`ae/c1/1\`'s output, ${log}, cannot be read: line 3 of the \`codex exec --json\` stream is a \`turn.completed\` event whose \`usage.input_tokens\` is "many", where Codex prints number. Every Codex session stays unread, neither there nor gone, until its stream decodes: run a Codex whose \`exec --json\` stream this runtime reads, or a runtime whose \`CodexEventSchema\` (\`harness/codex/stream.ts\`) reads this one.`,
+  );
+
+  codexRun(dir, 'ae/c1/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: CODEX_USED }]);
+  const seen = (await Effect.runPromise(detachedOps(codex, dir).observe)).get('ae/c1/1');
+  assert.deepEqual(
+    seen,
+    {
+      sessionId: 'ae/c1/1',
+      state: 'completed',
+      nativeId: undefined,
+      closeout: undefined,
+      exitCode: 0,
+      usage: { toolCalls: 0, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
+    },
+    'a stream that decodes is observed as ever, field for field',
+  );
+});
+
+test('a Codex stream that does not decode is never an absence: through the composite, the names routed to Codex are unread', async () => {
+  const dir = root();
+  codexRun(dir, 'ae/c2/1', [{ type: 'turn.started' }, { type: 'item.completed', item: { id: '', type: 'agent_message' } }]);
+  const other = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'working' }]]);
+  const ops = composite({ codex: detachedOps(codex, dir), alpha: testOps({ sessions: other }) }, 'alpha');
+  const o = await Effect.runPromise(
+    ops.observeFor!([
+      { name: 'ae/c2/1', harness: 'codex' },
+      { name: 'ae/x/1', harness: 'alpha' },
+    ]),
+  );
+  assert.deepEqual([...o.seen.keys()], ['ae/x/1']);
+  assert.deepEqual(o.unread, new Set(['ae/c2/1']), 'neither there nor gone');
+});
+
+test('a Codex stream refused is refused once per change of its output: an unchanged log is not decoded again on every pass', async () => {
+  const dir = root();
+  const log = codexRun(dir, 'ae/c3/1', [{ type: 'turn.started' }, { type: 'turn.completed', usage: { output_tokens: 5 } }]);
+  let reads = 0;
+  const counted: HarnessSpec = { ...codex, readOutput: (text) => (reads++, codex.readOutput!(text)) };
+  const ops = detachedOps(counted, dir);
+  for (const pass of [1, 2]) {
+    const e = await Effect.runPromise(Effect.flip(ops.observe));
+    assert.match(e.message, /`usage\.input_tokens` is missing\./, `pass ${pass}`);
+  }
+  assert.equal(reads, 1, 'read once, and the refusal kept');
+  fs.appendFileSync(log, '\n');
+  await Effect.runPromise(Effect.flip(ops.observe));
+  assert.equal(reads, 2, 'read again once its output changed');
 });
 
 test('a harness the composite cannot read leaves the names routed to it unread, and the others are read as ever', async () => {

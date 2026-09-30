@@ -7,7 +7,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
-import { codexOutput } from '../detached/output.ts';
+import { codexOutput } from './stream.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
 import { countSpawn } from '../../core/engine/tally.ts';
@@ -111,8 +111,9 @@ export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medi
  * It refuses what Codex would drop without a word: a deny or an allow list, as Codex has no tool list, only a sandbox; a
  * spend cap, as `codex exec` has none and its stream counts tokens, not dollars — its config's budgets are token
  * budgets; Claude Code's flags, as `codex exec` is another CLI. It reads what a session consumed from the same JSONL
- * (`codexOutput`: tokens from `turn.completed`, tool calls by item), and the conversation from Codex's own rollout of the
- * thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `nativeIdPattern`
+ * (`codexOutput`: tokens from `turn.completed`, tool calls by item), each event it reads decoded by `CodexEventSchema` — a
+ * line that does not decode fails `observe`, so every Codex session is unread, never gone — and the conversation from Codex's
+ * own rollout of the thread rather than the stream: the rollout dates every record, and `exec --json` dates none. Its `nativeIdPattern`
  * finds the thread id Codex prints in its JSONL, which a resume and the rollout are found by.
  */
 export const codex: HarnessSpec = {

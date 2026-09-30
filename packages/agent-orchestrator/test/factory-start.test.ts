@@ -107,7 +107,7 @@ test('REFUSED: a start in a factory that hires no one into its steps names each 
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, review\. Hire an agent into each — wf factory hire pipao <agent> --step build\/implement; wf factory hire pipao <agent> --step build\/review — or start it in the default factory, where such a step runs as a plain session\. Nothing was started\.$/,
+      /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, review\. Hire an agent into each — wf factory hire pipao <agent> --step build\/implement; wf factory hire pipao <agent> --step build\/review\. Nothing was started\.$/,
     ),
   );
   assert.deepEqual(runsWritten(), before);

@@ -352,7 +352,7 @@ export { prune } from './prune/prune.verb.ts';
 export { decide } from './decide/decide.verb.ts';
 export { stats } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
-export type { ByKey, Stats, StatsQuery } from './stats/index.ts';
+export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
 export { list, unjudgedOf } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { Unjudged } from './list/list.verb.ts';

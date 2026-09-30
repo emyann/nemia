@@ -379,12 +379,15 @@ export function statsOf(facts: Facts, query: StatsQuery, now: Date, unreadable: 
 /** Whether `text` is a real UTC day, `YYYY-MM-DD`. */
 const isDay = (text: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text)) && dayOf(text) === text;
 
+/** A key of what a person gives a query: the days, the key to go by, and a filter per key. */
+export type QueryKey = 'from' | 'to' | 'by' | ByKey;
+
 /**
  * A query off what a person gave, each value under the name its key has where they gave it (`nameOf`: `--by` on the command line, `by` on
  * the api). Refused with `Invalid`: a key to go by that is not one of `BY_KEYS`, a day that is not a real `YYYY-MM-DD`, a `from` after the
  * `to`, and an empty filter.
  */
-export function statsQueryOf(given: Partial<Record<'from' | 'to' | ByKey | 'by', string>>, nameOf: (key: string) => string): StatsQuery {
+export function statsQueryOf(given: Partial<Record<QueryKey, string>>, nameOf: (key: QueryKey) => string): StatsQuery {
   const by = given.by;
   if (by !== undefined && !(BY_KEYS as readonly string[]).includes(by))
     throw new Invalid({ message: `${nameOf('by')} takes one of ${BY_KEYS.join(', ')}, not ${JSON.stringify(by)}.` });

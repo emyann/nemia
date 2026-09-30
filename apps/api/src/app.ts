@@ -12,6 +12,7 @@ import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
 import { runs } from './runs/index.ts';
+import { stats } from './stats/stats.ts';
 import { steps } from './steps/index.ts';
 import { Engine, StoreRoot } from './store.ts';
 import { builder, workflows } from './workflows/index.ts';
@@ -69,6 +70,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   `copySkill`.
  * - inbox/inbox.ts — the inbox: its cards listed, one filed, one dropped; two writes, guarded as a start is.
  * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.
+ * - stats/stats.ts — the flow numbers of every run in the store, as `wf stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
@@ -108,6 +110,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', skills)
     .route('/', inbox)
     .route('/', runs)
+    .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) => served(c, async ({ env, quota }) => c.json(await quota({ env }))))

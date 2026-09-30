@@ -47,6 +47,7 @@ import { RunnerError, testOps } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
+import { resultLine, SESSION, stream } from './reader-streams.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
@@ -1304,11 +1305,6 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   );
 });
 
-const SESSION = '5e551011-0000-4000-8000-000000000001';
-/** A `result` object as `claude -p --output-format json` prints it, on one line (keys trimmed), with `o` over its fields. */
-const resultLine = (o: object) =>
-  JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
-
 test('claude-detached is asked for JSON, and for the schema as --json-schema when the task gives one', async () => {
   const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const schema = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
@@ -1481,35 +1477,6 @@ test("what claude -p cost is its result's total_cost_usd, and its API time durat
   assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: -1 })), {});
   assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
 });
-
-/** Lines of `claude -p --output-format stream-json --verbose`, shaped as Claude Code prints them (keys trimmed). */
-const stream = {
-  init: JSON.stringify({ type: 'system', subtype: 'init', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
-  calls: (...uses: Array<[string, string, object]>) =>
-    JSON.stringify({
-      type: 'assistant',
-      session_id: SESSION,
-      message: { role: 'assistant', content: uses.map(([id, name, input]) => ({ type: 'tool_use', id, name, input })) },
-    }),
-  denied: (id: string, tool: string, reason?: object) =>
-    JSON.stringify({
-      type: 'system',
-      subtype: 'permission_denied',
-      tool_name: tool,
-      tool_use_id: id,
-      ...(reason ?? {
-        decision_reason_type: 'asyncAgent',
-        decision_reason: 'no approval surface in this session; permission request denied automatically',
-      }),
-      message: 'Permission for this tool use was denied. It requires approval, and this session has no approval surface.',
-      session_id: SESSION,
-    }),
-  toolResult: (id: string) =>
-    JSON.stringify({
-      type: 'user',
-      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, is_error: true, content: 'denied' }] },
-    }),
-};
 
 test("what claude -p was denied is its result's permission_denials, each by what a rule would name — and nothing when it was denied nothing", () => {
   const denials = [

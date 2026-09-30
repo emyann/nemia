@@ -4,7 +4,7 @@
  * person's answer to it — a blocked sign-off answered, a send-back from its gate — is the task's next turn, in the session that signed,
  * under the same id. Everything else is filed as it was: rounds, `--fresh` and `--model` tries, checks.
  *
- * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, so what the run reads
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, so what the run reads
  * is what the runtime says: its phase, its turns, its refusals. What `holdsOpen` judges is pure, and lives in run.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST` judges in full every run a pass answers
@@ -16,7 +16,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
-  createEngine,
   nameFor,
   type Engine,
   type PromiseJournal,
@@ -26,6 +25,7 @@ import {
   type SpawnRequest,
   type TaskView,
 } from 'agent-runtime';
+import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-held-');
@@ -110,12 +110,14 @@ const engine = () => {
       return '';
     },
   };
-  const e = createEngine({
-    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal: memoryJournal(),
-    harnesses: { claude: runner, codex: runner, check: runner },
-    defaultHarness: 'claude',
-  });
+  const e = promiseEngine(
+    EngineService.layer({
+      root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+      journal: memoryJournal(),
+      harnesses: { claude: runner, codex: runner, check: runner },
+      defaultHarness: 'claude',
+    }),
+  );
   const sign = (taskId: string, n: number, closeout: object, usage?: Sighting['usage']) => {
     const name = nameFor(taskId, n);
     assert.ok(sessions.has(name), `${name} was never started: ${[...sessions.keys()].join(', ')}`);

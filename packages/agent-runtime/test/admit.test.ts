@@ -8,7 +8,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createEngine, type Event, type FeedEntry, type PromiseJournal, type PromiseRunner, type Sighting } from '../src/facade.ts';
+import type { Event, FeedEntry, PromiseJournal, PromiseRunner, Sighting } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from '../src/core/domain.ts';
 
 const T0 = new Date('2026-09-25T09:00:00Z');
@@ -134,7 +135,7 @@ const board = () => {
   const observes = { n: 0 };
   const reads = { n: 0 };
   const journal = memoryJournal(reads);
-  const engine = createEngine({ journal, harnesses: { fake: countingHarness(sessions, observes) }, defaultHarness: 'fake' });
+  const engine = promiseEngine(Engine.layer({ journal, harnesses: { fake: countingHarness(sessions, observes) }, defaultHarness: 'fake' }));
   return { engine, sessions, observes, reads, journal };
 };
 

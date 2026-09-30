@@ -19,16 +19,18 @@ import {
   close,
   file,
   InputRefused,
+  Engine,
   Journal,
   Runner,
   testOps,
+  promiseEngine,
   tick,
   view,
   type Event,
   type Sighting,
   type SpawnRequest,
 } from '../src/index.ts';
-import { createEngine, type PromiseJournal, type PromiseRunner } from '../src/facade.ts';
+import type { PromiseJournal, PromiseRunner } from '../src/facade.ts';
 import { fold } from '../src/core/domain.ts';
 import { parseBrief, taskLine } from '../src/cli/main.ts';
 import { scratch } from './scratch.ts';
@@ -208,7 +210,7 @@ const board = (harnesses?: Record<string, PromiseRunner | 'claude-bg'>) => {
       return '';
     },
   };
-  const engine = createEngine({ journal, harnesses: harnesses ?? { fake } });
+  const engine = promiseEngine(Engine.layer({ journal, harnesses: harnesses ?? { fake } }));
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
     tasks.set(id, [
       { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', holdOpen: true, harness: 'fake', ...filed },
@@ -399,7 +401,7 @@ const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 test('ae answer prints the line it journalled, the words being everything after the id but --budget; ae close; each refusal exits 2', async () => {
   const root = scratch('ae-hold-open-cli-');
   try {
-    const engine = createEngine({ root });
+    const engine = promiseEngine(Engine.layer({ root }));
     const waiting = async () => {
       const id = await engine.file({ brief: 'b', cwd: root, holdOpen: true });
       await Effect.runPromise(

@@ -18,7 +18,7 @@ import { scratch } from './scratch.ts';
 const tmp = (label: string) => scratch(`ae-waiting-${label}-`);
 
 process.env.CLAUDE_CONFIG_DIR = tmp('config');
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; waitingFor?: unknown; startedAt: number };
 
@@ -62,7 +62,7 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 
 /** A task whose one session the registry lists blocked, and the engine that reads it. */
 const blocked = async () => {
-  const engine = createEngine({ root: tmp('root') });
+  const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
   const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
   await engine.tick();
   return { engine, id };

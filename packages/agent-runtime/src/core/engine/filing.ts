@@ -50,7 +50,7 @@ export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\`
 
 /**
  * What to do instead of a ceiling, pools or a priority, none of which the runtime keeps: the layer above chooses what starts,
- * and when. Shared by every refusal of them — `priority` here, the pass's arguments, `createEngine`'s `maxConcurrent` and a
+ * and when. Shared by every refusal of them — `priority` here, the pass's arguments, `Engine.layer`'s `maxConcurrent` and a
  * harness's `pool` (`facade/consumer.ts`), and `AE_MAX_CONCURRENT` (`cli/main.ts`).
  */
 export const ADMIT_INSTEAD =
@@ -75,7 +75,7 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
  * journals as `null` and would stop its task on the first pass. The harness's arguments under `config` are the adapter's to
  * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
- * `createEngine().file()` asks both, then each harness for its own words (`harnessRefusalOf` in `facade/consumer.ts`), which this
+ * The `file` of an engine `Engine.layer` builds asks both, then each harness for its own words (`harnessRefusalOf` in `facade/consumer.ts`), which this
  * door never learns.
  */
 export const refusalOf = (spec: Filing): string | undefined => {

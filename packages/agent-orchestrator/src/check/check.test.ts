@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createEngine, type Engine } from 'agent-runtime';
+import type { Engine } from 'agent-runtime';
+import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
 import {
   CHECK,
   CHECK_NICENESS,
@@ -272,7 +273,7 @@ const rig = () => {
   const root = fs.realpathSync(scratch('wf-check-'));
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(workspace);
-  const e = createEngine({ root: path.join(root, 'engine'), harnesses: { check: CHECK } });
+  const e = promiseEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: CHECK } }));
   const env = (step: string): CheckEnv => ({
     ...ENV,
     WF_STEP: step,

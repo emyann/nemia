@@ -9,7 +9,7 @@
  * runs: named on the command line, it stops Claude Code before a session exists, and waiting out the grace window to call
  * that `lost` would only hide the reason.
  *
- * Every case below goes through `createEngine()`'s own harnesses with a fake `claude` and `codex` on PATH, each writing down
+ * Every case below goes through the Promise engine's own harnesses with a fake `claude` and `codex` on PATH, each writing down
  * the argv it was given, so what is checked is what the engine really runs.
  */
 import { test } from 'node:test';
@@ -17,7 +17,8 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
+import type { McpServer, TaskSpec } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { claudeOps } from '../src/harness/claude/bg.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
@@ -67,7 +68,7 @@ const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-h
   process.env.CODEX_HOME = codexHome;
   return onPath(bin, async () => {
     const root = tmp('root');
-    const engine = createEngine({ root });
+    const engine = promiseEngine(Engine.layer({ root }));
     const id = await engine.file({ brief: 'the prompt', ...task });
     await engine.tick();
     const attempt = (await engine.view(id)).state.attempts[0];

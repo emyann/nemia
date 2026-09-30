@@ -32,7 +32,7 @@ const tmp = (label: string) => scratch(`ae-say-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
-const { createEngine } = await import('../src/facade.ts');
+const { Engine: EngineService, promiseEngine } = await import('../src/index.ts');
 const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, processStart, CLAUDE_INBOX_LINE_MAX } =
   await import('../src/harness/claude/inbox.ts');
 
@@ -207,7 +207,7 @@ const failed = async (engine: Engine, id: string, pattern: RegExp) => {
 };
 
 test("at shipped defaults, say hands the words verbatim to the running session's inbox, addressed to its session, then journals them", async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine);
   const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
 
@@ -237,7 +237,7 @@ test("at shipped defaults, say hands the words verbatim to the running session's
 });
 
 test('a session its harness lists blocked is running, and its inbox is handed the words as a working one is', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine);
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'blocked', status: 'idle' } : r)));
   await engine.say(id, 'you may run the migration');
@@ -248,7 +248,7 @@ test('a session its harness lists blocked is running, and its inbox is handed th
 
 test('a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words', async () => {
   const root = tmp('board');
-  const engine = createEngine({ root });
+  const engine = promiseEngine(EngineService.layer({ root }));
   const { id, box } = await running(engine);
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
@@ -283,7 +283,7 @@ const job = async (engine: Engine, brief: string, spec: Partial<TaskSpec> = {}) 
 };
 
 test('at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const id = await job(engine, 'job-told');
   const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
 
@@ -311,7 +311,7 @@ test('at shipped defaults, a job is told on its stdin: the words, verbatim, as t
 });
 
 test("a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox", async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const id = await job(engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
   await engine.say(id, 'carry on');
   await until(() => (fake.stdin('job-bypass')!.length === 2 ? true : undefined), 'the words on its stdin');
@@ -322,7 +322,7 @@ test("a job in bypassPermissions is told: what Claude Code's inbox holds for an 
 
 test('a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused', async () => {
   const root = tmp('board');
-  const engine = createEngine({ root });
+  const engine = promiseEngine(EngineService.layer({ root }));
   const id = await job(engine, 'job-lingers');
   await engine.say(id, 'finish and linger');
   const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
@@ -357,7 +357,7 @@ test('a job that has given its result reads nothing more: words said before it e
 });
 
 test('refused: empty words, and words that are only whitespace', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, box } = await running(engine);
   await refused(engine, id, '', /`text` is empty/, box);
   await refused(engine, id, ' \n\t ', /`text` is empty/, box);
@@ -365,24 +365,24 @@ test('refused: empty words, and words that are only whitespace', async () => {
 });
 
 test('refused: a task the engine has no record of', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   await refused(engine, 'no-such-task', 'hello', /`no-such-task` is not a task on this board/);
 });
 
 test('refused: a Codex task, in its own words — `codex exec` takes nothing while it runs', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const id = await engine.file({ brief: 'review', cwd: work, harness: 'codex' });
   await refused(engine, id, 'hello', /`codex exec` reads its prompt once and takes nothing while it runs/);
 });
 
 test('refused: a claude-detached task, in its own words — no session id to address until it exits', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const id = await engine.file({ brief: 'review', cwd: work, harness: 'claude-detached' });
   await refused(engine, id, 'hello', /learns its session's id only from what it prints as it exits/);
 });
 
 test('refused: a Claude task in bypassPermissions, though its session runs and has an inbox — the words would wait for an approval nobody gives', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
   await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);
   await box.close();
@@ -390,7 +390,7 @@ test('refused: a Claude task in bypassPermissions, though its session runs and h
 
 test('refused: a task journalled on claude before a job was its default, in bypassPermissions — known for a background session once its harness lists it', async () => {
   const root = tmp('board');
-  const engine = createEngine({ root });
+  const engine = promiseEngine(EngineService.layer({ root }));
   const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
@@ -402,20 +402,20 @@ test('refused: a task journalled on claude before a job was its default, in bypa
 });
 
 test("refused: words longer than Claude Code's inbox reads", async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, box } = await running(engine);
   await refused(engine, id, 'x'.repeat(CLAUDE_INBOX_LINE_MAX), /inbox drops a line over 1048576/, box);
   await box.close();
 });
 
 test('refused: a task that has not started an attempt', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const id = await engine.file({ brief: 'queued', cwd: work, config: { background: true } });
   await refused(engine, id, 'hello', /has not started an attempt yet/);
 });
 
 test('refused: a task that has settled', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine);
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
   for (let i = 0; i < 5 && !(await engine.view(id)).state.settled; i++) await engine.tick();
@@ -425,7 +425,7 @@ test('refused: a task that has settled', async () => {
 });
 
 test('refused: a task asked to stop, before its session has', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, box } = await running(engine);
   await engine.stop(id);
   await refused(engine, id, 'hello', /has been asked to stop/, box);
@@ -433,7 +433,7 @@ test('refused: a task asked to stop, before its session has', async () => {
 });
 
 test('refused: an attempt that has ended on a task that has not settled — one held open between turns, where nothing runs to hear anything until a person answers it', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
   await engine.tick();
@@ -449,7 +449,7 @@ test('refused: an attempt that has ended on a task that has not settled — one 
 });
 
 test('refused: an attempt its harness does not list, and one it lists as no longer running', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const gone = await running(engine);
   fake.setRows(fake.rows().filter((r) => r.sessionId !== gone.row.sessionId));
   await refused(engine, gone.id, 'hello', /its harness lists no `ae\/.+\/1`/, gone.box);
@@ -462,7 +462,7 @@ test('refused: an attempt its harness does not list, and one it lists as no long
 });
 
 test('a registry that cannot be read rejects, not refuses: ask again', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine);
   fs.writeFileSync(
     path.join(sessions, `${process.pid}.json`),
@@ -487,7 +487,7 @@ test('a registry that cannot be read rejects, not refuses: ask again', async () 
 });
 
 test('a session with no registration, one registered to another session, one with no inbox, and one whose inbox is gone: rejected, nothing journalled', async () => {
-  const board = () => createEngine({ root: tmp('board') });
+  const board = () => promiseEngine(EngineService.layer({ root: tmp('board') }));
 
   const e1 = board();
   const unregistered = await running(e1, {}, false);
@@ -514,7 +514,7 @@ test('a session with no registration, one registered to another session, one wit
 });
 
 test('a session listed with no process — exited — rejects: nothing to find its inbox by', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine);
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, pid: undefined } : r)));
   await failed(engine, id, /`claude agents` lists no process for/);
@@ -523,7 +523,7 @@ test('a session listed with no process — exited — rejects: nothing to find i
 });
 
 test("an inbox that is a symlink to a real socket is refused before anything is sent — so is a registration another user owns, or a plain file in the socket's place", async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row, box } = await running(engine, {}, false);
   const link = path.join(tmp('link'), 'in.sock');
   fs.symlinkSync(box.path, link);
@@ -563,7 +563,7 @@ test("a socket another user owns is refused — the check on what lstat said, ha
 });
 
 test('an inbox that reads the words and never closes its end — a process busy past the deadline — was given them: said, and journalled', async () => {
-  const engine = createEngine({ root: tmp('board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
   const { id, row } = await running(engine, {}, false);
   const box = await inbox({ neverCloses: true });
   register(row, { messagingSocketPath: box.path });
@@ -649,27 +649,29 @@ const promiseHarness = (
 
 test("a PromiseRunner's own say is handed the session as observed and the words; without one, its tasks are refused", async () => {
   const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
-  const engine = createEngine({ journal: memoryJournal(), harnesses: { mine: promiseHarness(heard) } });
+  const engine = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { mine: promiseHarness(heard) } }));
   const id = await engine.file({ brief: 'b', cwd: '/repo' });
   await engine.tick();
   const said = await engine.say(id, 'hello');
   assert.deepEqual(heard, [{ session: { name: `ae/${id}/1`, sessionId: 's-1' }, text: 'hello' }]);
   assert.deepEqual((await engine.view(id)).state.said, [said]);
 
-  const mute = createEngine({ journal: memoryJournal(), harnesses: { mine: promiseHarness() } });
+  const mute = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { mine: promiseHarness() } }));
   const muteId = await mute.file({ brief: 'b', cwd: '/repo' });
   await mute.tick();
   await refused(mute, muteId, 'hello', /the `mine` harness has no channel into a running session/);
 });
 
 test("a PromiseRunner's say that rejects journals nothing; a journal that fails after the words were taken says so", async () => {
-  const engine = createEngine({ journal: memoryJournal(), harnesses: { mine: promiseHarness([], 'the line is down') } });
+  const engine = promiseEngine(
+    EngineService.layer({ journal: memoryJournal(), harnesses: { mine: promiseHarness([], 'the line is down') } }),
+  );
   const id = await engine.file({ brief: 'b', cwd: '/repo' });
   await engine.tick();
   await failed(engine, id, /ae\/.+\/1 was not given the words \(the line is down\)\. Nothing was journalled/);
 
   const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
-  const readOnly = createEngine({ journal: memoryJournal('said'), harnesses: { mine: promiseHarness(heard) } });
+  const readOnly = promiseEngine(EngineService.layer({ journal: memoryJournal('said'), harnesses: { mine: promiseHarness(heard) } }));
   const roId = await readOnly.file({ brief: 'b', cwd: '/repo' });
   await readOnly.tick();
   await assert.rejects(
@@ -702,7 +704,7 @@ const aeRun = (args: string[], env: NodeJS.ProcessEnv) =>
 
 test('ae say <id> prints the line it journalled, the words being everything after the id; ae say <id> "" exits 2 and journals nothing', async () => {
   const root = tmp('cli-board');
-  const engine = createEngine({ root });
+  const engine = promiseEngine(EngineService.layer({ root }));
   const { id, box } = await running(engine);
   const env = { ...process.env, AE_ROOT: root };
 

@@ -51,7 +51,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { createEngine, nameFor, type Engine, type Said, type TaskView } from '../src/facade.ts';
+import { nameFor, type Engine, type Said, type TaskView } from '../src/facade.ts';
+import { Engine as EngineService, promiseEngine } from '../src/index.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { tick, view } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
@@ -128,7 +129,7 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = createEngine({ root: tmp('board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
     const fenced = tmp('fenced');
     const open = tmp('open');
     const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
@@ -186,7 +187,7 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = createEngine({ root: tmp('deny-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('deny-board') }));
     const fenced = allowingCheckout('deny-fenced');
     const open = allowingCheckout('deny-open');
     const common = {
@@ -267,7 +268,7 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = createEngine({ root: tmp('mcp-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('mcp-board') }));
     const server = path.join(tmp('mcp-server'), 'server.mjs');
     fs.writeFileSync(server, PROBE_SERVER);
     const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
@@ -326,7 +327,7 @@ const NAME_CLOSEOUT = {
  *   a line of their own.
  */
 const sayReaches = (background: boolean) => async (t: TestContext) => {
-  const engine = createEngine({ root: tmp('say-board') });
+  const engine = promiseEngine(EngineService.layer({ root: tmp('say-board') }));
   const told = tmp('say-told');
   const control = tmp('say-control');
   const common = {
@@ -426,7 +427,7 @@ test(
     timeout: 25 * 60_000,
   },
   async () => {
-    const engine = createEngine({ root: tmp('release-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('release-board') }));
     const cwd = tmp('release');
     const word = `ae${randomUUID().slice(0, 8)}`;
     const agents = () =>
@@ -514,7 +515,7 @@ test(
     timeout: 12 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('budget-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('budget-board') }));
     const ids = {
       capped: await engine.file({
         brief: LOOP_BRIEF,
@@ -604,7 +605,7 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('unsigned-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('unsigned-board') }));
     const ids = {
       unsigned: await engine.file({
         brief: UNSIGNED_BRIEF,
@@ -652,7 +653,7 @@ test(
     timeout: 6 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('remote-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('remote-board') }));
     const common = {
       brief: 'Reply with the single word ok, and nothing else.',
       config: { model: 'haiku', tools: [] as string[], background: true },
@@ -828,7 +829,7 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('m1-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('m1-board') }));
     const probe = tmp('m1-engine');
     const ids = {
       denied: await engine.file({
@@ -872,7 +873,7 @@ test(
     timeout: 40 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('m2-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('m2-board') }));
     const cwd = tmp('m2');
     const settled = async (id: string) => {
       const end = Date.now() + 10 * 60_000;
@@ -939,7 +940,7 @@ test(
     timeout: 20 * 60_000,
   },
   async (t) => {
-    const engine = createEngine({ root: tmp('m7-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('m7-board') }));
     const probe = tmp('m7');
     const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: { model: 'haiku' } };
     const settled = async (id: string) => {
@@ -1221,7 +1222,7 @@ test(
   async (t) => {
     const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
     t.diagnostic(`claude --version: ${version}`);
-    const engine = createEngine({ root: tmp('m11-board') });
+    const engine = promiseEngine(EngineService.layer({ root: tmp('m11-board') }));
     const job = oneAllowedCheckout('m11-job');
     const bg = oneAllowedCheckout('m11-bg');
     t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
@@ -1280,7 +1281,7 @@ test(
   async (t) => {
     t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
-    const engine = createEngine({ root });
+    const engine = promiseEngine(EngineService.layer({ root }));
     const secret = `m12-${randomUUID().slice(0, 8)}`;
     const id = await engine.file({
       brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
@@ -1356,7 +1357,7 @@ test(
   async (t) => {
     t.diagnostic(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m13-board');
-    const engine = createEngine({ root, harnesses: { codex } });
+    const engine = promiseEngine(EngineService.layer({ root, harnesses: { codex } }));
     const client = clientOf('codex', detachedOps(codex, root), (taskId) =>
       Effect.runPromise(
         Effect.gen(function* () {

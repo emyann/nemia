@@ -29,7 +29,7 @@ const tmp = (label: string) => scratch(`ae-find-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 const { claudeOps } = await import('../src/harness/claude/bg.ts');
 const { claudeRegistered, processStart } = await import('../src/harness/claude/inbox.ts');
 
@@ -120,7 +120,7 @@ const find = (name: string) => Effect.runPromise(claudeOps().find!(name));
 test("a session registered under its attempt's name is found by it: its conversation is read with no `claude agents`, and a settled task is viewed off its record", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -149,7 +149,7 @@ test("a session registered under its attempt's name is found by it: its conversa
 test('a registration whose process has gone is not found, nor one whose pid another process has taken since — the session is observed instead', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -222,7 +222,7 @@ test('a name no running session registered is not found — nor an interactive s
 test("a registration and the registry that disagree: the registry's word is taken — by a view, by say, and by the pass", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -286,7 +286,7 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
 
   for (const withFind of [false, true]) {
     const h = harness(withFind);
-    const engine = createEngine({ root: tmp('root'), harnesses: { mine: h.runner } });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { mine: h.runner } }));
     const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const at = `with find: ${withFind}`;
@@ -333,7 +333,7 @@ test("a view asks its task's own harness and no other, on harnesses that cannot 
   const a = harness('a');
   const b = harness('b');
   const root = tmp('root');
-  const engine = createEngine({ root, harnesses: { a: a.runner, b: b.runner } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { a: a.runner, b: b.runner } }));
   const running = await engine.file({ brief: 'runs on b', cwd: tmp('cwd'), harness: 'b', id: 'running' });
   const settled = await engine.file({ brief: 'ends on b', cwd: tmp('cwd'), harness: 'b', id: 'settled' });
   await engine.tick();
@@ -353,7 +353,7 @@ test("a view asks its task's own harness and no other, on harnesses that cannot 
 
   const c = harness('c');
   for (const [name, s] of b.sessions) c.sessions.set(name, s);
-  const reopened = createEngine({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' });
+  const reopened = promiseEngine(Engine.layer({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' }));
   const at = { a: a.counts.observe, c: c.counts.observe };
   const recorded = await reopened.view(running);
   assert.equal(recorded.phase, 'starting', 'what the record says of an attempt it has seen spawned and nothing since');

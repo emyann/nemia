@@ -79,7 +79,7 @@ export type Credentials = (scheme: string, agentUrl: string, harness: string) =>
 
 /**
  * The words a spawn is refused in when `credentials` gives no secret for `scheme`: what a caller that keeps its secrets
- * somewhere of its own says to do, say which variable to set. Absent, the refusal says to give `createEngine` a
+ * somewhere of its own says to do, say which variable to set. Absent, the refusal says to give `Engine.layer` a
  * `credentials` that answers for the scheme.
  */
 export type MissingCredential = (scheme: string, agentUrl: string, harness: string) => string;
@@ -147,7 +147,7 @@ const headerOf = (
   const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
     const given = secret();
     return given === undefined || given === ''
-      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${missing() ?? `give \`createEngine\` a \`credentials\` that answers for \`${name}\``}`
+      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``}`
       : [header, value(given)];
   };
   switch (s.$case) {

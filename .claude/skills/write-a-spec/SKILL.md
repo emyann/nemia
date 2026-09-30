@@ -20,4 +20,8 @@ intent, so restate the intent's goal and constraints in it.
 6. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 
+Run each check bare, as your fence allows it — `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint` — one
+command per call: never wrapped in `timeout` or `( … )`, piped to `tail` or `grep`, or redirected; paths from the workspace root, never
+`cd`, `git -C`, `VAR=` or `for`. Anything else is refused.
+
 A spec that reads well and names a function that does not exist is worse than none: name only what you read.

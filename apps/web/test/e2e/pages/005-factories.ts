@@ -15,11 +15,11 @@ const LISTED = ['default', FACTORIES.broken, ...FACTORIES.others, FACTORIES.hiri
 
 export default {
   /**
-   * The Factories at `/`: every factory a block on a canvas, the default one first — it holds every run started in no factory — and a file
-   * that does not read a block that says why. The menu's Factories lists the first five under it and a button for the rest. A block pressed
-   * opens its factory's floor, at `/factories/<name>`, with only its runs on it: FOLDER's, in `hiring`, once finished runs are shown. A name
-   * no factory has says so, answered with no 4xx, and leads back. The default block counts its runs as the default floor does, the two
-   * read a moment apart: the store the pages leave moves between the themes.
+   * The Factories at `/`: every factory a block on a canvas, the default one first — it holds every run started in no factory — and a
+   * file that does not read a block that says why. The menu's Factories lists the first five under it and a button for the rest. A block
+   * pressed opens its factory's floor, at `/factories/<name>`, with only its runs on it: FOLDER's, in `hiring`, once finished runs are
+   * shown. A name no factory has says so, answered with no 4xx, and leads back. The default block counts its runs as the default floor
+   * does, the two read a moment apart: the store the pages leave moves between the themes.
    */
   name: 'factories',
   route: '/',

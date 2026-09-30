@@ -75,10 +75,13 @@ test('REFUSED: each field the runtime reads that is not what Codex prints, by it
   ] as const) {
     const type = event.type;
     const message = wrong(stream(THREAD, TURN, event));
-    assert.ok(message.startsWith(`line 4 of the \`codex exec --json\` stream is a \`${type}\` event whose \`${field}\` `), `${field}: ${message}`);
+    assert.ok(
+      message.startsWith(`line 4 of the \`codex exec --json\` stream is a \`${type}\` event whose \`${field}\` `),
+      `${field}: ${message}`,
+    );
   }
   assert.match(wrong(stream(TURN, completed({ ...USED, input_tokens: 'many' }))), /`usage\.input_tokens` is "many", where Codex prints /);
-  assert.match(wrong(stream(TURN, { type: 'turn.completed' }))!, /`usage` is missing\./);
+  assert.match(wrong(stream(TURN, { type: 'turn.completed' })), /`usage` is missing\./);
 });
 
 test('REFUSED: the first line that does not decode is the one named, and nothing after it is read', () => {
@@ -103,7 +106,8 @@ test('a refused value is quoted to 60 characters, however large', () => {
 test('codexOutput refuses a stream that does not decode by throwing its words, and reads one that does as ever', () => {
   assert.throws(
     () => codexOutput(stream(TURN, completed({ output_tokens: 5 }))),
-    (err: Error) => err.message.startsWith('line 3 of the `codex exec --json` stream is a `turn.completed` event whose `usage.input_tokens` is missing.'),
+    (err: Error) =>
+      err.message.startsWith('line 3 of the `codex exec --json` stream is a `turn.completed` event whose `usage.input_tokens` is missing.'),
   );
   assert.deepEqual(codexOutput(stream(THREAD, TURN, completed())).usage, {
     toolCalls: 0,

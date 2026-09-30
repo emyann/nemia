@@ -73,7 +73,7 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
   for (const [at, line] of lines.entries()) {
     const event = ours(line);
     if (!event) continue;
-    const decoded = DECODERS[event.type]!(event);
+    const decoded = DECODERS[event.type](event);
     if (Result.isSuccess(decoded)) {
       events.push(decoded.success);
       continue;

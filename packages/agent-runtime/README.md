@@ -1767,9 +1767,10 @@ of pure code sits beside it.
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the doors take it |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
+| `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
-| `src/harness/detached/output.ts` | what a detached session's output says: Codex's `exec --json` stream and `claude -p`'s result, read for closeout, usage, cost and a spent budget |
+| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |

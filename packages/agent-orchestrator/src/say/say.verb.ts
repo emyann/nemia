@@ -1,9 +1,11 @@
 /**
- * `wf say`: tell a step's running session something (`say`), through the engine, which journals the words; and why an ask cannot be
- * written where a file that is not one stands (`strayAsk`), which `wf retry` and `wf round` say. A controller, reaching the runtime through
- * the client (`runtime-client.ts`).
+ * `wf say`: tell a step's running session something, through the engine, which journals the words; and why an ask cannot be written where
+ * a file that is not one stands (`strayAsk`), which `wf retry` and `wf round` say. A controller, reaching the runtime through the client
+ * (`runtime-client.ts`): an Effect program that requires the engine as a service (`sayRun`, over `EngineService`), and `say`, its plain
+ * face in a Promise, over the engine it is handed.
  */
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { sayRefusal, type Said } from './say.ts';
 import { type RoundAsk } from '../status/status.ts';
@@ -25,20 +27,39 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
  * Refused before the engine is asked, with what to do instead (`sayRefusal`): a step the run does not have, a cancelled run, a step with no
  * task filed, and one whose task has settled — each a `Conflict`. Then the engine's refusals, each a `Conflict` in the engine's words —
  * empty words, an attempt not started, a harness with no way in, a session its harness does not list running — and a failure to deliver,
- * as the engine throws it, which journals nothing and has no exit code: ask again.
+ * as the engine throws it, which journals nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's
+ * (`toldBy`) or one a read threw; dies of anything else, a failure to deliver included (`tried`, `awaited`).
  */
-export async function say(e: Engine, id: string, stepName: string, text: string): Promise<Told> {
-  const run = readRun(id);
-  const steps = stepsOf(run);
+export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string) {
+  const e = yield* EngineService;
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
   const taskId = run.steps[stepName]?.taskId;
-  const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
+  const phase = taskId ? phaseOfView(yield* awaited(() => e.view(taskId))) : 'unknown';
   const refused = sayRefusal(steps, run, stepName, () => phase);
-  if (refused) throw new Conflict({ message: refused });
-  const said = await e.say(taskId!, text).catch((err: unknown) => {
-    throw (err as { exitCode?: unknown }).exitCode === 2 ? new Conflict({ message: (err as Error).message }) : err;
-  });
-  return { run, taskId: taskId!, try: tryOf(run, stepName), said };
-}
+  if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
+  const said = yield* toldBy(e, taskId!, text);
+  return { run, taskId: taskId!, try: tryOf(run, stepName), said } satisfies Told;
+});
+
+/**
+ * `wf say` (`sayRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed with,
+ * or with whatever else it died of, as it was thrown.
+ */
+export const say = (e: Engine, id: string, stepName: string, text: string): Promise<Told> =>
+  Effect.runPromise(sayRun(id, stepName, text).pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * The engine's `say` of `text` to the task `taskId`, in `wf say`'s program: the `said` entry it journalled, or its refusal — an error it
+ * rejects with carrying exit code 2 — as a `Conflict` in its words; anything else it rejects with, a failure to deliver among them, the
+ * program dies of.
+ */
+const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Conflict> =>
+  Effect.tryPromise({ try: () => e.say(taskId, text), catch: (err) => err }).pipe(
+    Effect.catch((err) =>
+      (err as { exitCode?: unknown }).exitCode === 2 ? Effect.fail(new Conflict({ message: (err as Error).message })) : Effect.die(err),
+    ),
+  );
 
 /**
  * Why an ask cannot be written where a file that is not one already stands, in words that name it — or null, when there is none: the file reads

@@ -94,12 +94,12 @@ function writeRun(id: string, steps: Record<string, object>, more: object = {}) 
 
 shipped('wf/r-good/implement');
 signedOff('r-good-implement');
-writeRun('r-good', { implement: { taskId: 'r-good-implement', branch: 'wf/r-good/implement' } });
+writeRun('r-good', { implement: { taskId: 'r-good-implement', branch: 'wf/r-good/implement' } }, { factory: 'pipao' });
 
 shipped('wf/r-bad/implement');
 signedOff('r-bad-implement');
 fs.appendFileSync(journal('r-bad-implement'), jsonl([MISWRITTEN]));
-writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/implement' } });
+writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/implement' } }, { factory: 'pipao' });
 
 writeRun('r-child', {}, { after: ['r-bad'] });
 writeRun('r-sibling', {}, { after: ['r-good'] });
@@ -114,6 +114,8 @@ test('GET /api/runs answers every run while one task journal holds an entry no r
   assert.equal(good.status, 'succeeded');
   assert.equal(good.unreadable, null);
   assert.equal(runs.get('r-sibling')!.unreadable, null, 'a run waiting on a run whose tasks read is judged as ever');
+  assert.equal(good.factory, 'pipao', 'judged, a run names the factory its record names');
+  assert.equal(runs.get('r-sibling')!.factory, null, 'and a record that names none is the default factory, null');
 
   const bad = runs.get('r-bad')!;
   const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`;
@@ -125,6 +127,7 @@ test('GET /api/runs answers every run while one task journal holds an entry no r
   );
   assert.ok(bad.unreadable?.includes('the tick does not advance it, until that journal reads again'), bad.unreadable ?? 'null');
   assert.equal(bad.brief, 'The brief of r-bad', 'what its record says');
+  assert.equal(bad.factory, 'pipao', 'its factory among it');
   assert.deepEqual(
     bad.steps.map((s) => [s.name, s.taskId, s.status]),
     [['implement', 'r-bad-implement', 'unreadable']],

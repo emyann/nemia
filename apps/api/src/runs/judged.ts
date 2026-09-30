@@ -128,7 +128,8 @@ export type RunWaiting = {
  *
  * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped,
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next
- * tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), and `advice` the line
+ * tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), with the person's why
+ * and name when the hold has them, and `advice` the line
  * `wf decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it names
  * never ships on its own — the rule `wf ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every verb a
  * step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and nothing is
@@ -237,7 +238,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
       gone: w.gone ?? [],
       shipped: Boolean(w.shipped),
     })),
-    word: holdWord(holds),
+    word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
     onYou: holdNeedsYou(holds),
   };

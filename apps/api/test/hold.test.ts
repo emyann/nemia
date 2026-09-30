@@ -121,8 +121,12 @@ function writeRun(id: string, workflow: object[], steps: object, more: { after?:
 
 const holdFile = (id: string) => path.join(root, 'runs', `${id}.hold`);
 const HELD_AT = at(30);
-/** Held as `wf hold` writes it: a file of its own beside the record, which the tick lifts. */
-const holdOn = (id: string, until: string[]) => write(holdFile(id), JSON.stringify({ at: HELD_AT, until }));
+/**
+ * Held as `wf hold` writes it: a file of its own beside the record, which the tick lifts — with no `why` and no `by` unless `said` gives
+ * them, as code older than `wf hold --why` wrote it.
+ */
+const holdOn = (id: string, until: string[], said: { why?: string; by?: string } = {}) =>
+  write(holdFile(id), JSON.stringify({ at: HELD_AT, until, ...said }));
 
 const implement = { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' };
 const review = { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex' };
@@ -641,4 +645,42 @@ test('REFUSED at shipped defaults: a lift from a page on another site, addressed
     assert.match(error, new RegExp(`^DELETE /api/runs/${GATE}/hold `));
     assert.equal(fs.readFileSync(holdFile(GATE), 'utf8'), held);
   }
+});
+
+/** `plan → implement`, started `--gate plan`: plan signed off and waiting at its gate, held with a person's words and name. */
+const SAID = 'h-said';
+writeRun(
+  SAID,
+  [
+    { name: 'plan', after: [], body: 'Plan it.', harness: 'codex' },
+    { ...implement, after: ['plan'] },
+  ],
+  { plan: { taskId: `${SAID}-plan`, branch: `wf/${SAID}/plan` }, implement: { taskId: null } },
+);
+fs.writeFileSync(
+  path.join(root, 'runs', `${SAID}.json`),
+  JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(root, 'runs', `${SAID}.json`), 'utf8')), gates: ['plan'] }),
+);
+signedOff(`${SAID}-plan`, DONE);
+
+test("a hold's why and who put it are in `holding.word` on the list and the detail, and in the note of the gate it holds back — the package's words, never the api's — and a lift answers them", async () => {
+  holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
+  const words = 'held until p-live ships (why: merge conflicts in five files; by operator)';
+  const run = readRun(SAID);
+  const cli = await list(engine(), run);
+  const api = (await listed()).get(SAID)!;
+  assert.equal(api.holding?.word, words);
+  assert.equal(api.holding.word, holdWord(cli.holding!, run.hold));
+  assert.equal((await detail(SAID)).holding?.word, words);
+  const note = `${words}; its approval is asked once the hold lifts`;
+  assert.equal(api.steps.find((s) => s.name === 'plan')!.note, note, "the list's gate note");
+  assert.equal((await detail(SAID)).steps.find((s) => s.name === 'plan')!.note, note, "the page's gate note");
+  assert.equal((await listed()).get(GATE)!.holding?.word, 'held until p-live ships', 'a hold older code wrote says the plain line');
+  const res = await lift(SAID);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), {
+    id: SAID,
+    lifted: true,
+    hold: { at: HELD_AT, until: ['p-live'], why: 'merge conflicts in five files', by: 'operator' },
+  });
 });

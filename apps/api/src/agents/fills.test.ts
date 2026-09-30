@@ -4,7 +4,8 @@
  * credited to the agent file a start would run it with, found as the loader finds it (`lookupRoots`), never to every agent of that name.
  *
  * The api's own repository (`HKB_REPO`) is `repoR`. Its `alpha` has `implement`, naming no agent, and `review`, naming `iris`; `gamma/plan`
- * names `cleo`; `delta/ship` names none; `broken/named` names `bo` beside `broken/bad`, a step the loader refuses. `repoR` has `ada`,
+ * names `cleo`; `delta/ship` names none; `broken/named` names `bo` beside `broken/bad`, a step the loader refuses, and `broken/stray`,
+ * which names `../agents/cleo`, no agent's name. `repoR` has `ada`,
  * `iris`, `cleo` and `bo` in `workflows/agents/`, and `max` in `.claude/agents/`. Yours has `ada`, `max` and `zed`, and the workflow
  * `omega`, whose `step` names none. `repoS` is a second repository with no workflow.
  *
@@ -40,6 +41,7 @@ write(path.join(repoR, 'workflows', 'gamma', 'plan.md'), '---\nagent: cleo\n---\
 write(path.join(repoR, 'workflows', 'delta', 'ship.md'), 'Ship it.\n');
 write(path.join(repoR, 'workflows', 'broken', 'named.md'), '---\nagent: bo\n---\nDo it.\n');
 write(path.join(repoR, 'workflows', 'broken', 'bad.md'), '---\nnotakey: 1\n---\nDo it.\n');
+write(path.join(repoR, 'workflows', 'broken', 'stray.md'), '---\nagent: ../agents/cleo\n---\nDo it.\n');
 for (const name of ['ada', 'iris', 'cleo', 'bo'])
   write(path.join(repoR, 'workflows', 'agents', `${name}.md`), agentText(`You are ${name}.`));
 write(path.join(repoR, '.claude', 'agents', 'max.md'), agentText('You are the repository max.'));
@@ -158,5 +160,13 @@ test("the workflow listing's `hired` is the factory's hire into the step: null f
   assert.deepEqual(
     all.flatMap((w) => w.steps.map((s) => s.hired)),
     all.flatMap((w) => w.steps.map(() => null)),
+  );
+});
+
+test('REFUSED: a step whose `agent:` holds a path separator credits no agent, not even the file the path would reach', async () => {
+  assert.deepEqual(
+    one(await agents('/api/agents'), 'repo', 'cleo').fills,
+    [{ from: 'repo', workflow: 'gamma', step: 'plan', hired: false }],
+    'broken/stray names ../agents/cleo, which the package refuses as a name: gamma/plan is all cleo fills',
   );
 });

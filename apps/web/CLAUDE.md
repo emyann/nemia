@@ -100,6 +100,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a schema narrower than
   its type (a word left out, a `null` refused, a `?` key required) and a `Schema.Any`: read the schema against the type. `getUndecoded`
   is a list that only shrinks (`test/read.test.ts`).
+- A mirror narrower than the api's type drops the key on decode, and a write that sends the read back loses it (the builder's save, a
+  step's `workspace` and `slot`): diff the mirror against the api's type, key by key, before writing its schema.
 - `Schema.Union` takes the first member that decodes and drops the keys it does not know: put a member that owns more keys before one it
   extends (`StepArtifactSchema`, `RunDecisionSchema`), and prove the order with an answer the wrong order strips.
 

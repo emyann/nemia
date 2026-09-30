@@ -99,7 +99,13 @@
         "apps/web/src/lib/api/decision.ts",
         "apps/web/src/lib/api/steps.ts",
         "apps/web/src/lib/api/tries.ts",
-        "apps/web/src/lib/api/usage.ts"
+        "apps/web/src/lib/api/usage.ts",
+        "apps/web/src/lib/api/library.ts",
+        "apps/web/src/lib/api/agents.ts",
+        "apps/web/src/lib/api/skills.ts",
+        "apps/web/src/lib/api/workflows.ts",
+        "apps/web/src/lib/api/builder.ts",
+        "apps/web/src/lib/api/machines.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",

@@ -1,8 +1,8 @@
 /**
  * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): the face runs the program over the engine
  * it is handed and adds nothing, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
- * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `promiseEngine` over an in-memory journal and a
- * harness the test signs by hand, as unreadable-journal.test.ts does.
+ * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `promiseEngine` over an in-memory journal
+ * and a harness the test signs by hand, as unreadable-journal.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.

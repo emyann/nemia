@@ -39,6 +39,7 @@ const {
   retry,
   round,
   start,
+  toDecideWords,
 } = await import('../src/runner.ts');
 const { main } = await import('../src/cli/main.ts');
 const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
@@ -261,7 +262,9 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
     kind: 'approve',
     step: 'ship',
     says: "Stage the merge of this run's result onto the base branch, and sign off with the message to commit it with.",
+    filed: false,
   });
+  assert.doesNotMatch(toDecideWords(readRun(id), listed.toDecide), /You are/, "the gate says ship.md's note, not its agent's instructions");
   const again = await advance(e, readRun(id));
   assert.deepEqual(
     [again.filed, again.checked, again.tried],

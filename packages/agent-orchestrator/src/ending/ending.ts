@@ -202,9 +202,10 @@ export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standi
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
  * at a gate.
  *
- *   approve  the run is at its result and the gate on a last step has nobody's approval: `says` is what that step would do, in the folder's
- *            own words, for an ending that has not run — and null for a gated step that has signed off, whose closeout is what to read,
- *            since approving that one accepts what it did rather than letting it act
+ *   approve  the run is at its result and the gate on a last step has nobody's approval: `says` is what that step would do, the first
+ *            line of its own note (`ownNote`), for an ending that has not run — null where it has no note, and null for a gated step that
+ *            has signed off (`filed`), whose closeout is what to read, since approving that one accepts what it did rather than letting it
+ *            act
  *   git      nothing waits at such a gate, every step of the run finished, no step of the workflow merges (`workspace: main`), and a result
  *            branch is ahead of the base branch and not gone: the branch is the product, and merging or dropping it is a person's, by hand
  *
@@ -230,7 +231,8 @@ export function toDecide(
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
   if (waiting && !run.pruned) {
     if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
-    return { kind: 'approve', step: waiting.name, says: run.steps[waiting.name]?.taskId ? null : firstLine(waiting.body) };
+    const filed = Boolean(run.steps[waiting.name]?.taskId);
+    return { kind: 'approve', step: waiting.name, says: filed ? null : firstLine(ownNote(waiting)) || null, filed };
   }
   if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
@@ -255,15 +257,22 @@ export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>)
   terminalSteps(steps).filter((s) => hasGate(s, run));
 
 /**
- * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which git
- * ships. `says` is the ending's first line, what it would do, and null for a gated step that has already done it.
+ * The words a step's own file says, below its frontmatter: its note alone where it names an agent, whose instructions `body` opens
+ * with, and its whole body otherwise. Pure.
  */
-export type ToDecide = { kind: 'approve'; step: string; says: string | null } | { kind: 'git'; branches: string[] };
+export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
+
+/**
+ * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which git
+ * ships. `filed` is whether the step has run; `says` is the first line of its own note (`ownNote`), what it would do, and null for a step
+ * that has already done it or has no note.
+ */
+export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'git'; branches: string[] };
 
 /** What `wf ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure. */
 export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>
   t.kind === 'approve'
-    ? `${t.says ?? `${t.step} has signed off at its gate`} — wf approve ${run.id} ${t.step}`
+    ? `${t.says ?? (t.filed ? `${t.step} has signed off at its gate` : `${t.step} has not run: approving runs it`)} — wf approve ${run.id} ${t.step}`
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — wf decide ${run.id}`;
 
 /**

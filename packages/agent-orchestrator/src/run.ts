@@ -119,6 +119,7 @@ export {
   landingDue,
   landingOpen,
   merges,
+  ownNote,
   toDecide,
   toDecideWords,
 } from './ending/ending.ts';

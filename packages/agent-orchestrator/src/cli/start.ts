@@ -23,6 +23,7 @@ import {
   planStopped,
   queueInInbox,
   readInbox,
+  repoFor,
   start,
   startFromInbox,
   startPlan,
@@ -211,13 +212,19 @@ export function inboxAddHow(argv: string[]): { workflow?: string; repo?: string 
   return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
 }
 
+/** The factory a run was started in, and the repository a git run works on there, as `wf start` says it; none in the default factory. */
+const factoryLine = (run: ReturnType<typeof start>): string[] =>
+  run.factory ? [`factory: ${run.factory}${isGitRun(run) ? `, on ${run.repo}` : ''}`] : [];
+
 /**
- * What `wf start` prints of a run it started: its steps, where it came from when said, where it works, and what it waits on and ends at.
+ * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, where it works, and what it waits on
+ * and ends at.
  */
 function printStarted(run: ReturnType<typeof start>, from?: string): void {
   const steps = stepsOf(run);
   console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`);
   if (from) console.log(from);
+  for (const line of factoryLine(run)) console.log(line);
   console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
   if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
   if (run.after?.length)
@@ -287,7 +294,7 @@ export function startVerb(rest: string[]): void {
     );
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, how.after);
-  const repo = path.resolve(how.repo ?? '.');
+  const repo = repoFor(how.factory, how.repo === undefined ? undefined : path.resolve(how.repo), path.resolve('.'));
   const run = start({
     brief: card ? card.body : (text?.trim() ?? arg),
     repo,

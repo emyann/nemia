@@ -111,6 +111,15 @@ test('a frozen step with no name, a step record with no task, and a folder run w
   );
 });
 
+test("a record's `factory` that is no name is refused at its field; a record with none reads as it is, in the default factory", () => {
+  put('r-factory', { ...aRecord('r-factory'), factory: 42 });
+  assert.ok(refusalOf('r-factory').includes('its `factory` is 42'), refusalOf('r-factory'));
+  put('r-nofactory', aRecord('r-nofactory'));
+  assert.equal('factory' in readRun('r-nofactory'), false);
+  put('r-pipao', { ...aRecord('r-pipao'), factory: 'pipao' });
+  assert.equal(readRun('r-pipao').factory, 'pipao');
+});
+
 /** A frozen step with the agent it names, as the parser resolves one: what each refusal below breaks one field of. */
 const withAgent = (id: string): Record<string, unknown> => {
   const record = aRecord(id);

@@ -2247,7 +2247,8 @@ run 'wf tick' (or 'wf up') to start it
 ## Factories: a named grouping in the store — `wf factory`
 
 A factory names the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps, as a
-file of its own in the store. No record carries a factory yet: runs and inbox cards name none, so all of them are in the one default factory.
+file of its own in the store. A run started in a factory names it on its record; inbox cards name none yet, and a run or card that names
+none is in the one default factory.
 
 ```
 $ wf factory add pipao --repo ~/code/pipao
@@ -2317,7 +2318,7 @@ be (the workflow's `agents/`, the repository's, the store's).
   of what it is given, never that the workflow, the step or the agent exists: the start judges that.
 - **`wf start --factory <name>`** reads the factory as it is then, and hands each step of the workflow its hire: a hired step
   is resolved exactly as if its file said `agent: <name>` (`parseWorkflow`'s `hired`), and frozen so on the run, which never
-  reads the factory again. The run records no factory yet.
+  reads the factory again.
 - **Refused before anything is written**, exit 2: a step left with no agent — its file names none, no hire fills it, and it
   runs on no remote agent (`harness: a2a:<name>`) — every such step named with the `wf factory hire` that fills it
   (`unfilledRefusal`); a hire into a step whose file names its own agent, which fills it in every factory, naming both and the
@@ -2325,6 +2326,19 @@ be (the workflow's `agents/`, the repository's, the store's).
   does not have (`Missing`), or whose file does not read; and `--factory` on an inbox card, which names no factory yet.
 - **In the default factory** — no `--factory`, or `--factory default` — nothing is read, and a step that names no agent runs
   as a plain session, as it always has. The default factory is never written, so it hires no one: `hire` and `fire` refuse it.
+
+### A run names its factory and its repository
+
+- **A run started in a factory records it**: `"factory": "pipao"` on its record, frozen at `wf start` beside the `repo` a git run
+  records, and `wf start` says it (`factory: pipao, on /home/me/code/pipao`). A run in the default factory records no `factory`,
+  and a record that names none — every one written before — is the default factory's: read as it is, and never rewritten.
+- **A factory with one repository gives the run its repository**: `wf start "add a flag" --workflows build --factory pipao`
+  runs on pipao's repository from any directory, and resolves `--workflows build` there. `--repo` still names one.
+- **With several, the one named**, else the directory `wf start` is typed in, when it is one of them.
+- **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a git run on a repository that is not one of
+  the factory's, naming them and the `--repo` that starts it in one. Paths are compared as `path.resolve` spells them, so a
+  symlink to a repository is not that repository. A team that says `workspace: folder` works on no repository: it records its
+  factory and no `repo`, and is never refused for where it is typed.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 

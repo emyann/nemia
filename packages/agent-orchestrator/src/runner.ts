@@ -321,7 +321,7 @@ export {
 export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
 export type { CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
-export { start } from './start/start.verb.ts';
+export { repoFor, start } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';

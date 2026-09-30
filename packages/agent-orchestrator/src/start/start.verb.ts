@@ -24,7 +24,15 @@ import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { DEFAULT_FACTORY, fillsOf, unattachedRefusal, unfilledRefusal, type Factory } from '../factory/factory.ts';
+import {
+  DEFAULT_FACTORY,
+  factoryRepo,
+  fillsOf,
+  outsideRefusal,
+  unattachedRefusal,
+  unfilledRefusal,
+  type Factory,
+} from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { Effect } from 'effect';
 
@@ -191,7 +199,7 @@ export type StartOptions = {
 };
 
 /** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
-type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates'>;
+type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory'>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
@@ -207,8 +215,11 @@ function inputsOf(given: readonly string[]): InputFile[] {
   });
 }
 
-/** What `opts` tells the run, with `steps` as the workflow it freezes and `inputs` by name; an option not given is left out. */
-function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[]): Told {
+/**
+ * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, and `factory` the one it is started in; an option
+ * not given is left out, and so is the default factory.
+ */
+function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined): Told {
   const after = opts.after ?? [];
   const gates = opts.gates ?? [];
   return {
@@ -219,6 +230,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
+    ...(factory ? { factory: factory.name } : {}),
   };
 }
 
@@ -297,6 +309,14 @@ const factoryNamed = (name: string | undefined): Factory | undefined =>
   name === undefined || name === DEFAULT_FACTORY ? undefined : readFactory(name);
 
 /**
+ * The repository a run started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository, else
+ * `fallback`. What `wf start` resolves its workflow folder against, before `start` judges it. Refused as `start` refuses the factory: none
+ * by that name, or one whose file does not read (`readFactory`).
+ */
+export const repoFor = (name: string | undefined, named: string | undefined, fallback: string): string =>
+  factoryRepo(factoryNamed(name), named, fallback);
+
+/**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
  *
  * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
@@ -323,8 +343,9 @@ const factoryNamed = (name: string | undefined): Factory | undefined =>
  *
  * `factory` names the factory the run is started in (`wf start --factory`): its hires fill the workflow's steps (`stepsToStart`), read as
  * they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
- * no factory, or one whose file does not read (`readFactory`), and when it has not attached the workflow (`stepsIn`). Left out, or the
- * default factory, nothing is read. The factory is not frozen on the record.
+ * no factory, or one whose file does not read (`readFactory`), when it has not attached the workflow (`stepsIn`), and, for a git run, when
+ * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
+ * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
  * else, the copy's and the render's `Error` included (`tried`).
@@ -336,6 +357,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory));
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
+  const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;
+  if (outside) return yield* Effect.fail(new Invalid({ message: outside }));
   const refusedGates = gateRefusal(opts.gates ?? [], steps);
   if (refusedGates) return yield* Effect.fail(new Invalid({ message: refusedGates }));
   if (!folder) yield* tried(() => refuseInclude(opts.repo, isolate));
@@ -343,7 +366,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
-  const told = toldOf(opts, steps, inputs);
+  const told = toldOf(opts, steps, inputs, factory);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));

@@ -361,6 +361,11 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own system prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
+  `--settings` turns each of those names `off` in `skillOverrides`, which Claude Code applies to no plugin's skill: a bare skill of the
+  same name — the repository's `.claude/skills/<name>`, a nested folder's or Claude Code's own — is not listed to the job, so the session
+  sees the frozen copy once, and a call to the bare name is refused (*"Skill look is disabled for model invocation in skillOverrides
+  settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
+  calls `nemia-<agent>:look`, the one it is listed.
 - `systemPrompt:` — `default`, or no line, keeps Claude Code's prompt and appends the instructions after it; `no-coding` does too, less
   Claude Code's coding instructions, through an output style in the plugin that says `keep-coding-instructions: false`, chosen by its
   namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude

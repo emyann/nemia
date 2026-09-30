@@ -8,7 +8,7 @@ effort: high
 context: 200k
 tools: Read, Grep, Glob, Bash, Skill, Agent
 permissionMode: dontAsk
-allowedTools: Agent, Bash(npm run lint)
+allowedTools: Agent, Bash(npm run lint), Bash(npx turbo run typecheck --force)
 disallowedTools: Bash(npm run build), Bash(npm run e2e)
 output: review.schema.json
 ---

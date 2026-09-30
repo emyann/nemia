@@ -405,7 +405,7 @@ test('the prompt is the instructions, then each skill by its namespaced name, th
   assert.match(noCodingStyle('builder'), /^---\nname: no-coding\n[\s\S]*keep-coding-instructions: false\n---\n/);
 });
 
-test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name", () => {
+test("the flags: the prompt appended by default and for no-coding, in place of Claude Code's for own; the plugin for skills or a style; the style by its namespaced name; each named skill's bare copy off", () => {
   const dir = '/runs/r/agents/build';
   const flags = (agent: string, files: Record<string, string> = {}) => renderedFlags(resolved(agent, files), dir);
   const skill = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
@@ -413,6 +413,12 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
   assert.deepEqual(flags('---\nskills: write-a-note\n---\nYou build.\n', skill), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
+    settings: JSON.stringify({ skillOverrides: { 'write-a-note': 'off' } }),
+  });
+  assert.deepEqual(flags('---\nsystemPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n', skill), {
+    appendSystemPromptFile: `${dir}/prompt.md`,
+    pluginDir: [`${dir}/nemia-builder`],
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: { 'write-a-note': 'off' } }),
   });
   assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
   assert.deepEqual(flags('---\nsystemPrompt: no-coding\n---\nYou build.\n'), {
@@ -501,7 +507,7 @@ test("wf start renders each Claude Code step's agent under runs/<id>/agents/<ste
   assert.deepEqual(write.config?.claude, {
     appendSystemPromptFile: path.join(at, 'prompt.md'),
     pluginDir: [path.join(at, 'nemia-scribe')],
-    settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding' }),
+    settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding', skillOverrides: { 'write-a-note': 'off', 'mind-the-tone': 'off' } }),
   });
   assert.match(write.brief, /^Write about tides\.\n/, "the step's own note first");
   assert.doesNotMatch(write.brief, /You write notes/, 'the instructions are in the system prompt, not the brief');

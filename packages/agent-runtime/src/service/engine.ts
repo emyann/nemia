@@ -38,6 +38,7 @@ import {
   TickRefused,
   AdmitRefused,
   InputRefused,
+  StopRefused,
   ioCounts,
   tickMemoLayer,
   admit,
@@ -118,9 +119,10 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, and
- * `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError`
- * is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
+ * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `StopRefused`
+ * for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
+ * `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops
+ * them.
  */
 export type EngineShape = {
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
@@ -129,7 +131,7 @@ export type EngineShape = {
   readonly view: (taskId: string) => Effect.Effect<TaskView, JournalError>;
   readonly path: (taskId: string) => Effect.Effect<LifecycleStep[], JournalError>;
   readonly list: (taskIds?: readonly string[]) => Effect.Effect<TaskList, ListRefused | JournalError | RunnerError>;
-  readonly stop: (taskId: string) => Effect.Effect<void, JournalError>;
+  readonly stop: (taskId: string) => Effect.Effect<void, StopRefused | JournalError>;
   readonly logs: (taskId: string) => Effect.Effect<string, JournalError | RunnerError>;
   readonly transcript: (
     taskId: string,

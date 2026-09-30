@@ -248,6 +248,7 @@ test('each refusal is a tagged error at the Effect door, and its words behind th
       /^`budgetUsd` is the harness's configuration/,
     ],
     ['close', 'InputRefused', () => effect((e) => e.close('one')), () => promise.close('one'), /`one`/],
+    ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), () => promise.stop('ghost'), /^`ghost` is not a task on this board\./],
   ];
   for (const [verb, tag, viaService, viaPromise, words] of cases) {
     const tagged = await failure(viaService());

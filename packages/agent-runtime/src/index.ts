@@ -43,7 +43,7 @@ export type { EngineShape } from './service/index.ts';
 export { promiseEngine } from './facade/engine.ts';
 export type { EngineOptions, TaskSpec, TickReport, EngineIo, ObserveCount } from './facade/consumer.ts';
 
-export { file, FileRefused, requestStop, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
+export { file, FileRefused, requestStop, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
 export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskView } from './core/engine/index.ts';

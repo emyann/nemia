@@ -12,6 +12,7 @@ import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from '../tick/advance.verb.ts';
+import { stopAsked } from '../tick/held.verb.ts';
 
 export type Cancelled = { run: Run; plan: CancelPlan };
 
@@ -30,7 +31,9 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  *
  * Never writes the run's json: a tick may be halfway through a pass over the same run. The cancellation goes in a file only this verb
  * writes (`runStore.runs.cancel`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was
- * taken. Fails with a refusal a read threw; dies of anything else, a stop the engine rejects included (`tried`, `awaited`).
+ * taken. A task the engine's record says was asked to stop is not asked again, and a stop it refuses — the task settled, or was asked to
+ * stop, since the read — is nothing left to do (`stopAsked`). Fails with a refusal a read threw; dies of anything else, any other failure
+ * of the engine included (`tried`, `awaited`).
  */
 export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const e = yield* EngineService;
@@ -49,7 +52,9 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds, spendOf);
   if (plan.kind === 'finished') return { run, plan } satisfies Cancelled;
 
-  for (const { taskId } of plan.stop) yield* awaited(() => e.stop(taskId));
+  for (const { taskId } of plan.stop) {
+    if (!views.get(taskId)?.state.stopRequested) yield* awaited(() => stopAsked(e, taskId));
+  }
   yield* awaited(() => closeWaitingTasks(e, run, views));
   if (plan.kind === 'already-cancelled') return { run, plan } satisfies Cancelled;
 

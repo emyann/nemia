@@ -50,6 +50,7 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
+import { closeHeld, stopAsked } from './held.verb.ts';
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
@@ -356,7 +357,10 @@ async function adoptAll(e: Engine, run: Run, r: PassReads): Promise<string[]> {
   return [...rounds, ...tries, ...checks];
 }
 
-/** Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included: none the engine was already asked to stop. */
+/**
+ * Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included: none the engine was already asked to stop. A
+ * stop the engine refuses (`stopAsked`) is one of a task that settled or was asked to stop since this pass read it: nothing left to do.
+ */
 async function stopCancelled(e: Engine, run: Run, r: PassReads): Promise<void> {
   const unrecorded = await unrecordedSteps(
     e,
@@ -373,7 +377,7 @@ async function stopCancelled(e: Engine, run: Run, r: PassReads): Promise<void> {
   );
   const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(r.phaseOf(taskId)));
   for (const { taskId } of [...inFlight(run, r.phaseOf), ...live]) {
-    if (!r.views.get(taskId)?.state.stopRequested) await e.stop(taskId);
+    if (!r.views.get(taskId)?.state.stopRequested) await stopAsked(e, taskId);
   }
 }
 
@@ -575,21 +579,6 @@ function answerOf(
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));
-
-/**
- * Close a task held open that waits for a word (`e.close`): undefined once closed, and the engine's refusal in its words where it refused
- * (an `Error` whose `exitCode` is 2 — the task was answered, settled or stopped since this pass read it). A refusal is a note, not a
- * failure of the pass: the next pass reads the task again. Any other error is the engine's, and thrown.
- */
-async function closeHeld(e: Engine, taskId: string): Promise<string | undefined> {
-  try {
-    await e.close(taskId);
-    return undefined;
-  } catch (err) {
-    if ((err as { exitCode?: number }).exitCode === 2) return (err as Error).message;
-    throw err;
-  }
-}
 
 /**
  * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `wf cancel`, `wf rm` — at once

@@ -45,6 +45,7 @@ const PINNED: Record<string, string[]> = {
     'SayRefused',
     'SayUnsent',
     'StepRefused',
+    'StopRefused',
     'TURN_ARGS',
     'TickRefused',
     'TranscriptRefused',

@@ -21,6 +21,7 @@ export {
   AdmitRefused,
   FileRefused,
   InputRefused,
+  StopRefused,
   admit,
   answer,
   answerRefusalOf,

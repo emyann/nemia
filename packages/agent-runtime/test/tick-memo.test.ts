@@ -57,12 +57,12 @@ test('a pass over settled tasks nothing has written to reads no journal, and not
 });
 
 test("a pass after an entry is appended to one settled task reads the feed's new bytes and that one journal, and the pass after it nothing", async () => {
-  const { root, engine, ids } = await settledStore();
+  const { root, cwd, engine, ids } = await settledStore();
   const feed = path.join(root, 'feed.jsonl');
   const feed0 = sizeOf(feed);
-  await engine.stop(ids[7]);
+  await engine.file({ brief: 'task 7, filed again under its id', cwd, id: ids[7] });
   const grown = sizeOf(feed) - feed0;
-  assert.ok(grown > 0, 'the stop was written to the feed');
+  assert.ok(grown > 0, 'the filing was written to the feed');
   const journal = sizeOf(path.join(root, 'tasks', `${ids[7]}.jsonl`));
 
   const before = engine.io();

@@ -14,8 +14,10 @@ description: "Review a change in this repository as a second engineer would: aga
    `npx turbo run typecheck --force`, `npm run lint`. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the
    workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run is not a finding.
 4. **Judge the mutants, do not run them**: implement's check applied each mutant the engineer's closeout names and refused the step if
-   one survived (its log). Judge whether the list covers every rule the change adds, and whether each mutant breaks the rule rather than
-   the file's syntax: a rule with no mutant, or a mutant that only stops the file loading, is a finding.
+   one survived; your brief hands you what it said under `## What implement's check said`, each `wf mutants:` line whole in `reported`.
+   Judge whether the list covers every rule the change adds, and whether each mutant breaks the rule rather than the file's syntax: a
+   rule with no mutant, or a mutant that only stops the file loading, is a finding. Quote each `wf mutants:` line you judged in your
+   closeout's `mutants`.
 5. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
    caller that rebuilds a returned type field by field and drops the new one; a layer crossed; a limit raised; a behaviour change the spec
    did not ask for. When the change touches `apps/web`, read the pictures implement handed on, in both themes, with `look`; never build

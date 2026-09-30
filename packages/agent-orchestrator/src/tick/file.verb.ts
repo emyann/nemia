@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from '../check/check.ts';
+import { CHECK_DEADLINE_SECONDS, checkBrief, type CheckHanded, type Verdict } from '../check/check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { filedDenies } from '../ending/ending.ts';
@@ -48,7 +48,7 @@ import { runStore } from '../record/files.store.ts';
 import { writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedOf, closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../start/start.verb.ts';
 import { skillsFor } from '../folder/folder.store.ts';
@@ -295,6 +295,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
   const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined;
   const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
   const closeouts = await askingReads(f, r, resumeFrom);
+  const checked = remote ? [] : await checksHandedOf(e, run, reads.steps, step);
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told = toldOf(run, step);
   const brief = remote
@@ -317,6 +318,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         undefined,
         undefined,
         inputsDir(run),
+        checked,
       );
   const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
@@ -573,7 +575,8 @@ export async function fileReady(f: Filing, ready: readonly string[], starting: b
     if (!f.mayFile()) break;
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const taskId = await e.file(readySpec(f, step, place, files, parents));
+    const checked = isRemoteHarness(step.harness) ? [] : await checksHandedOf(f.e, run, f.reads.steps, step);
+    const taskId = await e.file(readySpec(f, step, place, files, { parents, checked }));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
@@ -586,8 +589,17 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
   return taskId ? sessionIn(f.reads.views, taskId) : undefined;
 };
 
-/** A ready step as it is filed, in the workspace cut for it, told what the steps before it and the runs it waited on said. */
-function readySpec(f: Filing, step: Workflow, place: Place, files: string, parents: ParentCloseout[] | undefined): Spec {
+/**
+ * A ready step as it is filed, in the workspace cut for it, told what the steps before it, their checks and the runs it waited on said.
+ */
+function readySpec(
+  f: Filing,
+  step: Workflow,
+  place: Place,
+  files: string,
+  said: { parents: ParentCloseout[] | undefined; checked: readonly CheckHanded[] },
+): Spec {
+  const { parents } = said;
   const { run, reads } = f;
   const told = toldOf(run, step);
   return {
@@ -613,6 +625,7 @@ function readySpec(f: Filing, step: Workflow, place: Place, files: string, paren
           undefined,
           step.after.length ? undefined : parents,
           inputsDir(run),
+          said.checked,
         ),
     cwd: place.workspace,
     harness: step.harness,

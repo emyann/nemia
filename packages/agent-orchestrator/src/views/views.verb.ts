@@ -1,17 +1,18 @@
 /**
  * What the runtime's views of a run's tasks say, read into the words the pure functions take: a step's closeout and whether it was asked
- * for one, what its sessions cost, what its check exited with and said, what was said to it, what the runs it waits on concluded
- * (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the engine's word for it are `views-words.ts`'s.
- * A controller: it reads the runtime through the client (`runtime-client.ts`), and the store's files beneath it, and files nothing — the
- * tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the engine is an Effect program that requires the engine
- * as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`, `filingsRead` — and
- * fails with a refusal and dies of anything else; beside each, its plain face in a Promise over the engine it is handed, which rejects with
- * either as it was thrown. What reads only views already read is plain.
+ * for one, what its sessions cost, what its check exited with and said, and what the checks of the steps it follows said, what was said
+ * to it, what the runs it waits on concluded (`parentOf`), what each step consumed, and when each task was filed. A task's phase and the
+ * engine's word for it are `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the
+ * store's files beneath it, and files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the
+ * engine is an Effect program that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`,
+ * `refusalRead`, `checksHandedRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies of anything else;
+ * beside each, its plain face in a Promise over the engine it is handed, which rejects with either as it was thrown. What reads only
+ * views already read is plain.
  */
 import fs from 'node:fs';
-import { Effect } from 'effect';
+import { Effect, Result } from 'effect';
 import { EngineService, awaited, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
-import { lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from '../check/check.ts';
+import { lastLines, readVerdict, reportedLines, stdoutTail, type CheckHanded, type CheckRefusal, type Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
@@ -350,6 +351,44 @@ export const refusalRead = Effect.fn('refusalOf')(function* (command: string, ta
  */
 export const refusalOf = (e: Engine, command: string, taskId: string): Promise<CheckRefusal> =>
   Effect.runPromise(refusalRead(command, taskId).pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * What a checked step's check said, for the step filed after it (`checkHandedSection`): one read of its log for the verdict, the stdout's
+ * tail and the lines it marked (`reportedLines`), and the tail of its stderr file. A log whose read rejects, with anything, is
+ * `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read of the log throws.
+ */
+export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
+  const e = yield* EngineService;
+  const read = yield* Effect.result(Effect.tryPromise({ try: () => e.logs(taskId), catch: (err) => err }));
+  if (Result.isFailure(read))
+    return {
+      step,
+      command,
+      unreadable: `the engine could not give the log of its task ${taskId}: ${read.failure instanceof Error ? read.failure.message : String(read.failure)}`,
+    } satisfies CheckHanded;
+  const log = read.success;
+  const stderr = yield* tried(() => lastLines(tailOf(checkStderr(taskId))));
+  const { lines, cut } = reportedLines(log);
+  return { step, command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr, reported: lines, cut } satisfies CheckHanded;
+});
+
+/**
+ * What a step is told its checked steps' checks said (`checkHandedRead`): for each step it waits on (`after:`) that has a `check:` whose
+ * task is on the record, the check of its current try or round, read on the pass that files the step and never carried from another.
+ */
+export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, steps: readonly Workflow[], step: Workflow) {
+  const out: CheckHanded[] = [];
+  for (const name of step.after) {
+    const command = steps.find((s) => s.name === name)?.check;
+    const taskId = run.steps[name]?.check?.taskId;
+    if (command && taskId) out.push(yield* checkHandedRead(name, command, taskId));
+  }
+  return out;
+});
+
+/** What a step is told its checked steps' checks said (`checksHandedRead`), in a Promise over `e`. */
+export const checksHandedOf = (e: Engine, run: Run, steps: readonly Workflow[], step: Workflow): Promise<CheckHanded[]> =>
+  Effect.runPromise(checksHandedRead(run, steps, step).pipe(Effect.provide(EngineService.layer(e))));
 
 /** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
 function tailOf(file: string, bytes = 64_000): string {

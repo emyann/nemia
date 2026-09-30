@@ -150,8 +150,12 @@ test("a signed step's check is looked for, then filed; once it passes, the ready
   b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
   const ready = await pass(b, run.id);
   assert.deepEqual(ready.advanced.filed, ['review']);
-  assert.deepEqual(ready.calls, ['view R-implement', 'view R-implement-check', 'file R-review']);
-  assert.deepEqual(ready.counted, { journals: 2, act: 5 });
+  assert.deepEqual(
+    ready.calls,
+    ['view R-implement', 'view R-implement-check', 'logs R-implement-check', 'file R-review'],
+    "the check's log is read once, for what the step after it is told the check said",
+  );
+  assert.deepEqual(ready.counted, { journals: 3, act: 5 }, "the two views, and the check's log");
 });
 
 test('a try its check refused is looked for, then filed, under its own id', async () => {

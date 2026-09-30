@@ -1583,6 +1583,132 @@ test('implement ⇄ review: `again: true` files round 2 — implement continued 
   );
 });
 
+/**
+ * A check's stdout as `workflows/build`'s prints it: turbo's prefixed lines, the mutants' `wf mutants:` lines, then a tail longer than
+ * 20 lines.
+ */
+const mutantLog = (killed: readonly string[]): string =>
+  [
+    'agent-orchestrator:test: ✔ files a step (12 ms)',
+    'agent-orchestrator:test: wf mutants: a line a test printed, prefixed by turbo',
+    'wf mutants: baseline: test/a.test.ts passes unmutated',
+    ...killed.map((k) => `wf mutants: killed ${k}`),
+    `wf mutants: ${killed.length} mutant(s), 0 refused, in 3.1 s`,
+    ...Array.from({ length: 24 }, (_, i) => `web:build: chunk ${i} built`),
+    'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
+    '',
+    '[wf check] exit 0',
+    '',
+  ].join('\n');
+const KILLED_1 = '#1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)';
+const KILLED_2 = '#2 src/b.ts: "<" → "<=", by test/b.test.ts (failed, 0.3 s)';
+const CHECK_SAID = "## What implement's check said";
+
+test('the step after a checked step is handed what the check said: its exit, the tails, and every `wf <name>:` line of the whole log, in its brief', async () => {
+  const { run, e, tasks, logs } = await throughCheck('check: npm test', 'succeeded', 0);
+  const check = `${run.id}-implement-check`;
+  logs.set(check, mutantLog([KILLED_1, KILLED_2]));
+  fs.writeFileSync(path.join(ROOT, 'checks', `${check}.stderr`), 'npm warn deprecated glob@7\n');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  const brief = tasks.get(`${run.id}-review`)!.spec.brief;
+  assert.match(brief, /\n## What implement's check said\n\nIt passed: exited 0\./);
+  const said = dataUnder(brief, CHECK_SAID) as { stdout: string; reported: string[] };
+  assert.deepEqual(said.reported, [
+    'wf mutants: baseline: test/a.test.ts passes unmutated',
+    `wf mutants: killed ${KILLED_1}`,
+    `wf mutants: killed ${KILLED_2}`,
+    'wf mutants: 2 mutant(s), 0 refused, in 3.1 s',
+    'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
+  ]);
+  assert.doesNotMatch(said.stdout, /killed/, 'the mutant lines are above the tail, so only the whole log hands them');
+  assert.deepEqual(dataUnder(brief, CHECK_SAID), {
+    command: 'npm test',
+    exit: 0,
+    stdout: [
+      ...Array.from({ length: 19 }, (_, i) => `web:build: chunk ${i + 5} built`),
+      'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
+    ].join('\n'),
+    stderr: 'npm warn deprecated glob@7',
+    reported: said.reported,
+  });
+});
+
+test("each round's review is handed that round's check, never the first try's", async () => {
+  const run = started(looped());
+  const b = board();
+  b.logs.set(`${run.id}-implement-check`, mutantLog([KILLED_1]));
+  b.logs.set(`${run.id}-implement-try2-check`, mutantLog(['#9 src/c.ts: "a" → "b", by test/c.test.ts (failed, 0.2 s)']));
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  await toReview(b, run.id, 2, false);
+
+  const first = dataUnder(b.tasks.get(`${run.id}-review`)!.spec.brief, CHECK_SAID) as { reported: string[] };
+  const second = dataUnder(b.tasks.get(`${run.id}-review-try2`)!.spec.brief, CHECK_SAID) as { reported: string[] };
+  assert.ok(first.reported.includes(`wf mutants: killed ${KILLED_1}`), first.reported.join('\n'));
+  assert.ok(
+    second.reported.some((l) => l.startsWith('wf mutants: killed #9 ')),
+    second.reported.join('\n'),
+  );
+  assert.ok(!second.reported.some((l) => l.includes('#1 ')), 'round 2 reads its own check, not the first try’s');
+});
+
+test('REFUSED silence: a check that did not finish says so, and one whose log cannot be read says why, in the brief of the step after it', async () => {
+  const cut = await throughCheck('check: npm test', 'succeeded', 0);
+  cut.logs.set(`${cut.run.id}-implement-check`, 'wf mutants: baseline: test/a.test.ts passes unmutated\nok 1 - builds\n');
+  await advance(cut.e, readRun(cut.run.id));
+  const unfinished = cut.tasks.get(`${cut.run.id}-review`)!.spec.brief;
+  assert.match(
+    unfinished,
+    /\n## What implement's check said\n\nIt did not finish: it was stopped, or killed before it printed an exit code\./,
+  );
+  assert.doesNotMatch(unfinished, /It passed/);
+  assert.deepEqual((dataUnder(unfinished, CHECK_SAID) as { exit: unknown }).exit, 'unfinished');
+
+  const gone = await throughCheck('check: npm test', 'succeeded', 0);
+  const check = `${gone.run.id}-implement-check`;
+  const logsOf = gone.e.logs.bind(gone.e);
+  Object.assign(gone.e, {
+    logs: async (id: string) => {
+      if (id === check) throw new Error(`no journal for ${id}`);
+      return logsOf(id);
+    },
+  });
+  assert.deepEqual((await advance(gone.e, readRun(gone.run.id))).filed, ['review'], 'the step is filed all the same');
+  assert.match(
+    gone.tasks.get(`${gone.run.id}-review`)!.spec.brief,
+    new RegExp(
+      `\\n## What implement's check said\\n\\nWhat it said cannot be given here — the engine could not give the log of its task ${check}: no journal for ${check}\\.`,
+    ),
+  );
+});
+
+test("a step after a checked step, tried afresh, is handed that check in its try's brief too", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  b.logs.set(`${run.id}-implement-check`, mutantLog([KILLED_1]));
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['review']);
+  b.settle(`${run.id}-review`, 'failed', undefined, 1, 'quiet');
+  await retry(b.e, run.id, 'review', { mode: 'fresh' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['review']);
+  const said = dataUnder(b.tasks.get(`${run.id}-review-try2`)!.spec.brief, CHECK_SAID) as { reported: string[] };
+  assert.ok(said.reported.includes(`wf mutants: killed ${KILLED_1}`), said.reported.join('\n'));
+});
+
+test("a step after a step with no `check:` is handed no check's word", async () => {
+  const run = started(folder());
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  assert.ok(!tasks.get(`${run.id}-review`)!.spec.brief.includes(CHECK_SAID));
+});
+
 test('REFUSED at the cap, at shipped defaults: `again: true` on round 3 files nothing, reads exhausted and waits on you — and `wf round` takes it once more, once', async () => {
   const run = started(looped());
   const b = board();

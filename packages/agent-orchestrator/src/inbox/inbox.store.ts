@@ -41,7 +41,8 @@ export const inboxCards = (): string[] =>
  * not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
  * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
-export const readInbox = (): InboxListing[] => inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries());
+export const readInbox = (): InboxListing[] =>
+  inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries());
 
 /**
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every

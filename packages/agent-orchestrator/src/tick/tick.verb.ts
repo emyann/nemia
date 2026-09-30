@@ -14,7 +14,8 @@ import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
-import { listRuns, restStamps, stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile, recordFeed } from '../feed/feed.store.ts';
@@ -160,7 +161,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());
   yield* tried(() => within('act', () => recordCeilings(ran)));
-  const runs = yield* tried(() => listRuns());
+  const runs = yield* tried(() => runStore.runs.list());
   if (resting) forgotten(memo, runs);
   yield* admitted(e, report, runs, ran.sessions);
   const judging: Judging = { done: new Map(), unjudged: new Map() };
@@ -305,7 +306,7 @@ type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: 
 const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMemo, verify: boolean) {
   if (typeof e.feed !== 'function') return undefined;
   if (!(yield* Effect.promise(() => followedFeed(e, memo)))) return undefined;
-  const stamps = yield* tried(() => restStamps());
+  const stamps = yield* tried(() => runStore.runs.stamps());
   const heads = new Map<string, Record<string, string>>();
   const resting: RestingPass = {
     memo,

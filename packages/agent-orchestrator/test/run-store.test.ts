@@ -219,7 +219,6 @@ const DIRECT = [
   'src/runner.ts',
   'src/say/say.verb.ts',
   'src/start/start.verb.ts',
-  'src/tick/tick.verb.ts',
   'src/views/views.verb.ts',
   'src/wait/wait.verb.ts',
 ];

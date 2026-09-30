@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { Artifacts } from './Artifacts';
 import { Markdown } from './Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
+import { Questions } from './Questions';
 
 export { Artifacts, bytesWord } from './Artifacts';
 
@@ -206,7 +207,10 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
  */
 function DeclaredFields({ closeout, fold = false }: { closeout: StepCloseout; fold?: boolean }) {
   const images = imagePaths(closeout.artifacts);
+  const asked = new Map(closeout.questions.map((a) => [a.field, a.questions]));
   const field = (name: string, value: unknown, first = false) => {
+    const questions = asked.get(name);
+    if (questions) return <Questions key={name} field={name} questions={questions} />;
     const folded = fold && foldsAtGate(value, first);
     const view = (
       <FieldView

@@ -3,7 +3,7 @@ import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'r
 import { backName, gateCardLine, readLink, takenLine, type GateAsk } from '../lib/gate';
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
-import { BUTTON, Refusal, TEXTAREA, useAsk } from './Decide';
+import { BUTTON, Refusal, TEXTAREA, useAsk } from './Ask';
 import { SECONDARY, useApprove } from './Gate';
 
 /**

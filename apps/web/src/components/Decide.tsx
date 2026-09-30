@@ -4,7 +4,6 @@ import { ChevronRight } from 'lucide-react';
 import {
   acceptLoop,
   askRound,
-  askTry,
   decisionQuery,
   type Decidable,
   type DecideCommand,
@@ -19,9 +18,11 @@ import {
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
+import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { CopyButton } from './CopyButton';
 import { Facts, pathRow, readRows } from './Facts';
 import { Markdown } from './Markdown';
+import { QuestionsForm } from './Questions';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what `wf decide` shows a
@@ -130,21 +131,9 @@ export function DecideSection({
   );
 }
 
-/** Each of `wf retry`'s ways, as an answer offers it. */
-export const MODES: Record<RetryMode, string> = {
-  nudge: 'continue its session',
-  fresh: 'a new session',
-  recheck: 'its check again, and no session',
-};
-
-export const BUTTON =
-  'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
-
-export const TEXTAREA =
-  'block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
-
 /**
- * What the board can ask for each step waiting on you (`offersOf`), a row a step. Each ask is `wf retry`'s, made by the api through the
+ * What the board can ask for each step waiting on you (`offersOf`), a row a step: a step whose closeout asks questions as data is answered
+ * by choosing (`QuestionsForm`). Each ask is `wf retry`'s, made by the api through the
  * package's `retry()`, which writes the ask and nothing else; the next tick files the try.
  */
 export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
@@ -157,6 +146,8 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
         {offers.map((offer) =>
           offer.kind === 'raise' ? (
             <RaiseRow key={offer.step} runId={runId} offer={offer} />
+          ) : offer.kind === 'answer' && offer.questions.length > 0 ? (
+            <QuestionsForm key={offer.step} runId={runId} offer={offer} />
           ) : (
             <OfferRow key={offer.step} runId={runId} offer={offer} />
           ),
@@ -507,28 +498,6 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
 }
 
 /**
- * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`), never
- * its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on would
- * fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads, which
- * answers a gate from the board.
- *
- * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
- * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it.
- */
-export function useAsk(runId: string, step: string, onAsked: () => void) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) =>
-      askTry(runId, to ?? step, how),
-    onSuccess: () => {
-      onAsked();
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
-    },
-  });
-}
-
-/**
  * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the list the
  * Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a key of its own.
  */
@@ -555,19 +524,6 @@ function useRound(runId: string) {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
-}
-
-/**
- * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what did
- * not happen: `Not asked`, or `Not approved`.
- */
-export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
-  return (
-    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">{not}. The api refused it:</p>
-      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error.message}</p>
-    </div>
-  );
 }
 
 /** What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any. */

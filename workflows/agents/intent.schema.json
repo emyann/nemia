@@ -32,7 +32,7 @@
         "additionalProperties": false
       }
     },
-    "open": { "type": "array", "description": "What is still undecided, each as a question. Empty only when nothing is.", "items": { "type": "string" } }
+    "open": { "x-shape": "questions", "description": "What is still undecided, each as a question. Empty only when nothing is." }
   },
   "required": ["title", "problem", "proposedOutcome", "affected", "constraints", "decisions", "open"],
   "additionalProperties": false

@@ -4,7 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
-import { asks } from './asks/asks.ts';
+import { asks } from './asks/index.ts';
 import { capabilitiesWithSteps, McpAsker, repoOf } from './capabilities/index.ts';
 import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
@@ -75,7 +75,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/quota` — the subscription's quota, as Claude Code answers its get_usage request, asked at most once a keep however many
  *   boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's failures
  *   included.
- * - asks/asks.ts — a person's asks of a run: a try, a round, words for a running session, an approval and an acceptance; five writes.
+ * - asks/asks.ts — a person's asks of a run: a try (with answers to its questions, asks/answers.ts), a round, words for a running
+ *   session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.

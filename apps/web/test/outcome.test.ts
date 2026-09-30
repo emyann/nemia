@@ -140,6 +140,7 @@ const said = (outcome: 'done' | 'blocked') =>
     missing: [],
     replies: null,
     schema: {},
+    questions: [],
     raw: {},
   }) satisfies StepCloseout;
 

@@ -1,0 +1,63 @@
+/**
+ * A person's ask of a step's next try, as the board's rows make it: `wf retry`'s ways, the button and box every ask is made with, the
+ * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`).
+ */
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
+
+/** Each of `wf retry`'s ways, as an answer offers it. */
+export const MODES: Record<RetryMode, string> = {
+  nudge: 'continue its session',
+  fresh: 'a new session',
+  recheck: 'its check again, and no session',
+};
+
+export const BUTTON =
+  'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
+
+export const TEXTAREA =
+  'block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
+
+/**
+ * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`), never
+ * its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on would
+ * fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads, which
+ * answers a gate from the board.
+ *
+ * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
+ * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it. Its `answers` are a person's to the
+ * questions the step's closeout asks, which the api checks and writes as the try's message, the `message` beside them their note.
+ */
+export function useAsk(runId: string, step: string, onAsked: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      step: to,
+      ...how
+    }: {
+      mode: RetryMode;
+      message?: string;
+      budget?: number;
+      answers?: readonly QuestionAnswer[];
+      step?: string;
+    }) => askTry(runId, to ?? step, how),
+    onSuccess: () => {
+      onAsked();
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+    },
+  });
+}
+
+/**
+ * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what did
+ * not happen: `Not asked`, or `Not approved`.
+ */
+export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
+  return (
+    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">{not}. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error.message}</p>
+    </div>
+  );
+}

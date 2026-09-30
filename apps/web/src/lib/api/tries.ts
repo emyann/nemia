@@ -16,9 +16,22 @@ export type StepArtifact =
 /** Mirrors `StepReply` in apps/api/src/detail/tries.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
+/** Mirrors `QuestionOption` in agent-orchestrator's question/question.ts: one option of a question, its label and what choosing it means. */
+export type QuestionOption = { label: string; meaning: string };
+
+/**
+ * Mirrors `Question` in agent-orchestrator's question/question.ts: its `title`, which an answer names; its `body`; its `options`; the label
+ * it `recommended`, or null; and whether `multiple` options may be chosen together.
+ */
+export type Question = { title: string; body: string; options: QuestionOption[]; recommended: string | null; multiple: boolean };
+
+/** Mirrors `Asked` in agent-orchestrator's question/question.ts: a question field of a closeout that decoded, and its questions. */
+export type AskedQuestions = { field: string; questions: Question[] };
+
 /**
  * Mirrors `StepCloseout` in apps/api/src/detail/tries.ts: with what it gave of its declared output, what it did not, and its `replies`;
- * each declared field's JSON Schema off the workflow the run froze, and the statement as the engine recorded it (`raw`).
+ * each declared field's JSON Schema off the workflow the run froze; the `questions` of each question field that decoded, in the schema's
+ * order; and the statement as the engine recorded it (`raw`).
  */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
@@ -29,6 +42,7 @@ export type StepCloseout = {
   missing: string[];
   replies: StepReply[] | null;
   schema: Record<string, unknown>;
+  questions: AskedQuestions[];
   raw: unknown;
 };
 

@@ -83,8 +83,8 @@ Say so in the body of an agent that interviews, and gate the step whose closeout
 turn is its sign-off: an agent that runs long commands (the e2e) is told to run them in the foreground or wait on them, never to sign
 off with one running (Ada's first web build signed off before its e2e ended). A closeout
 signed `blocked` is read on its own, so an agent that asks in rounds carries everything settled so far in each one: Iris's third
-round once dropped her earlier decisions. The board renders a round as Markdown, where single line breaks join: tell such an agent to put
-each option on its own list line after a blank line (Iris's first rounds ran her options into the question).
+round once dropped her earlier decisions. Declare the questions as a field of the output schema, `{ "x-shape": "questions", "description":
+"…" }`, which the loader expands to one strict shape (`question/question.ts`): the board draws them as choices a person answers by clicking.
 
 ## Check it
 

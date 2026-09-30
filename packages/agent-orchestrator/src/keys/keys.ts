@@ -19,6 +19,7 @@ import {
   SANDBOXES,
 } from '../harness/harness.ts';
 import { looseAt } from '../closeout/closeout.ts';
+import { expandShapes, SHAPE_KEY } from '../question/question.ts';
 import type { SystemPrompt } from '../agents/agents.ts';
 
 export function harnessOf(step: string, harness: string | undefined): string | undefined {
@@ -472,6 +473,13 @@ export function outputOf(
       `${named} declares ${taken.map((k) => `\`${k}\``).join(', ')}, which every closeout already has. ${CLOSEOUT_FIELDS.map((k) => `\`${k}\``).join(', ')} are the run's, and \`summary\` goes to the person who decides, never to a step. Rename the field.`,
     );
   }
+  const shaped = expandShapes(schema.properties);
+  if ('error' in shaped) {
+    refuse(
+      `${named} ${shaped.error}. A field of questions is written \`"<field>": { "${SHAPE_KEY}": "questions", "description": "<what they are>" }\`, and the run expands it to the questions' schema.`,
+    );
+  }
+  schema.properties = shaped.properties;
   const loose = looseAt(schema, '');
   if (loose && 'ref' in loose) {
     refuse(

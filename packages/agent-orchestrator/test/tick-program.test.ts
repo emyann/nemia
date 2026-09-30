@@ -1,7 +1,7 @@
 /**
  * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): the face runs the program over the engine
  * it is handed and adds nothing, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
- * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `createEngine` over an in-memory journal and a
+ * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `promiseEngine` over an in-memory journal and a
  * harness the test signs by hand, as unreadable-journal.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type Engine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
+import type { Engine, PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
+import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { Refusal } from '../src/refusal/refusal.ts';
@@ -76,12 +77,14 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = createEngine({
-  root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-  journal,
-  harnesses: { claude: runner, codex: runner, check: runner },
-  defaultHarness: 'claude',
-});
+const e = promiseEngine(
+  RuntimeEngine.layer({
+    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+    journal,
+    harnesses: { claude: runner, codex: runner, check: runner },
+    defaultHarness: 'claude',
+  }),
+);
 const signAll = () => {
   for (const [name, s] of sessions)
     if (s.state === 'working')

@@ -57,3 +57,5 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   store function of a run (`packages/agent-orchestrator/test/entries.test.ts`).
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).
+- **An agent fills a step by the file a start would run it with** (`stepsFilled`, `agents/fills.ts`), never by its name alone: the same
+  name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.

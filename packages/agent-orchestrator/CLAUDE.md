@@ -14,8 +14,9 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 
 ## Keys, agents and folders
 
-- **A key added to `STEP_KEYS` has three sites outside the package**: `KINDS` in `apps/api/src/workflows/builder.ts`, `WorkflowStepSpec` and
-  `specOf` in `apps/api/src/workflows/workflows.ts`, and the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`).
+- **A key added to `STEP_KEYS` has four sites outside the package**: `KINDS` in `apps/api/src/workflows/builder.ts`, `WorkflowStepSpec` and
+  `specOf` in `apps/api/src/workflows/workflows.ts`, the web's mirror with `UNSET` (`apps/web/src/lib/builder.ts`), and its schemas with
+  `StepKeySchema` (`apps/web/src/lib/api/library.ts`), which refuses a key it does not list.
 - **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), `formerStepFields` and the agent's
   `keys` in `FrozenStepSchema` (`folder/folder.store.ts`, held by `test/frozen-step.test.ts`), `asNamed` in `readRun`,
   `formerOf` in `apps/api/src/agents/agents.ts`, `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.

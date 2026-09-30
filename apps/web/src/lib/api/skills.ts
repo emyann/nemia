@@ -3,17 +3,12 @@
  * on the board (apps/api/src/agents/skills.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { getUndecoded } from './read.ts';
-import type { AgentSkill } from './agents.ts';
+import { Schema } from 'effect';
+import { get } from './read.ts';
+import { AgentSkillSchema, SkillCostSchema, SkillSourceSchema, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
 
-/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what Nemia ships. */
-export type SkillSource = 'yours' | 'repo' | 'shipped';
-
-/**
- * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its
- * name and description); preloaded, its body too.
- */
-export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
+/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
+const Strings = Schema.mutable(Schema.Array(Schema.String));
 
 /**
  * Mirrors `SkillRow` in apps/api/src/agents/skills.ts: one skill as the picker lists it, its card entry or why no agent can be given it.
@@ -32,18 +27,28 @@ export type SkillRow = {
   found: 'yours' | 'repo' | null;
 };
 
+/** Decodes a `SkillRow`. */
+const SkillRowSchema = Schema.Struct({
+  name: Schema.String,
+  from: SkillSourceSchema,
+  dir: Schema.String,
+  entry: Schema.NullOr(AgentSkillSchema),
+  error: Schema.NullOr(Schema.String),
+  preload: Schema.Boolean,
+  cost: Schema.NullOr(SkillCostSchema),
+  usedBy: Strings,
+  found: Schema.NullOr(Schema.Literals(['yours', 'repo'])),
+}) satisfies Schema.Schema<SkillRow>;
+
 /** Mirrors `SkillPlace`: one place, in the order an agent of yours finds a name, the shipped last. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
-/** Mirrors `GivenSkill`: a skill an agent gives, where a start finds it and what it costs — or why none is found (`from: null`). */
-export type GivenSkill = {
-  name: string;
-  from: SkillSource | null;
-  entry: AgentSkill | null;
-  error: string | null;
-  preload: boolean;
-  cost: SkillCost | null;
-};
+/** Decodes a `SkillPlace`. */
+const SkillPlaceSchema = Schema.Struct({
+  from: SkillSourceSchema,
+  dir: Schema.String,
+  skills: Schema.mutable(Schema.Array(SkillRowSchema)),
+}) satisfies Schema.Schema<SkillPlace>;
 
 /** Mirrors `SkillAdded`: the copied skill as it now reads in your library, and its files. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
@@ -51,7 +56,7 @@ export type SkillAdded = { skill: SkillRow; written: string[] };
 /** Every skill the picker lists, by place, read from disk on each request. */
 export const skillsQuery = queryOptions({
   queryKey: ['skills'],
-  queryFn: () => getUndecoded<SkillPlace[]>('/api/skills'),
+  queryFn: () => get('/api/skills', Schema.mutable(Schema.Array(SkillPlaceSchema))),
 });
 
 /** A copy the api refused: its words, and its status — 404 for a skill Nemia does not ship, 409 for a name your library has already. */
@@ -92,8 +97,22 @@ export type SkillDraft = {
   body: string;
 };
 
+/** Decodes a `SkillDraft`: a key it leaves out stays out. */
+const SkillDraftSchema = Schema.Struct({
+  name: Schema.String,
+  title: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  description: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  tags: Schema.optionalKey(Schema.NullOr(Strings)),
+  examples: Schema.optionalKey(Schema.NullOr(Strings)),
+  preload: Schema.optionalKey(Schema.Boolean),
+  body: Schema.String,
+}) satisfies Schema.Schema<SkillDraft>;
+
 /** Mirrors `SkillUser`: an agent that gives a skill, by its place and its name. */
 export type SkillUser = { from: 'yours' | 'repo'; name: string };
+
+/** Decodes a `SkillUser`. */
+const SkillUserSchema = Schema.Struct({ from: Schema.Literals(['yours', 'repo']), name: Schema.String }) satisfies Schema.Schema<SkillUser>;
 
 /**
  * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not
@@ -109,6 +128,16 @@ export type SkillDetail = {
   copyHint: string | null;
 };
 
+/** Decodes a `SkillDetail`. */
+const SkillDetailSchema = Schema.Struct({
+  skill: SkillRowSchema,
+  version: Schema.String,
+  draft: Schema.NullOr(SkillDraftSchema),
+  body: Schema.String,
+  users: Schema.mutable(Schema.Array(SkillUserSchema)),
+  copyHint: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<SkillDetail>;
+
 /** Mirrors `SkillSaved`: a skill written, as its page now reads it. */
 export type SkillSaved = SkillDetail & { written: string[] };
 
@@ -116,7 +145,7 @@ export type SkillSaved = SkillDetail & { written: string[] };
 export const skillQuery = (from: string, name: string) =>
   queryOptions({
     queryKey: ['skills', from, name],
-    queryFn: () => getUndecoded<SkillDetail>(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
+    queryFn: () => get(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`, SkillDetailSchema),
   });
 
 async function written(method: 'POST' | 'PUT', url: string, body: unknown): Promise<SkillSaved> {

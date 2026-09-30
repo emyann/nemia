@@ -470,7 +470,7 @@ test('watch() keeps its host process alive, even with a store that cannot push',
       append: async () => {}, read: async () => [], list: async () => [],
       feed: async () => ({ entries: [], cursor: 0 }),
     };
-    promiseEngine(EngineService.layer({ journal: store })).watch({ onEntry: () => {} });
+    promiseEngine(Engine.layer({ journal: store })).watch({ onEntry: () => {} });
   `),
     true,
     "a store with no `subscribe`, the kind a consumer brings, has only the interval to hold the loop open: the file store's fs.watch holds it by itself",

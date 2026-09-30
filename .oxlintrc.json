@@ -562,8 +562,7 @@
     {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.ts"],
       "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 19]
+        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {

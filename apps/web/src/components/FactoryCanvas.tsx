@@ -54,6 +54,7 @@ import {
 } from '@/lib/factory';
 import { flowSteps, tilesOf } from '@/lib/flow';
 import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, type Transform } from '@/lib/frame';
+import { queuedIn, type FactoryPlace } from '@/lib/factories';
 import { capLine, queueOf } from '@/lib/inbox';
 import { passLine, passTitle } from '@/lib/pass';
 import { useContent } from '@/lib/useContent';
@@ -141,30 +142,30 @@ const minimapFill = (node: RunFlowNode) =>
         : 'var(--color-sky-500)';
 
 /**
- * Every run in flight, a card each, on a floor a person can arrange, each with its steps as a small flowchart on it (`StepRail`). A run
- * started `--after` runs is drawn with an edge from each of their cards into its own (`afterEdges`), and a finished run a run in flight
- * waits on is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left of children.
+ * Every run in flight of `factory`, given as `runs`, a card each, on a floor a person can arrange, each with its steps as a small
+ * flowchart on it (`StepRail`). A run started `--after` runs is drawn with an edge from each of their cards into its own (`afterEdges`),
+ * and a finished run a run in flight waits on is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left
+ * of children.
  *
- * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that
- * starts takes the next free cell and moves no card already down — and after that wherever a person
- * dragged it, until "Reset layout". A click on a card, or Enter on one, opens it: the card grows to the right
- * over as many cells as its steps' tiles need (`openSpan`), and the cards in them move aside (`placeRuns`) — when
- * it opens, by a click or brought back onto the floor open, and then only (`unfoldingNow`). Otherwise each card
- * moves alone, as in a factory modeller: a drop moves nothing else — a card dropped over another stays over it,
- * since that is where the person put it. The edges between cards stretch to follow; they pull nothing. A press
- * on a step's tile opens its inspector beside the floor. Which runs are open is kept in this browser with the layout.
+ * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that starts takes the next free cell and
+ * moves no card already down — and after that wherever a person dragged it, until "Reset layout". A click on a card, or Enter on one,
+ * opens it: the card grows to the right over as many cells as its steps' tiles need (`openSpan`), and the cards in them move aside
+ * (`placeRuns`) — when it opens, by a click or brought back onto the floor open, and then only (`unfoldingNow`). Otherwise each card
+ * moves alone, as in a factory modeller: a drop moves nothing else — a card dropped over another stays over it, since that is where the
+ * person put it. The edges between cards stretch to follow; they pull nothing. A press on a step's tile opens its inspector beside the
+ * floor. Which runs are open is kept in this browser with the layout.
  *
- * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says
- * the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it
- * (`QuotaLine`) — and, when no wf up ticks the store, that nothing does and how to start one (`DaemonLine`), since a run waiting its turn
- * and a run nobody moves look alike on the floor. The cap is read again as the runs are, on each run's event of the workflow feed; the
- * queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees, and nothing on the board asks
- * it to.
+ * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
+ * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as
+ * the api last asked Claude Code for it (`QuotaLine`) — and, when no wf up ticks the store, that nothing does and how to start one
+ * (`DaemonLine`), since a run waiting its turn and a run nobody moves look alike on the floor. The cap is read again as the runs are, on
+ * each run's event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a
+ * run slot frees, and nothing on the board asks it to.
  */
-export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
+export function FactoryCanvas({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
   return (
     <ReactFlowProvider>
-      <Floor runs={runs} />
+      <Floor runs={runs} factory={factory} />
     </ReactFlowProvider>
   );
 }
@@ -214,14 +215,14 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
  *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
- * - The floor fills the screen under the root's header. The queue lane sits at its left, off while a step's inspector is open. The
+ * - The floor fills the box its page gives it. The queue lane sits at its left, off while a step's inspector is open. The
  *   floor's hint shows only where the floor is wide enough beside its buttons, and the legend wraps short of the minimap when there is
  *   one; arrowheads take their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, opens or closes it; a click or Enter on a link or a button in it does only what
  *   that does. A press on a step's tile opens its inspector, which closes on a click on the floor, and when the run's read no longer
  *   has that step.
  */
-function Floor({ runs }: { runs: readonly RunSummary[] }) {
+function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
   const { fitView, setViewport } = useReactFlow<RunFlowNode>();
   const store = useStoreApi<RunFlowNode>();
   const [showFinished, setShowFinished] = useState(false);
@@ -421,7 +422,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const waiting = runs.filter(waitsOnYou).length;
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
-  const queued = queue.data ? queueOf(queue.data) : [];
+  const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
   const laned = queued.length > 0;
   const wasLaned = useRef(laned);
   useEffect(() => {
@@ -454,7 +455,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const inspected = inspectedRun?.steps.find((step) => step.name === selected?.step);
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
+    <div className="flex h-full min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className="text-sm text-muted-foreground">

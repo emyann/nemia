@@ -213,8 +213,9 @@ test("a filter keeps the runs or cards of its factory in their order — the def
 });
 
 test('the filter offers each factory the runs or cards name, with how many, the default first and then by name, whatever their order', () => {
-  assert.deepEqual(factoryCounts(tagged), [
+  assert.deepEqual(factoryCounts([...tagged, { factory: 'amber' }]), [
     { name: 'default', count: 2 },
+    { name: 'amber', count: 1 },
     { name: 'nemia', count: 2 },
     { name: 'quay', count: 1 },
   ]);

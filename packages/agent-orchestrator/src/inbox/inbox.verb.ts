@@ -9,6 +9,8 @@ import {
   inboxListing,
   inboxNameRefusal,
   nextQueued,
+  queueOrder,
+  queueRepo,
   noCardLine,
   noWorkflowRefusal,
   parseInboxCard,
@@ -22,7 +24,9 @@ import { isGitRun, type Run } from '../record/record.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { inboxCards } from './inbox.store.ts';
-import { placesOf, start } from '../start/start.verb.ts';
+import { placesOf, repoFor, start } from '../start/start.verb.ts';
+import { readFactories } from '../factory/factory.store.ts';
+import type { Factory } from '../factory/factory.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
@@ -41,8 +45,10 @@ export type InboxStart = {
    * takes it as it takes the directory `wf start` is typed in, and never looks at it.
    */
   repo?: string;
-  /** The repository when neither `repo` nor the card names one: `wf start`'s `.`, or the board's own. */
+  /** The repository when neither `repo`, the card nor its factory names one: `wf start`'s `.`, or the board's own. */
   callerRepo: string;
+  /** The factory it is started in, over the card's `factory:` (`wf start <card> --factory`). */
+  factory?: string;
   /** The runs it waits on (`wf start --after`): an inbox card has no `after:`, so it is said here, at start. */
   after?: readonly string[];
   isolate?: boolean;
@@ -64,20 +70,35 @@ export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run
 };
 
 /**
+ * The workflow folder a card is started on, found in `repo`: `opts.workflow`, from `opts.from`, else the card's `workflow:`, from the
+ * inbox. Refused by name: a card's workflow that does not load, in the card's words, and none from either, naming the repository's.
+ */
+function cardWorkflow(opts: Pick<InboxStart, 'workflow' | 'from'>, card: InboxCard, file: string, repo: string): string {
+  if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo);
+  if (card.workflow === undefined) throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
+  try {
+    return workflowFolder(card.workflow, inboxDir(), repo);
+  } catch (err) {
+    throw new WorkflowError(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`);
+  }
+}
+
+/**
  * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
  * on its record, then removed from the inbox.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
  * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
- * repository's workflows. The repository is `repo`, else the card's `repo:`, else `callerRepo`. The run is gated at the card's `gate:` and
- * at `gates`, the card's first; a step both name is gated once.
+ * repository's workflows. The factory is `factory`, else the card's `factory:`, else none: the default. The repository is `repo`, else the
+ * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
+ * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
  * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card.
  * It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is
  * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no workflow, a workflow that does not load behind the card, a `gate:` naming no
  * step of it, in the card's words, and a `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a
- * `--gate` — as it refuses it.
+ * `--gate`, a factory not there, one that does not offer the workflow or does not work on the repository — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);
@@ -96,16 +117,9 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     .map((r) => r.id);
   if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
 
-  const repo = opts.repo ?? card.repo ?? opts.callerRepo;
-  let workflowDir: string;
-  if (opts.workflow !== undefined) workflowDir = workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo);
-  else if (card.workflow !== undefined) {
-    try {
-      workflowDir = workflowFolder(card.workflow, inboxDir(), repo);
-    } catch (err) {
-      throw new WorkflowError(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`);
-    }
-  } else throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
+  const factory = opts.factory ?? card.factory;
+  const repo = repoFor(factory, opts.repo ?? card.repo, opts.callerRepo);
+  const workflowDir = cardWorkflow(opts, card, file, repo);
   if (opts.brief !== undefined && !opts.brief.trim()) {
     throw new WorkflowError(
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
@@ -128,6 +142,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     inputs: opts.inputs,
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
+    ...(factory !== undefined ? { factory } : {}),
   });
   const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
   try {
@@ -138,19 +153,23 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   return { run, card, removed: true, ...ignoredRepo };
 }
 
+/** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One that does not read is none. */
+const readableFactories = (): Map<string, Factory> => new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
+
 /**
- * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else
- * `repo`, the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
+ * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
+ * repository `queueRepo` names — its `repo:`, else its factory's one repository, else `repo`, the daemon's — the same one its refusal is
+ * remembered on, so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
  * whose `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line
- * (`queueLine`) is the only place a daemon's start is read. The result names the repository (`on`) only for a card that names none, whose
- * start turns on where the daemon runs.
+ * (`queueLine`) is the only place a daemon's start is read. The result names the repository (`on`) only when neither the card nor its
+ * factory names one, and the start turns on where the daemon runs.
  *
  * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name:
  * the workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
  * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
  * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. A
  * failure is said on one line, its lines joined by ` / `; a try that cannot be written is said all the same, and the next pass tries the
- * card again. The inbox and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way, or
+ * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer queued as it was is removed on the way, or
  * on a later pass when it cannot be.
  */
 export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.list()): QueueStarted | undefined {
@@ -163,10 +182,12 @@ export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.l
       runStore.inbox.dropTry(name);
     } catch {}
   }
-  const next = nextQueued(listing, repo);
+  if (!queueOrder(listing).length) return undefined;
+  const factories = readableFactories();
+  const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
-  const on = next.repo ?? repo;
-  const where = next.repo ? {} : { on };
+  const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
+  const where = fromDaemon ? { on } : {};
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};

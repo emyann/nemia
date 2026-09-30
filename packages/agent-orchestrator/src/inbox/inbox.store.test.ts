@@ -20,6 +20,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, start, startFromInbox } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
+const { runStore } = await import('../record/files.store.ts');
 const { main } = await import('../cli/main.ts');
 
 /** No verb here asks the engine anything. */
@@ -650,3 +651,18 @@ test(
     assert.deepEqual(readInbox(), []);
   },
 );
+
+test('a card gone between its start and its removal — removed by someone else once the run is written — is still said removed, and the run stands', (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  const { card, file } = addToInbox({ text: 'Cache the views', workflow: 'dev', repo });
+  const create = runStore.runs.create;
+  t.mock.method(runStore.runs, 'create', (run: Run) => {
+    create(run);
+    fs.rmSync(file);
+  });
+  const started = startFromInbox({ name: card.name, callerRepo: repo });
+  assert.equal(started.removed, true, 'a card already gone is not a removal that failed');
+  assert.deepEqual(readRun(started.run.id).from, { inbox: card.name });
+  assert.deepEqual(readInbox(), []);
+});

@@ -20,7 +20,7 @@ import { teamCopy } from './team.ts';
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, hireAgent, inboxDir, repoFor, start } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent, inboxDir, repoFor, start, startFromInbox } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { startHow } = await import('../src/cli/start.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -193,7 +193,7 @@ test('REFUSED: a start in a factory the store does not have is Missing, naming t
   );
 });
 
-test('wf start reads --factory once, and refuses it twice; on a card of the inbox it is refused, never dropped', async () => {
+test('wf start reads --factory once, and refuses it twice', () => {
   assert.equal(startHow(['--factory', 'pipao']).factory, 'pipao');
   assert.equal(startHow(['--factory=pipao']).factory, 'pipao');
   assert.equal(startHow([]).factory, undefined);
@@ -201,20 +201,6 @@ test('wf start reads --factory once, and refuses it twice; on a card of the inbo
     () => startHow(['--factory', 'pipao', '--factory', 'nemia']),
     refusedWith('Invalid', /^wf start takes --factory once: a run is started in one factory\.$/),
   );
-  const { build } = fresh();
-  fs.mkdirSync(inboxDir(), { recursive: true });
-  const card = path.join(inboxDir(), 'build-it.md');
-  fs.writeFileSync(card, 'Build it.\n');
-  const before = runsWritten();
-  await assert.rejects(
-    main(['start', card, '--workflows', build, '--factory', 'pipao'], {} as Engine),
-    refusedWith(
-      'Invalid',
-      /^wf start --factory pipao starts a run in a factory, and a card of the inbox is started in the default factory for now/,
-    ),
-  );
-  assert.ok(fs.existsSync(card), 'the card is left in the inbox');
-  assert.deepEqual(runsWritten(), before);
 });
 
 /** Every step of `build` filled in `factory`: `implement` and `review` hired, `named` naming its own. */
@@ -322,5 +308,105 @@ test('a run in the default factory — no --factory, or default — records no f
     assert.equal('factory' in run, false, String(factory));
     assert.equal(run.repo, other);
     assert.equal('factory' in readRun(run.id), false);
+  }
+});
+
+/** A card filed in the inbox as `<name>.md`, with `text` whole: its path. */
+function aCard(name: string, text: string): string {
+  fs.mkdirSync(inboxDir(), { recursive: true });
+  const card = path.join(inboxDir(), `${name}.md`);
+  fs.writeFileSync(card, text);
+  return card;
+}
+
+test('wf start <card> --factory starts the card in the factory, on its one repository from any directory, and removes it', async () => {
+  const { repo, build } = fresh();
+  hired();
+  const card = aCard('build-it', 'Build it.\n');
+  const out = await typedFrom(ROOT, ['start', card, '--workflows', build, '--factory', 'pipao', '--no-worktree']);
+  const run = readRun(startedId(out));
+  assert.equal(run.factory, 'pipao');
+  assert.equal(run.repo, repo);
+  assert.deepEqual(run.from, { inbox: 'build-it' });
+  assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
+  assert.equal(fs.existsSync(card), false, 'the card is removed');
+});
+
+test("a card's factory: starts it in that factory, on its one repository, its workflow: found there — and --factory is over it", async () => {
+  const { repo, build } = fresh();
+  hired();
+  fs.cpSync(path.dirname(build), path.join(repo, 'workflows'), { recursive: true });
+  aCard('in-pipao', '---\nworkflow: build\nfactory: pipao\n---\nBuild it.\n');
+  const run = readRun(startedId(await typedFrom(ROOT, ['start', path.join(inboxDir(), 'in-pipao.md'), '--no-worktree'])));
+  assert.equal(run.factory, 'pipao');
+  assert.equal(run.repo, repo);
+  assert.equal(run.workflowDir, path.join(repo, 'workflows', 'build'), "the card's workflow: found in the factory's repository");
+
+  const other = aRepo();
+  addFactory({ name: 'other', repos: [other] });
+  attachWorkflow({ factory: 'other', workflow: 'build' });
+  hired('other');
+  aCard('over', '---\nfactory: pipao\n---\nBuild it.\n');
+  const over = startFromInbox({ name: 'over', workflow: build, callerRepo: ROOT, isolate: false, factory: 'other' });
+  assert.equal(over.run.factory, 'other');
+  assert.equal(readRun(over.run.id).repo, other);
+});
+
+test('a card of a factory with two repositories runs where it is started when that is one of them, else is refused naming both, nothing written and the card kept', async () => {
+  const { build } = fresh();
+  const [first, second] = [aRepo(), aRepo()];
+  addFactory({ name: 'duo', repos: [first, second] });
+  attachWorkflow({ factory: 'duo', workflow: 'build' });
+  hired('duo');
+  aCard('in-duo', '---\nfactory: duo\n---\nBuild it.\n');
+  const inside = startFromInbox({ name: 'in-duo', workflow: build, callerRepo: first, isolate: false });
+  assert.equal(readRun(inside.run.id).repo, first);
+  assert.equal(inside.run.factory, 'duo');
+
+  const card = aCard('outside-duo', '---\nfactory: duo\n---\nBuild it.\n');
+  const before = runsWritten();
+  const listed = [first, second].sort().join(', ');
+  assert.throws(
+    () => startFromInbox({ name: 'outside-duo', workflow: build, callerRepo: ROOT, isolate: false }),
+    (err: Error & { exitCode?: number; _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.exitCode === 2 &&
+      err.message.startsWith(`${ROOT}: the factory duo works on ${listed}, and this repository is not one of them`),
+  );
+  assert.deepEqual(runsWritten(), before);
+  assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+});
+
+test("REFUSED: a card's factory: the store does not have, and one that does not offer the card's workflow — nothing written, the card kept", () => {
+  const { repo, build } = fresh(['dev']);
+  const before = runsWritten();
+  const nosuch = aCard('nosuch', '---\nfactory: nosuch\n---\nBuild it.\n');
+  assert.throws(
+    () => startFromInbox({ name: 'nosuch', workflow: build, callerRepo: repo, isolate: false }),
+    refusedWith('Missing', /^no factory nosuch in the store\. Its factories are: pipao\. Nothing was started\.$/),
+  );
+  const unattached = aCard('unattached', '---\nfactory: pipao\n---\nBuild it.\n');
+  assert.throws(
+    () => startFromInbox({ name: 'unattached', workflow: build, callerRepo: repo, isolate: false }),
+    refusedWith(
+      'Invalid',
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it — wf factory attach pipao build — /,
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+  assert.ok(fs.existsSync(nosuch) && fs.existsSync(unattached), 'both cards are left in the inbox');
+});
+
+test('a card of the default factory — no factory:, or factory: default — records no factory, and runs on the repository it is started in', () => {
+  const { build } = fresh();
+  const other = aRepo();
+  for (const [name, text] of [
+    ['no-key', 'Build it.\n'],
+    ['by-name', '---\nfactory: default\n---\nBuild it.\n'],
+  ]) {
+    aCard(name, text);
+    const { run } = startFromInbox({ name, workflow: build, callerRepo: other, isolate: false });
+    assert.equal('factory' in readRun(run.id), false, name);
+    assert.equal(readRun(run.id).repo, other, name);
   }
 });

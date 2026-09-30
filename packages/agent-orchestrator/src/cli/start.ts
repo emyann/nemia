@@ -252,10 +252,6 @@ function printStarted(run: ReturnType<typeof start>, from?: string): void {
 
 /** `wf start` of the inbox's card `inboxName`: its body, or `--brief` in its place — a file's text, or the words — started and said. */
 function startInboxCard(inboxName: string, how: StartHow): void {
-  if (how.factory !== undefined)
-    usage(
-      `wf start --factory ${how.factory} starts a run in a factory, and a card of the inbox is started in the default factory for now: a card does not name its factory yet. Start its brief in the factory instead — wf start "<brief>" --workflows <dir> --factory ${how.factory} — or drop --factory.`,
-    );
   const brief =
     how.brief === undefined
       ? undefined
@@ -272,6 +268,7 @@ function startInboxCard(inboxName: string, how: StartHow): void {
     after: how.after,
     inputs: how.inputs,
     gates: how.gates,
+    ...(how.factory !== undefined ? { factory: how.factory } : {}),
   });
   printStarted(
     started.run,

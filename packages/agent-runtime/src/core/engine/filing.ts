@@ -75,8 +75,8 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
  * journals as `null` and would stop its task on the first pass. The harness's arguments under `config` are the adapter's to
  * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
- * The `file` of an engine `Engine.layer` builds asks both, then each harness for its own words (`harnessRefusalOf` in `facade/consumer.ts`), which this
- * door never learns.
+ * The `file` of an engine `Engine.layer` builds asks both, then each harness for its own words (`harnessRefusalOf` in
+ * `facade/consumer.ts`), which this door never learns.
  */
 export const refusalOf = (spec: Filing): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';

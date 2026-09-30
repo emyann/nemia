@@ -6296,7 +6296,9 @@ test("the views' programs say in their types what they need and what they refuse
   assert.deepEqual([typed.length, infallible.length, typeof unprovided], [6, 3, 'function']);
 });
 
-/** `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */
+/**
+ * `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`.
+ */
 const whole = (t: TestContext, e: Engine, run: GitRun): Promise<string[]> =>
   decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
 

@@ -1,8 +1,8 @@
 /**
  * The engine through both doors: the `Engine` service of `agent-runtime/effect`, and the Promise engine `promiseEngine` makes of its
- * layer, which is that service with each verb run as a Promise. Each has every verb the other has; each verb gives the same answer through either, over
- * one store; and each refusal is a tagged error at the Effect door and the same words behind the verb, exit code 2, at the Promise
- * door.
+ * layer, which is that service with each verb run as a Promise. Each has every verb the other has; each verb gives the same answer through
+ * either, over one store; and each refusal is a tagged error at the Effect door and the same words behind the verb, exit code 2, at the
+ * Promise door.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

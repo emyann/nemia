@@ -80,7 +80,9 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
 /** What the runtime's own pass reported (`Engine`'s `tick`). */
 type TickReport = Awaited<ReturnType<Engine['tick']>>;
 
-/** What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies. */
+/**
+ * What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies.
+ */
 type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
 
 /**
@@ -210,8 +212,9 @@ const judged = (e: Engine, judging: Judging, run: Run, resting: RestingPass | un
   );
 
 /**
- * Each run with nothing filed judged, oldest first (`admissionOrder`), against the runs in flight so far under the cap `cap`: those the pass
- * judged in flight and those it left unjudged, and each waiting run once it filed or went unjudged. Answers the runs in flight at the end.
+ * Each run with nothing filed judged, oldest first (`admissionOrder`), against the runs in flight so far under the cap `cap`: those the
+ * pass judged in flight and those it left unjudged, and each waiting run once it filed or went unjudged. Answers the runs in flight at the
+ * end.
  */
 const waitingJudged = Effect.fn('waitingJudged')(function* (
   e: Engine,
@@ -347,8 +350,8 @@ async function followedFeed(e: Engine, memo: RestMemo): Promise<boolean> {
 }
 
 /**
- * A run's full pass (`advanceRun`): what it advanced, what holds it out of rest, and what it rests on. Fails with `Unjudged` where a read of
- * one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass refused, and dies of anything else.
+ * A run's full pass (`advanceRun`): what it advanced, what holds it out of rest, and what it rests on. Fails with `Unjudged` where a read
+ * of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass refused, and dies of anything else.
  */
 const fullPass = (e: Engine, run: Run, slot?: RunSlot) =>
   awaited(() =>
@@ -397,8 +400,8 @@ const advanceResting = Effect.fn('advanceResting')(function* (e: Engine, run: Ru
 });
 
 /**
- * A run the memo answered, judged in full as well (`fullPass`): nothing where the two agree, and a defect naming the run where the full pass
- * answers otherwise, finds it not at rest, or wrote its record (`record`, as the memo read it) otherwise.
+ * A run the memo answered, judged in full as well (`fullPass`): nothing where the two agree, and a defect naming the run where the full
+ * pass answers otherwise, finds it not at rest, or wrote its record (`record`, as the memo read it) otherwise.
  */
 const verified = Effect.fn('verified')(function* (
   e: Engine,

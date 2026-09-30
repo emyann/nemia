@@ -145,6 +145,30 @@ writeRun(
 tasks.set('spoilt-build', [{ kind: 'measured', at: at(1), attempt: 1, usage: { turns: 'three' } }]);
 writeRun('spoilt', [{ name: 'build', after: [], body: 'Build it.' }], { build: { taskId: 'spoilt-build' } });
 
+const REVIEWED = '/repos/one/workflows/review';
+const SKILL = 'review-a-change';
+const reviewStep = {
+  name: 'review',
+  after: [],
+  body: 'You are Agora.\n\nReview it.',
+  agent: { ...agent('agora'), body: 'Review it.', instructions: 'You are Agora.', skills: [SKILL] },
+};
+
+/** A run of the review workflow created at `createdAt`, its skill rendered as `text` where given, its review's task `taskId` if given. */
+function reviewRun(id: string, createdAt: string, text?: string, taskId?: string) {
+  writeRun(id, [reviewStep], taskId ? { review: { taskId } } : {}, { createdAt, workflowDir: REVIEWED });
+  if (text === undefined) return;
+  const dir = path.join(ROOT, 'runs', id, 'agents', 'review', 'nemia-agora', 'skills', SKILL);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${SKILL}\ndescription: Review a change.\n---\n${text}\n`);
+}
+
+tasks.set('marks-2-review', [{ kind: 'measured', at: at(1), attempt: 1, usage: { turns: 'three' } }]);
+reviewRun('marks-1', '2026-09-25T08:00:00.000Z', 'Read the diff.');
+reviewRun('marks-2', '2026-09-25T23:59:00.000Z', 'Read the diff, then run the suite.', 'marks-2-review');
+reviewRun('marks-3', '2026-09-26T08:00:00.000Z', 'Read the diff, then run the suite.');
+reviewRun('marks-4', '2026-09-27T08:00:00.000Z');
+
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
@@ -172,7 +196,7 @@ test('wf stats --json answers the numbers of the store: a landing on its first t
   );
   assert.equal(build?.costUsd, null, 'no session of build was measured');
   assert.equal(s.all.steps.find((row) => row.step === 'implement')?.agent, 'ada');
-  assert.deepEqual(s.unreadable, ['spoilt'], 'a run whose journal does not read is left out whole, and named');
+  assert.deepEqual(s.unreadable, ['marks-2', 'spoilt'], 'a run whose journal does not read is left out whole, and named');
 });
 
 test('wf stats --by factory answers a group per factory, and --factory keeps one', async (t) => {
@@ -195,7 +219,7 @@ test('wf stats --line prints one line, and wf stats prints the tiles and the day
   const words = await printedBy(t, ['stats', '--from', DAY, '--to', DAY]);
   assert.match(words, /^last 14 days \(/);
   assert.match(words, new RegExp(`^${DAY}\\s+1\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
-  assert.match(words, /left out, a journal of each not reading \(wf ls says why\): spoilt/);
+  assert.match(words, /left out, a journal of each not reading \(wf ls says why\): marks-2, spoilt/);
 });
 
 test('wf stats --help prints each flag and what it takes, and is refused nothing', async (t) => {
@@ -221,4 +245,28 @@ test('wf stats refuses a key to go by it does not know, and a day that is not on
     assert.match(err.message, want);
     assert.equal(err.exitCode, 2);
   }
+});
+
+test('wf stats marks the day a run froze a rendered skill that differs from the run before, its journal read or not', async (t) => {
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', '--workflow', 'review'])) as Stats;
+  assert.deepEqual(
+    s.all.marks,
+    [
+      {
+        run: 'marks-2',
+        factory: 'default',
+        workflow: 'review',
+        repo: '/repos/one',
+        day: '2026-09-25',
+        kind: 'skill',
+        name: SKILL,
+        steps: ['review'],
+        agents: ['agora'],
+        since: 'marks-1',
+      },
+    ],
+    'marks-2 changed the skill on the day it was created, though its journal does not read; marks-3 kept it; marks-4 rendered none',
+  );
+  const words = await printedBy(t, ['stats', '--workflow', 'review']);
+  assert.match(words, new RegExp(`^2026-09-25\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
 });

@@ -4,8 +4,9 @@
  * time, cost, check verdicts and gate waits.
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
- * and totals them, and `statsQueryOf` reads what a person asked. `stats.verb.ts` reads the store and the engine and hands them here;
- * `stats-words.ts` says the answer. A number with nothing measured under it is `null`, never 0.
+ * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
+ * `stats.verb.ts` reads the store and the engine and hands them here; `stats-words.ts` says the answer. A number with nothing measured
+ * under it is `null`, never 0.
  */
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
@@ -15,6 +16,7 @@ import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
+import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
 export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
@@ -32,7 +34,7 @@ export type StatsQuery = { from?: string; to?: string; by?: ByKey } & Partial<Re
 export type CheckVerdict = 'passed' | 'refused' | 'unfinished';
 
 /** The values a run's facts have for the run's own keys: its factory, its workflow's folder, and its repository, null for a folder run. */
-type RunKeys = { run: string; factory: string; workflow: string; repo: string | null };
+export type RunKeys = { run: string; factory: string; workflow: string; repo: string | null };
 
 /**
  * One try of one step that ended, on the UTC day it ended: its check's end, or its session's where it has no check. `agent` is the
@@ -68,8 +70,8 @@ export type RunFact = RunKeys & {
   wallMs: number | null;
 };
 
-/** What a store's runs give: a fact per try that ended, and one per run that finished. */
-export type Facts = { tries: TryFact[]; runs: RunFact[] };
+/** What a store's runs give: a fact per try that ended, one per run that finished, and what each run froze (`RunFrozen`, `marks.ts`). */
+export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
 
 /**
  * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, and each step's
@@ -116,7 +118,7 @@ function gateWaitOf(r: RunRead, step: Workflow, t: TimelineTry): number | null {
 }
 
 /** The keys a run's facts carry. */
-const keysOf = (run: Run): RunKeys => ({
+export const keysOf = (run: Run): RunKeys => ({
   run: run.id,
   factory: run.factory ?? DEFAULT_FACTORY,
   workflow: path.basename(run.workflowDir),
@@ -225,8 +227,8 @@ function runFactOf(r: RunRead): RunFact[] {
   ];
 }
 
-/** What one run gives (`Facts`): a fact per try that ended, and the run's own once it finished. */
-export const factsOf = (r: RunRead): Facts => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
+/** What one run's timeline gives: a fact per try that ended, and the run's own once it finished. */
+export const factsOf = (r: RunRead): Pick<Facts, 'tries' | 'runs'> => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
  * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed, null where no run recorded
@@ -265,8 +267,11 @@ export type StepRow = {
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
 export type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
 
-/** The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles. */
-export type Group = { total: Headline; days: Array<Headline & { day: string }>; steps: StepRow[]; tiles: Tiles };
+/**
+ * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; and the changes to what its runs
+ * froze on the days of the range (`Mark`, `marks.ts`), sorted by day, run, kind and name.
+ */
+export type Group = { total: Headline; days: Array<Headline & { day: string }>; steps: StepRow[]; tiles: Tiles; marks: Mark[] };
 
 /**
  * What `wf stats` and `GET /api/stats` answer: the days asked for, the filters and the key, the numbers of every fact kept (`all`), and,
@@ -289,7 +294,7 @@ const mean = (values: ReadonlyArray<number | null>): number | null => {
 };
 
 /** The headline numbers of a set of facts (`Headline`). */
-export function headlineOf(f: Facts): Headline {
+export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>): Headline {
   const landed = f.runs.filter((r) => r.landed === true);
   return {
     runs: f.runs.length,
@@ -339,14 +344,18 @@ function daysBetween(from: string, to: string): string[] {
   return days;
 }
 
-/** The facts that fall between two days, both included. */
-const within = (f: Facts, from: string, to: string): Facts => ({
+/** The facts and marks a query keeps: its tries and runs, and the marks of what the runs froze (`marksOf`). */
+type Kept = Pick<Facts, 'tries' | 'runs'> & { marks: Mark[] };
+
+/** The facts and marks that fall between two days, both included. */
+const within = (f: Kept, from: string, to: string): Kept => ({
   tries: f.tries.filter((t) => t.day >= from && t.day <= to),
   runs: f.runs.filter((r) => r.day >= from && r.day <= to),
+  marks: f.marks.filter((m) => m.day >= from && m.day <= to),
 });
 
-/** The numbers of a set of facts (`Group`): the tiles against `today`, the rest over the days from `from` to `to`. */
-function groupOf(f: Facts, from: string | null, to: string, today: string): Group {
+/** The numbers of a set of facts and marks (`Group`): the tiles against `today`, the rest over the days from `from` to `to`. */
+function groupOf(f: Kept, from: string | null, to: string, today: string): Group {
   const kept = within(f, from ?? '0000-00-00', to);
   const tile = (a: string, b: string) => ({ ...headlineOf(within(f, a, b)), from: a, to: b });
   return {
@@ -354,39 +363,44 @@ function groupOf(f: Facts, from: string | null, to: string, today: string): Grou
     days: from ? daysBetween(from, to).map((day) => ({ day, ...headlineOf(within(kept, day, day)) })) : [],
     steps: stepRowsOf(kept.tries),
     tiles: { last: tile(dayPlus(today, -13), today), before: tile(dayPlus(today, -27), dayPlus(today, -14)) },
+    marks: kept.marks,
   };
 }
 
-/** The values a try's or a run's fact has for a key: a run's, for a step or an agent, every one it has. */
-function valuesOf(fact: TryFact | RunFact, key: ByKey): Array<string | null> {
+/** The values a try's or a run's fact, or a mark, has for a key: a run's or a mark's, for a step or an agent, every one it has. */
+function valuesOf(fact: TryFact | RunFact | Mark, key: ByKey): Array<string | null> {
   if ('steps' in fact) return key === 'step' ? fact.steps : key === 'agent' ? fact.agents : [fact[key]];
   return [fact[key]];
 }
 
-/** The facts that have `value` for `key`. */
-const having = (f: Facts, key: ByKey, value: string | null): Facts => ({
+/** The facts and marks that have `value` for `key`. */
+const having = (f: Kept, key: ByKey, value: string | null): Kept => ({
   tries: f.tries.filter((t) => valuesOf(t, key).includes(value)),
   runs: f.runs.filter((r) => valuesOf(r, key).includes(value)),
+  marks: f.marks.filter((m) => valuesOf(m, key).includes(value)),
 });
 
 /** The order of the groups: by key, the group with none last. */
 const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a === null ? 1 : b === null ? -1 : a < b ? -1 : 1);
 
 /**
- * The stats of a store's facts for a query (`Stats`), as of `now`. The facts are filtered by each key the query gives a value, then kept
- * between its days: `from` defaults to the first fact's day, `to` to `now`'s. With `by`, one group per value of that key, sorted by key
- * (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles are always the
- * last 14 days to `now`'s day and the 14 before.
+ * The stats of a store's facts for a query (`Stats`), as of `now`. The marks are found over every run that froze (`marksOf`), so a run
+ * before `from` or of another factory is still compared with; the facts and marks are then filtered by each key the query gives a value,
+ * then kept between its days: `from` defaults to the first fact's or mark's day, `to` to `now`'s. With `by`, one group per value of that
+ * key, sorted by key (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles
+ * are always the last 14 days to `now`'s day and the 14 before.
  */
 export function statsOf(facts: Facts, query: StatsQuery, now: Date, unreadable: readonly string[] = []): Stats {
   const filters = Object.fromEntries(BY_KEYS.flatMap((k) => (query[k] === undefined ? [] : [[k, query[k]]]))) as Partial<
     Record<ByKey, string>
   >;
-  const kept = Object.entries(filters).reduce((f, [k, v]) => having(f, k as ByKey, v ?? null), facts);
+  const every: Kept = { tries: facts.tries, runs: facts.runs, marks: marksOf(facts.frozen) };
+  const kept = Object.entries(filters).reduce((f, [k, v]) => having(f, k as ByKey, v ?? null), every);
   const today = now.toISOString().slice(0, 10);
   const to = query.to ?? today;
-  const from = query.from ?? [...kept.tries, ...kept.runs].map((x) => x.day).sort()[0] ?? null;
-  const keys = query.by ? [...new Set([...kept.tries, ...kept.runs].flatMap((x) => valuesOf(x, query.by!)))].sort(byKey) : [];
+  const all = [...kept.tries, ...kept.runs, ...kept.marks];
+  const from = query.from ?? all.map((x) => x.day).sort()[0] ?? null;
+  const keys = query.by ? [...new Set(all.flatMap((x) => valuesOf(x, query.by!)))].sort(byKey) : [];
   return {
     from,
     to,

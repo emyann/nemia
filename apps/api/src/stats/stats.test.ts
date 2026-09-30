@@ -73,6 +73,40 @@ function finished(id: string, repo: string, costUsd: number, factory?: string) {
 finished('r-home', '/repos/home', 1);
 finished('r-away', '/repos/away', 2, 'other');
 
+/** A run of the review workflow on `/repos/home`, created at `createdAt`, its skill rendered as `text`: nothing of it ran. */
+function reviewed(id: string, createdAt: string, text: string) {
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/repos/home',
+      baseRef: 'abc',
+      workspace: '/repos/home',
+      branch: 'main',
+      isolate: true,
+      brief: `The brief of ${id}`,
+      createdAt,
+      workflowDir: '/repos/home/workflows/review',
+      workflow: [
+        {
+          name: 'review',
+          after: [],
+          body: 'You are Agora.\n\nReview it.',
+          agent: { name: 'agora', keys: [], body: 'Review it.', given: {}, instructions: 'You are Agora.', skills: ['review-a-change'] },
+        },
+      ],
+      steps: {},
+    }),
+  );
+  write(
+    path.join(root, 'runs', id, 'agents', 'review', 'nemia-agora', 'skills', 'review-a-change', 'SKILL.md'),
+    `---\nname: review-a-change\ndescription: Review a change.\n---\n${text}\n`,
+  );
+}
+
+reviewed('m-1', '2026-09-26T09:00:00.000Z', 'Read the diff.');
+reviewed('m-2', '2026-09-27T09:00:00.000Z', 'Read the diff, then run the suite.');
+
 const asked = async (query: string) => {
   const res = await app.request(`/api/stats${query}`);
   return { status: res.status, body: (await res.json()) as Stats & { error?: string } };
@@ -107,4 +141,14 @@ test('GET /api/stats refuses a key to go by it does not know, and a day that is 
   const day = await asked('?from=2026-13-40');
   assert.equal(day.status, 422);
   assert.match(day.body.error ?? '', /^\?from= takes a day as YYYY-MM-DD, in UTC/);
+});
+
+test('GET /api/stats answers the change marks as the package does: a rendered skill that differs from the run before', async () => {
+  const { status, body } = await asked('?workflow=review');
+  assert.equal(status, 200, body.error);
+  assert.deepEqual(
+    body.all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
+    [['2026-09-27', 'm-2', 'skill', 'review-a-change', 'm-1']],
+  );
+  assert.deepEqual(body, await flowNumbers(e, { workflow: 'review' }));
 });

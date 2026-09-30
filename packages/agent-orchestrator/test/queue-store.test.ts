@@ -18,6 +18,7 @@ import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { queueLine } from '../src/inbox/inbox.ts';
 import { scratch } from './scratch.ts';
+import { TEAM } from './team.ts';
 import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-queue-');
@@ -27,7 +28,7 @@ const INBOX = path.join(ROOT, 'inbox');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, cancel, decide, readInbox, start, startFromInbox, tick } = await import('../src/runner.ts');
+const { addFactory, addToInbox, attachWorkflow, cancel, decide, readInbox, start, startFromInbox, tick } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { filesStore } = await import('../src/record/files.store.ts');
@@ -1050,6 +1051,49 @@ test("REFUSED at shipped defaults, on the repository it was tried on: a queued c
   const started = await tick(b.e, { repo: dev });
   const [run] = fromCard(card.name);
   assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run.id, removed: true }, dev]);
+});
+
+/**
+ * The factory `solo`, filed afresh on one repository that holds the tests' team under `workflows/`, with `attached` attached to it: the
+ * team's `dev` names its agents in its steps, so a start of it in `solo` hires no one.
+ */
+const aSoloFactory = (attached: readonly string[]): string => {
+  fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
+  const repo = aRepo();
+  fs.cpSync(TEAM, path.join(repo, 'workflows'), { recursive: true });
+  addFactory({ name: 'solo', repos: [repo] });
+  for (const workflow of attached) attachWorkflow({ factory: 'solo', workflow });
+  return repo;
+};
+
+test("a queued card of a factory with one repository starts in it, on that repository, from a daemon anywhere — the tick's line names no repository of the daemon's", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const solo = aSoloFactory(['dev']);
+  const daemons = aRepoWith('dev');
+  aCard('solo-card', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
+  await printedBy(t, b.e, 'inbox', 'queue', 'solo-card');
+  const pass = await tick(b.e, { repo: daemons });
+  const [run] = fromCard('solo-card');
+  assert.deepEqual(
+    [pass.queue, run?.factory, run?.repo, run?.workflowDir],
+    [{ card: 'solo-card', run: run?.id, removed: true }, 'solo', solo, path.join(solo, 'workflows', 'dev')],
+  );
+});
+
+test("REFUSED at shipped defaults, on its factory's repository: a queued card of a workflow its factory has not attached is tried there, and passed over by every pass after, from a daemon anywhere", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const solo = aSoloFactory([]);
+  const daemons = aRepoWith('dev');
+  aCard('unattached-card', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
+  await printedBy(t, b.e, 'inbox', 'queue', 'unattached-card');
+  const refused = await tick(b.e, { repo: daemons });
+  assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
+  assert.equal(refused.queue.on, undefined, "the card's factory names the repository, not the daemon");
+  assert.match(refused.queue.refused, /^dev: the factory solo does not offer this workflow — it offers none yet\. /);
+  assert.equal(filesStore.inbox.tries().get('unattached-card')?.repo, solo);
+  assert.deepEqual([(await tick(b.e, { repo: daemons })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
 });
 
 test('a record that does not read as a run stops no other run: the pass files the rest, and says once, on stderr, which record it left out and why', async (t) => {

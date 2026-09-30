@@ -20,11 +20,10 @@ Load your skill `grilling` with the Skill tool and follow it: map the idea as a 
 each round, every question numbered with your recommended answer. Facts are yours to find: read the repository, its docs and any files
 given with the card, or dispatch a sub-agent. Never ask the person for what you can look up.
 
-Here a round ends your turn: you cannot wait inside a conversation. To ask a round, sign off `blocked`, with the round, in the format
-the skill gives, as what you need. The board renders a round as Markdown, where a single line break joins lines: put a blank line after
-each question, write its options as a list, one `- (a) …` line each, and put your recommendation on its own line after another blank
-line. The answers come back as your next turn, in this same session. Recompute the frontier from them and ask the next round the same
-way. Each round's closeout carries the intent as it stands: every decision settled so far, in every round, with who answered it — never
+Here a round ends your turn: you cannot wait inside a conversation. To ask a round, put each of its questions in `open` — its title,
+its body, its options each a label and what choosing it means, the label you recommend (or null), and whether several may be chosen —
+and sign off `blocked` with `needs` as one line. The board draws them as choices, and the answers come back as your next turn, in this
+same session. Recompute the frontier from them and ask the next round the same way. Each round's closeout carries the intent as it stands: every decision settled so far, in every round, with who answered it — never
 only this round's.
 
 When the frontier is empty, ask one last round of one question: whether you share an understanding, with the intent you would write as

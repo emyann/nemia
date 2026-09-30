@@ -1,34 +1,26 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { FactoryCanvas } from '@/components/FactoryCanvas';
-import { daemonQuery, inboxQuery, quotaQuery, runsQuery } from '@/lib/api';
+import { FactoriesCanvas } from '@/components/FactoriesCanvas';
+import { factoriesQuery, runsQuery } from '@/lib/api';
+import { factoryBlocks } from '@/lib/factories';
 
 export const Route = createFileRoute('/')({
-  /**
-   * Waits for the runs, and prefetches the inbox for the queue's ghosts beside the floor, the quota, and whether a daemon ticks over it,
-   * so the floor is fitted beside them with the first cards. A prefetch never throws: what cannot be read says so over the floor, and the
-   * runs are drawn all the same.
-   */
+  /** Waits for the factories and the runs, which the blocks count. */
   loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(runsQuery),
-      context.queryClient.prefetchQuery(inboxQuery),
-      context.queryClient.prefetchQuery(quotaQuery),
-      context.queryClient.prefetchQuery(daemonQuery),
-    ]),
+    Promise.all([context.queryClient.ensureQueryData(factoriesQuery), context.queryClient.ensureQueryData(runsQuery)]),
   staticData: { fullBleed: true },
-  component: Factory,
+  component: Factories,
   errorComponent: ({ error }) => (
     <p className="p-4 text-sm text-red-600">
-      Could not load runs: {error instanceof Error ? error.message : String(error)}. Is the api running (<code>npm run dev</code>)?
+      Could not load the factories and their runs: {error instanceof Error ? error.message : String(error)}. Is the api running (
+      <code>npm run dev</code>)?
     </p>
   ),
 });
 
-/**
- * Every run in flight, a card each, and the queued cards beside them. `runsQuery` reads the runs again on each event of the workflow feed.
- */
-function Factory() {
+/** Every factory, a block each (`factoryBlocks`). `runsQuery` reads the runs again on each event of the workflow feed. */
+function Factories() {
+  const { data: factories } = useSuspenseQuery(factoriesQuery);
   const { data: runs } = useSuspenseQuery(runsQuery);
-  return <FactoryCanvas runs={runs} />;
+  return <FactoriesCanvas blocks={factoryBlocks(factories, runs)} />;
 }

@@ -103,7 +103,11 @@ test('a factory whose file does not read is still a block, with why, and hides n
 
 test('the menu shows the first five factories and says how many more there are; all of them once asked', () => {
   assert.equal(MENU_SHOWN, 5);
-  const blocks = (n: number) => factoryBlocks(Array.from({ length: n }, (_, i) => factory(`f-${i}`)), []);
+  const blocks = (n: number) =>
+    factoryBlocks(
+      Array.from({ length: n }, (_, i) => factory(`f-${i}`)),
+      [],
+    );
   const seven = menuFactories(blocks(7), false);
   assert.deepEqual([names(seven.shown), seven.hidden], [['f-0', 'f-1', 'f-2', 'f-3', 'f-4'], 2]);
   const all = menuFactories(blocks(7), true);

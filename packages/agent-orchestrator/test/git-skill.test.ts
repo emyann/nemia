@@ -1,0 +1,305 @@
+/**
+ * The git place the package ships (`place/git/`), its real scripts run through `runPlaceVerb` against scratch repositories: each verb's
+ * answer, a refusal and an unread outcome. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session
+ * what `LANDING_DENIED` denies today. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default
+ * branch or signing change nothing here.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { LANDING_DENIED } from '../src/ending/ending.ts';
+import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
+import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
+import { scratch } from './scratch.ts';
+
+/** The git place the package ships. */
+const GIT_SKILL = path.join(import.meta.dirname, '..', 'place', 'git');
+
+/** The environment git and the scripts run in: this process's, without its git variables, with no configuration read and one identity. */
+const ENV: NodeJS.ProcessEnv = {
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_AUTHOR_NAME: 'Test',
+  GIT_AUTHOR_EMAIL: 'test@local',
+  GIT_COMMITTER_NAME: 'Test',
+  GIT_COMMITTER_EMAIL: 'test@local',
+};
+
+/** Git in `dir`, its stdout trimmed. */
+const git = (dir: string, ...args: string[]): string =>
+  execFileSync('git', args, { cwd: dir, env: ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+/** Git in `dir` whose failure is expected, as a merge that conflicts: whether it exited 0. */
+const gitOk = (dir: string, ...args: string[]): boolean => spawnSync('git', args, { cwd: dir, env: ENV, stdio: 'ignore' }).status === 0;
+
+/** A new repository on `main` with one commit of `f` and `g`. */
+function repository(): string {
+  const dir = scratch('wf-git-skill-');
+  git(dir, 'init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(dir, 'f'), 'base\n');
+  fs.writeFileSync(path.join(dir, 'g'), 'base\n');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-q', '-m', 'base');
+  return dir;
+}
+
+/** A branch `name` off main with `file` set to `text` in one commit, main checked out again; its tip. */
+function branched(dir: string, name: string, file: string, text: string): string {
+  git(dir, 'switch', '-q', '-c', name);
+  fs.writeFileSync(path.join(dir, file), text);
+  git(dir, 'commit', '-q', '-am', `${name} sets ${file}`);
+  const tip = git(dir, 'rev-parse', 'HEAD');
+  git(dir, 'switch', '-q', 'main');
+  return tip;
+}
+
+/** A repository with `wf/x/a` staged as a merge into main that conflicts on `f`; the branch's tip. */
+function conflicted(dir: string): string {
+  const tip = branched(dir, 'wf/x/a', 'f', 'theirs\n');
+  fs.writeFileSync(path.join(dir, 'f'), 'ours\n');
+  git(dir, 'commit', '-q', '-am', 'main sets f');
+  assert.equal(gitOk(dir, 'merge', '--no-ff', '--no-commit', 'wf/x/a'), false, 'the merge conflicts');
+  return tip;
+}
+
+/** A repository with `wf/x/a` staged as a clean merge into main, not committed; the branch's tip. */
+function staged(dir: string): string {
+  const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
+  git(dir, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
+  return tip;
+}
+
+/** Whether a merge is in progress in `dir`. */
+const merging = (dir: string): boolean => gitOk(dir, 'rev-parse', '--verify', '--quiet', 'MERGE_HEAD');
+
+/** `verb` of the git place, in `ENV`, its request as given: one the contract's type refuses is how a malformed request is sent. */
+const run = <V extends PlaceVerb>(verb: V, request: object): PlaceOutcome<V> =>
+  runPlaceVerb(GIT_SKILL, verb, request as never, { env: ENV });
+
+/** The answer of an outcome, or a failure naming what it was instead. */
+function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceOutcome<V>, { answer: unknown }>['answer'] {
+  assert.ok('answer' in outcome, `an answer expected, got ${JSON.stringify(outcome)}`);
+  return outcome.answer;
+}
+
+/** The words of a refusal, or a failure naming what it was instead. */
+function refusalOf(outcome: PlaceOutcome<PlaceVerb>): string {
+  assert.ok('refused' in outcome, `a refusal expected, got ${JSON.stringify(outcome)}`);
+  return outcome.refused;
+}
+
+/** The words of an unread outcome, or a failure naming what it was instead. */
+function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
+  assert.ok('unread' in outcome, `unread expected, got ${JSON.stringify(outcome)}`);
+  return outcome.unread.said;
+}
+
+test('place.json decodes, declares exactly the verbs scripts/ holds, and denies a landing what LANDING_DENIED does', () => {
+  const declared = readPlaceJson(GIT_SKILL);
+  const scripts = fs
+    .readdirSync(path.join(GIT_SKILL, 'scripts'))
+    .filter((f) => f !== 'contract.ts')
+    .map((f) => f.replace(/\.ts$/, ''));
+  assert.deepEqual([...declared.verbs].sort(), scripts.sort());
+  assert.deepEqual([...declared.verbs].sort(), ['handoff', 'land', 'open', 'status']);
+  assert.deepEqual(declared.denyWhileLanding, LANDING_DENIED);
+});
+
+test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
+  for (const script of ['open', 'handoff', 'status', 'land']) {
+    const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
+      input: JSON.stringify({ v: 2, root: '/' }),
+      encoding: 'utf8',
+      env: ENV,
+    });
+    assert.equal(ran.status, 2, script);
+    assert.equal(ran.stdout, '', script);
+    assert.equal(ran.stderr.trim(), 'the request carries v 2, and this place speaks v 1', script);
+  }
+});
+
+test('open answers the repository as given, the commit HEAD is at, and the branch it is on', () => {
+  const dir = repository();
+  assert.deepEqual(answerOf(run('open', { root: dir })), { repo: dir, baseRef: git(dir, 'rev-parse', 'HEAD'), branch: 'main' });
+});
+
+test('REFUSED: open on no directory, on a directory that is no repository, and on a repository with no commit', () => {
+  const plain = scratch('wf-git-skill-plain-');
+  assert.match(
+    refusalOf(run('open', { root: path.join(plain, 'nowhere') })),
+    /nowhere is not a directory: name a git repository with --repo$/,
+  );
+  assert.equal(
+    refusalOf(run('open', { root: plain })),
+    `${plain} is not a git repository: run git init there and commit once, or name a repository with --repo`,
+  );
+  const empty = scratch('wf-git-skill-empty-');
+  git(empty, 'init', '-q', '-b', 'main');
+  assert.equal(
+    refusalOf(run('open', { root: empty })),
+    `${empty} has no commit yet, so a run has nothing to start from: commit once there, then start again`,
+  );
+});
+
+test('open is unread for a request with no root', () => {
+  assert.equal(unreadOf(run('open', {})), "the request's `root` is missing, where a string is asked");
+});
+
+test('handoff commits what a step left, under its name and why, and answers the commit', () => {
+  const dir = repository();
+  fs.writeFileSync(path.join(dir, 'f'), 'changed\n');
+  fs.writeFileSync(path.join(dir, 'new'), 'added\n');
+  const { commit } = answerOf(run('handoff', { workspace: dir, step: 'build', why: ', before its run was forgotten' }));
+  assert.equal(commit, git(dir, 'rev-parse', 'HEAD'));
+  assert.equal(git(dir, 'log', '-1', '--format=%s'), 'build: hand off what was left uncommitted, before its run was forgotten');
+  assert.equal(git(dir, 'status', '--porcelain'), '');
+});
+
+test('handoff of a clean tree commits nothing and answers a null commit', () => {
+  const dir = repository();
+  const head = git(dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(answerOf(run('handoff', { workspace: dir, step: 'build', why: '' })), { commit: null });
+  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
+});
+
+test('REFUSED: handoff when a hook refuses the commit, in the hook words, and in a workspace that is not there', () => {
+  const dir = repository();
+  const hook = path.join(dir, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\necho "a secret is staged in f" >&2\nexit 1\n');
+  fs.chmodSync(hook, 0o755);
+  fs.writeFileSync(path.join(dir, 'f'), 'changed\n');
+  assert.equal(refusalOf(run('handoff', { workspace: dir, step: 'build', why: '' })), 'a secret is staged in f');
+  const gone = path.join(dir, 'gone');
+  assert.equal(
+    refusalOf(run('handoff', { workspace: gone, step: 'build', why: '' })),
+    `${gone} is not a directory, so nothing of build is there to hand off`,
+  );
+});
+
+test('handoff is unread for a request with no step', () => {
+  assert.equal(unreadOf(run('handoff', { workspace: '/', why: '' })), "the request's `step` is missing, where a string is asked");
+});
+
+test('status of a checkout merging nothing: none, nothing unmerged, and a tip not on HEAD is missing', () => {
+  const dir = repository();
+  const head = git(dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: {} })), { merging: 'none', conflicted: false, missing: [], head });
+  const tip = branched(dir, 'wf/x/b', 'g', 'b\n');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/b': tip } })), {
+    merging: 'none',
+    conflicted: false,
+    missing: ['wf/x/b'],
+    head,
+  });
+  git(dir, 'merge', '-q', '--no-ff', '-m', 'land b', 'wf/x/b');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/b': tip } })).missing, []);
+});
+
+test("status of a clean merge staged: ours when it merges the run's tips, other when it merges anything else", () => {
+  const dir = repository();
+  const tip = staged(dir);
+  const head = git(dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), {
+    merging: 'ours',
+    conflicted: false,
+    missing: [],
+    head,
+  });
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/c': head } })).merging, 'other');
+});
+
+test('status of a merge that conflicts: conflicted, read off the index even while a lock is held on it', () => {
+  const dir = repository();
+  const tip = conflicted(dir);
+  const head = git(dir, 'rev-parse', 'HEAD');
+  const want = { merging: 'ours', conflicted: true, missing: [], head };
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), want);
+  const lock = path.join(dir, '.git', 'index.lock');
+  fs.writeFileSync(lock, '');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), want);
+  assert.ok(fs.existsSync(lock), 'the lock is still the one planted');
+});
+
+test('status writes nothing to the index of a checkout a person works in, where a diff would refresh it', () => {
+  const dir = repository();
+  const tip = conflicted(dir);
+  const later = new Date(Date.now() + 60_000);
+  fs.utimesSync(path.join(dir, 'g'), later, later);
+  const index = path.join(dir, '.git', 'index');
+  const before = fs.readFileSync(index);
+  assert.equal(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })).conflicted, true);
+  assert.deepEqual(fs.readFileSync(index), before);
+  git(dir, 'diff', '--quiet', 'HEAD', '--', 'g');
+  assert.notDeepEqual(fs.readFileSync(index), before, 'a diff does refresh it, so the comparison above can fail');
+});
+
+test('status reads a worktree, whose MERGE_HEAD is not under its own folder', () => {
+  const dir = repository();
+  const tip = branched(dir, 'wf/x/a', 'g', 'theirs\n');
+  const tree = path.join(scratch('wf-git-skill-tree-'), 'w');
+  git(dir, 'worktree', 'add', '-q', '-b', 'ship', tree, 'main');
+  git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
+  assert.equal(answerOf(run('status', { checkout: tree, tips: { 'wf/x/a': tip } })).merging, 'ours');
+  assert.equal(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })).merging, 'none');
+});
+
+test('REFUSED: status of a checkout that is no repository', () => {
+  const plain = scratch('wf-git-skill-plain-');
+  assert.equal(
+    refusalOf(run('status', { checkout: plain, tips: {} })),
+    `${plain} is not a git repository, so no merge can be staged there`,
+  );
+});
+
+test('status is unread when its tips are not an object of strings', () => {
+  assert.equal(
+    unreadOf(run('status', { checkout: '/', tips: ['wf/x/a'] })),
+    'the request\'s `tips` is ["wf/x/a"], where an object of strings is asked',
+  );
+});
+
+test('land commits a staged merge with the message given, and answers the commit', () => {
+  const dir = repository();
+  const tip = staged(dir);
+  const before = git(dir, 'rev-parse', 'HEAD');
+  const { commit } = answerOf(run('land', { checkout: dir, act: 'commit', message: 'Land wf/x/a\n\nIt passed its check.' })) as {
+    commit: string;
+  };
+  assert.equal(commit, git(dir, 'rev-parse', 'HEAD'));
+  assert.equal(git(dir, 'log', '-1', '--format=%B'), 'Land wf/x/a\n\nIt passed its check.');
+  assert.equal(git(dir, 'rev-parse', `${commit}^1`, `${commit}^2`), `${before}\n${tip}`);
+  assert.equal(merging(dir), false);
+});
+
+test('land aborts a merge that conflicts, and leaves the checkout at ours', () => {
+  const dir = repository();
+  conflicted(dir);
+  const head = git(dir, 'rev-parse', 'HEAD');
+  assert.deepEqual(answerOf(run('land', { checkout: dir, act: 'abort' })), { aborted: true });
+  assert.equal(merging(dir), false);
+  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
+  assert.equal(fs.readFileSync(path.join(dir, 'f'), 'utf8'), 'ours\n');
+  assert.equal(git(dir, 'status', '--porcelain'), '');
+});
+
+test('REFUSED: land with no merge in progress, either act, and a commit git will not make, in its words', () => {
+  const dir = repository();
+  const head = git(dir, 'rev-parse', 'HEAD');
+  assert.equal(
+    refusalOf(run('land', { checkout: dir, act: 'commit', message: 'm' })),
+    `no merge is in progress in ${dir}, so there is none to commit`,
+  );
+  assert.equal(refusalOf(run('land', { checkout: dir, act: 'abort' })), `no merge is in progress in ${dir}, so there is none to abort`);
+  assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
+  conflicted(dir);
+  assert.match(refusalOf(run('land', { checkout: dir, act: 'commit', message: 'm' })), /unmerged/);
+  assert.equal(merging(dir), true, 'the merge is left for the abort');
+});
+
+test('land is unread for an act it does not know, and for a commit with no message', () => {
+  assert.equal(unreadOf(run('land', { checkout: '/', act: 'push' })), 'the request\'s `act` is "push", where commit or abort is asked');
+  assert.equal(unreadOf(run('land', { checkout: '/', act: 'commit' })), "the request's `message` is missing, where a string is asked");
+});

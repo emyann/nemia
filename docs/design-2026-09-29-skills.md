@@ -160,7 +160,8 @@ Each row shows:
   - For a *named* skill, the row also shows the preload flag and what it costs a turn, as the picker shows them.
 - **a clash, shown as one**. A name at two levels is two rows. The nearer says *given*, and the farther says *shadowed by <level>*, with
   its folder. A name at both of one repository's places shows the refusal the load gives. A harness skill that an agent also names shows
-  *the session sees both* (`effect` and `hkb-<agent>:effect`), until card 4 settles it.
+  *the session sees both* (`effect` and `hkb-<agent>:effect`) for a person's own session; a step's job is listed the agent's copy alone
+  (card 4).
 - **a library copy of a default's name**, marked for what it does under section 1's order: *shadows the default for your own workflows;
   not read by a shipped or repository folder's run*. Where the default has changed since the copy (the versions differ), the row says so.
 - **a copy of a skill Nemia no longer ships**, for a library copy whose shipped original went in section 4's merge.
@@ -340,7 +341,7 @@ these:
 | 1 | **The api by level**, read-only: `GET /api/skills/levels` (section 2), `~/.claude/skills` read for display | api tests; a fixture whose clash is shown as one | untouched |
 | 2 | **The `/skills` page**, and Capabilities' list becomes a count and a link | an e2e page file, `390-skills-levels`, with a clash in the seed; the pictures read | untouched |
 | 3 | **Lookup by level**: `Places` gains the default root; `lookupRoots` adds `<repo>/workflows` for `places.repo` and orders by level, with default before user except for a store workflow (section 1) | fixtures that break the order, each with a test that fails without the rule: a shipped `dev` run on a fixture repository finds its `workflows/skills/<name>` over the default, and its `.claude/skills/<name>` over the default; a library copy of a shipped name does **not** shadow the default in a shipped folder's run, and does in a store workflow's; a name in both of the repository's places is still refused (`sameRepository`) | untouched: its steps and skills were frozen at start |
-| 4 | **A harness skill named, not copied**: a skill an agent names that is found at the harness level is named by its bare name in the prompt, and not copied into the plugin, so the session sees one | argv and prompt pins; card 0's probe | untouched |
+| 4 | **A named skill's bare copy hidden**: every skill an agent names is still copied into its plugin at `wf start`, and `--settings` turns the name `off` in `skillOverrides`, which spares a plugin's skills, so the session sees `nemia-<agent>:<name>` once (reworked at its gate: the freeze stays) | argv pin; a live init line and skill listing before and after | its next filed step gets the override; its frozen copies are unchanged |
 | 5 | **The `allowed-tools` refusal**, if card 0 shows the grant | a test that makes the load refuse at shipped defaults | untouched |
 | 6 | **Planner**: `plan-a-change` absorbs `ask-when-it-reads-two-ways`, preloaded | `planned-workflow.test.ts` sentences, `PRELOADED`, `BODIES_REWORDED`, argv re-recorded, the live check | a planner not yet rendered anew reads *not told* for the deleted name |
 | 7 | **Implementer**: `implement-a-change` absorbs `weigh-a-plan`; the effect and e2e paragraphs become the generic sentence | as 6 | as 6 |

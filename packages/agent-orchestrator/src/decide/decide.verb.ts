@@ -5,7 +5,7 @@
  * plain face in a Promise, over the engine it is handed.
  */
 import { Effect } from 'effect';
-import { EngineService, nameFor, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
+import { EngineService, awaited, nameFor, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
@@ -45,12 +45,6 @@ import { isRemoteHarness } from '../harness/harness.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
-
-/** A synchronous read of the store or of git, failing with what it threw. */
-const tried = <A>(read: () => A): Effect.Effect<A, unknown> => Effect.try({ try: read, catch: (err) => err });
-
-/** A read of the engine, failing with what it rejected with. */
-const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, unknown> => Effect.tryPromise({ try: read, catch: (err) => err });
 
 /** What `wf decide` answers of one run (`decideRun`). */
 export type Decided = {
@@ -232,6 +226,7 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
+ * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`, `awaited`).
  */
 export const decideRun = Effect.fn('decide')(function* (id: string) {
   const e = viewedOnce(yield* EngineService);
@@ -295,6 +290,9 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   return answer;
 });
 
-/** `wf decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with what the program failed with. */
+/**
+ * `wf decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed with,
+ * or with whatever else it died of, as it was thrown.
+ */
 export const decide = (engine: Engine, id: string): Promise<Decided> =>
   Effect.runPromise(decideRun(id).pipe(Effect.provide(EngineService.layer(engine))));

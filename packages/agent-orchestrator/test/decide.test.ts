@@ -12,6 +12,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
+import type { Effect as EffectOf } from 'effect/Effect';
+import type { Decided } from '../src/decide/decide.verb.ts';
+import type { Refusal } from '../src/refusal/refusal.ts';
+import type { EngineService } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 
@@ -930,13 +934,29 @@ test('`wf decide` of a run that is not there rejects with the refusal itself: a 
   assert.match(err.message, /^no such run: no-such-run/);
 });
 
-test("`wf decide`'s program says in its type that it needs the engine: run without it, it does not typecheck", async () => {
+test("`wf decide`'s refusal is its program's typed failure: a `Missing`, picked out by its tag", async () => {
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const recovered = await Effect.runPromise(
+    decideRun('no-such-run').pipe(
+      Effect.catchTag('Missing', (r) => Effect.succeed(r.message)),
+      Effect.provide(EngineService.layer(board().e)),
+    ),
+  );
+  assert.match(String(recovered), /^no such run: no-such-run/);
+});
+
+test("`wf decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", async () => {
+  const { Effect } = await import('effect');
+  const { decideRun } = await import('../src/decide/decide.verb.ts');
+  const typed: EffectOf<Decided, Refusal, EngineService> = decideRun('x');
+  // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+  const infallible: EffectOf<Decided, never, EngineService> = decideRun('x');
   const unprovided = () =>
     // @ts-expect-error -- decideRun requires EngineService, and runPromise takes no requirement
     Effect.runPromise(decideRun('x'));
-  assert.equal(typeof unprovided, 'function');
+  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
 });
 
 /** `wf decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */

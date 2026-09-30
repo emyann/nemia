@@ -9,7 +9,8 @@
  * its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it is
  * and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
  * and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect program requires that same
- * Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed.
+ * Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and lifts each read with
+ * `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
  */
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
@@ -27,7 +28,7 @@ import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.sto
 import { CHECK } from './check/check.ts';
 import { HOME } from './record/record.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
-import { Invalid } from './refusal/refusal.ts';
+import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
 export type { ClaudeFlags, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
@@ -110,6 +111,23 @@ export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine =>
 export class EngineService extends Context.Service<EngineService, Engine>()('agent-orchestrator/Engine') {
   static readonly layer = (e: Engine): Layer.Layer<EngineService> => Layer.succeed(EngineService)(e);
 }
+
+/** What a read threw or rejected with, in a controller's program: a refusal (`isRefusal`) as its failure, anything else as a defect. */
+const orRefusal = (err: unknown): Effect.Effect<never, Refusal> => (isRefusal(err) ? Effect.fail(err) : Effect.die(err));
+
+/**
+ * A synchronous read of the store or of git, in a controller's program: what `read` returns, or the refusal it threw as the program's
+ * failure (`orRefusal`); anything else it threw, the program dies of.
+ */
+export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
+  Effect.try({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+
+/**
+ * A read of the engine, in a controller's program: what `read` resolves, or the refusal it rejected with as the program's failure
+ * (`orRefusal`); anything else it rejected with, the program dies of.
+ */
+export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
+  Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
 const LEFT_OUT =

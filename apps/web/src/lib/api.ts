@@ -20,6 +20,8 @@ export type * from './api/workflows.ts';
 export {
   BuildRefusal,
   createWorkflow,
+  factoryWorkflowsQuery,
+  placeQuery,
   repositoryQuery,
   saveWorkflow,
   startRun,

@@ -19,10 +19,14 @@ import {
 } from './library.ts';
 
 /**
- * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back.
- * `spec` and `body` are the step resolved; `own` is what a step with an agent sets itself, null for a step with none.
+ * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it. `spec` and `body` are the step
+ * resolved; `own` is what a step with an agent sets itself, null for a step with none; `hired` is the agent the factory the listing is in
+ * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory.
  */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null; hired: string | null };
+
+/** A step as the builder puts it back: a listed step without `hired`, which no step file writes. */
+export type StepWritten = Omit<ListedStep, 'hired'>;
 
 /**
  * Mirrors `StepOwn` in apps/api/src/workflows/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its
@@ -42,6 +46,7 @@ const ListedStepSchema = Schema.Struct({
   spec: WorkflowStepSpecSchema,
   body: Schema.String,
   own: Schema.NullOr(StepOwnSchema),
+  hired: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<ListedStep>;
 
 /**
@@ -66,6 +71,11 @@ export type WorkflowListing = {
   /** What the folder's files held when it was listed: a save carries it, and the api refuses one of a folder changed since (409). */
   version: string;
   error: string | null;
+  /**
+   * Why a run of it cannot start in the factory it is listed in, in the package's words: the steps its hires leave with no agent, and the
+   * hire that fills each. Null where every step has one, in the default factory, and for a folder that does not load.
+   */
+  unfilled: string | null;
 };
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours. */
@@ -83,6 +93,7 @@ const WorkflowListingSchema = Schema.Struct({
   folderTeam: Schema.Boolean,
   version: Schema.String,
   error: Schema.NullOr(Schema.String),
+  unfilled: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<WorkflowListing>;
 
 /** Every workflow there is. Not polled: it changes when a person edits a folder. Read again on each visit. */
@@ -90,6 +101,26 @@ export const workflowsQuery = queryOptions({
   queryKey: ['workflows'],
   queryFn: () => get('/api/workflows', Schema.mutable(Schema.Array(WorkflowListingSchema))),
 });
+
+/**
+ * Where a start runs and a listing is read, as the api resolves `?factory=` and `?repo=` (`placeFor`): a factory, and one of its
+ * repositories.
+ */
+export type Place = { factory: string; repo: string };
+
+/** The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none. */
+export const placeQuery = (place?: Place | null): string =>
+  !place || place.factory === 'default' ? '' : `?factory=${encodeURIComponent(place.factory)}&repo=${encodeURIComponent(place.repo)}`;
+
+/**
+ * The workflows a factory offers on one of its repositories, read with its hires: each says what they leave `unfilled`, and each step the
+ * agent `hired` into it. Keyed apart from `workflowsQuery`, which the builder drafts from: a builder never reads this one.
+ */
+export const factoryWorkflowsQuery = (place: Place) =>
+  queryOptions({
+    queryKey: ['factory-workflows', place.factory, place.repo],
+    queryFn: () => get(`/api/workflows${placeQuery(place)}`, Schema.mutable(Schema.Array(WorkflowListingSchema))),
+  });
 
 /**
  * Mirrors `WorkflowStepPage` in apps/api/src/workflows/workflows.ts: one step of a workflow — its body, its file as written, and every key
@@ -163,16 +194,22 @@ const StartedSchema = Schema.Struct({
  * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
  * already.
  *
+ * `place` starts it in a factory, on one of its repositories, as `wf start --factory` does (`placeQuery`): refused in the package's words
+ * for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
+ *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export const startRun = (start: {
-  workflow: string;
-  from: WorkflowListing['from'];
-  brief: string;
-  after?: readonly string[];
-  card?: string;
-}): Promise<Started> =>
-  send('POST', '/api/runs', StartedSchema, {
+export const startRun = (
+  start: {
+    workflow: string;
+    from: WorkflowListing['from'];
+    brief: string;
+    after?: readonly string[];
+    card?: string;
+  },
+  place?: Place | null,
+): Promise<Started> =>
+  send('POST', `/api/runs${placeQuery(place)}`, StartedSchema, {
     body: start,
     may: 'The run may have started: look on the Runs page before starting it again.',
   });
@@ -233,7 +270,7 @@ const build = (method: 'PUT' | 'POST', route: string, body: unknown): Promise<Wo
  */
 export const saveWorkflow = (
   name: string,
-  save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] },
+  save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[] },
 ): Promise<WorkflowSaved> =>
   build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, {
     version: save.version,
@@ -244,5 +281,5 @@ export const saveWorkflow = (
 /**
  * Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses.
  */
-export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
+export const createWorkflow = (name: string, step: StepWritten): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step });

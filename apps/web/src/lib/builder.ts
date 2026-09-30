@@ -3,7 +3,7 @@
  * step added or removed, a value set — and put back in the listing's shape. Pure. What a step may say is the package's to judge when the
  * draft is saved; the draft judges only what it needs to stay a draft: one step per name, and a name to call it by.
  */
-import type { GraphEdge, KeyField, KeyForm, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
+import type { GraphEdge, KeyField, KeyForm, ListedStep, RunGraph, SchemaFile, StepWritten, WorkflowListing, WorkflowStepSpec } from './api';
 import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
 
 /**
@@ -22,8 +22,11 @@ export function takes(form: Pick<KeyForm, 'keys' | 'remote'>, field: Pick<KeyFie
 export const remoteRefuses = (form: Pick<KeyForm, 'remote'>, key: keyof WorkflowStepSpec, harness: string): boolean =>
   !!form.remote && harness.startsWith(form.remote.prefix) && form.remote.refuses.includes(key);
 
-/** A step being built: as the listing has it, and a schema pasted for its `output:`, written beside it on save — null for none. */
-export type DraftStep = ListedStep & { schema: { file: string; text: string } | null };
+/**
+ * A step being built: as its file writes it, and a schema pasted for its `output:`, written beside it on save — null for none. It carries
+ * no `hired`: a factory's hire is the factory's, and no save writes it into a step file.
+ */
+export type DraftStep = StepWritten & { schema: { file: string; text: string } | null };
 
 /** The rounds a `loop:` runs when its step does not say: the package's `DEFAULT_ROUNDS`, which a loop drawn is given. */
 export const DEFAULT_ROUNDS = 3;
@@ -58,9 +61,25 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   rounds: null,
 };
 
-/** A folder's steps as a draft: as they are listed, nothing pasted — and none of its lists the listing's, which the page's cache holds. */
-export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =>
-  workflow.steps.map(({ name, spec, body, own }) => ({
+/**
+ * Why a listing cannot be drafted, or null: a step a factory hires an agent into, whose `spec.agent` is the hire and not what its file
+ * writes, so a save would write the hire into the file.
+ */
+const hiredRefusal = (steps: readonly ListedStep[]): string | null => {
+  const hired = steps.find((s) => s.hired !== null);
+  return hired
+    ? `The step ${hired.name} is listed with ${hired.hired}, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as GET /api/workflows lists it without ?factory= (workflowsQuery).`
+    : null;
+};
+
+/**
+ * A folder's steps as a draft: as they are listed, nothing pasted — and none of its lists the listing's, which the page's cache holds.
+ * Throws on a listing read in a factory that hires into one of its steps (`hiredRefusal`).
+ */
+export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] => {
+  const refused = hiredRefusal(workflow.steps);
+  if (refused) throw new Error(refused);
+  return workflow.steps.map(({ name, spec, body, own }) => ({
     name,
     spec: {
       ...spec,
@@ -74,6 +93,7 @@ export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =
     own: own && { keys: [...own.keys], body: own.body },
     schema: null,
   }));
+};
 
 const without = (list: readonly string[], name: string): string[] => list.filter((x) => x !== name);
 
@@ -278,7 +298,7 @@ export function orderOf(steps: readonly DraftStep[]): string[] {
 }
 
 /** A step as it is compared: its keys in one order, its body, what it sets itself, and a pasted schema. */
-const said = (step: ListedStep, schema: DraftStep['schema']): string =>
+const said = (step: StepWritten, schema: DraftStep['schema']): string =>
   JSON.stringify([
     Object.keys(step.spec)
       .sort()
@@ -299,7 +319,7 @@ export const unsaved = (steps: readonly DraftStep[], workflow: Pick<WorkflowList
   unsavedSteps(steps, workflow).length > 0 || workflow.steps.some((listed) => !steps.some((s) => s.name === listed.name));
 
 /** The draft as a save puts it: each step in the listing's shape, a pasted schema's file named by its `output:`. */
-export const toPut = (steps: readonly DraftStep[]): ListedStep[] =>
+export const toPut = (steps: readonly DraftStep[]): StepWritten[] =>
   steps.map(({ name, spec, body, own, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body, own }));
 
 /** The schemas pasted in the draft, as a save carries them: written beside the steps with them, judged with them first. */

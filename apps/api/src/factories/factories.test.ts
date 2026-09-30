@@ -223,15 +223,35 @@ test('POST /api/runs?factory= starts the run in the factory: its record names th
   assert.equal(listed.body.find((r) => r.id === id)?.factory, 'hired', 'the list names the factory the run is in');
 });
 
-test('REFUSED at shipped defaults: a card started in a factory is a 422 in the words of `wf start --factory`, and the card stays in the inbox', async () => {
+test('POST /api/runs?factory= starts a card in the factory: the record names the factory, its repository and the card, and the card leaves the inbox', async () => {
   const { card } = addToInbox({ text: 'Cache the views' });
-  const before = runFiles();
   const res = await post('/api/runs?factory=hired', { workflow: 'alpha', card: card.name });
+  assert.equal(res.status, 201, await res.clone().text());
+  const { id } = (await res.json()) as { id: string };
+  const run = runStore.runs.read(id);
+  assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
+  assert.ok(!readInbox().some((c) => c.name === card.name), 'the card has left the inbox');
+});
+
+test("REFUSED at shipped defaults: a card started in a factory whose hires leave the workflow's steps unfilled is a 422 in `start()`'s words, the card stays and nothing is written", async () => {
+  const { card } = addToInbox({ text: 'Cache the lists' });
+  const before = runFiles();
+  const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
   assert.equal(res.status, 422);
-  assert.match(
-    said(await res.json()),
-    /a card of the inbox is started in the default factory for now: a card does not name its factory yet/,
+  assert.equal(said(await res.json()), unfilledRefusal(loadWorkflows(path.join(repoR, 'workflows', 'alpha')), 'solo', 'alpha'));
+  assert.ok(
+    readInbox().some((c) => c.name === card.name),
+    'the card is still there',
   );
+  assert.deepEqual(runFiles(), before, 'nothing written');
+});
+
+test("the request's factory comes before the card's `factory:`: a card of hired started with ?factory=solo is refused as solo's, and stays", async () => {
+  const { card } = addToInbox({ text: 'Cache the pages', factory: 'hired' });
+  const before = runFiles();
+  const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });
+  assert.equal(res.status, 422, 'started in hired, the card would have run: hired fills alpha');
+  assert.equal(said(await res.json()), unfilledRefusal(loadWorkflows(path.join(repoR, 'workflows', 'alpha')), 'solo', 'alpha'));
   assert.ok(
     readInbox().some((c) => c.name === card.name),
     'the card is still there',

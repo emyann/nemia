@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { repositoryQuery, runsQuery, startRun, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
+import { repositoryQuery, runsQuery, startRun, type Place, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
 import { afterFor, ignoredRepoNote } from '../lib/inbox';
 
@@ -14,7 +14,8 @@ import { afterFor, ignoredRepoNote } from '../lib/inbox';
  * body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told
  * of a start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives
  * none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to wait on are
- * listed from. A card's start sits under the workflow it picks, with no rule of its own above it.
+ * listed from. A card's start sits under the workflow it picks, with no rule of its own above it. `place` starts it in a factory, on one
+ * of its repositories, which `repo` then is too.
  *
  * A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one, since there is no branch to
  * wait on: no picker is drawn and nothing about a repository, and the start sends what the workflow takes of the picks (`afterFor`), none
@@ -30,12 +31,14 @@ export function StartRun({
   workflow,
   card,
   repo,
+  place,
   onStarted,
   onRefused,
 }: {
   workflow: WorkflowListing;
   card?: { name: string; body: string };
   repo?: string;
+  place?: Place;
   onStarted?: (started: Started) => void;
   onRefused?: (message: string | null) => void;
 }) {
@@ -46,13 +49,16 @@ export function StartRun({
   const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[] }) =>
-      startRun({
-        workflow: workflow.name,
-        from: workflow.from,
-        brief: asked.brief,
-        ...(asked.after.length ? { after: asked.after } : {}),
-        ...(card ? { card: card.name } : {}),
-      }),
+      startRun(
+        {
+          workflow: workflow.name,
+          from: workflow.from,
+          brief: asked.brief,
+          ...(asked.after.length ? { after: asked.after } : {}),
+          ...(card ? { card: card.name } : {}),
+        },
+        place,
+      ),
     onMutate: () => onRefused?.(null),
     onSuccess: (started) => {
       if (!card) {
@@ -98,15 +104,7 @@ export function StartRun({
         >
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
-        <span className="min-w-0 text-xs text-neutral-500">
-          {inFolders ? (
-            'Works in folders it makes for each step'
-          ) : (
-            <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>
-          )}
-          , from <code className="font-mono break-all">{workflow.dir}</code>
-          {card && ', and the card leaves the inbox'}.
-        </span>
+        <Where workflow={workflow} repo={repo} factory={place?.factory} card={!!card} />
       </div>
       {ignored && (
         <p data-ignored-repo className="text-xs text-amber-700 dark:text-amber-400">
@@ -137,6 +135,30 @@ export function StartRun({
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * Where a start runs: in folders, for a team whose every step works in one, else on `repo` — this repository when none is given — and in
+ * `factory` when one is named; from the workflow's folder; and, for a card, that it leaves the inbox.
+ */
+function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
+  return (
+    <span className="min-w-0 text-xs text-neutral-500">
+      {workflow.folderTeam ? (
+        'Works in folders it makes for each step'
+      ) : (
+        <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>
+      )}
+      {factory && (
+        <>
+          {' '}
+          in the factory <code className="font-mono">{factory}</code>
+        </>
+      )}
+      , from <code className="font-mono break-all">{workflow.dir}</code>
+      {card && ', and the card leaves the inbox'}.
+    </span>
   );
 }
 

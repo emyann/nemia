@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { KeyField, KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import type { KeyField, KeyForm, ListedStep, StepWritten, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
   addStep,
   connect,
@@ -43,6 +43,7 @@ const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${
   spec: spec(fields),
   body,
   own: null,
+  hired: null,
 });
 
 /** implement ⇄ review, as the listing has a folder of yours. */
@@ -52,6 +53,9 @@ const folder: Pick<WorkflowListing, 'steps'> = {
     listed('review', { after: ['implement'], output: 'review.schema.json', loop: 'implement', rounds: 3 }),
   ],
 };
+
+/** Listed steps as their files write them, as a save puts them back: without the factory's `hired`. */
+const written = (steps: readonly ListedStep[]): StepWritten[] => steps.map(({ name, spec, body, own }) => ({ name, spec, body, own }));
 
 const specOf = (steps: readonly DraftStep[], name: string) => steps.find((s) => s.name === name)!.spec;
 
@@ -63,7 +67,7 @@ test('a folder as a draft is as it is listed, unsaved nowhere, and puts back as 
   );
   assert.equal(unsaved(draft, folder), false);
   assert.deepEqual(unsavedSteps(draft, folder), []);
-  assert.deepEqual(toPut(draft), folder.steps);
+  assert.deepEqual(toPut(draft), written(folder.steps));
   setKey(draft, 'implement', 'model', 'opus');
   draft[0].spec.after.push('x');
   assert.deepEqual(folder.steps[0].spec.after, [], 'the draft is a copy: it changes, and the listing does not');
@@ -223,6 +227,7 @@ test("a folder written goes into the page's listing in the listing's order: the 
     folderTeam: false,
     version: '0',
     error: null,
+    unfilled: null,
   });
   const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'yours')];
   assert.deepEqual(
@@ -247,13 +252,14 @@ const attached: Pick<WorkflowListing, 'steps'> = {
       spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
       body: 'You write code.\n\nMind the cache.',
       own: { keys: ['check'], body: 'Mind the cache.' },
+      hired: null,
     },
   ],
 };
 
 test("a step with an agent: a key changed is its own, one unset is its agent's again, and its body is its own note — each a change, put back with what it sets itself", () => {
   const draft = draftOf(attached);
-  assert.deepEqual(toPut(draft), attached.steps, 'as listed');
+  assert.deepEqual(toPut(draft), written(attached.steps), 'as listed');
   assert.equal(unsaved(draft, attached), false);
 
   const lower = setKey(draft, 'build', 'effort', 'low');
@@ -374,4 +380,19 @@ test('a step on a remote A2A agent has none of the keys the package refuses ther
     true,
     'an api that sends no `remote`, which the type does not allow, has nothing hidden for it',
   );
+});
+
+test("REFUSED: a listing read in a factory that hires into a step is not drafted — a save would write the hire into the step's file", () => {
+  const hiredIn = (hired: string | null): Pick<WorkflowListing, 'steps'> => ({
+    steps: [{ ...listed('implement', { agent: 'ada', harness: 'claude' }), hired }],
+  });
+  assert.throws(
+    () => draftOf(hiredIn('ada')),
+    (err: Error) =>
+      err.message ===
+      'The step implement is listed with ada, the agent its factory hires into it, which its file does not write: the builder drafts a folder as its files write it. Open the builder on the folder as GET /api/workflows lists it without ?factory= (workflowsQuery).',
+  );
+  const unhired = toPut(draftOf(hiredIn(null)));
+  assert.equal('hired' in unhired[0], false, 'a step put carries no hire');
+  assert.equal(unhired[0].spec.agent, 'ada', 'drafted, a step whose file writes an agent puts it back');
 });

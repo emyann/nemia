@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
-import { factoryBlocks, MENU_SHOWN, menuFactories, queuedIn, runsIn, type FactoryRun } from '../src/lib/factories.ts';
+import { factoryBlocks, MENU_SHOWN, menuFactories, queuedIn, runsIn, startRepo, type FactoryRun } from '../src/lib/factories.ts';
+import { placeQuery } from '../src/lib/api/workflows.ts';
 
 /** A factory as the api lists it: attached to one repository and one workflow, with one hire. */
 const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
@@ -116,4 +117,18 @@ test('the menu shows the first five factories and says how many more there are; 
   assert.deepEqual([five.shown.length, five.hidden], [5, 0]);
   const six = menuFactories(blocks(6), false);
   assert.deepEqual([six.shown.length, six.hidden], [5, 1]);
+});
+
+test("a card starts on its repo:, else on the factory's one repository; with several and no repo:, on none until a person picks", () => {
+  assert.equal(startRepo(factory('solo', { repos: ['/r/a', '/r/b'] }), '/r/b'), '/r/b');
+  assert.equal(startRepo(factory('solo'), null), '/code/nemia');
+  assert.equal(startRepo(factory('pair', { repos: ['/r/a', '/r/b'] }), null), null);
+  assert.equal(startRepo(factory('none', { repos: [] }), null), null);
+});
+
+test("a place is named in a request's query, encoded; the default factory and no place name none, as the api answers them alike", () => {
+  assert.equal(placeQuery(), '');
+  assert.equal(placeQuery(null), '');
+  assert.equal(placeQuery({ factory: 'default', repo: '/code/app' }), '');
+  assert.equal(placeQuery({ factory: 'hiring', repo: '/r/x' }), '?factory=hiring&repo=%2Fr%2Fx');
 });

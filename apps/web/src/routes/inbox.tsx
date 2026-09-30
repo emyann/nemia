@@ -1,7 +1,9 @@
 import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { FactoryCardStart } from '../components/FactoryCardStart';
 import { StartRun } from '../components/StartRun';
+import { FIELD, WorkflowOptions } from '../components/WorkflowOptions';
 import {
   dropCard,
   fileCard,
@@ -11,7 +13,7 @@ import {
   workflowNameOf,
   workflowsQuery,
   type InboxEntry,
-  type WorkflowListing,
+  type Started,
 } from '../lib/api';
 import {
   cardLines,
@@ -39,8 +41,6 @@ export const Route = createFileRoute('/inbox')({
 
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
-const FIELD =
-  'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 const PRIMARY =
   'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
 const SECONDARY =
@@ -100,18 +100,6 @@ function InboxPage() {
       </section>
     </article>
   );
-}
-
-/** The workflows a card can name: those that read, the repository's then yours, as the Workflows page lists them. */
-function WorkflowOptions({ workflows }: { workflows: readonly WorkflowListing[] }) {
-  return workflows
-    .filter((w) => w.error === null)
-    .map((w) => (
-      <option key={workflowKey(w)} value={workflowKey(w)}>
-        {w.name}
-        {w.from === 'yours' ? ' (yours)' : ''}
-      </option>
-    ));
 }
 
 /**
@@ -481,10 +469,9 @@ function Refused({ refusal }: { refusal: CardRefusal }) {
 }
 
 /**
- * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. The workflows
- * listed are those of the api's repository: a card about another repository names a workflow of that one, and presets none of these. A
- * start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays. A
- * refusal is `onRefused`'s to show, since the form may not outlive it.
+ * A card's start: in the factory it names (`FactoryCardStart`), or, for a card of the default factory, on the api's repository
+ * (`StartHere`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and
+ * the page stays. A refusal is `onRefused`'s to show, since the form may not outlive it.
  */
 function StartCard({
   entry,
@@ -496,6 +483,31 @@ function StartCard({
   onRefused: (message: string | null) => void;
 }) {
   const navigate = useNavigate();
+  const onStarted = (started: Started) => {
+    if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
+    else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
+  };
+  return entry.factory !== null && entry.factory !== 'default' ? (
+    <FactoryCardStart entry={entry} onStarted={onStarted} onRefused={onRefused} />
+  ) : (
+    <StartHere entry={entry} onStarted={onStarted} onRefused={onRefused} />
+  );
+}
+
+/**
+ * A card's start on the api's repository: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from
+ * its body. The workflows listed are those of the api's repository: a card about another repository names a workflow of that one, and
+ * presets none of these.
+ */
+function StartHere({
+  entry,
+  onStarted,
+  onRefused,
+}: {
+  entry: InboxEntry;
+  onStarted: (started: Started) => void;
+  onRefused: (message: string | null) => void;
+}) {
   const workflows = useQuery(workflowsQuery);
   const repository = useQuery(repositoryQuery);
   const here = repository.data?.repo;
@@ -543,10 +555,7 @@ function StartCard({
           workflow={workflow}
           card={{ name: entry.name, body: entry.body ?? '' }}
           {...(entry.repo ? { repo: entry.repo } : {})}
-          onStarted={(started) => {
-            if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
-            else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
-          }}
+          onStarted={onStarted}
           onRefused={onRefused}
         />
       )}

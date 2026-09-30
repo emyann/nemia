@@ -8,7 +8,7 @@ import type { Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline, type TaskClock } from '../timeline/timeline.ts';
 import { factsOf, statsOf, statsQueryOf, type CheckVerdict, type Facts } from './stats.ts';
-import { statsLine } from './stats-words.ts';
+import { statsLine, statsLines } from './stats-words.ts';
 
 const MIN = 60_000;
 const minus = (at: string, ms: number): string => new Date(Date.parse(at) - ms).toISOString();
@@ -344,4 +344,22 @@ test('a loop that asked for another round leaves a run with no ending waiting, u
     [[1]],
     'an acceptance of the try the loop is on finishes the run',
   );
+});
+
+test('a day whose runs never recorded their landing has no landed count, printed —; a day with one recorded counts it', () => {
+  const prose = TEAM.map((s) => (s.workspace === 'main' ? { ...s, check: undefined } : s));
+  const old = (id: string) =>
+    readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+  const unknown = factsOfAll(old('old-1'), old('old-2'));
+  const s = statsOf(unknown, { by: 'workflow' }, NOW);
+  assert.deepEqual(
+    [s.all.total.runs, s.all.total.landed, s.all.total.firstTry],
+    [2, null, null],
+    'two runs finished, and no record says whether either landed',
+  );
+  assert.equal(s.groups[0].days.find((d) => d.day === DAY)?.landed, null);
+  const row = statsLines(s).find((line) => line.startsWith(`${DAY}  `));
+  assert.match(row ?? '', new RegExp(`^${DAY}\\s+2\\s+—\\s`), 'the day row reads — under landed, not 0');
+  const mixed = statsOf(factsOfAll(old('old-1'), old('old-2'), twoRounds('landed')), {}, NOW);
+  assert.deepEqual([mixed.all.total.runs, mixed.all.total.landed], [3, 1], 'one run of the day recorded its landing');
 });

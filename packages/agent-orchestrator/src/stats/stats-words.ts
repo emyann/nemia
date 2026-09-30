@@ -14,7 +14,7 @@ const oneDecimal = (n: number): string => (Math.round(n * 10) / 10).toString();
 /** A headline's numbers in words, by the name each is printed under. */
 const wordsOf = (h: Headline): Record<string, string> => ({
   runs: String(h.runs),
-  landed: String(h.landed),
+  landed: or(h.landed, String),
   rounds: or(h.rounds, oneDecimal),
   'first try': or(h.firstTry, percent),
   'cost/landed': or(h.costPerLanded, dollars),

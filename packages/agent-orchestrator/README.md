@@ -129,13 +129,15 @@ wf stats --json                            # what GET /api/stats answers
 ```
 
 - **A number nothing measured is absent** — `—` in words, null in JSON — never 0: a run with a session
-  not measured has no cost, and a workflow with no `loop:` step has no rounds.
+  not measured has no cost, a workflow with no `loop:` step has no rounds, and a day on which no run
+  recorded whether it landed has no landed count.
 - **A try falls on the UTC day it ended, a run on the day it finished**: its ending step's landing
   settled (committed, aborted or untouched), or, for an ending that commits in its own prose and so
   never says how it landed, its current try done (its session succeeded and not blocked, its check
   passed) and none in flight — its landing then unknown, `—`. With no ending step, every step's current
   try done and none in flight. A run waiting on a person — a check refused or unfinished, a session
-  failed — has not finished, nor has a cancelled one.
+  failed or blocked, a loop that asked for another round nobody accepted — has not finished, nor has a
+  cancelled one.
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited

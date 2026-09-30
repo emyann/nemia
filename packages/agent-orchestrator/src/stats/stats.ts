@@ -229,14 +229,15 @@ function runFactOf(r: RunRead): RunFact[] {
 export const factsOf = (r: RunRead): Facts => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
- * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed. `rounds` is the mean rounds
+ * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed, null where no run recorded
+ * whether it landed. `rounds` is the mean rounds
  * to acceptance, `firstTry` the share of landed runs that landed on their first try, `costPerLanded` and `timePerLanded` the mean cost and
  * wall time of a landed run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
  * wait at a gate. Each mean over nothing is null.
  */
 export type Headline = {
   runs: number;
-  landed: number;
+  landed: number | null;
   rounds: number | null;
   firstTry: number | null;
   costPerLanded: number | null;
@@ -292,7 +293,7 @@ export function headlineOf(f: Facts): Headline {
   const landed = f.runs.filter((r) => r.landed === true);
   return {
     runs: f.runs.length,
-    landed: landed.length,
+    landed: f.runs.some((r) => r.landed !== null) ? landed.length : null,
     rounds: mean(f.runs.flatMap((r) => r.rounds)),
     firstTry: landed.length ? landed.filter((r) => r.firstTry === true).length / landed.length : null,
     costPerLanded: mean(landed.map((r) => r.costUsd)),

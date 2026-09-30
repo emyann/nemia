@@ -515,7 +515,7 @@ export type RunStore = {
      * with none. None when there is no inbox yet.
      */
     readonly entries: () => Array<{ file: string; text: string }>;
-    /** The text of the inbox's entry `file` (`<name>.md` for a card), or null when it cannot be read: gone, a folder, unreadable. */
+    /** The text of the inbox's entry `file` (`<name>.md` for a card), or null when it is not there. Throws what else the filesystem throws. */
     readonly read: (file: string) => string | null;
     /** When the entry `file` was last written, as an ISO time: a card's filing time. Null when it is gone. */
     readonly filedAt: (file: string) => string | null;

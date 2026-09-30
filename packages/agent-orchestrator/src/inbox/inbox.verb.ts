@@ -2,7 +2,6 @@
  * Starting an inbox card (`startFromInbox`) and the queue's next card (`startQueued`, which the tick calls), each through `start`, then
  * taking the card out of the inbox. A controller: it reaches the runtime through `start/start.verb.ts`.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { WorkflowError } from '../step/step.ts';
 import { loadWorkflows, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
@@ -20,8 +19,9 @@ import {
 } from './inbox.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isGitRun, type Run } from '../record/record.ts';
-import { isDirectory, listRuns } from '../record/record.store.ts';
-import { inboxCards, inboxDir, inboxFiles, queueDir, queueTries } from './inbox.store.ts';
+import { isDirectory } from '../record/record.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxCards } from './inbox.store.ts';
 import { placesOf, start } from '../start/start.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
@@ -82,18 +82,16 @@ export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);
   if (refused) throw new WorkflowError(refused);
-  const file = path.join(inboxDir(), `${opts.name}.md`);
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  const file = runStore.inbox.where(`${opts.name}.md`);
+  const text = runStore.inbox.read(`${opts.name}.md`);
+  if (text === null) {
     throw new Missing({
-      message: `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${path.join(inboxDir(), '<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
+      message: `${noCardLine(opts.name, inboxCards())} Start one of those — wf start ${runStore.inbox.where('<name>.md')} — or park the idea first: wf inbox add "<idea>".`,
     });
   }
   const card = parseInboxCard(`${opts.name}.md`, text, isDirectory);
-  const started = listRuns()
+  const started = runStore.runs
+    .list()
     .filter((r) => r.from?.inbox === card.name)
     .map((r) => r.id);
   if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
@@ -133,7 +131,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   });
   const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
   try {
-    fs.rmSync(file, { force: true });
+    runStore.inbox.drop(`${opts.name}.md`);
   } catch (err) {
     return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}`, ...ignoredRepo };
   }
@@ -155,14 +153,14 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
  * card again. The inbox and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way, or
  * on a later pass when it cannot be.
  */
-export function startQueued(repo: string, runs: readonly Run[] = listRuns()): QueueStarted | undefined {
-  const files = inboxFiles();
-  const tries = queueTries();
+export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.list()): QueueStarted | undefined {
+  const files = runStore.inbox.entries();
+  const tries = runStore.inbox.tries();
   const listing = inboxListing(files, runs, isDirectory, tries);
   for (const name of tries.keys()) {
     if (listing.some((l) => l.name === name && l.tried)) continue;
     try {
-      fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true });
+      runStore.inbox.dropTry(name);
     } catch {}
   }
   const next = nextQueued(listing, repo);
@@ -187,8 +185,7 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
       return { card: next.name, failed: why, again: true, ...where };
     const tried: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
     try {
-      fs.mkdirSync(queueDir(), { recursive: true });
-      fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(tried, null, 2));
+      runStore.inbox.putTry(next.name, tried);
     } catch {}
     return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
   }

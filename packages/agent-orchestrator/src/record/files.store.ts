@@ -106,16 +106,21 @@ function inboxEntries(): Array<{ file: string; text: string }> {
   return names.map((name) => {
     const at = path.join(inboxDir(), name);
     if (isDirectory(at)) return { file: `${name}/`, text: '' };
-    return { file: name, text: name.endsWith('.md') ? (readInboxFile(name) ?? '') : '' };
+    try {
+      return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
+    } catch {
+      return { file: name, text: '' };
+    }
   });
 }
 
-/** The text of the inbox's entry `file`, or null when it cannot be read. */
+/** The text of the inbox's entry `file`, or null when it is not there. */
 function readInboxFile(file: string): string | null {
   try {
     return fs.readFileSync(path.join(inboxDir(), file), 'utf8');
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
   }
 }
 

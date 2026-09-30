@@ -1,15 +1,14 @@
 /**
- * The inbox on disk: its cards read (`readInbox`), filed (`addToInbox`), queued and taken back (`queueInInbox`), dropped
- * (`dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files — the tries the tick wrote down of a queued card's start
- * (`queueDir`, `queueTries`). The judgement is `inbox.ts`'s; this reads and writes.
+ * The inbox's verbs: its cards read (`readInbox`), filed (`addToInbox`), queued and taken back (`queueInInbox`), dropped
+ * (`dropFromInbox`), and a path named as a card (`inboxNameAt`), each card and each try the tick wrote down of a queued card's start read
+ * and written through `runStore.inbox` (`files.store.ts`). The judgement is `inbox.ts`'s.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
+ * Beneath the controllers, beside `files.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
 import {
   ideaCard,
   inboxListing,
@@ -22,89 +21,27 @@ import {
   queueRefusal,
   type InboxCard,
   type InboxListing,
-  type QueueTry,
 } from './inbox.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
-import { HOME, isDirectory, listRuns, runId, runsDir } from '../record/record.store.ts';
-
-/**
- * The inbox: cards before they are started, one `<name>.md` per card (`parseInboxCard` in inbox.ts), in the store beside `runs/` — not in a
- * repository, since a card's `repo:` says which one the idea is about.
- */
-export const inboxDir = (): string => path.join(HOME, 'inbox');
-
-/**
- * The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when
- * there is no inbox yet.
- */
-export function inboxFiles(): Array<{ file: string; text: string }> {
-  let names: string[];
-  try {
-    names = fs.readdirSync(inboxDir());
-  } catch {
-    return [];
-  }
-  return names.map((name) => {
-    const at = path.join(inboxDir(), name);
-    if (isDirectory(at)) return { file: `${name}/`, text: '' };
-    try {
-      return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
-    } catch {
-      return { file: name, text: '' };
-    }
-  });
-}
+import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 
 /** The names of the inbox's cards, as `wf inbox` lists them. */
 export const inboxCards = (): string[] =>
-  inboxListing(inboxFiles(), [], () => true)
+  inboxListing(runStore.inbox.entries(), [], () => true)
     .filter((l) => l.file.endsWith('.md'))
     .map((l) => l.name);
-
-/**
- * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox,
- * which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued
- * as it was — started, taken back, dropped or edited.
- */
-export const queueDir = (): string => path.join(HOME, 'queue');
-
-/** A try as the tick writes it (`QueueTry`); any key beside these is left unread. */
-const isQueueTry = Schema.is(
-  Schema.Struct({ at: Schema.String, text: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean }),
-);
-
-/**
- * The tries the tick has written down, by card name. A file that does not read as one, torn or removed after the listing, is none: the card
- * is tried, and written again.
- */
-export function queueTries(): Map<string, QueueTry> {
-  const tries = new Map<string, QueueTry>();
-  let names: string[];
-  try {
-    names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json'));
-  } catch {
-    return tries;
-  }
-  for (const file of names) {
-    try {
-      const r: unknown = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8'));
-      if (isQueueTry(r))
-        tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-    } catch {}
-  }
-  return tries;
-}
 
 /**
  * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does
  * not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
  * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
-export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
+export const readInbox = (): InboxListing[] => inboxListing(runStore.inbox.entries(), runStore.runs.list(), isDirectory, runStore.inbox.tries());
 
 /**
  * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
@@ -148,17 +85,10 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
   const refusedRepo = cardRepoRefusal(opts);
   if (refusedRepo) throw new WorkflowError(refusedRepo);
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
-  fs.mkdirSync(inboxDir(), { recursive: true });
   for (;;) {
     const name = runId(body.split('\n')[0]);
-    const file = path.join(inboxDir(), `${name}.md`);
-    try {
-      fs.writeFileSync(file, text, { flag: 'wx' });
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
-      throw err;
-    }
-    return { card: parseInboxCard(`${name}.md`, text, isDirectory), file };
+    if (!runStore.inbox.add(`${name}.md`, text)) continue;
+    return { card: parseInboxCard(`${name}.md`, text, isDirectory), file: runStore.inbox.where(`${name}.md`) };
   }
 }
 
@@ -188,12 +118,9 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
 export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
   const refused = inboxNameRefusal(name);
   if (refused) throw new WorkflowError(refused);
-  const file = path.join(inboxDir(), `${name}.md`);
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  const file = runStore.inbox.where(`${name}.md`);
+  const text = runStore.inbox.read(`${name}.md`);
+  if (text === null) {
     throw new Missing({
       message: `${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`,
     });
@@ -212,15 +139,7 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     if (refusedRepo) throw new WorkflowError(refusedRepo);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
-  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
-  const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
-  fs.writeFileSync(hidden, written);
-  fs.renameSync(hidden, file);
-  if (filed) {
-    try {
-      fs.utimesSync(file, filed, filed);
-    } catch {}
-  }
+  runStore.inbox.rewrite(`${name}.md`, written);
   const now = parseInboxCard(`${name}.md`, written, exists);
   if (how.off) return { card: now, file, was: 'taken back' };
   const order = queueOrder(readInbox());
@@ -238,11 +157,10 @@ export type InboxDropped = { removed: true; file: string } | { removed: false; c
 export function dropFromInbox(name: string): InboxDropped {
   const refused = inboxNameRefusal(name);
   if (refused) throw new WorkflowError(refused);
-  const file = path.join(inboxDir(), `${name}.md`);
+  const file = runStore.inbox.where(`${name}.md`);
   try {
-    fs.rmSync(file);
+    if (!runStore.inbox.drop(`${name}.md`)) return { removed: false, cards: inboxCards() };
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { removed: false, cards: inboxCards() };
     throw Object.assign(
       new Error(
         `wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,

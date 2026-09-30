@@ -1,5 +1,6 @@
 /**
- * The feed on disk (`wf feed`, `wf watch`): what the tick judged of each run and each step, a line each time it changed, in a store of its own.
+ * The feed on disk (`wf feed`, `wf watch`): what the tick judged of each run and each step, a line each time it changed, in a store of its
+ * own.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: the runs of the other store tests would
  * be in it. The fold and the diff are pure, and are tested here beside the file, since what matters of them is what the file ends up
@@ -35,8 +36,8 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
 
 /**
- * An engine board a test settles by hand, as queue-store.test.ts's: a task filed is `pending`, one given a live word (`running (working)`) is
- * running with it, and a settled one carries the closeout it is given. It counts its reads, so a test can say the feed asked for none.
+ * An engine board a test settles by hand, as queue-store.test.ts's: a task filed is `pending`, one given a live word (`running (working)`)
+ * is running with it, and a settled one carries the closeout it is given. It counts its reads, so a test can say the feed asked for none.
  */
 const board = () => {
   const tasks = new Map<string, { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown }>();

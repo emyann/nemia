@@ -34,11 +34,11 @@ const busy = (ms: number) => {
 
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
- * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that keeps no
- * totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has each word,
- * and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the pass reads
- * it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a
- * runtime that counts none.
+ * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that
+ * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has
+ * each word, and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the
+ * pass reads it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the
+ * fake is a runtime that counts none.
  */
 const fake = ({
   passMs = 0,

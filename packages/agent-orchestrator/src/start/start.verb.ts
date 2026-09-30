@@ -38,9 +38,9 @@ const NOT_BRIDGED =
 const JOB_NOT_BRIDGED = 'only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge';
 
 /**
- * The first step that says `remote: true` where the engine refuses `claude.remoteControl` — every one of `HARNESSES` but Claude Code's, as the
- * engine's own door judges (`NOT_BRIDGED`), and on Claude Code every step but a background session (`JOB_NOT_BRIDGED`) — refused by name
- * in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
+ * The first step that says `remote: true` where the engine refuses `claude.remoteControl` — every one of `HARNESSES` but Claude Code's, as
+ * the engine's own door judges (`NOT_BRIDGED`), and on Claude Code every step but a background session (`JOB_NOT_BRIDGED`) — refused by
+ * name in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
  */
 function remoteRefusal(steps: readonly Workflow[]): string | undefined {
   const bridged = Object.entries(HARNESSES)
@@ -60,13 +60,13 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
  * - a folder that is not a workflow (`loadWorkflows`);
- * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that can
- *   run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run does
- *   not have into the branch it stands on;
+ * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that
+ *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
+ *   does not have into the branch it stands on;
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
  *   under those names, and would read one task as the other;
- * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine refuses
- *   them only when the step is filed, with the run on the record.
+ * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine
+ *   refuses them only when the step is filed, with the run on the record.
  */
 export function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
   const steps = loadWorkflows(workflowDir, places);
@@ -139,7 +139,10 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
   return `${missing.s.name}: \`harness: ${missing.s.harness}\` names a remote A2A agent \`${missing.name}\`, and ${file} ${has}. Add it there — \`{ "${missing.name}": { "url": "https://…" } }\`, the agent's base URL, where its card is served — or name a declared one.`;
 }
 
-/** A `.worktreeinclude` with lines `start` refuses, refused where a person is looking, rather than line by line in a daemon's log. Only a run that cuts worktrees reads the file. */
+/**
+ * A `.worktreeinclude` with lines `start` refuses, refused where a person is looking, rather than line by line in a daemon's log. Only a
+ * run that cuts worktrees reads the file.
+ */
 export function refuseInclude(repo: string, isolate: boolean): void {
   const refused = isolate ? (readInclude(repo)?.refused ?? []) : [];
   if (refused.length) {
@@ -158,7 +161,8 @@ export function refuseInclude(repo: string, isolate: boolean): void {
  * when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and their
  * names frozen on the record. Left out, no directory is made, and the record has no `inputs`.
  *
- * `from` says where the brief came from — the inbox card `startFromInbox` starts — and is frozen on the record. Left out, the record has none.
+ * `from` says where the brief came from — the inbox card `startFromInbox` starts — and is frozen on the record. Left out, the record has
+ * none.
  *
  * `gates` are the steps whose closeout waits for a person before anything after them is filed, beside those the workflow gates itself
  * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow

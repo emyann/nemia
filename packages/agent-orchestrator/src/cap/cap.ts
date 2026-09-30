@@ -149,9 +149,9 @@ export function heldCheckouts(claims: readonly MainClaim[]): Map<string, Checkou
 }
 
 /**
- * The cap on runs in flight (`WF_MAX_RUNS`), and how many are in flight as a run with nothing filed is judged: every run that has started and
- * is in flight on the pass (`slotNeed`), then each run with nothing filed admitted before it, oldest first (`admissionOrder`) — serial, as the
- * engine admits its tasks, so a run admitted on a pass counts for the next one on the same pass. `cap` 0 is no cap.
+ * The cap on runs in flight (`WF_MAX_RUNS`), and how many are in flight as a run with nothing filed is judged: every run that has started
+ * and is in flight on the pass (`slotNeed`), then each run with nothing filed admitted before it, oldest first (`admissionOrder`) — serial,
+ * as the engine admits its tasks, so a run admitted on a pass counts for the next one on the same pass. `cap` 0 is no cap.
  */
 export type RunSlot = { inFlight: number; cap: number };
 
@@ -164,11 +164,11 @@ export type RunSlot = { inFlight: number; cap: number };
  * no person, and would otherwise free the very slot it is queued for. A cancelled run counts while the engine is still stopping what it
  * had in flight; one that waits on a person, or has finished, does not.
  *
- * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
- * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
+ * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is
+ * what it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
  *
- * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap holds,
- * so the cap neither counts it nor holds it.
+ * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap
+ * holds, so the cap neither counts it nor holds it.
  *
  * @param steps The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted.
  */
@@ -195,14 +195,17 @@ export function slotNeed(
 export const takesNoSlot = (steps: readonly Pick<Workflow, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
 
 /**
- * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
- * started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and for one
- * whose workflow takes no slot at all (`takesNoSlot`).
+ * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that
+ * has started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and
+ * for one whose workflow takes no slot at all (`takesNoSlot`).
  */
 export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<Workflow, 'slot'>[] = []): boolean =>
   hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
 
-/** Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has been advanced. */
+/**
+ * Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has
+ * been advanced.
+ */
 export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;
 
 /** Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure. */
@@ -210,9 +213,9 @@ export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: re
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
 /**
- * The runs the cap holds, each with the count it was held at, as a pass would judge them from the store as it stands (`slotNeed`): every run
- * in flight counted, then each that wants a slot admitted oldest first while one is free — and counted — and held once none is. Pure. What
- * `wf ls` and `wf decide` say between passes; none with no cap.
+ * The runs the cap holds, each with the count it was held at, as a pass would judge them from the store as it stands (`slotNeed`): every
+ * run in flight counted, then each that wants a slot admitted oldest first while one is free — and counted — and held once none is. Pure.
+ * What `wf ls` and `wf decide` say between passes; none with no cap.
  */
 export function heldRuns(
   runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>,
@@ -235,8 +238,9 @@ export const SLOT_WAIT = 'waiting for a run slot';
 export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**
- * The daemon's two ceilings, as `wf up` says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude` with `claude-detached`,
- * `codex` and checks each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when none.
+ * The daemon's two ceilings, as `wf up` says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude` with
+ * `claude-detached`, `codex` and checks each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when
+ * none.
  */
 export const ceilingLines = (c: { sessions: number; runs: number }): string[] => [
   `sessions at work per pool: at most ${c.sessions} at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)`,

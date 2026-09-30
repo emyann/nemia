@@ -9,7 +9,10 @@
 export { durationWord } from './status/status.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath; closeout.ts imports nothing from here. */
 export { declaredOutput, parseCloseout } from './closeout/closeout.ts';
-/** Re-exported for apps/api, which reads a closeout's questions and writes a person's answers to them from the `agent-orchestrator/run` subpath. */
+/**
+ * Re-exported for apps/api, which reads a closeout's questions and writes a person's answers to them from the `agent-orchestrator/run`
+ * subpath.
+ */
 export { answerRefusal, answerText, askedQuestions, questionsOf } from './question/question.ts';
 export type { Answer, Asked, Question, QuestionOption } from './question/question.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */

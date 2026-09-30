@@ -229,8 +229,8 @@ export type Advanced = {
  * so it is safe to run repeatedly, safe to interrupt, and correct after a restart with no memory
  * of what it did last time.
  *
- * `slot` is the cap on runs in flight as `tick` judges this run (`runAdmitted`): a run with nothing filed files its roots only while a slot is
- * free, and the first pass that holds it writes when (`slotHeldAt`). Left out, nothing holds it.
+ * `slot` is the cap on runs in flight as `tick` judges this run (`runAdmitted`): a run with nothing filed files its roots only while a slot
+ * is free, and the first pass that holds it writes when (`slotHeldAt`). Left out, nothing holds it.
  */
 export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
   return (await advanceRun(e, run, slot)).advanced;
@@ -344,7 +344,10 @@ async function readPass(e: Engine, run: Run): Promise<{ reads: PassReads; askNot
   return { reads: { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks }, askNotes };
 }
 
-/** Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step adopted. */
+/**
+ * Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step
+ * adopted.
+ */
 async function adoptAll(e: Engine, run: Run, r: PassReads): Promise<string[]> {
   const rounds = await adoptRounds(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.roundAsks, r.spendOf);
   const tries = await adoptTries(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.verdictOf, r.asks, r.spendOf);
@@ -574,8 +577,8 @@ export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (task
 
 /**
  * Close a task held open that waits for a word (`e.close`): undefined once closed, and the engine's refusal in its words where it refused
- * (an `Error` whose `exitCode` is 2 — the task was answered, settled or stopped since this pass read it). A refusal is a note, not a failure
- * of the pass: the next pass reads the task again. Any other error is the engine's, and thrown.
+ * (an `Error` whose `exitCode` is 2 — the task was answered, settled or stopped since this pass read it). A refusal is a note, not a
+ * failure of the pass: the next pass reads the task again. Any other error is the engine's, and thrown.
  */
 async function closeHeld(e: Engine, taskId: string): Promise<string | undefined> {
   try {
@@ -588,10 +591,10 @@ async function closeHeld(e: Engine, taskId: string): Promise<string | undefined>
 }
 
 /**
- * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `wf cancel`, `wf rm` — at once rather
- * than on the next pass. A close is no stop: nothing is running, and the engine settles the task as it signed. Only a step's current task can
- * wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a cancelled
- * run's next pass closes it again (the sweep in `advance`).
+ * Close each step's task held open that waits for a word, for a verb that ends what the run waits on — `wf cancel`, `wf rm` — at once
+ * rather than on the next pass. A close is no stop: nothing is running, and the engine settles the task as it signed. Only a step's current
+ * task can wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a
+ * cancelled run's next pass closes it again (the sweep in `advance`).
  */
 export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<string, TaskView>): Promise<string[]> {
   const waits = waitsForWord(views);

@@ -1659,7 +1659,10 @@ test('an output schema is read strict wherever an object can sit — and one tha
   }
 });
 
-/** implement → review, declaring `findings` and `again`, with `reviewKeys` beside `after` and `output` — and whatever `files` add or replace. */
+/**
+ * implement → review, declaring `findings` and `again`, with `reviewKeys` beside `after` and `output` — and whatever `files` add or
+ * replace.
+ */
 const loopFiles = (reviewKeys: string, files: Record<string, string | object | null> = {}) => ({
   'review.md': `---\nafter: implement\noutput: review.schema.json\n${reviewKeys}\n---\nreview it\n`,
   'review.schema.json': LOOPING,

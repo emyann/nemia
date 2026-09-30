@@ -8,7 +8,10 @@ import { readPlan } from './plan.store.ts';
 import { placesOf, refuseInclude, start, stepsToStart } from '../start/start.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
-/** What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a `start()` refused part-way, which card, why, and the cards after it. */
+/**
+ * What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a `start()`
+ * refused part-way, which card, why, and the cards after it.
+ */
 export type PlanStarted = {
   started: Planned[];
   folderOf: (card: Card) => string;

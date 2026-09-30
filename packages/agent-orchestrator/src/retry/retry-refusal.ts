@@ -78,10 +78,10 @@ type Judged = Asked &
  * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
  * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
  *
- * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at it,
- * asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step, whose
- * cap is not what stops it; and an ask already waiting that no tick will honour, for want of one. A step over its budget whose check did
- * not finish is offered the recheck first, which costs nothing and needs no `--budget`.
+ * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at
+ * it, asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step,
+ * whose cap is not what stops it; and an ask already waiting that no tick will honour, for want of one. A step over its budget whose check
+ * did not finish is offered the recheck first, which costs nothing and needs no `--budget`.
  *
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is
  *   running, and refused.

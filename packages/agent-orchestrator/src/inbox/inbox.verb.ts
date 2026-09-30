@@ -36,9 +36,9 @@ export type InboxStart = {
   /** Where a relative `workflow` is read from: where `wf start` was typed. The current directory when left out. */
   from?: string;
   /**
-   * The repository, over the card's `repo:`: named by a person at start (`wf start <card> --repo`), and refused as `start()` refuses it for a
-   * team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team takes
-   * it as it takes the directory `wf start` is typed in, and never looks at it.
+   * The repository, over the card's `repo:`: named by a person at start (`wf start <card> --repo`), and refused as `start()` refuses it for
+   * a team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
+   * takes it as it takes the directory `wf start` is typed in, and never looks at it.
    */
   repo?: string;
   /** The repository when neither `repo` nor the card names one: `wf start`'s `.`, or the board's own. */
@@ -56,26 +56,28 @@ export type InboxStart = {
  *
  * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card written by hand, or
  * by a writer that does not ask `cardRepoRefusal`, may carry one. The run is started all the same, and the line says the path was not
- * looked at: said, not refused, since a card on disk cannot be edited from the board. A `repo` a person gives for such a team is refused by `start()`.
+ * looked at: said, not refused, since a card on disk cannot be edited from the board. A `repo` a person gives for such a team is refused by
+ * `start()`.
  */
 export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & {
   ignoredRepo?: string;
 };
 
 /**
- * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }` on
- * its record, then removed from the inbox.
+ * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
+ * on its record, then removed from the inbox.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
- * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the repository's
- * workflows. The repository is `repo`, else the card's `repo:`, else `callerRepo`. The run is gated at the card's `gate:` and at `gates`, the
- * card's first; a step both name is gated once.
+ * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
+ * repository's workflows. The repository is `repo`, else the card's `repo:`, else `callerRepo`. The run is gated at the card's `gate:` and
+ * at `gates`, the card's first; a step both name is gated once.
  *
- * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card. It
- * says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is written,
- * exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card that does not
- * read, a card already started (`Conflict`), no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a
- * `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a `--gate` — as it refuses it.
+ * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card.
+ * It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is
+ * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
+ * that does not read, a card already started (`Conflict`), no workflow, a workflow that does not load behind the card, a `gate:` naming no
+ * step of it, in the card's words, and a `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a
+ * `--gate` — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);
@@ -139,14 +141,14 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
 }
 
 /**
- * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
- * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card whose
- * `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line (`queueLine`) is
- * the only place a daemon's start is read. The result names the repository (`on`) only for a card that names none, whose start turns on
- * where the daemon runs.
+ * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else
+ * `repo`, the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
+ * whose `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line
+ * (`queueLine`) is the only place a daemon's start is read. The result names the repository (`on`) only for a card that names none, whose
+ * start turns on where the daemon runs.
  *
- * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
- * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
+ * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name:
+ * the workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
  * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
  * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. A
  * failure is said on one line, its lines joined by ` / `; a try that cannot be written is said all the same, and the next pass tries the

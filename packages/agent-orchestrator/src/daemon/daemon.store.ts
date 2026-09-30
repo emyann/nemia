@@ -2,8 +2,8 @@
  * The store's two files about the tick itself: `tick.json`, the ceilings the last pass ran with, and `daemon.json`, who ticks the store —
  * read, judged by `daemon.ts`'s pure half against the process table, and written.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
- * exports of it.
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
+ * package exports of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,9 +38,10 @@ const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is the tick's admission's
- * (`toAdmit` in `cap.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of its own,
- * and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is the tick's
+ * admission's (`toAdmit` in `cap.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of
+ * its own, and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the
+ * tick's: runs in flight at once, 0 — or unset — for no cap.
  */
 export const ceilings = (): { sessions: number; runs: number } => ({
   sessions: maxConcurrent(),
@@ -48,16 +49,19 @@ export const ceilings = (): { sessions: number; runs: number } => ({
 });
 
 /**
- * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `wf up`'s or `wf tick`'s.
- * `wf ls` and `wf decide` run in a shell of their own, whose environment is not the daemon's: `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up` sets
- * the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain `waiting`.
+ * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `wf up`'s or
+ * `wf tick`'s. `wf ls` and `wf decide` run in a shell of their own, whose environment is not the daemon's:
+ * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain
+ * `waiting`.
  */
 const tickFile = (): string => path.join(HOME, 'tick.json');
 
 /** `tick.json` as the tick writes it: the sessions a pool admits, and the runs in flight at once, a whole number (0 for no cap). */
 const isCeilings = Schema.is(Schema.Struct({ sessions: Schema.Finite, runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }));
 
-/** The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them. */
+/**
+ * The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them.
+ */
 export function lastCeilings(): { sessions: number; runs: number } | undefined {
   let text: string;
   try {
@@ -70,8 +74,8 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
 }
 
 /**
- * The ceilings a pass runs with, written down for `wf ls` and `wf decide` — only when they differ from what is there, and through a hidden file
- * renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
+ * The ceilings a pass runs with, written down for `wf ls` and `wf decide` — only when they differ from what is there, and through a hidden
+ * file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
  * environment, and the pass goes on.
  */
 export function recordCeilings(c: { sessions: number; runs: number }): void {
@@ -136,8 +140,9 @@ export function lastPassCost(): PassCost | undefined {
 }
 
 /**
- * A pass's cost written down, through a hidden file renamed over the last, so a reader never reads half of it. A store that cannot be written
- * loses only this, which the next pass writes again, and the pass goes on. Answers with the time the write took, which is measuring's too.
+ * A pass's cost written down, through a hidden file renamed over the last, so a reader never reads half of it. A store that cannot be
+ * written loses only this, which the next pass writes again, and the pass goes on. Answers with the time the write took, which is
+ * measuring's too.
  */
 export function recordPassCost(cost: PassCost): number {
   const t0 = performance.now();
@@ -179,7 +184,10 @@ export function parseDaemonFile(text: string): DaemonFile | undefined {
   return { ...file, passedAt: file.passedAt ?? null };
 }
 
-/** The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged free. */
+/**
+ * The file's text, or undefined when there is none. Any other failure to read it is thrown: a store that cannot be read cannot be judged
+ * free.
+ */
 function readDaemonText(): string | undefined {
   try {
     return fs.readFileSync(daemonFile(), 'utf8');
@@ -241,10 +249,10 @@ function writeDaemon(file: DaemonFile): void {
 export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
 
 /**
- * `wf up` takes the store: refused by name, exit 2, while another daemon ticks it (`holdRefusal`); otherwise the file names this process. An
- * empty store is claimed with a link, which fails when the file appeared in between, so two starts on an empty store cannot both win — the
- * loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns it at
- * its first pass (`stillHeld`).
+ * `wf up` takes the store: refused by name, exit 2, while another daemon ticks it (`holdRefusal`); otherwise the file names this process.
+ * An empty store is claimed with a link, which fails when the file appeared in between, so two starts on an empty store cannot both win —
+ * the loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns
+ * it at its first pass (`stillHeld`).
  */
 export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd: string; now?: number }): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
@@ -279,8 +287,8 @@ export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd
 }
 
 /**
- * Whether the store is still this daemon's, read at the start of each pass: undefined when it is — the file names this process, or there is no
- * file or none that reads, which the next write puts right — or the file of whoever took it over.
+ * Whether the store is still this daemon's, read at the start of each pass: undefined when it is — the file names this process, or there is
+ * no file or none that reads, which the next write puts right — or the file of whoever took it over.
  */
 export function stillHeld(held: DaemonFile): DaemonFile | undefined {
   const file = readDaemon()?.file;

@@ -1,6 +1,6 @@
 /**
- * The verbs over runs and agents — `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents` — their flags,
- * read off the command line, and what each prints.
+ * The verbs over runs and agents — `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents` — their
+ * flags, read off the command line, and what each prints.
  */
 import path from 'node:path';
 import {
@@ -67,7 +67,10 @@ export function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
   return { ids, how };
 }
 
-/** `wf prune`'s arguments: the runs to prune, each once — none is every run — and its three switches. Refused before any run is read: a flag it does not take. */
+/**
+ * `wf prune`'s arguments: the runs to prune, each once — none is every run — and its three switches. Refused before any run is read: a flag
+ * it does not take.
+ */
 export function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: boolean; artifacts: boolean } {
   const ids: string[] = [];
   let unmerged = false;
@@ -88,7 +91,8 @@ export function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; ye
 
 /**
  * `wf hold`'s arguments after the run: `--until <runId>`, once for each run to wait on, or `--off` alone. Refused before any run is read:
- * neither, both, a flag it does not take, and `--until` with no run. A run named twice is the verb's to refuse (`holdRefusal`), in its words.
+ * neither, both, a flag it does not take, and `--until` with no run. A run named twice is the verb's to refuse (`holdRefusal`), in its
+ * words.
  */
 export function holdHow(argv: string[]): { until: string[]; off: boolean } {
   const shape = 'wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off';

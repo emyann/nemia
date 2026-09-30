@@ -6,7 +6,10 @@ import type { Engine } from '../runtime-client.ts';
 import { addRuntime, aside, within, type Tallies } from './tally.store.ts';
 import { passCost, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
-/** The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a task is `act`. */
+/**
+ * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
+ * task is `act`.
+ */
 const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   tick: 'runtime',
   view: 'journals',

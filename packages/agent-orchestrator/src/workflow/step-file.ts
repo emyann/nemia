@@ -153,7 +153,8 @@ function agentOf(step: string, name: string, agents: Agents | undefined): Agent 
 /**
  * A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. `spelled` names a
  * key read under a former name (`FORMER_KEYS`) by that name, so a refusal quotes the line as the file has it. `resume: x` adds `x` to
- * `after`. Refused: `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no parent.
+ * `after`. Refused: `model: inherit`, what Claude Code's `/agents` wizard writes for the parent's model, since a step's session has no
+ * parent.
  */
 export function stepFrom(
   name: string,
@@ -252,7 +253,10 @@ export function autoDropped(
  */
 export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
-/** The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to one person. */
+/**
+ * The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to
+ * one person.
+ */
 const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools', 'allowedTools'];
 
 /**
@@ -327,7 +331,7 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
       `${step}: \`${key}\` is ${JSON.stringify(value) ?? `a ${typeof value}`}, and a frontmatter line holds a word, a number or a list: an object would be written as \`[object Object]\`.`,
     );
   } else {
-    // oxlint-disable-next-line typescript/no-base-to-string -- the branches above took an object and a function, a narrowing tsc reads and this rule does not
+    // oxlint-disable-next-line typescript/no-base-to-string -- the branches above took an object and a function
     text = String(value);
   }
   if (/[\r\n]/.test(text)) {
@@ -373,7 +377,9 @@ function roundsOf(step: string, loop: string | undefined, rounds: string | undef
   return loop === undefined ? undefined : (countOf(step, 'rounds', rounds) ?? DEFAULT_ROUNDS);
 }
 
-/** The refusal of a key no step has, by name: with a reason of its own where it has one (`REFUSED`), and otherwise with the keys a step has. */
+/**
+ * The refusal of a key no step has, by name: with a reason of its own where it has one (`REFUSED`), and otherwise with the keys a step has.
+ */
 const unknownKey = (step: string, key: string): string =>
   Object.hasOwn(REFUSED, key)
     ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`

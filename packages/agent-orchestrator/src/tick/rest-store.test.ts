@@ -46,7 +46,9 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs. */
+/**
+ * A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs.
+ */
 const folder = (...steps: string[]) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   steps.forEach((name, k) =>

@@ -223,11 +223,11 @@ export const checkContract = (command: string): string =>
   ].join('\n');
 
 /**
- * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step stages the merge, and the
- * run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the run executes
- * the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and aborts it
- * otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a turn it
- * cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself.
+ * The check, told to an ending that lands on it (`landsOnCheck` in `status/status.ts`) in place of `checkContract`: the step stages the
+ * merge, and the run judges and lands it. Appended to its brief, so the shipper's recipe and the run's mechanism cannot say two things: the
+ * run executes the command on the merged tree once the step signs off, commits the merge with the closeout's `message` when it exits 0, and
+ * aborts it otherwise — a check that did not finish included, which is no verdict. What a session would do instead — run the suite in a
+ * turn it cannot hold open, commit on what it read of it — is what the run refuses here by doing it itself.
  */
 export const landingContract = (command: string): string =>
   [

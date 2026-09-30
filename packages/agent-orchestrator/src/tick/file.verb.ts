@@ -65,10 +65,10 @@ import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { within } from '../meter/tally.store.ts';
 
 /**
- * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema — for a
- * step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured it. The
- * runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left out, not
- * emptied; and a try of a remote step is a new Task, never a turn of the last one.
+ * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
+ * for a step on a local harness, and nothing for one on a remote A2A agent (`harness: a2a:<name>`), which runs as its operator configured
+ * it. The runtime refuses a `config` with any key in it, one whose value is undefined included (`remoteRefuses`), so the fields are left
+ * out, not emptied; and a try of a remote step is a new Task, never a turn of the last one.
  */
 export const localFields = <T extends object>(step: Workflow, fields: () => T): T | Record<string, never> =>
   isRemoteHarness(step.harness) ? {} : fields();
@@ -99,9 +99,9 @@ export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claud
 }
 
 /**
- * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief, and
- * the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as `wf decide`
- * reads one (`closeoutOf`). Read once, on the pass that files the roots.
+ * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief,
+ * and the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as
+ * `wf decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
  * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
  * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
@@ -171,7 +171,8 @@ export type PassReads = {
 
 /**
  * The pass's closer of the tasks held open that wait for a word: `closeWaiting` closes one, and answers with the engine's refusal as a
- * note of the step's, or undefined once closed; `awaitsWord` says whether a task still waits for one, which one closed on this pass does not.
+ * note of the step's, or undefined once closed; `awaitsWord` says whether a task still waits for one, which one closed on this pass does
+ * not.
  */
 export type Closer = {
   closeWaiting: (name: string, taskId: string) => Promise<string | undefined>;
@@ -420,7 +421,9 @@ const trySpec = (
   deadlineSeconds: step.deadlineSeconds,
 });
 
-/** File the rounds due (the assessment's `round`), in order, until the pass may file no more: answers with the looping steps it took round. */
+/**
+ * File the rounds due (the assessment's `round`), in order, until the pass may file no more: answers with the looping steps it took round.
+ */
 export async function fileRounds(f: Filing, round: readonly Round[]): Promise<string[]> {
   const looped: string[] = [];
   for (const r of round) {

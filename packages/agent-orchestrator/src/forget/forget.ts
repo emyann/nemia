@@ -32,11 +32,12 @@ import path from 'node:path';
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `wf rm` — or `wf prune` or `wf hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files under `WF_ROOT`
- * with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`, `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId`
- * mints is taken: lowercase letters, digits and dashes, starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives —
- * names `runs/r-xyz.json` as a run's directory, which is another run's record, and a run with no record of its own is swept of it with
- * nothing asked. `..` or a path would name a directory that is not the run's. One that is an id with a file's suffix on it is told the id.
+ * Why `wf rm` — or `wf prune` or `wf hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is
+ * read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`, `.asks` — and
+ * directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes, starting with
+ * a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which is another
+ * run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory that is not
+ * the run's. One that is an id with a file's suffix on it is told the id.
  */
 export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `wf ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
@@ -52,23 +53,23 @@ export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
 
 /**
  * Why `wf rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every task
- * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read it
- * before the cancel may be filing one — the asks in its directory, and the store's other runs.
+ * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read
+ * it before the cancel may be filing one — the asks in its directory, and the store's other runs.
  * Every reason is named at once, so a person clears them in one go.
  *
  * Refused:
  * - **a task in flight** — a step or its check, filed and settled neither way (`inFlight`), on a cancelled run too, whose tasks a tick is
  *   still stopping. Cancelling and forgetting are two decisions, and this never takes the first: a task the engine no longer knows is not
  *   in flight, so a run whose board was cleared is forgotten.
- * - **anything a pass would file** (`assess`): a step ready, a check, a try or a round due, on a run nobody called off. A pass may be filing
- *   it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they ship, and is held
- *   the same way.
+ * - **anything a pass would file** (`assess`): a step ready, a check, a try or a round due, on a run nobody called off. A pass may be
+ *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they ship, and
+ *   is held the same way.
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
  *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
- * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever. And
- *   a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
+ * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
+ *   And a run another is held until (`Run.hold`), whose hold would wait on no such run the same way.
  * - **an ending that lands on its check whose merge is not landed** (`landingOpen`), with nothing of it running, cancelled or not: a pass
  *   checks it and commits or aborts it, and with the record gone none would, and the merge would stay staged in the checkout.
  *
@@ -309,7 +310,9 @@ function gatesHeld(c: Facts): string | undefined {
   return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`;
 }
 
-/** What a pass would file now — or once the hold lifts, on a held run: `them` for more than one thing due, or for more than one step ready. */
+/**
+ * What a pass would file now — or once the hold lifts, on a held run: `them` for more than one thing due, or for more than one step ready.
+ */
 function dueHeld(c: Facts): string | undefined {
   const { due, run, lifts, ready, waits } = c;
   if (!due.length) return undefined;
@@ -398,7 +401,10 @@ const FIXES = [cancelFix, unheardFix, unlandedFix, strandedFix, holdersFix];
  */
 export type GitWorktree = { path: string; head?: string; branch?: string; detached?: true; locked?: string; prunable?: boolean };
 
-/** `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `HEAD`, `branch`, `detached`, `locked` and `prunable` lines are kept. */
+/**
+ * `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `HEAD`, `branch`, `detached`, `locked` and
+ * `prunable` lines are kept.
+ */
 export function parseWorktrees(porcelain: string): GitWorktree[] {
   const listed: GitWorktree[] = [];
   for (const line of porcelain.split('\n')) {
@@ -451,9 +457,9 @@ export function runWorktrees(
 }
 
 /**
- * Why `wf rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on no
- * branch, what git says of it. Locked: git refuses, and so does `wf rm`. Detached — a rebase, a bisect or a checkout of a commit left its
- * HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
+ * Why `wf rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on
+ * no branch, what git says of it. Locked: git refuses, and so does `wf rm`. Detached — a rebase, a bisect or a checkout of a commit left
+ * its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
  * branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
  */
 export function heldWorktree(
@@ -465,7 +471,10 @@ export function heldWorktree(
   return null;
 }
 
-/** What `wf rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's words, when it would not. */
+/**
+ * What `wf rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's
+ * words, when it would not.
+ */
 export type BranchFate = { branch: string; deleted: boolean; why: 'merged' | 'forced' | 'default' | 'unmerged' | { git: string } };
 
 /**
@@ -491,8 +500,8 @@ export function branchFates(
 
 /**
  * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, for each step the
- * record names (`checkStderr` in record.store.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could be
- * another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
+ * record names (`checkStderr` in record.store.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could
+ * be another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
  * `r-xyz-implement-check.stderr` is `r-xyz`'s.
  */
 export function checkLogsOf(

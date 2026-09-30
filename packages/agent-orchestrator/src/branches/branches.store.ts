@@ -37,9 +37,9 @@ import { git, gitSays } from '../workspace/worktree.store.ts';
 export const isShipped = (run: GitRun, branch: string): Shipped => shippedBy(askGit, run, branch);
 
 /**
- * Whether `commit` is within `base` — git's `merge-base --is-ancestor` — as `yes`, git's `no` (its exit 1), or `unknown`: a name git cannot read.
- * What `isShipped` asks, twice at most for a branch; answered by one process each here, and by a listing of the repository's branches in a
- * `BranchReader`.
+ * Whether `commit` is within `base` — git's `merge-base --is-ancestor` — as `yes`, git's `no` (its exit 1), or `unknown`: a name git cannot
+ * read. What `isShipped` asks, twice at most for a branch; answered by one process each here, and by a listing of the repository's branches
+ * in a `BranchReader`.
  */
 type Within = (repo: string, commit: string, base: string) => 'yes' | 'no' | 'unknown';
 
@@ -102,7 +102,9 @@ export type BranchReader = {
   shipped(run: GitRun, branch: string): Shipped;
   /** Whether git has the branch (`rev-parse --verify refs/heads/<branch>`). */
   has(repo: string, branch: string): boolean;
-  /** The commits on the branch that the run's base branch does not have (`rev-list --count <base>..<branch>`); none where git cannot count. */
+  /**
+   * The commits on the branch that the run's base branch does not have (`rev-list --count <base>..<branch>`); none where git cannot count.
+   */
   ahead(run: GitRun, branch: string): number;
   /**
    * List, in one process for each repository, every base these runs will ask about: their base branches and the commits they were cut at.
@@ -134,8 +136,8 @@ export const oneByOne: BranchReader = {
 const isCommitName = (name: string) => /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(name);
 
 /**
- * The `BranchReader` that answers from one listing per repository and base, each question once. Git refuses the whole listing for one base it
- * cannot read, so where it does, the commits a run was cut at that it can read are found in one more process (`rev-list --no-walk
+ * The `BranchReader` that answers from one listing per repository and base, each question once. Git refuses the whole listing for one base
+ * it cannot read, so where it does, the commits a run was cut at that it can read are found in one more process (`rev-list --no-walk
  * --ignore-missing`) and listed again without the rest — with every commit readable, the base it cannot read is a branch; a base branch
  * the repository does not have is found by a listing of the branches alone, and the rest listed again; a base still not listed is asked
  * one by one. A commit is within itself, so a branch still at the commit the run was cut at is within it without asking git.

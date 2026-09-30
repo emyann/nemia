@@ -49,7 +49,10 @@ export { nameFor } from './runtime-client.ts';
  * because the api cannot import agent-runtime, as `nameFor` is.
  */
 export { lifecycleGraph, type LifecycleGraph } from './runtime-client.ts';
-/** Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure (`unreadableJournal`). */
+/**
+ * Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure
+ * (`unreadableJournal`).
+ */
 export { unreadableJournal } from './runtime-client.ts';
 export {
   filesPrunedWords,

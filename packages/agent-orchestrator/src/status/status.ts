@@ -27,7 +27,9 @@ import {
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 
-/** Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with. */
+/**
+ * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
+ */
 export const hasGate = (step: Pick<Workflow, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean =>
   step.gate === true || Boolean(run.gates?.includes(step.name));
 
@@ -35,7 +37,9 @@ export const hasGate = (step: Pick<Workflow, 'name' | 'gate'>, run: Pick<Run, 'g
 export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): string[] =>
   steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
-/** The approval of the try a step is on, if a person gave one (`wf approve`). One for an earlier try was spent by the try after it. Pure. */
+/**
+ * The approval of the try a step is on, if a person gave one (`wf approve`). One for an earlier try was spent by the try after it. Pure.
+ */
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
@@ -47,14 +51,23 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
 export const holdsOpenOn = (step: Pick<Workflow, 'harness' | 'background'>): boolean =>
   (step.harness ?? 'claude') === 'claude' && !step.background;
 
-/** The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask. Pure. */
+/**
+ * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
+ * Pure.
+ */
 export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
-/** What a person accepted of a loop on the try its looping step is on (`wf accept`). One for an earlier try was spent by the try after it. Pure. */
+/**
+ * What a person accepted of a loop on the try its looping step is on (`wf accept`). One for an earlier try was spent by the try after it.
+ * Pure.
+ */
 export const acceptanceOf = (run: Run, step: string): Acceptance | undefined =>
   run.acceptances?.find((a) => a.step === step && a.try === tryOf(run, step));
 
-/** The acceptances a later try of their looping step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask. Pure. */
+/**
+ * The acceptances a later try of their looping step has spent: each names a try the step is past. The tick consumes these, as it does a
+ * spent ask. Pure.
+ */
 export const spentAcceptances = (run: Run): Acceptance[] => (run.acceptances ?? []).filter((a) => a.try < tryOf(run, a.step));
 
 /**
@@ -68,17 +81,20 @@ export const spentAcceptances = (run: Run): Acceptance[] => (run.acceptances ?? 
 export const askedAgain = (step: Pick<Workflow, 'name' | 'loop'>, run: Run, closeoutOf: (step: string) => Closeout | undefined): boolean =>
   Boolean(step.loop) && closeoutOf(step.name)?.output?.again === true && !acceptanceOf(run, step.name);
 
-/** Where a step that may be sent back stands at its gate, in words: `is awaiting approval`, or `is approved (try 1, at …), and nothing after it is filed yet`. */
+/**
+ * Where a step that may be sent back stands at its gate, in words: `is awaiting approval`, or
+ * `is approved (try 1, at …), and nothing after it is filed yet`.
+ */
 export const gateWords = (run: Run, step: string): string => {
   const given = approvalOf(run, step);
   return given ? `is approved (try ${given.try}, at ${given.at}), and nothing after it is filed yet` : 'is awaiting approval';
 };
 
 /**
- * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not approved
- * for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate holds it:
- * the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed (`approvedFirst`) is
- * that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
+ * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not
+ * approved for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate
+ * holds it: the round is its loop's, and the gate is on what comes after. A later try of an ending approved before it is filed
+ * (`approvedFirst`) is that act again, with nothing to hand on, so no gate holds it, though its approval names a try it is past. Pure.
  */
 function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: string) => Closeout | undefined): boolean {
   if (!satisfiesAfter(own) || !hasGate(step, run)) return false;
@@ -173,8 +189,8 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
 
 /**
  * Whether an ending step that acts on the base branch (`approvedFirst`) was filed on its approval and stopped there without doing it: its
- * try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was stopped, or reached its budget.
- * Pure.
+ * try settled and it signed off blocked, ended without its closeout, failed — its session or its check — was stopped, or reached its
+ * budget. Pure.
  *
  * Such an ending has two ways on. Its own try (`wf retry <run> <ending>`) does the act again, for what was not the work — a checkout left
  * dirty, a flaky test. And the send-back (`sendsBack` in `retryable`): the work does not hold on the base branch as it is now, so it goes
@@ -205,7 +221,10 @@ export function sentBack(record: StepRecord): StepRecord {
   return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), then: 'back' }] };
 }
 
-/** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
+/**
+ * The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps
+ * it waits on, whose work the objection is about. Pure.
+ */
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
 
 /**
@@ -236,7 +255,10 @@ export type BranchStanding =
   | { branch: string; where: 'ahead'; commits: number }
   | { branch: string; where: 'gone' };
 
-/** One branch's standing, for a person: `wf/r-1/implement is on main`, `… is ahead of main by 3 commits`, `… is gone: git no longer has it`. Pure. */
+/**
+ * One branch's standing, for a person: `wf/r-1/implement is on main`, `… is ahead of main by 3 commits`, `… is gone: git no longer has it`.
+ * Pure.
+ */
 export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string =>
   s.where === 'on'
     ? `${s.branch} is on ${run.branch}`
@@ -245,8 +267,8 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string 
       : `${s.branch} is gone: git no longer has it`;
 
 /**
- * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that merges
- * has nothing left to merge — a person merged it by hand, or the work committed nothing past the run's base. Pure.
+ * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that
+ * merges has nothing left to merge — a person merged it by hand, or the work committed nothing past the run's base. Pure.
  *
  * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks.
  */
@@ -319,8 +341,9 @@ export function stepStatus(
 }
 
 /**
- * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways are
- * its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed (`waitsAtGate`).
+ * Where a step stands (`stepStatus`), and where it would stand but for being over its budget or waiting at its gate (`own`): a try's ways
+ * are its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed
+ * (`waitsAtGate`).
  */
 export function standing(
   step: Workflow,
@@ -341,8 +364,8 @@ export function standing(
 }
 
 /**
- * How a step's last try ended, as a try's brief says it (`RetryBriefing.status`): on its own work (`ownStatus`) — and, for a gated step that
- * signed off, `awaiting approval`, since a try of it is a send-back from its gate (`retryable`), approved or not. Pure.
+ * How a step's last try ended, as a try's brief says it (`RetryBriefing.status`): on its own work (`ownStatus`) — and, for a gated step
+ * that signed off, `awaiting approval`, since a try of it is a send-back from its gate (`retryable`), approved or not. Pure.
  */
 export function triedFrom(
   step: Workflow,
@@ -358,8 +381,8 @@ export function triedFrom(
 }
 
 /**
- * Whether a step reads `over budget`: over it (`overBudget`) with another session of it the way on — a try, from a status a try is taken from
- * (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
+ * Whether a step reads `over budget`: over it (`overBudget`) with another session of it the way on — a try, from a status a try is taken
+ * from (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
  * check again), or a round its loop asks for (`roundWanted`). A looping step that asked for a round is held by any step of its loop over
  * budget, itself included: the round would file each of them again.
  */
@@ -450,9 +473,10 @@ export function ownStatus(
 }
 
 /**
- * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`), and
- * how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still running is
- * in neither: a `claude --bg` session writes its cost only as its process exits, and a job as it prints its result (agent-runtime's open issue 18).
+ * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),
+ * and how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still
+ * running is in neither: a `claude --bg` session writes its cost only as its process exits, and a job as it prints its result
+ * (agent-runtime's open issue 18).
  */
 export type Spend = { usd: number; measured: number; unmeasured: number };
 
@@ -504,13 +528,16 @@ export const stepSpend = (run: Run, name: string, spendOf: SpendOf): Spend => ad
 export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
   addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
 
-/** The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `wf retry --budget`, `wf round --budget`), else its `budget:`. */
+/**
+ * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `wf retry --budget`, `wf round --budget`), else its
+ * `budget:`.
+ */
 export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
   [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
 
 /**
- * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what they
- * cost, and the cap. Undefined for any other. Pure. At the cap and not only past it, so a session filed for a step not held always has
+ * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what
+ * they cost, and the cap. Undefined for any other. Pure. At the cap and not only past it, so a session filed for a step not held always has
  * something left, which `budgetUsdFor` hands a harness that keeps a cap.
  */
 export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
@@ -533,15 +560,17 @@ export const loopOver = (
     return over ? [{ name, ...over }] : [];
   });
 
-/** What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole. */
+/**
+ * What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole.
+ */
 export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd)}`;
 
 /**
  * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, on a harness that runs
- * `claude -p` and ends a session at it — `claude-detached`, and `claude` as a job, which is every `claude` step without `background: true` —
- * so the harness holds the tries together to the cap, and not each session to a whole cap of its own. A resume is charged its own spend
- * (agent-runtime's open issue 28, M2), and a cap caps a resume's own spend (M5), so the remainder is what the next try may spend. The engine
- * refuses one on a background session, which keeps none (open issue 17), and the parser refuses a budget beside `background: true`.
+ * `claude -p` and ends a session at it — `claude-detached`, and `claude` as a job, which is every `claude` step without `background: true`
+ * — so the harness holds the tries together to the cap, and not each session to a whole cap of its own. A resume is charged its own spend
+ * (agent-runtime's open issue 28, M2), and a cap caps a resume's own spend (M5), so the remainder is what the next try may spend. The
+ * engine refuses one on a background session, which keeps none (open issue 17), and the parser refuses a budget beside `background: true`.
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
  * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is
@@ -564,15 +593,15 @@ export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spe
 export const MOMENTUM = 1;
 
 /**
- * The momentum a step's own filing has (`MOMENTUM`, read by `momentumOf`): none — 0 — for a run's first steps, which wait on nothing and are
- * filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a check
- * are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
+ * The momentum a step's own filing has (`MOMENTUM`, read by `momentumOf`): none — 0 — for a run's first steps, which wait on nothing and
+ * are filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a
+ * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  */
 export const stepMomentum = (step: Pick<Workflow, 'after'>): number => (step.after.length ? MOMENTUM : 0);
 
 /**
- * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or the
- * cap its session was ended at, whichever is more — beside what they cost and the cap in force.
+ * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or
+ * the cap its session was ended at, whichever is more — beside what they cost and the cap in force.
  */
 export type Raise = { above: number; spent: Spend; cap: number };
 
@@ -583,7 +612,10 @@ export function raiseOf(step: Workflow, run: Run, spendOf: SpendOf): Raise | und
   return { above: Math.max(spent.usd, cap), spent, cap };
 }
 
-/** What a raise has to pass, for a person: what the step's tries cost, `$4.20`, or the cap its session was ended at, as its author wrote it, `$3`. */
+/**
+ * What a raise has to pass, for a person: what the step's tries cost, `$4.20`, or the cap its session was ended at, as its author wrote it,
+ * `$3`.
+ */
 export const aboveWord = (r: Raise): string => (r.above > r.spent.usd ? budgetWord(r.above) : dollars(r.above));
 
 /** A step over its budget, or ended at it, in words: `is over budget: its tries have cost $4.20 of its $3 budget`. */
@@ -616,7 +648,10 @@ export type Round = {
   target: string;
   round: number;
   by: 'again' | 'ask';
-  /** On a person's round past a step of the loop's budget (`wf round --budget`): the cap, and the steps of the loop it is raised for — those over it. */
+  /**
+   * On a person's round past a step of the loop's budget (`wf round --budget`): the cap, and the steps of the loop it is raised for — those
+   * over it.
+   */
   budget?: number;
   raise?: string[];
 };
@@ -784,8 +819,8 @@ const compactedWords = (n: number): string => `compacted${n === 1 ? '' : n === 2
 /**
  * What a session read, by price, for a person at a glance: `read 21.4M · wrote 412k · peak 167k` — the cache's reads and writes, which
  * are nearly all of an attempt's input and priced twenty-fold apart, and the largest context it carried. The peak says where it reached
- * a step's `context:` cap — compacting says it did — or passed 200k with none, and a resumed attempt that rebuilt its cache says so. Empty where nothing measured
- * any of it: a runner that counted none says nothing, rather than 0.
+ * a step's `context:` cap — compacting says it did — or passed 200k with none, and a resumed attempt that rebuilt its cache says so. Empty
+ * where nothing measured any of it: a runner that counted none says nothing, rather than 0.
  */
 export function readWords(u: Consumed | null | undefined, cap?: number): string {
   if (!u) return '';

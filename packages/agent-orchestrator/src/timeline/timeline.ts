@@ -67,16 +67,16 @@ export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
 /**
  * One task on the clock: a try's session, or its check.
  *
- * `filedAt` is when the task was filed, off the engine's feed — its view carries no such time — and null where the feed has no filing of it.
- * `spawnedAt` is its first attempt's spawn, `endedAt` its last attempt's end once the task settled. A task waits for a slot between
+ * `filedAt` is when the task was filed, off the engine's feed — its view carries no such time — and null where the feed has no filing of
+ * it. `spawnedAt` is its first attempt's spawn, `endedAt` its last attempt's end once the task settled. A task waits for a slot between
  * being filed and its first attempt, so `queuedMs` — filed → spawned — is the slot wait and the spawn; `ranMs` is spawned → ended,
  * gaps between attempts included — but for a task held open, turn by turn: each turn's first spawn to its last end, summed, since between
  * the turn that signed and the next a person was deciding, and nothing ran. Each is null where it cannot be measured, never 0.
  *
  * `at` is where the task stands: `unknown` to the engine; `queued`, filed and no attempt yet; `starting`, a slot taken and not spawned;
- * `running`, spawned and not settled; `ended`, settled after it spawned, or held open and signed, waiting on a person's word or closed on it
- * (`signedAndHeld`); `unspawned`, settled before it ever spawned — stopped in the queue, or never startable. `queued` and `ran` are the two
- * times in words: a duration, or why there is none.
+ * `running`, spawned and not settled; `ended`, settled after it spawned, or held open and signed, waiting on a person's word or closed on
+ * it (`signedAndHeld`); `unspawned`, settled before it ever spawned — stopped in the queue, or never startable. `queued` and `ran` are the
+ * two times in words: a duration, or why there is none.
  */
 export type TaskSpan = {
   taskId: string;
@@ -106,11 +106,12 @@ export type TimelineTry = {
 };
 
 /**
- * The time of several tasks together: a round of a loop (`loop` and `round`), counting the steps that round files again (`loopSpan`) — a step
- * before the loop or after it is in no round — or the whole run's, every step's (both null). `tasks` counts the sessions and checks in it — a recheck's try
- * adds its check, and not its session again — and `inFlight` those that have not ended. `queuedMs` sums the queue times that are known, and
- * `ranMs` the run times of the tasks that ended: sums, so a fan-out's run time is more than its wall. `wallMs` is first filed → last ended,
- * null while a task is in flight or a filing is not known. `queued`, `ran` and `wall` are the three in words, each saying what it leaves out.
+ * The time of several tasks together: a round of a loop (`loop` and `round`), counting the steps that round files again (`loopSpan`) — a
+ * step before the loop or after it is in no round — or the whole run's, every step's (both null). `tasks` counts the sessions and checks in
+ * it — a recheck's try adds its check, and not its session again — and `inFlight` those that have not ended. `queuedMs` sums the queue
+ * times that are known, and `ranMs` the run times of the tasks that ended: sums, so a fan-out's run time is more than its wall. `wallMs` is
+ * first filed → last ended, null while a task is in flight or a filing is not known. `queued`, `ran` and `wall` are the three in words,
+ * each saying what it leaves out.
  */
 export type TimelineTotal = {
   /** The looping step whose loop this is a round of; null for the run's total. */
@@ -128,9 +129,10 @@ export type TimelineTotal = {
 
 /**
  * A run's wait for a run slot (`WF_MAX_RUNS`), on a run the cap held (`slotHeldAt`): from `createdAt` — or, on a run that waited on runs
- * (`--after`), from the pass the cap first held it, since the wait before was for those runs — to its first task's filing. `filedAt` is that
- * filing, null while nothing is filed or when the feed has no filing of it; `ms` the wait, null where it cannot be measured; `queued` the wait
- * in words: a duration, `still waiting` while nothing is filed, and `not known` where the feed does not say when the first task was filed.
+ * (`--after`), from the pass the cap first held it, since the wait before was for those runs — to its first task's filing. `filedAt` is
+ * that filing, null while nothing is filed or when the feed has no filing of it; `ms` the wait, null where it cannot be measured; `queued`
+ * the wait in words: a duration, `still waiting` while nothing is filed, and `not known` where the feed does not say when the first task
+ * was filed.
  */
 export type SlotWait = { from: string; filedAt: string | null; ms: number | null; queued: string };
 
@@ -147,10 +149,10 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in views.verb.ts) or each
  * view's `State.filedAt` (`decide`); a task without one has its queue time `not known`. A step not filed has no try on the clock.
  *
- * `steps` are the workflow the run is judged by — the one it froze, by default — whose loops its rounds are of. Without them no round is totalled.
- * A round counts the steps its loop files again (`loopSpan`), and a step before the loop or after it is in no round. The rounds go by loop,
- * in the workflow's order, then by round: the rounds of two loops are not the same rounds. A session a recheck's try shares is counted
- * once, on the try that ran it.
+ * `steps` are the workflow the run is judged by — the one it froze, by default — whose loops its rounds are of. Without them no round is
+ * totalled. A round counts the steps its loop files again (`loopSpan`), and a step before the loop or after it is in no round. The rounds
+ * go by loop, in the workflow's order, then by round: the rounds of two loops are not the same rounds. A session a recheck's try shares is
+ * counted once, on the try that ran it.
  */
 export function timeline(
   run: Run,
@@ -397,8 +399,9 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
 }
 
 /**
- * A run's totals as `wf decide` prints them, after its steps: each round of each loop that went round — named by its looping step where more
- * than one did — then, on a run the cap on runs in flight held, its wait for a run slot, then the run's, every step's, that wait among its queue.
+ * A run's totals as `wf decide` prints them, after its steps: each round of each loop that went round — named by its looping step where
+ * more than one did — then, on a run the cap on runs in flight held, its wait for a run slot, then the run's, every step's, that wait among
+ * its queue.
  */
 export function timelineTotalLines(t: Timeline): string[] {
   if (!t.run.tasks) return [];

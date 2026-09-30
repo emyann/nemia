@@ -1,7 +1,7 @@
 /**
  * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves; where a folder's runs look for agents and
- * skills (`placesAround`); and whether a folder holds the workflows the board lists (`isWorkflowsHolder`). A store beside `folder.store.ts`:
- * it imports neither the engine nor a controller. A run is changed by none of it: it froze its folder at `wf start`.
+ * skills (`placesAround`); and whether a folder holds the workflows the board lists (`isWorkflowsHolder`). A store beside
+ * `folder.store.ts`: it imports neither the engine nor a controller. A run is changed by none of it: it froze its folder at `wf start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,18 +13,22 @@ import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal } from '
 import { agentsFor, skillsFor, type Places } from './folder.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 
-/** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */
+/**
+ * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
+ * read so, and removed.
+ */
 export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
 
 /**
  * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.
  *
- * Judged whole before a byte is written, so a folder refused is the folder it was: where it is (`workflowPlaceRefusal`), each step's name as
- * a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory as
- * `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So every
- * refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a cycle, a
- * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
- * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
+ * Judged whole before a byte is written, so a folder refused is the folder it was: where it is (`workflowPlaceRefusal`), each step's name
+ * as a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory
+ * as `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So
+ * every refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a
+ * cycle, a `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the
+ * parser — a step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by
+ * hand.
  *
  * Then the `.md` of each step not in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
  * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
@@ -122,9 +126,9 @@ export function writeWorkflow(
 }
 
 /**
- * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the store's
- * `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below it, nor
- * the `workflows/` that holds it: those are the folders the board lists as workflows.
+ * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the
+ * store's `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below
+ * it, nor the `workflows/` that holds it: those are the folders the board lists as workflows.
  */
 function workflowPlaceRefusal(at: string): string | undefined {
   const holder = path.dirname(at);
@@ -140,8 +144,8 @@ export function isWorkflowsHolder(dir: string): boolean {
 }
 
 /**
- * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository it is in — `<repo>/workflows/<name>`,
- * a checkout by its `.git` — and the store. A folder of the store's is only the store's.
+ * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository it is in —
+ * `<repo>/workflows/<name>`, a checkout by its `.git` — and the store. A folder of the store's is only the store's.
  */
 export function placesAround(workflowDir: string): Places {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));

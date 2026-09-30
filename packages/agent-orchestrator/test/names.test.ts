@@ -98,8 +98,8 @@ const BRAND = ['Nemia', 'AI'].join(' ');
 /**
  * The project's former name in each form it is refused in, beside the brand said with more than its name. The versioned name after a `/`,
  * a `\\` or a `-` is the checkout's folder in a path (`/code/…`, a transcript's `-code-…` folder); `PATHED` allows the line that has one,
- * or that joins it into a path, as a fixture's folder does. The prefix is lower case and has no path allowance: a plugin, a storage key, a client
- * and a scratch folder are the project's machinery, wherever they sit.
+ * or that joins it into a path, as a fixture's folder does. The prefix is lower case and has no path allowance: a plugin, a storage key, a
+ * client and a scratch folder are the project's machinery, wherever they sit.
  */
 const PROJECT_FORMS: readonly RegExp[] = [
   new RegExp(`(?<!\\w)${OLD.toUpperCase()}(?!\\w)`),

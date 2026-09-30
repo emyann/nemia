@@ -1,6 +1,6 @@
 /**
- * The verbs that answer a run — `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — their flags, read off the command line, and
- * what each prints.
+ * The verbs that answer a run — `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — their flags, read off the command line,
+ * and what each prints.
  */
 import {
   accept,
@@ -101,7 +101,10 @@ export function approveHow(argv: string[]): string | undefined {
   return message;
 }
 
-/** `wf round`'s arguments after the run: the step that closes the loop, when there is more than one, and `--budget <amount>`, at most once each. */
+/**
+ * `wf round`'s arguments after the run: the step that closes the loop, when there is more than one, and `--budget <amount>`, at most once
+ * each.
+ */
 export function roundHow(argv: string[]): { stepName?: string; budget?: number } {
   let stepName: string | undefined;
   let budget: number | undefined;

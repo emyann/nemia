@@ -2,8 +2,9 @@
  * Between packages, only the public contract (`docs/architecture.md`, rule 1), for this package.
  *
  * The apps reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestrator/run`, `agent-orchestrator/workflow` and
- * `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the refusals an Effect caller picks out by kind, and what reads a folder from disk is exported from `agent-orchestrator`. Spawning `bin/wf.ts` is
- * the package's CLI, not an import, and prose that names a file in src/ is not a route to it.
+ * `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the refusals an Effect caller picks out by kind, and what
+ * reads a folder from disk is exported from `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that
+ * names a file in src/ is not a route to it.
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
  * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy

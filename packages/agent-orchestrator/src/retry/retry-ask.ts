@@ -20,9 +20,9 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * The session a try continues, off the attempts of the task before it: the harness's own id for the last attempt's session — what
  * `--resume` takes. An attempt its harness never named — one whose spawn it refused (`unstartable`), one it lost, one that died before it
  * said its id — continues nothing of its own, but the session it was started to continue is still there, and where the work last stood:
- * the try continues that one rather than starting cold. For a later turn of a task held open, that is the session that signed the turn before,
- * which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and left
- * no id. Pure; typed by what it reads, so this file imports no runtime.
+ * the try continues that one rather than starting cold. For a later turn of a task held open, that is the session that signed the turn
+ * before, which asked the question the turn answered. Undefined for a task with no attempt, and for one whose last attempt started cold and
+ * left no id. Pure; typed by what it reads, so this file imports no runtime.
  */
 export const continuesFrom = (
   attempts: ReadonlyArray<{ nativeId: string | null; resumeFrom?: string }> | undefined,
@@ -83,7 +83,10 @@ export type Retry = {
   by: 'retries' | 'signoff' | 'ask';
   stopFirst?: true;
   runsOn?: true;
-  /** The endings that stopped on the base branch this try sends the work back from (`endingStopped`): filed, it moves each one's try behind (`sentBack`). */
+  /**
+   * The endings that stopped on the base branch this try sends the work back from (`endingStopped`): filed, it moves each one's try behind
+   * (`sentBack`).
+   */
   back?: string[];
 };
 
@@ -143,9 +146,9 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
 
 /**
  * The model a step's current try runs on: the one a `wf retry --model` named for the new session it started, carried by every try that
- * continued that session since — a nudge, a `retries:` nudge, a sign-off nudge, a round — and the step's own where none did. A recheck is the same try.
- * What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet` on the step's
- * `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
+ * continued that session since — a nudge, a `retries:` nudge, a sign-off nudge, a round — and the step's own where none did. A recheck is
+ * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet`
+ * on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
  */
 export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
   for (const t of [...(record?.tries ?? [])].reverse()) {
@@ -157,9 +160,9 @@ export function sessionModel(step: Workflow, record: StepRecord | undefined): st
 
 /**
  * How many of a step's tries answered the task it is on (`e.answer`), each a turn of that one task rather than a task of its own: the tries
- * behind it on the same task that were not a recheck, which replaces only the check. Zero for a step on a task of its own. Pure: counted off
- * the record, as the turns the runtime has journalled are counted off its view (`answersIn`), so a turn a pass gave and died before writing
- * down is found (`adoptTries`).
+ * behind it on the same task that were not a recheck, which replaces only the check. Zero for a step on a task of its own. Pure: counted
+ * off the record, as the turns the runtime has journalled are counted off its view (`answersIn`), so a turn a pass gave and died before
+ * writing down is found (`adoptTries`).
  */
 export const turnsOf = (record: StepRecord | undefined): number =>
   (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.then !== 'recheck').length;
@@ -168,8 +171,8 @@ export const turnsOf = (record: StepRecord | undefined): number =>
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
 
 /**
- * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does: `its blocked session`
- * while its harness says so, and `its session` once it works again (`runsOn`).
+ * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does:
+ * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
  */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string =>
   r.by === 'ask'

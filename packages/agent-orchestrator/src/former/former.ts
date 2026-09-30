@@ -11,18 +11,19 @@ import type { RoleKey } from '../agents/agents.ts';
 
 /**
  * A key's former name, and the name it has now: `disallow:` and `allow:` are the former names of `disallowedTools:` and `allowedTools:`,
- * Claude Code's `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:`. A former name is read as the
- * key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files still use one (`formerKeyLine`); nothing
+ * Claude Code's `--disallowedTools` and `--allowedTools` — a subagent's `disallowedTools:` and `allowedTools:`. A former name is read as
+ * the key it is now (`readKeys`), in step files and agent files alike; `wf start` says which files still use one (`formerKeyLine`); nothing
  * writes one (`renderStep`, `renderAgent`); and a run record whose steps hold the former fields is read under the current ones
  * (`asNamed`). A key renamed adds its line here, and `asNamed` carries it.
  */
 export const FORMER_KEYS: Readonly<Record<string, StepKey & RoleKey>> = { disallow: 'disallowedTools', allow: 'allowedTools' };
 
 /**
- * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes for
- * the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a codex
- * sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is written beside it: on
- * codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming `sandbox:`. Pure.
+ * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes
+ * for the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a
+ * codex sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is
+ * written beside it: on codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming
+ * `sandbox:`. Pure.
  */
 export function codexSandboxNamed<K extends string>(
   file: string,
@@ -68,10 +69,10 @@ export type Spelled = Partial<Record<string, string>>;
 const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : written);
 
 /**
- * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A line
- * under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as written.
- * Blank lines and lines opening on `#`, the comment character, are skipped. A key set twice, under either name, is refused rather than
- * last-one-wins: both values are something the author meant, and a step would wait on half of what it was written to wait on.
+ * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A
+ * line under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
+ * written. Blank lines and lines opening on `#`, the comment character, are skipped. A key set twice, under either name, is refused rather
+ * than last-one-wins: both values are something the author meant, and a step would wait on half of what it was written to wait on.
  */
 export function readKeys<K extends string>(
   step: string,
@@ -147,7 +148,10 @@ export function frontmatterKey(text: string, key: string): string | undefined {
   return undefined;
 }
 
-/** The former key names (`FORMER_KEYS`) a file's frontmatter still uses, in the order it uses them — none for a file whose frontmatter never closes. */
+/**
+ * The former key names (`FORMER_KEYS`) a file's frontmatter still uses, in the order it uses them — none for a file whose frontmatter never
+ * closes.
+ */
 export function formerKeysIn(text: string): string[] {
   let block: string | null;
   try {
@@ -172,10 +176,11 @@ export const formerKeyWritten = (file: string, former: string): string =>
   `${file}: \`${former}\` is \`${FORMER_KEYS[former]}\`'s former name, which a file may still say but nothing writes. Send \`${FORMER_KEYS[former]}\` — a page that sends the former name is stale: reload it, and save again.`;
 
 /**
- * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read from a
- * file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and `writeWorkflow` for a
- * step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as `permissionMode`, or a step moved onto
- * codex that kept its Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written as given, and refused by the parser in words naming `sandbox:`.
+ * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read
+ * from a file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and
+ * `writeWorkflow` for a step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as
+ * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written
+ * as given, and refused by the parser in words naming `sandbox:`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
@@ -184,7 +189,10 @@ export const codexModeWritten = (file: string, word: string): string =>
 export const codexModeLine = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;
 
-/** What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one writer of it. */
+/**
+ * What `wf start` says of a file that still writes a key under its former name: that it is still read, as what, and what to write. The one
+ * writer of it.
+ */
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
 
@@ -208,8 +216,8 @@ function renamedFields(fields: object) {
 /**
  * A step read back off a record under the names its keys have now (`FORMER_KEYS`). A run frozen under a key's former name holds the step's
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no
- * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever sees
- * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
+ * `allowedTools` and the step would run unfenced, with nothing said. Read by `readRun`, so no reader — the tick, `wf ls`, the api — ever
+ * sees a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
  * value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: FrozenStep): Workflow {

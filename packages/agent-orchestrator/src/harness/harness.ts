@@ -32,8 +32,9 @@ const FENCED_THERE =
   "fences a session on this machine, and a remote agent runs on another party's, under their fence: nothing here would hold it";
 
 /**
- * The keys a step on a remote A2A agent may not set, and why: each tells a harness of ours something, and a remote agent is not one. Refused
- * rather than dropped, since a line the run does not read is a constraint nobody enforces — `permissionMode: plan` would read as a fence.
+ * The keys a step on a remote A2A agent may not set, and why: each tells a harness of ours something, and a remote agent is not one.
+ * Refused rather than dropped, since a line the run does not read is a constraint nobody enforces — `permissionMode: plan` would read as a
+ * fence.
  */
 const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   model: RUNS_AS_CONFIGURED,
@@ -65,7 +66,10 @@ export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', val
   return `\`--${flag} ${value}\` ${REMOTE_REFUSED[flag]}, and ${step.name} runs on \`harness: ${step.harness}\`, a remote A2A agent: its try would be sent without it. Ask without --${flag}: ${command}.`;
 }
 
-/** The keys a step on a remote A2A agent may not set (`REMOTE_REFUSED`), in `STEP_KEYS`' order: what the board's form leaves off such a step. */
+/**
+ * The keys a step on a remote A2A agent may not set (`REMOTE_REFUSED`), in `STEP_KEYS`' order: what the board's form leaves off such a
+ * step.
+ */
 export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
 
 /**
@@ -110,8 +114,8 @@ const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 export const HARNESSES: readonly string[] = ['claude', 'codex', 'claude-detached'];
 
 /**
- * The permission modes each harness takes: Claude Code's `--permission-mode`. Checked for the reason a harness is: an unknown mode is refused
- * by the engine only when the run files the step. Codex has none: its fence is its sandbox (`SANDBOXES`).
+ * The permission modes each harness takes: Claude Code's `--permission-mode`. Checked for the reason a harness is: an unknown mode is
+ * refused by the engine only when the run files the step. Codex has none: its fence is its sandbox (`SANDBOXES`).
  */
 export const PERMISSION_MODES: Readonly<Record<string, readonly string[]>> = {
   claude: CLAUDE_MODES,
@@ -119,9 +123,10 @@ export const PERMISSION_MODES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * The sandboxes each harness takes: Codex's `-s`, the one fence `codex exec` has around its one shell — `read-only` runs commands and writes
- * nothing, `workspace-write` writes in the workspace, `danger-full-access` anywhere. Claude Code has none: its fence is its permission mode
- * and its rule lists. `bypassPermissions`, which the engine takes for `danger-full-access`, is not among them: it is Claude Code's word.
+ * The sandboxes each harness takes: Codex's `-s`, the one fence `codex exec` has around its one shell — `read-only` runs commands and
+ * writes nothing, `workspace-write` writes in the workspace, `danger-full-access` anywhere. Claude Code has none: its fence is its
+ * permission mode and its rule lists. `bypassPermissions`, which the engine takes for `danger-full-access`, is not among them: it is Claude
+ * Code's word.
  */
 export const SANDBOXES: Readonly<Record<string, readonly string[]>> = {
   codex: ['read-only', 'workspace-write', 'danger-full-access'],
@@ -140,8 +145,8 @@ export const EFFORTS: Readonly<Record<string, readonly string[]>> = {
 
 /**
  * The context windows each harness takes, in tokens, both ends included: `context:`. Copied from the engine — `CLAUDE_CONTEXT_TOKENS` in
- * agent-runtime's `src/runner-claude-vocabulary.ts`, which `claudeDetached` declares too — for the reason the words above are, and held to it by
- * `test/vocabulary.test.ts`. A harness not listed has no such knob: `codex exec` runs on its model's own window.
+ * agent-runtime's `src/runner-claude-vocabulary.ts`, which `claudeDetached` declares too — for the reason the words above are, and held to
+ * it by `test/vocabulary.test.ts`. A harness not listed has no such knob: `codex exec` runs on its model's own window.
  */
 const CLAUDE_CONTEXT = { least: 100_000, most: 1_000_000 };
 export const CONTEXT_WINDOWS: Readonly<Record<string, { least: number; most: number }>> = {

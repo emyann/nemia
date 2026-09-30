@@ -282,7 +282,9 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
   ].join('\n');
 };
 
-/** Whether a step is some step's `loop:` target, in the workflow the run froze: filed with `replies` in its closeout schema on every try. */
+/**
+ * Whether a step is some step's `loop:` target, in the workflow the run froze: filed with `replies` in its closeout schema on every try.
+ */
 export const isLoopTarget = (steps: readonly Workflow[], name: string): boolean => steps.some((s) => s.loop === name);
 
 /**

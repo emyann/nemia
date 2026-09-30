@@ -1,13 +1,14 @@
 /**
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
- * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the runtime's types
- * the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
+ * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the
+ * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText`, `refusedText` and
+ * `lifecycleGraph`), which they import from here and never from the runtime.
  *
- * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every task
- * the orchestrator files is `queued` and starts only once the tick admits it (`cap.ts`). The controllers take the engine in Promises, each
- * verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view one, tick, admit, stop one, read
- * its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it is
- * and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
+ * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every
+ * task the orchestrator files is `queued` and starts only once the tick admits it (`cap.ts`). The controllers take the engine in Promises,
+ * each verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view one, tick, admit, stop one,
+ * read its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it
+ * is and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
  * and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect program requires that same
  * Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and lifts each read with
  * `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
@@ -41,8 +42,9 @@ export { denialText } from 'agent-runtime';
 export { refusedText } from 'agent-runtime';
 
 /**
- * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's `JournalError`,
- * which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which the caller rethrows.
+ * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's
+ * `JournalError`, which names the task — or undefined for any other failure, and for one of the whole store (named `*`), which the caller
+ * rethrows.
  */
 export const unreadableJournal = (err: unknown): string | undefined => {
   if (!(err instanceof Error)) return undefined;
@@ -135,8 +137,8 @@ const LEFT_OUT =
 
 /**
  * The store's `a2a-agents.json`, judged: the agents the runtime takes, by name; each entry it refuses (`remoteConfigRefusal`), by name, in
- * the file's words and naming the file; and, when the file as a whole is refused (`readRemoteAgents`) or cannot be read, why, with no agent.
- * Read afresh on each call; it throws nothing, so a bad file stops only a step that names one of its agents (`undeclaredRefusal` in
+ * the file's words and naming the file; and, when the file as a whole is refused (`readRemoteAgents`) or cannot be read, why, with no
+ * agent. Read afresh on each call; it throws nothing, so a bad file stops only a step that names one of its agents (`undeclaredRefusal` in
  * start.verb.ts).
  */
 export type RemoteRead = { agents: ReadonlyMap<string, RemoteAgent>; refused: ReadonlyMap<string, string>; unread?: string };
@@ -163,8 +165,9 @@ export function readRemote(): RemoteRead {
 export const refusalsOf = (read: RemoteRead): string[] => (read.unread ? [read.unread] : [...read.refused.values()]);
 
 /**
- * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step and
- * reads a run's address off. An entry the runtime refuses is not among them; a file refused as it stands is refused, exit code 2, in its words.
+ * The remote A2A agents the store's `a2a-agents.json` declares and the runtime takes, by name (`readRemote`): what the api offers a step
+ * and reads a run's address off. An entry the runtime refuses is not among them; a file refused as it stands is refused, exit code 2, in
+ * its words.
  */
 export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
   const read = readRemote();
@@ -173,8 +176,9 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
 }
 
 /**
- * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request, so a
- * variable set for a running `wf up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local harness.
+ * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request,
+ * so a variable set for a running `wf up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local
+ * harness.
  */
 export const credentials: Credentials = (scheme, _agentUrl, harness) => {
   const name = remoteNameOf(harness);

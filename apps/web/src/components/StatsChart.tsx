@@ -5,6 +5,9 @@ import { seriesOf, type HeadlineNumber } from '../lib/stats';
 const COLUMN = 10;
 const HEIGHT = 60;
 
+/** The widest a day's column is drawn, in pixels: a short period is drawn narrow rather than as a few wide blocks. */
+const WIDEST = 48;
+
 /** How tall the line drawn for a measured 0 is, at the foot of its column, apart from nothing drawn for a day nothing measured. */
 const ZERO = 1.5;
 
@@ -15,7 +18,8 @@ const changedWords = (marks: readonly StatsMark[]): string => marks.map((m) => `
  * One headline number's daily chart: a column per day served (`data-day`, its value as JSON in `data-value`, null kept), a bar for a
  * number, a line at the foot for a measured 0 and nothing for a day nothing measured, each day's value in words on hover; and a rule on
  * each day a run froze something that differs from the run before it (`data-mark-day`), naming what changed. The bars are scaled to the
- * largest known value, said above the drawing; the first and the last day are said beneath it.
+ * largest known value, said above the drawing — `—` where nothing was measured; the first and the last day are said beneath it, as month and
+ * day, the year being the period's.
  */
 export function StatsChart({
   number,
@@ -27,7 +31,7 @@ export function StatsChart({
   marks: ReadonlyMap<string, StatsMark[]>;
 }) {
   const { points, max } = seriesOf(days, number.key);
-  const scale = max > 0 ? max : 1;
+  const scale = max !== null && max > 0 ? max : 1;
   return (
     <figure data-chart={number.key} className="min-w-0 space-y-1 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
       <figcaption className="flex items-baseline justify-between gap-2 text-xs">
@@ -40,27 +44,44 @@ export function StatsChart({
         </span>
       </figcaption>
       {points.length ? (
-        <svg
-          viewBox={`0 0 ${points.length * COLUMN} ${HEIGHT}`}
-          preserveAspectRatio="none"
-          className="block h-24 w-full overflow-visible"
-          role="img"
-          aria-label={`${number.label}, a day at a time`}
-        >
-          {points.map(({ day, value }, i) => (
-            <DayColumn key={day} day={day} value={value} at={i} scale={scale} number={number} changed={marks.get(day)} />
-          ))}
-        </svg>
+        <div style={{ maxWidth: points.length * WIDEST }}>
+          <DayColumns points={points} scale={scale} number={number} marks={marks} />
+          <div className="flex justify-between border-t border-neutral-200 pt-1 font-mono text-[10px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+            <span title={points[0].day}>{points[0].day.slice(5)}</span>
+            {points.length > 1 && <span title={points[points.length - 1].day}>{points[points.length - 1].day.slice(5)}</span>}
+          </div>
+        </div>
       ) : (
         <p className="flex h-24 items-center justify-center text-xs text-neutral-500 dark:text-neutral-400">No day to draw.</p>
       )}
-      {points.length > 0 && (
-        <div className="flex justify-between border-t border-neutral-200 pt-1 font-mono text-[10px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-          <span>{points[0].day}</span>
-          <span>{points[points.length - 1].day}</span>
-        </div>
-      )}
     </figure>
+  );
+}
+
+/** The drawing: a column per day (`DayColumn`), stretched to the width it is given. */
+function DayColumns({
+  points,
+  scale,
+  number,
+  marks,
+}: {
+  points: ReadonlyArray<{ day: string; value: number | null }>;
+  scale: number;
+  number: HeadlineNumber;
+  marks: ReadonlyMap<string, StatsMark[]>;
+}) {
+  return (
+    <svg
+      viewBox={`0 0 ${points.length * COLUMN} ${HEIGHT}`}
+      preserveAspectRatio="none"
+      className="block h-24 w-full overflow-visible"
+      role="img"
+      aria-label={`${number.label}, a day at a time`}
+    >
+      {points.map(({ day, value }, i) => (
+        <DayColumn key={day} day={day} value={value} at={i} scale={scale} number={number} changed={marks.get(day)} />
+      ))}
+    </svg>
   );
 }
 

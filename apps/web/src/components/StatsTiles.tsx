@@ -29,9 +29,11 @@ export function StatsTiles({ last, before }: { last: StatsTile; before: StatsTil
               title={number.about}
               className="min-w-0 space-y-0.5 rounded-lg border border-neutral-200 px-2.5 py-2 dark:border-neutral-800"
             >
-              <div className="truncate text-xs text-neutral-500 dark:text-neutral-400">{number.label}</div>
+              <div data-words className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+                {number.label}
+              </div>
               <div className="flex items-baseline gap-1">
-                <span className="truncate text-lg font-semibold tabular-nums" title={`${last.from} → ${last.to}`}>
+                <span data-words className="truncate text-lg font-semibold tabular-nums" title={`${last.from} → ${last.to}`}>
                   {number.words(last[number.key])}
                 </span>
                 {trend && (
@@ -40,7 +42,11 @@ export function StatsTiles({ last, before }: { last: StatsTile; before: StatsTil
                   </span>
                 )}
               </div>
-              <div className="truncate text-xs text-neutral-500 tabular-nums dark:text-neutral-400" title={`${before.from} → ${before.to}`}>
+              <div
+                data-words
+                className="truncate text-xs text-neutral-500 tabular-nums dark:text-neutral-400"
+                title={`${before.from} → ${before.to}`}
+              >
                 before {number.words(before[number.key])}
               </div>
             </li>

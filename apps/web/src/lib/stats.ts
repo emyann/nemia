@@ -37,7 +37,7 @@ export const HEADLINES: readonly HeadlineNumber[] = [
   {
     key: 'firstTry',
     label: 'first try',
-    about: 'share of landed runs landed on the first try',
+    about: 'share landed on the first try',
     words: or((n) => `${Math.round(n * 100)}%`),
   },
   { key: 'costPerLanded', label: 'cost/landed', about: 'mean cost of a landed run', words: or(dollars) },
@@ -116,13 +116,14 @@ export function apiQueryOf(search: StatsSearch, now: Date, by?: FilterKey): stri
   return query.toString();
 }
 
-/** One headline number of each day: the values, null kept where nothing was measured, and the largest known value, 0 where none is. */
+/** One headline number of each day: the values, null kept where nothing was measured, and the largest known value, null where none is. */
 export function seriesOf(
   days: readonly StatsDay[],
   key: HeadlineKey,
-): { points: Array<{ day: string; value: number | null }>; max: number } {
+): { points: Array<{ day: string; value: number | null }>; max: number | null } {
   const points = days.map((d) => ({ day: d.day, value: d[key] }));
-  const max = Math.max(0, ...points.flatMap((p) => (p.value === null ? [] : [p.value])));
+  const known = points.flatMap((p) => (p.value === null ? [] : [p.value]));
+  const max = known.length ? Math.max(...known) : null;
   return { points, max };
 }
 

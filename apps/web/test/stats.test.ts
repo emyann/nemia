@@ -68,7 +68,7 @@ test('a day nothing measured stays apart from a measured 0: its value is null, i
   assert.equal(series.max, 2);
   assert.equal(rounds.words(null), NONE);
   assert.equal(rounds.words(0), '0');
-  assert.equal(seriesOf([day('2026-09-30')], 'rounds').max, 0, 'no known value: no scale beyond 0');
+  assert.equal(seriesOf([day('2026-09-30')], 'rounds').max, null, 'refused: a scale of 0 where nothing was measured');
 });
 
 test('each number is worded as wf stats words it', () => {

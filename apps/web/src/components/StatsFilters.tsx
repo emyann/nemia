@@ -80,7 +80,7 @@ function StatsPicker({ filter, search, now }: { filter: FilterKey; search: Stats
       onOpenChange={(open) => open && setOpened(true)}
       data-filter={filter}
       data-kept={kept === undefined ? undefined : ''}
-      className="w-40 space-y-1.5"
+      className="w-32 space-y-1.5"
     >
       <Label className="text-xs">{FILTER_LABELS[filter]}</Label>
       <SelectTrigger className="text-xs">

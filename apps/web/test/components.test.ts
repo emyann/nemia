@@ -4829,6 +4829,16 @@ test('REFUSED: a day nothing measured draws no bar and reads —, where a measur
   assert.doesNotMatch(two, /data-zero/);
   assert.equal([...markup.matchAll(/data-mark-day="([^"]+)"/g)].map((m) => m[1]).join(), '2026-09-29', 'one rule, on the changed day');
   assert.match(zero, /<line data-mark-day="2026-09-29"[^>]*><title>2026-09-29: changed agent seldon<\/title>/);
+  assert.match(markup, /title="The top of the scale">2</);
+});
+
+test('REFUSED: a chart whose days measured nothing says its scale is —, never a top of 0', () => {
+  const cost = HEADLINES.find((h) => h.key === 'costPerLanded')!;
+  const markup = renderToStaticMarkup(
+    createElement(StatsChart, { number: cost, days: [statsDay('2026-09-29'), statsDay('2026-09-30')], marks: new Map() }),
+  );
+  assert.match(markup, /title="The top of the scale">—</);
+  assert.doesNotMatch(markup, /data-bar|data-zero/);
 });
 
 test('REFUSED: a tile keeps a number nothing measured apart from 0, and says the last 14 days beside the 14 before', () => {

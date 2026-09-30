@@ -146,8 +146,8 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
 }
 
 /**
- * Read the run `id` as `cancel` does: its record, its frozen steps (`frozenSteps`), the engine's view of its tasks, and its asks; then every
- * check, try, round and step a pass filed and never wrote down, adopted onto the record in memory.
+ * Read the run `id` as `cancel` does: its record, its frozen steps (`frozenSteps`), the engine's view of its tasks, and its asks; then
+ * every check, try, round and step a pass filed and never wrote down, adopted onto the record in memory.
  */
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
   const run = yield* tried(() => readRun(id));
@@ -272,8 +272,8 @@ function strays(within: string): string[] {
 }
 
 /**
- * Delete the branches of the git run `id`, as asked (`branchFates`): those git has under `wf/<id>/`, merged into the run's base branch as git says it,
- * or forced. One git refuses to delete is kept, in git's words.
+ * Delete the branches of the git run `id`, as asked (`branchFates`): those git has under `wf/<id>/`, merged into the run's base branch
+ * as git says it, or forced. One git refuses to delete is kept, in git's words.
  */
 function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
   const listed = (gitSays(run.repo, 'for-each-ref', '--format=%(refname)', `refs/heads/wf/${id}/`) ?? '')

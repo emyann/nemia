@@ -7,7 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ClaudeFlags, Engine, TaskView } from '../runtime-client.ts';
+import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type Verdict } from '../check/check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
@@ -55,7 +55,7 @@ import {
   stepsOf,
 } from '../record/record.store.ts';
 import { writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
+import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
@@ -80,16 +80,22 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
  * gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its start, so its
  * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to claude.ai,
  * where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag, first among its
- * others (`claude.remoteControl`).
+ * others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the directory Codex's trust
+ * extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config lists; a folder run has no
+ * repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one whose repository is no longer
+ * there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a try and a round each spread into
+ * its `config`.
  */
-export function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags } {
+export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
   const dir = agentFilesDir(run, step.name);
   const told =
     rendersAgent(step) && !renderedIn(dir, step)
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
   const rendered = renderedFlags(told, dir);
-  return { step: told, claude: told.remote ? { remoteControl: true, ...rendered } : rendered };
+  const repo = step.harness === 'codex' ? realRepoOf(run) : undefined;
+  const codex = repo === undefined ? undefined : { trustFrom: repo };
+  return { step: told, own: { claude: told.remote ? { remoteControl: true, ...rendered } : rendered, ...(codex ? { codex } : {}) } };
 }
 
 /**
@@ -327,7 +333,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
       );
   const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
-  await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, claude: told.claude }));
+  await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told }));
   return undefined;
 }
 
@@ -387,7 +393,7 @@ const trySpec = (
   r: Retry,
   step: Workflow,
   record: StepRecord,
-  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; claude: ClaudeFlags | undefined },
+  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: ReturnType<typeof toldOf> },
 ): Spec => ({
   id: t.taskId,
   brief: t.brief,
@@ -405,7 +411,7 @@ const trySpec = (
       allowedTools: step.allowedTools,
       background: step.background,
       budgetUsd: t.budgetUsd,
-      claude: t.claude,
+      ...t.told.own,
     },
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -493,7 +499,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
         ),
-        claude: told.claude,
+        ...told.own,
       },
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -637,7 +643,7 @@ function readySpec(f: Filing, step: Workflow, place: Place, files: string, paren
         allowedTools: step.allowedTools,
         background: step.background,
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
-        claude: told.claude,
+        ...told.own,
       },
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

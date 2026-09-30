@@ -14,6 +14,7 @@ import {
   refusedText,
   retiredKeyRefusal,
   type Attempt,
+  type CodexArgs,
   type Engine,
   type Event,
   type HarnessArgs,
@@ -28,7 +29,8 @@ import {
  *
  * A key this list does not name is refused by name, with the list, so a typo is never read as a default; each value is
  * checked by `parseBrief`, so `deadlineSeconds: 5m` is refused rather than journalled as `null`. A test feeds every key
- * through the parser, so none can be accepted here and then dropped.
+ * through the parser, so none can be accepted here and then dropped. A key is one of the task's, one of its harness's
+ * arguments, or one of Codex's own, filed under `config.codex`.
  */
 export const BRIEF_KEYS = [
   'cwd',
@@ -46,7 +48,8 @@ export const BRIEF_KEYS = [
   'background',
   'holdOpen',
   'queued',
-] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs)[];
+  'trustFrom',
+] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs | keyof CodexArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
 const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
@@ -223,6 +226,8 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  * - `tools` is one line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
  * - `worktree: true` lets the harness name it, `false` is no worktree, and any other value names it.
  * - `resumeFrom` names the session to continue: the task's one attempt starts from it rather than cold.
+ * - `trustFrom` is the directory whose trust in the operator's Codex config extends to the `cwd`, filed under
+ *   `config.codex`; whether it is absolute, and whether the harness is Codex, is `file()`'s to say.
  *
  * The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
  */
@@ -249,6 +254,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const cwd = directoryOf(meta.get('cwd'));
   const closeoutSchema = schemaAt(meta.get('closeoutSchema'));
   const tools = toolsOf(meta.get('tools'));
+  const trustFrom = meta.get('trustFrom');
 
   const config: HarnessArgs = Object.fromEntries(
     Object.entries({
@@ -260,6 +266,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
       contextTokens,
       background,
       budgetUsd,
+      codex: trustFrom === undefined ? undefined : { trustFrom },
     }).filter(([, value]) => value !== undefined),
   );
   return {
@@ -457,6 +464,8 @@ const HELP = `ae — an engine for agent sessions
     queued           true — wait for ae admit <id> before it starts
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
+    trustFrom        codex only: an absolute directory you trust in ~/.codex/config.toml,
+                     whose trust extends to cwd — name it to work in a worktree of it
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
   one attempt per start: a task that fails settles failed — file it again, with
   resumeFrom to continue its session (maxAttempts and resume are retired)

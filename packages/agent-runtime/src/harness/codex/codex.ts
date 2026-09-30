@@ -4,13 +4,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
 import { codexOutput } from './stream.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
-import { countSpawn } from '../../core/engine/tally.ts';
 
 /**
  * The project paths a Codex config trusts.
@@ -35,21 +33,6 @@ export const trustedProjects = (toml: string): Set<string> => {
     if (current !== undefined && /^trust_level\s*=\s*"trusted"$/.test(line)) trusted.add(current);
   }
   return trusted;
-};
-
-/** The repository a directory's commits land in: the parent of its git common dir. */
-const repositoryOf = (cwd: string): string | undefined => {
-  try {
-    countSpawn();
-    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    return path.dirname(path.resolve(cwd, common));
-  } catch {
-    return undefined;
-  }
 };
 
 /**
@@ -102,8 +85,8 @@ export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medi
  *    operator's own `mcp_servers`, never puts it in their place — `-c mcp_servers={}` leaves every one of them loaded —
  *    so, unlike Claude Code, a Codex task still has the operator's servers.
  * 8. `-c projects."<dir>".trust_level="trusted"` for each directory `prepare` found trusted: what lets a repository's
- *    own `.codex/rules` load in a worktree. The directory is the task's `config.codex.trustFrom`, else the repository
- *    behind `cwd`, and the `cwd` beside it.
+ *    own `.codex/rules` load in a worktree. The directory is the task's `config.codex.trustFrom`, and the `cwd` beside
+ *    it.
  * 9. `resume <id>`, last after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects `-C`, `-s` and
  *    `--add-dir` after the id ("unexpected argument").
  * 10. The brief.
@@ -182,9 +165,8 @@ export const codex: HarnessSpec = {
    * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
    * Codex settings it ships, and that is not a decision this engine gets to make for you.
    *
-   * The directory trust is extended from is the task's `config.codex.trustFrom` when it names one,
-   * and then it decides alone: trusted, it and the `cwd` are; not, nothing is, and no git is asked.
-   * A task that names none extends it from the repository behind `cwd`, asked of git.
+   * The directory trust is extended from is the task's `config.codex.trustFrom`, and it decides
+   * alone: trusted, it and the `cwd` are; not, nothing is. A task that names none is extended no trust.
    *
    * The same config is read for the MCP servers it names. Codex merges a task's `mcp_servers` into
    * the operator's, so a task server with one of their names becomes a mix of the two — the task's
@@ -207,8 +189,8 @@ export const codex: HarnessSpec = {
       );
     }
     const named = r.config?.codex?.trustFrom;
-    const from = named === undefined ? repositoryOf(r.cwd) : path.resolve(named);
-    if (!from) return {};
+    if (named === undefined) return {};
+    const from = path.resolve(named);
     return trustedProjects(toml).has(from) ? { trustedDirs: [...new Set([from, r.cwd])] } : {};
   },
 };

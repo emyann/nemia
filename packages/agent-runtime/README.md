@@ -567,9 +567,11 @@ after a space starts a comment. The keys are a closed list:
 | `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
 | `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
 | `queued` | `true` or `false` — `true` has the task wait for `ae admit <id>` before it starts: the one way to hold a task back, since the runtime keeps no ceiling; see *Queued and admitted* |
+| `trustFrom` | `codex` only: an absolute directory you trust in `~/.codex/config.toml`, whose trust extends to the `cwd` — name it to work in a worktree of a repository you trust; see *Letting a sandboxed Codex step commit* |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
-`tools`, `effort`, `budgetUsd`, `contextTokens`, `background` — under the task's `config`, where `file()` takes them.
+`tools`, `effort`, `budgetUsd`, `contextTokens`, `background` — under the task's `config`, and Codex's own `trustFrom`
+under `config.codex`, where `file()` takes them.
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
@@ -1651,8 +1653,8 @@ trusted, and the one configuration measured to let a step commit from a worktree
 
 So the Codex spec **extends trust and never grants it.** When the directory a task extends trust from
 is already trusted in your own `~/.codex/config.toml`, the task's `cwd` is trusted for that run too
-(`codex.prepare`). That directory is the task's `config.codex.trustFrom` when it names one, and then
-no git is asked; else it is the repository behind the `cwd`, asked of `git rev-parse --git-common-dir`.
+(`codex.prepare`). That directory is the task's `config.codex.trustFrom`, written `trustFrom:` in an `ae`
+brief; a task that names none is extended no trust, and no git is asked.
 A directory you have not trusted gets nothing, because trusting it would also load whatever other
 Codex settings it ships — not a decision an engine gets to make for you.
 

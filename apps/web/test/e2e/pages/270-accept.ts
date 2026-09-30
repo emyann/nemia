@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -80,7 +80,7 @@ export default {
       await expectCount(waiting, 0, `the run's page no longer says ${step} is waiting on you`);
       await expectCount(row, 0, 'and the Decide section offers wf accept no more');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `accept-accepted-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `accept-accepted-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
       fed(id, step, 'rounds exhausted');

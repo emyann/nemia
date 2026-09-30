@@ -36,6 +36,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A page that holds a read with `route` routes before its `goto`: the feed's replay reads the run again right after the load.
 - A page whose state changes at its end waits for what it reads again before its last assertion, or its picture is taken mid-read.
 - Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's and is overwritten.
+- Take every picture with `photograph` (`board.ts`), which stills every animation for the shot: an agent's face moves at all times.
+  `e2e-pictures.test.ts` refuses a bare `.screenshot(`.
 - A page run against the old code proves only its first failing assertion: to prove each new one, skip the earlier ones in a throwaway
   edit, run, and put the page back.
 - The store is in `/tmp`, which a boot can empty under a running check: when a failure says the store is gone (`storeGone`), run again.

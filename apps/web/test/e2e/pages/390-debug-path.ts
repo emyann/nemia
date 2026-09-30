@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -64,7 +64,7 @@ export default {
     for (const route of TAKEN) await expectVisible(lifecycle.locator(`[data-route="${route}"][data-taken]`), `${route} taken`);
     await idle(page);
     await settled(page);
-    await panel.screenshot({ path: path.join(OUT, `debug-path-open-${await themeOf(page)}.png`) });
+    await photograph(panel, path.join(OUT, `debug-path-open-${await themeOf(page)}.png`));
 
     await entries.nth(2).getByRole('button').click();
     await expectVisible(lifecycle.locator('[data-state="working"][data-lit]'), 'scrubbed to its third entry: working lit');
@@ -77,6 +77,6 @@ export default {
     await expectCount(taken, 1, 'one route taken');
     await expectTexts(panel.locator('[data-shown]'), [`Entry 2 of ${WORDS.length}`], 'the timeline says which entry it shows');
     await settled(page);
-    await panel.screenshot({ path: path.join(OUT, `debug-path-scrubbed-${await themeOf(page)}.png`) });
+    await photograph(panel, path.join(OUT, `debug-path-scrubbed-${await themeOf(page)}.png`));
   },
 } satisfies PageSpec;

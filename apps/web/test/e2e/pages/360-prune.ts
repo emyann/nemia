@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
@@ -74,7 +74,7 @@ export default {
       await expectCount(third.and(page.locator('[data-selected]')), 1, 'and it is chosen: the one choice the api takes');
       if (fs.existsSync(marker)) throw new Refused('opening the choice prunes nothing');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `prune-choices-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `prune-choices-${theme}.png`), { fullPage: true });
 
       await dialog.getByRole('button', { name: 'Prune…', exact: true }).click();
       const question = dialog.locator('[data-prune-question]');
@@ -86,7 +86,7 @@ export default {
       );
       if (fs.existsSync(marker) || !fs.existsSync(lane)) throw new Refused('the first Prune… asks, and prunes nothing');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `prune-asking-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `prune-asking-${theme}.png`), { fullPage: true });
 
       await dialog.getByRole('button', { name: 'Prune', exact: true }).click();
       await expectCount(dialog, 0, 'the second press prunes, and the popover closes');
@@ -98,7 +98,7 @@ export default {
       await expectVisible(page.locator('[data-pruned][data-files-pruned]'), "the run's page says its worktrees and its files were pruned");
       await expectCount(open, 0, 'and offers no prune: nothing of it is left on disk');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `prune-pruned-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `prune-pruned-${theme}.png`), { fullPage: true });
 
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);
@@ -114,7 +114,7 @@ export default {
         throw new Refused(`the row says on hover what went and what was kept, as wf ls says it — its title is ${JSON.stringify(said)}`);
       }
       await settled(page);
-      await row.screenshot({ path: path.join(OUT, `prune-row-${theme}.png`) });
+      await photograph(row, path.join(OUT, `prune-row-${theme}.png`));
 
       await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
       await idle(page);

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -112,7 +112,7 @@ export default {
       `with the cp, as the api words it, that copies it into the store this api reads, ${into}, never a home the api may not read`,
     );
     await expectCount(page.getByRole('button', { name: 'Try it' }), 0, "the repository's agent has no Try button");
-    await yours.screenshot({ path: path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`) });
+    await photograph(yours, path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`));
 
     let id: string | undefined;
     try {
@@ -162,7 +162,7 @@ export default {
       );
       if (!(await button.isDisabled())) throw new Refused('Try it is held while a try moves');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agent-try-started-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agent-try-started-${await themeOf(page)}.png`), { fullPage: true });
 
       await goto(page, '/');
       await expectVisible(
@@ -184,7 +184,7 @@ export default {
       await brief.fill(TRY.brief);
       await expectCount(panel.locator('[data-try-held]'), 0, 'ended, another try may start');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agent-try-ended-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agent-try-ended-${await themeOf(page)}.png`), { fullPage: true });
 
       await shown.locator(`a[data-try-run="${id}"]`).click();
       await page.waitForURL((url) => url.pathname === `/runs/${id}`, { timeout: WAIT_MS });
@@ -193,7 +193,7 @@ export default {
       await expectVisible(header.locator(`a[data-agent-link="${seeded.name}"]`), 'and links the agent it tried');
       await idle(page);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agent-try-run-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agent-try-run-${await themeOf(page)}.png`), { fullPage: true });
       await header.getByRole('button', { name: 'Remove…' }).click();
       const [removed] = await Promise.all([
         answered(page, 'DELETE', `/api/runs/${id}`),

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { expectRendered, fed, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -98,7 +98,7 @@ export default {
       'and no git merge by hand: the ending step is what merges this branch',
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `decide-awaiting-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `decide-awaiting-${await themeOf(page)}.png`), { fullPage: true });
 
     const retried = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${back}/retry`;
     await sendBack.getByRole('textbox').fill(ENDING.objection);
@@ -130,7 +130,7 @@ export default {
       `${ending}'s facts say its gate holds once the work has handed on, never once ${ending}, which its approval files, has signed off`,
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `decide-sent-back-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `decide-sent-back-${await themeOf(page)}.png`), { fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, ending, 'awaiting approval');

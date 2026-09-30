@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -12,23 +12,28 @@ const WIDE = { width: 1280, height: 800 };
 /** A phone held upright. */
 const PHONE = { width: 390, height: 844 };
 
-/** How far a face's waking is from its rest: Blobatar's `--mo-amp` on its drawing, 1 awake and 0 at rest. */
-const ampOf = (card: Locator) =>
-  card.locator('svg[data-agent-face] .mo-root').evaluate((root) => getComputedStyle(root).getPropertyValue('--mo-amp').trim());
+/** What the face on `card` shows: Blobatar's `--mo-amp` on its drawing, 1 awake and 0 at rest, and whether its root is lifted. */
+const faceOf = (card: Locator) =>
+  card.locator('svg[data-agent-face] .mo-root').evaluate((root) => {
+    const style = getComputedStyle(root);
+    return { amp: style.getPropertyValue('--mo-amp').trim(), lifted: style.transform !== 'none' };
+  });
 
-/** Waits until the face on `card` is awake or at rest, as `ampOf` reads it; refuses with the last reading after `WAIT_MS`. */
-async function waitForAmp(page: Page, card: string, amp: '1' | '0', assertion: string) {
+/** Waits until the face on `card` is awake and lifted or not, as `faceOf` reads it; refuses with the last reading after `WAIT_MS`. */
+async function waitForFace(page: Page, card: string, lifted: boolean, assertion: string) {
   try {
     await page.waitForFunction(
-      ({ card, amp }) => {
+      ({ card, lifted }) => {
         const root = document.querySelector(`${card} svg[data-agent-face] .mo-root`);
-        return root !== null && getComputedStyle(root).getPropertyValue('--mo-amp').trim() === amp;
+        if (!root) return false;
+        const style = getComputedStyle(root);
+        return style.getPropertyValue('--mo-amp').trim() === '1' && (style.transform !== 'none') === lifted;
       },
-      { card, amp },
+      { card, lifted },
       { timeout: WAIT_MS },
     );
   } catch {
-    throw new Refused(`${assertion} — its --mo-amp is ${JSON.stringify(await ampOf(page.locator(card)))}`);
+    throw new Refused(`${assertion} — it shows ${JSON.stringify(await faceOf(page.locator(card)))}`);
   }
 }
 
@@ -56,9 +61,10 @@ async function expectOnePerRow(page: Page) {
 
 export default {
   /**
-   * The Agents page's character cards, as a person meets them. Hovered anywhere, a card wakes its face, as hovering the face itself would;
-   * the pointer gone, it rests. On a phone held upright, each card has a row of its own, holds its face, and the page does not scroll
-   * sideways. Read-only; the runner's viewport is put back before the page ends.
+   * The Agents page's character cards, as a person meets them. Each face is awake with nothing hovering its card; hovered anywhere, a card
+   * lifts its face, as hovering the face itself would, and the pointer gone, the lift goes and the face stays awake. On a phone held
+   * upright, each card has a row of its own, holds its face, and the page does not scroll sideways. Read-only; the runner's viewport is put
+   * back before the page ends.
    */
   name: 'agent-cards',
   route: '/agents',
@@ -67,14 +73,14 @@ export default {
     const people = [AGENTS.seeded.name, WORKFLOWS.good.agent.name];
     await expectCount(page.locator('section[data-agent]'), people.length, 'the list draws a card an agent');
     const card = `section[data-agent="${WORKFLOWS.good.agent.name}"]`;
-    await waitForAmp(page, card, '0', 'a face rests while nothing hovers its card');
+    await waitForFace(page, card, false, 'a face is awake and unlifted while nothing hovers its card');
     await page.locator(`${card} [data-agent-role]`).scrollIntoViewIfNeeded();
     const role = await page.locator(`${card} [data-agent-role]`).boundingBox();
     if (!role) throw new Refused('the role line is laid out');
     await page.mouse.move(role.x + role.width / 2, role.y + role.height / 2, { steps: 4 });
-    await waitForAmp(page, card, '1', 'hovering the card away from its face wakes the face');
+    await waitForFace(page, card, true, 'hovering the card away from its face lifts the face, as hovering the face itself would');
     await page.mouse.move(WIDE.width - 5, 5, { steps: 4 });
-    await waitForAmp(page, card, '0', 'and the pointer gone, the face rests again');
+    await waitForFace(page, card, false, 'and the pointer gone, the lift goes and the face stays awake');
 
     try {
       await page.setViewportSize(PHONE);
@@ -87,7 +93,7 @@ export default {
         throw new Refused(`on a phone, the page does not scroll sideways — it is ${wide.scroll}px wide in ${wide.client}px`);
       await expectOnePerRow(page);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agent-cards-phone-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agent-cards-phone-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       await page.setViewportSize(WIDE);
     }

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATH_POLL_MS } from '../../../src/lib/lifecyclePath.ts';
-import { openDebug, sidebar, themeOf } from '../board.ts';
+import { openDebug, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, settled } from '../checks.ts';
 import { SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -37,7 +37,7 @@ export default {
       await expectCount(lifecycle.locator('[data-state][data-lit]'), 1, 'and it alone');
       await expectVisible(panel.getByRole('list', { name: 'The path' }).getByText('(no edge)'), 'a person’s stop is a move no edge makes');
       await settled(page);
-      await panel.screenshot({ path: path.join(OUT, `debug-polled-stopping-${await themeOf(page)}.png`) });
+      await photograph(panel, path.join(OUT, `debug-polled-stopping-${await themeOf(page)}.png`));
     } finally {
       fs.writeFileSync(journal, seeded);
     }

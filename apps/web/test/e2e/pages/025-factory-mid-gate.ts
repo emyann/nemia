@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -44,7 +44,7 @@ export default {
       `and ${gated}'s pill on its rail, awaiting approval`,
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), { fullPage: true });
 
     const read = card.locator(`a[data-read="${gated}"]`, { hasText: /^Read the plan$/ });
     await expectVisible(read, `the card's gate offers Read the plan, in its answer row`);
@@ -62,7 +62,7 @@ export default {
       inspector,
       `the page is scrolled to ${gated}'s inspector, below the first screen under the banners and Decide, and stays there once Decide has read its decision`,
     );
-    await page.screenshot({ path: path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`) });
+    await photograph(page, path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`));
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), 'back on the floor, the card at its gate again');
@@ -90,7 +90,7 @@ export default {
         'the card says it is approved, and what comes next',
       );
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `factory-mid-gate-approved-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `factory-mid-gate-approved-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       fs.rmSync(asks, { recursive: true, force: true });
       fed(id, gated, 'awaiting approval');

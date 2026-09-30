@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -52,7 +52,7 @@ export default {
       await expectVisible(dialog.getByText(`Lift the hold on ${id}?`, { exact: true }), 'the first press asks');
       if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `lift-card-asking-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `lift-card-asking-${theme}.png`), { fullPage: true });
       await dialog.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(dialog, 0, 'the second press lifts, and the popover closes');
       lifted('the card');
@@ -70,7 +70,7 @@ export default {
       await expectVisible(section.getByText(`Lift the hold on ${id}?`), 'the first press asks');
       if (!fs.existsSync(hold)) throw new Refused('the first press lifts nothing: the hold is still on disk');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `lift-run-asking-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `lift-run-asking-${theme}.png`), { fullPage: true });
       await section.getByRole('button', { name: 'Lift', exact: true }).click();
       await expectCount(section, 0, 'the second press lifts, and the page says no hold');
       lifted('the run page');
@@ -80,7 +80,7 @@ export default {
       );
       await expectCount(page.locator('[role="alert"][data-lift-refused]'), 0, 'with no refusal said');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `lift-lifted-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `lift-lifted-${theme}.png`), { fullPage: true });
     } finally {
       await takeBack(page, hold, id, gated);
     }

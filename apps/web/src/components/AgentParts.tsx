@@ -136,32 +136,36 @@ type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolea
 
 /**
  * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
- * design. Named as a person is, for a screen reader; `size` in pixels. Still, it is one image; with `follows`, it is an inline drawing whose
- * eyes turn toward the pointer and which comes alive while hovered — unless the person asked for reduced motion, or has no fine pointer
- * that hovers, where its eyes stay still. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours,
+ * design. Named as a person is, for a screen reader: by its label, so the name is no text of the line it stands in and no tooltip, or with
+ * `follows` by its title. `size` in pixels. It is an inline drawing alive at all times — it breathes, bobs, blinks and glances with nothing
+ * hovering it — and with `follows` its eyes also turn toward the pointer; still where the person asked for reduced motion, and with no eyes
+ * following where there is no fine pointer. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours,
  * dimmed in the dark theme.
  */
 export function AgentFace({ name, size, follows, plate, className }: FaceProps) {
   if (follows) return <FollowingFace name={name} size={size} plate={plate} className={className} />;
   return (
     <Blobatar
+      animate="always"
       name={name}
       size={size}
       background={plate ? 'squircle' : false}
-      title={personOf(name)}
+      role="img"
+      aria-label={personOf(name)}
+      aria-hidden={false}
       data-agent-face={name}
       className={cn(plate ? PLATE : FACE, className)}
     />
   );
 }
 
-/** An agent's face whose eyes follow the pointer: Blobatar's gaze driver on its inline drawing, three units of a hundred at most. */
+/** An agent's face, alive at all times, whose eyes follow the pointer: Blobatar's gaze driver on its drawing, three units of a hundred at most. */
 function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follows'>) {
   const { ref } = useGaze({ travel: 3, lookAt: 'pointer' });
   return (
     <Blobatar
       ref={ref}
-      animate="hover"
+      animate="always"
       name={name}
       size={size}
       background={plate ? 'squircle' : false}

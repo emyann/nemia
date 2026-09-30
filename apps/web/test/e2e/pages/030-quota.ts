@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { recordedUsage, themeOf } from '../board.ts';
+import { photograph, recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
@@ -25,7 +25,7 @@ export default {
     const line = page.locator('[data-quota]');
     const shoot = async (what: string) => {
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
     };
     const said = async (state: string, text: RegExp, why: string) => {
       await page.reload({ waitUntil: 'load' });

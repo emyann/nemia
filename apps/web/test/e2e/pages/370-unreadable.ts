@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused } from '../checks.ts';
 import { DIAMOND } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -49,7 +49,7 @@ export default {
       if (said < 1 || said > 2)
         throw new Refused(`only the run whose task does not read, and the run waiting on it, may say so — ${said} rows say so`);
       await idle(page);
-      await row(running.id).screenshot({ path: path.join(OUT, `unreadable-row-${await themeOf(page)}.png`) });
+      await photograph(row(running.id), path.join(OUT, `unreadable-row-${await themeOf(page)}.png`));
     } finally {
       fs.writeFileSync(journal, was);
       fed(running.id, 'implement', 'running');

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectApart, expectCount, expectInside, expectUncut, expectVisible, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -112,6 +112,6 @@ export default {
     await expectUncut(frame.locator('[data-edge-line]'), 'every event line read whole');
     await expectHeld(states, 'each state holds its name and its lines');
     await expectHeld(labels, 'each label holds its lines');
-    await frame.screenshot({ path: path.join(OUT, `machines-lifecycle-${await themeOf(page)}.png`) });
+    await photograph(frame, path.join(OUT, `machines-lifecycle-${await themeOf(page)}.png`));
   },
 } satisfies PageSpec;

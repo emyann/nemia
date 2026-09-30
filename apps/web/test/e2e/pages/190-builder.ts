@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { filesIn, sidebar, themeOf } from '../board.ts';
+import { filesIn, photograph, sidebar, themeOf } from '../board.ts';
 import { drawEdge } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
@@ -125,7 +125,7 @@ export default {
             .join(', ')}`,
         );
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `builder-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `builder-refused-${await themeOf(refused)}.png`), { fullPage: true });
 
       await builder.getByRole('button', { name: 'Remove the edge build → plan' }).click();
       await expectCount(builder.locator('.react-flow__edge'), 1, "the edge's button takes it away, and plan no longer waits on build");
@@ -209,7 +209,7 @@ export default {
       const again = builder.getByRole('button', { name: 'Read the folder again' });
       await expectVisible(again, 'the refusal offers to read the folder again');
       await settled(stale);
-      await stale.screenshot({ path: path.join(OUT, `builder-changed-${await themeOf(stale)}.png`), fullPage: true });
+      await photograph(stale, path.join(OUT, `builder-changed-${await themeOf(stale)}.png`), { fullPage: true });
       await again.click();
       await expectCount(builder.locator('[data-refused]'), 0, 'read again, the refusal goes');
       await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'and the draft is the folder as it is now: nothing unsaved');
@@ -282,7 +282,7 @@ export default {
       if ((await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test')
         throw new Refused('the check it sets itself is in its field');
       await settled(crewed);
-      await crewed.screenshot({ path: path.join(OUT, `builder-agent-${await themeOf(crewed)}.png`), fullPage: true });
+      await photograph(crewed, path.join(OUT, `builder-agent-${await themeOf(crewed)}.png`), { fullPage: true });
 
       await picker.selectOption(other);
       await expectTexts(
@@ -410,7 +410,7 @@ export default {
       const { source } = (await stepPage.json()) as { source?: string };
       if (source !== files[0][1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `builder-saved-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `builder-saved-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
       fs.rmSync(made, { recursive: true, force: true });
     }

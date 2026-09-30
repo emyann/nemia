@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -101,7 +101,7 @@ export default {
           `wf decide, on the same store, prints what was said under ${SAYING.step}, fenced, with when it was said — it printed:\n${decided}`,
         );
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `say-said-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `say-said-${await themeOf(page)}.png`), { fullPage: true });
 
       const refused = await page.context().newPage();
       try {
@@ -158,7 +158,7 @@ export default {
           throw new Refused(`nothing reaches the inbox on a refusal — it heard ${JSON.stringify(heard.slice(heardBefore))}`);
         if (fs.readFileSync(journal, 'utf8') !== journalled) throw new Refused(`nothing is journalled on a refusal — ${journal} changed`);
         await settled(refused);
-        await refused.screenshot({ path: path.join(OUT, `say-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await photograph(refused, path.join(OUT, `say-refused-${await themeOf(refused)}.png`), { fullPage: true });
         const expected = `request answered 409: POST ${answered.url()}`;
         const seen = problems();
         const others = seen.filter(

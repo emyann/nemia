@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { nextVisit, PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { nextVisit, photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import {
   cardOf,
   cardsOf,
@@ -254,7 +254,7 @@ export default {
       "the Factory's legend draws the edge between two cards",
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-diamond-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-diamond-${await themeOf(page)}.png`), { fullPage: true });
 
     const everyOther = (...ids: string[]) =>
       page.locator(`.react-flow__node[data-id]${ids.map((id) => `:not([data-id="${id}"])`).join('')}`);
@@ -278,7 +278,7 @@ export default {
     await expectCount(page.locator('[data-tile]'), 0, 'a drop is not a click: no card opened');
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-cards-dragged-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-cards-dragged-${await themeOf(page)}.png`), { fullPage: true });
     const [putDown, leftBe] = [await placeOf(cardOf(page, running.id)), await placeOf(cardOf(page, bottom.id))];
     await nextVisit(page, async (again) => {
       await expectVisible(cardOf(again, running.id), `${running.id} is on the floor on the next visit`);
@@ -339,7 +339,7 @@ export default {
       `a run whose ending merged it is decided: no card on the floor by default (${SHIPPED.id})`,
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), { fullPage: true });
 
     await showFinished(page);
     await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
@@ -439,7 +439,7 @@ export default {
     await photographCard(page, card, path.join(OUT, `factory-card-at-rest-${await themeOf(page)}.png`));
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-laid-out-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-laid-out-${await themeOf(page)}.png`), { fullPage: true });
 
     const nodes = await page.locator('.react-flow__node').count();
     await card.locator('time').click();
@@ -536,7 +536,7 @@ export default {
     await expectCount(tiles, FAKE.steps.length, 'and does not close the card');
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-dragged-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-dragged-${await themeOf(page)}.png`), { fullPage: true });
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await expectCount(tiles, 0, 'Reset layout closes the card');

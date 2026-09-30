@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { cardOf, cardsDrawn, expectClearOfEachOther, placeOf, said } from '../canvas.ts';
 import { expectCount, expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { lines, write } from '../seed.ts';
@@ -163,7 +163,7 @@ export default {
           `${notes} and ${back}, both after ${LONG_NAMES.steps[0]}, are one column in two lanes — at ${said(notesAt)} and ${said(backAt)}`,
         );
       }
-      await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), { fullPage: true });
       await card.locator('time').click();
       await expectCount(card.locator('[data-tile]'), LONG_NAMES.steps.length, 'the card opens into a tile per step');
       for (const name of LONG_NAMES.steps) {

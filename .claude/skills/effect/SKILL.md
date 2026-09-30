@@ -113,7 +113,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - A controller's program is an `Effect.fn` that requires the Promise engine as a service (`EngineService`) and lifts each read
   with `tried` or `awaited` (`packages/agent-orchestrator/src/runtime-client.ts`): it fails with a `Refusal` and dies of anything
   else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
-  `decideRun` and `decide`, `forgetRun` and `forget`.
+  `decideRun` and `decide`, `forgetRun` and `forget`, and the verbs a person asks of a run (`roundRun` and `round`, `acceptRun`,
+  `retryRun`, `approveRun`, `sayRun`, `cancelRun`). An engine refusal is mapped in one place: `toldBy` in `say.verb.ts` turns the
+  runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make a defect.
 
 ## Tests
 

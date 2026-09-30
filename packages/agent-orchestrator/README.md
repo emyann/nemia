@@ -2775,7 +2775,7 @@ holding a concurrency slot forever.
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
-| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: `cancel`, `retry`, `approve`, `say`, `hold` and `unhold`, `round` and `accept` |
+| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`, and `cancel`, `retry`, `approve`, `say`, `round` and `accept`, their plain faces; `hold` and `unhold` |
 | `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and `forget`, its plain face |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
 | `src/list/list.verb.ts` | what a person reads of the runs: `wf ls` (`list`) |

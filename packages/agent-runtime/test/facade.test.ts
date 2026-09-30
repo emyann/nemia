@@ -780,7 +780,7 @@ test('the Promise engine refuses `maxConcurrent` at any value, as an own key: th
         assert.equal(e.exitCode, 2, e.message);
         assert.match(
           e.message,
-          /^createEngine: `maxConcurrent` is retired: the runtime keeps no ceiling, and starts every task it is given\. File tasks `queued: true` and `admit` each/,
+          /^promiseEngine: `maxConcurrent` is retired: the runtime keeps no ceiling, and starts every task it is given\. File tasks `queued: true` and `admit` each/,
         );
         return true;
       },
@@ -806,7 +806,7 @@ test('the Promise engine refuses a harness that names a `pool`, a spec or a Prom
         assert.match(
           e.message,
           new RegExp(
-            `^createEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\\. Take \`pool\` off it`,
+            `^promiseEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\\. Take \`pool\` off it`,
           ),
         );
         assert.match(e.message, /the orchestrator's `POOLS` in `src\/cap\/cap\.ts`/);

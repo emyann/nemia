@@ -128,7 +128,10 @@ test('a card that asks for a bearer token, with no credentials to give one: unst
   assert.equal(v.state.settled, 'failed');
   const a = v.state.attempts[0];
   assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none/);
+  assert.match(
+    a.error ?? '',
+    /`token` needs a secret, and `credentials` gave none: give `Engine\.layer` a `credentials` that answers for `token`/,
+  );
   assert.match(a.error ?? '', /Nothing was sent/);
   assert.equal(s.counts.sendMessage ?? 0, 0);
   assert.equal(s.paths.length, 0, 'no request reached the agent');
@@ -253,7 +256,7 @@ test('the Promise engine refuses a remote agent it could never reach, whose addr
     );
     assert.equal(err.exitCode, 2, String(said));
     assert.match(err.message, said);
-    assert.ok(err.message.startsWith('createEngine: the `remote` harness'), err.message);
+    assert.ok(err.message.startsWith('promiseEngine: the `remote` harness'), err.message);
   }
   const err = await refusal(() =>
     promiseEngine(

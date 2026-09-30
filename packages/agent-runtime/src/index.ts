@@ -29,7 +29,8 @@
  * The list, in groups:
  *
  * - the engine as a service (`Engine`, `service/engine.ts`): a layer made from the engine's options, whose verbs are Effects with
- *   typed errors, and `promiseEngine`, which runs each verb of a layer's `Engine` as a Promise, as `createEngine` does;
+ *   typed errors, and `promiseEngine`, which runs each verb of a layer's `Engine` as a Promise: `promiseEngine(Engine.layer(options))`
+ *   is the engine a consumer uses without writing Effect;
  * - filing work, asking about it and stopping it, verb by verb (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);

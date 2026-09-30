@@ -1,10 +1,9 @@
 /**
- * `createEngine`: the engine without Effect, the `Engine` service (`service/engine.ts`) with each verb run as a Promise
- * (`promiseEngine`).
+ * `promiseEngine`: the engine without Effect, the `Engine` service (`service/engine.ts`) of a layer with each verb run as a Promise.
  */
 import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
 import { Engine as EngineService, listRefusalOf, type EngineShape } from '../service/index.ts';
-import type { Engine, EngineOptions } from './consumer.ts';
+import type { Engine } from './consumer.ts';
 
 /** The tags of the verbs' refusals: each rejects at this door as an `Error` whose `exitCode` is 2, its message led by the verb. */
 const REFUSALS = new Set([
@@ -30,10 +29,11 @@ const plainOf =
   };
 
 /**
- * The engine `layer` gives, in Promises: the layer built once, here and at once, and each verb of its `Engine` run as a Promise — a
- * refusal rejected as an `Error` whose `exitCode` is 2 and whose message is led by the verb, `SayUnsent` as an `Error` with its `cause`
- * and no `exitCode`, and a `JournalError` or a `RunnerError` as it failed. `list` handed something other than task ids throws at the
- * call, as it always has. Refused — throws an `Error` whose `exitCode` is 2, led by `createEngine` — when the layer fails with
+ * The engine `layer` gives, in Promises: `promiseEngine(Engine.layer(options))` is the engine over `options` that a consumer uses
+ * without writing Effect. The layer is built once, here and at once, and each verb of its `Engine` run as a Promise — a refusal
+ * rejected as an `Error` whose `exitCode` is 2 and whose message is led by the verb, `SayUnsent` as an `Error` with its `cause` and no
+ * `exitCode`, and a `JournalError` or a `RunnerError` as it failed. `list` handed something other than task ids throws at the call, as
+ * it always has. Refused — throws an `Error` whose `exitCode` is 2, led by `promiseEngine` — when the layer fails with
  * `EngineRefused`; any other failure to build it is thrown as it is.
  */
 export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
@@ -43,7 +43,7 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
       Effect.provideService(Scope.Scope, Scope.makeUnsafe()),
     ),
   );
-  if (Exit.isFailure(built)) throw plainOf('createEngine')(Cause.squash(built.cause));
+  if (Exit.isFailure(built)) throw plainOf('promiseEngine')(Cause.squash(built.cause));
   const service: EngineShape = built.value;
   const run = <A, F>(verb: string, e: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(e.pipe(Effect.mapError(plainOf(verb))));
 
@@ -69,14 +69,4 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
     io: () => Effect.runSync(service.io()),
     start: (options) => Effect.runSync(service.start(options)),
   };
-}
-
-/**
- * An engine over `options`, as `Engine.layer` builds it (`service/engine.ts`, where what it is made of is described), in Promises. The
- * default harness, `defaultHarness` or else the first, takes a task that names none, and answers `logs`, `transcript` and `say` for a
- * task whose harness this engine does not have, whose `view` asks no harness. Refused — throws an `Error` whose `exitCode` is 2 — for
- * what `optionsRefusalOf` refuses.
- */
-export function createEngine(options: EngineOptions = {}): Engine {
-  return promiseEngine(EngineService.layer(options));
 }

@@ -93,7 +93,7 @@ const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(
 const NOW = new Date(`${DAY}T20:00:00.000Z`);
 
 /** A run of the team that went round its loop twice and landed on the ending's first try. */
-const twoRounds = (id: string, steps = TEAM, landed = { commit: 'abc' }, more: Partial<Run> = {}) => {
+const twoRounds = (id: string, steps = TEAM, landed: object = { commit: 'abc' }, more: Partial<Run> = {}) => {
   const [design, implement, review, land] = steps.map((s) => s.name);
   const tries = {
     [design]: [{ end: at(1) }],

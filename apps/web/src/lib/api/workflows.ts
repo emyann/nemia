@@ -102,7 +102,10 @@ export const workflowsQuery = queryOptions({
   queryFn: () => get('/api/workflows', Schema.mutable(Schema.Array(WorkflowListingSchema))),
 });
 
-/** Where a start runs and a listing is read, as the api resolves `?factory=` and `?repo=` (`placeFor`): a factory, and one of its repositories. */
+/**
+ * Where a start runs and a listing is read, as the api resolves `?factory=` and `?repo=` (`placeFor`): a factory, and one of its
+ * repositories.
+ */
 export type Place = { factory: string; repo: string };
 
 /** The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none. */

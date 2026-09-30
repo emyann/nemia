@@ -55,7 +55,7 @@ import {
   stepsOf,
 } from '../record/record.store.ts';
 import { writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
+import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
@@ -82,8 +82,9 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
  * where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag, first among its
  * others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the directory Codex's trust
  * extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config lists; a folder run has no
- * repository, and a step on another harness takes no Codex arguments, so either is filed with none. Both are the harness's own arguments
- * (`own`), which the first filing, a try and a round each spread into its `config`.
+ * repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one whose repository is no longer
+ * there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a try and a round each spread into
+ * its `config`.
  */
 export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
   const dir = agentFilesDir(run, step.name);
@@ -92,7 +93,8 @@ export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claud
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
   const rendered = renderedFlags(told, dir);
-  const codex = step.harness === 'codex' && isGitRun(run) ? { trustFrom: fs.realpathSync(run.repo) } : undefined;
+  const repo = step.harness === 'codex' ? realRepoOf(run) : undefined;
+  const codex = repo === undefined ? undefined : { trustFrom: repo };
   return { step: told, own: { claude: told.remote ? { remoteControl: true, ...rendered } : rendered, ...(codex ? { codex } : {}) } };
 }
 

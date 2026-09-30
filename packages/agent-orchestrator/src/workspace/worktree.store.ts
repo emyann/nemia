@@ -35,6 +35,19 @@ import type { Workflow } from '../step/step.ts';
 import { HOME, lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn, execCounted, readText } from '../meter/tally.store.ts';
 
+/**
+ * The real path of a git run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there to
+ * resolve, so a filing that reads it goes on without it rather than stopping the pass.
+ */
+export const realRepoOf = (run: Run): string | undefined => {
+  if (!isGitRun(run)) return undefined;
+  try {
+    return fs.realpathSync(run.repo);
+  } catch {
+    return undefined;
+  }
+};
+
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 

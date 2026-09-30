@@ -2202,6 +2202,20 @@ test("a codex step of a repository run is filed with `codex.trustFrom` the real 
   assert.equal(written.config?.codex, undefined, 'a folder run has no repository to extend trust from');
 });
 
+test('a codex try of a run whose repository is gone is filed with no `codex.trustFrom`, rather than throwing out of the pass', async () => {
+  const repo = aRepo();
+  const run = gitRunOf(start({ brief: 'add a flag', repo, workflowDir: folder('harness: codex\ncheck: npm test\nretries: 1') }));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).checked, ['implement']);
+  b.settle(`${run.id}-implement-check`, 'failed', undefined, 1);
+  fs.rmSync(repo, { recursive: true, force: true });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  const tried = b.tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.equal(tried.config?.codex, undefined, 'a repository that is not there extends no trust');
+});
+
 test('a step with `allowedTools:` reaches `e.file` with exactly those rules as `allowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Edit(**)', 'Bash(npm test)'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nallowedTools: Edit(**), Bash(npm test)', 'failed', 1);

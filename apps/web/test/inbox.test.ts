@@ -464,13 +464,13 @@ test("a start the tick tried and did not make says so as `wf inbox` does: refuse
   );
 });
 
-test('the Factory says the run slots taken of the cap and how many are queued — `no cap` with none, and the queue left out when empty', () => {
-  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 3), '2 of 4 run slots taken · 3 queued');
-  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 0), '2 of 4 run slots taken');
-  assert.equal(capLine({ cap: 1, inFlight: [] }, 1), '0 of 1 run slots taken · 1 queued');
-  assert.equal(capLine({ cap: 0, inFlight: null }, 3), 'no cap · 3 queued');
-  assert.equal(capLine({ cap: 0, inFlight: null }, 0), 'no cap');
-  assert.equal(capLine({ cap: 0, inFlight: ['a'] }, 0), 'no cap', 'a count with no cap is no count against one');
+test("a factory's floor says the run slots taken of the machine's cap, on this machine, and how many are queued — `no cap` with none, and the queue left out when empty", () => {
+  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 3), '2 of 4 run slots taken on this machine · 3 queued');
+  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 0), '2 of 4 run slots taken on this machine');
+  assert.equal(capLine({ cap: 1, inFlight: [] }, 1), '0 of 1 run slots taken on this machine · 1 queued');
+  assert.equal(capLine({ cap: 0, inFlight: null }, 3), 'no cap on this machine · 3 queued');
+  assert.equal(capLine({ cap: 0, inFlight: null }, 0), 'no cap on this machine');
+  assert.equal(capLine({ cap: 0, inFlight: ['a'] }, 0), 'no cap on this machine', 'a count with no cap is no count against one');
 });
 
 test("a card is queued by its name in the path, POST, and taken off the queue with DELETE, each sent as JSON with no body; a refusal rejects with the api's message word for word", async (t) => {

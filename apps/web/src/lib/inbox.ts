@@ -177,12 +177,16 @@ export function triedLine(entry: Pick<InboxEntry, 'repo' | 'error'> & { tried: N
 }
 
 /**
- * The Factory's line on the cap: `2 of 4 run slots taken · 3 queued`, or `no cap · 3 queued` — the queue left out when it is empty. The
- * count is the cap's (`Ceilings.inFlight`), not the floor's, and said in the package's word for what the cap holds, a run slot
- * (`slotWord`): beside the floor's `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` would read as a full
- * floor with a slot free.
+ * A factory's floor's line on the cap: `2 of 4 run slots taken on this machine · 3 queued`, or `no cap on this machine · 3 queued` — the
+ * queue, the factory's own, left out when it is empty. The cap and its count are the machine's (`Ceilings.inFlight`), not the factory's,
+ * and it says so; the count is the cap's, not the floor's, and said in the package's word for what the cap holds, a run slot (`slotWord`):
+ * beside the floor's `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` would read as a full floor with a slot
+ * free.
  */
 export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: number): string {
-  const cap = ceilings.cap > 0 && ceilings.inFlight ? `${ceilings.inFlight.length} of ${ceilings.cap} run slots taken` : 'no cap';
+  const cap =
+    ceilings.cap > 0 && ceilings.inFlight
+      ? `${ceilings.inFlight.length} of ${ceilings.cap} run slots taken on this machine`
+      : 'no cap on this machine';
   return queued > 0 ? `${cap} · ${queued} queued` : cap;
 }

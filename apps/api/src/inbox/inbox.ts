@@ -24,12 +24,12 @@ import {
   dropFromInbox,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
-  inboxDir,
   inboxNameRefusal,
   noCardLine,
   parseInboxCard,
   queueInInbox,
   readInbox,
+  runStore,
   type InboxListing,
 } from 'agent-orchestrator';
 import { decodeBody, readBody, valueAt, type BodyIssue } from '../body.ts';
@@ -80,12 +80,12 @@ const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNo
  */
 export function listInbox(): InboxEntry[] {
   return readInbox().map((entry) => {
-    const file = path.join(inboxDir(), entry.file);
     let filedAt: string | null = null;
     let body: string | null = null;
     try {
-      filedAt = fs.statSync(file).mtime.toISOString();
-      if (entry.error === null) body = parseInboxCard(entry.file, fs.readFileSync(file, 'utf8'), isDirectory).body;
+      filedAt = runStore.inbox.filedAt(entry.file);
+      const text = filedAt !== null && entry.error === null ? runStore.inbox.read(entry.file) : null;
+      if (text !== null) body = parseInboxCard(entry.file, text, isDirectory).body;
     } catch {}
     return { ...entry, body, filedAt };
   });
@@ -256,12 +256,13 @@ export const inbox = new Hono<ApiEnv>()
     const entries = listInbox();
     const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
     if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
-    let source: string;
+    let source: string | null;
     try {
-      source = fs.readFileSync(path.join(inboxDir(), entry.file), 'utf8');
+      source = runStore.inbox.read(entry.file);
     } catch {
-      return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
+      source = null;
     }
+    if (source === null) return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
     const keys =
       entry.error === null
         ? INBOX_KEYS.map((key) => ({
@@ -314,11 +315,6 @@ export const inbox = new Hono<ApiEnv>()
  * `queueInInbox`, whose refusals go to `app.onError` (app.ts), which answers each by its kind in its words: 404 for a card not there
  * (`Missing`); 409 for a card a run's record already names, or queued already — a card whose state is not the one the request was made
  * against (`Conflict`); 422 for a card that does not read, or a card to queue that names no workflow (`Invalid`).
- *
- * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
- * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken
- * back would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
- * A time that cannot be set back leaves the queue written all the same: the card lists at the time of the queue, until it is written again.
  */
 async function queueRoute(c: Context, off: boolean) {
   const name = c.req.param('name')!;
@@ -329,14 +325,7 @@ async function queueRoute(c: Context, off: boolean) {
   if (wrong) return c.json({ error: wrong }, 400);
   const shaped = queueBodyRefusal(guard.route, await c.req.text());
   if (shaped) return c.json({ error: shaped.error }, shaped.status);
-  const file = path.join(inboxDir(), `${name}.md`);
-  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
   const done = queueInInbox(name, { off });
-  if (filed && done.was !== 'not queued') {
-    try {
-      fs.utimesSync(file, filed, filed);
-    } catch {}
-  }
   return c.json({
     name: done.card.name,
     file: done.file,

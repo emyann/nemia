@@ -83,7 +83,8 @@ In order, each small enough for one card, none before the one above it.
 
    Begun 2026-09-30 as `RunStore` (`packages/agent-orchestrator/src/record/record.ts`), files its only implementation
    (`filesStore`, bound as `runStore` in `src/record/files.store.ts`), the tick's pass first. The person's verbs, the
-   readers and the api, and the inbox follow; `test/run-store.test.ts` lists the files still reaching the files directly.
+   readers and the api, and the inbox's cards and queue tries (`inbox`) followed; no file of `src` but the store's own
+   reaches a run's files directly, which `test/run-store.test.ts` refuses.
 2. **SQLite as a second journal for the engine.** The engine's journal is already an interface with a file
    implementation and a memory one (`memoryJournal`). A `sqliteJournal` on `node:sqlite` — tasks, events and the feed in
    one file, WAL mode — is the cleanest place to try it: behind a boundary, measured, with the file journal kept as the

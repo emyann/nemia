@@ -4,11 +4,12 @@
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
  * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
  * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
- * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file.
+ * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file. And the inbox: its entries, a
+ * card filed exclusively, rewritten keeping its filing time, dropped, and the tick's tries put, read and dropped.
  *
- * And the refusal that keeps the interface the one way in: a file of `src` that imports a run's or a person's file functions from
- * `record.store.ts`, or through `runner.ts`, is refused, unless `DIRECT` still names it, and an entry of `DIRECT` that imports none of them
- * is refused too, so the list only shrinks. `WF_ROOT` is set before the store is imported, since it is read as the module loads.
+ * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
+ * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
+ * the module loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -341,6 +342,93 @@ test("a run forgotten loses its record and every person's file and its directory
   assert.deepEqual(filesStore.runs.forget(run.id), []);
 });
 
+test("the inbox's entries are a folder by its name and a trailing slash, a markdown file with its text, any other file with none; and none with no inbox", () => {
+  assert.equal(fs.existsSync(path.join(ROOT, 'inbox')), false);
+  assert.deepEqual(filesStore.inbox.entries(), []);
+  fs.mkdirSync(path.join(ROOT, 'inbox', 'a-folder'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'inbox', 'an-idea.md'), 'an idea\n');
+  fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.txt'), 'not a card');
+  try {
+    assert.deepEqual(
+      filesStore.inbox.entries().sort((a, b) => a.file.localeCompare(b.file)),
+      [
+        { file: 'a-folder/', text: '' },
+        { file: 'an-idea.md', text: 'an idea\n' },
+        { file: 'notes.txt', text: '' },
+      ],
+    );
+  } finally {
+    fs.rmSync(path.join(ROOT, 'inbox'), { recursive: true });
+  }
+});
+
+test('a card is read by its file, and a file not there reads as null', () => {
+  assert.equal(filesStore.inbox.add('c-read.md', 'read me\n'), true);
+  assert.equal(filesStore.inbox.read('c-read.md'), 'read me\n');
+  assert.equal(filesStore.inbox.read('c-never-filed.md'), null);
+});
+
+test('a card that is there and cannot be read is not read as gone: reading it throws', () => {
+  fs.mkdirSync(path.join(ROOT, 'inbox', 'c-folder.md'), { recursive: true });
+  assert.throws(
+    () => filesStore.inbox.read('c-folder.md'),
+    (err: NodeJS.ErrnoException) => err.code === 'EISDIR',
+  );
+});
+
+test('a card filed is written exclusively: a second filing at its name answers false and the first stays byte for byte', () => {
+  assert.equal(filesStore.inbox.add('c-twice.md', 'first\n'), true);
+  assert.equal(filesStore.inbox.add('c-twice.md', 'second\n'), false);
+  assert.equal(fs.readFileSync(path.join(ROOT, 'inbox', 'c-twice.md'), 'utf8'), 'first\n');
+});
+
+test('a card rewritten is written whole, keeps the time it was filed, and leaves no hidden file', () => {
+  const file = path.join(ROOT, 'inbox', 'c-rewrite.md');
+  assert.equal(filesStore.inbox.add('c-rewrite.md', 'before\n'), true);
+  const filed = new Date('2026-01-02T03:04:05.000Z');
+  fs.utimesSync(file, filed, filed);
+  filesStore.inbox.rewrite('c-rewrite.md', 'after\n');
+  assert.equal(fs.readFileSync(file, 'utf8'), 'after\n');
+  assert.equal(filesStore.inbox.filedAt('c-rewrite.md'), filed.toISOString());
+  assert.deepEqual(
+    fs.readdirSync(path.join(ROOT, 'inbox')).filter((name) => name.startsWith('.')),
+    [],
+  );
+});
+
+test('a card dropped is gone, and dropped again answers false', () => {
+  assert.equal(filesStore.inbox.add('c-drop.md', 'drop me\n'), true);
+  assert.equal(typeof filesStore.inbox.filedAt('c-drop.md'), 'string');
+  assert.equal(filesStore.inbox.drop('c-drop.md'), true);
+  assert.equal(filesStore.inbox.filedAt('c-drop.md'), null);
+  assert.equal(filesStore.inbox.drop('c-drop.md'), false);
+});
+
+test('a card that is there and cannot be removed is not dropped as gone: dropping it throws, and it stays', () => {
+  const at = path.join(ROOT, 'inbox', 'c-stuck.md');
+  fs.mkdirSync(at, { recursive: true });
+  assert.throws(() => filesStore.inbox.drop('c-stuck.md'));
+  assert.equal(fs.existsSync(at), true);
+});
+
+test('a card is found where a person reads it', () => {
+  assert.equal(filesStore.inbox.where('x.md'), path.join(ROOT, 'inbox', 'x.md'));
+});
+
+test("a try put is read back by its card's name, a file that does not read as a try is none, and a try dropped is gone", () => {
+  const queue = path.join(ROOT, 'queue');
+  const tried = { at, text: 'the card\n', repo: '/repo', why: 'the workflow is gone', refused: true };
+  filesStore.inbox.putTry('t-put', tried);
+  assert.equal(fs.readFileSync(path.join(queue, 't-put.json'), 'utf8'), JSON.stringify(tried, null, 2));
+  fs.writeFileSync(path.join(queue, 't-torn.json'), '{ "at": ');
+  fs.writeFileSync(path.join(queue, 't-shape.json'), JSON.stringify({ at, text: 'x' }));
+  assert.deepEqual([...filesStore.inbox.tries()], [['t-put', tried]]);
+  filesStore.inbox.dropTry('t-put');
+  filesStore.inbox.dropTry('t-never-put');
+  assert.deepEqual([...filesStore.inbox.tries()], []);
+  assert.equal(fs.existsSync(path.join(queue, 't-put.json')), false);
+});
+
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
 const GUARDED = [
   'readRun',
@@ -363,9 +451,6 @@ const GUARDED = [
 
 /** The files the interface is built from, which alone may import them for good. */
 const OWN = ['src/record/record.store.ts', 'src/record/files.store.ts'];
-
-/** The files of `src` that still import a guarded function directly, until the card that moves them onto `runStore`. */
-const DIRECT = ['src/inbox/inbox.store.ts', 'src/inbox/inbox.verb.ts'];
 
 /** `record.store.ts`, and `runner.ts`, which re-exports some of its functions. */
 const STORE_MODULE = /(?:^|\/)(?:record\.store|runner)(?:\.ts)?$/;
@@ -401,23 +486,16 @@ function importsFrom(text: string): Map<string, string[]> {
 /** The guarded functions a source text imports, whichever module they came from (`importsFrom`). */
 const directImports = (text: string): string[] => [...new Set([...importsFrom(text).values()].flat())].sort();
 
-/**
- * What each file imports directly, among `sources`, and a line for each file not on `direct`, naming the module each import came from,
- * and each entry that imports nothing.
- */
-function refusals(sources: Record<string, string>, direct: readonly string[]): string[] {
+/** A line for each file among `sources` that imports a guarded function directly, naming the module each import came from. */
+function refusals(sources: Record<string, string>): string[] {
   const out: string[] = [];
   for (const [file, text] of Object.entries(sources)) {
-    if (direct.includes(file)) continue;
     for (const [from, names] of importsFrom(text))
       out.push(
         `${file} imports ${names.join(', ')} from ${from}: read and write through runStore (src/record/files.store.ts), adding ` +
           'the method to RunStore (src/record/record.ts)',
       );
   }
-  for (const file of direct)
-    if (!directImports(sources[file] ?? '').length)
-      out.push(`${file} imports nothing of record.store.ts that runStore says: delete its entry from DIRECT in test/run-store.test.ts`);
   return out;
 }
 
@@ -432,9 +510,9 @@ function sourcesOfSrc(): Record<string, string> {
   return out;
 }
 
-test('a file not on the list that imports a run function from record.store.ts is refused, naming the file and the function', () => {
+test('a file that imports a run function from record.store.ts is refused, naming the file and the function', () => {
   const sources = { 'src/new/new.verb.ts': "import { readRun, stepsOf } from '../record/record.store.ts';\n" };
-  assert.deepEqual(refusals(sources, []), [
+  assert.deepEqual(refusals(sources), [
     'src/new/new.verb.ts imports readRun from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
   ]);
@@ -451,14 +529,14 @@ test('an import spread over lines is refused, as is a re-export, a namespace and
 
 test('a run function imported through runner.ts is refused, naming runner.ts as the module it came from', () => {
   const sources = { 'src/new/new.verb.ts': "import {\n  HOME,\n  readRun,\n} from '../runner.ts';\n" };
-  assert.deepEqual(refusals(sources, []), [
+  assert.deepEqual(refusals(sources), [
     'src/new/new.verb.ts imports readRun from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
   ]);
   const both = {
     'src/new/new.verb.ts': "import { listRuns } from '../runner.ts';\nimport { readAsks } from '../record/record.store.ts';\n",
   };
-  assert.deepEqual(refusals(both, []), [
+  assert.deepEqual(refusals(both), [
     'src/new/new.verb.ts imports readAsks from record.store.ts: read and write through runStore (src/record/files.store.ts), adding ' +
       'the method to RunStore (src/record/record.ts)',
     'src/new/new.verb.ts imports listRuns from runner.ts: read and write through runStore (src/record/files.store.ts), adding ' +
@@ -467,18 +545,6 @@ test('a run function imported through runner.ts is refused, naming runner.ts as 
   assert.deepEqual(directImports("import { readRun } from '../runners.ts';\nimport { stepsOf } from '../../runner.ts';\n"), []);
 });
 
-test('an entry on the list that imports none of them is refused, naming the entry to delete', () => {
-  const sources = { 'src/tick/tick.verb.ts': "import { stepsOf } from '../record/record.store.ts';\n" };
-  assert.deepEqual(refusals(sources, ['src/tick/tick.verb.ts']), [
-    'src/tick/tick.verb.ts imports nothing of record.store.ts that runStore says: delete its entry from DIRECT in test/run-store.test.ts',
-  ]);
-});
-
-test("the files of src that import a run's functions directly are exactly the list", () => {
-  const sources = sourcesOfSrc();
-  const found = Object.keys(sources)
-    .filter((file) => directImports(sources[file]).length)
-    .sort();
-  assert.deepEqual(found, DIRECT);
-  assert.deepEqual(refusals(sources, DIRECT), []);
+test("no file of src but the store's own imports a run's functions from record.store.ts or through runner.ts", () => {
+  assert.deepEqual(refusals(sourcesOfSrc()), []);
 });

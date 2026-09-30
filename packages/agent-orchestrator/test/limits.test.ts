@@ -106,7 +106,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/feed/feed.store.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/prune/prune.verb.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/former/former.ts': { 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/inbox/inbox.store.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
+  'packages/agent-orchestrator/src/inbox/inbox.store.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/inbox/inbox.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 3 },
   'packages/agent-orchestrator/src/keys/keys.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-orchestrator/src/plan/plan.ts': { 'sonarjs/cognitive-complexity': 1 },

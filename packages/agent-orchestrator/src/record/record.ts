@@ -9,6 +9,7 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
+import type { QueueTry } from '../inbox/inbox.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
@@ -443,7 +444,8 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
  * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
  * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's
  * one touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
- * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks` and `holds`.
+ * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks` and `holds`; and the inbox, `inbox`: a person's
+ * cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
@@ -506,5 +508,39 @@ export type RunStore = {
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
+  };
+  readonly inbox: {
+    /**
+     * The inbox's entries, by their file in it: a folder by its name and a trailing `/`, a markdown file with its text, any other file
+     * with none. None when there is no inbox yet.
+     */
+    readonly entries: () => Array<{ file: string; text: string }>;
+    /** The text of the inbox's entry `file` (`<name>.md` for a card), or null when it is not there. Throws anything else. */
+    readonly read: (file: string) => string | null;
+    /** When the entry `file` was last written, as an ISO time: a card's filing time. Null when it is gone. */
+    readonly filedAt: (file: string) => string | null;
+    /**
+     * File a person's card at `file`, exclusively: false when a file already stands at its name, which is left as it is. Throws what the
+     * filesystem throws otherwise.
+     */
+    readonly add: (file: string, text: string) => boolean;
+    /**
+     * Write a person's card at `file` whole, through a hidden file renamed over it, so a reader never reads half a card; the card keeps
+     * the time it was filed, set back when it can be. Throws what the filesystem throws.
+     */
+    readonly rewrite: (file: string, text: string) => void;
+    /** Remove a person's card at `file`: false when it is not there. Throws what the filesystem throws otherwise. */
+    readonly drop: (file: string) => boolean;
+    /** Where a person finds the inbox's entry `file`: the path a message names. */
+    readonly where: (file: string) => string;
+    /**
+     * The tick's tries of a queued card's start that did not happen, by card name. A file that does not read as one, torn or removed
+     * after the listing, is none.
+     */
+    readonly tries: () => Map<string, QueueTry>;
+    /** Write down the tick's try of the card `name`, whole over the one there: the tick's alone. Throws what the filesystem throws. */
+    readonly putTry: (name: string, tried: QueueTry) => void;
+    /** Remove the tick's try of the card `name`, there or not: the tick's alone. */
+    readonly dropTry: (name: string) => void;
   };
 };

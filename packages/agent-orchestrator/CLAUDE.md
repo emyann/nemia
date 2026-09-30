@@ -62,10 +62,11 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
   field its agent's `output:` schema requires.
 - **`wf decide` of a shipped run prints no step's closeout**: a test of a step's artifact lines reads a run still awaiting a decision.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
-- **A run's record and a person's files beside it are read and written through `runStore`** (`src/record/files.store.ts`): add the
-  method to `RunStore` (`src/record/record.ts`), never an import of `record.store.ts`'s run functions, nor through `runner.ts`;
-  `test/run-store.test.ts` refuses a new direct reader, and its list of the files still reaching them only shrinks. A person's verb
-  writes through `asks.write`, `holds.put`, `runs.cancel`, `runs.forget` and `runs.prune`; a message names an ask's file by `asks.where`.
+- **A run's record, a person's files beside it and the inbox are read and written through `runStore`** (`src/record/files.store.ts`):
+  add the method to `RunStore` (`src/record/record.ts`), never an import of `record.store.ts`'s run functions, nor through `runner.ts`;
+  `test/run-store.test.ts` refuses any file of `src` but the store's own that imports them. A person's verb writes through `asks.write`,
+  `holds.put`, `runs.cancel`, `runs.forget`, `runs.prune` and the inbox's `add`, `rewrite` and `drop`; the tick alone writes a queue try
+  (`inbox.putTry`, `inbox.dropTry`); a message names an ask's file by `asks.where`, a card's by `inbox.where`.
 - **What the store reads back is decoded by a schema in a store file, never a pure one** (`boundary.test.ts` refuses Effect in a pure file
   but `effect/Data`: the api loads `./run` and `./workflow`, whose modules `test/refusal.test.ts` pins). A run record, a person's ask,
   `daemon.json`, `tick.json`, `tick-stats.json`, a queue try and a line of the feed each have one, a `StructWithRest` where the file is

@@ -12,12 +12,12 @@
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
- * record and a person's files beside it are read and written through, `runStore`),
+ * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
  * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
  * `skills.store.ts` (an agent and a skill written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
- * folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`), `factory.store.ts` (the factories, `factoriesDir`) and
+ * folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and
  * `config.store.ts` (the `WF_` environment). They import
  * neither the runtime nor a controller, and load as a tree:
  * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
@@ -219,7 +219,7 @@ export {
   runId,
   stepsOf,
 } from './record/record.store.ts';
-export { runStore } from './record/files.store.ts';
+export { inboxDir, runStore } from './record/files.store.ts';
 export type { RunStore } from './record/record.ts';
 export {
   alive,
@@ -287,7 +287,7 @@ export { writeWorkflow } from './folder/write.store.ts';
 export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
-export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
+export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,

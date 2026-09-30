@@ -30,7 +30,7 @@ delete process.env.WF_MAX_RUNS;
 const { addToInbox, cancel, decide, readInbox, start, startFromInbox, tick } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
-const { queueTries } = await import('../src/inbox/inbox.store.ts');
+const { filesStore } = await import('../src/record/files.store.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
@@ -1096,7 +1096,7 @@ test('a try the tick wrote down is read only as the tick writes it: a file whose
   };
   for (const [name, body] of Object.entries(files)) fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(body));
   fs.writeFileSync(path.join(queue, 'torn.json'), '{"at": "2026');
-  assert.deepEqual([...queueTries()], [['kept', kept]]);
+  assert.deepEqual([...filesStore.inbox.tries()], [['kept', kept]]);
 });
 
 test('the whole screen of a run held by the cap on runs in flight', async (t) => {

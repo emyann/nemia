@@ -15,7 +15,7 @@ export type Verb = (rest: string[], e: Engine) => void | Promise<void>;
 /** What `wf` prints for no verb, for a verb it does not know, and for a verb given too little to act on. */
 export const HELP = `wf — run a workflow of agent steps
 
-  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--brief "<brief>"]
+  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until wf decide says that
                                run has shipped — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -27,6 +27,9 @@ export const HELP = `wf — run a workflow of agent steps
                                workflow: unless given, and its after: needs an --after for each
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
+                               --factory <name>: the factory's hires fill the workflow's steps, and
+                               a step left with no agent is refused (wf factory --help); without it,
+                               such a step runs as a plain session
                                a card of the inbox (wf inbox --help) starts its body, or --brief
                                "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
                                unless given, --repo its repo:

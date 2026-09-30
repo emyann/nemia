@@ -1,7 +1,7 @@
 /**
- * A run a person holds (`wf hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's words —
- * on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb the board
- * sends refused in the package's words (`heldRefusal`). Each held to what `wf ls` and `wf decide` say of the same run.
+ * A run a person holds (`wf hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's words
+ * — on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb the
+ * board sends refused in the package's words (`heldRefusal`). Each held to what `wf ls` and `wf decide` say of the same run.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on ships by its branch being
  * merged, in the harness's scratch store (`root`), and the harness's fake `claude` (test/harness.ts) first on PATH.
@@ -188,7 +188,8 @@ holdOn(BLOCKS, ['p-live']);
 
 /**
  * `implement → review`, implement signed off, review not filed: the next tick files it once the hold lifts. One for each kind of run a hold
- * can name — one that may still ship, one shipped, one cancelled, one whose branch is gone, one the store has none of — and a hold naming none.
+ * can name — one that may still ship, one shipped, one cancelled, one whose branch is gone, one the store has none of — and a hold naming
+ * none.
  */
 const ON = {
   live: ['p-live'],
@@ -557,7 +558,10 @@ fs.writeFileSync(
 );
 signedOff(`${LIFT}-plan`, DONE);
 
-/** Pruned, as `wf prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with none. */
+/**
+ * Pruned, as `wf prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with
+ * none.
+ */
 const PRUNED = { at: at(50), worktrees: [] };
 for (const id of ['h-pruned-held', 'h-pruned']) {
   writeRun(id, [implement, review], { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` }, review: { taskId: null } });

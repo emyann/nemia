@@ -1,6 +1,6 @@
 /**
- * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` — `wf say`'s
- * own — and the `said` on the step's detail, read back off the engine's journal.
+ * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` —
+ * `wf say`'s own — and the `said` on the step's detail, read back off the engine's journal.
  *
  * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH,
  * listing the sessions this file says are running, each with a pid, so the registry of the sessions on this machine is never asked; and a
@@ -44,7 +44,10 @@ const started = [
   { kind: 'spawned', at: at(1), attempt: 1 },
 ];
 
-/** A session's inbox: a Unix socket that keeps each line it is sent, answers nothing, and closes its end once the sender has, as Claude Code's does. */
+/**
+ * A session's inbox: a Unix socket that keeps each line it is sent, answers nothing, and closes its end once the sender has, as Claude
+ * Code's does.
+ */
 const inbox = async () => {
   const socket = path.join(tmp('sock'), 'in.sock');
   const lines: unknown[] = [];
@@ -65,7 +68,10 @@ const inbox = async () => {
 };
 
 let pid = 424_200;
-/** A Claude Code task whose session the harness lists at work, with a pid, and registered as Claude Code registers one, its inbox at `socket`. */
+/**
+ * A Claude Code task whose session the harness lists at work, with a pid, and registered as Claude Code registers one, its inbox at
+ * `socket`.
+ */
 const runningSession = (taskId: string, socket: string): string => {
   const sessionId = randomUUID();
   journal(taskId, started);

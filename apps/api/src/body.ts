@@ -10,9 +10,9 @@ import type { Refusal } from './guard.ts';
  * The first thing a schema refused in a body: where (`path`, the keys from the body down to the value, `[]` for the body itself), what
  * (`kind`), and the value there as the body has it (`input`, undefined for a key left out).
  *
- * `missing` is a required key left out; `type` a value of the wrong type, or not one of the values allowed — the body itself where `path` is
- * empty, which is not an object; `check` a value of the right type that fails a check the schema adds; `excess` a key the schema does not
- * have, under `onExcessProperty: 'error'`.
+ * `missing` is a required key left out; `type` a value of the wrong type, or not one of the values allowed — the body itself where `path`
+ * is empty, which is not an object; `check` a value of the right type that fails a check the schema adds; `excess` a key the schema does
+ * not have, under `onExcessProperty: 'error'`.
  */
 export type BodyIssue = {
   path: ReadonlyArray<PropertyKey>;

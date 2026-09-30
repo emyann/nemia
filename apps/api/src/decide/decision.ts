@@ -1,4 +1,6 @@
-/** What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands. */
+/**
+ * What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands.
+ */
 import {
   branchesToRead,
   type BranchStanding,
@@ -96,8 +98,8 @@ export type Decidable = {
   /**
    * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `wf prune` refuses without
    * `--unmerged` (`pruneRefusal`): the result branches it waits on, and `direct` for a run that worked on its base branch itself, which has
-   * nothing to merge and still waits on you (its branch is the base branch). Null for a run still running with a step waiting on you. A run called off, or whose branches are
-   * on the base however they got there, is `nothing`, never this.
+   * nothing to merge and still waits on you (its branch is the base branch). Null for a run still running with a step waiting on you. A run
+   * called off, or whose branches are on the base however they got there, is `nothing`, never this.
    */
   awaiting: { branches: string[]; direct: boolean } | null;
 };
@@ -208,8 +210,8 @@ type AtGate = { step: string; back: string[] };
  * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
  * whose only remaining action is an approval must not be handed an empty list of commands because a sentence did not parse.
  *
- * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
- * that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
+ * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the
+ * folder that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
  * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
  * decides it (cli/main.ts, `!merges(steps)`).
  */

@@ -1,8 +1,8 @@
 /**
- * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail, the
- * need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as `wf approve` does,
- * through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST …/retry with words, as
- * `wf retry --message` is.
+ * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail,
+ * the need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as
+ * `wf approve` does, through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST …/retry
+ * with words, as `wf retry --message` is.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
  * (test/harness.ts) first on PATH.
@@ -43,8 +43,8 @@ const signedOff = (taskId: string, closeout: object) =>
 const PLAN = { outcome: 'done', summary: '## The plan\n\n- parse the flag\n- store it', needs: null, artifacts: [] };
 
 /**
- * A run of `plan → implement → review`, started `--gate plan`, whose plan signed off: it waits at its gate. Beside them `tokens`, signed off
- * and not gated, and `sketch`, gated by its own `gate: true` and not filed.
+ * A run of `plan → implement → review`, started `--gate plan`, whose plan signed off: it waits at its gate. Beside them `tokens`, signed
+ * off and not gated, and `sketch`, gated by its own `gate: true` and not filed.
  */
 const gatedRun = (id: string) => {
   write(

@@ -90,21 +90,21 @@ import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
 /**
- * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person raises
- * it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the step's
- * tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they have cost
- * the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says `over budget` or
- * `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a background session
- * (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget beside it, but a
+ * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
+ * raises it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the
+ * step's tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they
+ * have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says
+ * `over budget` or `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a background
+ * session (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget beside it, but a
  * frozen record may carry both — can finish past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
 /**
- * A raise of a step's cap the package takes, and how it is asked for: `retry` — `wf retry --budget`, the board's `POST …/retry` — for a step
- * over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `wf round --budget`, `POST …/round` — for a looping
- * step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the package
- * refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
+ * A raise of a step's cap the package takes, and how it is asked for: `retry` — `wf retry --budget`, the board's `POST …/retry` — for a
+ * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `wf round --budget`, `POST …/round` — for a
+ * looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the
+ * package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
  *
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
@@ -115,8 +115,8 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /**
- * A person's approval of the try a gated step is on (`approvalOf`), off their file (`wf approve`): the try, when, and the words given with it
- * — handed to every step after the gate under `## Approved` — null where none were.
+ * A person's approval of the try a gated step is on (`approvalOf`), off their file (`wf approve`): the try, when, and the words given with
+ * it — handed to every step after the gate under `## Approved` — null where none were.
  */
 export type StepApproval = { try: number; at: string; message: string | null };
 
@@ -190,7 +190,10 @@ export type StepFiled = {
   effort: string | null;
   /** The context window the try was filed with, in tokens (`contextTokens`): null for the model's whole window. */
   contextTokens: number | null;
-  /** The fence the try was filed with, as the engine's task names it: Claude Code's permission mode, or Codex's sandbox (a step's `sandbox:`). */
+  /**
+   * The fence the try was filed with, as the engine's task names it: Claude Code's permission mode, or Codex's sandbox (a step's
+   * `sandbox:`).
+   */
   permissionMode: string | null;
   /**
    * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
@@ -200,8 +203,8 @@ export type StepFiled = {
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   /**
    * The remote A2A agent the try was sent to, for a step that says `harness: a2a:<name>` (`remoteOf`): its name, and its address as the
-   * store's `a2a-agents.json` gives it now — origin and path, never a query or a secret, which is never in the file — or null where the file
-   * does not declare it or cannot be read. Null for a local harness, whose mode is `runsIn`.
+   * store's `a2a-agents.json` gives it now — origin and path, never a query or a secret, which is never in the file — or null where the
+   * file does not declare it or cannot be read. Null for a local harness, whose mode is `runsIn`.
    */
   remote: { name: string; address: string | null } | null;
   tools: string[] | null;
@@ -232,10 +235,10 @@ export type RunDetail = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record and
-   * files are kept, so the rest of the page reads as before; what it does not offer is anything that would work in a worktree. Null for a
-   * run never pruned. `artifacts` is when `wf prune --artifacts` removed its files directory too, and what that freed: each file a closeout
-   * named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
+   * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record
+   * and files are kept, so the rest of the page reads as before; what it does not offer is anything that would work in a worktree. Null for
+   * a run never pruned. `artifacts` is when `wf prune --artifacts` removed its files directory too, and what that freed: each file a
+   * closeout named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
    */
   pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
   /**
@@ -261,8 +264,8 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   cost: Spent | null;
   /**
-   * What the sessions of every try of every step read, by price, beside `cost`, which is theirs too (`RunRead`): each class only where every
-   * session measured it, and the largest peak against the cap of the step that reached it. Null where none of it was measured.
+   * What the sessions of every try of every step read, by price, beside `cost`, which is theirs too (`RunRead`): each class only where
+   * every session measured it, and the largest peak against the cap of the step that reached it. Null where none of it was measured.
    */
   read: RunRead | null;
   waitingOnYou: string[];
@@ -296,7 +299,9 @@ export type RunDetail = {
      * only what its closeout named. Empty for a step of a git run, whose work is a branch to read, and for one not filed yet.
      */
     files: StepArtifact[];
-    /** Why that list is empty when the folder is there and could not be read (`folderFiles`); null where the list is what the folder holds. */
+    /**
+     * Why that list is empty when the folder is there and could not be read (`folderFiles`); null where the list is what the folder holds.
+     */
     filesError: string | null;
     branch: string | null;
     status: string;
@@ -321,14 +326,17 @@ export type RunDetail = {
      */
     lastLine: string | null;
     /**
-     * What a person said to the session of the step's current try while it ran — with `wf say`, or the session page's prompt box — in the order
-     * said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one nobody told.
+     * What a person said to the session of the step's current try while it ran — with `wf say`, or the session page's prompt box — in the
+     * order said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one
+     * nobody told.
      */
     said: Said[];
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
-    /** Why its current try's closeout could not be read (`unreadableIn`), where `closeout` is null; null when it was read or there is none. */
+    /**
+     * Why its current try's closeout could not be read (`unreadableIn`), where `closeout` is null; null when it was read or there is none.
+     */
     unreadable: StepUnreadable | null;
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
@@ -338,11 +346,17 @@ export type RunDetail = {
      * step; null for a step not filed, which consumed nothing.
      */
     used: StepUsed | null;
-    /** What every try of it has cost together, each session once, as `wf ls` puts it beside the step's word (`stepSpend`); null until a cost was measured. */
+    /**
+     * What every try of it has cost together, each session once, as `wf ls` puts it beside the step's word (`stepSpend`); null until a cost
+     * was measured.
+     */
     spent: Spent | null;
     /** Its cap in force, and what its tries have cost of it (`StepBudget`); null for a step with no `budget:`. */
     budget: StepBudget | null;
-    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off, pruned or held. */
+    /**
+     * The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off, pruned or
+     * held.
+     */
     raise: StepRaise | null;
     /**
      * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
@@ -353,19 +367,23 @@ export type RunDetail = {
     /** Where the step's time went, try by try and check by check (`StepTimelineTry`); empty for a step not filed. */
     timeline: StepTimelineTry[];
   }>;
-  /** The run's time together, in the package's words (`timeline`): each round of its loop, and the whole run — with what the sessions in each cost. */
+  /**
+   * The run's time together, in the package's words (`timeline`): each round of its loop, and the whole run — with what the sessions in
+   * each cost.
+   */
   timeline: { rounds: StepTimelineTotal[]; run: StepTimelineTotal };
 };
 
 /**
- * A total of the run's time, as the package's `timeline` has it (`TimelineTotal`), and what the sessions it counts cost (`Spent`): the run's,
- * every step's tries (`runSpend`), or a round's — each session of a try its loop filed again in that round (`roundSpend`).
+ * A total of the run's time, as the package's `timeline` has it (`TimelineTotal`), and what the sessions it counts cost (`Spent`): the
+ * run's, every step's tries (`runSpend`), or a round's — each session of a try its loop filed again in that round (`roundSpend`).
  */
 export type StepTimelineTotal = TimelineTotal & { cost: Spent | null };
 
 /**
- * One try of a step on the clock, as the package's `timeline` has it (`TimelineTry`): its session's task and its check's, each filed, spawned
- * and ended, with how long it queued for a slot and ran (the package's `TaskSpan`) — and what its session used, in `wf decide`'s words, where it ran one.
+ * One try of a step on the clock, as the package's `timeline` has it (`TimelineTry`): its session's task and its check's, each filed,
+ * spawned and ended, with how long it queued for a slot and ran (the package's `TaskSpan`) — and what its session used, in `wf decide`'s
+ * words, where it ran one.
  */
 export type StepTimelineTry = Omit<TimelineTry, 'used'> & { used: StepUsed | null };
 
@@ -385,10 +403,10 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
 }
 
 /**
- * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off the
- * views the request already read, which hold every try's task, with no observation of its own. `steps` are the workflow the run is judged
- * by: a step it does not have has no `budget:`. No raise on a run called off, pruned or held: a raise is asked with a try or a round, which
- * the verb refuses while a hold stands (`heldRefusal`).
+ * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off
+ * the views the request already read, which hold every try's task, with no observation of its own. `steps` are the workflow the run is
+ * judged by: a step it does not have has no `budget:`. No raise on a run called off, pruned or held: a raise is asked with a try or a
+ * round, which the verb refuses while a hold stands (`heldRefusal`).
  */
 function costOf(
   run: Run,
@@ -413,9 +431,10 @@ function costOf(
 }
 
 /**
- * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its budget
- * or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds whose loop has
- * a step over its budget (`loopOver`): `wf round --budget` has to pass the most any of them has cost, as `roundAsk` refuses less.
+ * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its
+ * budget or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds
+ * whose loop has a step over its budget (`loopOver`): `wf round --budget` has to pass the most any of them has cost, as `roundAsk` refuses
+ * less.
  */
 function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
@@ -469,8 +488,8 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
 }
 
 /**
- * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `wf ls`'s word, and the approval of the try it is on.
- * Off the record as `listRuns` composes it, with each approval its file holds (`approvalOf`): no read of its own.
+ * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `wf ls`'s word, and the approval of the try it is
+ * on. Off the record as `listRuns` composes it, with each approval its file holds (`approvalOf`): no read of its own.
  */
 function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
   if (!hasGate(step, run)) return null;
@@ -481,7 +500,10 @@ function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
   };
 }
 
-/** A looping step's acceptance (`StepAcceptance`), off the record as `listRuns` composes it, as `gateOf` reads an approval: no read of its own. */
+/**
+ * A looping step's acceptance (`StepAcceptance`), off the record as `listRuns` composes it, as `gateOf` reads an approval: no read of its
+ * own.
+ */
 function acceptedOf(run: Run, step: string): StepAcceptance | null {
   const given = acceptanceOf(run, step);
   return given ? { try: given.try, at: given.at, message: given.message } : null;

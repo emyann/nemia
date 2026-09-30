@@ -291,7 +291,10 @@ const settledTimeline = (taskId: string) => [
   },
 ];
 
-/** The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can know. */
+/**
+ * The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can
+ * know.
+ */
 const oneTaskTotals = () => ({
   rounds: [],
   run: {
@@ -1137,7 +1140,9 @@ test('output the engine cannot read is a 502 that says how to read it from the c
 
 const done = { outcome: 'done', summary: 'It is done.', needs: null, artifacts: [] };
 
-/** A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one. */
+/**
+ * A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one.
+ */
 const checkTask = (taskId: string, how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number }) =>
   journal(taskId, [
     { ...filed(taskId), harness: 'check' },

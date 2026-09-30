@@ -14,10 +14,10 @@ import os from 'node:os';
 import { Context, Effect, Exit, Layer } from 'effect';
 
 /**
- * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The windows
- * are five hours and a week long, and a number read ten minutes ago says as much about them as one read three minutes ago; the usage endpoint
- * behind `get_usage` is reported to refuse an account that asks in bursts, for hours, and every board open on this api shares one ask.
- * `HKB_QUOTA_KEEP_MS` sets it (the e2e's 0 asks on every read).
+ * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The
+ * windows are five hours and a week long, and a number read ten minutes ago says as much about them as one read three minutes ago; the
+ * usage endpoint behind `get_usage` is reported to refuse an account that asks in bursts, for hours, and every board open on this api
+ * shares one ask. `HKB_QUOTA_KEEP_MS` sets it (the e2e's 0 asks on every read).
  */
 export const QUOTA_KEEP_MS = 10 * 60 * 1000;
 
@@ -29,8 +29,8 @@ export const QUOTA_KEEP_MS = 10 * 60 * 1000;
 export const QUOTA_BACKOFF_MS = 20 * 60 * 1000;
 
 /**
- * The longest an `unanswered` outcome is kept: four hours — 20, 40, 80 and 160 minutes, then four hours for as long as it lasts, five asks in
- * the first five hours and six a day after. Longer, and a service that answers again is not read for most of a five-hour window.
+ * The longest an `unanswered` outcome is kept: four hours — 20, 40, 80 and 160 minutes, then four hours for as long as it lasts, five asks
+ * in the first five hours and six a day after. Longer, and a service that answers again is not read for most of a five-hour window.
  */
 export const QUOTA_BACKOFF_CEILING_MS = 4 * 60 * 60 * 1000;
 
@@ -128,8 +128,8 @@ const LABELS: Record<string, string> = {
   seven_day_opus: 'week, Opus',
 };
 /**
- * The windows the board shows, in this order: the plan's own. Claude Code's answer holds many more keys, most null and some named for no one
- * (`nimbus_quill`, at 0% with no reset), so a key it does not know is not shown.
+ * The windows the board shows, in this order: the plan's own. Claude Code's answer holds many more keys, most null and some named for no
+ * one (`nimbus_quill`, at 0% with no reset), so a key it does not know is not shown.
  */
 const ORDER = Object.keys(LABELS);
 
@@ -172,9 +172,9 @@ const subscriptionOf = (usage: Record<string, unknown>): string | null =>
   typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
 
 /**
- * What an answer says: the plan's windows and its subscription, no plan, a plan the usage service gave nothing for, or why it cannot be read.
- * Pure, and judged at `now` for the windows' resets. A plan whose `rate_limits` are null is `unanswered`, as the Agent SDK's type for this
- * answer says: "or null when unavailable".
+ * What an answer says: the plan's windows and its subscription, no plan, a plan the usage service gave nothing for, or why it cannot be
+ * read. Pure, and judged at `now` for the windows' resets. A plan whose `rate_limits` are null is `unanswered`, as the Agent SDK's type for
+ * this answer says: "or null when unavailable".
  */
 export function answerOf(
   response: unknown,
@@ -432,8 +432,8 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
 export type ReadQuota = (opts?: { waitMs?: number; timeoutMs?: number; env?: NodeJS.ProcessEnv; now?: () => number }) => Promise<Quota>;
 
 /**
- * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many `unanswered`
- * outcomes in a row since it, and the ask in flight, in its own memory and nobody's file.
+ * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many
+ * `unanswered` outcomes in a row since it, and the ask in flight, in its own memory and nobody's file.
  *
  * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
  * outcome's wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that. An

@@ -150,7 +150,8 @@ function howOf(how: RetryHow, command: string): RetryHow | Refusal {
 /**
  * Why `POST …/round`'s body is not an ask (400), by the first key its schema refused: the looping step, which `wf round` takes when the run
  * has more than one loop, and `--budget`, the cap each step of the loop over its budget is raised to. Whether the loop may go round, with
- * that cap, is the package's to say (`roundAsk`, through `round()`) — a number not above zero included, before anything of the run is decided.
+ * that cap, is the package's to say (`roundAsk`, through `round()`) — a number not above zero included, before anything of the run is
+ * decided.
  */
 const roundWords =
   (id: string) =>
@@ -163,11 +164,11 @@ const roundWords =
 
 /**
  * The board's writes for a person's asks of a run. Each route is guarded as a start is (guard.ts), answers 404 for a run or a step it does
- * not have and 400 for a body that is not an ask, and writes through the package's own verb, whose refusals it lets through to `app.onError`
- * (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the route read it (`Missing`), 409 for a state that forbids
- * the ask (`Conflict`), 422 for a record that does not read (`Invalid`). The api judges none of it. A 202 is accepted and not yet done: the
- * next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the command that
- * asks the same way.
+ * not have and 400 for a body that is not an ask, and writes through the package's own verb, whose refusals it lets through to
+ * `app.onError` (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the route read it (`Missing`), 409 for a state
+ * that forbids the ask (`Conflict`), 422 for a record that does not read (`Invalid`). The api judges none of it. A 202 is accepted and not
+ * yet done: the next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the
+ * command that asks the same way.
  *
  * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
  *   by `retry()`, `wf retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the ask
@@ -184,9 +185,9 @@ const roundWords =
  * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `wf say`'s own, which hands them
  *   to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
- *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `say()`. Words the harness did not take are the engine's error, verbatim, with 502: nothing was
- *   journalled, and asking again may work. Its 202 means the session's harness took the words and the engine journalled them; whether the
- *   session reads them is the session's.
+ *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `say()`. Words the harness did not take are
+ *   the engine's error, verbatim, with 502: nothing was journalled, and asking again may work. Its 202 means the session's harness took the
+ *   words and the engine journalled them; whether the session reads them is the session's.
  * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `wf approve`'s own, which
  *   writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words (`approvalWordsRefusal`)
  *   with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after — not gated, not signed off

@@ -2,7 +2,8 @@
  * A place's verbs heard (`runPlaceVerb`) and its declaration read (`readPlaceJson`), against scripts planted in a scratch skill: each of
  * the nine answers decodes, and one missing a field or holding one of another type is unread, naming it; a refusal at exit 0 is a
  * refusal; a non-zero exit, a signal, a stdout that is not JSON or is empty, a script past its deadline and one that is not there are
- * each unread, with their words; and a `place.json` that does not read as the contract is refused, naming the file and the field.
+ * each unread, with their words; a script past its deadline leaves nothing it started running, children deaf to SIGTERM killed, gone
+ * and named; and a `place.json` that does not read as the contract is refused, naming the file and the field.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +12,7 @@ import path from 'node:path';
 import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceAnswers, type PlaceOutcome, type PlaceRequests, type PlaceVerb } from './place.ts';
 import { readPlaceJson, runPlaceVerb } from './place.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
 
 /** A skill folder holding one script, `scripts/<verb>.ts`, whose body is `body`. */
@@ -165,25 +167,49 @@ test('a verb whose script is not there is unread, naming the path', () => {
   assert.equal(said, `the place has no script for make: ${path.join(dir, 'scripts', 'make.ts')} is not there`);
 });
 
-/** The processes whose command line names `file`, read from /proc. */
-function running(file: string): number[] {
-  return fs
-    .readdirSync('/proc')
-    .filter((entry) => /^\d+$/.test(entry))
-    .filter((pid) => {
-      try {
-        return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').includes(file);
-      } catch {
-        return false;
-      }
-    })
-    .map(Number);
-}
-
 test('a script past its deadline is unread, saying so, and is left running nowhere', () => {
   const dir = planted('report', `console.error('reading the diff');\nsetInterval(() => {}, 1000);\n`);
   const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs: 300 }), 'report');
   assert.match(said, /^it gave no answer within 0\.3 s, its deadline, and was stopped/);
+  assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
+});
+
+test('a script past its deadline stops its whole group, killing the children that ignore SIGTERM, and says so', (t) => {
+  const deaf = [
+    "import fs from 'node:fs';",
+    "process.on('SIGTERM', () => {});",
+    'fs.writeFileSync(process.argv[2], String(process.pid));',
+    'setInterval(() => {}, 1000);',
+  ].join('\n');
+  const dir = planted(
+    'report',
+    [
+      "import { spawn } from 'node:child_process';",
+      "import fs from 'node:fs';",
+      "import path from 'node:path';",
+      "const child = path.resolve('scripts', 'child.mjs');",
+      `fs.writeFileSync(child, ${JSON.stringify(deaf)});`,
+      "for (const n of [1, 2, 3, 4]) spawn(process.execPath, [child, path.resolve(`deaf-${n}`)], { stdio: 'ignore' });",
+      'setInterval(() => {}, 1000);',
+    ].join('\n'),
+  );
+  const child = path.join(dir, 'scripts', 'child.mjs');
+  t.after(() => {
+    for (const pid of running(child)) process.kill(pid, 'SIGKILL');
+  });
+  const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs: 1500 }), 'report');
+  const markers = [1, 2, 3, 4].map((n) => path.join(dir, `deaf-${n}`));
+  assert.ok(
+    markers.every((marker) => fs.existsSync(marker)),
+    `each child ignored SIGTERM before the deadline: ${said}`,
+  );
+  for (const pid of markers.map((marker) => Number(fs.readFileSync(marker, 'utf8'))))
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
+  assert.match(
+    said,
+    /^it gave no answer within 1\.5 s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, so a lock it held may be left$/,
+  );
+  assert.deepEqual(running(child), []);
   assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
 });
 

@@ -1036,6 +1036,13 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   to read (`checks/<task>.closeout.json`, beside its stderr).
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
+- **The step filed after a checked step is handed what the check said**, in its brief, under
+  `## What <step>'s check said`: its verdict (exit N, did not finish, or why it cannot be read), the last lines
+  of its stdout and its stderr, and every line of its stdout that starts `wf <name>:` — a lowercase name, a colon
+  and a space, at the start of the line — whole, from the whole log and not only the tail (`reportedLines`, at
+  most `REPORTED_LINES`). That is how a check marks what the next step must read: `workflows/build`'s mutants
+  print `wf mutants: …`, and a reviewer whose fence reaches no log judges them from its brief. The step reads
+  the check of the try or round it follows, read on the pass that files it.
 
 The line is the workflow author's, for their repository. `check: npm test && npm run typecheck` is the check a
 person used to run by hand at every trial merge, and every round of it is checked again. A step that changes a

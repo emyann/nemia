@@ -82,20 +82,18 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
  * where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag, first among its
  * others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the directory Codex's trust
  * extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config lists; a folder run has no
- * repository, and a step on another harness takes no Codex arguments, so either is filed with none.
+ * repository, and a step on another harness takes no Codex arguments, so either is filed with none. Both are the harness's own arguments
+ * (`own`), which the first filing, a try and a round each spread into its `config`.
  */
-export function toldOf(run: Run, step: Workflow): { step: Workflow; claude?: ClaudeFlags; codex?: CodexArgs } {
+export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
   const dir = agentFilesDir(run, step.name);
   const told =
     rendersAgent(step) && !renderedIn(dir, step)
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
   const rendered = renderedFlags(told, dir);
-  return {
-    step: told,
-    claude: told.remote ? { remoteControl: true, ...rendered } : rendered,
-    ...(step.harness === 'codex' && isGitRun(run) ? { codex: { trustFrom: fs.realpathSync(run.repo) } } : {}),
-  };
+  const codex = step.harness === 'codex' && isGitRun(run) ? { trustFrom: fs.realpathSync(run.repo) } : undefined;
+  return { step: told, own: { claude: told.remote ? { remoteControl: true, ...rendered } : rendered, ...(codex ? { codex } : {}) } };
 }
 
 /**
@@ -333,7 +331,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
       );
   const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
-  await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, claude: told.claude, codex: told.codex }));
+  await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told }));
   return undefined;
 }
 
@@ -393,14 +391,7 @@ const trySpec = (
   r: Retry,
   step: Workflow,
   record: StepRecord,
-  t: {
-    taskId: string;
-    brief: string;
-    resumeFrom: string | undefined;
-    budgetUsd: number | undefined;
-    claude: ClaudeFlags | undefined;
-    codex: CodexArgs | undefined;
-  },
+  t: { taskId: string; brief: string; resumeFrom: string | undefined; budgetUsd: number | undefined; told: ReturnType<typeof toldOf> },
 ): Spec => ({
   id: t.taskId,
   brief: t.brief,
@@ -418,8 +409,7 @@ const trySpec = (
       allowedTools: step.allowedTools,
       background: step.background,
       budgetUsd: t.budgetUsd,
-      claude: t.claude,
-      codex: t.codex,
+      ...t.told.own,
     },
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
@@ -507,8 +497,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
         ),
-        claude: told.claude,
-        codex: told.codex,
+        ...told.own,
       },
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
@@ -652,8 +641,7 @@ function readySpec(f: Filing, step: Workflow, place: Place, files: string, paren
         allowedTools: step.allowedTools,
         background: step.background,
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
-        claude: told.claude,
-        codex: told.codex,
+        ...told.own,
       },
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),

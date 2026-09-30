@@ -373,14 +373,14 @@ const claudeWith = (sessionId: string, at: number, line: object) => {
   return jsonl(lines);
 };
 
-test("REFUSED: a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its offset, its field and the fix", async () => {
+test("REFUSED: a Claude transcript's conversation line that does not decode, a subagent's included, refuses the read by its file, its offset, its field and the fix", async () => {
   const sessionId = randomUUID();
   const text = claudeWith(sessionId, 3, { message: { id: 'msg_1', content: [{ type: 'thinking', thinking: 7 }] } });
   writeClaude(sessionId, text);
   const offset = Buffer.byteLength(text.split('\n').slice(0, 3).join('\n')) + 1;
   const words =
-    `the line at byte ${offset} of the transcript is an \`assistant\` line whose \`message.content.0.thinking\` is 7, where Claude` +
-    ' Code writes string.';
+    `the line at byte ${offset} of the transcript \`${claudeFile(sessionId)}\` is an \`assistant\` line whose` +
+    ' `message.content.0.thinking` is 7, where Claude Code writes string.';
   await assert.rejects(readTranscript(claudeFile(sessionId), undefined, claudeTranscriptEvents), (e: Error) => e.message.startsWith(words));
   await assert.rejects(claudeRead(sessionId), (e: unknown) => {
     assert.ok(e instanceof RunnerError, String(e));

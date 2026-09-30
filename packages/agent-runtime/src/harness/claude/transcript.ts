@@ -192,11 +192,12 @@ const isQueued = (a: Attached): a is Extract<Attached, { type: 'queued_command' 
  * a task it ran in the background ended (`task-notification`) — gives nothing.
  *
  * A line of those four types is decoded (`lines.ts`) before anything is read of it, a subagent's included, and one that does not
- * decode throws an `Error` naming the line by its offset, its field and the fix: the transcript is refused, never read as saying
+ * decode throws an `Error` naming the line by its offset, in `file` when it is given, its field and the fix: the transcript is refused, never read as saying
  * nothing. Any other value — another type, no object — gives nothing, unread.
  */
-export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
-  const read = decodeLine(entry, ['user', 'assistant', 'system', 'attachment'], `the line at byte ${offset} of the transcript`);
+export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
+  const where = `the line at byte ${offset} of ${file ? `the transcript \`${file}\`` : 'the transcript'}`;
+  const read = decodeLine(entry, ['user', 'assistant', 'system', 'attachment'], where);
   if (read === undefined) return [];
   if ('wrong' in read) throw new Error(read.wrong);
   const { line } = read;

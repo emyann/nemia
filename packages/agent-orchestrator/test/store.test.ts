@@ -5727,6 +5727,16 @@ test("`wf rm`'s refusal is its program's typed failure; anything else is a defec
     (x: unknown) => x,
   );
   assert.equal(died, boom, 'not a failure the program may catch by its tag: the error itself');
+  const uncaught = await Effect.runPromise(
+    forgetRun(run.id, {}).pipe(
+      Effect.catch(() => Effect.succeed('caught')),
+      Effect.provide(EngineService.layer(broken)),
+    ),
+  ).then(
+    () => assert.fail('a defect caught as a failure'),
+    (x: unknown) => x,
+  );
+  assert.equal(uncaught, boom, 'nor any failure at all: a defect, which no `Effect.catch` recovers');
   const face = await forget(broken, run.id).then(
     () => assert.fail('wf rm over a journal that does not read resolved'),
     (x: unknown) => x,

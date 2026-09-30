@@ -23,7 +23,8 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type Engine, type TaskView } from 'agent-runtime';
+import type { Engine, TaskView } from 'agent-runtime';
+import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
@@ -248,7 +249,7 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine: Engine = createEngine({ root: scratch('wf-live-mcp-') });
+    const engine: Engine = promiseEngine(EngineService.layer({ root: scratch('wf-live-mcp-') }));
     const id = await engine.file({
       brief: BRIEF,
       cwd: REPO,

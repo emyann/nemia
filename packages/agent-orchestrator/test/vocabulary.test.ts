@@ -22,8 +22,8 @@ import {
   CODEX_SANDBOXES,
   claudeDetached,
   codex,
-  createEngine,
 } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
 import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, modeOf, parseWorkflow, PERMISSION_MODES, SANDBOXES } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 
@@ -203,7 +203,7 @@ test("REFUSED at load in the engine's words: a `budget:` on a codex step, which 
 
 test("REFUSED at load in the engine's words: a `budget:` beside `background: true`, which a `claude --bg` session has no spend cap to keep — and a job's is taken", async () => {
   const { parseWorkflow } = await import('../src/workflow.ts');
-  const engine = createEngine({ root: scratch('wf-vocabulary-'), harnesses: { claude: 'claude' } });
+  const engine = promiseEngine(Engine.layer({ root: scratch('wf-vocabulary-'), harnesses: { claude: 'claude' } }));
   const refusal = async (config: { background?: boolean }): Promise<string | undefined> => {
     try {
       await engine.file({ brief: 'b', cwd: '/w', harness: 'claude', config: { ...config, budgetUsd: 5 } });
@@ -254,7 +254,7 @@ test("a step that names no mode is filed in the mode the parser refuses `auto` f
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const e = createEngine({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } });
+    const e = promiseEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
     const id = await e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } });
     const until = Date.now() + 20_000;
     while (!(await e.view(id)).state.settled) {

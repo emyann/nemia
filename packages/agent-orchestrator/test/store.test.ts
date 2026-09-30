@@ -14,16 +14,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import {
-  createEngine,
-  nameFor,
-  type Engine,
-  type PromiseJournal,
-  type PromiseRunner,
-  type Sighting,
-  type TaskSpec,
-  type TaskView,
-} from 'agent-runtime';
+import { nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskSpec, type TaskView } from 'agent-runtime';
+import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
@@ -2429,7 +2421,9 @@ test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits
 
   const admitted = async (momentum: (id: string) => number) => {
     const sessions = new Map<string, Sighting>();
-    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude' });
+    const e = promiseEngine(
+      RuntimeEngine.layer({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude' }),
+    );
     const as = (spec: typeof next) => ({ ...spec, harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
     await e.file(as(newer));
     await new Promise((r) => setTimeout(r, 5));
@@ -2517,7 +2511,9 @@ test('a round files its target bridged as the target says, and the looping step 
 });
 
 test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `claude.remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
-  const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
+  const engine = promiseEngine(
+    RuntimeEngine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES }),
+  );
   const engineRefusal = async (harness: string, background?: boolean): Promise<string | undefined> => {
     try {
       await engine.file({

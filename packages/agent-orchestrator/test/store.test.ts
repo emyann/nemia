@@ -35,6 +35,10 @@ import type { Asked } from '../src/retry/retry.verb.ts';
 import type { Approved } from '../src/gate/gate.verb.ts';
 import type { Told } from '../src/say/say.verb.ts';
 import type { Cancelled } from '../src/cancel/cancel.verb.ts';
+import type { CheckReport } from '../src/views/views.verb.ts';
+import type { CheckRefusal } from '../src/check/check.ts';
+import type { ParentRun } from '../src/wait/wait.ts';
+import type { BranchReader } from '../src/branches/branches.store.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
@@ -6094,6 +6098,205 @@ test('the programs of what a person asks of a run say in their types what they n
     v.Effect.runPromise(v.cancelRun('x')),
   ];
   assert.deepEqual([typed.length, infallible.length, typeof unprovided], [6, 6, 'function']);
+});
+
+/**
+ * The views' programs, a runner of one over `e` as its plain face runs it, and an engine over `e` whose feed says `entries`. Imported at
+ * the call, as `WF_ROOT` is read when the store loads.
+ */
+const viewPrograms = async () => {
+  const { Effect } = await import('effect');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const views = await import('../src/views/views.verb.ts');
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
+    Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
+  const fed = (e: Engine, entries: Awaited<ReturnType<Engine['feed']>>['entries']): Engine => ({
+    ...e,
+    feed: async (after = 0) => ({ entries: entries.slice(after), cursor: entries.length }),
+  });
+  return { Effect, over, fed, ...views };
+};
+
+test('the programs of the views, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async () => {
+  const v = await viewPrograms();
+  const { run, e, settle, logs } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  const check = `${run.id}-implement-try2-check`;
+  settle(check, 'failed', undefined, 1);
+  logs.set(check, 'not ok 1 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n');
+  fs.writeFileSync(path.join(ROOT, 'checks', `${check}.stderr`), 'npm error Test failed.\n');
+  const record = readRun(run.id);
+  const earlier = `${run.id}-implement`;
+  assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
+
+  for (const how of [{}, { earlierTries: false }]) {
+    const ran = await v.over(e, v.taskPhasesRead(record, how));
+    const face = await v.taskPhases(e, record, how);
+    assert.deepStrictEqual(ran.views, face.views, JSON.stringify(how));
+    assert.equal(ran.views.has(earlier), how.earlierTries !== false, JSON.stringify(how));
+    const ids = [...face.views.keys(), earlier, 'no-such-task'];
+    assert.deepStrictEqual(ids.map(ran.phaseOf), ids.map(face.phaseOf), JSON.stringify(how));
+  }
+
+  const { phaseOf } = await v.taskPhases(e, record);
+  const steps = stepsOf(record);
+  const failed = (p: TaskPhase) => p === 'failed' || p === 'stopped';
+  const reports = await v.over(e, v.checkReportsRead(record, steps, phaseOf, failed));
+  assert.deepStrictEqual(reports, await v.checkReports(e, record, steps, phaseOf, failed));
+  assert.deepStrictEqual(reports.get('implement'), {
+    passed: false,
+    command: 'npm test',
+    verdict: 1,
+    stdout: 'not ok 1 - parses a trailing comma\n# fail 1',
+    stderr: 'npm error Test failed.',
+  });
+  assert.deepStrictEqual(await v.over(e, v.refusalRead('npm test', check)), await v.refusalOf(e, 'npm test', check));
+
+  const at = '2026-09-30T08:00:00.000Z';
+  const told = v.fed(e, [
+    { taskId: 'a', event: { kind: 'filed', at, brief: 'a', cwd: '/repo' } },
+    { taskId: 'a', event: { kind: 'admitted', at: '2026-09-30T08:01:00.000Z' } },
+    { taskId: 'b', event: { kind: 'filed', at: '2026-09-30T08:02:00.000Z', brief: 'b', cwd: '/repo' } },
+  ]);
+  const first = await v.over(told, v.filingsRead(0, new Map([['c', at]])));
+  assert.deepStrictEqual(first, await v.readFilings(told, 0, new Map([['c', at]])));
+  assert.deepStrictEqual(first, {
+    filed: new Map([
+      ['c', at],
+      ['a', at],
+      ['b', '2026-09-30T08:02:00.000Z'],
+    ]),
+    cursor: 3,
+  });
+  assert.deepStrictEqual(await v.over(told, v.filingsRead(1)), await v.readFilings(told, 1), 'from a cursor');
+
+  const repo = aRepo();
+  const b = board();
+  const shipped = await aParent(repo, b);
+  b.settle(`${shipped.run.id}-implement`, 'succeeded', SIGNED);
+  const running = await aParent(repo, b);
+  const child = start({ brief: 'the child', repo, workflowDir: folder(), after: [shipped.run.id, running.run.id] });
+  const ids = [shipped.run.id, running.run.id, 'no-such-run'];
+  const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id))));
+  assert.deepStrictEqual(read, await Promise.all(ids.map((id) => v.parentOf(b.e, id))));
+  assert.deepEqual(
+    read.map((p) => p.shipped),
+    [true, false, false],
+  );
+  const lookup = await v.over(b.e, v.parentsRead(readRun(child.id)));
+  const looked = await v.parentsOf(b.e, readRun(child.id));
+  assert.deepStrictEqual(ids.map(lookup), ids.map(looked));
+  assert.deepStrictEqual(ids.map(lookup), read);
+});
+
+test("REFUSED as a typed failure: a refusal the engine's view, logs or feed rejects with is each views program's failure, recoverable by its tag; anything else a defect, which no `Effect.catch` recovers; each face rejects with either as it was thrown", async () => {
+  const v = await viewPrograms();
+  const { run, e } = await throughCheck('check: npm test', 'failed', 1);
+  const record = readRun(run.id);
+  const check = `${run.id}-implement-check`;
+  const repo = aRepo();
+  const b = board();
+  const parent = await aParent(repo, b);
+  b.settle(`${parent.run.id}-implement`, 'succeeded', SIGNED);
+  const child = readRun(start({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }).id);
+  const failed = (): TaskPhase => 'failed';
+  const reads = (err: unknown) => {
+    const refuse = async () => {
+      throw err;
+    };
+    return [
+      ['taskPhases', v.taskPhasesRead(record), () => v.taskPhases({ ...e, view: refuse }, record), { ...e, view: refuse }],
+      [
+        'checkReports',
+        v.checkReportsRead(record, stepsOf(record), failed, () => true),
+        () => v.checkReports({ ...e, logs: refuse }, record, stepsOf(record), failed, () => true),
+        { ...e, logs: refuse },
+      ],
+      ['refusalOf', v.refusalRead('npm test', check), () => v.refusalOf({ ...e, logs: refuse }, 'npm test', check), { ...e, logs: refuse }],
+      ['parentOf', v.parentRead(parent.run.id), () => v.parentOf({ ...b.e, view: refuse }, parent.run.id), { ...b.e, view: refuse }],
+      ['parentsOf', v.parentsRead(child), () => v.parentsOf({ ...b.e, view: refuse }, child), { ...b.e, view: refuse }],
+      ['readFilings', v.filingsRead(), () => v.readFilings({ ...e, feed: refuse }), { ...e, feed: refuse }],
+    ] as Array<[string, EffectOf<unknown, Refusal, EngineService>, () => Promise<unknown>, Engine]>;
+  };
+
+  const missing = new Missing({ message: 'no such task' });
+  for (const [what, program, face, broken] of reads(missing)) {
+    const recovered = await v.over(broken, program.pipe(v.Effect.catchTag('Missing', (r) => v.Effect.succeed(r))));
+    assert.equal(recovered, missing, `${what}: the refusal itself, recovered by its tag`);
+    assert.equal(await rejection(face(), what), missing, `${what}: its face rejects with the refusal itself`);
+  }
+
+  const boom = new Error('journal');
+  for (const [what, program, face, broken] of reads(boom)) {
+    const uncaught = await rejection(v.over(broken, program.pipe(v.Effect.catch(() => v.Effect.succeed('caught')))), what);
+    assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
+    assert.equal(await rejection(v.over(broken, program), what), boom, `${what}: the program rejects with the error itself`);
+    assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
+  }
+});
+
+test('a parent whose frozen steps cannot be read has not shipped: its views program answers so, neither failing nor dying, and asks git nothing of its branches', async () => {
+  const v = await viewPrograms();
+  const { oneByOne } = await import('../src/branches/branches.store.ts');
+  const repo = aRepo();
+  const b = board();
+  const dir = oneStep();
+  const p = await aParent(repo, b, { workflowDir: dir });
+  b.settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
+  const record = readRun(p.run.id);
+  delete record.workflow;
+  writeRun(record);
+  fs.rmSync(dir, { recursive: true });
+  assert.throws(() => stepsOf(readRun(p.run.id)), 'its steps do not read');
+  const asked: string[] = [];
+  const git: BranchReader = {
+    ...oneByOne,
+    shipped: (run, branch) => {
+      asked.push(branch);
+      return oneByOne.shipped(run, branch);
+    },
+  };
+  const unshipped = { record: readRun(p.run.id), shipped: false };
+  assert.deepStrictEqual(await v.over(b.e, v.parentRead(p.run.id, git)), unshipped, 'no `catch`: it answers');
+  assert.deepStrictEqual(await v.parentOf(b.e, p.run.id, git), unshipped);
+  assert.deepEqual(asked, [], 'no branch of it asked');
+});
+
+test("the views' programs say in their types what they need and what they refuse: the engine, and a refusal", async () => {
+  const v = await viewPrograms();
+  const run = aRun('x', {});
+  const failed = (): TaskPhase => 'failed';
+  const typed: Array<EffectOf<unknown, Refusal, EngineService>> = [
+    v.taskPhasesRead(run) satisfies EffectOf<
+      { views: Map<string, TaskView>; phaseOf: (taskId: string) => TaskPhase },
+      Refusal,
+      EngineService
+    >,
+    v.checkReportsRead(run, [], failed, () => true) satisfies EffectOf<Map<string, CheckReport>, Refusal, EngineService>,
+    v.refusalRead('x', 'y') satisfies EffectOf<CheckRefusal, Refusal, EngineService>,
+    v.parentRead('x') satisfies EffectOf<ParentRun, Refusal, EngineService>,
+    v.parentsRead(run) satisfies EffectOf<(id: string) => ParentRun, Refusal, EngineService>,
+    v.filingsRead() satisfies EffectOf<{ filed: Map<string, string>; cursor: number }, Refusal, EngineService>,
+  ];
+  const infallible = [
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.taskPhasesRead(run) satisfies EffectOf<unknown, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.parentRead('x') satisfies EffectOf<ParentRun, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.filingsRead() satisfies EffectOf<unknown, never, EngineService>,
+  ];
+  const unprovided = () => [
+    // @ts-expect-error -- taskPhasesRead requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.taskPhasesRead(run)),
+    // @ts-expect-error -- parentRead requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.parentRead('x')),
+    // @ts-expect-error -- filingsRead requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.filingsRead()),
+  ];
+  assert.deepEqual([typed.length, infallible.length, typeof unprovided], [6, 3, 'function']);
 });
 
 /** `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */

@@ -114,8 +114,10 @@ version, and the version above must be the pin. An upgrade re-measures the table
   with `tried` or `awaited` (`packages/agent-orchestrator/src/runtime-client.ts`): it fails with a `Refusal` and dies of anything
   else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
   `decideRun` and `decide`, `forgetRun` and `forget`, and the verbs a person asks of a run (`roundRun` and `round`, `acceptRun`,
-  `retryRun`, `approveRun`, `sayRun`, `cancelRun`). An engine refusal is mapped in one place: `toldBy` in `say.verb.ts` turns the
-  runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make a defect.
+  `retryRun`, `approveRun`, `sayRun`, `cancelRun`), and the views' reads (`taskPhasesRead` and `taskPhases`, `checkReportsRead`,
+  `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`). An engine refusal is mapped in
+  one place: `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make
+  a defect.
 
 ## Tests
 

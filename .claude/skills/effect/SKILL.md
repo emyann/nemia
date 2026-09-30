@@ -119,6 +119,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`). An engine refusal is mapped in
   one place: `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make
   a defect.
+- A controller that reads no engine requires nothing: `startRun`, whose plain face `start` runs it with `Effect.runSync` and
+  throws either as it was thrown (`runSync` throws the first failure, else the first defect, itself). Its face stays synchronous,
+  so a read it lifts must be too.
 
 ## Tests
 

@@ -1,11 +1,12 @@
 /**
- * Starting a workflow folder's run (`start`): it refuses what it can before anything is written, and writes the run's record; nothing is
- * filed here — the tick files a run's first steps on its next pass. `wf plan` and the inbox start their runs through it. A controller: the
- * runtime it reads, through the client (`runtime-client.ts`), is its harnesses, which say which steps a session can be bridged for.
+ * Starting a workflow folder's run: the program `startRun`, beside `start`, its plain face. It refuses what it can before anything is
+ * written, and writes the run's record; nothing is filed here — the tick files a run's first steps on its next pass. `wf plan` and the
+ * inbox start their runs through it. A controller whose program requires nothing: the runtime it reads, through the client
+ * (`runtime-client.ts`), is its harnesses, which say which steps a session can be bridged for, and never the engine.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HARNESSES, readRemote } from '../runtime-client.ts';
+import { HARNESSES, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
 import { refusalLines } from '../workspace/workspace.ts';
 import { type Workflow } from '../step/step.ts';
@@ -22,6 +23,7 @@ import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { Effect } from 'effect';
 
 /**
  * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
@@ -149,7 +151,124 @@ export function refuseInclude(repo: string, isolate: boolean): void {
   }
 }
 
+/** What `wf start` is told: the brief, the repository and the workflow folder, and what `startRun` says of each of the rest. */
+export type StartOptions = {
+  brief: string;
+  repo: string;
+  repoNamed?: boolean;
+  workflowDir: string;
+  isolate?: boolean;
+  after?: readonly string[];
+  inputs?: readonly string[];
+  from?: { inbox: string };
+  gates?: readonly string[];
+};
+
+/** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
+type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates'>;
+
+/** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
+const repoNamedRefusal = (repo: string): string =>
+  `--repo ${repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
+  `Start it without --repo, or start a workflow whose steps work on a repository.`;
+
+/** The files `wf start --input` names, each resolved from where it is typed, and what is there: a file, a directory, other or nothing. */
+function inputsOf(given: readonly string[]): InputFile[] {
+  return given.map((g): InputFile => {
+    const resolved = path.resolve(g);
+    const at = fs.statSync(resolved, { throwIfNoEntry: false });
+    return { given: g, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
+  });
+}
+
+/** What `opts` tells the run, with `steps` as the workflow it freezes and `inputs` by name; an option not given is left out. */
+function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[]): Told {
+  const after = opts.after ?? [];
+  const gates = opts.gates ?? [];
+  return {
+    brief: opts.brief,
+    workflowDir: path.resolve(opts.workflowDir),
+    workflow: steps,
+    ...(after.length ? { after: [...after] } : {}),
+    ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
+    ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
+    ...(gates.length ? { gates: [...gates] } : {}),
+  };
+}
+
+/** A folder run's record, its workspace its own directory in the store: fails with an `--after`'s refusal (`afterRefusal`). */
+const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, steps: Run['steps']) {
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { place: { kind: 'folder' } }, parentRecord));
+  if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
+  const run: Run = {
+    id,
+    place: { kind: 'folder' },
+    workspace: workRoot(runsDir(), id),
+    ...told,
+    steps,
+    createdAt: new Date().toISOString(),
+  };
+  return run;
+});
+
+/** A git run's record on `repo`, on the branch checked out there (`makeWorkspace`): fails with an `--after`'s refusal (`afterRefusal`). */
+const gitRun = Effect.fn('gitRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
+  const { workspace, baseRef, branch } = yield* tried(() => makeWorkspace(repo));
+  const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, parentRecord));
+  if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));
+  const run: Run = {
+    id,
+    repo,
+    workspace,
+    baseRef,
+    isolate,
+    ...told,
+    branch,
+    steps,
+    createdAt: new Date().toISOString(),
+  };
+  return run;
+});
+
+/** Copies `inputs` into the run's own `inputs/` (`inputsDir`); throws with exit 1 when one cannot be, the run's directory removed. */
+function copyInputs(run: Run, inputs: readonly InputFile[]): void {
+  if (!inputs.length) return;
+  const dir = inputsDir(run);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
+  } catch (err) {
+    fs.rmSync(path.dirname(dir), { recursive: true, force: true });
+    throw Object.assign(
+      new Error(
+        `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
+      ),
+      { exitCode: 1 },
+    );
+  }
+}
+
 /**
+ * Renders the steps' agents into the run's `agents/` (`writeAgentFiles`), with the skills the folder's places hold (`skillsFor`); throws
+ * with exit 1 when they cannot be, the run's directory removed.
+ */
+function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string, places: Places): void {
+  try {
+    writeAgentFiles(run, steps, skillsFor(workflowDir, places));
+  } catch (err) {
+    fs.rmSync(path.join(runsDir(), run.id), { recursive: true, force: true });
+    throw Object.assign(
+      new Error(
+        `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
+      ),
+      { exitCode: 1 },
+    );
+  }
+}
+
+/**
+ * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
+ *
  * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
  * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
  * the record has no `after`.
@@ -169,110 +288,38 @@ export function refuseInclude(repo: string, isolate: boolean): void {
  *
  * The record's steps are keyed in the order the steps run, as `loadWorkflows` gives them: the order `wf ls`, `wf decide` and the board list
  * them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record never names a
- * file that is not there: a copy or a render that fails removes the run's directory, and throws with exit 1.
+ * file that is not there: a copy or a render that fails removes the run's directory, and is an `Error` with exit 1.
+ *
+ * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
+ * else, the copy's and the render's `Error` included (`tried`).
  */
-export function start(opts: {
-  brief: string;
-  repo: string;
-  repoNamed?: boolean;
-  workflowDir: string;
-  isolate?: boolean;
-  after?: readonly string[];
-  inputs?: readonly string[];
-  from?: { inbox: string };
-  gates?: readonly string[];
-}): Run {
+export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
-  const steps = stepsToStart(opts.workflowDir, isolate, places);
+  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places));
   const folder = isFolderTeam(steps);
-  if (folder && opts.repoNamed) {
-    throw new Invalid({
-      message:
-        `--repo ${opts.repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n` +
-        `Start it without --repo, or start a workflow whose steps work on a repository.`,
-    });
-  }
-  const gates = opts.gates ?? [];
-  const refusedGates = gateRefusal(gates, steps);
-  if (refusedGates) throw new Invalid({ message: refusedGates });
-  if (!folder) refuseInclude(opts.repo, isolate);
-  const inputs = (opts.inputs ?? []).map((given): InputFile => {
-    const resolved = path.resolve(given);
-    const at = fs.statSync(resolved, { throwIfNoEntry: false });
-    return { given, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
-  });
+  if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
+  const refusedGates = gateRefusal(opts.gates ?? [], steps);
+  if (refusedGates) return yield* Effect.fail(new Invalid({ message: refusedGates }));
+  if (!folder) yield* tried(() => refuseInclude(opts.repo, isolate));
+  const inputs = yield* tried(() => inputsOf(opts.inputs ?? []));
   const refusedInputs = inputRefusal(inputs);
-  if (refusedInputs) throw new Invalid({ message: refusedInputs });
+  if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
-  const after = opts.after ?? [];
+  const told = toldOf(opts, steps, inputs);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
-  const told = {
-    brief: opts.brief,
-    workflowDir: path.resolve(opts.workflowDir),
-    workflow: steps,
-    ...(after.length ? { after: [...after] } : {}),
-    ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
-    ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
-    ...(gates.length ? { gates: [...gates] } : {}),
-  };
-  let run: Run;
-  if (folder) {
-    const refusedAfter = afterRefusal(after, { place: { kind: 'folder' } }, parentRecord);
-    if (refusedAfter) throw new Invalid({ message: refusedAfter });
-    run = {
-      id,
-      place: { kind: 'folder' },
-      workspace: workRoot(runsDir(), id),
-      ...told,
-      steps: stepRecords,
-      createdAt: new Date().toISOString(),
-    };
-  } else {
-    const { workspace, baseRef, branch } = makeWorkspace(opts.repo);
-    const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
-    if (refusedAfter) throw new Invalid({ message: refusedAfter });
-    run = {
-      id,
-      repo: opts.repo,
-      workspace,
-      baseRef,
-      isolate,
-      ...told,
-      branch,
-      steps: stepRecords,
-      createdAt: new Date().toISOString(),
-    };
-  }
-  if (inputs.length) {
-    const dir = inputsDir(run);
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-      for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
-    } catch (err) {
-      fs.rmSync(path.dirname(dir), { recursive: true, force: true });
-      throw Object.assign(
-        new Error(
-          `--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
-        ),
-        { exitCode: 1 },
-      );
-    }
-  }
-  try {
-    writeAgentFiles(run, steps, skillsFor(opts.workflowDir, places));
-  } catch (err) {
-    fs.rmSync(path.join(runsDir(), run.id), { recursive: true, force: true });
-    throw Object.assign(
-      new Error(
-        `the steps' agents could not be rendered into ${path.join(runsDir(), run.id, 'agents')} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`,
-      ),
-      { exitCode: 1 },
-    );
-  }
-  writeRun(run);
+  const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
+  yield* tried(() => copyInputs(run, inputs));
+  yield* tried(() => renderAgents(run, steps, opts.workflowDir, places));
+  yield* tried(() => writeRun(run));
   return run;
-}
+});
+
+/**
+ * `wf start`'s plain face: `startRun`, run synchronously. Returns the run's record; throws the refusal the program failed with, or what it
+ * died of, as it was thrown.
+ */
+export const start = (opts: StartOptions): Run => Effect.runSync(startRun(opts));
 
 /** Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store. */
 export const placesOf = (repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home: HOME });

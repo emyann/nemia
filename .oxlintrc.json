@@ -656,14 +656,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/start/start.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 21]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.verb.ts"],
       "rules": {
         "complexity": ["error", { "max": 24 }],

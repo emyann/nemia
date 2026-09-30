@@ -41,6 +41,7 @@ import type { ParentRun } from '../src/wait/wait.ts';
 import type { BranchReader } from '../src/branches/branches.store.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { TEAM_DEV } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { isGitRun, SIGNOFF } from '../src/run.ts';
 import { momentumOf, toAdmit } from '../src/cap/cap.ts';
@@ -6510,4 +6511,121 @@ test('the whole screen of a run whose every step passed its check', async (t) =>
     '  worked directly on master; nothing to merge; the base was <base>',
     '  read it    git -C <repo> diff <base>...master',
   ]);
+});
+
+/** The start program, its face, and what a test of either reads. Imported at the call, as `WF_ROOT` is read when the store loads. */
+const startProgram = async () => {
+  const { Effect } = await import('effect');
+  const { startRun } = await import('../src/start/start.verb.ts');
+  const { Invalid, isRefusal } = await import('../src/refusal/refusal.ts');
+  const { inputsDir, runsDir } = await import('../src/record/record.store.ts');
+  return { Effect, startRun, Invalid, isRefusal, inputsDir, runsDir };
+};
+
+/**
+ * A team whose steps say `workspace: folder`, in a chain, its writer an agent of its own: a run of it works in folders it makes, with no
+ * git repository, and renders the writer.
+ */
+const folderTeam = () => {
+  const root = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  const dir = path.join(root, 'notes');
+  fs.mkdirSync(path.join(root, 'agents'));
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(root, 'agents', 'writer.md'), '---\nrole: Writer\ndescription: Writes the note.\n---\nWrite the note.\n');
+  fs.writeFileSync(path.join(dir, 'write.md'), '---\nagent: writer\nworkspace: folder\npermissionMode: dontAsk\n---\nwrite the note\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nworkspace: folder\npermissionMode: dontAsk\nafter: write\n---\nreview the note\n');
+  return dir;
+};
+
+/** What `fn` threw, or a failure of the test when it returned. */
+const thrown = (fn: () => unknown, what: string): unknown => {
+  try {
+    fn();
+  } catch (err) {
+    return err;
+  }
+  return assert.fail(`${what} returned`);
+};
+
+test('the start program answers what its plain face answers on the same store: a git run with an input, a gate and a parent, and a folder run', async () => {
+  const s = await startProgram();
+  const repo = aRepo();
+  const parent = start({ brief: 'the parent', repo, workflowDir: oneStep() });
+  const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+  fs.writeFileSync(input, 'the notes\n');
+  const cases: Array<[string, Parameters<typeof start>[0]]> = [
+    ['a git run', { brief: 'the child', repo, workflowDir: TEAM_DEV, inputs: [input], gates: ['review'], after: [parent.id] }],
+    ['a folder run', { brief: 'the note', repo: ROOT, workflowDir: folderTeam(), inputs: [input] }],
+  ];
+  const differ = ['id', 'workspace', 'branch', 'baseRef', 'createdAt'];
+  const same = (r: Run) => Object.fromEntries(Object.entries(r).filter(([k]) => !differ.includes(k)));
+  for (const [what, opts] of cases) {
+    const ran = s.Effect.runSync(s.startRun(opts));
+    const face = start(opts);
+    const written = (r: Run) => JSON.parse(JSON.stringify(r)) as Run;
+    assert.deepStrictEqual(written(ran), readRun(ran.id), `${what}: the program's run is on the record`);
+    assert.deepStrictEqual(written(face), readRun(face.id), `${what}: the face's run is on the record`);
+    assert.deepStrictEqual(same(written(ran)), same(written(face)), what);
+    assert.ok(fs.existsSync(path.join(s.inputsDir(ran), 'notes.md')), `${what}: its input copied`);
+    assert.ok(fs.statSync(path.join(s.runsDir(), ran.id, 'agents')).isDirectory(), `${what}: its agents rendered`);
+  }
+});
+
+test("REFUSED as a typed failure at `wf start`: each refusal is the start program's `Invalid`, in the words its face throws with exit 2, and nothing is written", async () => {
+  const s = await startProgram();
+  const repo = aRepo();
+  const fan = fs.mkdtempSync(path.join(ROOT, 'fan-'));
+  fs.writeFileSync(path.join(fan, 'a.md'), 'side a\n');
+  fs.writeFileSync(path.join(fan, 'b.md'), 'side b\n');
+  const cases: Array<[string, Parameters<typeof start>[0]]> = [
+    ['--repo on a folder team', { brief: 'x', repo, repoNamed: true, workflowDir: folderTeam() }],
+    ['a gate naming no step', { brief: 'x', repo, workflowDir: folder(), gates: ['nowhere'] }],
+    ['an input not there', { brief: 'x', repo, workflowDir: folder(), inputs: [path.join(ROOT, 'no-such-input.md')] }],
+    ['after an unknown run', { brief: 'x', repo, workflowDir: folder(), after: ['no-such-run'] }],
+    ['--no-worktree on a fan-out', { brief: 'x', repo, workflowDir: fan, isolate: false }],
+  ];
+  for (const [what, opts] of cases) {
+    const before = fs.readdirSync(s.runsDir()).sort();
+    const recovered = s.Effect.runSync(s.startRun(opts).pipe(s.Effect.catchTag('Invalid', (r) => s.Effect.succeed(r))));
+    assert.ok(recovered instanceof s.Invalid, `${what}: an Invalid, recovered by its tag`);
+    const err = thrown(() => start(opts), what);
+    assert.ok(err instanceof s.Invalid, `${what}: the face throws the Invalid itself, not ${String(err)}`);
+    assert.equal(err.exitCode, 2, what);
+    assert.equal(recovered.message, err.message, what);
+    assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, `${what}: nothing written`);
+  }
+});
+
+test('a run whose inputs cannot be copied is what the start program dies of, not a refusal: its face throws the same exit-1 Error, and no record or directory is left', async (t) => {
+  const s = await startProgram();
+  const input = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.md');
+  fs.writeFileSync(input, 'the notes\n');
+  const opts = { brief: 'unwritable', repo: aRepo(), workflowDir: folder(), inputs: [input] };
+  const before = fs.readdirSync(s.runsDir()).sort();
+  fs.chmodSync(s.runsDir(), 0o555);
+  t.after(() => fs.chmodSync(s.runsDir(), 0o755));
+  const died = thrown(() => s.Effect.runSync(s.startRun(opts).pipe(s.Effect.catch(() => s.Effect.succeed('caught')))), 'the program');
+  const face = thrown(() => start(opts), 'the face');
+  fs.chmodSync(s.runsDir(), 0o755);
+  for (const [what, err] of [
+    ['the program', died],
+    ['the face', face],
+  ] as const) {
+    assert.ok(err instanceof Error && !s.isRefusal(err), `${what}: an Error, not a refusal: ${String(err)}`);
+    assert.equal((err as Error & { exitCode?: number }).exitCode, 1, what);
+    assert.match(err.message, /^--input: the run's files could not be copied into /, what);
+  }
+  const anyId = (err: unknown) => (err as Error).message.replaceAll(/unwritable-[a-z0-9]+/g, '<id>');
+  assert.equal(anyId(died), anyId(face), 'in the same words, but for the run id');
+  assert.deepEqual(fs.readdirSync(s.runsDir()).sort(), before, 'no record, and no run directory');
+});
+
+test('the start program says in its type that it refuses and requires nothing: a run, a refusal, no service', async () => {
+  const s = await startProgram();
+  const opts = { brief: 'x', repo: ROOT, workflowDir: WORKFLOW };
+  const typed = s.startRun(opts) satisfies EffectOf<Run, Refusal>;
+  // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+  const infallible = s.startRun(opts) satisfies EffectOf<Run>;
+  const provided = () => s.Effect.runSync(s.startRun(opts)) satisfies Run;
+  assert.deepEqual([typeof typed, typeof infallible, typeof provided], ['object', 'object', 'function']);
 });

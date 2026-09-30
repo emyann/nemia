@@ -5,7 +5,8 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
 import { asks } from './asks/index.ts';
-import { capabilitiesWithSteps, McpAsker, repoOf } from './capabilities/index.ts';
+import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
+import { factories } from './factories/index.ts';
 import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
@@ -52,6 +53,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * The api's routes: every one the board reads and writes, its groups each in a router of their own.
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
+ * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
+ *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
+ *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -95,8 +99,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     })
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ env, home, mcp }) => c.json(await capabilitiesWithSteps(repoOf(env), { env, home, asker: mcp }))),
+      served(c, async ({ env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { env, home, asker: mcp }))),
     )
+    .route('/', factories)
     .route('/', workflows)
     .route('/', builder)
     .route('/', agents)

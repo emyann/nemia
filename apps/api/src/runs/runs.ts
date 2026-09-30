@@ -57,6 +57,8 @@ export type RunSummary = {
   id: string;
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
+  /** The factory the run was started in, as its record names it; null for a run in the default factory, whose record names none. */
+  factory: string | null;
   /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `workspace: folder`. */
   place: PlaceKind;
   /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
@@ -153,6 +155,7 @@ async function summarize(run: Run, views: Views, reader: Engine['Service'], git:
   const summary = {
     id: run.id,
     repo: run.repo ?? null,
+    factory: run.factory ?? null,
     place: placeOf(run),
     work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,
@@ -198,6 +201,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
   return {
     id: run.id,
     repo: run.repo ?? null,
+    factory: run.factory ?? null,
     place: placeOf(run),
     work: isGitRun(run) ? null : run.workspace,
     brief: run.brief,

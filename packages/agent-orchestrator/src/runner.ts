@@ -183,9 +183,12 @@ export {
   DEFAULT_FACTORY,
   factoryLines,
   factoryNameRefusal,
+  factoryRepo,
   fillsOf,
   hireRefusal,
   noFactoryLine,
+  outsideRefusal,
+  unattachedRefusal,
   unfilledRefusal,
 } from './factory/factory.ts';
 export type { Factory, FactoryListing, Hires } from './factory/factory.ts';

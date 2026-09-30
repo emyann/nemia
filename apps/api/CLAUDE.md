@@ -55,3 +55,5 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
   taken a few microtasks after its response, so a test waits for it before it breaks the feed.
 - **A run's record, asks and stamps, and the inbox's cards, are read through `runStore`** (`agent-orchestrator`): the root exports no
   store function of a run (`packages/agent-orchestrator/test/entries.test.ts`).
+- **A request's factory and repository are resolved in `served`** (`placeFor`, `factories/place.ts`): a handler reads `repo` and `factory`
+  off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).

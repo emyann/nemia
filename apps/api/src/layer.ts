@@ -6,8 +6,10 @@
  * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
-import { McpAsker, repoOf } from './capabilities/capabilities.ts';
+import type { Factory } from 'agent-orchestrator';
+import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
+import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
 import { type RestingMemo, restingMemo } from './runs/resting.ts';
 import type { RunSummary } from './runs/runs.ts';
@@ -48,12 +50,13 @@ export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;
 export type ApiEnv = { Variables: { runtime: ApiRuntime } };
 
 /**
- * The services as a handler reads them, each under the name the helpers it calls take it by, and `repo`, the repository the board serves,
- * read off `env` (`repoOf`).
+ * The services as a handler reads them, each under the name the helpers it calls take it by, and where the request is answered
+ * (`placeFor`, factories/place.ts): `repo`, the repository it is answered on, and `factory`, the factory it names, none for the default.
  */
 export type Served = {
   env: NodeJS.ProcessEnv;
   repo: string;
+  factory: Factory | undefined;
   e: Engine['Service'];
   home: string;
   mcp: McpAsker['Service'];
@@ -61,24 +64,29 @@ export type Served = {
   memo: ReadMemo['Service'];
 };
 
+/** What `served` reads of a request: the app's runtime, and the query's `factory` and `repo`. */
+export type ServedRequest = { var: ApiEnv['Variables']; req: { query: (key: string) => string | undefined } };
+
 /**
- * `handle` over the request's services, run on the app's runtime: what it returns, or its rejection itself, so a refusal thrown inside it
- * reaches `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded
- * inside `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves.
+ * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
+ * what it returns, or its rejection itself, so a refusal thrown inside it — the place's among them, before `handle` runs — reaches
+ * `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded inside
+ * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves.
  */
-export const served = <A>(c: { var: ApiEnv['Variables'] }, handle: (s: Served) => A | Promise<A>): Promise<A> =>
+export const served = <A>(c: ServedRequest, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(
     Effect.gen(function* () {
       const { env } = yield* ApiConfig;
-      const s: Served = {
+      const services = {
         env,
-        repo: repoOf(env),
         e: yield* Engine,
         home: yield* StoreRoot,
         mcp: yield* McpAsker,
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
       };
-      return yield* Effect.promise(async () => handle(s));
+      return yield* Effect.promise(async () =>
+        handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env) }),
+      );
     }),
   );

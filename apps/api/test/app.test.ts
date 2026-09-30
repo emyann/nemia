@@ -180,6 +180,7 @@ test('runs are read from the workflow store and summarized, with what each step 
     {
       id: 'r-1',
       repo: '/code/app',
+      factory: null,
       place: 'git',
       work: null,
       brief: 'Do the thing',

@@ -67,40 +67,58 @@ export function UsedBy({ listing, className }: { listing: Pick<AgentListing, 'us
 
 /**
  * What an agent says it can do: each A2A skill on its card, generated from the skills it gives, in their order — the name a caller would read,
- * what it is for, and the tags it carries. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is drawn
- * at all where `none` is left out.
+ * what it is for, and the tags it carries. `compact`, as a character card shows them: the name on its line, what it is for cut to two lines,
+ * and no tags; the whole of it is on the agent's page, a click away. `none` is what stands there when there is no card, its refusal shown elsewhere; nothing is
+ * drawn at all where `none` is left out.
  */
 export function Skills({
   skills,
   none,
+  compact,
   className,
 }: {
   skills: readonly AgentSkill[] | null | undefined;
   none?: React.ReactNode;
+  compact?: boolean;
   className?: string;
 }) {
   if (!skills?.length) return none ? <p className="text-xs text-neutral-500">{none}</p> : null;
   return (
     <ul data-skills className={cn('space-y-1.5', className)}>
-      {skills.map((skill) => (
-        <li key={skill.id} data-agent-skill={skill.id} className="text-xs leading-snug">
-          <span className="font-medium text-neutral-800 dark:text-neutral-200">{skill.name}</span>{' '}
-          <span className="text-neutral-600 dark:text-neutral-400">{skill.description}</span>
-          {skill.tags.length > 0 && (
-            <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
-              {skill.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
-                >
-                  {tag}
-                </span>
-              ))}
-            </span>
-          )}
-        </li>
-      ))}
+      {skills.map((skill) => (compact ? <CompactSkill key={skill.id} skill={skill} /> : <FullSkill key={skill.id} skill={skill} />))}
     </ul>
+  );
+}
+
+/** One skill as an agent's page shows it: its name, what it is for, and its tags, on a line. */
+function FullSkill({ skill }: { skill: AgentSkill }) {
+  return (
+    <li data-agent-skill={skill.id} className="text-xs leading-snug">
+      <span className="font-medium text-neutral-800 dark:text-neutral-200">{skill.name}</span>{' '}
+      <span className="text-neutral-600 dark:text-neutral-400">{skill.description}</span>
+      {skill.tags.length > 0 && (
+        <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+          {skill.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded bg-neutral-100 px-1 py-px font-mono text-[10px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+            >
+              {tag}
+            </span>
+          ))}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** One skill as a character card shows it: its name, and what it is for cut to two lines. */
+function CompactSkill({ skill }: { skill: AgentSkill }) {
+  return (
+    <li data-agent-skill={skill.id} className="text-sm leading-snug">
+      <span className="block font-semibold text-neutral-900 dark:text-neutral-100">{skill.name}</span>{' '}
+      <span className="line-clamp-2 text-xs text-neutral-600 dark:text-neutral-400">{skill.description}</span>
+    </li>
   );
 }
 
@@ -112,19 +130,33 @@ export const personOf = (name: string): string => {
 
 const FACE = 'shrink-0 rounded-full bg-neutral-100 dark:bg-neutral-800';
 
+const PLATE = 'shrink-0 dark:[&>path]:opacity-25';
+
+type FaceProps = { name: string; size: number; follows?: boolean; plate?: boolean; className?: string };
+
 /**
  * An agent's face: a Blobatar drawn from its name, so the same agent has the same face wherever it shows, and no two names share one by
  * design. Named as a person is, for a screen reader; `size` in pixels. Still, it is one image; with `follows`, it is an inline drawing whose
  * eyes turn toward the pointer and which comes alive while hovered — unless the person asked for reduced motion, or has no fine pointer
- * that hovers, where its eyes stay still.
+ * that hovers, where its eyes stay still. It stands on a grey round, or with `plate` on Blobatar's own backdrop, in its face's colours,
+ * dimmed in the dark theme.
  */
-export function AgentFace({ name, size, follows, className }: { name: string; size: number; follows?: boolean; className?: string }) {
-  if (follows) return <FollowingFace name={name} size={size} className={className} />;
-  return <Blobatar name={name} size={size} title={personOf(name)} data-agent-face={name} className={cn(FACE, className)} />;
+export function AgentFace({ name, size, follows, plate, className }: FaceProps) {
+  if (follows) return <FollowingFace name={name} size={size} plate={plate} className={className} />;
+  return (
+    <Blobatar
+      name={name}
+      size={size}
+      background={plate ? 'squircle' : false}
+      title={personOf(name)}
+      data-agent-face={name}
+      className={cn(plate ? PLATE : FACE, className)}
+    />
+  );
 }
 
 /** An agent's face whose eyes follow the pointer: Blobatar's gaze driver on its inline drawing, three units of a hundred at most. */
-function FollowingFace({ name, size, className }: { name: string; size: number; className?: string }) {
+function FollowingFace({ name, size, plate, className }: Omit<FaceProps, 'follows'>) {
   const { ref } = useGaze({ travel: 3, lookAt: 'pointer' });
   return (
     <Blobatar
@@ -132,9 +164,10 @@ function FollowingFace({ name, size, className }: { name: string; size: number; 
       animate="hover"
       name={name}
       size={size}
+      background={plate ? 'squircle' : false}
       title={personOf(name)}
       data-agent-face={name}
-      className={cn(FACE, className)}
+      className={cn(plate ? PLATE : FACE, className)}
     />
   );
 }

@@ -39,15 +39,24 @@ export default {
     await expectCount(theirs.locator('section[data-agent]'), 1, `the repository's lists one, ${good.agent.name}`);
     const scribe = card(page, 'yours', seeded.name);
     await expectVisible(scribe.getByText(seeded.description, { exact: true }), `${seeded.name} with its description`);
-    await expectVisible(scribe.locator('dd', { hasText: /^sonnet$/ }), 'and the keys it sets');
+    await expectTexts(
+      scribe.locator('[data-agent-stats] dd'),
+      [seeded.keys.model, seeded.keys.effort],
+      `and its stats: the model and effort it sets, which the card shows`,
+    );
+    await expectCount(
+      scribe.getByText(seeded.keys.output),
+      0,
+      `and not its result schema, ${seeded.keys.output}: that key is on its page, a click away`,
+    );
     await expectTexts(scribe.locator('[data-used-by]'), ['No node names it yet.'], `and that no node names ${seeded.name}`);
     await expectTexts(scribe.locator('[data-agent-role]'), [`No role yet · ${seeded.name}`], `${seeded.name} holds no role, and says so`);
     const says = (where: ReturnType<typeof card>, skill: { id: string; name: string; description: string; tags: readonly string[] }) =>
       where.locator(`[data-agent-skill="${skill.id}"]`);
     await expectTexts(
       scribe.locator('[data-agent-skill]'),
-      [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`],
-      `${seeded.name}, given no skills, says what it can do in one entry made from itself: its name, its description, and its name again as the tag`,
+      [`${seeded.skill.name} ${seeded.skill.description}`],
+      `${seeded.name}, given no skills, says what it can do in one entry made from itself: its name and its description, its tag left to its page`,
     );
     await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
     const implementer = card(page, 'repo', good.agent.name);
@@ -66,15 +75,24 @@ export default {
       says(implementer, good.agent.skill).getByText(good.agent.skill.name, { exact: true }),
       `${good.agent.name} says what it can do too, its skill's title as the entry's name`,
     );
-    for (const tag of good.agent.skill.tags)
-      await expectVisible(says(implementer, good.agent.skill).getByText(tag, { exact: true }), `with the skill's tag ${tag}`);
     await expectCount(page.locator('[data-card-error]'), 0, 'and every card is made');
     const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
     await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
     if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`)
       throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
 
-    await implementer.getByRole('link', { name: good.agent.person, exact: true }).click();
+    await node.click();
+    await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
+    await page.goBack({ waitUntil: 'load' });
+    await idle(page);
+    await expectCount(
+      implementer.getByRole('link', { name: good.agent.person, exact: true }),
+      1,
+      `${good.agent.person}'s card holds one link to its page, its name`,
+    );
+    const role = await implementer.locator('[data-agent-role]').boundingBox();
+    if (!role) throw new Refused(`${good.agent.person}'s role line is laid out`);
+    await page.mouse.click(role.x + role.width / 2, role.y + role.height / 2);
     await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
     const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
     await expectVisible(repoForm, `${good.agent.name}'s form`);
@@ -89,6 +107,11 @@ export default {
       repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
       'its form shows its card, generated from its skill',
     );
+    for (const tag of good.agent.skill.tags)
+      await expectVisible(
+        repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(tag, { exact: true }),
+        `with the skill's tag ${tag}, which the card on the list leaves to this page`,
+      );
     await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
     await expectVisible(
       page.locator('[data-read-only]', {
@@ -133,7 +156,7 @@ export default {
     await expectTexts(
       scribeForm.locator('[data-card] [data-agent-skill]'),
       [`${seeded.skill.name} ${seeded.skill.description}${seeded.skill.tags.join('')}`],
-      `${seeded.name}'s form shows its card, one entry made from its description`,
+      `${seeded.name}'s form shows its card, one entry made from its description, and its tag`,
     );
     await expectVisible(
       scribeForm.locator('[data-card]', { hasText: 'Generated from its skills' }),

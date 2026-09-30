@@ -139,7 +139,7 @@ export default {
           .and(page.locator(`${card} svg[data-agent-face="${name}"]`)),
         `${name}'s face is named ${person}, so a screen reader says it`,
       );
-      await follows(page, `${card} svg[data-agent-face="${name}"]`, 36, person);
+      await follows(page, `${card} svg[data-agent-face="${name}"]`, 112, person);
     }
     const theme = await themeOf(page);
     await page.screenshot({ path: path.join(OUT, `faces-list-${theme}.png`), fullPage: true });
@@ -151,7 +151,7 @@ export default {
       page.locator('header').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(head)),
       `the face at the head of ${good.agent.name}'s page is a drawing, named ${good.agent.person}`,
     );
-    await follows(page, head, 56, `${good.agent.person}, at the head of its page,`);
+    await follows(page, head, 96, `${good.agent.person}, at the head of its page,`);
     await page.screenshot({ path: path.join(OUT, `faces-head-${theme}.png`), fullPage: true });
   },
 } satisfies PageSpec;

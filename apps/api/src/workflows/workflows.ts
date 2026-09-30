@@ -162,7 +162,17 @@ export type WorkflowListing = {
  * be; for a step with an agent, `own` is what its file sets itself — the keys (the rest are its agent's) and its own note, which follows
  * the agent's instructions in `body`. Null for a step with no agent, whose file is all of it.
  */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+export type ListedStep = {
+  name: string;
+  spec: WorkflowStepSpec;
+  body: string;
+  own: StepOwn | null;
+  /**
+   * The agent the factory the listing is in hires into the step (`fillsOf`), which `spec.agent` then names too: a builder writes it into
+   * no step file. Null for a step it does not hire into, and in the default factory, which hires no one.
+   */
+  hired: string | null;
+};
 
 /**
  * What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it).
@@ -271,7 +281,7 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
     from,
     dir,
     description,
-    steps: steps.map(listedStep),
+    steps: steps.map(listedStep(new Map(factory ? Object.entries(fillsOf(factory.hires, name)) : []))),
     graph: graphOf(steps),
     schemas,
     folderTeam: isFolderTeam(steps),
@@ -281,13 +291,19 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
   };
 }
 
-/** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */
-const listedStep = (step: Workflow): ListedStep => ({
-  name: step.name,
-  spec: specOf(step),
-  body: step.body,
-  own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
-});
+/**
+ * A step as the listing has it, in a factory whose hires into its workflow are `hires`, by step: resolved, what its file sets itself where
+ * an agent gives it the rest, and the agent hired into it.
+ */
+const listedStep =
+  (hires: ReadonlyMap<string, string>) =>
+  (step: Workflow): ListedStep => ({
+    name: step.name,
+    spec: specOf(step),
+    body: step.body,
+    own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
+    hired: hires.get(step.name) ?? null,
+  });
 
 /**
  * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what
@@ -582,8 +598,8 @@ function cardStarted(asked: Extract<Asked, { card: string }>, repo: string) {
  * The workflows' routes, and the board's first write.
  *
  * - `GET /api/workflows` — every workflow (`listWorkflows`), read from disk on each request, so a folder a person has just edited lists as
- *   it is now; in a factory (`?factory=`), only those attached to it, read with its hires, each saying what they leave `unfilled`. 500 for
- *   a folder that could not be listed.
+ *   it is now; in a factory (`?factory=`), only those attached to it, read with its hires, each saying what they leave `unfilled` and
+ *   each step the agent hired into it (`hired`). 500 for a folder that could not be listed.
  * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
  *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
  *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for

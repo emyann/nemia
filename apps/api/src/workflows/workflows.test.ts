@@ -155,7 +155,13 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       description: 'Implement it, then review it, two rounds at most.',
       /** The README is not among the steps. */
       steps: [
-        { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }), body: 'Implement it.', own: null },
+        {
+          name: 'implement',
+          spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }),
+          body: 'Implement it.',
+          own: null,
+          hired: null,
+        },
         {
           name: 'review',
           spec: spec({
@@ -169,6 +175,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
           }),
           body: 'Review it.',
           own: null,
+          /** Listed in the default factory, which hires no one. */
+          hired: null,
         },
       ],
       /** `graphOf` the steps, as a run of it is drawn. */
@@ -192,7 +200,15 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'yours',
       dir: mine,
       description: null,
-      steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.', own: null }],
+      steps: [
+        {
+          name: 'plan',
+          spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }),
+          body: 'Write PLAN.md.',
+          own: null,
+          hired: null,
+        },
+      ],
       graph: { roots: ['plan'], edges: [] },
       schemas: [],
       folderTeam: false,

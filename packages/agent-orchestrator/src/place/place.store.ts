@@ -4,7 +4,7 @@
  * by a schema per answer, each held to its type in `place.ts`: a field missing or of another type is no answer, and a field the contract
  * does not name is dropped.
  */
-import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding, type SpawnSyncReturns } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
@@ -165,6 +165,37 @@ function firstWrong(value: unknown, error: Schema.SchemaError): string {
   return `${where} is ${quoted(JSON.stringify(found) ?? 'undefined')}, where ${message.replace(/^Expected /, '').replace(/ \| undefined$/, '')} is expected`;
 }
 
+/** How long a script's process group, stopped at its deadline, is given to end on SIGTERM before it is killed. */
+const STOP_GRACE_MS = 2000;
+
+/** How often a stopped group is asked whether it has ended. */
+const STOP_POLL_MS = 20;
+
+/** Signal the process group `pgid` leads; false when it has no process left, or cannot be signalled. */
+function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
+  try {
+    process.kill(-pgid, signal);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
+ * there after `STOP_GRACE_MS`, SIGKILL. Returns whether it had to kill. Never throws.
+ */
+function stopGroup(pgid: number): boolean {
+  if (!signalGroup(pgid, 'SIGTERM')) return false;
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  const until = Date.now() + STOP_GRACE_MS;
+  while (Date.now() < until) {
+    if (!signalGroup(pgid, 0)) return false;
+    Atomics.wait(pause, 0, 0, STOP_POLL_MS);
+  }
+  return signalGroup(pgid, 'SIGKILL');
+}
+
 /** The last lines a script wrote on stderr, joined for one line, or the empty string. */
 function lastLines(stderr: string): string {
   return stderr
@@ -175,12 +206,21 @@ function lastLines(stderr: string): string {
     .join(' / ');
 }
 
-/** Why a finished script gave no answer, or undefined when it exited 0 and its stdout is to be read. */
-function unheard(ran: SpawnSyncReturns<string>, deadlineMs: number): string | undefined {
+/** Whether a script was stopped at its deadline. */
+const pastDeadline = (ran: SpawnSyncReturns<string>): boolean =>
+  ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT';
+
+/**
+ * Why a finished script gave no answer, or undefined when it exited 0 and its stdout is to be read. `killed` says a process it started
+ * outlived SIGTERM at its deadline and was killed.
+ */
+function unheard(ran: SpawnSyncReturns<string>, deadlineMs: number, killed: boolean): string | undefined {
   const words = lastLines(ran.stderr ?? '');
   const tail = words ? `: ${words}` : '';
-  if (ran.error && 'code' in ran.error && ran.error.code === 'ETIMEDOUT')
-    return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${tail}`;
+  const kill = killed
+    ? `, and a process it started outlived SIGTERM for ${STOP_GRACE_MS / 1000} s and was killed, so a lock it held may be left`
+    : '';
+  if (pastDeadline(ran)) return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${tail}`;
   if (ran.error) return `it could not be run: ${ran.error.message}`;
   if (ran.signal) return `it was ended by ${ran.signal}${tail}`;
   if (ran.status !== 0) return words || `it exited ${ran.status ?? 'with no status'}`;
@@ -209,7 +249,9 @@ function heard<V extends PlaceVerb>(verb: V, stdout: string): { readonly answer:
  *
  * Returns the verb's decoded answer; `{ refused }` when the script refused at exit 0; or `{ unread }`, with its last stderr lines or the
  * reason, for anything else — no script, a non-zero exit, a signal, the deadline passed, or a stdout that does not decode. Never throws for
- * what the script did, and leaves no script running: one past its deadline is killed.
+ * what the script did. The script leads a process group of its own; past its deadline it is killed, and what it started (git, git's hooks
+ * and filters) is sent SIGTERM, so git takes its locks away, then SIGKILL after `STOP_GRACE_MS`. A process that leaves the group is not
+ * stopped.
  */
 export function runPlaceVerb<V extends PlaceVerb>(
   skillDir: string,
@@ -221,7 +263,7 @@ export function runPlaceVerb<V extends PlaceVerb>(
   const script = path.join(skillDir, 'scripts', `${verb}.ts`);
   if (!fs.existsSync(script)) return unread(`the place has no script for ${verb}: ${script} is not there`);
   const deadlineMs = options.deadlineMs ?? PLACE_DEADLINE_MS[verb];
-  const ran = spawnSync(process.execPath, [script], {
+  const spawned: SpawnSyncOptionsWithStringEncoding & { readonly detached: boolean } = {
     cwd: skillDir,
     input: JSON.stringify({ ...request, v: PLACE_CONTRACT }),
     encoding: 'utf8',
@@ -230,8 +272,11 @@ export function runPlaceVerb<V extends PlaceVerb>(
     killSignal: 'SIGKILL',
     maxBuffer: 256 * 1024 * 1024,
     env: options.env ?? process.env,
-  });
-  const why = unheard(ran, deadlineMs);
+    detached: true,
+  };
+  const ran = spawnSync(process.execPath, [script], spawned);
+  const killed = pastDeadline(ran) && ran.pid > 0 && stopGroup(ran.pid);
+  const why = unheard(ran, deadlineMs, killed);
   if (why !== undefined) return unread(why);
   const answer = heard(verb, ran.stdout);
   return typeof answer === 'string' ? unread(answer) : answer;

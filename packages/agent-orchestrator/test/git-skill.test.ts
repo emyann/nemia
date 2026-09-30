@@ -1,8 +1,9 @@
 /**
  * The git place the package ships (`place/git/`), its real scripts run through `runPlaceVerb` against scratch repositories: each verb's
- * answer, a refusal and an unread outcome. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session
- * what `LANDING_DENIED` denies today. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default
- * branch or signing change nothing here.
+ * answer, a refusal and an unread outcome, and a verb held past its deadline by a hook or a filter, which leaves neither running nor a
+ * lock behind. `place.json` decodes, declares exactly the verbs `scripts/` holds, and denies a landing session what `LANDING_DENIED`
+ * denies today. Git runs with no user or system configuration and a fixed identity, so a machine's hooks, default branch or signing
+ * change nothing here.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -24,7 +24,7 @@ const TEAM = [
   step('design', [], { by: 'seldon' }),
   step('implement', ['design'], { by: 'ada' }),
   step('review', ['implement'], { by: 'agora', loop: 'implement', rounds: 3 }),
-  step('land', ['review'], { by: 'otto', workspace: 'main', gate: true }),
+  step('land', ['review'], { by: 'otto', workspace: 'main', gate: true, check: 'npm test' }),
 ];
 
 /**
@@ -188,6 +188,29 @@ test('a run with no ending finishes once each step is done; a check refused or u
   assert.equal(finished({ end: at(2), check: 'refused' }), 0, 'a refused check waits for wf retry');
   assert.equal(finished({ end: at(2), check: 'unfinished' }), 0, 'an unfinished check waits for wf retry --recheck');
   assert.equal(finished({ end: at(2), failed: true }), 0, 'a failed session waits for wf retry');
+});
+
+test('an ending that commits in its own prose finishes once done, its landing unknown; one that lands on its check waits to land', () => {
+  const prose = TEAM.map((s) => (s.workspace === 'main' ? { ...s, check: undefined } : s));
+  const tries = (land: Try[]) => ({
+    design: [{ end: at(1) }],
+    implement: [{ end: at(2), then: 'round' as const }, { end: at(4) }],
+    review: [{ end: at(3), then: 'round' as const }, { end: at(5) }],
+    land,
+  });
+  const [old] = factsOf(readOf('old', prose, tries([{ end: at(7) }]))).runs;
+  assert.deepEqual(
+    [old?.day, old?.rounds, old?.landed, old?.firstTry],
+    [DAY, [2], null, null],
+    'a record with no landing counts the run and its rounds, and says nothing of its landing',
+  );
+  assert.equal(factsOf(readOf('old', prose, tries([{ end: at(7), failed: true }]))).runs.length, 0, 'an ending that failed waits');
+  const staged = readOf('staged', TEAM, tries([{ end: at(7), check: 'passed' }]));
+  assert.equal(factsOf(staged).runs.length, 0, 'a merge staged and checked waits for the run to land it');
+  assert.deepEqual(
+    factsOf(withLanded(staged, 'land', { commit: 'abc' })).runs.map((r) => r.landed),
+    [true],
+  );
 });
 
 test('a cancelled run never finishes: its tries are counted, and the run is not', () => {

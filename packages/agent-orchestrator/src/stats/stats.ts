@@ -13,6 +13,7 @@ import { tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
+import { landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
@@ -52,7 +53,8 @@ export type TryFact = RunKeys & {
 /**
  * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
  * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: main` step committed, and
- * `firstTry` whether it did so on its first try: null with no such step, and `firstTry` null on a run that did not land. `costUsd` is every
+ * `firstTry` whether it did so on its first try: null with no such step or where its record does not say, and `firstTry` null on a run
+ * that did not land. `costUsd` is every
  * session's cost, null unless each was measured; `wallMs` its first filing to its last end. A run counts under every step and agent it has.
  */
 export type RunFact = RunKeys & {
@@ -177,17 +179,18 @@ function doneStep(r: RunRead, step: Workflow): boolean {
 }
 
 /**
- * Whether a run is finished, and the time it finished: its ending's last try's end once the ending's landing settled, or, with no ending,
- * its last task's end once every step's current try is done (`doneStep`) and nothing is in flight. Null for a run cancelled, a run that
- * waits on a person — a check refused, a session failed or blocked — and a run still going.
+ * Whether a run is finished, and the time it finished: its ending's last try's end once the record says how the ending landed. Else, once
+ * nothing is in flight, its last task's end when its ending's current try is done (`doneStep`) — an ending that commits in its own prose,
+ * whose record never says — or, with no ending, when every step's is. Null for a run cancelled, a run whose ending lands on its check
+ * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked — and a run still going.
  */
 function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
   if (r.run.cancelledAt) return null;
-  if (ending) {
+  if (ending && (r.run.steps[ending.name]?.landed || landsOnCheck(ending, r.run))) {
     const last = r.timeline.steps[ending.name]?.at(-1);
     return r.run.steps[ending.name]?.landed && last ? endOf(last) : null;
   }
-  if (r.timeline.run.inFlight || !r.steps.every((s) => doneStep(r, s))) return null;
+  if (r.timeline.run.inFlight || !(ending ? [ending] : r.steps).every((s) => doneStep(r, s))) return null;
   return (
     Object.values(r.timeline.steps)
       .flat()
@@ -203,7 +206,8 @@ function runFactOf(r: RunRead): RunFact[] {
   const ending = r.steps.find((s) => s.workspace === 'main');
   const at = finishedAt(r, ending);
   if (!at) return [];
-  const landed = ending ? 'commit' in (r.run.steps[ending.name]?.landed ?? {}) : null;
+  const how = ending && r.run.steps[ending.name]?.landed;
+  const landed = how ? 'commit' in how : null;
   return [
     {
       ...keysOf(r.run),

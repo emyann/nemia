@@ -181,19 +181,26 @@ function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
   }
 }
 
-/**
- * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
- * there after `STOP_GRACE_MS`, SIGKILL. Returns whether it had to kill. Never throws.
- */
-function stopGroup(pgid: number): boolean {
-  if (!signalGroup(pgid, 'SIGTERM')) return false;
+/** Whether the process group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. */
+function emptied(pgid: number): boolean {
   const pause = new Int32Array(new SharedArrayBuffer(4));
   const until = Date.now() + STOP_GRACE_MS;
   while (Date.now() < until) {
-    if (!signalGroup(pgid, 0)) return false;
+    if (!signalGroup(pgid, 0)) return true;
     Atomics.wait(pause, 0, 0, STOP_POLL_MS);
   }
-  return signalGroup(pgid, 'SIGKILL');
+  return !signalGroup(pgid, 0);
+}
+
+/**
+ * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
+ * there after `STOP_GRACE_MS`, SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill. Never throws.
+ */
+function stopGroup(pgid: number): boolean {
+  if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid)) return false;
+  signalGroup(pgid, 'SIGKILL');
+  emptied(pgid);
+  return true;
 }
 
 /** The last lines a script wrote on stderr, joined for one line, or the empty string. */

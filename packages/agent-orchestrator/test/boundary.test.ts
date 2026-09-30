@@ -490,7 +490,15 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
       imports.filter((m) => m.startsWith('src/')).sort(),
     ),
     [
-      ['src/cli/asks.ts', 'src/cli/decide/decide.ts', 'src/cli/flags.ts', 'src/cli/runs.ts', 'src/cli/start.ts', 'src/runner.ts'],
+      [
+        'src/cli/asks.ts',
+        'src/cli/decide/decide.ts',
+        'src/cli/factory/factory.ts',
+        'src/cli/flags.ts',
+        'src/cli/runs.ts',
+        'src/cli/start.ts',
+        'src/runner.ts',
+      ],
       ['src/cli/flags.ts', 'src/runner.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
     ],

@@ -38,6 +38,7 @@ import {
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { acceptVerb, approveVerb, retryVerb, roundVerb, sayVerb } from './asks.ts';
 import { decideVerb } from './decide/decide.ts';
+import { factoryVerb } from './factory/factory.ts';
 import { agentsVerb, cancelVerb, holdVerb, logsVerb, lsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
 
@@ -301,6 +302,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['start', startVerb],
   ['plan', planVerb],
   ['inbox', inboxVerb],
+  ['factory', factoryVerb],
   ['tick', tickVerb],
   ['up', upVerb],
   ['feed', feedVerb],

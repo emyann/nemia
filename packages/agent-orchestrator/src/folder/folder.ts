@@ -4,7 +4,7 @@
  */
 import path from 'node:path';
 import { AGENTS_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
-import { orderSteps, parseWorkflow, validate } from '../workflow/index.ts';
+import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 
 /**
@@ -56,9 +56,22 @@ export const linkRefusal = (file: string, what: string): string =>
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
+ * The agents a factory hires into one workflow's steps: the factory's name, the workflow's — its folder's name, as a hire names it — and
+ * the agent each step is hired, by step.
+ */
+export type Fills = { factory: string; workflow: string; agents: Readonly<Record<string, string>> };
+
+/** The hire `fills` makes into the step `step`, or undefined for none. */
+function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
+  if (!fills || !Object.hasOwn(fills.agents, step)) return undefined;
+  return { agent: fills.agents[step], factory: fills.factory, step: `${fills.workflow}/${step}` };
+}
+
+/**
  * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the
  * order of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run.
- * Pure: `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are.
+ * Pure: `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are. `fills` are the
+ * agents a factory hires into the steps (`Fills`), each handed to its step as `parseWorkflow`'s `hired`.
  *
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a
  * folder written is refused for what a folder read would be, in the same words.
@@ -68,9 +81,10 @@ export function parseFolder(
   read?: (file: string) => string | undefined,
   agents?: Agents,
   skills?: SkillsFound,
+  fills?: Fills,
 ): Workflow[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
-  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills));
+  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name)));
   validate(steps);
   return orderSteps(steps);
 }

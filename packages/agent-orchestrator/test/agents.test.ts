@@ -272,6 +272,58 @@ test('REFUSED at shipped defaults: a step naming an agent there is not, listing 
   assert.ok(empty.startsWith("build: the body is empty, and so is agents/quiet.md's"), empty);
 });
 
+/** A factory's hire of `agent` into the workflow build's step `step`, as `wf start --factory pipao` hands it to the parser. */
+const hire = (agent: string, step = 'implement') => ({ agent, factory: 'pipao', step: `build/${step}` });
+
+test('a step whose file names no agent, hired one, is resolved exactly as if its file said `agent:` it', () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER });
+  const text = '---\nmodel: sonnet\n---\nBuild the parser first.\n';
+  const hired = parseWorkflow('implement', text, undefined, agents, undefined, hire('implementer'));
+  const written = parseWorkflow('implement', '---\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n', undefined, agents);
+  assert.deepEqual(hired, written);
+  assert.equal(hired.agent?.name, 'implementer');
+  assert.equal(hired.body, 'Implement what you are asked.\n\nBuild the parser first.');
+  const bare = parseWorkflow('implement', '---\nafter: plan\n---\n', undefined, agents, undefined, hire('implementer'));
+  assert.equal(bare.body, 'Implement what you are asked.', "a step with no note of its own is told its hire's words");
+  assert.equal(parseWorkflow('implement', text, undefined, agents).agent, undefined, 'unhired, it names no agent');
+});
+
+test('REFUSED: a step whose file names its own agent, hired another, naming both and the fire that takes the hire back', () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER, reviewer: '---\nmodel: opus\n---\nReview it.\n' });
+  const both = refusal(() =>
+    parseWorkflow('implement', '---\nagent: implementer\n---\nBuild it.\n', undefined, agents, undefined, hire('reviewer')),
+  );
+  assert.equal(
+    both,
+    "implement: `agent: implementer` fills this step in every factory, and the factory pipao hires reviewer into it too. Take the hire back — wf factory fire pipao --step build/implement — or delete the step's `agent:` line. Nothing was started.",
+  );
+  const same = refusal(() =>
+    parseWorkflow('implement', '---\nagent: implementer\n---\nBuild it.\n', undefined, agents, undefined, hire('implementer')),
+  );
+  assert.match(
+    same,
+    /^implement: `agent: implementer` fills this step in every factory, and the factory pipao hires implementer into it too/,
+  );
+});
+
+test("REFUSED: a hired agent there is not, in the factory's words — the agents there are, and the hire to make — never an `agent:` line", () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER, reviewer: '---\nmodel: opus\n---\nReview it.\n' });
+  const unknown = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, agents, undefined, hire('ada')));
+  assert.equal(
+    unknown,
+    'implement: the factory pipao hires `ada` into it, which is not an agent here. The agents are: implementer, reviewer — hire one — wf factory hire pipao <agent> --step build/implement, or write agents/ada.md beside them.',
+  );
+  const none = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, undefined, undefined, hire('ada')));
+  assert.match(
+    none,
+    /^implement: the factory pipao hires `ada` into it, which is not an agent here\. There are none: .* or hire one — wf factory hire pipao <agent> --step build\/implement\.$/,
+  );
+  const refused: Agents = new Map([['ada', new WorkflowError('agents/ada.md: `after` is wiring.')]]);
+  const broken = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, refused, undefined, hire('ada')));
+  assert.equal(broken, 'implement: the factory pipao hires `ada` into it, and its file is refused — agents/ada.md: `after` is wiring.');
+  for (const words of [unknown, none, broken]) assert.doesNotMatch(words, /`agent: ada`/);
+});
+
 test("a schema the agent's output: names is read beside the agent, and one the step names beside the step", () => {
   const dir = workflows({
     'agents/reviewer.md': '---\noutput: review.schema.json\n---\nReview it.\n',

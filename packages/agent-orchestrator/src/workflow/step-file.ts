@@ -62,6 +62,9 @@ import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
  * names none, before the two are merged: a step's `permissionMode:` on codex is its own `sandbox:`. A schema the agent's `output:` names is
  * read beside the agent, and one the step names beside the step. Everything downstream of the parser sees the resolved step; `agent` on it
  * says what was the step's own.
+ *
+ * `hired` is the agent a factory hires into a step (`Hire`): a step whose file names no agent is resolved with it exactly as if its file
+ * said `agent: <name>`. A step whose file names its own agent and is hired one too is refused, naming both (`attachedAgent`).
  */
 export function parseWorkflow(
   name: string,
@@ -69,20 +72,22 @@ export function parseWorkflow(
   read?: (file: string) => string | undefined,
   agents?: Agents,
   skills?: SkillsFound,
+  hired?: Hire,
 ): Workflow {
   const { block, body: own } = splitFrontmatter(name, text);
   let {
-    meta: { agent: attached, ...meta },
+    meta: { agent: written, ...meta },
     spelled,
   } =
     block === null
       ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
       : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
     return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
   }
-  const agent = agentOf(name, attached, agents);
+  const agent = agentOf(name, attached, agents, written === undefined ? hired : undefined);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
@@ -136,17 +141,42 @@ function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
   return rest as T;
 }
 
-/** The agent `agent:` names, or why not: one there is not, listing those there are, or one whose file is refused, in its words. */
-function agentOf(step: string, name: string, agents: Agents | undefined): Agent {
+/**
+ * An agent a factory hires into a step (`wf factory hire`): the agent's name, the factory's, and the step as the hire names it,
+ * `<workflow>/<step>`.
+ */
+export type Hire = { agent: string; factory: string; step: string };
+
+/** The agent a step is resolved with: its file's `agent:`, else the one a factory hires into it. Refused: both, naming each. */
+function attachedAgent(step: string, written: string | undefined, hired: Hire | undefined): string | undefined {
+  if (written !== undefined && hired !== undefined)
+    refuse(
+      `${step}: \`agent: ${written}\` fills this step in every factory, and the factory ${hired.factory} hires ${hired.agent} into it too. Take the hire back — wf factory fire ${hired.factory} --step ${hired.step} — or delete the step's \`agent:\` line. Nothing was started.`,
+    );
+  return written ?? hired?.agent;
+}
+
+/**
+ * The agent `agent:` names — or, for a step whose file names none, the one its factory hires (`hired`) — or why not: one there is not,
+ * listing those there are, or one whose file is refused, in its words.
+ */
+function agentOf(step: string, name: string, agents: Agents | undefined, hired?: Hire): Agent {
   const found = agents?.get(name);
-  if (found instanceof WorkflowError) refuse(`${step}: \`agent: ${name}\` names an agent whose file is refused — ${found.message}`);
+  const named = hired ? `the factory ${hired.factory} hires \`${name}\` into it, and its` : `\`agent: ${name}\` names an agent whose`;
+  if (found instanceof WorkflowError) refuse(`${step}: ${named} file is refused — ${found.message}`);
   if (found) return found;
   const there = [...(agents?.keys() ?? [])].sort();
+  const missing = hired ? `the factory ${hired.factory} hires \`${name}\` into it, which` : `\`agent: ${name}\``;
+  const instead = hired
+    ? `hire one — wf factory hire ${hired.factory} <agent> --step ${hired.step}`
+    : there.length
+      ? 'name one'
+      : 'delete the line';
   return refuse(
-    `${step}: \`agent: ${name}\` is not an agent here. ` +
+    `${step}: ${missing} is not an agent here. ` +
       (there.length
-        ? `The agents are: ${there.join(', ')} — name one, or write ${AGENTS_FOLDER}/${name}.md beside them.`
-        : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or delete the line.`),
+        ? `The agents are: ${there.join(', ')} — ${instead}, or write ${AGENTS_FOLDER}/${name}.md beside them.`
+        : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or ${instead}.`),
   );
 }
 

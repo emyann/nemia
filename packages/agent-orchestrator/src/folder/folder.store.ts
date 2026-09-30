@@ -21,7 +21,7 @@ import {
   type Workflow,
 } from '../step/step.ts';
 import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from '../former/former.ts';
-import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles } from './folder.ts';
+import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
 import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, type AgentSkill } from '../skills/skills.ts';
 
@@ -119,9 +119,9 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
  * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
  * (`orderSteps`), not the folder's, each resolved against the agent it names, found beside it or in `places` (`agentsFor`), and each skill
- * that agent gives found (`skillsFor`).
+ * that agent gives found (`skillsFor`). A step `fills` hires an agent into is resolved against that agent, found the same way (`Fills`).
  */
-export function loadWorkflows(dir: string, places: Places = {}): Workflow[] {
+export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const agents = agentsFolderRefusal(dir);
   if (agents) throw new WorkflowError(agents);
@@ -141,6 +141,7 @@ export function loadWorkflows(dir: string, places: Places = {}): Workflow[] {
     read,
     agentsFor(dir, places),
     skillsFor(dir, places),
+    fills,
   );
 }
 

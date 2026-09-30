@@ -97,7 +97,7 @@ export default {
         );
       await idle(other);
       await settled(other);
-      await photograph(other, path.join(OUT, `factory-start-${theme}.png`));
+      await photograph(other, path.join(OUT, `factory-start-started-${theme}.png`));
       const seen = problems();
       if (seen.length)
         throw new Refused(

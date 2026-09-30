@@ -14,7 +14,8 @@ import { workflowKey } from '@/lib/inbox';
 import { RepoPicker } from './FactoryCardStart';
 import { StartRun } from './StartRun';
 
-const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
+const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
+const path = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
 /**
  * The header's 'Start a run' in the factory `name`, and its sheet. Nothing is drawn before the factories are read, for a name the api lists
@@ -71,7 +72,7 @@ function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: st
         />
       ) : (
         <p data-repo className="text-sm">
-          On {code(place.repo)}
+          On {path(place.repo)}
         </p>
       )}
       {repo !== null && <Workflows key={repo} place={{ factory: place.factory, repo }} />}
@@ -103,7 +104,8 @@ function Workflows({ place }: { place: Place }) {
           <p className="text-xs text-neutral-500">Reading the workflows…</p>
         ) : !workflows.data.length ? (
           <p className="text-xs text-neutral-500">
-            The factory offers none: attach one with {code(`wf factory attach ${place.factory} <workflow>`)}.
+            No workflow the factory attaches is on {path(place.repo)}: attach one there with{' '}
+            {code(`wf factory attach ${place.factory} <workflow>`)}.
           </p>
         ) : (
           <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">

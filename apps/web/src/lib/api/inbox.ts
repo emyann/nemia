@@ -18,6 +18,8 @@ export type InboxEntry = {
   /** As the card writes it: a workflow's name, or the absolute folder of one. */
   workflow: string | null;
   repo: string | null;
+  /** The factory the card names (`factory:`); null for a card of the default factory, and for an entry that does not read as a card. */
+  factory: string | null;
   /** The runs a record says it was started as: a card still here was started, and its removal failed. */
   startedAs: string[];
   error: string | null;
@@ -42,6 +44,7 @@ const inboxEntryFields = {
   title: Schema.NullOr(Schema.String),
   workflow: Schema.NullOr(Schema.String),
   repo: Schema.NullOr(Schema.String),
+  factory: Schema.NullOr(Schema.String),
   startedAs: Schema.mutable(Schema.Array(Schema.String)),
   error: Schema.NullOr(Schema.String),
   body: Schema.NullOr(Schema.String),

@@ -34,6 +34,7 @@ import {
   seed,
   seedCheckout,
   seedDiamond,
+  seedFactories,
   seedFeed,
   seedFolder,
   seedInbox,
@@ -177,6 +178,7 @@ async function main(): Promise<void> {
   seedQuota(store);
   seedDiamond(checkout, store);
   seedFolder(store);
+  seedFactories(store, checkout);
   seedFeed(store);
   const bin = path.join(store, 'bin');
   fs.mkdirSync(bin);

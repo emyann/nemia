@@ -17,7 +17,7 @@ export default {
    * each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
    */
   name: 'factory-gate',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, ending, back } = ENDING;
     const asks = path.join(store!, 'runs', `${id}.asks`);

@@ -16,7 +16,7 @@ export default {
    * refuses is proven in its own tests (`apps/api/test/hold.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'lift',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;

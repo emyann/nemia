@@ -13,15 +13,19 @@ export default {
    * The steering channel: words said to draft's running session from its page go through the api to the session's inbox and onto its
    * record, where the step's detail and wf decide read them back. In a page of its own whose one refusal is the point, words sent after the
    * session ended while the page still shows it running are refused in the package's words under the box, and nothing is said or
-   * journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its writes back, draft's task journal
-   * and its conversation as seeded, at work and told nothing, so each page after it, in either theme, reads the store as it was.
+   * journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its writes back, draft's task journal,
+   * the engine's feed and its conversation as seeded, at work and told nothing, so each page after it, in either theme, reads the store as
+   * it was: the session's end goes on the feed as the runtime writes it, and the feed cut back empties the api's memo of runs at rest.
    */
   name: 'say',
   route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
   follows: true,
   expect: async (page) => {
     await sidebar(page);
-    const journal = path.join(store!, 'engine', 'tasks', `${SAYING.run}-${SAYING.step}.jsonl`);
+    const taskId = `${SAYING.run}-${SAYING.step}`;
+    const journal = path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`);
+    const engineFeed = path.join(store!, 'engine', 'feed.jsonl');
+    let feedBefore: string | undefined;
     const seeded = fs.readFileSync(journal, 'utf8');
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
@@ -118,23 +122,21 @@ export default {
           'the prompt box, open, on a page of its own that holds the run as read before its session ends',
         );
         const end = new Date().toISOString();
-        fs.appendFileSync(
-          journal,
-          [
-            {
-              kind: 'ended',
-              at: end,
-              attempt: 1,
-              sessionId: `ae/${SAYING.run}-${SAYING.step}/1`,
-              nativeId: SAYING.sessionId,
-              observed: 'done',
-              reason: 'harness',
-            },
-            { kind: 'settled', at: end, outcome: 'succeeded' },
-          ]
-            .map((event) => `${JSON.stringify(event)}\n`)
-            .join(''),
-        );
+        const ended = [
+          {
+            kind: 'ended',
+            at: end,
+            attempt: 1,
+            sessionId: `ae/${SAYING.run}-${SAYING.step}/1`,
+            nativeId: SAYING.sessionId,
+            observed: 'done',
+            reason: 'harness',
+          },
+          { kind: 'settled', at: end, outcome: 'succeeded' },
+        ];
+        fs.appendFileSync(journal, ended.map((event) => `${JSON.stringify(event)}\n`).join(''));
+        feedBefore = fs.readFileSync(engineFeed, 'utf8');
+        fs.appendFileSync(engineFeed, ended.map((event) => `${JSON.stringify({ taskId, event })}\n`).join(''));
         const journalled = fs.readFileSync(journal, 'utf8');
         const heardBefore = heard.length;
         await fieldOf(refused).fill(SAYING.words);
@@ -178,6 +180,7 @@ export default {
       );
     } finally {
       fs.writeFileSync(journal, seeded);
+      if (feedBefore !== undefined) fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);
       fed(SAYING.run, SAYING.step, 'running');
     }

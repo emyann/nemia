@@ -28,6 +28,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 const row = (extra: object = {}): RunSummary => ({
   id: 'r-1',
   repo: '/work/repo',
+  factory: 'nemia',
   place: 'git',
   work: null,
   brief: 'Decode the reads',
@@ -115,6 +116,18 @@ test('the Runs list decodes an answer the api gives, each union in its every sha
   assert.equal(runs.length, 3);
   assert.deepEqual(runs[0], row());
   assert.deepEqual(runs[1], git);
+});
+
+test("a row keeps the factory its run was started in, null for the default factory's; REFUSED: a row without it", async (t) => {
+  answering(t, [row(), row({ factory: null })]);
+  assert.deepEqual(
+    (await readRuns()).map((run) => run.factory),
+    ['nemia', null],
+  );
+
+  const { factory: _, ...without } = row();
+  answering(t, [without]);
+  await assert.rejects(readRuns(), unread('[0].factory', 'is missing'));
 });
 
 test('REFUSED: a row without its status, naming the route, the key, what was there and the fix', async (t) => {

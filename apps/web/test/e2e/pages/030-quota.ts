@@ -18,7 +18,7 @@ export default {
    * every card clear of the one beneath it.
    */
   name: 'quota',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');

@@ -19,7 +19,7 @@ export default {
    * third choice — is proven in its own tests (`apps/api/src/runs/prune.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'prune',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, branch } = UNMERGED;
     const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${id}.json`), 'utf8')) as {
@@ -116,7 +116,7 @@ export default {
       await settled(page);
       await photograph(row, path.join(OUT, `prune-row-${theme}.png`));
 
-      await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+      await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);

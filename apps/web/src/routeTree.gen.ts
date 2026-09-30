@@ -16,6 +16,7 @@ import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as MachinesRouteImport } from './routes/machines'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as AgentsNewRouteImport } from './routes/agents_.new'
+import { Route as FactoriesFactoryRouteImport } from './routes/factories.$factory'
 import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
@@ -58,6 +59,11 @@ const WorkflowsRoute = WorkflowsRouteImport.update({
 const AgentsNewRoute = AgentsNewRouteImport.update({
   id: '/agents_/new',
   path: '/agents/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FactoriesFactoryRoute = FactoriesFactoryRouteImport.update({
+  id: '/factories/$factory',
+  path: '/factories/$factory',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboxNameRoute = InboxNameRouteImport.update({
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/machines': typeof MachinesRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
+  '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/machines': typeof MachinesRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
+  '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs': typeof RunsIndexRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/machines': typeof MachinesRoute
   '/workflows': typeof WorkflowsRoute
   '/agents_/new': typeof AgentsNewRoute
+  '/factories/$factory': typeof FactoriesFactoryRoute
   '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/machines'
     | '/workflows'
     | '/agents/new'
+    | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
     | '/runs/'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/machines'
     | '/workflows'
     | '/agents/new'
+    | '/factories/$factory'
     | '/inbox/$name'
     | '/runs/$runId'
     | '/runs'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/machines'
     | '/workflows'
     | '/agents_/new'
+    | '/factories/$factory'
     | '/inbox_/$name'
     | '/runs/$runId'
     | '/runs/'
@@ -216,6 +228,7 @@ export interface RootRouteChildren {
   MachinesRoute: typeof MachinesRoute
   WorkflowsRoute: typeof WorkflowsRoute
   AgentsNewRoute: typeof AgentsNewRoute
+  FactoriesFactoryRoute: typeof FactoriesFactoryRoute
   InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
   RunsIndexRoute: typeof RunsIndexRoute
@@ -275,6 +288,13 @@ declare module '@tanstack/react-router' {
       path: '/agents/new'
       fullPath: '/agents/new'
       preLoaderRoute: typeof AgentsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factories/$factory': {
+      id: '/factories/$factory'
+      path: '/factories/$factory'
+      fullPath: '/factories/$factory'
+      preLoaderRoute: typeof FactoriesFactoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox_/$name': {
@@ -344,6 +364,7 @@ const rootRouteChildren: RootRouteChildren = {
   MachinesRoute: MachinesRoute,
   WorkflowsRoute: WorkflowsRoute,
   AgentsNewRoute: AgentsNewRoute,
+  FactoriesFactoryRoute: FactoriesFactoryRoute,
   InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
   RunsIndexRoute: RunsIndexRoute,

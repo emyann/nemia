@@ -30,6 +30,7 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
   title: name,
   workflow: null,
   repo: null,
+  factory: null,
   startedAs: [],
   error: null,
   body: name,

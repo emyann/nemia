@@ -19,7 +19,7 @@ export default {
    * no why and no name, and reads the plain line; the one written next has both (`heldWithWords`).
    */
   name: 'hold',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, gated } = GATED;
     const until = HELD.id;
@@ -87,7 +87,7 @@ export default {
       page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }),
       `and offers ${gated}'s Approve again`,
     );
-    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
     await expectCount(card.locator('[data-holding]'), 0, 'and says no hold');
@@ -118,7 +118,7 @@ async function heldWithWords(page: Page): Promise<void> {
     fed(id, 'held');
     const theme = await themeOf(page);
 
-    await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
+    await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const card = cardOf(page, id);
     const said = card.locator('[data-holding="on-runs"]');

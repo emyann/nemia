@@ -32,7 +32,7 @@ export default {
    * back, and the store reads as seeded again.
    */
   name: 'daemon',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const file = path.join(store!, 'daemon.json');
     if (fs.existsSync(file)) throw new Refused(`the seeded store has no daemon.json — ${file} is there`);

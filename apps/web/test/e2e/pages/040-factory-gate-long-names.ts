@@ -107,7 +107,7 @@ export default {
    * seeded.
    */
   name: 'factory-gate-long-names',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, ending, back, onto } = LONG_NAMES;
     const notes = LONG_NAMES.steps[1];

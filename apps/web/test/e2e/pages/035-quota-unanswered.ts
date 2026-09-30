@@ -16,7 +16,7 @@ export default {
    * its own tests'; the answer is put back.
    */
   name: 'quota-unanswered',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');

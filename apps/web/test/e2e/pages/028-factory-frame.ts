@@ -39,7 +39,7 @@ export default {
    * page after it reads it.
    */
   name: 'factory-frame',
-  route: '/',
+  route: '/factories/default',
   expect: async (page) => {
     const { id, ending } = ENDING;
     const card = cardOf(page, id);

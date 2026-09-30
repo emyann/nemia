@@ -42,6 +42,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   edit, run, and put the page back.
 - The store is in `/tmp`, which a boot can empty under a running check: when a failure says the store is gone (`storeGone`), run again.
 - The engine's task view carries no filing time; its feed does: a store written by hand writes `engine/feed.jsonl` too (`seedFeed`).
+- A journal line written by hand goes on `engine/feed.jsonl` too, and its take-back cuts the feed back: the api keeps a run judged at
+  rest until a line for its tasks reaches the feed (`restingRead` in the api's `runs/resting.ts`; `130-say.ts`).
 - A record or journal written by hand is decoded as the tick's and the runtime's are (`StepRecordSchema` in the orchestrator's `record.store.ts`,
   `event-schema.ts`): write each key as they write it — a key they leave out is absent, never `null` (`340-agent-try.ts`).
 - Anything a check runs that can fail says why last, on stdout too (`exitOn`, `headlineOf` in `visit.ts`).
@@ -53,6 +55,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - Drag with `page.mouse` (down, `move(…, { steps: 12 })`, up), never `dragTo`: React Flow moves a node from the second pointer move, and a
   handle has `pointer-events: none` until a drag starts (`drawEdge` in `canvas.ts`). In the browser tools, synthesize mouse events a few
   milliseconds apart from `browser_evaluate`.
+- React Flow sets `pointer-events: none` on a node neither draggable nor selectable, and a click on it lands on the pane: a node that is
+  a link gives them back in its `style` (`nodesOf` in `FactoriesCanvas.tsx`).
 - React Flow's `nodeTypes` and `edgeTypes` are module constants, and each `ReactFlow` has an `id` of its own, which scopes its marker
   ids; `defaultMarkerColor={null}` lets the stylesheet colour a marker.
 - Chromium writes a console error, `Failed to load resource`, for every 4xx: a page expecting one refusal allows that line too.

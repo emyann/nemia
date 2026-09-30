@@ -27,6 +27,8 @@ export type RunSummary = {
   id: string;
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
+  /** The factory the run was started in, as its record names it; null for a run of the default factory, whose record names none. */
+  factory: string | null;
   place: PlaceKind;
   /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run. */
   work: string | null;
@@ -95,6 +97,7 @@ export type RunSummary = {
 const RunSummarySchema = Schema.Struct({
   id: Schema.String,
   repo: Schema.NullOr(Schema.String),
+  factory: Schema.NullOr(Schema.String),
   place: PlaceKindSchema,
   work: Schema.NullOr(Schema.String),
   brief: Schema.String,

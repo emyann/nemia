@@ -41,6 +41,7 @@ import type { Point } from '../src/lib/layout.ts';
 const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
+  factory: null,
   place: 'git',
   work: null,
   brief: 'Do the thing',

@@ -1,6 +1,7 @@
 /**
- * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...] }` — read (`readFactories`),
- * filed (`addFactory`) and removed (`removeFactory`). A person's verbs are their one writer; the judgement is `factory.ts`'s.
+ * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "hires": {...} }` — read
+ * (`readFactories`, `readFactory`), filed (`addFactory`), hired into and fired from (`hireAgent`, `fireAgent`) and removed
+ * (`removeFactory`). A person's verbs are their one writer; the judgement is `factory.ts`'s.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
@@ -8,44 +9,66 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
-import { defaultFactoryRefusal, DEFAULT_FACTORY, factoryNameRefusal, noFactoryLine, type Factory, type FactoryListing } from './factory.ts';
+import {
+  defaultFactoryRefusal,
+  DEFAULT_FACTORY,
+  factoryNameRefusal,
+  hireRefusal,
+  noFactoryLine,
+  type Factory,
+  type FactoryListing,
+  type FactoryWrite,
+} from './factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 
 /** Where the factories are: `$WF_ROOT/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDir = (): string => path.join(HOME, 'factories');
 
-/** A factory's file: at least one repository, each a string; a key a later `wf` writes beside them is kept, not refused. */
-const FactoryFileSchema = Schema.StructWithRest(Schema.Struct({ repos: Schema.NonEmptyArray(Schema.String) }), [
-  Schema.Record(Schema.String, Schema.Unknown),
-]);
+/**
+ * A factory's file: at least one repository, each a string, and its hires, a step's `<workflow>/<step>` to an agent's name, when it has
+ * any; a key a later `wf` writes beside them is kept, not refused.
+ */
+const FactoryFileSchema = Schema.StructWithRest(
+  Schema.Struct({ repos: Schema.NonEmptyArray(Schema.String), hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)) }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
+/** A factory's file as it reads, every key it holds kept, so a verb that writes it back drops none. */
+type FactoryFile = typeof FactoryFileSchema.Type;
+
+/** A factory's file where it is: what it holds, or why it does not read as a factory (`error`). */
+type FileRead = { file: string } & ({ content: FactoryFile } | { error: string });
 
 /**
- * One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one — a name that is
- * no slug, and `default.json`, since the default factory is no file, are each listed to be removed by hand.
+ * The file of the factory `name`, read — or why it does not read as one: a name that is no slug, and `default.json`, since the default
+ * factory is no file, are each to be removed by hand.
  */
-function factoryAt(file: string): FactoryListing {
-  const at = path.join(factoriesDir(), file);
-  const name = file.slice(0, -'.json'.length);
+function factoryFile(name: string): FileRead {
+  const file = path.join(factoriesDir(), `${name}.json`);
   const badName = factoryNameRefusal(name);
-  if (badName) return { name, file: at, error: `${badName} Remove the file by hand.` };
+  if (badName) return { file, error: `${badName} Remove the file by hand.` };
   if (name === DEFAULT_FACTORY)
-    return {
-      name,
-      file: at,
-      error: 'is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.',
-    };
+    return { file, error: 'is no factory: the default factory is no file, and wf factory rm does not take it. Remove this file by hand.' };
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(at, 'utf8'));
+    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    return { name, file: at, error: `is not JSON (${(err as Error).message}): wf factory rm ${name}, then add it again.` };
+    return { file, error: `is not JSON (${(err as Error).message}): wf factory rm ${name}, then add it again.` };
   }
   const decoded = Schema.decodeUnknownResult(FactoryFileSchema)(raw);
-  if (Result.isSuccess(decoded)) return { name, file: at, repos: decoded.success.repos };
+  if (Result.isSuccess(decoded)) return { file, content: decoded.success };
   const { path: where, words } = firstRefusal(raw, decoded.failure);
   const field = where.length ? `\`${where.map(String).join('.')}\`` : 'the whole';
-  return { name, file: at, error: `does not read as a factory: ${field} ${words}. wf factory rm ${name}, then add it again.` };
+  return { file, error: `does not read as a factory: ${field} ${words}. wf factory rm ${name}, then add it again.` };
+}
+
+/** One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one. */
+function factoryAt(file: string): FactoryListing {
+  const name = file.slice(0, -'.json'.length);
+  const read = factoryFile(name);
+  if ('error' in read) return { name, file: read.file, error: read.error };
+  return { name, file: read.file, repos: read.content.repos, hires: read.content.hires ?? {} };
 }
 
 /**
@@ -83,8 +106,8 @@ function factoryRepos(name: string, given: readonly string[]): string[] {
   return repos;
 }
 
-/** A name `wf factory add` and `wf factory rm` refuse: not a slug (`Invalid`), or the default factory (`Conflict`). */
-function refuseName(name: string, verb: 'add' | 'rm'): void {
+/** A name a verb that writes a factory refuses: not a slug (`Invalid`), or the default factory (`Conflict`). */
+function refuseName(name: string, verb: FactoryWrite): void {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   if (name === DEFAULT_FACTORY) throw new Conflict({ message: defaultFactoryRefusal(verb) });
@@ -112,8 +135,17 @@ export function addFactory(opts: { name: string; repos: readonly string[] }): { 
   } finally {
     fs.rmSync(hidden, { force: true });
   }
-  return { factory: { name: opts.name, repos }, file };
+  return { factory: { name: opts.name, repos, hires: {} }, file };
 }
+
+/** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
+const noFactory = (name: string, notDone: string): Missing =>
+  new Missing({
+    message: `${noFactoryLine(
+      name,
+      readFactories().map((f) => f.name),
+    )} ${notDone}`,
+  });
 
 /**
  * `wf factory rm`: a factory's file removed, one that does not read included, since removing it is its fix. Refused: the name
@@ -125,13 +157,7 @@ export function removeFactory(name: string): { file: string } {
   try {
     fs.rmSync(file);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT')
-      throw new Missing({
-        message: `${noFactoryLine(
-          name,
-          readFactories().map((f) => f.name),
-        )} Nothing was removed.`,
-      });
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw noFactory(name, 'Nothing was removed.');
     throw Object.assign(
       new Error(
         `wf factory rm: ${file} could not be removed — ${(err as Error).message}. Nothing was removed: remove the file by hand, or fix what stops it and remove it again.`,
@@ -140,4 +166,76 @@ export function removeFactory(name: string): { file: string } {
     );
   }
   return { file };
+}
+
+/**
+ * The factory `name`, as a run started in it reads it. Refused: a name that is no slug (`Invalid`), a name with no file (`Missing`, naming
+ * the factories there are), and a file that does not read as a factory (`Invalid`, quoting why). The default factory is no file, and is
+ * never asked for here.
+ */
+export function readFactory(name: string): Factory {
+  const bad = factoryNameRefusal(name);
+  if (bad) throw new Invalid({ message: bad });
+  const read = factoryFile(name);
+  if (!fs.existsSync(read.file)) throw noFactory(name, 'Nothing was started.');
+  if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
+  return { name, repos: read.content.repos, hires: read.content.hires ?? {} };
+}
+
+/**
+ * The file of the factory `name`, to be written back by `verb`. Refused: the name (`refuseName`), a name with no file (`Missing`), and a
+ * file that does not read (`Invalid`), left as it is.
+ */
+function fileToChange(name: string, verb: FactoryWrite): FileRead & { content: FactoryFile } {
+  refuseName(name, verb);
+  const read = factoryFile(name);
+  if (!fs.existsSync(read.file)) throw noFactory(name, `Nothing was ${verb === 'hire' ? 'hired' : 'fired'}.`);
+  if ('error' in read)
+    throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error} It was left as it is, and nothing was changed.` });
+  return read;
+}
+
+/** `content` written whole onto `file`: to a hidden file beside it first, then renamed onto it, so no reader sees half a file. */
+function writeWhole(file: string, content: FactoryFile): void {
+  const hidden = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${randomBytes(4).toString('hex')}`);
+  try {
+    fs.writeFileSync(hidden, `${JSON.stringify(content, null, 2)}\n`);
+    fs.renameSync(hidden, file);
+  } finally {
+    fs.rmSync(hidden, { force: true });
+  }
+}
+
+/**
+ * `wf factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
+ * step, replacing an earlier hire, which is returned (`replaced`). Every other key of the file is kept. Refused before anything is written:
+ * the factory (`fileToChange`), and a step or an agent that is not one (`hireRefusal`, `Invalid`). Whether the workflow, its step and the
+ * agent exist is judged when a run starts in the factory.
+ */
+export function hireAgent(opts: { factory: string; agent: string; step: string }): { file: string; replaced?: string } {
+  const bad = hireRefusal(opts.step, opts.agent);
+  if (bad) throw new Invalid({ message: `${bad} Nothing was hired.` });
+  const { file, content } = fileToChange(opts.factory, 'hire');
+  const replaced = content.hires?.[opts.step];
+  writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
+  return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };
+}
+
+/**
+ * `wf factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the agent
+ * it hired. Refused: the factory (`fileToChange`), and a step it hires no one into (`Missing`, naming its hires).
+ */
+export function fireAgent(opts: { factory: string; step: string }): { file: string; fired: string } {
+  const { file, content } = fileToChange(opts.factory, 'fire');
+  const hires = { ...content.hires };
+  const fired = hires[opts.step];
+  if (fired === undefined) {
+    const there = Object.keys(hires).sort();
+    throw new Missing({
+      message: `${opts.factory} hires no agent into ${opts.step}. ${there.length ? `It hires into: ${there.join(', ')}.` : 'It hires none.'} Nothing was fired.`,
+    });
+  }
+  delete hires[opts.step];
+  writeWhole(file, { ...content, hires });
+  return { file, fired };
 }

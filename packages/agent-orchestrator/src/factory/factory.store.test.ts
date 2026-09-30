@@ -15,7 +15,7 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const { addFactory, factoriesDir, readFactories } = await import('../runner.ts');
+const { addFactory, factoriesDir, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { FACTORY_HELP } = await import('../cli/factory/factory.ts');
 
@@ -209,11 +209,151 @@ test("wf factory rm removes that factory's file alone, and one that does not rea
   assert.deepEqual(filed(), ['nemia.json']);
 });
 
-test('REFUSED: wf factory with a subcommand it does not have names the three; --help prints its help', async (t) => {
+test('REFUSED: wf factory with a subcommand it does not have names the five; --help prints its help', async (t) => {
   await assert.rejects(
     main(['factory', 'frob'], NO_ENGINE),
-    refusedWith('Invalid', /^wf factory does not take frob\. .*wf factory ls.*wf factory add <name> --repo <path>.*wf factory rm <name>/),
+    refusedWith(
+      'Invalid',
+      /^wf factory does not take frob\. .*wf factory ls.*wf factory add <name> --repo <path>.*wf factory hire <factory> <agent> --step <workflow>\/<step>.*wf factory fire <factory> --step <workflow>\/<step>.*wf factory rm <name>/,
+    ),
   );
   await assert.rejects(main(['factory', 'add', 'pipao', '--rep', '/x'], NO_ENGINE), refusedWith('Invalid', /does not take --rep\./));
   assert.deepEqual(await printedBy(t, 'factory', '--help'), FACTORY_HELP.split('\n'));
+});
+
+/** The factory `name`'s file, as JSON. */
+const fileOf = (name: string): Record<string, unknown> => JSON.parse(fs.readFileSync(path.join(FACTORIES, `${name}.json`), 'utf8'));
+
+test('wf factory hire files one agent a step, keeping repos and a key a later wf wrote; a second hire into the step replaces the first', async (t) => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  const file = path.join(FACTORIES, 'pipao.json');
+  fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
+  assert.deepEqual(await printedBy(t, 'factory', 'hire', 'pipao', 'otto', '--step', 'build/implement'), [
+    'pipao  build/implement ← otto',
+    `hired: ${file}`,
+  ]);
+  assert.deepEqual(await printedBy(t, 'factory', 'hire', 'pipao', 'ada', '--step=build/implement'), [
+    'pipao  build/implement ← ada (was otto)',
+    `hired: ${file}`,
+  ]);
+  assert.deepEqual(hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' }), { file });
+  assert.deepEqual(fileOf('pipao'), {
+    repos: [repo],
+    later: { kept: true },
+    hires: { 'build/implement': 'ada', 'build/review': 'agora' },
+  });
+  assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
+  assert.deepEqual(readFactory('pipao'), { name: 'pipao', repos: [repo], hires: { 'build/implement': 'ada', 'build/review': 'agora' } });
+  const listed = await printedBy(t, 'factory', 'ls');
+  assert.deepEqual(listed.slice(1, 4), [`pipao    ${repo}`, '         build/implement ← ada', '         build/review ← agora']);
+});
+
+test('wf factory fire takes one hire back and keeps the rest; a step it hires no one into is Missing, naming its hires', async (t) => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
+  hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  assert.deepEqual(await printedBy(t, 'factory', 'fire', 'pipao', '--step', 'build/implement'), [
+    'pipao  build/implement  fired ada',
+    `fired: ${file}`,
+  ]);
+  assert.deepEqual(fileOf('pipao'), { repos: [repo], hires: { 'build/review': 'agora' } });
+  const before = fs.readFileSync(file);
+  assert.throws(
+    () => fireAgent({ factory: 'pipao', step: 'build/implement' }),
+    refusedWith('Missing', /^pipao hires no agent into build\/implement\. It hires into: build\/review\. Nothing was fired\.$/),
+  );
+  assert.deepEqual(fs.readFileSync(file), before);
+  fireAgent({ factory: 'pipao', step: 'build/review' });
+  assert.throws(
+    () => fireAgent({ factory: 'pipao', step: 'build/review' }),
+    refusedWith('Missing', /It hires none\. Nothing was fired\.$/),
+  );
+});
+
+test('REFUSED: a hire or a fire in the default factory is a Conflict, and in no factory Missing, nothing written', async () => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  await assert.rejects(
+    main(['factory', 'hire', 'default', 'ada', '--step', 'build/implement'], NO_ENGINE),
+    refusedWith(
+      'Conflict',
+      /^`default` is the default factory: .* wf factory hire does not take it\. In it, a step that names no agent runs as a plain session/,
+    ),
+  );
+  await assert.rejects(
+    main(['factory', 'fire', 'default', '--step', 'build/implement'], NO_ENGINE),
+    refusedWith('Conflict', /wf factory fire does not take it/),
+  );
+  await assert.rejects(
+    main(['factory', 'hire', 'nope', 'ada', '--step', 'build/implement'], NO_ENGINE),
+    refusedWith('Missing', /^no factory nope in the store\. Its factories are: pipao\. Nothing was hired\.$/),
+  );
+  assert.throws(() => fireAgent({ factory: 'nope', step: 'build/implement' }), refusedWith('Missing', /Nothing was fired\.$/));
+  assert.throws(
+    () => hireAgent({ factory: 'Pipao', agent: 'ada', step: 'build/implement' }),
+    refusedWith('Invalid', /is not a factory's name/),
+  );
+  assert.deepEqual(filed(), ['pipao.json']);
+  assert.deepEqual(fileOf('pipao'), { repos: [repo] });
+});
+
+test('REFUSED: a hire whose step is not <workflow>/<step>, or whose agent is no name, is Invalid and writes nothing', () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  const before = fs.readFileSync(path.join(FACTORIES, 'pipao.json'));
+  for (const step of ['build', 'build/a/b', 'build/.x', '/x'])
+    assert.throws(
+      () => hireAgent({ factory: 'pipao', agent: 'ada', step }),
+      refusedWith('Invalid', new RegExp(`^--step ${escaped(step)}.* Nothing was hired\\.$`)),
+      step,
+    );
+  assert.throws(
+    () => hireAgent({ factory: 'pipao', agent: 'a/b', step: 'build/implement' }),
+    refusedWith('Invalid', /^`a\/b` is not an agent's name/),
+  );
+  assert.deepEqual(fs.readFileSync(path.join(FACTORIES, 'pipao.json')), before);
+  assert.deepEqual(filed(), ['pipao.json']);
+});
+
+test('REFUSED: a factory whose file does not read is Invalid to hire, fire and a start, its bytes left as they are', () => {
+  fresh();
+  fs.mkdirSync(FACTORIES, { recursive: true });
+  const file = path.join(FACTORIES, 'bent.json');
+  fs.writeFileSync(file, '{"repos": ["/x"], "hires": 3}\n');
+  const before = fs.readFileSync(file);
+  const bent = readFactories().find((f) => f.name === 'bent');
+  assert.ok(bent && 'error' in bent, 'listed with why');
+  assert.match(bent.error, /^does not read as a factory: `hires` /);
+  assert.throws(() => readFactory('bent'), refusedWith('Invalid', /^the factory bent: \S*bent\.json does not read as a factory: `hires` /));
+  assert.throws(
+    () => hireAgent({ factory: 'bent', agent: 'ada', step: 'build/implement' }),
+    refusedWith('Invalid', /^the factory bent: .* It was left as it is, and nothing was changed\.$/),
+  );
+  assert.throws(() => fireAgent({ factory: 'bent', step: 'build/implement' }), refusedWith('Invalid', /does not read as a factory/));
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.throws(
+    () => readFactory('nope'),
+    refusedWith('Missing', /^no factory nope in the store\. Its factories are: bent\. Nothing was started\.$/),
+  );
+});
+
+test('REFUSED: wf factory hire and fire with a --step missing or twice, an unknown flag, or an argument too many, each by name', async () => {
+  const repo = fresh();
+  await main(['factory', 'add', 'pipao', '--repo', repo], NO_ENGINE);
+  const refusals: Array<[string[], RegExp]> = [
+    [['hire', 'pipao', 'ada'], /^wf factory hire names the step with --step: .* Nothing was hired\.$/],
+    [['hire', 'pipao'], /^wf factory hire takes the factory, then the agent/],
+    [['hire', 'pipao', 'ada', '--step', 'build/a', '--step', 'build/b'], /^wf factory hire takes --step once/],
+    [['hire', 'pipao', 'ada', '--step', 'build/a', '--stp', 'x'], /^wf factory hire does not take --stp\./],
+    [['hire', 'pipao', 'ada', 'otto', '--step', 'build/a'], /^wf factory hire takes <factory> <agent>, and otto is one more/],
+    [['fire', 'pipao'], /^wf factory fire names the step with --step: .* Nothing was fired\.$/],
+    [['fire', 'pipao', 'ada', '--step', 'build/a'], /^wf factory fire takes <factory>, and ada is one more/],
+    [['fire', '--step', 'build/a'], /^wf factory fire takes the factory first/],
+  ];
+  for (const [argv, pattern] of refusals)
+    await assert.rejects(main(['factory', ...argv], NO_ENGINE), refusedWith('Invalid', pattern), argv.join(' '));
+  assert.deepEqual(fileOf('pipao'), { repos: [repo] });
 });

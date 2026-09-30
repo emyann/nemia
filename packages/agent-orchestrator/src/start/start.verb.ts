@@ -23,6 +23,8 @@ import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { DEFAULT_FACTORY, fillsOf, unfilledRefusal, type Factory } from '../factory/factory.ts';
+import { readFactory } from '../factory/factory.store.ts';
 import { Effect } from 'effect';
 
 /**
@@ -59,9 +61,24 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
 }
 
 /**
+ * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`fillsOf`, by the folder's name) resolved against
+ * the agent hired, as if its file named it. Refused: every step then left with no agent (`unfilledRefusal`), since a factory's steps are
+ * filled by its hires; and a hire into a step whose file names its own agent (`parseWorkflow`). With no factory — the default — a step that
+ * names no agent is a plain session, as it always was.
+ */
+function stepsIn(workflowDir: string, places: Places, factory: Factory | undefined): Workflow[] {
+  if (!factory) return loadWorkflows(workflowDir, places);
+  const workflow = path.basename(path.resolve(workflowDir));
+  const steps = loadWorkflows(workflowDir, places, { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow) });
+  const unfilled = unfilledRefusal(steps, factory.name, workflow);
+  if (unfilled) throw new Invalid({ message: unfilled });
+  return steps;
+}
+
+/**
  * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix. What `startPlan` asks of every card
  * before the first run is started. Refused:
- * - a folder that is not a workflow (`loadWorkflows`);
+ * - a folder that is not a workflow (`loadWorkflows`), and, in a factory, a step its hires leave unfilled or fill twice (`stepsIn`);
  * - with `isolate: false` (`--no-worktree`): a team that says `workspace: folder`, which has no base branch to work on in place; one that
  *   can run two steps at once, which would share a directory; and an ending (`workspace: main`), which would merge a result branch the run
  *   does not have into the branch it stands on;
@@ -70,8 +87,8 @@ function remoteRefusal(steps: readonly Workflow[]): string | undefined {
  * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine
  *   refuses them only when the step is filed, with the run on the record.
  */
-export function stepsToStart(workflowDir: string, isolate: boolean, places: Places): Workflow[] {
-  const steps = loadWorkflows(workflowDir, places);
+export function stepsToStart(workflowDir: string, isolate: boolean, places: Places, factory?: Factory): Workflow[] {
+  const steps = stepsIn(workflowDir, places, factory);
   if (!isolate && isFolderTeam(steps)) {
     throw new Invalid({
       message:
@@ -165,6 +182,7 @@ export type StartOptions = {
   inputs?: readonly string[];
   from?: { inbox: string };
   gates?: readonly string[];
+  factory?: string;
 };
 
 /** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
@@ -269,6 +287,10 @@ function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string,
   }
 }
 
+/** The factory a run is started in, read (`readFactory`); none for no name and for the default factory, which is no file. */
+const factoryNamed = (name: string | undefined): Factory | undefined =>
+  name === undefined || name === DEFAULT_FACTORY ? undefined : readFactory(name);
+
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
  *
@@ -294,13 +316,19 @@ function renderAgents(run: Run, steps: readonly Workflow[], workflowDir: string,
  * them in. The inputs are copied and the steps' agents rendered (`writeAgentFiles`) before the record is written, so a record never names a
  * file that is not there: a copy or a render that fails removes the run's directory, and is an `Error` with exit 1.
  *
+ * `factory` names the factory the run is started in (`wf start --factory`): its hires fill the workflow's steps (`stepsToStart`), read as
+ * they are now and frozen into the run's steps, so a later hire changes no run started. Refused before anything is written when it names
+ * no factory, or one whose file does not read (`readFactory`). Left out, or the default factory, nothing is read. The factory is not
+ * frozen on the record.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
  * else, the copy's and the render's `Error` included (`tried`).
  */
 export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
-  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places));
+  const factory = yield* tried(() => factoryNamed(opts.factory));
+  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory));
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const refusedGates = gateRefusal(opts.gates ?? [], steps);

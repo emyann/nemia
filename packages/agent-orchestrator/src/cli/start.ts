@@ -91,7 +91,16 @@ saying true — and, at start, one naming no step of the workflow — an add wit
 leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
 already queued, and of one a run was started from.`;
 
-type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[]; gates: string[]; brief?: string };
+type StartHow = {
+  workflows?: string;
+  repo?: string;
+  isolate: boolean;
+  after: string[];
+  inputs: string[];
+  gates: string[];
+  brief?: string;
+  factory?: string;
+};
 
 /** What each of `wf start`'s value flags takes, as its refusal says it. */
 const START_TAKES = {
@@ -103,11 +112,20 @@ const START_TAKES = {
     'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
   '--brief':
     'what the run is asked to do in place of an inbox card\'s body, as text or a file: wf start <inbox>/<name>.md --brief "<brief>"',
+  '--factory': "the factory the run is started in, whose hires fill the workflow's steps: wf start <brief> --factory <name>",
 } as const;
+
+/** Why a value flag of `wf start` is taken once, as its refusal says it, where it is not the workflow. */
+const ONCE: Readonly<Record<string, string>> = {
+  '--brief': 'is asked one thing',
+  '--repo': 'works on one repository',
+  '--factory': 'is started in one factory',
+};
 
 /**
  * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on,
- * `--input <file>` as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, and `--no-worktree`.
+ * `--input <file>` as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, `--factory <name>`,
+ * and `--no-worktree`.
  */
 export function startHow(argv: string[]): StartHow {
   const { values, switches } = readFlags(argv, {
@@ -116,10 +134,9 @@ export function startHow(argv: string[]): StartHow {
     repeats: ['--after', '--input', '--gate'],
     unknown: (arg) =>
       arg.startsWith('-')
-        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>".`
+        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".`
         : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`,
-    twice: (flag) =>
-      `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
+    twice: (flag) => `wf start takes ${flag} once: a run ${ONCE[flag] ?? 'works on one workflow'}.`,
   });
   return {
     workflows: values['--workflows']?.[0],
@@ -129,6 +146,7 @@ export function startHow(argv: string[]): StartHow {
     inputs: values['--input'] ?? [],
     gates: values['--gate'] ?? [],
     ...(values['--brief'] ? { brief: values['--brief'][0] } : {}),
+    ...(values['--factory'] ? { factory: values['--factory'][0] } : {}),
   };
 }
 
@@ -223,6 +241,10 @@ function printStarted(run: ReturnType<typeof start>, from?: string): void {
 
 /** `wf start` of the inbox's card `inboxName`: its body, or `--brief` in its place — a file's text, or the words — started and said. */
 function startInboxCard(inboxName: string, how: StartHow): void {
+  if (how.factory !== undefined)
+    usage(
+      `wf start --factory ${how.factory} starts a run in a factory, and a card of the inbox is started in the default factory for now: a card does not name its factory yet. Start its brief in the factory instead — wf start "<brief>" --workflows <dir> --factory ${how.factory} — or drop --factory.`,
+    );
   const brief =
     how.brief === undefined
       ? undefined
@@ -278,6 +300,7 @@ export function startVerb(rest: string[]): void {
     after: how.after,
     inputs: how.inputs,
     gates: how.gates,
+    ...(how.factory !== undefined ? { factory: how.factory } : {}),
   });
   printStarted(run);
 }

@@ -25,23 +25,22 @@ const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
 
 /** A git run's record as the tick writes one today, frozen steps and all. */
-const aRun = (id: string): Run =>
-  ({
-    id,
-    repo: '/repo',
-    workspace: '/repo',
-    baseRef: 'abc123',
-    branch: 'main',
-    isolate: true,
-    brief: 'add a flag',
-    workflowDir: '/repo/workflows/dev',
-    workflow: [
-      { name: 'implement', after: [], body: 'do it', harness: 'claude' },
-      { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
-    ],
-    steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
-    createdAt: '2026-09-01T00:00:00.000Z',
-  }) as Run;
+const aRun = (id: string): Run => ({
+  id,
+  repo: '/repo',
+  workspace: '/repo',
+  baseRef: 'abc123',
+  branch: 'main',
+  isolate: true,
+  brief: 'add a flag',
+  workflowDir: '/repo/workflows/dev',
+  workflow: [
+    { name: 'implement', after: [], body: 'do it', harness: 'claude' },
+    { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
+  ],
+  steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
+  createdAt: '2026-09-01T00:00:00.000Z',
+});
 
 /** A run made in the store under `id`. */
 const made = (id: string): Run => {

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { decisionQuery, type RunDetail } from '../lib/api';
 import { needOf, stepAnchor } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
-import { firstLine, gateBrief, gateFacts, gateOfStep, needWords, type GateFact } from '../lib/gate';
+import { gateBrief, gateFacts, gateOfStep, needWords, type GateFact } from '../lib/gate';
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { Gate } from './Gate';
@@ -36,7 +36,7 @@ export function Asked({ run, step }: { run: RunDetail; step: Step }) {
 function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
   const gate = gateOfStep(run, step)!;
   const next = run.graph.edges.filter((e) => e.kind === 'after' && e.from === step.name).map((e) => e.to);
-  const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : firstLine(step.body);
+  const says = run.toDecide?.kind === 'approve' && run.toDecide.step === step.name ? run.toDecide.says : null;
   const brief = gateBrief(gate, gate.ends ? says : null, next);
   const { data } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
   const facts = gateFacts(run, isDecidable(data) ? data : null);

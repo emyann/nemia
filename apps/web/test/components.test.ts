@@ -2624,6 +2624,7 @@ const toShip = {
   kind: 'approve' as const,
   step: 'ship',
   says: SHIPS,
+  filed: false,
   /** An ending's send-back goes to the work it waits on, not to the step itself. */
   back: ['implement'],
   onto: 'main',
@@ -2835,6 +2836,21 @@ test('the gate of an ending step says approving is what files it, and its send-b
     'a gate that is no ending holds what its step handed on',
   );
   assert.doesNotMatch(held, /name="[^"]*-to"/, "and its send-back is the step's own");
+});
+
+test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone — never its step's body, which opens with its agent's instructions", () => {
+  const led = endingRun();
+  const ship = { ...led.steps[1], body: "You are Otto, a release engineer. You land a run's result.\n\nNever push." };
+  const brief = (toDecide: RunDetail['toDecide']) =>
+    textsOf(
+      withClient(createElement(StepInspector, { run: { ...led, toDecide, steps: [led.steps[0], ship] }, step: ship, onClose: () => {} })),
+    ).join(' ');
+  for (const toDecide of [null, { ...toShip, step: 'implement' }]) {
+    const said = brief(toDecide);
+    assert.ok(said.includes('ship waits at its gate'), said);
+    assert.doesNotMatch(said, /You are|Its folder says/, 'no decision about this step: nothing quoted');
+  }
+  assert.ok(brief(toShip).includes(`Its folder says what it does: “${SHIPS}”`), "the decision's own words, where it names this step");
 });
 
 test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {

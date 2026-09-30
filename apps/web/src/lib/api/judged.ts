@@ -8,9 +8,9 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 /**
  * Mirrors `RunToDecide` in apps/api/src/runs/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on
- * one — `approve`, the gate on its last step, with `step` and `says`, what that step would do in the folder's own words (null for a gated
- * step that has signed off, whose closeout is what to read); or `git`, result branches ahead of the base that nothing in the workflow
- * merges.
+ * one — `approve`, the gate on its last step, with `step`, `filed` whether it has run, and `says`, what it would do, the first line of the
+ * step's own note (null where it has none, and for a gated step that has signed off, whose closeout is what to read); or `git`, result
+ * branches ahead of the base that nothing in the workflow merges.
  *
  * On `approve`, `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on
  * before it is filed; and `onto` the base branch the run's result is on its way to: what the Factory's card answers the gate with, off the list.
@@ -18,7 +18,16 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
  */
 export type RunToDecide =
-  | { kind: 'approve'; step: string; says: string | null; back: string[]; onto: string | null; said: string; command: string }
+  | {
+      kind: 'approve';
+      step: string;
+      says: string | null;
+      filed: boolean;
+      back: string[];
+      onto: string | null;
+      said: string;
+      command: string;
+    }
   | { kind: 'git'; branches: string[]; said: string; command: string };
 
 /**

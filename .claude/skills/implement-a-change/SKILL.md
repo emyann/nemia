@@ -10,10 +10,10 @@ description: "Build a change from its spec in this repository: tests first where
 2. **Prove before you build** where the spec claims a rule: write the test that makes it refuse, see it fail, then make it pass.
 3. **Name your mutants** in the closeout: one per rule or guard the change adds, each a `file`, the text `from` it holds exactly once in
    your committed result, what it becomes `to` (valid code that breaks the rule, never a syntax error), the `test` file that must fail,
-   and a test `name` in it or null. Implement's check applies each to a copy of your result and refuses the step when its test still
-   passes, when `from` does not apply, or when the test fails or runs nothing unmutated. Try them first:
-   `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a change that adds no rule, saying why in
-   `noMutants`.
+   and the exact `name` of one test in it (its whole name, never a part of it: only that test runs) or null. Implement's check applies
+   each to a copy of your result and refuses the step when its test still passes, when `from` does not apply, or when the test fails or
+   runs nothing unmutated. Try them first: `node workflows/build/mutants.ts <closeout.json>` after you commit. Name none only for a
+   change that adds no rule, saying why in `noMutants`.
 4. **Work in small commits** with plain messages, as you go; the run commits only what you leave, in one commit under your step's name.
 5. **Check as the run will**: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`; and when `apps/web` changes,
    `npm run build` and `npm run e2e`, then read the pictures it writes with the `look` skill. Green is the floor, not the bar.

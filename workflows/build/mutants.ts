@@ -2,10 +2,10 @@
  * `node mutants.ts <closeout.json>` — the proof that each test an engineer names refuses the mutant they name with it.
  *
  * Takes the path of a step's closeout, flat (`WF_CLOSEOUT`), and reads its `mutants`: each a `file`, the text `from` it holds exactly once,
- * what it becomes `to`, the `test` file that must fail on it, and optionally one test in that file by `name`. It copies the commit the
- * working directory has checked out into a directory of its own (`git archive HEAD`, with each `node_modules` beside a `package.json`
- * hardlinked by `cp -al`), runs each named test there unmutated, which must pass at least one test, then applies each mutant in the copy,
- * runs its test, and restores the file. It never writes into the working directory.
+ * what it becomes `to`, the `test` file that must fail on it, and optionally one test in that file by its exact `name`. It copies the
+ * commit the working directory has checked out into a directory of its own (`git archive HEAD`, with each `node_modules` beside a
+ * `package.json` hardlinked by `cp -al`), runs each named test there unmutated, which must pass at least one test, then applies each
+ * mutant in the copy, runs its test, and restores the file. It never writes into the working directory.
  *
  * Prints a line per mutant and exits 0 when every mutant was killed, or the list is empty and `noMutants` says why. Exits 1, naming each
  * one on stderr, when a mutant survives, does not apply, names a path outside the tree or a test that fails or runs nothing without a
@@ -113,12 +113,13 @@ function packageDirOf(copy: string, test: string): string {
   return dir;
 }
 
-/** A name as a pattern that matches it literally. */
-const literal = (name: string): string => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A test's name as a pattern that matches that name exactly, and no name that only contains it. */
+const exactly = (name: string): string => `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 
 /**
- * Run the test file `test` in `copy`, only the test `name` where one is given, under the deadline; what it came to. In the runner's own
- * process (`--test-isolation=none`): a file run in a process of its own counts itself as one passing test when no test in it matches.
+ * Run the test file `test` in `copy`, only the test named exactly `name` where one is given, under the deadline; what it came to. In the
+ * runner's own process (`--test-isolation=none`): a file run in a process of its own counts itself as one passing test when no test in it
+ * matches.
  */
 function trial(copy: string, test: string, name: string | null): Trial {
   const cwd = packageDirOf(copy, test);
@@ -126,7 +127,7 @@ function trial(copy: string, test: string, name: string | null): Trial {
     '--test',
     '--test-reporter=tap',
     '--test-isolation=none',
-    ...(name ? [`--test-name-pattern=${literal(name)}`] : []),
+    ...(name ? [`--test-name-pattern=${exactly(name)}`] : []),
     path.relative(cwd, path.join(copy, test)),
   ];
   const env = { ...process.env };

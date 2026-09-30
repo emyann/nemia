@@ -29,6 +29,19 @@ test('max picks the larger', () => {
 test('a sum', () => assert.equal(1 + 1, 2));
 `;
 
+const NAMES_TEST = `import { describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { max, min } from '../src/math.ts';
+
+test('min', () => assert.ok(typeof min === 'function'));
+
+test('min is the smaller', () => assert.equal(min(1, 2), 1));
+
+describe('nested', () => {
+  test('max, inside a suite', () => assert.equal(max(1, 2), 2));
+});
+`;
+
 const BLOCK = 'export const block = false;\n';
 
 const BLOCK_TEST = `import { test } from 'node:test';
@@ -74,6 +87,7 @@ const mathRepo = (): string =>
     'package.json': '{ "type": "module" }\n',
     'src/math.ts': MATH,
     'test/math.test.ts': MATH_TEST,
+    'test/names.test.ts': NAMES_TEST,
     'src/flag.ts': BLOCK,
     'test/block.test.ts': BLOCK_TEST,
     'test/failing.test.ts': FAILING_TEST,
@@ -151,6 +165,17 @@ test('a mutant is run against the one test it names: a test in the file that doe
   const r = runMutants(repo, [{ ...MAX, name: 'a sum' }]);
   assert.equal(r.code, 1);
   assert.match(r.err, /by test\/math\.test\.ts › a sum survived/);
+});
+
+test('a name runs the one test called exactly that, never another whose name only contains it, nested in a suite or not', () => {
+  const repo = mathRepo();
+  const r = runMutants(repo, [{ ...MIN, test: 'test/names.test.ts', name: 'min' }]);
+  assert.equal(r.code, 1, 'only `min is the smaller` covers min, and it is not the test named');
+  assert.match(r.out, /baseline test\/names\.test\.ts › min: passed, 1 passed/);
+  assert.match(r.err, /by test\/names\.test\.ts › min survived/);
+  const nested = runMutants(repo, [{ ...MAX, test: 'test/names.test.ts', name: 'max, inside a suite' }]);
+  assert.equal(nested.code, 0, nested.err);
+  assert.match(nested.out, /baseline test\/names\.test\.ts › max, inside a suite: passed, 1 passed/);
 });
 
 test('a mutant whose text is not in its file exactly once does not apply, and refuses the step', () => {

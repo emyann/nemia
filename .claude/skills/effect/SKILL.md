@@ -105,9 +105,10 @@ version, and the version above must be the pin. An upgrade re-measures the table
 
 ## Plain faces
 
-- Consumers never adopt Effect. `agent-runtime` is Promises: `promiseEngine` in `src/facade/engine.ts` builds an `Engine` layer
-  once and runs each verb with `Effect.runPromise`, a tagged refusal turned into a plain `Error`; `createEngine` is it over
-  `Engine.layer(options)`.
+- Consumers never adopt Effect. `agent-runtime` gives the Promise engine's types and plain helpers; the engine a consumer uses
+  in Promises is `promiseEngine(Engine.layer(options))` from `agent-runtime/effect`: `promiseEngine` in `src/facade/engine.ts`
+  builds the layer once and runs each verb with `Effect.runPromise`, a tagged refusal turned into a plain `Error`. There is no
+  `createEngine`.
 - `agent-runtime/effect` (`src/index.ts`) is the one door that hands out Effect values, and it does not export `decide`.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
 - A controller's program is an `Effect.fn` that requires the Promise engine as a service (`EngineService`) and lifts each read

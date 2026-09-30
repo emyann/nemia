@@ -562,8 +562,7 @@
     {
       "files": ["packages/agent-orchestrator/src/inbox/inbox.ts"],
       "rules": {
-        "complexity": ["error", { "max": 22 }],
-        "sonarjs/cognitive-complexity": ["error", 19]
+        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {
@@ -672,13 +671,6 @@
       "rules": {
         "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 53]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/inbox/inbox.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 23 }],
-        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

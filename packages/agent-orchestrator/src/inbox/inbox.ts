@@ -19,6 +19,9 @@
  * `gate:` names a step of the card's workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, for the
  * run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
  *
+ * `factory:` names the factory that processes the card: its run is started in it, on its repository when it has one. A card that names
+ * none is the default factory's. Whether the factory is there, offers the workflow and works on the repository is the start's to say.
+ *
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
  * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
@@ -30,6 +33,7 @@
  */
 import path from 'node:path';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
+import { factoryNameRefusal, factoryRepo, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 
@@ -48,12 +52,17 @@ export type InboxCard = {
   queued?: string;
   /** The step its run is gated at, as written: frozen on the run's `gates` at start, beside any `--gate`. Absent on a card with no gate. */
   gate?: string;
+  /** The factory its run is started in, as written: absent on a card of the default factory. */
+  factory?: string;
   /** Everything below the frontmatter: the idea, and its run's brief unless a brief given at start replaces it. */
   body: string;
 };
 
 /** Every key an inbox card may set, each optional. Anything else is refused by name — `after:` with where it is said instead. */
-export const INBOX_KEYS = ['workflow', 'repo', 'queued', 'gate'] as const;
+export const INBOX_KEYS = ['workflow', 'repo', 'queued', 'gate', 'factory'] as const;
+
+/** A key an inbox card may set. */
+type InboxKey = (typeof INBOX_KEYS)[number];
 
 /**
  * An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is
@@ -63,13 +72,15 @@ const isInstant = (value: string): boolean =>
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
 /** What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: what the board shows beside a card's value. */
-export const INBOX_KEY_MEANINGS: Readonly<Record<(typeof INBOX_KEYS)[number], string>> = {
+export const INBOX_KEY_MEANINGS: Readonly<Record<InboxKey, string>> = {
   workflow:
     "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
   repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
   queued:
     'the time `wf inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
   gate: 'a step of its workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, in the run it starts: none when unset',
+  factory:
+    'the factory that processes the card: its run is started in it, on its repository when it has only one; the default factory when unset',
 };
 
 function refuse(why: string): never {
@@ -80,11 +91,12 @@ function refuse(why: string): never {
  * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have (`after:` among them),
  * a key set twice or to nothing, a `repo:` that is not an absolute path or names no directory (`isDirectory`), a `queued:` that is not an
  * ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one step or is a step's
- * `true`, an empty body, and a frontmatter that never closes.
+ * `true`, a `factory:` that is not a factory's name (`factoryNameRefusal`), an empty body, and a frontmatter that never closes.
  */
 export function parseInboxCard(file: string, text: string, isDirectory: (at: string) => boolean): InboxCard {
   const { block, body } = splitFrontmatter(file, text);
-  const { repo, workflow, queued, gate } = block === null ? {} : inboxKeys(file, block);
+  const keys = block === null ? {} : inboxKeys(file, block);
+  const { repo, workflow, queued, gate, factory } = keys;
   const name = file.slice(0, -'.md'.length);
   if (repo !== undefined && !path.isAbsolute(repo)) {
     refuse(
@@ -116,15 +128,17 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
       `${file}: \`gate: true\` is how a step's own file gates it, and a card names the step its run waits at — \`gate: plan\` — since a card is not a step. Name the step, or delete the line.`,
     );
   }
-  return {
-    name,
-    file,
-    ...(workflow !== undefined ? { workflow } : {}),
-    ...(repo !== undefined ? { repo } : {}),
-    ...(queued !== undefined ? { queued } : {}),
-    ...(gate !== undefined ? { gate } : {}),
-    body: bodyOf(file, body),
-  };
+  if (factory !== undefined) refuseFactoryKey(file, factory);
+  return { name, file, ...keys, body: bodyOf(file, body) };
+}
+
+/** Refuses a card's `factory:` that is not a factory's name (`factoryNameRefusal`), naming the file and the fix. */
+function refuseFactoryKey(file: string, factory: string): void {
+  const refused = factoryNameRefusal(factory);
+  if (refused)
+    refuse(
+      `${file}: \`factory: ${factory}\` — ${refused} Correct it to a factory wf factory ls lists, or delete the line, and the card is the default factory's.`,
+    );
 }
 
 /**
@@ -132,13 +146,13 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
  * `filing` is true for a file `wf inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start
  * that gives the wait, since `file` is where the idea is now, and no card's path.
  */
-function inboxKeys(file: string, block: string, filing = false): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
+function inboxKeys(file: string, block: string, filing = false): Partial<Record<InboxKey, string>> {
   return frontmatterKeys(file, block, INBOX_KEYS, (key) =>
     key === 'after'
       ? filing
         ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>.md --after <runId>.`
         : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
-      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, and the step its run waits at for a person; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, and the factory that processes it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
@@ -188,6 +202,8 @@ export type InboxListing = {
   title: string | null;
   workflow: string | null;
   repo: string | null;
+  /** The factory the card names (`factory:`), or null for a card of the default factory and an entry that does not read as a card. */
+  factory: string | null;
   /** On a card that names one only: the step its run is gated at (`gate:`). */
   gate?: string;
   /** The runs whose record's `from` names this card: a card still here was started, and its removal failed. */
@@ -248,6 +264,7 @@ export function inboxListing(
           title: null,
           workflow: null,
           repo: null,
+          factory: null,
           startedAs: [],
           error: `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
         };
@@ -262,6 +279,7 @@ export function inboxListing(
           title: card.body.split('\n')[0],
           workflow: card.workflow ?? null,
           repo: card.repo ?? null,
+          factory: card.factory ?? null,
           ...(card.gate !== undefined ? { gate: card.gate } : {}),
           startedAs,
           error: null,
@@ -279,6 +297,7 @@ export function inboxListing(
           title: null,
           workflow: queued !== undefined ? (lenient!.workflow ?? null) : null,
           repo: queued !== undefined ? (lenient!.repo ?? null) : null,
+          factory: queued !== undefined ? (lenient!.factory ?? null) : null,
           startedAs,
           error: (err as Error).message,
           ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
@@ -301,12 +320,30 @@ export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
     .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
 /**
- * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused
- * as it stands — its text the same, and tried on the repository it would be tried on now, its `repo:` or else `repo`. A card whose start
- * failed for any other reason keeps its place, and is tried again. Pure.
+ * The repository the tick tries a queued card on, from a daemon in `daemonRepo` (`factoryRepo`): its `repo:`, else its factory's one
+ * repository, else the daemon's. `factories` are the store's that read, by name; a card whose factory is not among them — the default, or
+ * one whose file does not read — is tried on its `repo:` or the daemon's, and its start refuses it by name. `fromDaemon` is true when the
+ * repository is the daemon's because neither the card nor its factory names one: the only start that turns on where the daemon runs.
  */
-export const nextQueued = (listing: readonly InboxListing[], repo: string): InboxListing | undefined =>
-  queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === (l.repo ?? repo)));
+export function queueRepo(
+  l: Pick<InboxListing, 'repo' | 'factory'>,
+  daemonRepo: string,
+  factories: ReadonlyMap<string, Pick<Factory, 'repos'>>,
+): { repo: string; fromDaemon: boolean } {
+  const factory = l.factory === null ? undefined : factories.get(l.factory);
+  return { repo: factoryRepo(factory, l.repo ?? undefined, daemonRepo), fromDaemon: l.repo === null && factory?.repos.length !== 1 };
+}
+
+/**
+ * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused
+ * as it stands — its text the same, and tried on the repository it would be tried on now (`queueRepo`, with the store's `factories` by
+ * name). A card whose start failed for any other reason keeps its place, and is tried again. Pure.
+ */
+export const nextQueued = (
+  listing: readonly InboxListing[],
+  repo: string,
+  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
+): InboxListing | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and whether the card left
@@ -370,9 +407,13 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
         ? ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${on ? ', or run wf up in the repository it is about' : ''}, and the tick tries it again`
         : ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}`;
-    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${queued}${tried}${started}`;
+    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}`;
   });
 }
+
+/** `given` without the keys it leaves undefined, so a key given as undefined leaves the text's own. */
+const definedOf = (given: Partial<Record<InboxKey, string | undefined>>): Partial<Record<InboxKey, string>> =>
+  Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined));
 
 /**
  * The file `wf inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
@@ -380,10 +421,11 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
  *
  * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or
  * an `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the
- * body whole, as `wf start` takes a brief that is not a card. `workflow` and `repo`, when given, are written over the text's own. Refused
- * too: text with nothing in it, a `workflow` or `repo` given on more than one line, and a `queued:` in the text: a card is queued once it
- * is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with a `---` rule of
- * its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
+ * body whole, as `wf start` takes a brief that is not a card. `workflow`, `repo` and `factory`, when given, are written over the text's
+ * own, the keys in `INBOX_KEYS`' order. Refused too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one
+ * line, and a `queued:` in the text: a card is queued once it is in the inbox, under its own name, and a time carried in from elsewhere
+ * would jump the queue. A body that opens with a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read
+ * as the card's frontmatter.
  *
  * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
@@ -392,7 +434,7 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
 export function ideaCard(
   from: string,
   text: string,
-  given: { workflow?: string; repo?: string },
+  given: { workflow?: string; repo?: string; factory?: string },
   isDirectory: (at: string) => boolean,
   dir?: string,
 ): { text: string; body: string } {
@@ -407,7 +449,7 @@ export function ideaCard(
         `${from}: the ${flag} given, ${JSON.stringify(value)}, is more than one line, and a card's ${flag}: is one. Give the one line it names.`,
       );
   }
-  let keys: { workflow?: string; repo?: string; queued?: string; gate?: string } = {};
+  let keys: Partial<Record<InboxKey, string>> = {};
   let body = text
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
@@ -433,13 +475,8 @@ export function ideaCard(
     body = split.body;
     if (keys.workflow !== undefined && dir !== undefined) keys.workflow = workflowAt(keys.workflow, dir);
   }
-  const workflow = given.workflow ?? keys.workflow;
-  const repo = given.repo ?? keys.repo;
-  const frontmatter = [
-    ...(workflow !== undefined ? [`workflow: ${workflow}`] : []),
-    ...(repo !== undefined ? [`repo: ${repo}`] : []),
-    ...(keys.gate !== undefined ? [`gate: ${keys.gate}`] : []),
-  ];
+  const written = { ...keys, ...definedOf(given) };
+  const frontmatter = INBOX_KEYS.flatMap((key) => (written[key] !== undefined ? [`${key}: ${written[key]}`] : []));
   if (!frontmatter.length && body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
   const card = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${body}\n`;
   parseInboxCard(from, card, isDirectory);
@@ -447,13 +484,13 @@ export function ideaCard(
 }
 
 /**
- * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given: what
- * `wf inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card, and
- * a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Pure; the text it
- * gives reads back as a card (`parseInboxCard`), or is refused as one would be.
+ * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given, its `repo:`,
+ * `gate:` and `factory:` kept: what `wf inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as
+ * `wf inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
+ * `ideaCard` keeps it. Pure; the text it gives reads back as a card (`parseInboxCard`), or is refused as one would be.
  */
 export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
-  const keys = { workflow: workflow ?? card.workflow, repo: card.repo, queued: at ?? undefined, gate: card.gate };
+  const keys = { workflow: workflow ?? card.workflow, repo: card.repo, queued: at ?? undefined, gate: card.gate, factory: card.factory };
   const frontmatter = INBOX_KEYS.flatMap((key) => (keys[key] !== undefined ? [`${key}: ${keys[key]}`] : []));
   if (!frontmatter.length && card.body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
   const text = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${card.body}\n`;

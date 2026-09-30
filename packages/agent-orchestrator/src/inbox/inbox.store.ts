@@ -76,16 +76,18 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
  * alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is what a
  * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
- * (`ideaCard`). `workflow` and `repo` are written as the card's keys, over the text's own: `repo` an absolute path to a directory,
- * `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
+ * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
+ * directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it, and `factory` a factory's name, whose
+ * factory the start judges.
  */
-export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): {
+export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string; factory?: string }): {
   card: InboxCard;
   file: string;
 } {
   const refusedRepo = cardRepoRefusal(opts);
   if (refusedRepo) throw new WorkflowError(refusedRepo);
-  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
+  const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
+  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
   for (;;) {
     const name = runId(body.split('\n')[0]);
     if (!runStore.inbox.add(`${name}.md`, text)) continue;

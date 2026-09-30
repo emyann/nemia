@@ -35,12 +35,12 @@ export const HELP = `wf — run a workflow of agent steps
                                refused, naming them
                                a card of the inbox (wf inbox --help) starts its body, or --brief
                                "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
-                               unless given, --repo its repo:
+                               unless given, --repo its repo:, --factory its factory:
   wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
                                --after the runs of the cards its after: names (wf plan --help)
   wf inbox                     the cards parked before they are started: name, first line, workflow
                                and repo when set, and started as <runId> (wf inbox --help)
-  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
+  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
                                park an idea as a card in the inbox, named from its first line
   wf inbox queue <name> [--workflow <w>] [--off]
                                mark a card to start on its own: the tick starts the oldest queued

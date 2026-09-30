@@ -4517,7 +4517,7 @@ test('REFUSED at `wf start`, before a run is written: an --input that is not the
   await assert.rejects(
     typed('--inputs', path.join(given, 'a', 'notes.md')),
     refusedWith(
-      /^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>"\.$/,
+      /^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>"\.$/,
     ),
   );
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));

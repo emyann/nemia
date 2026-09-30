@@ -87,7 +87,7 @@ export function parseWorkflow(
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
     return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
   }
-  const agent = agentOf(name, attached, agents, written === undefined ? hired : undefined);
+  const agent = agentOf(name, attached, agents, hired);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const body = [agent.body, own].filter(Boolean).join('\n\n');
@@ -164,19 +164,18 @@ function agentOf(step: string, name: string, agents: Agents | undefined, hired?:
   const found = agents?.get(name);
   const named = hired ? `the factory ${hired.factory} hires \`${name}\` into it, and its` : `\`agent: ${name}\` names an agent whose`;
   if (found instanceof WorkflowError) refuse(`${step}: ${named} file is refused — ${found.message}`);
-  if (found) return found;
-  const there = [...(agents?.keys() ?? [])].sort();
+  return found ?? refuse(notAnAgent(step, name, [...(agents?.keys() ?? [])].sort(), hired));
+}
+
+/** Why `name` is not an agent of `step`, among the agents `there` are: named by its `agent:` line, or by the factory that `hired` it. */
+function notAnAgent(step: string, name: string, there: readonly string[], hired: Hire | undefined): string {
   const missing = hired ? `the factory ${hired.factory} hires \`${name}\` into it, which` : `\`agent: ${name}\``;
-  const instead = hired
-    ? `hire one — wf factory hire ${hired.factory} <agent> --step ${hired.step}`
-    : there.length
-      ? 'name one'
-      : 'delete the line';
-  return refuse(
+  const instead = hired ? `hire one — wf factory hire ${hired.factory} <agent> --step ${hired.step}` : undefined;
+  return (
     `${step}: ${missing} is not an agent here. ` +
-      (there.length
-        ? `The agents are: ${there.join(', ')} — ${instead}, or write ${AGENTS_FOLDER}/${name}.md beside them.`
-        : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or ${instead}.`),
+    (there.length
+      ? `The agents are: ${there.join(', ')} — ${instead ?? 'name one'}, or write ${AGENTS_FOLDER}/${name}.md beside them.`
+      : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or ${instead ?? 'delete the line'}.`)
   );
 }
 

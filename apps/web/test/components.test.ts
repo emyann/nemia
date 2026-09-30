@@ -1499,6 +1499,7 @@ const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): Step
   missing: [],
   replies: null,
   schema: {},
+  questions: [],
   raw: { outcome: 'done', summary },
   ...more,
 });
@@ -1750,6 +1751,51 @@ test("a plan's files are a table, its path over its change; its steps a list; a 
     screenshots,
     /<figure data-artifact="image"[\s\S]*<img src="\/api\/runs\/r-1\/steps\/implement\/artifacts\/runs-light\.png" alt="runs-light\.png"/,
   );
+});
+
+const { answersFrom, chosenDraft, recommendedDraft, unanswered } = await import('../src/components/Questions.tsx');
+type Question = import('../src/lib/api.ts').Question;
+
+const cut: Question = {
+  title: 'How is the card cut?',
+  body: 'It is **big**.',
+  options: [
+    { label: 'a', meaning: 'The shape and the board first.' },
+    { label: 'b', meaning: 'All of it at once.' },
+  ],
+  recommended: 'a',
+  multiple: false,
+};
+const where: Question = {
+  title: 'Where do the answers go?',
+  body: 'Either or both.',
+  options: [
+    { label: 'retry', meaning: 'Into the next try.' },
+    { label: 'gate', meaning: 'With the approval.' },
+  ],
+  recommended: null,
+  multiple: true,
+};
+
+test("a closeout's question field is drawn as its questions, read-only, the recommended marked — every other field as before", () => {
+  const output = { approach: 'Cut it.', open: [cut, where] };
+  const said = closeoutSaying('A design.', { output, questions: [{ field: 'open', questions: [cut, where] }] });
+  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: said }];
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
+  assert.deepEqual(
+    [...html.matchAll(/<section data-(field|questions)="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['field', 'approach'],
+      ['questions', 'open'],
+    ],
+  );
+  const open = /<section data-questions="open"[\s\S]*?<\/section>/.exec(html)![0];
+  assert.deepEqual(
+    [...open.matchAll(/<li data-question="([^"]+)"/g)].map((m) => unescaped(m[1])),
+    [cut.title, where.title],
+  );
+  assert.equal([...open.matchAll(/data-recommended="true"/g)].length, 1);
+  assert.doesNotMatch(open, /<input|<button/, 'read-only: nothing to choose');
 });
 
 test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
@@ -2166,7 +2212,7 @@ const offersMarkup = (offers: Answer[]) =>
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
   const html = offersMarkup([
-    { step: 'implement', kind: 'answer', needs: 'Which database?' },
+    { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
     { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
     { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
     { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
@@ -2290,6 +2336,79 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
   assert.match(rows.get('notes')!, /<button type="submit"[^>]*>Try again<\/button>/);
 });
 
+test('a step asking questions as data is answered by choosing: radios where it takes one, checkboxes where several, the recommended marked, nothing chosen, and a button that waits for every answer', () => {
+  const html = offersMarkup([
+    { step: 'design', kind: 'answer', needs: 'Two questions.', questions: [cut, where] },
+    { step: 'spec', kind: 'answer', needs: 'One question.', questions: [where] },
+  ]);
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="answer" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
+  );
+  const design = rows.get('design')!;
+  assert.ok(design, html);
+  assert.deepEqual(
+    [...design.matchAll(/<fieldset data-question="([^"]+)"/g)].map((m) => unescaped(m[1])),
+    [cut.title, where.title],
+  );
+  const choices = [
+    ...design.matchAll(/<input type="(radio|checkbox)" class="[^"]*" name="[^"]*-choice"( checked="")? value="([^"]+)"/g),
+  ].map((m) => [m[3], m[1], Boolean(m[2])]);
+  assert.deepEqual(
+    choices,
+    [
+      ['a', 'radio', false],
+      ['b', 'radio', false],
+      ['retry', 'checkbox', false],
+      ['gate', 'checkbox', false],
+    ],
+    'nothing is chosen until the person chooses',
+  );
+  assert.equal([...design.matchAll(/data-recommended="true"/g)].length, 1, 'the one recommended option is marked');
+  assert.match(
+    design,
+    /<strong class="font-medium">a<\/strong> <span[^>]*>— The shape and the board first\.<\/span><span data-recommended="true"[^>]*>recommended<\/span>/,
+  );
+  assert.match(design, /<strong>big<\/strong>/, 'a body is its markdown');
+  const buttons = (row: string) =>
+    [...row.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  assert.deepEqual(buttons(design), [
+    ['submit', true, 'Answer and continue'],
+    ['button', false, 'Choose the recommended answers'],
+  ]);
+  assert.match(design, /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"/);
+  assert.equal([...design.matchAll(/<textarea [^>]*data-own="true"/g)].length, 2, "a line for each question's own words");
+  assert.deepEqual(
+    buttons(rows.get('spec')!),
+    [['submit', true, 'Answer and continue']],
+    'no recommended answers to choose where none is recommended',
+  );
+  assert.doesNotMatch(html, /--recheck/, 'a recheck files no session to read answers');
+});
+
+test('Choose the recommended answers chooses each recommended option, keeps words already written, and leaves a question with none as it was', () => {
+  assert.deepEqual(unanswered([cut, where], {}), [cut.title, where.title], 'nothing is answered before the person answers');
+  const typed = { [cut.title]: { chose: ['b'], own: 'Mine.' } };
+  const filled = recommendedDraft([cut, where], typed);
+  assert.deepEqual(filled, { [cut.title]: { chose: ['a'], own: 'Mine.' } });
+  assert.deepEqual(unanswered([cut, where], filled), [where.title], 'a question without a recommendation still waits for the person');
+  assert.deepEqual(recommendedDraft([where], {}), {});
+});
+
+test('choosing takes the one option of a question that takes one, and adds or drops one of a question that takes several; the answers go as the api takes them', () => {
+  const one = chosenDraft(chosenDraft({}, cut, 'a', true), cut, 'b', true);
+  assert.deepEqual(one[cut.title].chose, ['b']);
+  const both = chosenDraft(chosenDraft({}, where, 'retry', true), where, 'gate', true);
+  assert.deepEqual(both[where.title].chose, ['retry', 'gate']);
+  assert.deepEqual(chosenDraft(both, where, 'retry', false)[where.title].chose, ['gate']);
+  const draft = { ...one, [where.title]: { chose: [], own: '  Neither.  ' } };
+  assert.deepEqual(unanswered([cut, where], draft), []);
+  assert.deepEqual(answersFrom([cut, where], draft), [
+    { question: cut.title, chose: ['b'] },
+    { question: where.title, chose: [], own: 'Neither.' },
+  ]);
+  assert.deepEqual(unanswered([where], { [where.title]: { chose: [], own: '   ' } }), [where.title], 'blank words answer nothing');
+});
+
 test('the Decide section puts the answers first, before what there is to decide, and its commands still only copy', () => {
   const decision: Decidable = {
     standings: [],
@@ -2306,7 +2425,10 @@ test('the Decide section puts the answers first, before what there is to decide,
   const offers = createElement(
     QueryClientProvider,
     { client: new QueryClient() },
-    createElement(Answering.Offers, { runId: 'r-1', offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?' }] }),
+    createElement(Answering.Offers, {
+      runId: 'r-1',
+      offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] }],
+    }),
   );
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision, offers }));
   assert.ok(html.indexOf('aria-label="Answer"') < html.indexOf('data-lesson'), html);
@@ -3972,6 +4094,7 @@ const planCloseout: StepCloseout = {
   artifacts: [],
   replies: null,
   missing: [],
+  questions: [],
   raw: {},
   output: {
     approach: 'Parse `--flag` in cli.ts and store it on the run record.',

@@ -187,8 +187,8 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
   assert.deepEqual(
     offersOf(run(steps, waiting)),
     [
-      { step: 'implement', kind: 'answer', needs: 'Which database?' },
-      { step: 'quiet', kind: 'answer', needs: null },
+      { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
+      { step: 'quiet', kind: 'answer', needs: null, questions: [] },
       { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
       { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
       { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
@@ -207,6 +207,36 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
   assert.deepEqual(kinds(needsOf(run(steps, waiting))), ['asks'], 'the banner names the step that asks');
 });
 
+test("a step that signed off blocked asking questions as data is offered them to answer, every field's in the schema's order — and one whose closeout asks in words, none", () => {
+  const asking = (title: string) => ({
+    title,
+    body: 'Why it matters.',
+    options: [{ label: 'a', meaning: 'This.' }],
+    recommended: 'a',
+    multiple: false,
+  });
+  const closeout = {
+    questions: [
+      { field: 'open', questions: [asking('Which cut?'), asking('Which name?')] },
+      { field: 'later', questions: [asking('When?')] },
+    ],
+  } as Step['closeout'];
+  const design = step('design', 'succeeded · BLOCKED', { needs: 'Three questions.', closeout });
+  const worded = step('spec', 'succeeded · BLOCKED', {
+    needs: 'Postgres or MySQL?',
+    closeout: { questions: [] } as unknown as Step['closeout'],
+  });
+  assert.deepEqual(offersOf(run([design, worded], ['design', 'spec'])), [
+    {
+      step: 'design',
+      kind: 'answer',
+      needs: 'Three questions.',
+      questions: [asking('Which cut?'), asking('Which name?'), asking('When?')],
+    },
+    { step: 'spec', kind: 'answer', needs: 'Postgres or MySQL?', questions: [] },
+  ]);
+});
+
 test("a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner's", () => {
   const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
   const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
@@ -217,10 +247,12 @@ test("a session the harness blocked is offered Continue, whether or not the api 
   );
   assert.deepEqual(offersOf(run([held], ['held'])), [{ step: 'held', kind: 'continue' }]);
   assert.deepEqual(offersOf(run([implement, held], ['implement'])), [
-    { step: 'implement', kind: 'answer', needs: 'Which database?' },
+    { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
     { step: 'held', kind: 'continue' },
   ]);
-  assert.deepEqual(answersOf(run([implement, held], ['implement'])), [{ step: 'implement', kind: 'answer', needs: 'Which database?' }]);
+  assert.deepEqual(answersOf(run([implement, held], ['implement'])), [
+    { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
+  ]);
   assert.deepEqual(answersOf(run([held], [])), [], 'no Decide section for it until its try is asked');
 
   const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { liftHold } from '../lib/api';
 import { cn } from '../lib/utils';
 import { POPOVER, SMALL } from './CardGate';
-import { BUTTON, Refusal } from './Decide';
+import { BUTTON, Refusal } from './Ask';
 import { SECONDARY } from './Gate';
 
 /** What a lift does, said before the second press: the package's `unhold`, as `wf hold <run> --off` runs it. */

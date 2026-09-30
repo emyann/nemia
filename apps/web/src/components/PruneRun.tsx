@@ -8,7 +8,7 @@ import { awaitingOf, firstChoice, prunable, pruneOffer, pruneQuestion, type Prun
 import { cn } from '../lib/utils';
 import { DOT, RADIO } from './AgentForm';
 import { POPOVER } from './CardGate';
-import { Refusal } from './Decide';
+import { Refusal } from './Ask';
 
 /**
  * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and, for

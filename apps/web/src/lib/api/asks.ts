@@ -5,6 +5,12 @@
 /** Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, and to which attempt of its task. */
 export type Said = { at: string; attempt: number; text: string };
 
+/**
+ * Mirrors `Answer` in agent-orchestrator's question/question.ts: a person's answer to one question a step asks, by its title — the labels
+ * they chose, and words of their own.
+ */
+export type QuestionAnswer = { question: string; chose: readonly string[]; own?: string };
+
 /** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
@@ -13,14 +19,15 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
  * session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that cannot ride
  * on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own about the request; and an answer that succeeded without the try,
- * saying the ask may be written. `budget` is `--budget`: the cap a step over its budget, or ended at it, is raised to.
+ * saying the ask may be written. `budget` is `--budget`: the cap a step over its budget, or ended at it, is raised to. `answers` are a
+ * person's to the questions the step's closeout asks: the api refuses those that do not fit, and writes the rest as the try's message.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
 export async function askTry(
   runId: string,
   step: string,
-  how: { mode: RetryMode; model?: string; message?: string; budget?: number },
+  how: { mode: RetryMode; model?: string; message?: string; budget?: number; answers?: readonly QuestionAnswer[] },
 ): Promise<{ try: number; file: string; stopFirst: boolean }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });

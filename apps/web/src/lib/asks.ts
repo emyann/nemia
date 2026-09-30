@@ -5,7 +5,7 @@
  * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the engine's.
  * The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for them.
  */
-import type { RunDetail, RunSummary, RunToDecide } from './api';
+import type { Question, RunDetail, RunSummary, RunToDecide } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
@@ -109,7 +109,8 @@ export const stepAnchor = (step: string): string => `step-${step}`;
 /**
  * What a run's page offers for a step, each a `wf retry` the api asks for (`askTry`):
  *
- *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session
+ *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session — and where its closeout asks
+ *              questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
  *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as `wf decide` offers it —
@@ -123,7 +124,7 @@ export const stepAnchor = (step: string): string => `step-${step}`;
  *   asked      a person asked for its next try, which the next tick files: `wf ls`'s note says so
  */
 export type Offer =
-  | { step: string; kind: 'answer'; needs: string | null }
+  | { step: string; kind: 'answer'; needs: string | null; questions: Question[] }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
   | { step: string; kind: 'denied'; calls: string | null }
   | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<
@@ -155,7 +156,11 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     const unfinished = step.check?.verdict === 'unfinished';
     if (step.raise) return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, ...step.raise }];
     const state = stepState(step.status, false, false);
-    if (state === 'blocked') return [{ step: step.name, kind: 'answer', needs: step.needs }];
+    if (state === 'blocked') {
+      return [
+        { step: step.name, kind: 'answer', needs: step.needs, questions: step.closeout?.questions.flatMap((a) => a.questions) ?? [] },
+      ];
+    }
     if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
     if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];
     if (state === 'denied') return [{ step: step.name, kind: 'denied', calls: step.denied?.words ?? null }];

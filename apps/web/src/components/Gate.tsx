@@ -13,7 +13,7 @@ import { askedSaid } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { Artifacts, HandedOn } from './Closeout';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Decide';
+import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { Markdown } from './Markdown';
 import { when } from './Facts';
 

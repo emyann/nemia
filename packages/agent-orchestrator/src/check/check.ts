@@ -58,6 +58,8 @@ export type CheckEnv = {
   WF_WORKSPACE: string;
   WF_STDERR: string;
   WF_ARTIFACTS: string;
+  /** The judged step's closeout, flat, as a JSON file: absent where the step signed off none. */
+  WF_CLOSEOUT?: string;
 };
 
 /**

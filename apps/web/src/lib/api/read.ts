@@ -46,7 +46,7 @@ const valueAt = (value: unknown, path: readonly PropertyKey[]): unknown =>
   );
 
 /** Why `route` answered `value` with what the board does not read, from the first issue of its failed decode: a sentence ending on the fix. */
-export function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue): string {
+function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue): string {
   const [first] = formatter(issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const message = first?.message ?? 'Expected what the board reads';

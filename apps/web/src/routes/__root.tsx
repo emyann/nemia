@@ -1,4 +1,5 @@
-import type { QueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
@@ -16,11 +17,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { factoriesQuery, runsQuery } from '@/lib/api';
+import { factoryBlocks, menuFactories } from '@/lib/factories';
 import { useFeed } from '@/lib/useFeed';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -100,6 +106,7 @@ function AppSidebar({ path }: { path: string }) {
                     <item.icon />
                     <span>{item.label}</span>
                   </NavLink>
+                  {item.to === '/' && <FactoriesMenu path={path} onPick={picked} />}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -108,5 +115,46 @@ function AppSidebar({ path }: { path: string }) {
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+/** A factory in the menu: the sidebar's sub-button, a React Aria link given the router's `to`. */
+const SubLink = routeLink(SidebarMenuSubButton);
+
+/**
+ * The factories under the Factories item, one a block (`factoryBlocks`): the first `MENU_SHOWN`, and a button that shows the rest in place.
+ * Each is lit on its own floor. It reads the runs without polling them — a page that shows none must not read them every 5 s — so they are
+ * read again only on the feed's events and when a page that polls them is open. Nothing is listed while either read has no answer.
+ */
+function FactoriesMenu({ path, onPick }: { path: string; onPick: () => void }) {
+  const [all, setAll] = useState(false);
+  const factories = useQuery(factoriesQuery);
+  const runs = useQuery({ ...runsQuery, refetchInterval: false });
+  if (!factories.data || !runs.data) return null;
+  const { shown, hidden } = menuFactories(factoryBlocks(factories.data, runs.data), all);
+  if (!shown.length) return null;
+  return (
+    <SidebarMenuSub aria-label="Factories">
+      {shown.map((block) => (
+        <SidebarMenuSubItem key={block.name}>
+          <SubLink
+            to="/factories/$factory"
+            params={{ factory: block.name }}
+            isActive={path === `/factories/${block.name}`}
+            data-factory={block.name}
+            onPress={onPick}
+          >
+            <span>{block.name}</span>
+          </SubLink>
+        </SidebarMenuSubItem>
+      ))}
+      {hidden > 0 && (
+        <SidebarMenuSubItem>
+          <SidebarMenuSubButton size="sm" onPress={() => setAll(true)}>
+            <span>Show {hidden} more</span>
+          </SidebarMenuSubButton>
+        </SidebarMenuSubItem>
+      )}
+    </SidebarMenuSub>
   );
 }

@@ -397,7 +397,7 @@ test('LIVE: a child the command leaves behind holding its stdout does not hold t
   assert.equal(fs.readFileSync(path.join(root, 'left.stdout'), 'utf8'), 'done\n');
 });
 
-test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a check that finishes or one killed at its deadline', async (t) => {
+test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a check that finishes or one stopped while its command runs', async (t) => {
   const { root, e, file } = rig();
   const tmp = scratch('wf-check-tmpdir-');
   const TMPDIR = process.env.TMPDIR;
@@ -407,10 +407,17 @@ test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a che
   });
   process.env.TMPDIR = tmp;
   const done = await file('done', 'echo done');
-  const hung = await file('hung', 'echo started; sleep 60', 1);
+  const hung = await file('hung', 'echo started; sleep 60', 120);
   assert.equal((await settled(e, done)).state.settled, 'succeeded');
-  assert.equal((await settled(e, hung)).state.settled, 'failed');
-  assert.equal(fs.readFileSync(path.join(root, 'hung.stdout'), 'utf8'), 'started\n', 'the copy was made, through a FIFO under TMPDIR');
+  const copy = path.join(root, 'hung.stdout');
+  const deadline = Date.now() + 20_000;
+  while (!(fs.existsSync(copy) && fs.readFileSync(copy, 'utf8') === 'started\n')) {
+    assert.ok(Date.now() < deadline, `the command never printed through the copy; phase ${(await e.view(hung)).phase}`);
+    await e.tick();
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  await e.stop(hung);
+  assert.equal((await settled(e, hung)).state.settled, 'stopped');
   assert.deepEqual(fs.readdirSync(tmp), [], "the worker inherits this process's TMPDIR when a tick starts it");
 });
 

@@ -115,9 +115,9 @@ version, and the version above must be the pin. An upgrade re-measures the table
   else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
   `decideRun` and `decide`, `forgetRun` and `forget`, and the verbs a person asks of a run (`roundRun` and `round`, `acceptRun`,
   `retryRun`, `approveRun`, `sayRun`, `cancelRun`), and the views' reads (`taskPhasesRead` and `taskPhases`, `checkReportsRead`,
-  `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`). An engine refusal is mapped in
-  one place: `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make
-  a defect.
+  `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`), and the tick (`tickRun` and
+  `tick`), whose pass is metered through `meteredPass` over the module-global meter. An engine refusal is mapped in one place:
+  `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make a defect.
 - A controller that reads no engine requires nothing: `startRun`, whose plain face `start` runs it with `Effect.runSync` and
   throws either as it was thrown (`runSync` throws the first failure, else the first defect, itself). Its face stays synchronous,
   so a read it lifts must be too.

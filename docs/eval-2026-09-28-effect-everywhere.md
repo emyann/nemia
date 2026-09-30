@@ -401,7 +401,9 @@ Each card is one concern, leaves the suite green, and can be merged alone. They 
    plain `decide(engine, id)` runs it over that engine and rejects with what it failed with. `forget` followed it
    (`forgetRun`, and the plain `forget(e, id, how)`). Both programs fail with the refusals (`Missing`, `Conflict`, `Invalid`)
    and die of anything else, through the two lifts beside `EngineService` in `runtime-client.ts`, `tried` for the store and
-   git and `awaited` for the engine; the plain faces reject with either as it was thrown.
+   git and `awaited` for the engine; the plain faces reject with either as it was thrown. The verbs followed (`roundRun`,
+   `acceptRun`, `retryRun`, `approveRun`, `sayRun`, `cancelRun`, each beside its plain face): `wf say`'s engine refusal, an
+   error with exit code 2, is its program's `Conflict`, and `hold` and `unhold` are left as they are, for a card of their own.
 8. **The api's errors.** One mapping from the union to statuses (under B, checked by the compiler), `app.onError` for the
    rest, and the 6 `messageOf` copies gone. Landed under B. Left for a card of its own: the authoring errors that carry a
    `why` beside their kind (`AgentWriteError`, `SkillWriteError`, each an `Invalid` today) are still answered by their

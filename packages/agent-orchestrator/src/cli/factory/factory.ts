@@ -1,27 +1,39 @@
 /**
- * `wf factory`: the store's factories listed, filed and removed — its help, its flags, read off the command line, and what each prints.
+ * `wf factory`: the store's factories listed, filed, hired into, fired from and removed — its help, its flags, read off the command line,
+ * and what each prints.
  */
-import { addFactory, factoriesDir, factoryLines, readFactories, removeFactory } from '../../runner.ts';
+import { addFactory, factoriesDir, factoryLines, fireAgent, hireAgent, readFactories, removeFactory } from '../../runner.ts';
 import { readFlags, usage } from '../flags.ts';
 
 export const FACTORY_HELP = `wf factory [ls]
 wf factory add <name> --repo <path> [--repo <path> ...]
+wf factory hire <factory> <agent> --step <workflow>/<step>
+wf factory fire <factory> --step <workflow>/<step>
 wf factory rm <name>
 
 A factory is a named grouping in the store: \${WF_ROOT:-~/.agent-workflows}/factories/, one <name>.json per
-factory, naming the repositories its work is on:
+factory, naming the repositories its work is on and the agents it hires into workflows' steps:
 
-    { "repos": ["/home/me/code/app"] }
+    { "repos": ["/home/me/code/app"], "hires": { "build/implement": "ada" } }
 
   wf factory     lists the default factory first — every run and card that names no factory; it is no file,
                  and is read, never written — then each factory by name with its repositories. A file that
                  does not read as a factory is listed with why.
   wf factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
                  --repo at least, each a directory, written as an absolute path and named once. Git is not asked.
+  wf factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
+                 by its file's, without .md: one agent a step, so a second hire replaces the first. Any agent
+                 fills any step; it is found, when the run starts, where the step's own agent: would be.
+  wf factory fire takes a step's hire back.
   wf factory rm  removes a factory's file, one that does not read included.
 
+wf start --factory <name> starts a run in a factory: each step its hires fill runs as its agent, and the start
+is refused while a step names no agent and is hired none, or names its own agent and is hired one too. Started
+in the default factory — no --factory — a step that names no agent runs as a plain session.
+
 Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
-with a --repo that is not a directory, an add of a name already filed, and an rm of a name with no factory.`;
+with a --repo that is not a directory, an add of a name already filed, an rm, hire or fire of a name with no
+factory, a --step that is not <workflow>/<step>, and a fire of a step with no hire.`;
 
 /** `wf factory add`'s flags, after the name: `--repo <path>`, once per repository. */
 export function factoryAddHow(argv: string[]): { repos: string[] } {
@@ -35,6 +47,56 @@ export function factoryAddHow(argv: string[]): { repos: string[] } {
     twice: () => 'wf factory add takes --repo once per repository.',
   });
   return { repos: values['--repo'] ?? [] };
+}
+
+/** `--step <workflow>/<step>`, the one flag of `wf factory <verb>`, after `shape`, its positional arguments, as the refusals say them. */
+function stepFlag(verb: 'hire' | 'fire', shape: string, argv: string[]): string {
+  const { values } = readFlags(argv, {
+    takes: { '--step': `the step, as <workflow>/<step>: wf factory ${verb} ${shape} --step build/implement` },
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf factory ${verb} does not take ${arg}. It takes ${shape}, then --step <workflow>/<step>.`
+        : `wf factory ${verb} takes ${shape}, and ${arg} is one more: wf factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
+    twice: () => `wf factory ${verb} takes --step once: one step at a time.`,
+  });
+  const step = values['--step']?.[0];
+  if (step === undefined)
+    usage(`wf factory ${verb} names the step with --step: wf factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`);
+  return step;
+}
+
+/** `wf factory hire`'s arguments: the factory, the agent, then `--step`. */
+export function factoryHireHow(args: string[]): { factory: string; agent: string; step: string } {
+  const [factory, agent, ...more] = args;
+  if (factory === undefined || agent === undefined || factory.startsWith('--') || agent.startsWith('--'))
+    usage(
+      'wf factory hire takes the factory, then the agent: wf factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
+    );
+  return { factory, agent, step: stepFlag('hire', '<factory> <agent>', more) };
+}
+
+/** `wf factory fire`'s arguments: the factory, then `--step`. */
+export function factoryFireHow(args: string[]): { factory: string; step: string } {
+  const [factory, ...more] = args;
+  if (factory === undefined || factory.startsWith('--'))
+    usage('wf factory fire takes the factory first: wf factory fire <factory> --step <workflow>/<step>. Nothing was fired.');
+  return { factory, step: stepFlag('fire', '<factory>', more) };
+}
+
+/** `wf factory hire`: one agent hired into one step, and the agent it replaced, if any. */
+function factoryHire(args: string[]): void {
+  const how = factoryHireHow(args);
+  const { file, replaced } = hireAgent(how);
+  console.log(`${how.factory}  ${how.step} ← ${how.agent}${replaced === undefined ? '' : ` (was ${replaced})`}`);
+  console.log(`hired: ${file}`);
+}
+
+/** `wf factory fire`: one step's hire taken back. */
+function factoryFire(args: string[]): void {
+  const how = factoryFireHow(args);
+  const { file, fired } = fireAgent(how);
+  console.log(`${how.factory}  ${how.step}  fired ${fired}`);
+  console.log(`fired: ${file}`);
 }
 
 /** `wf factory ls`: the default factory, then each in the store. */
@@ -64,14 +126,16 @@ function factoryRm(args: string[]): void {
   console.log(`${name}  removed — ${file}`);
 }
 
-/** `wf factory` and its subcommands `ls` (the bare verb too), `add` and `rm`; anything else is refused, naming the three. */
+/** `wf factory` and its subcommands `ls` (the bare verb too), `add`, `hire`, `fire` and `rm`; anything else is refused, naming the five. */
 export function factoryVerb(rest: string[]): void {
   const [sub, ...args] = rest;
   if (sub === '--help') return console.log(FACTORY_HELP);
   if (sub === undefined || sub === 'ls') return factoryList(args);
   if (sub === 'add') return factoryAdd(args);
+  if (sub === 'hire') return factoryHire(args);
+  if (sub === 'fire') return factoryFire(args);
   if (sub === 'rm') return factoryRm(args);
   return usage(
-    `wf factory does not take ${sub}. It lists the factories — wf factory ls — files one with wf factory add <name> --repo <path>, and removes one with wf factory rm <name> (wf factory --help).`,
+    `wf factory does not take ${sub}. It lists the factories — wf factory ls — files one with wf factory add <name> --repo <path>, hires an agent into a step with wf factory hire <factory> <agent> --step <workflow>/<step>, fires it with wf factory fire <factory> --step <workflow>/<step>, and removes one with wf factory rm <name> (wf factory --help).`,
   );
 }

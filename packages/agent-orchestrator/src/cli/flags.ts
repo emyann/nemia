@@ -45,6 +45,10 @@ export const HELP = `wf — run a workflow of agent steps
                                repositories (wf factory --help)
   wf factory add <name> --repo <path> [--repo <path> ...]
                                file a factory: a lowercase slug naming one or more directories
+  wf factory hire <factory> <agent> --step <workflow>/<step>
+                               hire an agent into a workflow's step: one a step, a second replaces it
+  wf factory fire <factory> --step <workflow>/<step>
+                               take a step's hire back
   wf factory rm <name>         remove a factory's file
   wf tick [--stats]            one pass: tick the engine, file what became ready — refused while a
                                wf up ticks the store, since it runs the same pass (daemon.json);

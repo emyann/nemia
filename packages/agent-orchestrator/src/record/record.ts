@@ -99,6 +99,11 @@ type RunBase = {
    */
   gates?: string[];
   /**
+   * The factory the run was started in (`wf start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is one
+   * of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
+   */
+  factory?: string;
+  /**
    * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
    * — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a
    * person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when

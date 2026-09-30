@@ -3,6 +3,9 @@
  * anything is written: a workflow the factory has not attached, first; then a step left unfilled, or filled twice — by its own `agent:` and
  * a hire. Started in the default factory, every workflow is offered, and a step that names no agent is a plain session, as it always was.
  *
+ * And the factory on the run: its name frozen on the record, a factory with one repository giving the run its repository, and a git run on
+ * a repository outside the factory refused, naming its list; a folder team works on none, and a run in the default factory records none.
+ *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
 import { test } from 'node:test';
@@ -17,7 +20,8 @@ import { teamCopy } from './team.ts';
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, hireAgent, inboxDir, start } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent, inboxDir, repoFor, start } = await import('../src/runner.ts');
+const { readRun } = await import('../src/record/record.store.ts');
 const { startHow } = await import('../src/cli/start.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -211,4 +215,112 @@ test('wf start reads --factory once, and refuses it twice; on a card of the inbo
   );
   assert.ok(fs.existsSync(card), 'the card is left in the inbox');
   assert.deepEqual(runsWritten(), before);
+});
+
+/** Every step of `build` filled in `factory`: `implement` and `review` hired, `named` naming its own. */
+function hired(factory = 'pipao'): void {
+  hireAgent({ factory, agent: 'implementer', step: 'build/implement' });
+  hireAgent({ factory, agent: 'reviewer', step: 'build/review' });
+}
+
+/** What `wf <argv>` prints, typed from `cwd`, a line each. */
+async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
+  const lines: string[] = [];
+  const log = console.log;
+  const was = process.cwd();
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(' '));
+  };
+  process.chdir(cwd);
+  try {
+    await main(argv, {} as Engine);
+  } finally {
+    process.chdir(was);
+    console.log = log;
+  }
+  return lines.join('\n').split('\n');
+}
+
+/** The id of the run `wf start` printed first. */
+const startedId = (lines: readonly string[]): string => lines[0].split(' ')[0];
+
+test('a run started in a factory names it on its record, as written to disk', () => {
+  const { repo, build } = fresh();
+  hired();
+  const run = start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' });
+  assert.equal(run.factory, 'pipao');
+  assert.equal(readRun(run.id).factory, 'pipao');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')).factory, 'pipao');
+});
+
+test("REFUSED: a git run on a repository outside its factory, naming the factory's list, with no run written", () => {
+  const { repo, build } = fresh();
+  hired();
+  const other = aRepo();
+  const before = runsWritten();
+  assert.throws(
+    () => start({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' }),
+    (err: Error & { exitCode?: number; _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.exitCode === 2 &&
+      err.message ===
+        `${other}: the factory pipao works on ${repo}, and this repository is not one of them. Name one of them — --repo ${repo} — or start it in the default factory. Nothing was started.`,
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('a factory with one repository gives the run its repository: wf start --factory from any directory runs on it', async () => {
+  const { repo, build } = fresh();
+  hired();
+  assert.equal(repoFor('pipao', undefined, ROOT), repo);
+  assert.equal(repoFor('pipao', '/elsewhere', ROOT), '/elsewhere', 'a repository named is kept, for the start to judge');
+  assert.equal(repoFor(undefined, undefined, ROOT), ROOT);
+  const out = await typedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
+  const run = readRun(startedId(out));
+  assert.equal(run.repo, repo);
+  assert.equal(run.factory, 'pipao');
+  assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
+});
+
+test('a factory with two repositories: the one named, else where wf start is typed if it is one of them, else refused naming both', async () => {
+  const { build } = fresh();
+  const [first, second] = [aRepo(), aRepo()];
+  addFactory({ name: 'duo', repos: [first, second] });
+  attachWorkflow({ factory: 'duo', workflow: 'build' });
+  hired('duo');
+  const named = await typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'duo', '--repo', second, '--no-worktree']);
+  assert.equal(readRun(startedId(named)).repo, second);
+  const inside = await typedFrom(first, ['start', 'x', '--workflows', build, '--factory', 'duo', '--no-worktree']);
+  assert.equal(readRun(startedId(inside)).repo, first);
+  const before = runsWritten();
+  const listed = [first, second].sort().join(', ');
+  await assert.rejects(
+    typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'duo', '--no-worktree']),
+    (err: Error & { _tag?: string }) =>
+      err._tag === 'Invalid' &&
+      err.message.startsWith(`${ROOT}: the factory duo works on ${listed}, and this repository is not one of them`),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('a folder team started in a factory names it and works on no repository, wherever it is typed from', () => {
+  const { build } = fresh(['notes']);
+  const notes = path.join(path.dirname(build), 'notes');
+  fs.mkdirSync(notes);
+  fs.writeFileSync(path.join(notes, 'write.md'), '---\nworkspace: folder\nagent: implementer\n---\nWrite it.\n');
+  const run = start({ brief: 'a note', repo: ROOT, workflowDir: notes, factory: 'pipao' });
+  assert.equal(run.place?.kind, 'folder');
+  assert.equal(run.factory, 'pipao');
+  assert.equal(readRun(run.id).repo, undefined);
+});
+
+test('a run in the default factory — no --factory, or default — records no factory, and runs on the repository given', () => {
+  const { build } = fresh();
+  const other = aRepo();
+  for (const factory of [undefined, 'default']) {
+    const run = start({ brief: 'build it', repo: other, workflowDir: build, isolate: false, ...(factory ? { factory } : {}) });
+    assert.equal('factory' in run, false, String(factory));
+    assert.equal(run.repo, other);
+    assert.equal('factory' in readRun(run.id), false);
+  }
 });

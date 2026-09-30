@@ -218,6 +218,7 @@ const PINNED: Record<string, string[]> = {
     'remoteAgents',
     'removeAgent',
     'removeFactory',
+    'repoFor',
     'resultBranches',
     'resultSteps',
     'retry',

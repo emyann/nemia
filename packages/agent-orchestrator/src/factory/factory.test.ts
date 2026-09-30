@@ -8,9 +8,11 @@ import {
   defaultFactoryRefusal,
   factoryLines,
   factoryNameRefusal,
+  factoryRepo,
   fillsOf,
   hireRefusal,
   noFactoryLine,
+  outsideRefusal,
   unattachedRefusal,
   unfilledRefusal,
   workflowNameRefusal,
@@ -168,4 +170,23 @@ test('REFUSED: a start of a workflow its factory has not attached, saying what i
 test('the default factory is refused to attach and detach, since it offers every workflow and is never written', () => {
   assert.match(defaultFactoryRefusal('attach'), /wf factory attach does not take it\. It offers every workflow found already/);
   assert.match(defaultFactoryRefusal('detach'), /wf factory detach does not take it\. It offers every workflow found/);
+});
+
+test("the repository of a run in a factory: the one named, else the factory's only one, else where it is started from", () => {
+  const one = { repos: ['/r/pipao'] };
+  const two = { repos: ['/r/b', '/r/a'] };
+  assert.equal(factoryRepo(one, '/r/other', '/here'), '/r/other', 'a named repository over everything');
+  assert.equal(factoryRepo(one, undefined, '/here'), '/r/pipao', 'the only repository, wherever it is started from');
+  assert.equal(factoryRepo(two, undefined, '/here'), '/here', 'with two, where it is started from');
+  assert.equal(factoryRepo(undefined, undefined, '/here'), '/here', 'the default factory has no list');
+});
+
+test('REFUSED: a repository outside the factory, naming its list, sorted, and the --repo that starts it in one', () => {
+  const pipao = { name: 'pipao', repos: ['/r/b', '/r/a/'] };
+  assert.equal(outsideRefusal(pipao, '/r/a'), undefined, 'compared as path.resolve spells both');
+  assert.equal(outsideRefusal(pipao, '/r/b/'), undefined);
+  assert.equal(
+    outsideRefusal(pipao, '/r/c'),
+    '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or start it in the default factory. Nothing was started.',
+  );
 });

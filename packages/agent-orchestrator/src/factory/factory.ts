@@ -4,6 +4,7 @@
  *
  * The default factory holds everything that names no factory. It is no file: it is listed first, and never added, removed or hired into.
  */
+import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
@@ -123,6 +124,28 @@ export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, 
   if (factory.workflows.includes(workflow)) return undefined;
   const offers = factory.workflows.length ? `it offers: ${[...factory.workflows].sort().join(', ')}` : 'it offers none yet';
   return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it — wf factory attach ${factory.name} ${workflow} — or start it in the default factory, which offers every workflow. Nothing was started.`;
+}
+
+/**
+ * The repository a run in `factory` works on: `named` when a person named one, else the factory's repository when it has only one, else
+ * `fallback` — where `wf start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
+ * `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
+ */
+export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: string | undefined, fallback: string): string {
+  if (named !== undefined) return named;
+  if (factory?.repos.length === 1) return factory.repos[0];
+  return fallback;
+}
+
+/**
+ * Why a git run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as `path.resolve`
+ * spells it: the factory's list named, sorted, with the `--repo` that starts it in one.
+ */
+export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: string): string | undefined {
+  const repos = factory.repos.map((r) => path.resolve(r));
+  if (repos.includes(path.resolve(repo))) return undefined;
+  const sorted = [...repos].sort();
+  return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or start it in the default factory. Nothing was started.`;
 }
 
 /** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */

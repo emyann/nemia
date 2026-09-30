@@ -72,6 +72,7 @@ const runBase = {
   inputs: Schema.optional(Strings),
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
   gates: Schema.optional(Strings),
+  factory: Schema.optional(Schema.String),
   slotHeldAt: Schema.optional(Schema.String),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
@@ -151,9 +152,8 @@ export class UnreadableRecord extends Invalid {
 /** Each unreadable record said once a process: a daemon lists the runs every pass. */
 const saidAlready = new Set<string>();
 const sayOnce = (line: string): void => {
-  if (saidAlready.has(line)) return;
+  if (!saidAlready.has(line)) process.stderr.write(`${line}\n`);
   saidAlready.add(line);
-  process.stderr.write(`${line}\n`);
 };
 
 const isText = Schema.is(Schema.String);

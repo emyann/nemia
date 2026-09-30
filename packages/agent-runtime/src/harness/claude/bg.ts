@@ -134,14 +134,15 @@ type Registry = { listed: Map<string, SessionState>; pids: Map<string, number>; 
  * `--resume` of the same id is another attempt, never handed what was read of the one before. An attempt
  * is the row's name, its session, and the start `claude agents` gave it.
  */
-type Kept<T> = { value: T; readAt: number };
+type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number };
 
 /** An attempt's key in what is kept (`Kept`): the row's name, its session, and the start `claude agents` gave it. */
 const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
 
 /**
  * A runner's kept reads (`Kept`), over its clock and its two readers: `statementOf` and `usageOf` read an attempt's closeout
- * and usage through them, and `prune` lets go of every attempt not in the set it is given.
+ * and usage through them, and `prune` lets go of every attempt not in the set it is given. A read that throws — a transcript
+ * refused (`lines.ts`) — is kept as a value is, and thrown again while the transcript is unchanged, not read again.
  */
 const keptReads = (
   now: () => number,
@@ -159,14 +160,18 @@ const keptReads = (
   ): Promise<T> => {
     if (!keep) return read();
     const pin = kept.get(attempt);
-    if (pin) {
-      const written = await writtenAt();
-      if (written !== undefined && written < pin.readAt - MTIME_SLOP_MS) return pin.value;
+    const written = pin ? await writtenAt() : undefined;
+    let got = pin && written !== undefined && written < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
+    if (!got) {
+      const readAt = now();
+      got = await read().then(
+        (value) => ({ value }),
+        (refused: unknown) => ({ refused }),
+      );
+      kept.set(attempt, { read: got, readAt });
     }
-    const readAt = now();
-    const value = await read();
-    kept.set(attempt, { value, readAt });
-    return value;
+    if ('refused' in got) throw got.refused;
+    return got.value;
   };
   return {
     statementOf: (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
@@ -211,26 +216,33 @@ const sdkTranscriptTime = async (sessionId: string) => {
   }
 };
 
-/** A session's closing statement, read off its transcript (`lastStructuredOutput`), or `undefined` with no transcript or no read. */
-const transcriptCloseout = async (sessionId: string) => {
+/** A session's transcript, found and read, with where it is; `undefined` with no transcript, or when it cannot be read. */
+const transcriptText = async (sessionId: string) => {
   const file = transcriptFile(sessionId);
   if (!file) return undefined;
   try {
-    return lastStructuredOutput(await readTextAsync(file));
+    return { file, text: await readTextAsync(file) };
   } catch {
     return undefined;
   }
 };
 
-/** What a session consumed since `since`, read off its transcript (`transcriptUsage`), or `undefined` with no transcript or no read. */
+/**
+ * A session's closing statement, read off its transcript (`lastStructuredOutput`), or `undefined` with no transcript or no read.
+ * Throws the refusal of a transcript whose lines do not decode.
+ */
+const transcriptCloseout = async (sessionId: string) => {
+  const read = await transcriptText(sessionId);
+  return read && lastStructuredOutput(read.text, read.file);
+};
+
+/**
+ * What a session consumed since `since`, read off its transcript (`transcriptUsage`), or `undefined` with no transcript or no read.
+ * Throws the refusal of a transcript whose lines do not decode.
+ */
 const transcriptUsageSince = async (sessionId: string, since: number) => {
-  const file = transcriptFile(sessionId);
-  if (!file) return undefined;
-  try {
-    return transcriptUsage(await readTextAsync(file), since);
-  } catch {
-    return undefined;
-  }
+  const read = await transcriptText(sessionId);
+  return read && transcriptUsage(read.text, since, read.file);
 };
 
 /**
@@ -414,7 +426,7 @@ const observeInto = (x: Reading, registry: Registry): RunnerOps['observe'] =>
     }),
     Effect.flatMap((m) => {
       x.kept.prune(new Set([...m].map(([name, { sighting, startedAt }]) => attemptOf(name, sighting, startedAt))));
-      return Effect.forEach([...m], ([name, { sighting, startedAt }]) => Effect.promise(() => reportOf(x, name, sighting, startedAt)), {
+      return Effect.forEach([...m], ([name, { sighting, startedAt }]) => reportedOf(x, name, sighting, startedAt), {
         concurrency: 'unbounded',
       }).pipe(Effect.map((entries) => new Map(entries)));
     }),
@@ -462,6 +474,21 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
     pid: row.pid ?? undefined,
   };
 };
+
+/**
+ * `reportOf`, failing with a `RunnerError` for `observe` when a read of the session's transcript throws — its lines do not decode
+ * (`lines.ts`): a statement or usage the transcript holds and the runtime cannot read is no absence, so the whole listing fails and
+ * each background session is unread.
+ */
+const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: number | undefined) =>
+  Effect.tryPromise({
+    try: () => reportOf(x, name, sighting, startedAt),
+    catch: (cause) =>
+      new RunnerError({
+        verb: 'observe',
+        message: `claude --bg: ${name} (${sighting.sessionId}): ${cause instanceof Error ? cause.message : String(cause)}`,
+      }),
+  });
 
 /**
  * One listed session as `observe` reports it, by this harness's own definition of finished. The clock is the transcript's

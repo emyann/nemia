@@ -330,6 +330,7 @@ test('the recap line is one line, and says — where nothing was measured', () =
   const line = statsLine(statsOf({ tries: [], runs: [] }, {}, NOW));
   assert.equal(line.split('\n').length, 1);
   assert.match(line, /— \(—\) rounds/);
+  assert.match(line, /— \(—\) landed/, 'a fortnight with no run finished recorded no landing');
 });
 
 test('a loop that asked for another round leaves a run with no ending waiting, until a person accepts it', () => {

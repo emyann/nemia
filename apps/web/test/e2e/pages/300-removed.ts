@@ -24,7 +24,8 @@ export default {
   /**
    * A run removed while a person has its page open, and one of its steps' too, as `wf rm` removes it: its record gone from the store, and
    * the feed says `removed`. Each page reads the run's record again, finds none, and says the run is gone in place of what it drew — at
-   * once, the 404 not tried again. Its record is put back before the pages are closed, and said on the feed, and the list, read again, has it.
+   * once, the 404 not tried again. Its record is put back before the pages are closed, and said on the feed, and the list, read again, has
+   * it.
    */
   name: 'removed',
   route: '/runs',

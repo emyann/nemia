@@ -48,9 +48,9 @@ const SECONDARY =
 
 /**
  * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
- * refused with, by card, since the inbox is read again after each answer: a card gone behind the page's back leaves the list, and its refusal
- * stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray file
- * beside it answer to one name, and a refusal is of one of them.
+ * refused with, by card, since the inbox is read again after each answer: a card gone behind the page's back leaves the list, and its
+ * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
+ * file beside it answer to one name, and a refusal is of one of them.
  */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
@@ -115,10 +115,10 @@ function WorkflowOptions({ workflows }: { workflows: readonly WorkflowListing[] 
 }
 
 /**
- * The box that files a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is known; and the
- * repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's refusal in full, with the
- * idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository, and the api refuses a card
- * for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed before.
+ * The box that files a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does: the idea; what runs it, when it is known; and
+ * the repository it is about, the api's own until a person changes it — empty, for a card that names none. Then the api's refusal in full,
+ * with the idea kept to send again. A workflow whose every step works in a folder (`folderTeam`) looks at no repository, and the api
+ * refuses a card for one that names one: once it is picked, the box goes, and no repository is sent, whatever a person typed before.
  */
 function FileCard() {
   const queryClient = useQueryClient();
@@ -231,8 +231,8 @@ function FileCard() {
  * which only the start's answer carries, so a later visit says it was started, and not why.
  *
  * What its start, drop, queue or unqueue was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot.
- * Remove, Queue and Unqueue read the inbox again whatever the answer, so a card dropped, queued or started behind the page's back reads as it is; a
- * card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
+ * Remove, Queue and Unqueue read the inbox again whatever the answer, so a card dropped, queued or started behind the page's back reads as
+ * it is; a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
 function CardItem({
   entry,
@@ -445,8 +445,8 @@ function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; refusal: C
 }
 
 /**
- * The tick's last try of a queued card's start, which did not start it (`triedLine`): refused, in amber — it stays queued and waits for you; failed
- * otherwise, muted — the tick tries it again on the next pass.
+ * The tick's last try of a queued card's start, which did not start it (`triedLine`): refused, in amber — it stays queued and waits for
+ * you; failed otherwise, muted — the tick tries it again on the next pass.
  */
 function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
   const { refused } = entry.tried;

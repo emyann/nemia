@@ -22,10 +22,10 @@ export function Reach({ label, children }: { label: string; children: ReactNode 
 }
 
 /**
- * What a Claude Code step runs without being asked: Claude Code's read-only commands, which ask for no rule in any mode unless an ask rule names
- * one, then what the settings allow of what asks. In `dontAsk` the rest of what asks is denied without a prompt, so the part is its Bash; in any
- * other mode, what asks is the mode's to decide, and on a job, which asks nobody, what would still ask is denied (`askDenier`). Then the allows a
- * deny takes back, those an ask rule takes back, and those of a tool the step does not have.
+ * What a Claude Code step runs without being asked: Claude Code's read-only commands, which ask for no rule in any mode unless an ask rule
+ * names one, then what the settings allow of what asks. In `dontAsk` the rest of what asks is denied without a prompt, so the part is its
+ * Bash; in any other mode, what asks is the mode's to decide, and on a job, which asks nobody, what would still ask is denied
+ * (`askDenier`). Then the allows a deny takes back, those an ask rule takes back, and those of a tool the step does not have.
  */
 export function AllowedReach({
   allowed,
@@ -143,7 +143,10 @@ export function AllowedReach({
   );
 }
 
-/** After an allow that stands, what of it a narrower deny still refuses, and what a narrower ask rule still makes ask — in dontAsk, or on a job, denied. */
+/**
+ * After an allow that stands, what of it a narrower deny still refuses, and what a narrower ask rule still makes ask — in dontAsk, or on a
+ * job, denied.
+ */
 function Exceptions({
   of,
   except,
@@ -176,9 +179,10 @@ function Exceptions({
 const named = (command: string) => (command === 'git' ? 'read-only git' : command);
 
 /**
- * Claude Code's read-only commands as they reach a step: solid where they were measured running without a rule, dashed where only its docs say
- * so, amber where an ask rule makes one ask, struck where a deny refuses the whole command or, in dontAsk or on a job, an ask rule does — each said
- * with its rule — then the day and the version it was measured on, and where that is recorded: a measurement of that day, never claimed current.
+ * Claude Code's read-only commands as they reach a step: solid where they were measured running without a rule, dashed where only its docs
+ * say so, amber where an ask rule makes one ask, struck where a deny refuses the whole command or, in dontAsk or on a job, an ask rule does
+ * — each said with its rule — then the day and the version it was measured on, and where that is recorded: a measurement of that day, never
+ * claimed current.
  */
 function ReadOnly({
   readOnly,

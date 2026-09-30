@@ -46,8 +46,8 @@ const MS_IN_S = 1000;
 
 /**
  * A thought's fold: open as `open` says, or on a state of its own from `defaultOpen`, driving the `Collapsible` with `isExpanded` and
- * `onExpandedChange`; `onOpenChange` is told of each change. It times the streaming — how long it took is read off a clock as it ends, not in
- * a render — unless `duration` is given, and where it opened by default, it folds itself once, a second after the streaming ends.
+ * `onExpandedChange`; `onOpenChange` is told of each change. It times the streaming — how long it took is read off a clock as it ends, not
+ * in a render — unless `duration` is given, and where it opened by default, it folds itself once, a second after the streaming ends.
  */
 export const Reasoning = memo(
   ({
@@ -152,8 +152,8 @@ export type ReasoningContentProps = Omit<ComponentProps<typeof CollapsibleConten
 };
 
 /**
- * The thought, drawn only while it is open: a `DisclosurePanel` keeps its children mounted and hidden. `className` styles what is drawn, not
- * the panel: a panel hidden `until-found` is still laid out, so a margin or a border on it would show under a closed thought.
+ * The thought, drawn only while it is open: a `DisclosurePanel` keeps its children mounted and hidden. `className` styles what is drawn,
+ * not the panel: a panel hidden `until-found` is still laid out, so a margin or a border on it would show under a closed thought.
  */
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isOpen } = useReasoning();

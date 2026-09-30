@@ -59,8 +59,8 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
 }
 
 /**
- * A file, rendered — what `children` draws of it — or as written: a toggle between the two, the file's path beside it. As written is the text
- * whole, frontmatter included, as an editor shows it; nothing on the page writes to it.
+ * A file, rendered — what `children` draws of it — or as written: a toggle between the two, the file's path beside it. As written is the
+ * text whole, frontmatter included, as an editor shows it; nothing on the page writes to it.
  */
 export function AsWritten({ file, source, children }: { file: string; source: string; children: ReactNode }) {
   const [shown, setShown] = useState(false);

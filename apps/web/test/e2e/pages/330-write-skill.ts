@@ -26,12 +26,12 @@ const wrote = (page: Page, method: 'POST' | 'PUT', pathname: string) =>
 export default {
   /**
    * A skill of your own, written on the board. In a page of its own, a new skill named as one your library has already is refused in the
-   * package's words, and nothing is written. Then `scribe` names a skill nobody has yet, and New skill, from the Agents page, writes it: its
-   * folder in your library, its SKILL.md as the package renders it. Its page says `scribe` gives it and what it costs a turn; the switch,
-   * pressed by its label, loads it every turn, says a change of it changes every agent that gives it, and moves `scribe`'s version. A saved
-   * edit of its description keeps the switch's line and moves the version again. In a page of its own, a save under a hand edit of the file
-   * is refused as stale: the page keeps the typed words and says the file moved, and Read it again shows the file. The Agents page lists
-   * the skill under your library. The page takes the skill and `scribe`'s file back, so each visit reads the store as seeded.
+   * package's words, and nothing is written. Then `scribe` names a skill nobody has yet, and New skill, from the Agents page, writes it:
+   * its folder in your library, its SKILL.md as the package renders it. Its page says `scribe` gives it and what it costs a turn; the
+   * switch, pressed by its label, loads it every turn, says a change of it changes every agent that gives it, and moves `scribe`'s version.
+   * A saved edit of its description keeps the switch's line and moves the version again. In a page of its own, a save under a hand edit of
+   * the file is refused as stale: the page keeps the typed words and says the file moved, and Read it again shows the file. The Agents page
+   * lists the skill under your library. The page takes the skill and `scribe`'s file back, so each visit reads the store as seeded.
    */
   name: 'write-skill',
   route: '/agents',

@@ -22,9 +22,9 @@ const RouterLinkButton = routeLink(LinkButton);
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 
 /**
- * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of thing
- * a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it. Then the
- * skills an agent can be given, by place, each linked to its page.
+ * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of
+ * thing a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it.
+ * Then the skills an agent can be given, by place, each linked to its page.
  */
 function AgentsPage() {
   const { data: agents } = useSuspenseQuery(agentsQuery);

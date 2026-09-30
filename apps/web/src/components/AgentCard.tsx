@@ -7,8 +7,8 @@ const STATS: readonly AgentRoleKey[] = ['model', 'effort', 'harness'];
 /**
  * One agent as a character card: its face large on its own plate, its name as a person's with the job it holds, what it is for, what it
  * can do, its model, effort and harness where it sets them, and the nodes that name it. The whole card opens the agent's page, where every
- * other key, the skills it gives and its system prompt are; its name is the one link there, stretched over the card, and the nodes' links sit
- * above it.
+ * other key, the skills it gives and its system prompt are; its name is the one link there, stretched over the card, and the nodes' links
+ * sit above it.
  */
 export function AgentCard({ agent }: { agent: AgentListing }) {
   return (

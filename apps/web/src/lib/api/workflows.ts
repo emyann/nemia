@@ -18,7 +18,10 @@ export type WorkflowStepSpec = {
   agent: string | null;
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
-  /** Codex's sandbox (`sandbox:`, or `permissionMode:` where a codex step's file names its sandbox under that key): null on Claude Code, and where a codex step names none. */
+  /**
+   * Codex's sandbox (`sandbox:`, or `permissionMode:` where a codex step's file names its sandbox under that key): null on Claude Code, and
+   * where a codex step names none.
+   */
   sandbox: string | null;
   tools: string[] | null;
   /** What the session may not have (`disallowedTools:`): empty where the step denies nothing. */
@@ -104,7 +107,10 @@ export type WorkflowStepPage = {
   body: string;
   source: string;
   keys: KeyRow[];
-  /** What the agent this step names says it can do, read beside the workflow — null for a step with no agent, or one whose skills do not read. */
+  /**
+   * What the agent this step names says it can do, read beside the workflow — null for a step with no agent, or one whose skills do not
+   * read.
+   */
   agentSkills: AgentSkill[] | null;
 };
 
@@ -135,10 +141,12 @@ export type Started = { id: string; removed?: boolean; why?: string };
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
  * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
- * on), or the api's own about the request; and an answer that succeeded without an id, saying the run may have started. `after` names the runs it waits on, as `--after` does; left out when there are none.
+ * on), or the api's own about the request; and an answer that succeeded without an id, saying the run may have started. `after` names the
+ * runs it waits on, as `--after` does; left out when there are none.
  *
  * `card` starts an inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the card
- * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started already.
+ * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
+ * already.
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */

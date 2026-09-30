@@ -160,14 +160,17 @@ export function StepNode({
 /** A step's place in its workflow's order, as its node heads it: `step 01`. */
 const stepLabel = (index: number): string => `step ${String(index + 1).padStart(2, '0')}`;
 
-/** Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the default. */
+/**
+ * Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the
+ * default.
+ */
 const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
   `${spec.agent ? `${spec.agent} · ` : ''}${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
 
 /**
- * A step of a workflow no run has started: `index` is its place in the workflow's order, `spec` what its frontmatter sets. `build` while the
- * builder has it (`WorkflowBuilder`): whether it has changes not saved, whether the last save was refused for it, and whether it is the one
- * its form shows.
+ * A step of a workflow no run has started: `index` is its place in the workflow's order, `spec` what its frontmatter sets. `build` while
+ * the builder has it (`WorkflowBuilder`): whether it has changes not saved, whether the last save was refused for it, and whether it is the
+ * one its form shows.
  */
 export type SpecNodeData = {
   name: string;
@@ -185,10 +188,10 @@ export const HARNESS_OWN = "harness's own";
 
 /**
  * What a step is set to do beyond what it runs on, as its node lists it: its check, its effort, its context window, its tools, its
- * permission mode and its loop. The check, the window, the mode and the loop only when the step sets them; the effort and the tools always, `harness's own` where
- * it sets none — what a session runs with is the thing a person reads a workflow for, and a step that says nothing gets the most.
- * The rest of its keys are on the step's file. A line's `title`, when it has one, is what its value stands for — the tools' names,
- * where the value counts them — and is the value itself otherwise.
+ * permission mode and its loop. The check, the window, the mode and the loop only when the step sets them; the effort and the tools always,
+ * `harness's own` where it sets none — what a session runs with is the thing a person reads a workflow for, and a step that says nothing
+ * gets the most. The rest of its keys are on the step's file. A line's `title`, when it has one, is what its value stands for — the tools'
+ * names, where the value counts them — and is the value itself otherwise.
  */
 export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string, title?: string]> {
   const lines: Array<[string, string, string?]> = [];
@@ -271,10 +274,10 @@ export function SpecNode({
 const HANDLE = '!size-3 !border-2 !border-white dark:!border-neutral-900';
 
 /**
- * The spec node while the builder has it: the same head and lines, with handles a person draws edges with. Drag from the right-hand dot to a
- * step's left-hand dot and that step waits on this one (`after:`); drag from the violet dot underneath to another step and this one runs that
- * step again (`loop:`). The dot a loop comes into sits beside it, and takes no drag of its own. A step not saved says so under its name, and a
- * step the last save was refused for is drawn in red.
+ * The spec node while the builder has it: the same head and lines, with handles a person draws edges with. Drag from the right-hand dot to
+ * a step's left-hand dot and that step waits on this one (`after:`); drag from the violet dot underneath to another step and this one runs
+ * that step again (`loop:`). The dot a loop comes into sits beside it, and takes no drag of its own. A step not saved says so under its
+ * name, and a step the last save was refused for is drawn in red.
  */
 function BuildingNode({
   name,
@@ -369,8 +372,8 @@ function BuildingNode({
 }
 
 /**
- * What a gate's node says after `waiting on you`: what approving does in a line (`approve ship to run it`, `approve plan's hand-off`), whose
- * whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
+ * What a gate's node says after `waiting on you`: what approving does in a line (`approve ship to run it`, `approve plan's hand-off`),
+ * whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
  */
 const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
   need.kind === 'approve'

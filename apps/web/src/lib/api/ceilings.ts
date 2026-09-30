@@ -7,9 +7,9 @@ import { get } from './read.ts';
 export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'git' | 'assess' | 'act';
 
 /**
- * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started; each
- * harness's observes (at once in a pass, so their times overlap); the run records read, the totals, what measuring it took, and the runs at
- * rest it answered from memory.
+ * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started;
+ * each harness's observes (at once in a pass, so their times overlap); the run records read, the totals, what measuring it took, and the
+ * runs at rest it answered from memory.
  */
 export type PassCost = {
   at: string;

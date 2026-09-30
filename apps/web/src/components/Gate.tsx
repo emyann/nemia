@@ -19,11 +19,11 @@ import { when } from './Facts';
 
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things `wf ls` says a person can do. Approve, with a box for the
- * words every step after the gate is handed under `## Approved` — `wf approve --message`, which may be left empty. And Send back, the answer
- * box: an objection the step's next try is told, continuing its session or in a new one — `wf retry --message`, which needs words. Each is
- * the api's (`approveStep`, `askTry`), through the package, which writes a person's file and nothing else; its refusal shows beside the
- * button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does with it, until the run is
- * read again and the step says it: approved under the step, or the try asked in its note.
+ * words every step after the gate is handed under `## Approved` — `wf approve --message`, which may be left empty. And Send back, the
+ * answer box: an objection the step's next try is told, continuing its session or in a new one — `wf retry --message`, which needs words.
+ * Each is the api's (`approveStep`, `askTry`), through the package, which writes a person's file and nothing else; its refusal shows beside
+ * the button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does with it, until the run
+ * is read again and the step says it: approved under the step, or the try asked in its note.
  *
  * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself, which is the default and §6's
  * gate; or, at an ending step's gate — held before the step is filed — the steps it waits on, whose work the objection is about, since the
@@ -253,8 +253,9 @@ export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): bool
  * Where each result branch stands against the base branch and how much it changed, in the package's words (`branchWord`, `diffStat`, off
  * the run's decision, which the Decide section on this page has already read for this state of the run); then, for each step the ending
  * waits on — the steps a send-back goes to (`sendBackTo`) — the closeout it handed on, rendered, with the files it named. That is the
- * whole of what there is to read: the ending has run nothing and said nothing. Git's own `--shortstat` sits under each branch, as `wf decide`
- * prints it beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the ending's spec reads.
+ * whole of what there is to read: the ending has run nothing and said nothing. Git's own `--shortstat` sits under each branch, as
+ * `wf decide` prints it beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the
+ * ending's spec reads.
  */
 export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps'][number] }) {
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidableRun(run) });
@@ -331,8 +332,8 @@ export const gateWord = (gate: StepGate, ends = false): string =>
  * after the gate is handed under `## Approved`.
  *
  * `ends` for the step that ends the run in the checkout (`endsTheRun`): nothing follows its gate, and the package hands the words to that
- * step itself — the terms it acts on (`approvedSection` in agent-orchestrator). Its approval is also what filed it, so the sentence says that
- * and not that something after it was let through.
+ * step itself — the terms it acts on (`approvedSection` in agent-orchestrator). Its approval is also what filed it, so the sentence says
+ * that and not that something after it was let through.
  */
 export function Approved({ step, approval, ends = false }: { step: string; approval: StepApproval; ends?: boolean }) {
   return (

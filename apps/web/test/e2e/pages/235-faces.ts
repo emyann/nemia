@@ -72,9 +72,10 @@ const twoFrames = (page: Page) =>
   page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
 
 /**
- * Each face follows the pointer to either side of the page, from its rest. Its rest is measured with reduced motion asked for, when its driver
- * stands down and writes nothing; once the person no longer asks, the eyes go left with the pointer and right with it. Asked again with the
- * page open, they go back to their rest and stay there wherever the pointer goes; no longer asked, they follow again, without a reload.
+ * Each face follows the pointer to either side of the page, from its rest. Its rest is measured with reduced motion asked for, when its
+ * driver stands down and writes nothing; once the person no longer asks, the eyes go left with the pointer and right with it. Asked again
+ * with the page open, they go back to their rest and stay there wherever the pointer goes; no longer asked, they follow again, without a
+ * reload.
  */
 async function follows(page: Page, face: string, size: number, who: string) {
   const at = page.locator(face);
@@ -116,9 +117,9 @@ async function follows(page: Page, face: string, size: number, who: string) {
 
 export default {
   /**
-   * The agents' faces are alive and follow the pointer: each face on the list, and the face at the head of an agent's own page, breathes and
-   * blinks with nothing hovering it, and turns its eyes toward the pointer, measured, not pictured. Each is still named as a person is, and
-   * a person who asks for reduced motion sees it still. Read-only.
+   * The agents' faces are alive and follow the pointer: each face on the list, and the face at the head of an agent's own page, breathes
+   * and blinks with nothing hovering it, and turns its eyes toward the pointer, measured, not pictured. Each is still named as a person is,
+   * and a person who asks for reduced motion sees it still. Read-only.
    */
   name: 'faces',
   route: '/agents',

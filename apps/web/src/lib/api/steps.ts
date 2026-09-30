@@ -33,7 +33,9 @@ export const transcriptPath = (runId: string, step: string) =>
 export const readTranscript = (runId: string, step: string, signal?: AbortSignal) =>
   get<StepTranscript>(transcriptPath(runId, step), { signal });
 
-/** Mirrors the runtime's `LifecycleStep`: the lifecycle state a task's journal says once an entry is on it, the entry's kind and its `at`. */
+/**
+ * Mirrors the runtime's `LifecycleStep`: the lifecycle state a task's journal says once an entry is on it, the entry's kind and its `at`.
+ */
 export type LifecycleStep = { state: string; event: string; at: string };
 
 /** Mirrors `StepPath` in apps/api/src/steps/path.ts: a try's task, the try's number, and the task's path to the end of that try. */

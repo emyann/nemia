@@ -68,9 +68,10 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
 });
 
 /**
- * The phases as the package words them: `wf up --stats` over a store holding this pass, its CLI. The web imports nothing of the package, and
- * reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. A phase the
- * package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or moved.
+ * The phases as the package words them: `wf up --stats` over a store holding this pass, its CLI. The web imports nothing of the package,
+ * and reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. A phase
+ * the package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or
+ * moved.
  */
 function packagePhases(pass: PassCost): string[] {
   const store = scratch('web-pass-');

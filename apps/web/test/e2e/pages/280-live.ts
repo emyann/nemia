@@ -15,9 +15,10 @@ const OLD_POLL_WINDOW_MS = 6_000;
 export default {
   /**
    * The board follows the workflow feed, and reads what moves on it at once: one stream for the page, kept across a navigation inside the
-   * board. An approval written behind the page's back — through the api, as `wf approve` from a terminal would be — is not read while nothing
-   * says so, for longer than a poll every 5 s would take; once the feed says plan moved, as the tick would, the page shows the approval within
-   * `LIVE_MS`. Taken back the same way, so every page after this one, and this one in the other theme, reads the store as seeded.
+   * board. An approval written behind the page's back — through the api, as `wf approve` from a terminal would be — is not read while
+   * nothing says so, for longer than a poll every 5 s would take; once the feed says plan moved, as the tick would, the page shows the
+   * approval within `LIVE_MS`. Taken back the same way, so every page after this one, and this one in the other theme, reads the store as
+   * seeded.
    */
   name: 'live',
   route: `/runs/${GATED.id}`,

@@ -10,8 +10,8 @@ export class ReadRefusal extends Error {
 }
 
 /**
- * Reads `path` from the api: resolves with its JSON; rejects with a `ReadRefusal` in the api's own words (its `error`, which says what to do
- * next) where it gave them, else naming the status.
+ * Reads `path` from the api: resolves with its JSON; rejects with a `ReadRefusal` in the api's own words (its `error`, which says what to
+ * do next) where it gave them, else naming the status.
  */
 export async function get<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);

@@ -67,13 +67,16 @@ export const FAKE = {
   capped: 'apps/web/test/theme.test.ts',
   /** What `tokens`' session consumed, in `wf decide`'s words. */
   used: '14 turns · 31 tool calls · 112k in · 6.35k out',
-  /** What `tokens` named in its closeout: an image and a text file in its files directory, which the api serves, and a path on its branch. */
+  /**
+   * What `tokens` named in its closeout: an image and a text file in its files directory, which the api serves, and a path on its branch.
+   */
   artifacts: { image: 'palette.png', text: 'tokens.txt', path: 'TOKENS.md' },
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
   /**
    * Where its time went, off the engine's attempts and the filings on its feed (`seedFeed`): each step that signed off was spawned a minute
-   * after it was filed — `[queued, ran]` — and theme's check at once. review's task has no journal, so the run's totals leave it out and say so.
+   * after it was filed — `[queued, ran]` — and theme's check at once. review's task has no journal, so the run's totals leave it out and
+   * say so.
    */
   timeline: {
     sessions: { implement: ['1m00s', '29m00s'], tokens: ['1m00s', '9m00s'], theme: ['1m00s', '19m00s'] },
@@ -215,10 +218,11 @@ export const NEIGHBOUR = {
 } as const;
 
 /**
- * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: `claude agents` lists it at work, with the pid Claude Code registers it
- * under — `claude/sessions/<pid>.json` in the store, the e2e's CLAUDE_CONFIG_DIR, whose `messagingSocketPath` is INBOX — and its conversation so
- * far is on disk (DRAFT_TRANSCRIPT): the prompt, words, and a call still waiting on its result. run.ts listens on INBOX, standing in for the
- * session's inbox, and writes into that file what a working session writes when it reads the words between calls (`arrivalLine`).
+ * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: `claude agents` lists it at work, with the pid Claude Code registers
+ * it under — `claude/sessions/<pid>.json` in the store, the e2e's CLAUDE_CONFIG_DIR, whose `messagingSocketPath` is INBOX — and its
+ * conversation so far is on disk (DRAFT_TRANSCRIPT): the prompt, words, and a call still waiting on its result. run.ts listens on INBOX,
+ * standing in for the session's inbox, and writes into that file what a working session writes when it reads the words between calls
+ * (`arrivalLine`).
  */
 export const SAYING = {
   run: NEIGHBOUR.id,
@@ -239,8 +243,8 @@ export const INBOX = 'inbox.sock';
 export const DRAFT_TRANSCRIPT = path.join('claude', 'projects', '-code-hkb-v2', `${SAYING.sessionId}.jsonl`);
 
 /**
- * The line a working Claude Code session writes into its transcript when it reads words another process posted to its inbox, between calls: a
- * `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-runtime's transcript test), for the words `prompt`, at `at`.
+ * The line a working Claude Code session writes into its transcript when it reads words another process posted to its inbox, between calls:
+ * a `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-runtime's transcript test), for the words `prompt`, at `at`.
  */
 export function arrivalLine(prompt: string, at: string): string {
   const uuid = `draft-arrival-${Date.parse(at)}`;
@@ -320,13 +324,13 @@ export const HELD = {
 } as const;
 
 /**
- * A fifth run: what it cost. `tokens` has `budget: 3`, and its two tries — the second a person's nudge — cost $1.75 and $2.50, each refused by
- * its check: `over budget $4.25 of $3`, raised with its try. `implement` has `budget: 2`, and `review` loops back to it: implement's two rounds
- * cost $1.20 and $0.90, review's two sessions ran on Codex, which prices nothing, and review asked for a third round, which would file implement
- * again past its cap — so both read `over budget`, raised with review's round. `palette` has `budget: 1`, and its one session cost $1.50 and
- * signed off blocked with a question: `over budget $1.50 of $1`, answered with its raise. The run cost `≥$7.85`: review's sessions have no cost
- * on them. Nothing of it moves, and it waits on you: finished, off the Factory's floor until finished runs are shown. Newer than every run but
- * the diamond's.
+ * A fifth run: what it cost. `tokens` has `budget: 3`, and its two tries — the second a person's nudge — cost $1.75 and $2.50, each refused
+ * by its check: `over budget $4.25 of $3`, raised with its try. `implement` has `budget: 2`, and `review` loops back to it: implement's two
+ * rounds cost $1.20 and $0.90, review's two sessions ran on Codex, which prices nothing, and review asked for a third round, which would
+ * file implement again past its cap — so both read `over budget`, raised with review's round. `palette` has `budget: 1`, and its one
+ * session cost $1.50 and signed off blocked with a question: `over budget $1.50 of $1`, answered with its raise. The run cost `≥$7.85`:
+ * review's sessions have no cost on them. Nothing of it moves, and it waits on you: finished, off the Factory's floor until finished runs
+ * are shown. Newer than every run but the diamond's.
  */
 export const COSTLY = {
   id: 'what-it-cost-e2e10',
@@ -334,7 +338,10 @@ export const COSTLY = {
   steps: ['implement', 'review', 'tokens', 'palette'],
   /** What the run cost, on its card, its row on Runs and its page's header: `≥`, since review's sessions were not priced. */
   cost: '≥$7.85',
-  /** The step that signed off blocked past its budget, answered with its raise: its word, what it cost of its cap, its question, and where its raise starts. */
+  /**
+   * The step that signed off blocked past its budget, answered with its raise: its word, what it cost of its cap, its question, and where
+   * its raise starts.
+   */
   asks: {
     step: 'palette',
     status: 'over budget $1.50 of $1',
@@ -360,8 +367,8 @@ export const COSTLY = {
   rounds: ['≥$1.20', '≥$0.90'],
   /**
    * What the sessions read, by price. The run's, in its header: every try's classes, and no peak, since Codex reports none — and tokens'
-   * second try, which continued its first, wrote its context to the cache again. tokens' own, under its `context: 200k`: it compacted, so it
-   * reached its cap, short of it in tokens, and the rebuild. palette's, with no cap, past 200k.
+   * second try, which continued its first, wrote its context to the cache again. tokens' own, under its `context: 200k`: it compacted, so
+   * it reached its cap, short of it in tokens, and the rebuild. palette's, with no cap, past 200k.
    */
   read: {
     run: 'read 5.9M · wrote 690k',
@@ -372,11 +379,11 @@ export const COSTLY = {
 } as const;
 
 /**
- * A sixth run, gated: `plan → implement`, started `--gate plan`, the gate frozen on its record as `wf start` freezes it (`gates`). plan signed
- * off done with a plan in markdown, and nothing after it is filed: it reads `awaiting approval` and waits on you — `approve plan` — and nothing
- * of the run moves, so it is finished, off the Factory's floor until finished runs are shown. Newest of every run, so its card takes the
- * last cell and moves none of the others. The `gate` page approves plan and sends it back from its page, taking each file back, and makes
- * its refusal — an approval of a step that is not gated — in a page of its own.
+ * A sixth run, gated: `plan → implement`, started `--gate plan`, the gate frozen on its record as `wf start` freezes it (`gates`). plan
+ * signed off done with a plan in markdown, and nothing after it is filed: it reads `awaiting approval` and waits on you — `approve plan` —
+ * and nothing of the run moves, so it is finished, off the Factory's floor until finished runs are shown. Newest of every run, so its card
+ * takes the last cell and moves none of the others. The `gate` page approves plan and sends it back from its page, taking each file back,
+ * and makes its refusal — an approval of a step that is not gated — in a page of its own.
  */
 export const GATED = {
   id: 'read-the-plan-first-e2e11',
@@ -422,7 +429,9 @@ export const ENDING = {
   ending: 'ship',
   /** The step a send-back at that gate goes to: the work it would act on, not the step at the gate (`sendBackTo`). */
   back: 'review',
-  /** What ship's prose says first, which is the whole of what a person is deciding: `wf ls`'s `→ to decide:` line is this and the command. */
+  /**
+   * What ship's prose says first, which is the whole of what a person is deciding: `wf ls`'s `→ to decide:` line is this and the command.
+   */
   says: 'Merge this run onto the base branch, or abort on any failure.',
   /** Its result branch, which review worked on and ship would merge. */
   branch: 'wf/ship-it-or-send-it-back-e2e12/implement',
@@ -529,9 +538,9 @@ export const FOLDER = {
  *
  * Every step works under the run's own directory in the store, and `review` continues `write`'s folder, as a chain does. The brief says no
  * git word of its own: the folder page sweeps everything the page draws, so a git word found there can only have come from the board. Each
- * step is filed as the run files a folder step, in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it ran
- * in rather than the engine's default. Its journal puts the mode beside the task's fields rather than under `config`, a shape the runtime
- * reads in today's (`upgrade` in agent-runtime's journal.ts): the folder page's `dontAsk` proves such a journal reaches the board.
+ * step is filed as the run files a folder step, in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it
+ * ran in rather than the engine's default. Its journal puts the mode beside the task's fields rather than under `config`, a shape the
+ * runtime reads in today's (`upgrade` in agent-runtime's journal.ts): the folder page's `dontAsk` proves such a journal reaches the board.
  */
 export function seedFolder(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -811,7 +820,10 @@ export const CHECKOUT = {
   missing: { name: 'missing', command: 'nemia-e2e-no-such-mcp-server' },
   /** `Bash(find:*)` refuses one of Claude Code's read-only commands, which the page strikes on a step with Bash. */
   denied: ['Bash(git push:*)', 'mcp__fixture__wipe', 'Bash(find:*)'],
-  /** `Bash(cat:*)` makes another of them ask, which the page strikes on a dontAsk step and on a job, and marks asking on a background session. */
+  /**
+   * `Bash(cat:*)` makes another of them ask, which the page strikes on a dontAsk step and on a job, and marks asking on a background
+   * session.
+   */
   asked: ['Bash(cat:*)'],
   /** What its settings allow: two Bash commands, which WORKFLOWS' review, in dontAsk, may run. */
   allowed: ['Bash(npm test)', 'Bash(git diff:*)'],
@@ -875,8 +887,8 @@ export const WORKFLOWS = {
       role: 'Software engineer',
       runsOn: 'implementer · claude · opus',
       /**
-       * What it says it can do, as an A2A skill: the one skill its `skills:` gives, `skills/<id>/SKILL.md` beside `agents/`, whose frontmatter
-       * is the card's entry (`title:` its name), which its step's page shows under its name.
+       * What it says it can do, as an A2A skill: the one skill its `skills:` gives, `skills/<id>/SKILL.md` beside `agents/`, whose
+       * frontmatter is the card's entry (`title:` its name), which its step's page shows under its name.
        */
       skill: {
         id: 'implement-a-change',
@@ -919,10 +931,10 @@ export const WORKFLOWS = {
 } as const;
 
 /**
- * The agents the Agents page lists: the checkout's `implementer` (WORKFLOWS' `dev` › implement names it), and one of yours, `scribe`, in the
- * store's `workflows/agents/`, which sets a description, two role keys and a result schema, gives no skills — so its card is one entry made
- * from its description — and which no node of yours names. `made` is the agent the page creates, edits and removes; `naming` the folder of yours the refusal page writes, whose one
- * step names `scribe`.
+ * The agents the Agents page lists: the checkout's `implementer` (WORKFLOWS' `dev` › implement names it), and one of yours, `scribe`, in
+ * the store's `workflows/agents/`, which sets a description, two role keys and a result schema, gives no skills — so its card is one entry
+ * made from its description — and which no node of yours names. `made` is the agent the page creates, edits and removes; `naming` the
+ * folder of yours the refusal page writes, whose one step names `scribe`.
  */
 export const AGENTS = {
   seeded: {
@@ -945,8 +957,8 @@ export const AGENTS = {
     model: 'sonnet',
     edited: 'opus',
     /**
-     * Picked from your library in the skill list, with the Skill tool its tools must then include: a skill its Claude Code sessions are given, by name, seeded
-     * in the store's `workflows/skills/`, whose SKILL.md is `skill`, the entry its card is generated with.
+     * Picked from your library in the skill list, with the Skill tool its tools must then include: a skill its Claude Code sessions are
+     * given, by name, seeded in the store's `workflows/skills/`, whose SKILL.md is `skill`, the entry its card is generated with.
      */
     skills: 'write-a-decision',
     tools: 'Read, Skill',
@@ -1013,11 +1025,11 @@ function writeSkill(skills: string, skill: { id: string; name: string; descripti
 }
 
 /**
- * The inbox the Inbox page lists: three cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev` and
- * the checkout as the repository it is about, and was filed an hour ago; `bare` names neither, and was filed ten minutes ago, so it is listed
- * first; `rich`, between them, names `dev` and is written in markdown — a heading, a list, a table, a code block, a line of raw HTML and two
- * links, one of them `javascript:` — for its page. Each body has a second paragraph, which the list does not show and a start's brief is
- * prefilled with.
+ * The inbox the Inbox page lists: three cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev`
+ * and the checkout as the repository it is about, and was filed an hour ago; `bare` names neither, and was filed ten minutes ago, so it is
+ * listed first; `rich`, between them, names `dev` and is written in markdown — a heading, a list, a table, a code block, a line of raw HTML
+ * and two links, one of them `javascript:` — for its page. Each body has a second paragraph, which the list does not show and a start's
+ * brief is prefilled with.
  */
 export const CARDS = {
   planned: {
@@ -1087,11 +1099,11 @@ export function seedInbox(root: string, repo: string, now = Date.now()): void {
 }
 
 /**
- * The queue the Factory draws and the Inbox page places: three cards in the store's `inbox/` queued to start on their own, as `wf inbox queue`
- * writes one, each filed before CARDS so the Inbox page lists them after those. `first` names `dev` and the checkout, and was queued first;
- * `refused` names a workflow nobody has, and the tick's try of its start is written down as refused (`queue/<name>.json`, of the card as it
- * stands), so it keeps its place and says why; `third` names `dev` and no repository. And the ceilings the daemon's last pass ran with
- * (`tick.json`): a cap of `cap` runs in flight.
+ * The queue the Factory draws and the Inbox page places: three cards in the store's `inbox/` queued to start on their own, as
+ * `wf inbox queue` writes one, each filed before CARDS so the Inbox page lists them after those. `first` names `dev` and the checkout, and
+ * was queued first; `refused` names a workflow nobody has, and the tick's try of its start is written down as refused (`queue/<name>.json`,
+ * of the card as it stands), so it keeps its place and says why; `third` names `dev` and no repository. And the ceilings the daemon's last
+ * pass ran with (`tick.json`): a cap of `cap` runs in flight.
  */
 export const QUEUE = {
   first: {
@@ -1136,8 +1148,8 @@ export const queuedCardText = (card: { workflow: string; body: string }, queued:
   `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
 
 /**
- * What the daemon's last pass cost, as the tick writes it to `tick-stats.json` (`recordPassCost`): 212 ms over twelve run records, most of it
- * observing claude, which the Factory's header says beside the cap (`a pass takes 212 ms`), with the breakdown on hover.
+ * What the daemon's last pass cost, as the tick writes it to `tick-stats.json` (`recordPassCost`): 212 ms over twelve run records, most of
+ * it observing claude, which the Factory's header says beside the cap (`a pass takes 212 ms`), with the breakdown on hover.
  */
 export const PASS = {
   ms: 212.4,
@@ -1166,8 +1178,8 @@ export const PASS = {
 } as const;
 
 /**
- * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and what
- * the pass that wrote it cost (`tick-stats.json`, PASS).
+ * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and
+ * what the pass that wrote it cost (`tick-stats.json`, PASS).
  */
 export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -1538,7 +1550,10 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
         workflowDir: aloneDir,
         workflow: [{ name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' }],
         createdAt: ago(0.7),
-        /** Handed off, as the tick writes it once the step signed off: the `prune` page cuts its worktree, and a hand-off owed would hold the prune. */
+        /**
+         * Handed off, as the tick writes it once the step signed off: the `prune` page cuts its worktree, and a hand-off owed would hold
+         * the prune.
+         */
         steps: {
           implement: {
             taskId: `${UNMERGED.id}-implement`,

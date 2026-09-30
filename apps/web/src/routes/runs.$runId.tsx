@@ -47,9 +47,9 @@ const LANDING_MS = 3_000;
 
 /**
  * Brings the page to `target`, the section that holds the inspector, when it is opened on a `step` (`?step=`): the inspector sits under the
- * banners and Decide, below the first screen, where a person who pressed Read the plan would otherwise be reading the Decide section. Decide
- * grows once its decision is read, after the page has drawn, so the scroll is made again each time `target`'s parent, the article, changes
- * height — for `LANDING_MS`, and never once the person scrolls, presses a key or touches the page themselves (`TAKEN_BACK`).
+ * banners and Decide, below the first screen, where a person who pressed Read the plan would otherwise be reading the Decide section.
+ * Decide grows once its decision is read, after the page has drawn, so the scroll is made again each time `target`'s parent, the article,
+ * changes height — for `LANDING_MS`, and never once the person scrolls, presses a key or touches the page themselves (`TAKEN_BACK`).
  */
 function useLanding(target: RefObject<HTMLElement | null>, step: string | undefined) {
   useEffect(() => {
@@ -264,8 +264,8 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  *
  * A folder step's files: what it left in its folder, which is the whole of what it made — the files its closeout named and the ones it
  * forgot to, each with its size, a text file readable in a tab, and what the api serves by no name, a directory or a link, by its path — so
- * *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read says so instead, where an empty list
- * would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
+ * *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read says so instead, where an empty
+ * list would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
  *
  * At its gate — waiting on you as `wf ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`) — the
  * gate, with what the step handed on, every field it declared, which is what a person approves, beside Approve and Send back. An ending
@@ -358,8 +358,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 }
 
 /**
- * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count as
- * time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
+ * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
+ * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
  */
 function startedRow(run: RunDetail): ReactNode {
   if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
@@ -409,9 +409,9 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
 }
 
 /**
- * A person's hold on the run (`wf hold`), as `wf decide` says it: until which runs ship, what that means and how to lift it, and each run it
- * is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While it stands no step
- * offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
+ * A person's hold on the run (`wf hold`), as `wf decide` says it: until which runs ship, what that means and how to lift it, and each run
+ * it is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While it stands no
+ * step offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
  */
 function HeldUntil({ run }: { run: RunDetail }) {
   const { holding } = run;

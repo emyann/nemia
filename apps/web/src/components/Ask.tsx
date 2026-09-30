@@ -19,10 +19,10 @@ export const TEXTAREA =
   'block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 
 /**
- * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`), never
- * its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on would
- * fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads, which
- * answers a gate from the board.
+ * An ask for a step's next try through the api (`askTry`), and the run read again once the api has it: its own record alone (`exact`),
+ * never its decisions, which are keyed by the state of the run they were read for (`decisionStamp`) — a refetch of the key the page is on
+ * would fill it with the answer for the state after this write, which is what the next key is for — and the list the Factory's card reads,
+ * which answers a gate from the board.
  *
  * A mutation's `step` names another step to try instead, at an ending step's gate, where the send-back goes to the work and not to the step
  * at the gate (`sendBackTo` in agent-orchestrator); the request the api takes does not carry it. Its `answers` are a person's to the
@@ -50,8 +50,8 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
 }
 
 /**
- * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what did
- * not happen: `Not asked`, or `Not approved`.
+ * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what
+ * did not happen: `Not asked`, or `Not approved`.
  */
 export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
   return (

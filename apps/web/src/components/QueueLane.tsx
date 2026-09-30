@@ -6,11 +6,11 @@ import { ordinal } from '@/lib/inbox';
 import { useNow } from '@/lib/useNow';
 
 /**
- * The queue on the Factory: every queued inbox card, in the order the tick starts them (`queueOf`), drawn as a ghost of the card its run will
- * be — at the floor's left edge, where work comes in, and off the floor itself: a ghost is no node, so nothing waits on it and it waits on
- * nothing, and it neither moves nor is moved by the cards. Each says its place, its first line, its workflow and repository, and how long it
- * has been queued, to the minute; a start the tick tried and did not make is marked, refused or failed, with why on hover. A ghost opens the
- * card's page.
+ * The queue on the Factory: every queued inbox card, in the order the tick starts them (`queueOf`), drawn as a ghost of the card its run
+ * will be — at the floor's left edge, where work comes in, and off the floor itself: a ghost is no node, so nothing waits on it and it
+ * waits on nothing, and it neither moves nor is moved by the cards. Each says its place, its first line, its workflow and repository, and
+ * how long it has been queued, to the minute; a start the tick tried and did not make is marked, refused or failed, with why on hover. A
+ * ghost opens the card's page.
  *
  * Beside the floor on a wide screen, a column that scrolls; above it on a narrow one, a row that does.
  */

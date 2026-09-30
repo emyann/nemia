@@ -10,7 +10,10 @@ import { satisfiesAfter, type StepState } from './status.ts';
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'needs-human';
 
-/** A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is `0s`. */
+/**
+ * A duration in its two largest units: `42s`, `12m 04s`, `3h 12m`, `2d 4h`; one below zero, where this clock is behind the engine's, is
+ * `0s`.
+ */
 export function duration(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
   if (s < 60) return `${s}s`;
@@ -111,7 +114,10 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
   });
 }
 
-/** The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (wf round) — …` — and its cap when it says one. */
+/**
+ * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (wf round) — …` — and
+ * its cap when it says one.
+ */
 const ROUND = /^round (\d+)(?: of (\d+))?/;
 
 /**

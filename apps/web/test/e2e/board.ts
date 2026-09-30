@@ -42,10 +42,10 @@ export async function nextVisit(page: Page, check: (again: Page) => Promise<void
 }
 
 /**
- * One line appended to the workflow feed, `$store/feed.jsonl`, in the shape the package's tick writes it (`FeedLine`: `{ at, run, step?, word }`):
- * for a page that edits the store by hand, where no tick runs to say so, and a board that reads the feed must see the edit. `word` is what
- * `wf ls` says of the step after the edit — or of the run, given no step. A report and never an input, as the package's own lines are: the
- * api reads the feed only to stream it, so a line left behind changes no page after this one.
+ * One line appended to the workflow feed, `$store/feed.jsonl`, in the shape the package's tick writes it (`FeedLine`:
+ * `{ at, run, step?, word }`): for a page that edits the store by hand, where no tick runs to say so, and a board that reads the feed must
+ * see the edit. `word` is what `wf ls` says of the step after the edit — or of the run, given no step. A report and never an input, as the
+ * package's own lines are: the api reads the feed only to stream it, so a line left behind changes no page after this one.
  */
 export function fed(run: string, word: string): void;
 export function fed(run: string, step: string, word: string): void;
@@ -166,8 +166,8 @@ export async function expectRendered(
 }
 
 /**
- * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says it.
- * `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
+ * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says
+ * it. `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
  */
 export async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>): Promise<void> {
   const answered = await page.request.get(new URL(api, page.url()).href);
@@ -210,7 +210,10 @@ export async function expectSource(file: Locator, body: Locator, onDisk: string)
   await expectVisible(body, 'the body rendered again');
 }
 
-/** Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id: what the quota pages write. */
+/**
+ * Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id: what the quota pages
+ * write.
+ */
 export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): string {
   const file = path.join(API, 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
   return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');

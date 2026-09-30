@@ -13,11 +13,11 @@ import { Travelling } from './StateEdge';
 type SummaryStep = RunSummary['steps'][number];
 
 /**
- * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the running
- * colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), violet looping back.
- * With `rounds`, a loop past its first round says the round it is on under its curve, as the run's page labels the edge: the open card's
- * tiles have the room, and the rail at rest leaves it to the pill's hover. The round is drawn after the dot, ringed in the card's colour over
- * the curve, so the dot passes under it and not over its words.
+ * The arrows of a flow, in one SVG under its boxes: each as the canvases draw an edge — dashed and still to come, solid done, in the
+ * running colour with a dot travelling it while work moves along it (`Travelling`, still where a person asked for reduced motion), violet
+ * looping back. With `rounds`, a loop past its first round says the round it is on under its curve, as the run's page labels the edge: the
+ * open card's tiles have the room, and the rail at rest leaves it to the pill's hover. The round is drawn after the dot, ringed in the
+ * card's colour over the curve, so the dot passes under it and not over its words.
  */
 function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
   return (
@@ -55,9 +55,10 @@ function Arrows({ flow, rounds = false }: { flow: Flow; rounds?: boolean }) {
 const at = (pill: Pill) => ({ left: pill.x, top: pill.y, width: pill.width, height: pill.height });
 
 /**
- * A run's steps on its card at rest: a pill per step in its chip's colour, on the run's layering, with the arrows between them (`railOf`). A
- * pill says its step's name, cut to its width and whole on hover with the step's status and note; the step the run is at wears a ring. Past
- * four columns, the columns before and after the ones around the run are one pill that counts them; past three lanes, one that counts the rest.
+ * A run's steps on its card at rest: a pill per step in its chip's colour, on the run's layering, with the arrows between them (`railOf`).
+ * A pill says its step's name, cut to its width and whole on hover with the step's status and note; the step the run is at wears a ring.
+ * Past four columns, the columns before and after the ones around the run are one pill that counts them; past three lanes, one that counts
+ * the rest.
  */
 export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
   const cancelled = run.cancelledAt !== null;
@@ -109,9 +110,9 @@ const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boole
   step ? `${name}: ${step.status} — ${stateMeaning[stepState(step.status, cancelled, held)]}${step.note ? `\n${step.note}` : ''}` : name;
 
 /**
- * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with its
- * status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a tile
- * opens its inspector beside the floor (`onStep`). The attempts' times move every second while one counts, and every 30 s otherwise.
+ * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with
+ * its status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a
+ * tile opens its inspector beside the floor (`onStep`). The attempts' times move every second while one counts, and every 30 s otherwise.
  */
 export function StepTiles({
   run,
@@ -209,8 +210,8 @@ export function StepTiles({
 }
 
 /**
- * What a tile says a person is asked: what approving its gate does in a line (`approve ship to run it`), off the gate the card answers, which
- * knows an ending from the list; a question as it was asked; and what a blocked session's harness waits for (`needNodeText`).
+ * What a tile says a person is asked: what approving its gate does in a line (`approve ship to run it`), off the gate the card answers,
+ * which knows an ending from the list; a question as it was asked; and what a blocked session's harness waits for (`needNodeText`).
  */
 const tileNeed = (need: Need, gate: ReturnType<typeof gateOfSummary>): string =>
   need.kind === 'approve' ? gateNodeLine({ step: need.step, ends: gate?.step === need.step && gate.ends }) : needNodeText(need);

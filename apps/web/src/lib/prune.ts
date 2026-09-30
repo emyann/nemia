@@ -4,8 +4,9 @@ import { isDecidable } from './decide.ts';
 import type { PruneHow } from './api/runs.ts';
 
 /**
- * One thing a person may give back of a finished run, as `wf prune` takes it: its worktrees; with its files too (`--artifacts`); and with them
- * a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be refused.
+ * One thing a person may give back of a finished run, as `wf prune` takes it: its worktrees; with its files too (`--artifacts`); and with
+ * them a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be
+ * refused.
  */
 export type PruneChoice = {
   key: 'worktrees' | 'files' | 'unmerged';
@@ -23,14 +24,14 @@ type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the
  * reading `wf prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status says
- * nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of a run
- * that worked on its base branch itself, which waits on a decision all the same.
+ * nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of a
+ * run that worked on its base branch itself, which waits on a decision all the same.
  */
 export type Awaiting = NonNullable<Decidable['awaiting']>;
 
 /**
- * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run shipped or called off
- * (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. A decision without `awaiting` is
+ * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run shipped or called
+ * off (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. A decision without `awaiting` is
  * read as null.
  */
 export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
@@ -46,8 +47,8 @@ export function prunable(run: Prunable): boolean {
 
 /**
  * What the run's page offers to prune, or null where it offers nothing (`prunable`). Only what is on disk is offered, and for a run nobody
- * decided (`awaiting`) the first two are shown refused and the third is the one to press. The api judges the prune again whatever this says,
- * and a refusal is shown in the package's words.
+ * decided (`awaiting`) the first two are shown refused and the third is the one to press. The api judges the prune again whatever this
+ * says, and a refusal is shown in the package's words.
  */
 export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer | null {
   if (!prunable(run)) return null;
@@ -98,8 +99,8 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
 }
 
 /**
- * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for a
- * run that worked on its base branch itself, what it would be decided on is gone.
+ * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for
+ * a run that worked on its base branch itself, what it would be decided on is gone.
  */
 export function unmergedWarning(id: string, awaiting: Awaiting): string {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved (wf prune --unmerged).';

@@ -12,9 +12,9 @@ export default {
    * A run a person holds until another ships (`wf hold`), on the board, its floor laid out by Reset layout whatever the page before left
    * open: GATED, at plan's gate, held until HELD, a run in flight on the same repository and branch, which `wf hold` takes (`holdRefusal`).
    * Its card says the hold's word where its gate was, with how to lift it on hover, no Approve and not waiting on you; its steps read held;
-   * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and offers
-   * no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every page after
-   * reads the store as seeded — and the card, read again, offers its gate as it did.
+   * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
+   * offers no answer. The hold is written as `wf hold` writes it, then taken back as `wf hold --off` does and said on the feed, so every
+   * page after reads the store as seeded — and the card, read again, offers its gate as it did.
    */
   name: 'hold',
   route: '/',

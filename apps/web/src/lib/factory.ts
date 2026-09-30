@@ -15,15 +15,16 @@ import { layers, type Point } from './layout.ts';
  * one step is final without letting its followers run, while a sibling's session still works. A run is
  * finished once it has stopped moving without running: succeeded; failed at a refused check or a step
  * signed off blocked, whose followers read `waiting` and will never be filed; or cancelled, its stop landed.
- * A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show finished", or on Runs.
+ * A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show finished", or on
+ * Runs.
  *
  * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots
  * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
  * `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until a person acts, and it waits on them.
  *
- * So is a run a person holds until runs ship (`wf hold`), and on the same terms. `assess` calls a held run running whatever its steps say, and
- * the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it (`holding.onYou`):
- * then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
+ * So is a run a person holds until runs ship (`wf hold`), and on the same terms. `assess` calls a held run running whatever its steps say,
+ * and the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it
+ * (`holding.onYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
   run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
@@ -48,13 +49,13 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
 
 /**
- * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
- * a listing without `onYou`, the steps by name (`waitingOnYou`). The list is read tolerantly, not refused as a run's detail is
+ * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and
+ * for a listing without `onYou`, the steps by name (`waitingOnYou`). The list is read tolerantly, not refused as a run's detail is
  * (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
  *
- * Without the ending step whose gate the to-decide line already says, as `wf ls` prints it (cli/main.ts): that line is above, it names the step
- * and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what is
- * asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
+ * Without the ending step whose gate the to-decide line already says, as `wf ls` prints it (cli/main.ts): that line is above, it names the
+ * step and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what
+ * is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
 export const onYouOf = (
   run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null },
@@ -86,8 +87,8 @@ export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): numb
 export const clockCounts = (run: Clocked, finished: boolean): boolean => (run.startedAt === null ? run.cancelledAt === null : !finished);
 
 /**
- * What a run's clock says, wherever the board says how long a run has been going: `words` on the Factory's card, `at` the instant they count
- * from, and `title` the times in full. `finished` is the card's: not in flight.
+ * What a run's clock says, wherever the board says how long a run has been going: `words` on the Factory's card, `at` the instant they
+ * count from, and `title` the times in full. `finished` is the card's: not in flight.
  *
  * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
  * then waits, doing nothing, until they ship, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
@@ -283,8 +284,8 @@ export function unfoldingNow(drawn: ReadonlySet<string>, spans: ReadonlyMap<stri
  *    layout, as in a modeller where each piece moves alone.
  * 2. A card coming onto the floor goes back where it was left (`saved`), unless a card placed before
  *    it is in any of those cells. An open one opening as it comes claims before (1), when no card on the
- *    floor is in its own cell, and moves the cards beside it aside as a card opened there would. The cells were free while this card was off the floor — finished and
- *    hidden, say — and a run that started meanwhile took one; putting both there would hide one under
+ *    floor is in its own cell, and moves the cards beside it aside as a card opened there would. The cells were free while this card was
+ *    off the floor — finished and hidden, say — and a run that started meanwhile took one; putting both there would hide one under
  *    the other, so the card coming back takes a free place instead.
  * 3. Any other card takes the first free place, row by row: the first cell from which every cell it
  *    takes is free. An open run wider than the grid starts a row, and its card runs past the grid's edge.

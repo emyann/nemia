@@ -67,7 +67,10 @@ import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
 import { afterEdges } from './stepGraph';
 
-/** Where the cards were left in this browser: the arrangement saved at the cell width, or else the one saved at the narrower width, widened (`widenLayout`). */
+/**
+ * Where the cards were left in this browser: the arrangement saved at the cell width, or else the one saved at the narrower width, widened
+ * (`widenLayout`).
+ */
 const savedLayout = (): Map<string, Point> | null => readFactoryLayout() ?? widenLayout(readNarrowFactoryLayout());
 
 /** The floor's node types for React Flow, one object for the module's life. */
@@ -138,9 +141,9 @@ const minimapFill = (node: RunFlowNode) =>
         : 'var(--color-sky-500)';
 
 /**
- * Every run in flight, a card each, on a floor a person can arrange, each with its steps as a small flowchart on it (`StepRail`). A run started `--after` runs is drawn with an
- * edge from each of their cards into its own (`afterEdges`), and a finished run a run in flight waits on
- * is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left of children.
+ * Every run in flight, a card each, on a floor a person can arrange, each with its steps as a small flowchart on it (`StepRail`). A run
+ * started `--after` runs is drawn with an edge from each of their cards into its own (`afterEdges`), and a finished run a run in flight
+ * waits on is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left of children.
  *
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that
  * starts takes the next free cell and moves no card already down — and after that wherever a person
@@ -151,11 +154,12 @@ const minimapFill = (node: RunFlowNode) =>
  * since that is where the person put it. The edges between cards stretch to follow; they pull nothing. A press
  * on a step's tile opens its inspector beside the floor. Which runs are open is kept in this browser with the layout.
  *
- * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
- * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`) —
- * and, when no wf up ticks the store, that nothing does and how to start one (`DaemonLine`), since a run waiting its turn and a run nobody moves
- * look alike on the floor. The cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed
- * carries no card's events: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
+ * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says
+ * the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it
+ * (`QuotaLine`) — and, when no wf up ticks the store, that nothing does and how to start one (`DaemonLine`), since a run waiting its turn
+ * and a run nobody moves look alike on the floor. The cap is read again as the runs are, on each run's event of the workflow feed; the
+ * queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees, and nothing on the board asks
+ * it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   return (
@@ -165,7 +169,10 @@ export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   );
 }
 
-/** A card as the floor keeps it: where it is and how big React Flow measured it. What it shows is filled in on every render, from the runs and the open runs' reads. */
+/**
+ * A card as the floor keeps it: where it is and how big React Flow measured it. What it shows is filled in on every render, from the runs
+ * and the open runs' reads.
+ */
 type PlacedCard = Node<Record<string, never>, 'run'>;
 const nodeOf = (id: string, position: Point): PlacedCard => ({ id, type: 'run', position, data: {} });
 
@@ -175,7 +182,9 @@ const NOT_READ: Read = { detail: null, trouble: null };
 const readsOf = (results: UseQueryResult<RunDetail>[]): Read[] =>
   results.map(({ data, error }) => ({ detail: data ?? null, trouble: error ? `Could not read its steps: ${error.message}` : null }));
 
-/** A drag moving a card, or React Flow measuring one: the only changes the floor takes, since it adds, removes and selects no card itself. */
+/**
+ * A drag moving a card, or React Flow measuring one: the only changes the floor takes, since it adds, removes and selects no card itself.
+ */
 const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
 
@@ -538,11 +547,11 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 }
 
 /**
- * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count is the
- * cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is not; the
- * difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, with its breakdown on hover (`passTitle`), once a pass has
- * written it, its time of day said as today's or another day's against a clock read each minute (`useNow`). Nothing until the cap is
- * read; why, when it or the queue cannot be.
+ * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count
+ * is the cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is
+ * not; the difference is said on hover. Then what that pass cost, `a pass takes 212 ms`, with its breakdown on hover (`passTitle`), once a
+ * pass has written it, its time of day said as today's or another day's against a clock read each minute (`useNow`). Nothing until the cap
+ * is read; why, when it or the queue cannot be.
  */
 function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
   const { data, error } = useQuery(ceilingsQuery);

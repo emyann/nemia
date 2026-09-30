@@ -52,7 +52,9 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   );
 }
 
-/** One window's words: its label, the percentage — in the text's own colour when `emphasis` is off, as for the last reading — and its reset. */
+/**
+ * One window's words: its label, the percentage — in the text's own colour when `emphasis` is off, as for the last reading — and its reset.
+ */
 function Window({
   words,
   markAt,

@@ -25,11 +25,11 @@ const reload = async (page: Page) => {
 
 export default {
   /**
-   * Whether a wf up ticks the store, over the Factory's floor. The seeded store has no daemon.json, which is true — nothing ticks it — so the
-   * Factory says so and how to start one. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: said as
-   * stalled, with its silence and the command, the header taller with the line and the floor fitted clear of it, every card clear of the one
-   * beneath it and of the panels. Then the same wf up heard from just now: nothing is said, and the cap still is. The file is taken back, and
-   * the store reads as seeded again.
+   * Whether a wf up ticks the store, over the Factory's floor. The seeded store has no daemon.json, which is true — nothing ticks it — so
+   * the Factory says so and how to start one. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: said
+   * as stalled, with its silence and the command, the header taller with the line and the floor fitted clear of it, every card clear of the
+   * one beneath it and of the panels. Then the same wf up heard from just now: nothing is said, and the cap still is. The file is taken
+   * back, and the store reads as seeded again.
    */
   name: 'daemon',
   route: '/',

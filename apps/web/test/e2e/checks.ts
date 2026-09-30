@@ -171,7 +171,10 @@ export async function expectTexts(locator: Locator, texts: readonly string[], as
   );
 }
 
-/** Every element matched lies inside `frame`'s box, give or take a pixel for borders that round onto its edge: a node on its canvas, not hanging off the edge. */
+/**
+ * Every element matched lies inside `frame`'s box, give or take a pixel for borders that round onto its edge: a node on its canvas, not
+ * hanging off the edge.
+ */
 export async function expectInside(elements: Locator, frame: Locator, assertion: string): Promise<void> {
   const box = await frame.boundingBox();
   if (!box) throw new Refused(`${assertion} — the frame is not on the page`);
@@ -295,7 +298,10 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
   );
 }
 
-/** Polls `problem` until it says none or `timeout` passes, and refuses with what it said last: for a floor laid out a render after what moved it. */
+/**
+ * Polls `problem` until it says none or `timeout` passes, and refuses with what it said last: for a floor laid out a render after what
+ * moved it.
+ */
 async function until(problem: () => Promise<string | null>, assertion: string, timeout: number): Promise<void> {
   const end = Date.now() + timeout;
   let found = await problem();

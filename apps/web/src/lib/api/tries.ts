@@ -16,7 +16,9 @@ export type StepArtifact =
 /** Mirrors `StepReply` in apps/api/src/detail/tries.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
-/** Mirrors `QuestionOption` in agent-orchestrator's question/question.ts: one option of a question, its label and what choosing it means. */
+/**
+ * Mirrors `QuestionOption` in agent-orchestrator's question/question.ts: one option of a question, its label and what choosing it means.
+ */
 export type QuestionOption = { label: string; meaning: string };
 
 /**

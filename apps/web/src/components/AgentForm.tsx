@@ -27,7 +27,10 @@ import {
   type AgentForm as Form,
 } from '../lib/agents';
 
-/** The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the default. */
+/**
+ * The option of a choice that leaves the key unset: the agent then says nothing of it, and a step that names it runs on its own or the
+ * default.
+ */
 const UNSET = '(unset)';
 
 /** What a key's field says beneath it where the package's line for a step's key would not fit an agent. */
@@ -240,8 +243,8 @@ function GeneratedCard({ listing }: { listing: AgentListing | null }) {
 }
 
 /**
- * Who the agent is, at the head of its form: its name, which is its file's and what a node names it by, the job it holds, and when to attach
- * it. Each field sets its line of `form` through `setForm`.
+ * Who the agent is, at the head of its form: its name, which is its file's and what a node names it by, the job it holds, and when to
+ * attach it. Each field sets its line of `form` through `setForm`.
  */
 function Identity({
   form,
@@ -289,7 +292,10 @@ function Identity({
   );
 }
 
-/** A text field: a line, or `area`'s textarea. Read-only, it is drawn as text on a quiet ground, not as a box waiting for words. The skill's form draws its fields with it too. */
+/**
+ * A text field: a line, or `area`'s textarea. Read-only, it is drawn as text on a quiet ground, not as a box waiting for words. The skill's
+ * form draws its fields with it too.
+ */
 export function Field({
   label,
   hint,
@@ -331,8 +337,8 @@ export function Field({
 }
 
 /**
- * A key set to one of the words it may take, or left unset. A value the file has that the list does not — an effort off its harness's words —
- * is shown as written; the package says what is wrong on save.
+ * A key set to one of the words it may take, or left unset. A value the file has that the list does not — an effort off its harness's words
+ * — is shown as written; the package says what is wrong on save.
  */
 function Choice({
   label,
@@ -381,8 +387,8 @@ function Choice({
 }
 
 /**
- * What the package refuses on save said before it: skills given, and tools that leave out `Skill` — the tool a session loads a skill with — or
- * deny it. One press puts it right.
+ * What the package refuses on save said before it: skills given, and tools that leave out `Skill` — the tool a session loads a skill with —
+ * or deny it. One press puts it right.
  */
 function SkillToolNote({ form, setKey }: { form: Form; setKey: (key: AgentRoleKey, value: string) => void }) {
   const gap = skillToolGap(form);

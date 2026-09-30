@@ -97,9 +97,9 @@ export type StepReach = {
   /** The settings' ask rules: what asks whatever an allow says, and in dontAsk, or on a job, is denied. None off Claude Code. */
   asked: Rule[];
   /**
-   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does not have;
-   * the Bash rules that stand, each with the narrower denies that still refuse some of it and the narrower ask rules that make some of it ask;
-   * and why there is no Bash command, for a step with no Bash.
+   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does
+   * not have; the Bash rules that stand, each with the narrower denies that still refuse some of it and the narrower ask rules that make
+   * some of it ask; and why there is no Bash command, for a step with no Bash.
    */
   allowed: {
     rules: string[];
@@ -107,7 +107,10 @@ export type StepReach = {
     asked: Array<{ rule: string; by: Rule }>;
     unused: string[];
     bash: Array<{ rule: string; command: string; except: string[]; asks: string[] }>;
-    /** Every standing rule a narrower deny still refuses part of, or a narrower ask rule makes part of ask — a Bash command, one tool of a server. */
+    /**
+     * Every standing rule a narrower deny still refuses part of, or a narrower ask rule makes part of ask — a Bash command, one tool of a
+     * server.
+     */
     exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
     dontAsk: boolean;
     /** Why what an ask rule makes ask is denied without a prompt: `dontAsk`, or `a job`, which asks nobody. Null where it prompts. */
@@ -115,8 +118,9 @@ export type StepReach = {
     why: string | null;
   };
   /**
-   * Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny refuses
-   * it; and the rule that refuses it — a deny, or that ask rule where `askDenier` says what asks is denied. None without Bash, null off Claude Code.
+   * Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny
+   * refuses it; and the rule that refuses it — a deny, or that ask rule where `askDenier` says what asks is denied. None without Bash, null
+   * off Claude Code.
    */
   readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
 };

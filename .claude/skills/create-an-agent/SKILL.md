@@ -68,7 +68,7 @@ the step's place, as a start gives it: a test that loads a shipped folder passes
   run e2e)`. A sub-agent inherits the mode and the rules; list `Agent` in `allowedTools:` so the dispatch itself is never refused.
   Allow by exact name each check the role runs that the settings do not (`npm run lint`, `npx turbo run typecheck --force`), and have
   its skill spell each bare, one per call: one wrapped, piped, redirected, or behind `cd`, `git -C`, `VAR=` or `for` is refused.
-  `packages/agent-orchestrator/test/agent-fences.test.ts` holds a skill's checks to its agent's fence.
+  A new one's agent and skill join `CHECKERS` in `packages/agent-orchestrator/test/agent-fences.test.ts`, to hold its checks to its fence.
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
   -D:*)`, `Bash(git branch --delete --force:*)`, `mcp__playwright__browser_run_code_unsafe`.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:

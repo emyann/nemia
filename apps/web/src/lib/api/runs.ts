@@ -1,12 +1,30 @@
 /** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs/runs.ts). */
 import { queryOptions } from '@tanstack/react-query';
+import { Schema } from 'effect';
 import { pace } from '../feed.ts';
 import { get } from './read.ts';
-import type { RunGraph } from './graph.ts';
-import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
+import { RunGraphSchema, type RunGraph } from './graph.ts';
+import {
+  RunHoldingSchema,
+  RunStatusSchema,
+  RunToDecideSchema,
+  RunWaitingSchema,
+  SpentSchema,
+  StepNeedsFields,
+  StringsSchema,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  type StepNeeds,
+} from './judged.ts';
 
 /** Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
 export type PlaceKind = 'git' | 'folder';
+
+/** Decodes a `PlaceKind`. */
+const PlaceKindSchema = Schema.Literals(['git', 'folder']) satisfies Schema.Schema<PlaceKind>;
 
 /** Mirrors `RunSummary` in apps/api/src/runs/runs.ts. */
 export type RunSummary = {
@@ -72,10 +90,49 @@ export type RunSummary = {
   unreadable: string | null;
 };
 
+/** Decodes a `RunSummary`: each key the board reads, of its type and words; a key it does not know is dropped. */
+const RunSummarySchema = Schema.Struct({
+  id: Schema.String,
+  repo: Schema.NullOr(Schema.String),
+  place: PlaceKindSchema,
+  work: Schema.NullOr(Schema.String),
+  brief: Schema.String,
+  workflowDir: Schema.String,
+  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
+  createdAt: Schema.String,
+  startedAt: Schema.NullOr(Schema.String),
+  cancelledAt: Schema.NullOr(Schema.String),
+  pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
+  after: StringsSchema,
+  waiting: Schema.NullOr(RunWaitingSchema),
+  heldUntil: StringsSchema,
+  holding: Schema.NullOr(RunHoldingSchema),
+  status: RunStatusSchema,
+  moving: Schema.Boolean,
+  cost: Schema.NullOr(SpentSchema),
+  steps: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        taskId: Schema.NullOr(Schema.String),
+        branch: Schema.NullOr(Schema.String),
+        status: Schema.String,
+        note: Schema.NullOr(Schema.String),
+        ...StepNeedsFields,
+      }),
+    ),
+  ),
+  graph: RunGraphSchema,
+  waitingOnYou: StringsSchema,
+  onYou: StringsSchema,
+  toDecide: Schema.NullOr(RunToDecideSchema),
+  unreadable: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<RunSummary>;
+
 /** Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while it is. */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
-  queryFn: () => get<RunSummary[]>('/api/runs'),
+  queryFn: () => get('/api/runs', Schema.mutable(Schema.Array(RunSummarySchema))),
   refetchInterval: () => pace(5_000),
 });
 

@@ -1,7 +1,7 @@
 /** The cap on runs in flight (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /** The phases of a pass (`PHASES` in agent-orchestrator's meter.ts; `PASS_PHASES` in lib/pass.ts keeps their order). */
 export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' | 'git' | 'assess' | 'act';
@@ -39,6 +39,6 @@ export type Ceilings = {
 /** The cap on runs in flight, read again as the runs are, on a run's event: what the Factory says over its floor. */
 export const ceilingsQuery = queryOptions({
   queryKey: ['ceilings'],
-  queryFn: () => get<Ceilings>('/api/ceilings'),
+  queryFn: () => getUndecoded<Ceilings>('/api/ceilings'),
   refetchInterval: () => pace(5_000),
 });

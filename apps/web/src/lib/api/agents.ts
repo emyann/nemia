@@ -1,6 +1,6 @@
 /** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { SchemaFile } from './builder.ts';
 import type { GivenSkill } from './skills.ts';
 
@@ -80,12 +80,12 @@ export type AgentListing = {
 /** Every agent of the repository's and of yours, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: () => get<AgentListing[]>('/api/agents'),
+  queryFn: () => getUndecoded<AgentListing[]>('/api/agents'),
 });
 
 /** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */
 export const readAgent = (from: string, name: string): Promise<AgentListing> =>
-  get<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`);
+  getUndecoded<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`);
 
 /** One agent, for its page. */
 export const agentQuery = (from: string, name: string) =>

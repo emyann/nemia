@@ -136,6 +136,16 @@ test("in the default factory, a factory's repository is served: ?repo= lists its
   );
 });
 
+test('?factory=default is the default factory: the same answer as naming none, and a ?repo= no factory names is refused in it all the same', async () => {
+  assert.deepEqual(await get<WorkflowListing[]>('/api/workflows?factory=default'), await get<WorkflowListing[]>('/api/workflows'));
+  const { status, body } = await get<unknown>(`/api/workflows?factory=default&repo=${encodeURIComponent(stranger)}`);
+  assert.equal(status, 422);
+  assert.equal(
+    said(body),
+    `${stranger}: the api serves its own repository and those of the factories in the store — ${[own, repoR, repoS].join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: wf factory add <name> --repo ${stranger}.`,
+  );
+});
+
 test("REFUSED at shipped defaults: a factory the store does not have is a 404, and a name that is no factory's a 422, each in the package's words", async () => {
   const unknown = await get<unknown>('/api/workflows?factory=nope');
   assert.equal(unknown.status, 404);
@@ -173,10 +183,12 @@ test("`unfilled` names a step a factory's hires leave with no agent, in the pack
   assert.equal(solo[0].unfilled, unfilledRefusal(steps, 'solo', 'alpha'));
   assert.match(solo[0].unfilled ?? '', /wf factory hire solo <agent> --step alpha\/implement/);
   assert.equal(solo[0].steps[0].spec.agent, null);
+  assert.equal(solo[0].steps[0].hired, null, 'solo hires no one into it');
 
   const { body: hired } = await get<WorkflowListing[]>('/api/workflows?factory=hired');
   assert.equal(hired[0].unfilled, null);
   assert.equal(hired[0].steps[0].spec.agent, 'ada');
+  assert.equal(hired[0].steps[0].hired, 'ada', 'the listing says the agent is hired, not written in the step');
   assert.equal(hired[0].error, null);
 });
 

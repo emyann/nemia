@@ -41,6 +41,7 @@ import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
 import { empty, unreadListing } from './listing.ts';
+import { factoriesFilling, inFactory, stepsFilled } from './fills.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
 import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
@@ -359,8 +360,10 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind
  * (`app.onError`).
  *
- * - `GET /api/agents` — every agent (`listAgents`), read from disk on each request, so an agent a person has just edited lists as it is
- *   now.
+ * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, fills.ts), read from disk on each request, so an agent
+ *   a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the factories it fills a step
+ *   in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents it hires into a step or
+ *   its attached workflows' steps name; in the default factory, every agent (`listAgents`).
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
  * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`). Not a valid card and it says so:
  *   A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and nothing here serves an agent over A2A — so
@@ -380,7 +383,11 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  *   it, saying which. The steps looked at are yours and the repository the board serves; another repository is not known here.
  */
 export const agents = new Hono<ApiEnv>()
-  .get('/api/agents', (c) => served(c, ({ repo, home }) => c.json(listAgents(repo, home))))
+  .get('/api/agents', (c) =>
+    served(c, ({ repo, home, factory }) =>
+      c.json(inFactory(listAgents(repo, home), stepsFilled(repo, home, factory), factoriesFilling(home), factory)),
+    ),
+  )
   .get('/api/agents/:from/:name', (c) =>
     served(c, async ({ repo, home }) => {
       const { from, name } = c.req.param();

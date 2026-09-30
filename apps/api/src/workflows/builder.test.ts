@@ -310,6 +310,7 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
     body: 'You write code.\n\nAnd mind the cache.',
     own: { keys: ['check'], body: 'And mind the cache.' },
+    hired: null,
   });
 
   let res = await put('with-agent', { steps: [build] });
@@ -583,6 +584,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     spec: spec({ after: ['build'], model: 'opus', output: 'build.schema.json', loop: 'build', rounds: 2 }),
     body: 'Review the build.',
     own: null,
+    hired: null,
   };
   const res = await put('drawn', {
     steps: [plan, { ...build, spec: { ...build.spec, retries: 1 } }, review],

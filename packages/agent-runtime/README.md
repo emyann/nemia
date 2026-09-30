@@ -205,19 +205,22 @@ stateDiagram-v2
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
 still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
 the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
-end a task settles on. `UNREAD` is a pass that could not read the attempt's harness (`Observation.unread`): nothing is
+end a task settles on. A person's verbs are no edges, since no pass takes them: `VERBS` declares each, drawn above with
+who writes it and no action — `requestStop` from any state not final and not `stopping` under `stoppable`, `answer` and
+`close` from `input-required` under `awaitsWord` — and each refusal asks its guard first (`verbTakes`, `VERB_GUARDS`), which
+`src/core/verbs.test.ts` holds to the data. `UNREAD` is a pass that could not read the attempt's harness (`Observation.unread`): nothing is
 known of the session, so nothing is done in `working` — where the deadline, read first, still ends it — and it never
 counts toward `LOST`; in `starting` it is read before the missing spawn, so an intent a crash left with a session running
 under its name is neither spawned a second time nor cut until a pass reads the harness. XState
 is a dependency of this package alone, imported by `src/core/lifecycle.ts` alone (`test/xstate-boundary.test.ts`), and no
 entry exports the machine or its move, as none exports `decide`. `agent-runtime` exports its graph as plain data
-(`lifecycleGraph`: the states, the edges, the first and the final states), which the board draws on its `/machines` page.
+(`lifecycleGraph`: the states, the edges, the verbs, the first and the final states), which the board draws on its `/machines` page.
 
 **A task's path through it is read, never kept.** `engine.path(taskId)` replays the journal entry by entry (`pathOf`,
 `src/core/path.ts`): for each, the state `lifecycleOf` reads off the journal up to it, the entry's kind and its `at`, from the
 filing to now. It writes nothing and asks no harness. The event is the journal's word — `spawned`, `ended`, `input` — and never
 the machine's, which a pass computes from its sightings and does not journal; a person's verbs (`stop-requested`, `input`,
-`closed`) move a task where no edge goes, and the path shows the move all the same. A task this engine has no record of has an
+`closed`) move a task where `VERBS` says and no pass does, and the path shows the move all the same. A task this engine has no record of has an
 empty path.
 
 ### Letting a finished session go

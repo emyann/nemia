@@ -40,6 +40,7 @@ const ENV: CheckEnv = {
   WF_BASE_REF: 'abc123',
   WF_WORKSPACE: '/wt',
   WF_STDERR: '/tmp/x.stderr',
+  WF_STDOUT: '',
   WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement',
 };
 
@@ -122,12 +123,41 @@ test("a check's own exit code comes back through `nice` — a failing command st
 test('a machine without ionice still runs the check, to its own exit code', () => {
   const bin = onlyPrograms(['nice', 'env', 'sh']);
   const { cmd, args } = CHECK.command({
-    brief: checkBrief('command -v ionice || echo no-ionice; exit 7', { ...ENV, WF_STDERR: path.join(bin, 'x.stderr') }),
+    brief: checkBrief('command -v ionice || echo no-ionice; exit 7', {
+      ...ENV,
+      WF_STDERR: path.join(bin, 'x.stderr'),
+      WF_STDOUT: path.join(bin, 'x.stdout'),
+    }),
   });
   const r = spawnSync(path.join(bin, cmd), args, { encoding: 'utf8', env: { PATH: bin } });
   assert.equal(r.status, 7, r.stderr);
   assert.match(r.stdout, /^no-ionice$/m, 'the check really ran with no ionice on its PATH');
   assert.match(r.stdout, /\[wf check\] exit 7\n$/);
+  assert.equal(fs.existsSync(path.join(bin, 'x.stdout')), false, 'nor mktemp, nor mkfifo: its stdout is left to the log alone');
+});
+
+/** The check's script run as the engine runs it, with its stdout kept at `WF_STDOUT` (`x.stdout` in a scratch folder by default). */
+const copied = (command: string, stdout = path.join(scratch('wf-check-stdout-'), 'x.stdout')) => {
+  const { cmd, args } = CHECK.command({
+    brief: checkBrief(command, { ...ENV, WF_STDERR: path.join(scratch('wf-check-stderr-'), 'x.stderr'), WF_STDOUT: stdout }),
+  });
+  return { stdout, r: spawnSync(cmd, args, { encoding: 'utf8' }) };
+};
+
+test("a check's stdout is kept whole at WF_STDOUT and still logged, its own exit code the script's, and the trailer last", () => {
+  const { stdout, r } = copied('echo a; echo b; exit 5');
+  assert.equal(r.status, 5, r.stderr);
+  assert.equal(readVerdict(r.stdout), 5);
+  assert.equal(fs.readFileSync(stdout, 'utf8'), 'a\nb\n', 'the whole stdout, in order, without the trailer');
+  assert.equal(r.stdout, 'a\nb\n\n[wf check] exit 5\n', 'logged as well, and the trailer after every line the copy wrote');
+  assert.equal(copied('true').r.status, 0);
+});
+
+test('a WF_STDOUT that cannot be opened is no verdict: the command runs to its own exit code, its stdout in the log', () => {
+  const { stdout, r } = copied('echo fine; exit 3', path.join(scratch('wf-check-stdout-'), 'gone', 'x.stdout'));
+  assert.equal(r.status, 3, r.stderr);
+  assert.equal(r.stdout, 'fine\n\n[wf check] exit 3\n');
+  assert.equal(fs.existsSync(stdout), false);
 });
 
 test("a brief carries the install an ending's check owes, and reads back only one that is a string", () => {
@@ -283,6 +313,7 @@ const rig = () => {
     WF_STEP: step,
     WF_WORKSPACE: workspace,
     WF_STDERR: path.join(root, `${step}.stderr`),
+    WF_STDOUT: path.join(root, `${step}.stdout`),
   });
   const file = (step: string, command: string, deadlineSeconds = 60) =>
     e.file({
@@ -347,6 +378,47 @@ test('LIVE: a stderr file that cannot be opened fails the check with a number, n
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed', 'a check whose evidence has nowhere to go does not pass');
   assert.notEqual(readVerdict(await e.logs(id)), 'unfinished', 'and the script still reached its last line');
+});
+
+test('LIVE: a child the command leaves behind holding its stdout does not hold the check: it settles on the exit code, not the deadline', async (t) => {
+  const { root, e, file } = rig();
+  const pid = path.join(root, 'left.pid');
+  t.after(() => {
+    try {
+      process.kill(Number(fs.readFileSync(pid, 'utf8')));
+    } catch {
+      return;
+    }
+  });
+  const id = await file('left', `sleep 30 & echo $! > ${JSON.stringify(pid)}; echo done`, 20);
+  const v = await settled(e, id, 30_000);
+  assert.equal(v.state.settled, 'succeeded', 'the copy is waited for a bounded time, never until the deadline');
+  assert.equal(readVerdict(await e.logs(id)), 0);
+  assert.equal(fs.readFileSync(path.join(root, 'left.stdout'), 'utf8'), 'done\n');
+});
+
+test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a check that finishes or one stopped while its command runs', async (t) => {
+  const { root, e, file } = rig();
+  const tmp = scratch('wf-check-tmpdir-');
+  const TMPDIR = process.env.TMPDIR;
+  t.after(() => {
+    if (TMPDIR === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = TMPDIR;
+  });
+  process.env.TMPDIR = tmp;
+  const done = await file('done', 'echo done');
+  const hung = await file('hung', 'echo started; sleep 60', 120);
+  assert.equal((await settled(e, done)).state.settled, 'succeeded');
+  const copy = path.join(root, 'hung.stdout');
+  const deadline = Date.now() + 20_000;
+  while (!(fs.existsSync(copy) && fs.readFileSync(copy, 'utf8') === 'started\n')) {
+    assert.ok(Date.now() < deadline, `the command never printed through the copy; phase ${(await e.view(hung)).phase}`);
+    await e.tick();
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  await e.stop(hung);
+  assert.equal((await settled(e, hung)).state.settled, 'stopped');
+  assert.deepEqual(fs.readdirSync(tmp), [], "the worker inherits this process's TMPDIR when a tick starts it");
 });
 
 test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async () => {
@@ -419,6 +491,16 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
   assert.doesNotMatch(log, /command ran/);
 });
 
+test('the command a check runs does not inherit WF_STDOUT, so a check inside a check keeps its own stdout', () => {
+  const file = path.join(scratch('wf-check-leak-'), 'outer.stdout');
+  const out = execFileSync('sh', ['-c', checkScript('printf "seen=%s\\n" "${WF_STDOUT-unset}"')], {
+    env: { ...process.env, WF_STDOUT: file },
+    encoding: 'utf8',
+  });
+  assert.match(out, /^seen=unset$/m, 'the command must not see the file the run copies its stdout into');
+  assert.equal(fs.readFileSync(file, 'utf8'), 'seen=unset\n', 'the copy itself still holds');
+});
+
 test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {
   const dir = scratch('wf-check-leak-');
   const file = path.join(dir, 'outer.stderr');
@@ -456,13 +538,35 @@ test('past REPORTED_LINES the first that many are kept, and how many more there 
     [lines.length, lines[0], lines.at(-1), cut],
     [REPORTED_LINES, 'wf mutants: killed #1', `wf mutants: killed #${REPORTED_LINES}`, 3],
   );
-  const section = checkHandedSection({ step: 'implement', command: 'npm test', verdict: 0, stdout: '', stderr: '', reported: lines, cut });
-  assert.match(section, new RegExp(`not only\\nthe tail: the first ${REPORTED_LINES}, and \`cut\` says how many more there were\\. It is`));
+  const section = checkHandedSection({
+    step: 'implement',
+    command: 'npm test',
+    verdict: 0,
+    stdout: '',
+    stderr: '',
+    reported: lines,
+    cut,
+    partial: false,
+  });
+  assert.match(section, new RegExp(`\\nIn \`reported\`, the first ${REPORTED_LINES}, and \`cut\` says how many more there were\\. It is`));
   assert.equal(JSON.parse(/```json\n([\s\S]*?)\n```/.exec(section)![1]).cut, 3);
 });
 
+test('REFUSED whole: marked lines read from the end of the log alone are said to be partial, in words and in the data', () => {
+  const said = { step: 'implement', command: 'npm test', verdict: 0, stdout: '', stderr: '', reported: ['wf check: no e2e'], cut: 0 };
+  const data = (section: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(section)![1]) as Record<string, unknown>;
+  const partial = checkHandedSection({ ...said, partial: true });
+  assert.equal(data(partial).partial, true);
+  assert.match(partial, /a line printed earlier may be missing, and a line absent from `reported` proves nothing\./);
+  assert.doesNotMatch(partial, /from all of it/);
+  const whole = checkHandedSection({ ...said, partial: false });
+  assert.equal('partial' in data(whole), false);
+  assert.match(whole, /from all of it and not only the tail\./);
+  assert.doesNotMatch(whole, /proves nothing/);
+});
+
 test('the section a step after a check is handed opens on the verdict it had, and fences its output as data, past any backticks in it', () => {
-  const said = { step: 'implement', command: 'npm test', stdout: 'a ```` fence', stderr: '', reported: [], cut: 0 };
+  const said = { step: 'implement', command: 'npm test', stdout: 'a ```` fence', stderr: '', reported: [], cut: 0, partial: false };
   const opening = (verdict: Verdict) =>
     checkHandedSection({ ...said, verdict })
       .split('\n')

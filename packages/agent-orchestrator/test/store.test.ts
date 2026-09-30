@@ -474,6 +474,7 @@ test("the run files a signed step's check itself: the frozen command, in its wor
         WF_BASE_REF: run.baseRef,
         WF_WORKSPACE: run.repo,
         WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`),
+        WF_STDOUT: path.join(ROOT, 'checks', `${id}.stdout`),
         WF_ARTIFACTS: path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'),
         WF_CLOSEOUT: path.join(ROOT, 'checks', `${id}.closeout.json`),
       },
@@ -1596,14 +1597,24 @@ const mutantLog = (killed: readonly string[]): string =>
     '[wf check] exit 0',
     '',
   ].join('\n');
+/**
+ * A check's output as the run keeps it: its whole stdout, without the trailer, at `checks/<id>.stdout`, and in the engine's log only the
+ * end from the web build on, which holds no `wf mutants:` line, as the engine keeps the end of a long one.
+ */
+const checkPrinted = (logs: Map<string, string>, id: string, text: string) => {
+  fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'checks', `${id}.stdout`), text.replace(/\n\[wf check\] exit \d+\n$/, ''));
+  logs.set(id, text.slice(text.indexOf('web:build:')));
+};
 const KILLED_1 = '#1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)';
 const KILLED_2 = '#2 src/b.ts: "<" → "<=", by test/b.test.ts (failed, 0.3 s)';
 const CHECK_SAID = "## What implement's check said";
 
-test('the step after a checked step is handed what the check said: its exit, the tails, and every `wf <name>:` line of the whole log, in its brief', async () => {
+test('the step after a checked step is handed what the check said: its exit, the tails, and every `wf <name>:` line of its whole stdout, in its brief', async () => {
   const { run, e, tasks, logs } = await throughCheck('check: npm test', 'succeeded', 0);
   const check = `${run.id}-implement-check`;
-  logs.set(check, mutantLog([KILLED_1, KILLED_2]));
+  checkPrinted(logs, check, mutantLog([KILLED_1, KILLED_2]));
+  assert.doesNotMatch(logs.get(check)!, /wf mutants:/, "the engine's log holds none of them");
   fs.writeFileSync(path.join(ROOT, 'checks', `${check}.stderr`), 'npm warn deprecated glob@7\n');
 
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
@@ -1617,7 +1628,8 @@ test('the step after a checked step is handed what the check said: its exit, the
     'wf mutants: 2 mutant(s), 0 refused, in 3.1 s',
     'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
   ]);
-  assert.doesNotMatch(said.stdout, /killed/, 'the mutant lines are above the tail, so only the whole log hands them');
+  assert.doesNotMatch(said.stdout, /killed/, 'the mutant lines are above the tail, so only the whole stdout hands them');
+  assert.match(brief, /from all of it and not only the tail\./);
   assert.deepEqual(dataUnder(brief, CHECK_SAID), {
     command: 'npm test',
     exit: 0,
@@ -1633,8 +1645,8 @@ test('the step after a checked step is handed what the check said: its exit, the
 test("each round's review is handed that round's check, never the first try's", async () => {
   const run = started(looped());
   const b = board();
-  b.logs.set(`${run.id}-implement-check`, mutantLog([KILLED_1]));
-  b.logs.set(`${run.id}-implement-try2-check`, mutantLog(['#9 src/c.ts: "a" → "b", by test/c.test.ts (failed, 0.2 s)']));
+  checkPrinted(b.logs, `${run.id}-implement-check`, mutantLog([KILLED_1]));
+  checkPrinted(b.logs, `${run.id}-implement-try2-check`, mutantLog(['#9 src/c.ts: "a" → "b", by test/c.test.ts (failed, 0.2 s)']));
   await advance(b.e, readRun(run.id));
   await toReview(b, run.id, 1, true);
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
@@ -1660,7 +1672,20 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
     /\n## What implement's check said\n\nIt did not finish: it was stopped, or killed before it printed an exit code\./,
   );
   assert.doesNotMatch(unfinished, /It passed/);
-  assert.deepEqual((dataUnder(unfinished, CHECK_SAID) as { exit: unknown }).exit, 'unfinished');
+  assert.deepEqual(
+    dataUnder(unfinished, CHECK_SAID) as object,
+    {
+      command: 'npm test',
+      exit: 'unfinished',
+      stdout: 'wf mutants: baseline: test/a.test.ts passes unmutated\nok 1 - builds',
+      stderr: '',
+      reported: ['wf mutants: baseline: test/a.test.ts passes unmutated'],
+      partial: true,
+    },
+    "no whole stdout was kept, so its marked lines are read from the end of the engine's log, and said to be partial",
+  );
+  assert.match(unfinished, /Its whole stdout\nwas not kept, so `partial` is true: a line printed earlier may be missing/);
+  assert.doesNotMatch(unfinished, /from all of it/);
 
   const gone = await throughCheck('check: npm test', 'succeeded', 0);
   const check = `${gone.run.id}-implement-check`;
@@ -1683,7 +1708,7 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
 test("a step after a checked step, tried afresh, is handed that check in its try's brief too", async () => {
   const run = started(folder('check: npm test'));
   const b = board();
-  b.logs.set(`${run.id}-implement-check`, mutantLog([KILLED_1]));
+  checkPrinted(b.logs, `${run.id}-implement-check`, mutantLog([KILLED_1]));
   await advance(b.e, readRun(run.id));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));

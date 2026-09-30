@@ -6986,21 +6986,29 @@ test("REFUSED at shipped defaults: `branchFates` keeps every branch unless asked
 test("`checkLogsOf`: a run's check logs are its steps' checks on every try — not another run's whose id starts with this one's; with no record to name the steps, any under its id but those", () => {
   const listing = [
     'r-1-implement-check.stderr',
+    'r-1-implement-check.stdout',
     'r-1-implement-try2-check.stderr',
+    'r-1-implement-try2-check.stdout',
     'r-1-review-check.stderr',
     'r-1-x2-implement-check.stderr',
+    'r-1-x2-implement-check.stdout',
     'r-1-implement-tryX-check.stderr',
     'r-1-implement.log',
+    'r-1-implement-check.closeout.json',
     'r-10-implement-check.stderr',
   ];
   assert.deepEqual(checkLogsOf('r-1', ['implement', 'review'], listing), [
     'r-1-implement-check.stderr',
+    'r-1-implement-check.stdout',
     'r-1-implement-try2-check.stderr',
+    'r-1-implement-try2-check.stdout',
     'r-1-review-check.stderr',
   ]);
   assert.deepEqual(checkLogsOf('r-1', undefined, listing, ['r-1-x2', 'r-10']), [
     'r-1-implement-check.stderr',
+    'r-1-implement-check.stdout',
     'r-1-implement-try2-check.stderr',
+    'r-1-implement-try2-check.stdout',
     'r-1-implement-tryX-check.stderr',
     'r-1-review-check.stderr',
   ]);
@@ -7011,7 +7019,9 @@ test("`checkLogsOf`: a run's check logs are its steps' checks on every try — n
   );
   assert.deepEqual(checkLogsOf('r-1-implement', undefined, listing, []), [
     'r-1-implement-check.stderr',
+    'r-1-implement-check.stdout',
     'r-1-implement-try2-check.stderr',
+    'r-1-implement-try2-check.stdout',
     'r-1-implement-tryX-check.stderr',
   ]);
 });

@@ -1030,17 +1030,22 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   person's own Linux work, but with nothing else busy there it still uses every CPU the VM has. `CHECK_NICENESS`.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
   number shown to a person; a command that prints one of its own changes that number and nothing else.
-- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, `WF_ARTIFACTS` — the
+- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_ARTIFACTS` — the
   step's files directory, where a check that takes screenshots puts them (*A step's files*, below) — and
   `WF_CLOSEOUT`: the step's closeout as a JSON file, flat, its declared fields beside the four, the check's own data
-  to read (`checks/<task>.closeout.json`, beside its stderr).
+  to read (`checks/<task>.closeout.json`, beside its stderr). `WF_STDERR` and `WF_STDOUT` are the run's, and unset
+  before the command runs: its stderr goes to `checks/<task>.stderr`, and its stdout to the log and, whole, to
+  `checks/<task>.stdout`, since the engine's log of a task keeps only its last 8,000 characters. The copy is no
+  verdict: the command's exit is the check's, and a copy that cannot be made leaves stdout to the log alone.
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 - **The step filed after a checked step is handed what the check said**, in its brief, under
   `## What <step>'s check said`: its verdict (exit N, did not finish, or why it cannot be read), the last lines
   of its stdout and its stderr, and every line of its stdout that starts `wf <name>:` — a lowercase name, a colon
-  and a space, at the start of the line — whole, from the whole log and not only the tail (`reportedLines`, at
-  most `REPORTED_LINES`). That is how a check marks what the next step must read: `workflows/build`'s mutants
+  and a space, at the start of the line — whole, from `checks/<task>.stdout` and not only the tail
+  (`reportedLines`, at most `REPORTED_LINES`). A check with no such file — filed before it was kept, or whose copy
+  could not be made — has those lines read from the end of the log alone, and the section says so, with
+  `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s mutants
   print `wf mutants: …`, and a reviewer whose fence reaches no log judges them from its brief. The step reads
   the check of the try or round it follows, read on the pass that files it.
 

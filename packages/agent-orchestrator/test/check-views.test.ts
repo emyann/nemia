@@ -31,7 +31,8 @@ const calls = () => e.io().observed.check?.calls ?? 0;
 
 /**
  * A check filed as the tick files one, through the client; `held` runs until its gate is opened, and every other exits 0 at once. It has
- * no stderr file, workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+ * no stderr or stdout file, workspace or artifacts: an empty `WF_STDERR` and `WF_STDOUT` leave both streams in the log, as a check filed
+ * by hand does.
  */
 const file = (id: string, held = false) =>
   e.file({
@@ -40,7 +41,7 @@ const file = (id: string, held = false) =>
     harness: 'check',
     brief: checkBrief(
       held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
-      { WF_RUN: 'r', WF_STEP: id, WF_WORKSPACE: '', WF_STDERR: '', WF_ARTIFACTS: '' },
+      { WF_RUN: 'r', WF_STEP: id, WF_WORKSPACE: '', WF_STDERR: '', WF_STDOUT: '', WF_ARTIFACTS: '' },
     ),
   });
 

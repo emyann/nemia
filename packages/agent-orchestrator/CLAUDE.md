@@ -100,7 +100,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 
 - **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: the ship's check runs on the merged tree with
   none. A check starts at low priority (`CHECK_NICENESS`); sessions do not.
-- **A check logs its stdout; a person is shown the tail of its stderr**, whole at `WF_STDERR`.
+- **A check logs its stdout; a person is shown the tail of its stderr**, whole at `WF_STDERR`. Its stdout is also kept whole at
+  `WF_STDOUT` (`checkStdout`), which is what `reported` reads: the engine's `logs` is a tail (`test/check-handed.test.ts`).
 - **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's; a lockfile that differs from main's
   costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a
   hardlinked file once per invocation (`diskBytes`).

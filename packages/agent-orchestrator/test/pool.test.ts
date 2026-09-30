@@ -91,8 +91,8 @@ const e = engine();
 const cwd = scratch('wf-pool-cwd-');
 
 /**
- * A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. A check's brief has no stderr file,
- * workspace or artifacts: an empty `WF_STDERR` leaves stderr in the log, as a check filed by hand does.
+ * A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. A check's brief has no stderr or
+ * stdout file, workspace or artifacts: an empty `WF_STDERR` and `WF_STDOUT` leave both streams in the log, as a check filed by hand does.
  */
 const file = (id: string, harness: string) =>
   e.file({
@@ -106,6 +106,7 @@ const file = (id: string, harness: string) =>
             WF_STEP: id,
             WF_WORKSPACE: '',
             WF_STDERR: '',
+            WF_STDOUT: '',
             WF_ARTIFACTS: '',
           })
         : id,

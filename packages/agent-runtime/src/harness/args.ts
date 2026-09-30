@@ -100,8 +100,8 @@ export type HarnessArgs = {
 /**
  * What a Codex session is given of its own. `trustFrom`: a directory whose trust in the operator's Codex config extends to
  * the session's `cwd`, so a worktree of a repository you trust is trusted for the run and loads the project's rules. It is
- * extended and never granted: a directory the config does not trust gives the session no trust. Absent: the repository
- * behind `cwd`.
+ * extended and never granted: a directory the config does not trust gives the session no trust. Absent: no trust is
+ * extended.
  */
 export type CodexArgs = { trustFrom?: string };
 
@@ -286,7 +286,7 @@ const codexArgsRefusalOf = (args: unknown): string | undefined => {
   }
   const { trustFrom } = args as CodexArgs;
   if (trustFrom !== undefined && !(typeof trustFrom === 'string' && path.isAbsolute(trustFrom))) {
-    return `\`codex.trustFrom: ${JSON.stringify(trustFrom)}\` is not an absolute directory. Name the directory you trust in your Codex config by its absolute path, like "/path/to/repo", or leave it out for the repository behind the cwd.`;
+    return `\`codex.trustFrom: ${JSON.stringify(trustFrom)}\` is not an absolute directory. Name the directory you trust in your Codex config by its absolute path, like "/path/to/repo", or leave it out to extend no trust.`;
   }
   return undefined;
 };

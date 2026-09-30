@@ -1048,24 +1048,28 @@ const inCodexHome = <T>(home: string, f: () => T): T => {
   }
 };
 
-test('a worktree of a repository you trust in Codex is trusted for the run, repository included', async () => {
+test('a worktree of a repository you trust in Codex, which the task names, is trusted for the run, repository included', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
   const { repo, wt, home } = repoWithWorktree(true);
-  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }));
   assert.deepEqual(io.trustedDirs, [repo, wt]);
 });
 
 test('a repository you never trusted gets no trust from the engine', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const { wt, home } = repoWithWorktree(false);
-  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+  const { repo, wt, home } = repoWithWorktree(false);
+  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }));
   assert.equal(io.trustedDirs, undefined, "trusting it would also load whatever Codex settings it ships: not the engine's call");
 });
 
-test('outside a repository there is nothing to extend', async () => {
+test('a worktree of a repository you trust in Codex gets no trust unless the task names the directory, and no git is spawned', async () => {
   const { codex } = await import('../src/harness/codex/codex.ts');
-  const plain = scratch('ae-plain-');
-  assert.deepEqual(codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: plain }), {});
+  const { ioCounts } = await import('../src/core/engine/tally.ts');
+  const { wt, home } = repoWithWorktree(true);
+  const before = ioCounts().spawned;
+  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+  assert.equal(io.trustedDirs, undefined);
+  assert.equal(ioCounts().spawned, before, 'the repository behind the cwd is never asked of git');
 });
 
 /** A directory the task names as the one to extend trust from, and a Codex home that does or does not trust it. */
@@ -1103,10 +1107,8 @@ test('a directory the task names decides alone: a worktree of a trusted reposito
   const untrusted = scratch('ae-trust-from-');
   const before = ioCounts().spawned;
   const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: untrusted } } }));
-  assert.equal(io.trustedDirs, undefined, 'the repository behind the cwd is not asked when the task names a directory');
+  assert.equal(io.trustedDirs, undefined, 'the repository behind the cwd is not asked for');
   assert.equal(ioCounts().spawned, before);
-  inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
-  assert.equal(ioCounts().spawned, before + 1, 'without one, the repository behind the cwd is asked of git, and counted');
 });
 
 test('a directory the task names is resolved before it is looked up, and named once when it is the cwd', async () => {

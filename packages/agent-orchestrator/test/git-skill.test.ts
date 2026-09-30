@@ -12,6 +12,7 @@ import path from 'node:path';
 import { LANDING_DENIED } from '../src/ending/ending.ts';
 import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
+import { running } from './running.ts';
 import { scratch } from './scratch.ts';
 
 /** The git place the package ships. */
@@ -272,6 +273,51 @@ test('land commits a staged merge with the message given, and answers the commit
   assert.equal(git(dir, 'log', '-1', '--format=%B'), 'Land wf/x/a\n\nIt passed its check.');
   assert.equal(git(dir, 'rev-parse', `${commit}^1`, `${commit}^2`), `${before}\n${tip}`);
   assert.equal(merging(dir), false);
+});
+
+test('a land held past its deadline by a hook leaves the hook running nowhere, the merge staged, and the abort answers', (t) => {
+  const dir = repository();
+  staged(dir);
+  const held = scratch('wf-git-held-');
+  const marker = path.join(held, 'in-the-hook');
+  const hook = path.join(held, 'hook.sh');
+  fs.writeFileSync(hook, `touch '${marker}'\nsleep 60\n`);
+  fs.writeFileSync(path.join(dir, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\nexec /bin/sh '${hook}'\n`, { mode: 0o755 });
+  t.after(() => {
+    for (const pid of running(hook)) process.kill(pid, 'SIGKILL');
+  });
+  const outcome = runPlaceVerb(GIT_SKILL, 'land', { checkout: dir, act: 'commit', message: 'm' }, { env: ENV, deadlineMs: 3000 });
+  assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
+  assert.ok(fs.existsSync(marker), 'git was in the hook at the deadline');
+  assert.deepEqual(running(hook), [], 'the hook runs no more');
+  assert.equal(merging(dir), true, 'the merge is still staged');
+  assert.deepEqual(answerOf(run('land', { checkout: dir, act: 'abort' })), { aborted: true });
+});
+
+test('a handoff held past its deadline by a clean filter leaves no index.lock, and the next verb answers', (t) => {
+  const dir = repository();
+  const held = scratch('wf-git-held-');
+  const marker = path.join(held, 'in-the-filter');
+  const filter = path.join(held, 'filter.sh');
+  fs.writeFileSync(filter, `touch '${marker}'\nsleep 60\n`);
+  git(dir, 'config', 'filter.held.clean', `/bin/sh '${filter}'`);
+  fs.writeFileSync(path.join(dir, '.gitattributes'), 'f filter=held\n');
+  fs.writeFileSync(path.join(dir, 'f'), 'left by the step\n');
+  t.after(() => {
+    for (const pid of running(filter)) process.kill(pid, 'SIGKILL');
+  });
+  const outcome = runPlaceVerb(GIT_SKILL, 'handoff', { workspace: dir, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  assert.match(unreadOf(outcome), /^it gave no answer within 3 s, its deadline, and was stopped/);
+  assert.ok(fs.existsSync(marker), 'git add was in the filter, holding the lock, at the deadline');
+  assert.equal(fs.existsSync(path.join(dir, '.git', 'index.lock')), false, 'the lock is gone');
+  assert.deepEqual(running(filter), [], 'the filter runs no more');
+  git(dir, 'config', '--unset', 'filter.held.clean');
+  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: {} })), {
+    merging: 'none',
+    conflicted: false,
+    missing: [],
+    head: git(dir, 'rev-parse', 'HEAD'),
+  });
 });
 
 test('land aborts a merge that conflicts, and leaves the checkout at ours', () => {

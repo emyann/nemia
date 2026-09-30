@@ -11,6 +11,7 @@ import path from 'node:path';
 import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceAnswers, type PlaceOutcome, type PlaceRequests, type PlaceVerb } from './place.ts';
 import { readPlaceJson, runPlaceVerb } from './place.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { running } from '../../test/running.ts';
 import { scratch } from '../../test/scratch.ts';
 
 /** A skill folder holding one script, `scripts/<verb>.ts`, whose body is `body`. */
@@ -164,21 +165,6 @@ test('a verb whose script is not there is unread, naming the path', () => {
   const said = saidOf(runPlaceVerb(dir, 'make', REQUESTS.make), 'make');
   assert.equal(said, `the place has no script for make: ${path.join(dir, 'scripts', 'make.ts')} is not there`);
 });
-
-/** The processes whose command line names `file`, read from /proc. */
-function running(file: string): number[] {
-  return fs
-    .readdirSync('/proc')
-    .filter((entry) => /^\d+$/.test(entry))
-    .filter((pid) => {
-      try {
-        return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').includes(file);
-      } catch {
-        return false;
-      }
-    })
-    .map(Number);
-}
 
 test('a script past its deadline is unread, saying so, and is left running nowhere', () => {
   const dir = planted('report', `console.error('reading the diff');\nsetInterval(() => {}, 1000);\n`);

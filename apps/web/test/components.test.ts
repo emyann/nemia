@@ -4769,3 +4769,116 @@ test('REFUSED: a character card draws no stats line for an agent that sets none,
   assert.match(broken, /agents\/iris\.md: no frontmatter\./);
   assert.doesNotMatch(broken, /data-agent-stats/);
 });
+
+const { StatsChart } = await import('../src/components/StatsChart.tsx');
+const { StatsTiles } = await import('../src/components/StatsTiles.tsx');
+const { StatsMarks } = await import('../src/components/StatsMarks.tsx');
+const { StatsFilters } = await import('../src/components/StatsFilters.tsx');
+const { HEADLINES, marksByDay } = await import('../src/lib/stats.ts');
+
+/** A day of the Stats page with nothing measured but what it is given. */
+const statsDay = (day: string, given: Record<string, number | null> = {}) => ({
+  day,
+  runs: 0,
+  landed: null,
+  rounds: null,
+  firstTry: null,
+  costPerLanded: null,
+  timePerLanded: null,
+  tries: 0,
+  refused: 0,
+  gateWaitMs: null,
+  ...given,
+});
+
+/** A change mark served on `day`: the agent `name` changed in run r-2, since r-1. */
+const statsMark = (day: string, name: string) => ({
+  day,
+  kind: 'agent' as const,
+  name,
+  run: 'r-2',
+  since: 'r-1',
+  factory: 'nemia',
+  workflow: 'build',
+  repo: null,
+  steps: ['design'],
+  agents: [name],
+});
+
+/** The markup of one day's column of a chart, by its day. */
+const columnOf = (markup: string, day: string): string => markup.match(new RegExp(`<g data-day="${day}"[^>]*>.*?</g>`))?.[0] ?? '';
+
+test('REFUSED: a day nothing measured draws no bar and reads —, where a measured 0 draws a line at its foot, and a changed day a rule naming the change', () => {
+  const rounds = HEADLINES.find((h) => h.key === 'rounds')!;
+  const days = [statsDay('2026-09-28'), statsDay('2026-09-29', { rounds: 0 }), statsDay('2026-09-30', { rounds: 2 })];
+  const markup = renderToStaticMarkup(
+    createElement(StatsChart, { number: rounds, days, marks: marksByDay([statsMark('2026-09-29', 'seldon')]) }),
+  );
+  assert.match(markup, /data-chart="rounds"/);
+  const none = columnOf(markup, '2026-09-28');
+  const zero = columnOf(markup, '2026-09-29');
+  const two = columnOf(markup, '2026-09-30');
+  assert.match(none, /data-value="null"/);
+  assert.match(none, /<title>2026-09-28: —<\/title>/);
+  assert.doesNotMatch(none, /data-bar|data-zero/, 'refused: nothing is drawn for a day nothing measured');
+  assert.match(zero, /data-value="0"/);
+  assert.match(zero, /data-zero/);
+  assert.doesNotMatch(zero, /data-bar/);
+  assert.match(two, /data-value="2"/);
+  assert.match(two, /data-bar/);
+  assert.doesNotMatch(two, /data-zero/);
+  assert.equal([...markup.matchAll(/data-mark-day="([^"]+)"/g)].map((m) => m[1]).join(), '2026-09-29', 'one rule, on the changed day');
+  assert.match(zero, /<line data-mark-day="2026-09-29"[^>]*><title>2026-09-29: changed agent seldon<\/title>/);
+  assert.match(markup, /title="The top of the scale">2</);
+});
+
+test('REFUSED: a chart whose days measured nothing says its scale is —, never a top of 0', () => {
+  const cost = HEADLINES.find((h) => h.key === 'costPerLanded')!;
+  const markup = renderToStaticMarkup(
+    createElement(StatsChart, { number: cost, days: [statsDay('2026-09-29'), statsDay('2026-09-30')], marks: new Map() }),
+  );
+  assert.match(markup, /title="The top of the scale">—</);
+  assert.doesNotMatch(markup, /data-bar|data-zero/);
+});
+
+test('REFUSED: a tile keeps a number nothing measured apart from 0, and says the last 14 days beside the 14 before', () => {
+  const window = (from: string, to: string, given: Record<string, number | null>) => ({ ...statsDay('x', given), from, to });
+  const markup = renderToStaticMarkup(
+    createElement(StatsTiles, {
+      last: window('2026-09-17', '2026-09-30', { runs: 3, landed: 0, firstTry: null }),
+      before: window('2026-09-03', '2026-09-16', { runs: 1, landed: null, firstTry: 0.5 }),
+    }),
+  );
+  assert.equal([...markup.matchAll(/data-tile="/g)].length, HEADLINES.length);
+  const tile = (key: string) => markup.match(new RegExp(`<li data-tile="${key}".*?</li>`))?.[0] ?? '';
+  assert.match(tile('runs'), /data-value="3"/);
+  assert.match(tile('runs'), />3<\/span>.*↑.*before 1</);
+  assert.match(tile('landed'), /data-value="0"/);
+  assert.match(tile('landed'), />0<\/span>.*before —</);
+  assert.doesNotMatch(tile('landed'), /[↑↓=]<\/span>/, 'no way it went, where the 14 before measured nothing');
+  assert.match(tile('firstTry'), /data-value="null"/);
+  assert.match(tile('firstTry'), />—<\/span>.*before 50%</);
+  assert.match(markup, /2026-09-17 → 2026-09-30/);
+});
+
+test('the changes are said a row each, with a link to the run that froze each, or a line saying nothing changed', async () => {
+  const markup = await routedWith(createElement(StatsMarks, { marks: [statsMark('2026-09-29', 'seldon')] }));
+  assert.match(markup, /data-mark="2026-09-29"/);
+  assert.match(markup, /agent seldon/);
+  assert.match(markup, /href="\/runs\/r-2"/);
+  assert.match(markup, />r-1</);
+  const none = await routedWith(createElement(StatsMarks, { marks: [] }));
+  assert.doesNotMatch(none, /data-mark=/);
+  assert.match(none, /Nothing a run froze changed in this period\./);
+});
+
+test('the filters link each period with the filters kept, the default period left out, and light the key a value is kept of', async () => {
+  const markup = await routedWith(createElement(StatsFilters, { search: { factory: 'nemia' }, now: new Date('2026-09-30T12:00:00Z') }));
+  const link = (period: string) => markup.match(new RegExp(`<a [^>]*data-period="${period}"[^>]*>`))?.[0] ?? '';
+  assert.match(link('28d'), /href="\/stats\?factory=nemia"/);
+  assert.match(link('28d'), /data-active="true"/);
+  assert.match(link('all'), /href="\/stats\?factory=nemia&amp;period=all"|href="\/stats\?period=all&amp;factory=nemia"/);
+  assert.doesNotMatch(link('all'), /data-active/);
+  assert.match(markup, /data-filter="factory"[^>]*data-kept=""/);
+  assert.doesNotMatch(markup, /data-filter="agent"[^>]*data-kept/);
+});

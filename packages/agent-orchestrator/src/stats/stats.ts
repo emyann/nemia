@@ -13,7 +13,7 @@ import { tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
-import { landsOnCheck } from '../status/status.ts';
+import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
@@ -169,12 +169,13 @@ function runCostOf(t: Timeline): number | null {
 }
 
 /**
- * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked, and its check, where the
- * step has one, passed.
+ * Whether a step's current try ended as work that is done: its session succeeded and did not sign off blocked nor, looping, ask for another
+ * round nobody accepted (`askedAgain`), and its check, where the step has one, passed.
  */
 function doneStep(r: RunRead, step: Workflow): boolean {
   const record = r.run.steps[step.name];
   if (!record?.taskId || !r.succeeded(record.taskId) || r.closeoutOf(step.name)?.outcome === 'blocked') return false;
+  if (askedAgain(step, r.run, r.closeoutOf)) return false;
   return record.check ? r.verdictOf(record.check.taskId) === 'passed' : step.check === undefined;
 }
 
@@ -182,7 +183,8 @@ function doneStep(r: RunRead, step: Workflow): boolean {
  * Whether a run is finished, and the time it finished: its ending's last try's end once the record says how the ending landed. Else, once
  * nothing is in flight, its last task's end when its ending's current try is done (`doneStep`) — an ending that commits in its own prose,
  * whose record never says — or, with no ending, when every step's is. Null for a run cancelled, a run whose ending lands on its check
- * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked — and a run still going.
+ * (`landsOnCheck`) and has not landed, a run that waits on a person — a check refused, a session failed or blocked, a loop that asked for
+ * another round nobody accepted — and a run still going.
  */
 function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
   if (r.run.cancelledAt) return null;
@@ -227,14 +229,15 @@ function runFactOf(r: RunRead): RunFact[] {
 export const factsOf = (r: RunRead): Facts => ({ tries: tryFactsOf(r), runs: runFactOf(r) });
 
 /**
- * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed. `rounds` is the mean rounds
+ * The headline numbers of a set of facts. `runs` counts the runs finished and `landed` those that landed, null where no run recorded
+ * whether it landed. `rounds` is the mean rounds
  * to acceptance, `firstTry` the share of landed runs that landed on their first try, `costPerLanded` and `timePerLanded` the mean cost and
  * wall time of a landed run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
  * wait at a gate. Each mean over nothing is null.
  */
 export type Headline = {
   runs: number;
-  landed: number;
+  landed: number | null;
   rounds: number | null;
   firstTry: number | null;
   costPerLanded: number | null;
@@ -290,7 +293,7 @@ export function headlineOf(f: Facts): Headline {
   const landed = f.runs.filter((r) => r.landed === true);
   return {
     runs: f.runs.length,
-    landed: landed.length,
+    landed: f.runs.some((r) => r.landed !== null) ? landed.length : null,
     rounds: mean(f.runs.flatMap((r) => r.rounds)),
     firstTry: landed.length ? landed.filter((r) => r.firstTry === true).length / landed.length : null,
     costPerLanded: mean(landed.map((r) => r.costUsd)),

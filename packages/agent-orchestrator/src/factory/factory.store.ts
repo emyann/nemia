@@ -1,7 +1,8 @@
 /**
- * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "hires": {...} }` — read
- * (`readFactories`, `readFactory`), filed (`addFactory`), hired into and fired from (`hireAgent`, `fireAgent`) and removed
- * (`removeFactory`). A person's verbs are their one writer; the judgement is `factory.ts`'s.
+ * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "workflows": [...], "hires":
+ * {...} }` — read (`readFactories`, `readFactory`), filed (`addFactory`), given workflows and relieved of them (`attachWorkflow`,
+ * `detachWorkflow`), hired into and fired from (`hireAgent`, `fireAgent`) and removed (`removeFactory`). A person's verbs are their one
+ * writer; the judgement is `factory.ts`'s.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
@@ -15,6 +16,7 @@ import {
   factoryNameRefusal,
   hireRefusal,
   noFactoryLine,
+  workflowNameRefusal,
   type Factory,
   type FactoryListing,
   type FactoryWrite,
@@ -26,11 +28,15 @@ import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 export const factoriesDir = (): string => path.join(HOME, 'factories');
 
 /**
- * A factory's file: at least one repository, each a string, and its hires, a step's `<workflow>/<step>` to an agent's name, when it has
- * any; a key a later `wf` writes beside them is kept, not refused.
+ * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, and its hires, a
+ * step's `<workflow>/<step>` to an agent's name, when it has any; a key a later `wf` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
-  Schema.Struct({ repos: Schema.NonEmptyArray(Schema.String), hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)) }),
+  Schema.Struct({
+    repos: Schema.NonEmptyArray(Schema.String),
+    workflows: Schema.optionalKey(Schema.Array(Schema.String)),
+    hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
@@ -63,12 +69,20 @@ function factoryFile(name: string): FileRead {
   return { file, error: `does not read as a factory: ${field} ${words}. wf factory rm ${name}, then add it again.` };
 }
 
+/** The factory `name` its file's `content` says: none attached and none hired when the file names none. */
+const factoryOf = (name: string, content: FactoryFile): Factory => ({
+  name,
+  repos: content.repos,
+  workflows: content.workflows ?? [],
+  hires: content.hires ?? {},
+});
+
 /** One entry of the folder as `wf factory ls` lists it: the factory its file says, or why the file does not read as one. */
 function factoryAt(file: string): FactoryListing {
   const name = file.slice(0, -'.json'.length);
   const read = factoryFile(name);
   if ('error' in read) return { name, file: read.file, error: read.error };
-  return { name, file: read.file, repos: read.content.repos, hires: read.content.hires ?? {} };
+  return { ...factoryOf(name, read.content), file: read.file };
 }
 
 /**
@@ -135,7 +149,7 @@ export function addFactory(opts: { name: string; repos: readonly string[] }): { 
   } finally {
     fs.rmSync(hidden, { force: true });
   }
-  return { factory: { name: opts.name, repos, hires: {} }, file };
+  return { factory: { name: opts.name, repos, workflows: [], hires: {} }, file };
 }
 
 /** That the store has no factory `name`, naming those it has: `Missing`, with what was not done. */
@@ -179,17 +193,20 @@ export function readFactory(name: string): Factory {
   const read = factoryFile(name);
   if (!fs.existsSync(read.file)) throw noFactory(name, 'Nothing was started.');
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
-  return { name, repos: read.content.repos, hires: read.content.hires ?? {} };
+  return factoryOf(name, read.content);
 }
+
+/** What each verb that changes a factory's file does, as its refusals say it was not done. */
+const DONE = { attach: 'attached', detach: 'detached', hire: 'hired', fire: 'fired' } as const;
 
 /**
  * The file of the factory `name`, to be written back by `verb`. Refused: the name (`refuseName`), a name with no file (`Missing`), and a
  * file that does not read (`Invalid`), left as it is.
  */
-function fileToChange(name: string, verb: FactoryWrite): FileRead & { content: FactoryFile } {
+function fileToChange(name: string, verb: Exclude<FactoryWrite, 'add' | 'rm'>): FileRead & { content: FactoryFile } {
   refuseName(name, verb);
   const read = factoryFile(name);
-  if (!fs.existsSync(read.file)) throw noFactory(name, `Nothing was ${verb === 'hire' ? 'hired' : 'fired'}.`);
+  if (!fs.existsSync(read.file)) throw noFactory(name, `Nothing was ${DONE[verb]}.`);
   if ('error' in read)
     throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error} It was left as it is, and nothing was changed.` });
   return read;
@@ -209,13 +226,19 @@ function writeWhole(file: string, content: FactoryFile): void {
 /**
  * `wf factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
  * step, replacing an earlier hire, which is returned (`replaced`). Every other key of the file is kept. Refused before anything is written:
- * the factory (`fileToChange`), and a step or an agent that is not one (`hireRefusal`, `Invalid`). Whether the workflow, its step and the
+ * the factory (`fileToChange`), a step or an agent that is not one (`hireRefusal`, `Invalid`), and a step of a workflow the factory has
+ * not attached (`Invalid`, naming the attach). Whether the workflow, its step and the
  * agent exist is judged when a run starts in the factory.
  */
 export function hireAgent(opts: { factory: string; agent: string; step: string }): { file: string; replaced?: string } {
   const bad = hireRefusal(opts.step, opts.agent);
   if (bad) throw new Invalid({ message: `${bad} Nothing was hired.` });
   const { file, content } = fileToChange(opts.factory, 'hire');
+  const workflow = opts.step.slice(0, opts.step.indexOf('/'));
+  if (!content.workflows?.includes(workflow))
+    throw new Invalid({
+      message: `${opts.factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — wf factory attach ${opts.factory} ${workflow} — then hire. Nothing was hired.`,
+    });
   const replaced = content.hires?.[opts.step];
   writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
   return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };
@@ -238,4 +261,49 @@ export function fireAgent(opts: { factory: string; step: string }): { file: stri
   delete hires[opts.step];
   writeWhole(file, { ...content, hires });
   return { file, fired };
+}
+
+/** The workflow name `workflow` a verb is given, refused (`Invalid`) when it cannot name one (`workflowNameRefusal`). */
+function refuseWorkflowName(workflow: string, verb: 'attach' | 'detach'): void {
+  const bad = workflowNameRefusal(workflow);
+  if (bad) throw new Invalid({ message: `${bad} Nothing was ${DONE[verb]}.` });
+}
+
+/**
+ * `wf factory attach`: the workflow whose folder is named `workflow` attached to the factory `factory`, which then offers it; the file's
+ * workflows kept sorted, each named once, and every other key kept. One already attached is not written again (`already`). Only the name
+ * is stored: whether the workflow exists is judged when a run starts in the factory. Refused before anything is written: the name
+ * (`workflowNameRefusal`, `Invalid`) and the factory (`fileToChange`).
+ */
+export function attachWorkflow(opts: { factory: string; workflow: string }): { file: string; already?: true } {
+  refuseWorkflowName(opts.workflow, 'attach');
+  const { file, content } = fileToChange(opts.factory, 'attach');
+  const workflows = content.workflows ?? [];
+  if (workflows.includes(opts.workflow)) return { file, already: true };
+  writeWhole(file, { ...content, workflows: [...workflows, opts.workflow].sort() });
+  return { file };
+}
+
+/**
+ * `wf factory detach`: the workflow `workflow` taken from the factory `factory`, which then offers it no more; every other key kept.
+ * Refused before anything is written: the name (`Invalid`), the factory (`fileToChange`), a workflow it has not attached (`Missing`, naming
+ * those it has), and one it still hires into (`Invalid`, naming the fire of each hire), so no hire outlives its workflow in the file.
+ */
+export function detachWorkflow(opts: { factory: string; workflow: string }): { file: string } {
+  refuseWorkflowName(opts.workflow, 'detach');
+  const { file, content } = fileToChange(opts.factory, 'detach');
+  const workflows = content.workflows ?? [];
+  if (!workflows.includes(opts.workflow))
+    throw new Missing({
+      message: `${opts.factory} has not attached ${opts.workflow}. ${workflows.length ? `It offers: ${workflows.join(', ')}.` : 'It offers none.'} Nothing was detached.`,
+    });
+  const hired = Object.keys(content.hires ?? {})
+    .filter((step) => step.startsWith(`${opts.workflow}/`))
+    .sort();
+  if (hired.length)
+    throw new Invalid({
+      message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `wf factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
+    });
+  writeWhole(file, { ...content, workflows: workflows.filter((w) => w !== opts.workflow) });
+  return { file };
 }

@@ -21,10 +21,10 @@ export const FACTORY_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
 export type Hires = Readonly<Record<string, string>>;
 
 /**
- * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, and its hires,
- * none when the file names none.
+ * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
+ * attached to it, each by its folder's name, and its hires; none of either when the file names none.
  */
-export type Factory = { name: string; repos: readonly string[]; hires: Hires };
+export type Factory = { name: string; repos: readonly string[]; workflows: readonly string[]; hires: Hires };
 
 /** A factory as `wf factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
 export type FactoryListing = (Factory & { file: string }) | { name: string; file: string; error: string };
@@ -39,12 +39,14 @@ export function factoryNameRefusal(name: string): string | undefined {
 }
 
 /** A verb of `wf factory` that writes a factory's file. */
-export type FactoryWrite = 'add' | 'rm' | 'hire' | 'fire';
+export type FactoryWrite = 'add' | 'rm' | 'attach' | 'detach' | 'hire' | 'fire';
 
 /** What to do in place of `wf factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
   add: 'Give the factory another name.',
   rm: 'Remove a factory wf factory ls lists under it.',
+  attach: 'It offers every workflow found already: attach to a factory wf factory ls lists.',
+  detach: 'It offers every workflow found, and none can be taken from it: detach from a factory wf factory ls lists.',
   hire: "In it, a step that names no agent runs as a plain session: hire into a factory wf factory ls lists, or write the step's agent: line.",
   fire: 'It hires no one: fire in a factory wf factory ls lists.',
 };
@@ -54,19 +56,29 @@ export const defaultFactoryRefusal = (verb: FactoryWrite): string =>
   `\`${DEFAULT_FACTORY}\` is the default factory: it holds every run and card that names no factory, and is read, never written, so wf factory ${verb} does not take it. ${INSTEAD[verb]}`;
 
 /**
- * Why `step` and `agent` cannot be a hire, or undefined: `step` is `<workflow>/<step>` — a workflow's name, which is a folder that is not
- * hidden and neither the agents' nor the skills' folder, then a step's name (`stepNameRefusal`) — and `agent` names an agent's file, not
- * empty, hidden, nor holding a slash or a space. Whether they exist is the start's to judge.
+ * Why `workflow` cannot name a workflow, or undefined: a workflow is named by its folder, which is not empty, not hidden, holds no slash,
+ * and is neither the agents' nor the skills' folder. Whether it exists is the start's to judge.
+ */
+export function workflowNameRefusal(workflow: string): string | undefined {
+  if (!workflow || workflow.startsWith('.') || /[\\/]/.test(workflow))
+    return `\`${workflow}\` is not a workflow's name: a workflow is named by its folder, not hidden, with no slash — build, say.`;
+  if (workflow === AGENTS_FOLDER || workflow === SKILLS_FOLDER)
+    return `${workflow}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`;
+  return undefined;
+}
+
+/**
+ * Why `step` and `agent` cannot be a hire, or undefined: `step` is `<workflow>/<step>` — a workflow's name (`workflowNameRefusal`), then a
+ * step's name (`stepNameRefusal`) — and `agent` names an agent's file, not empty, hidden, nor holding a slash or a space. Whether they
+ * exist is the start's to judge.
  */
 export function hireRefusal(step: string, agent: string): string | undefined {
   const parts = step.split('/');
   if (parts.length !== 2)
     return `--step ${step} names a step as <workflow>/<step>, its workflow's folder and its file without .md, one slash between them: --step build/implement, say.`;
   const [workflow, name] = parts;
-  if (!workflow || workflow.startsWith('.'))
-    return `--step ${step}: \`${workflow}\` is not a workflow's name: a workflow is a folder, named and not hidden. Give it as <workflow>/<step>: --step build/implement, say.`;
-  if (workflow === AGENTS_FOLDER || workflow === SKILLS_FOLDER)
-    return `--step ${step}: ${workflow}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`;
+  const badWorkflow = workflowNameRefusal(workflow);
+  if (badWorkflow) return `--step ${step}: ${badWorkflow}`;
   const badStep = stepNameRefusal(name);
   if (badStep) return `--step ${step}: ${badStep}`;
   if (!agent || agent.startsWith('.') || /[\\/\s]/.test(agent))
@@ -103,11 +115,25 @@ export function unfilledRefusal(
   return `${workflow}: in the factory ${factory}, ${which}. Hire an agent into ${unfilled.length === 1 ? 'it' : 'each'} — ${hires} — or start it in the default factory, where such a step runs as a plain session. Nothing was started.`;
 }
 
+/**
+ * Why a run of `workflow` cannot start in `factory`, or undefined when the factory offers it: a factory offers only the workflows attached
+ * to it, and none when none is — named, with the attach that adds it.
+ */
+export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string | undefined {
+  if (factory.workflows.includes(workflow)) return undefined;
+  const offers = factory.workflows.length ? `it offers: ${[...factory.workflows].sort().join(', ')}` : 'it offers none yet';
+  return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it — wf factory attach ${factory.name} ${workflow} — or start it in the default factory, which offers every workflow. Nothing was started.`;
+}
+
 /** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */
 const hireLines = (hires: Hires, width: number): string[] =>
   Object.keys(hires)
     .sort()
     .map((step) => `${' '.repeat(width)}  ${step} ← ${hires[step]}`);
+
+/** The workflows a factory offers as `wf factory ls` lists them under its line, by name — `workflows: build, intake` — or none. */
+const workflowLine = (workflows: readonly string[], width: number): string[] =>
+  workflows.length ? [`${' '.repeat(width)}  workflows: ${[...workflows].sort().join(', ')}`] : [];
 
 /** What `wf factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read. */
 export function factoryLines(listing: readonly FactoryListing[]): string[] {
@@ -117,7 +143,7 @@ export function factoryLines(listing: readonly FactoryListing[]): string[] {
     `${DEFAULT_FACTORY.padEnd(width)}  every run and card that names no factory — read, never written`,
     ...sorted.flatMap((l) => [
       `${l.name.padEnd(width)}  ${'error' in l ? `${l.file} ${l.error}` : l.repos.join(', ')}`,
-      ...('error' in l ? [] : hireLines(l.hires, width)),
+      ...('error' in l ? [] : [...workflowLine(l.workflows, width), ...hireLines(l.hires, width)]),
     ]),
   ];
 }

@@ -14,9 +14,9 @@ const MUTED = 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:
 const mark = <Factory aria-hidden className="size-3 shrink-0" />;
 
 /**
- * One factory's tag, `data-factory-tag` its name after a factory's mark: a named factory's in colour, linked to its floor when `linked` and plain text where it
- * sits inside another link, with no tooltip where a card's stretched link lies under it; the default factory's muted, and never linked, since
- * a run of it is read on the Runs page.
+ * One factory's tag, `data-factory-tag` its name after a factory's mark: a named factory's in colour, linked to its floor when `linked` and
+ * plain text where it sits inside another link, with no tooltip where a card's stretched link lies under it; the default factory's muted,
+ * and never linked, since a run of it is read on the Runs page.
  */
 export function FactoryTag({ name, linked = false }: { name: string; linked?: boolean }) {
   if (name === DEFAULT_NAME) {

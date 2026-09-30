@@ -212,11 +212,11 @@ function FileCard() {
 }
 
 /**
- * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start, which opens its
- * start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it was queued, and
- * Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps it. A card a
- * run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card shows
- * why, with its file for a title, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
+ * A card: its first line, linked to its page, and under it its name, factory, workflow, repository and filing time (`CardMeta`); Start,
+ * which opens its start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it
+ * was queued, and Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
+ * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
+ * card shows why, with its file for a title, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
  *
  * Its page shows the body rendered and its keys explained, and for a file that does not read, the file as written. A folder, a name the api
  * refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and its title is its name alone.

@@ -22,10 +22,10 @@ const filterOf = (page: Page): Locator => page.locator('[data-factory-filter] se
 export default {
   /**
    * Each item says which factory it is in. On Workflows, `dev` is tagged with the factory that attaches it on the checkout, linked to its
-   * floor, and not with `broken`, whose file does not read; on Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's row
-   * is tagged with its factory and every other row `default`; the filter offers both with how many, keeps one factory's runs in the page's
-   * address, says when it keeps none, and shows every factory's again. On the Inbox, a card filed in the factory is tagged with it, linked,
-   * and the filter by `default` leaves it out. The card is taken back.
+   * floor, and not with `broken`, whose file does not read; on Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's
+   * row is tagged with its factory and every other row `default`; the filter offers both with how many, keeps one factory's runs in the
+   * page's address, says when it keeps none, and shows every factory's again. On the Inbox, a card filed in the factory is tagged with it,
+   * linked, and the filter by `default` leaves it out. The card is taken back.
    */
   name: 'factory-tags',
   route: '/runs',

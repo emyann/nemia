@@ -1,7 +1,7 @@
 /**
- * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the skills by place (`skillPlace`), one
- * skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page (`stepPage`), the builder's form
- * (`keyForm`) and a machine (`machine`). Each takes keys to put over its own.
+ * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the
+ * skills by place (`skillPlace`), one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
+ * (`stepPage`), the builder's form (`keyForm`) and a machine (`machine`). Each takes keys to put over its own.
  */
 import type {
   AgentListing,

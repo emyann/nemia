@@ -132,8 +132,7 @@ wf stats --json                            # what GET /api/stats answers
   not measured has no cost, and a workflow with no `loop:` step has no rounds.
 - **A try falls on the UTC day it ended, a run on the day it finished**: its ending step's landing
   settled (committed, aborted or untouched), or, with no ending step, every step filed and none in
-  flight. A cancelled run
-  never finishes.
+  flight. A cancelled run never finishes.
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited

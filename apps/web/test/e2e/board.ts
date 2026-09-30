@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectCount, expectTexts, expectVisible, idle, Refused, watch } from './checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, WAIT_MS, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
 import { API, store } from './world.ts';
 
@@ -68,6 +68,75 @@ export const themeOf = (page: Page): Promise<string> =>
  */
 export async function photograph(target: Page | Locator, file: string, options: { fullPage?: boolean } = {}): Promise<void> {
   await target.screenshot({ ...options, path: file, animations: 'disabled' });
+}
+
+/** A face's idle loops, as Blobatar's stylesheet names them: it breathes, bobs, blinks and glances. */
+const IDLE_LOOPS = ['mo-breathe', 'mo-bob', 'mo-blink', 'mo-saccade'];
+
+/** What the face `face` (a selector for its drawing) shows of its life: its root's classes, its `--mo-amp`, and its idle loops running. */
+const lifeOf = (page: Page, face: string) =>
+  page.evaluate(
+    ({ face, loops }) => {
+      const svg = document.querySelector(face);
+      const root = svg?.querySelector('.mo-root');
+      if (!svg || !root) return null;
+      const running = svg
+        .getAnimations({ subtree: true })
+        .filter((a): a is CSSAnimation => a instanceof CSSAnimation && a.playState === 'running')
+        .map((a) => a.animationName)
+        .filter((name) => loops.includes(name));
+      return {
+        classes: root.getAttribute('class') ?? '',
+        amp: getComputedStyle(root).getPropertyValue('--mo-amp').trim(),
+        running: [...new Set(running)],
+      };
+    },
+    { face, loops: IDLE_LOOPS },
+  );
+
+/** Waits until `ok` holds of the face's life, as `lifeOf` reads it; refuses with the last reading after `WAIT_MS`. */
+async function waitForLife(page: Page, face: string, ok: 'alive' | 'still', assertion: string) {
+  try {
+    await page.waitForFunction(
+      ({ face, ok, loops }) => {
+        const svg = document.querySelector(face);
+        const root = svg?.querySelector('.mo-root');
+        if (!svg || !root) return false;
+        const running = new Set(
+          svg
+            .getAnimations({ subtree: true })
+            .filter((a) => a instanceof CSSAnimation && a.playState === 'running')
+            .map((a) => (a as CSSAnimation).animationName),
+        );
+        if (ok === 'still') return loops.every((name) => !running.has(name));
+        return (
+          root.classList.contains('mo-always') &&
+          getComputedStyle(root).getPropertyValue('--mo-amp').trim() === '1' &&
+          running.has('mo-breathe') &&
+          running.has('mo-blink')
+        );
+      },
+      { face, ok, loops: IDLE_LOOPS },
+      { timeout: WAIT_MS },
+    );
+  } catch {
+    throw new Refused(`${assertion} — it shows ${JSON.stringify(await lifeOf(page, face))}`);
+  }
+}
+
+/**
+ * The face `face` (a selector for its drawing) is alive with nothing hovering it: Blobatar's `mo-always` on its root, awake (`--mo-amp` 1),
+ * breathing and blinking with the pointer away from it. With reduced motion asked for, none of its idle loops runs; no longer asked, they
+ * run again, without a reload. Leaves the pointer in the page's top-right corner and reduced motion not asked for.
+ */
+export async function expectAlive(page: Page, face: string, who: string): Promise<void> {
+  await page.locator(face).scrollIntoViewIfNeeded();
+  await page.mouse.move((page.viewportSize()?.width ?? 1280) - 5, 5, { steps: 4 });
+  await waitForLife(page, face, 'alive', `${who}'s face moves with nothing hovering it`);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await waitForLife(page, face, 'still', `with reduced motion asked for, ${who}'s face is still`);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await waitForLife(page, face, 'alive', `once the person no longer asks, ${who}'s face moves again, without a reload`);
 }
 
 /** The places of the queued cards, as the board says them. */

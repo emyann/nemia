@@ -4500,22 +4500,27 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
   assert.match(edge(false), /stroke:var\(--edge-done\);stroke-width:1.5/);
 });
 
-test("an agent's face is drawn from its name: the same name the same face, another name another, named as a person is", async () => {
+test("an agent's face is drawn from its name, alive at all times: the same name the same face, another name another, named as a person is", async () => {
   const { AgentFace, personOf } = await import('../src/components/AgentParts.tsx');
-  const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 36 }));
-  const srcOf = (html: string) => /src="([^"]+)"/.exec(html)?.[1];
+  const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 16 }));
   const iris = face('iris');
-  assert.match(iris, /^<img /, 'one image, no script and no stylesheet to load');
-  assert.match(iris, /data-agent-face="iris"/);
-  assert.match(iris, /alt="Iris"/, 'a screen reader says its name as a person is named');
-  assert.ok(srcOf(iris), iris);
-  assert.equal(srcOf(face('iris')), srcOf(iris), 'the same name draws the same face');
-  assert.notEqual(srcOf(face('nora')), srcOf(iris), 'another name draws another face');
+  assert.match(iris, /^<svg [^>]*>/, "an inline drawing, which Blobatar's stylesheet moves");
+  assert.doesNotMatch(iris, /<img/, 'no still image');
+  const open = /^<svg [^>]*>/.exec(iris)?.[0] ?? '';
+  assert.match(open, /role="img"/);
+  assert.match(open, /data-agent-face="iris"/);
+  assert.match(open, /aria-label="Iris"/, 'a screen reader says its name as a person is named');
+  assert.doesNotMatch(open, /aria-hidden="true"/);
+  assert.doesNotMatch(iris, /<title>/, 'and no title: the name is no text of the line it stands in, and no tooltip');
+  assert.match(iris, /<g class="[^"]*\bmo-root\b[^"]*\bmo-always\b/, 'it moves with nothing hovering it');
+  assert.equal(face('iris'), iris, 'the same name draws the same face');
+  const drawing = (html: string) => html.replace(/aria-label="[^"]*"/, '').replace(/data-agent-face="[^"]*"/, '');
+  assert.notEqual(drawing(face('nora')), drawing(iris), 'another name draws another face, not only another label');
   assert.equal(personOf('iris'), 'Iris');
   assert.equal(personOf('note-writer'), 'Note writer');
 });
 
-test('a face that follows the pointer is an inline drawing its driver can move, still named as a person is', async () => {
+test('a face that follows the pointer is an inline drawing its driver can move, alive at all times, still named as a person is', async () => {
   const { AgentFace } = await import('../src/components/AgentParts.tsx');
   const face = (name: string) => renderToStaticMarkup(createElement(AgentFace, { name, size: 36, follows: true }));
   const iris = face('iris');
@@ -4526,6 +4531,7 @@ test('a face that follows the pointer is an inline drawing its driver can move, 
   assert.match(open, /data-agent-face="iris"/);
   assert.match(iris, /^<svg [^>]*><title>Iris<\/title>/, 'its name is its first child, so a screen reader says it');
   assert.match(iris, /class="[^"]*mo-eyes/, 'it has eyes a driver can move');
+  assert.match(iris, /<g class="[^"]*\bmo-root\b[^"]*\bmo-always\b/, 'it moves with nothing hovering it');
   assert.equal(face('iris'), iris, 'the same name draws the same face');
   const drawing = (html: string) => html.replace(/<title>[^<]*<\/title>/, '').replace(/data-agent-face="[^"]*"/, '');
   assert.notEqual(drawing(face('nora')), drawing(iris), 'another name draws another face, not only another title');
@@ -4547,7 +4553,7 @@ test('REFUSED: a face on a plate stands on its own Blobatar backdrop, not the gr
   assert.match(bare, /class="[^"]*rounded-full bg-neutral-100/);
   assert.match(
     renderToStaticMarkup(createElement(AgentFace, { name: 'iris', size: 16 })),
-    /^<img [^>]*class="[^"]*rounded-full bg-neutral-100/,
+    /^<svg [^>]*class="[^"]*rounded-full bg-neutral-100/,
   );
 });
 

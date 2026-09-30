@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { expectAlive, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -116,8 +116,9 @@ async function follows(page: Page, face: string, size: number, who: string) {
 
 export default {
   /**
-   * The agents' faces follow the pointer: each face on the list, and the face at the head of an agent's own page, turns its eyes toward it,
-   * measured, not pictured. Each is still named as a person is, and a person who asks for reduced motion sees their eyes still. Read-only.
+   * The agents' faces are alive and follow the pointer: each face on the list, and the face at the head of an agent's own page, breathes and
+   * blinks with nothing hovering it, and turns its eyes toward the pointer, measured, not pictured. Each is still named as a person is, and
+   * a person who asks for reduced motion sees it still. Read-only.
    */
   name: 'faces',
   route: '/agents',
@@ -139,6 +140,7 @@ export default {
           .and(page.locator(`${card} svg[data-agent-face="${name}"]`)),
         `${name}'s face is named ${person}, so a screen reader says it`,
       );
+      await expectAlive(page, `${card} svg[data-agent-face="${name}"]`, person);
       await follows(page, `${card} svg[data-agent-face="${name}"]`, 112, person);
     }
     const theme = await themeOf(page);
@@ -151,6 +153,7 @@ export default {
       page.locator('header').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(head)),
       `the face at the head of ${good.agent.name}'s page is a drawing, named ${good.agent.person}`,
     );
+    await expectAlive(page, head, `${good.agent.person}, at the head of its page,`);
     await follows(page, head, 96, `${good.agent.person}, at the head of its page,`);
     await photograph(page, path.join(OUT, `faces-head-${theme}.png`), { fullPage: true });
   },

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { filesIn, photograph, sidebar, themeOf } from '../board.ts';
+import { expectAlive, filesIn, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -132,10 +132,12 @@ export default {
     await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
     const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
     await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
+    const small = `[data-step-agent] svg[data-agent-face="${good.agent.name}"]`;
     await expectVisible(
-      page.locator(`[data-step-agent] img[data-agent-face="${good.agent.name}"][alt="${good.agent.person}"]`),
-      `and its small face beside the link is still an image: the faces beside a link do not follow the pointer`,
+      page.locator('[data-step-agent]').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(small)),
+      `and its small face beside the link is a drawing, named ${good.agent.person}`,
     );
+    await expectAlive(page, small, `${good.agent.person}, beside the link,`);
     await expectVisible(
       page.locator(`[data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
       `and what that agent says it can do, beneath it: ${good.agent.skill.name}`,

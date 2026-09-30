@@ -26,7 +26,8 @@ import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import { nextTry, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
-import { consumeAsks, readAnswers, readAsks, removeHold, rewriteRun, runFile, runsDir, stepsOf } from '../record/record.store.ts';
+import { runsDir, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { handOff } from '../workspace/worktree.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
 import { refsOf } from '../branches/branches.store.ts';
@@ -324,8 +325,8 @@ export async function advanceRun(
   const wrote =
     [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
     Boolean(tips || heldFirst || handed.marked || landing.landed);
-  if (wrote) rewriteRun(run);
-  consumeAsks(run, asks, roundAsks);
+  if (wrote) runStore.runs.rewrite(run);
+  runStore.asks.consume(run, asks, roundAsks);
 
   const done = { filed, checked, tried, looped, notes, feed };
   return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
@@ -340,7 +341,7 @@ async function readPass(e: Engine, run: Run): Promise<{ reads: PassReads; askNot
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
+  const { asks, rounds: roundAsks, notes: askNotes } = runStore.asks.read(run.id);
   return { reads: { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks }, askNotes };
 }
 
@@ -384,7 +385,7 @@ function handOffAll(run: Run, r: PassReads): { collected: string[]; marked: bool
   let marked = false;
   const collected = within('act', () =>
     handOffOwed(r.steps, run, r.phaseOf).flatMap((name) => {
-      if (!fs.existsSync(runFile(run.id))) return [];
+      if (!runStore.runs.exists(run.id)) return [];
       const record = run.steps[name];
       let handed: ReturnType<typeof handOff>;
       if (isGitRun(run)) handed = handOff(record.workspace!, name);
@@ -404,7 +405,7 @@ async function liftHold(e: Engine, run: Run): Promise<string[]> {
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
   let shipped = true;
   for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
-  if (!shipped || !removeHold(run.id, run.hold.at)) return [];
+  if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return [];
   const { until } = run.hold;
   delete run.hold;
   return [
@@ -478,7 +479,7 @@ function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admis
       r.verdictOf,
       r.asks,
       r.roundAsks,
-      readAnswers(run.id),
+      runStore.asks.answers(run.id),
       admission.waiting,
       saidCount(views, run),
       r.spendOf,

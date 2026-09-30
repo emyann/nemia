@@ -18,8 +18,8 @@ const changedWords = (marks: readonly StatsMark[]): string => marks.map((m) => `
  * One headline number's daily chart: a column per day served (`data-day`, its value as JSON in `data-value`, null kept), a bar for a
  * number, a line at the foot for a measured 0 and nothing for a day nothing measured, each day's value in words on hover; and a rule on
  * each day a run froze something that differs from the run before it (`data-mark-day`), naming what changed. The bars are scaled to the
- * largest known value, said above the drawing — `—` where nothing was measured; the first and the last day are said beneath it, as month and
- * day, the year being the period's.
+ * largest known value, said above the drawing — `—` where nothing was measured; the first and the last day are said beneath it, as month
+ * and day, the year being the period's.
  */
 export function StatsChart({
   number,

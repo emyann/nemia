@@ -53,7 +53,9 @@ export const HEADLINES: readonly HeadlineNumber[] = [
 export const wordsOf = (h: StatsHeadline): Record<HeadlineKey, string> =>
   Object.fromEntries(HEADLINES.map(({ key, words }) => [key, words(h[key])])) as Record<HeadlineKey, string>;
 
-/** Which way a number went from `before` to `last`; null where either is not measured. Neither good nor bad: that is not the page's call. */
+/**
+ * Which way a number went from `before` to `last`; null where either is not measured. Neither good nor bad: that is not the page's call.
+ */
 export const trendOf = (last: number | null, before: number | null): '↑' | '↓' | '=' | null =>
   last === null || before === null ? null : last > before ? '↑' : last < before ? '↓' : '=';
 
@@ -63,7 +65,9 @@ export const FILTERS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const
 /** A key the page can keep one value of. */
 export type FilterKey = (typeof FILTERS)[number];
 
-/** The name the api reads each filter under: a factory and a repository as `ofFactory` and `ofRepo`, since `factory` and `repo` place it. */
+/**
+ * The name the api reads each filter under: a factory and a repository as `ofFactory` and `ofRepo`, since `factory` and `repo` place it.
+ */
 const PARAM: Record<FilterKey, string> = { agent: 'agent', step: 'step', factory: 'ofFactory', workflow: 'workflow', repo: 'ofRepo' };
 
 /** The periods the charts offer: the tiles' 28 days, the default; 90 days; and every day the store has. */

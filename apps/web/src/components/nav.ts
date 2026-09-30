@@ -3,8 +3,9 @@ import { Blocks, Bot, ChartColumn, Factory, Inbox, List, Network, Waypoints } fr
 /**
  * The menu. The Inbox first: where an idea waits to be started, and so where work begins — lit on a card's page too. Then the Factories,
  * a block each, lit inside one too, which the frame lists under it; Runs, lit on a run's page too, since the list is where a run is reached
- * from; Stats, how well the runs went, measured; Workflows, where one starts, lit on a step's page; Agents, what a workflow's nodes may have attached, lit on an agent's page;
- * Capabilities, what the repository offers a step; and Machines, the state machines drawn from their code.
+ * from; Stats, how well the runs went, measured; Workflows, where one starts, lit on a step's page; Agents, what a workflow's nodes may
+ * have attached, lit on an agent's page; Capabilities, what the repository offers a step; and Machines, the state machines drawn from
+ * their code.
  */
 export const NAV = [
   { to: '/inbox', label: 'Inbox', icon: Inbox, active: (path: string) => path === '/inbox' || path.startsWith('/inbox/') },

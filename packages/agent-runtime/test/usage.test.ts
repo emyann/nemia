@@ -390,6 +390,15 @@ test('REFUSED: a line usage reads that does not decode is refused by its line an
   );
 });
 
+test('a cache count the API gives as null is none, counted as 0, as the SDK types it', () => {
+  const since = Date.parse('2026-09-12T09:00:00Z');
+  const usage = { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: null, cache_read_input_tokens: null };
+  const used = transcriptUsage(response('2026-09-12T09:00:01Z', 'msg_1', [], usage), since);
+  assert.equal(used.inputTokens, 10);
+  assert.equal(used.cacheWriteTokens, 0);
+  assert.equal(used.cacheReadTokens, 0);
+});
+
 test('usage decodes only the lines it reads: a response before the attempt began, and a line of a type it does not read, are not checked', () => {
   const since = Date.parse('2026-09-12T09:00:00Z');
   const jsonl = [

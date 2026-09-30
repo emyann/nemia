@@ -61,11 +61,12 @@ const Said = {
   isSidechain: Schema.optional(Schema.Boolean),
 };
 
+/** A response's token counts, as the API gives them: either cache count may be `null`, which is read as none. */
 const TokensSchema = Schema.Struct({
   input_tokens: Schema.optional(Count),
   output_tokens: Schema.optional(Count),
-  cache_creation_input_tokens: Schema.optional(Count),
-  cache_read_input_tokens: Schema.optional(Count),
+  cache_creation_input_tokens: Schema.optional(Schema.NullOr(Count)),
+  cache_read_input_tokens: Schema.optional(Schema.NullOr(Count)),
 });
 
 const ModelUsageSchema = Schema.Struct({

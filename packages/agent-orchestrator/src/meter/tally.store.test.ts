@@ -141,6 +141,12 @@ const started = (n: number): Run[] =>
 
 const phaseSum = (c: PassCost) => PHASES.reduce((n, p) => n + c.phases[p].ms, 0);
 
+/**
+ * The rounding of a sum of doubles, in ms: the phases and the overhead are differences of clock readings that add up to the pass exactly,
+ * so this is never time, only the last bits a float loses, far below any stall of the process.
+ */
+const ROUNDING_MS = 1e-6;
+
 test("a pass's phases add up to its time, less what measuring took, and the time is no more than the pass took seen from outside", async () => {
   emptyStore();
   started(3);
@@ -152,9 +158,9 @@ test("a pass's phases add up to its time, less what measuring took, and the time
     assert.ok(cost, 'the pass says what it cost');
     assert.ok(cost.ms <= outside, `the pass's ${cost.ms} ms fit in the ${outside} ms tick took`);
     const sum = phaseSum(cost);
-    assert.ok(sum <= cost.ms + 0.01, `the phases (${sum} ms) are no more than the pass (${cost.ms} ms)`);
+    assert.ok(sum <= cost.ms + ROUNDING_MS, `the phases (${sum} ms) are no more than the pass (${cost.ms} ms)`);
     assert.ok(
-      cost.ms - sum <= cost.overheadMs + 0.5,
+      cost.ms - sum <= cost.overheadMs + ROUNDING_MS,
       `the phases (${sum} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
     );
     assert.ok(cost.overheadMs < cost.ms, 'measuring costs less than what it measures');
@@ -174,8 +180,26 @@ test('what measuring took is in no phase: a runtime whose report is slow to read
     `the report read twice by each of the ${reads / 2} passes and reads, 3 ms a read, is overhead (${tallies.overheadMs} ms)`,
   );
   assert.ok(
-    Math.abs(ms - sum - tallies.overheadMs) <= 0.5,
+    Math.abs(ms - sum - tallies.overheadMs) <= ROUNDING_MS,
     `metered from outside, so the meter's own counts are read, not the pass's overhead, which also has what came after its time: the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms), no more and no less`,
+  );
+});
+
+test('on a clock that moves at every reading, the phases and measuring are the pass exactly: no reading falls between them', async (t) => {
+  emptyStore();
+  started(3);
+  let clock = 0;
+  t.mock.method(performance, 'now', () => ++clock);
+  const { ms, tallies } = await metered(() => tick(fake({ passMs: 5, observeMs: 2, ioMs: 1 })));
+  assert.ok(tallies);
+  const sum = PHASES.reduce((n, p) => n + tallies.kinds[p].ms, 0);
+  assert.equal(ms, sum + tallies.overheadMs, `the phases (${sum} ms) and measuring (${tallies.overheadMs} ms) are the pass (${ms} ms)`);
+  const { cost } = await tick(fake({ passMs: 20, observeMs: 12 }));
+  assert.ok(cost);
+  assert.ok(phaseSum(cost) <= cost.ms, `the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
+  assert.ok(
+    cost.ms - phaseSum(cost) <= cost.overheadMs,
+    `the phases (${phaseSum(cost)} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
   );
 });
 
@@ -221,7 +245,7 @@ test("a harness's observe is moved out of the runtime's pass into observe, and t
     `the runtime's pass keeps the rest of its 30 ms, a floor and never a ceiling, since a process parked after the spin takes longer (${cost.phases.runtime.ms})`,
   );
   assert.ok(
-    phaseSum(cost) <= cost.ms + 0.01,
+    phaseSum(cost) <= cost.ms + ROUNDING_MS,
     `the observe's 20 ms is moved, not copied, whatever the scheduler did: the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`,
   );
   assert.equal(cost.phases.runtime.bytes, 1000, 'what the runtime read is counted where it was called');
@@ -305,7 +329,7 @@ test('the word that admits a queued task is charged to act, and `wf tick --stats
       cost.phases.assess.ms >= unphasedMs,
       `the ${unphasedMs} ms spent reading the queued view, in no phase, are assess's (${cost.phases.assess.ms} ms)`,
     );
-    assert.ok(phaseSum(cost) <= cost.ms + 0.01, `the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
+    assert.ok(phaseSum(cost) <= cost.ms + ROUNDING_MS, `the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
     const row = breakdownLines(cost).find((l) => /^ {2}act /.test(l));
     assert.ok(row, breakdownLines(cost).join('\n'));
     const [, ms, calls] = row.trim().split(/ +/);

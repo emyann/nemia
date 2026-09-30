@@ -5,8 +5,8 @@
  * or a test between passes runs as it would unmetered, at the price of one comparison. Inside a pass, `within(kind, f)` charges the time
  * until `f` settles to `kind`, and the time of a `within` nested in it to the inner kind instead — so a run record's approvals are asks,
  * and a git call made to file a step is git — and the time in no `within` at all to `assess`, the judgement and whatever else is not
- * counted. So the kinds add up to the pass's time by construction, and the pass's time is measured apart from them, so a test can hold
- * the one against the other.
+ * counted. The counting itself is the overhead, and the reading that closes one interval opens the next, so the kinds and the overhead add
+ * up to the pass's time exactly, and the pass's time is measured apart from them, so a test can hold the one against the other.
  *
  * A pass is sequential — `tick` awaits each run before the next — which is what makes a stack right here. Something else in the process
  * that reads through these readers while a pass is open (the api's own requests) is charged to the pass: the process is the unit.
@@ -38,29 +38,40 @@ let meter: Meter | undefined;
 const empty = (): Tally => ({ ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 });
 const top = (m: Meter): Kind => m.stack.at(-1)?.kind ?? 'assess';
 
-/** The time since the last mark, charged to the kind on top — `assess` with none — and the time this took, to the overhead. */
+/** The time from the last mark to `now`, charged to the kind on top — `assess` with none — and the mark moved to `now`. */
 const charge = (m: Meter, now: number) => {
   m.kinds[top(m)].ms += now - m.mark;
   m.mark = now;
 };
 
-const enter = (m: Meter, frame: Frame) => {
+/**
+ * `f`, run as counting: the time before it charged first, and its own time, from the reading that charged to the one that closes it, added
+ * to the overhead, with the mark moved to that same closing reading, so no time falls between the kinds and the overhead. Throws as `f`
+ * does, counted all the same.
+ */
+const counting = <T>(m: Meter, f: () => T): T => {
   const now = performance.now();
   charge(m, now);
-  m.stack.push(frame);
-  m.kinds[frame.kind].calls++;
-  m.overheadMs += performance.now() - now;
-  m.mark = performance.now();
+  try {
+    return f();
+  } finally {
+    const after = performance.now();
+    m.overheadMs += after - now;
+    m.mark = after;
+  }
 };
 
-const leave = (m: Meter, frame: Frame) => {
-  const now = performance.now();
-  charge(m, now);
-  const at = m.stack.lastIndexOf(frame);
-  if (at >= 0) m.stack.splice(at, 1);
-  m.overheadMs += performance.now() - now;
-  m.mark = performance.now();
-};
+const enter = (m: Meter, frame: Frame) =>
+  counting(m, () => {
+    m.stack.push(frame);
+    m.kinds[frame.kind].calls++;
+  });
+
+const leave = (m: Meter, frame: Frame) =>
+  counting(m, () => {
+    const at = m.stack.lastIndexOf(frame);
+    if (at >= 0) m.stack.splice(at, 1);
+  });
 
 /**
  * `f`, counted as `kind` while a pass is metered: its time until it returns, or until the promise it returns settles. Throws and rejects as
@@ -135,16 +146,7 @@ export const addRuntime = (
  */
 export function aside<T>(f: () => T): T {
   const m = meter;
-  if (!m) return f();
-  const t0 = performance.now();
-  charge(m, t0);
-  try {
-    return f();
-  } finally {
-    const t1 = performance.now();
-    m.overheadMs += t1 - t0;
-    m.mark = t1;
-  }
+  return m ? counting(m, f) : f();
 }
 
 /** Whether a pass is being metered now. */

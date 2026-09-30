@@ -27,9 +27,10 @@ export const HELP = `wf — run a workflow of agent steps
                                workflow: unless given, and its after: needs an --after for each
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
-                               --factory <name>: the factory's hires fill the workflow's steps, and
-                               a step left with no agent is refused (wf factory --help); without it,
-                               such a step runs as a plain session
+                               --factory <name>: the workflow must be attached to the factory, whose
+                               hires fill its steps, and a step left with no agent is refused (wf
+                               factory --help); without it, every workflow is offered and such a
+                               step runs as a plain session
                                a card of the inbox (wf inbox --help) starts its body, or --brief
                                "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
                                unless given, --repo its repo:
@@ -48,6 +49,11 @@ export const HELP = `wf — run a workflow of agent steps
                                repositories (wf factory --help)
   wf factory add <name> --repo <path> [--repo <path> ...]
                                file a factory: a lowercase slug naming one or more directories
+  wf factory attach <factory> <workflow>
+                               offer a workflow in a factory, by its folder's name: a factory offers
+                               only the workflows attached to it
+  wf factory detach <factory> <workflow>
+                               take a workflow back, once no hire fills its steps
   wf factory hire <factory> <agent> --step <workflow>/<step>
                                hire an agent into a workflow's step: one a step, a second replaces it
   wf factory fire <factory> --step <workflow>/<step>

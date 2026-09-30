@@ -292,7 +292,17 @@ export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.sto
 export type { WorkflowWritten } from './folder/write.store.ts';
 export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
-export { addFactory, factoriesDir, fireAgent, hireAgent, readFactories, readFactory, removeFactory } from './factory/factory.store.ts';
+export {
+  addFactory,
+  attachWorkflow,
+  detachWorkflow,
+  factoriesDir,
+  fireAgent,
+  hireAgent,
+  readFactories,
+  readFactory,
+  removeFactory,
+} from './factory/factory.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {

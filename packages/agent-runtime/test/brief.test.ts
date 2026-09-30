@@ -50,13 +50,20 @@ test("every key a brief has reaches the spec — none is accepted and then dropp
     background: ['true', true],
     holdOpen: ['true', true],
     queued: ['true', true],
+    trustFrom: [dir, dir],
   };
+  const codexKeys: readonly string[] = ['trustFrom'];
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
     const spec = parse(brief(`${key}: ${written}`));
-    const where = (HARNESS_ARGS as readonly string[]).includes(key) ? (spec.config ?? {}) : spec;
+    const where = codexKeys.includes(key)
+      ? (spec.config?.codex ?? {})
+      : (HARNESS_ARGS as readonly string[]).includes(key)
+        ? (spec.config ?? {})
+        : spec;
     assert.deepEqual((where as Record<string, unknown>)[key], read, key);
     assert.equal(Object.hasOwn(spec, key) && where !== spec, false, `${key} is not left beside \`config\``);
+    assert.equal(codexKeys.includes(key) && Object.hasOwn(spec.config ?? {}, key), false, `${key} is not left beside \`config.codex\``);
   }
 });
 
@@ -199,6 +206,17 @@ test('`ae start` refuses what file() refuses, too — a harness this engine does
   assert.equal(r.status, 2);
   assert.match(r.stderr, /^file: `harness: banana` is not a harness this engine has/);
   assert.equal(r.filed, false);
+});
+
+test('`ae start` refuses a `trustFrom` that is not an absolute directory, and one on a harness that is not Codex, in the words of file()', () => {
+  const relative = aeStart('harness: codex\ntrustFrom: repo');
+  assert.equal(relative.status, 2);
+  assert.match(relative.stderr, /^file: `codex\.trustFrom: "repo"` is not an absolute directory\./);
+  assert.equal(relative.filed, false);
+  const claude = aeStart('trustFrom: /repo');
+  assert.equal(claude.status, 2);
+  assert.match(claude.stderr, /^file: `codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them\./);
+  assert.equal(claude.filed, false);
 });
 
 test("`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too: exit 2, the sentence, nothing filed — read and ignored, a person's `AE_MAX_CONCURRENT=1` would start every task at once", () => {

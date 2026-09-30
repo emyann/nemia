@@ -4,7 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
-import { ReadRefusal, get } from './read.ts';
+import { ReadRefusal, getUndecoded } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import type { RunGraph } from './graph.ts';
 import type { RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './judged.ts';
@@ -277,7 +277,7 @@ export const retryRun = (failures: number, error: unknown): boolean => !runGone(
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
-    queryFn: () => get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
+    queryFn: () => getUndecoded<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
     refetchInterval: () => pace(5_000),
     retry: retryRun,
   });

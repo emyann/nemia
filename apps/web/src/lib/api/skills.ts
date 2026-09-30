@@ -3,7 +3,7 @@
  * on the board (apps/api/src/agents/skills.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { AgentSkill } from './agents.ts';
 
 /** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what Nemia ships. */
@@ -51,7 +51,7 @@ export type SkillAdded = { skill: SkillRow; written: string[] };
 /** Every skill the picker lists, by place, read from disk on each request. */
 export const skillsQuery = queryOptions({
   queryKey: ['skills'],
-  queryFn: () => get<SkillPlace[]>('/api/skills'),
+  queryFn: () => getUndecoded<SkillPlace[]>('/api/skills'),
 });
 
 /** A copy the api refused: its words, and its status — 404 for a skill Nemia does not ship, 409 for a name your library has already. */
@@ -115,7 +115,7 @@ export type SkillSaved = SkillDetail & { written: string[] };
 export const skillQuery = (from: string, name: string) =>
   queryOptions({
     queryKey: ['skills', from, name],
-    queryFn: () => get<SkillDetail>(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
+    queryFn: () => getUndecoded<SkillDetail>(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`),
   });
 
 async function written(method: 'POST' | 'PUT', url: string, body: unknown): Promise<SkillSaved> {

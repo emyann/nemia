@@ -71,7 +71,7 @@
     {
       // The two rules left off above, on where what comes from outside is decoded by a schema before it is typed (Effect Schema: a
       // journal, a detached run file, a Codex `exec --json` stream, a Claude Code transcript line, a run record and a person's asks, daemon.json and tick stats, a
-      // queue try, a line of the feed, the api's request bodies): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
+      // queue try, a line of the feed, the api's request bodies, the board's reads of the api): there a value's type is what the value is, so a `String()` or a `=== true` the type makes needless guards nothing. A
       // value such a file still takes by a cast keeps its guard with an `oxlint-disable-next-line` saying why.
       "files": [
         "packages/agent-runtime/src/core/event-schema.ts",
@@ -90,7 +90,11 @@
         "apps/api/src/inbox/inbox.ts",
         "apps/api/src/runs/runs.ts",
         "apps/api/src/agents/skills.ts",
-        "apps/api/src/workflows/workflows.ts"
+        "apps/api/src/workflows/workflows.ts",
+        "apps/web/src/lib/api/read.ts",
+        "apps/web/src/lib/api/judged.ts",
+        "apps/web/src/lib/api/graph.ts",
+        "apps/web/src/lib/api/runs.ts"
       ],
       "rules": {
         "typescript/no-unnecessary-type-conversion": "error",

@@ -3,7 +3,7 @@
  * (`/api/runs/:id/steps/:step/path`), both in apps/api/src/steps/steps.ts.
  */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /**
  * Mirrors `TranscriptEvent` in packages/agent-runtime/src/runner.ts, as the api passes it on: one thing said in a session's
@@ -31,7 +31,7 @@ export const transcriptPath = (runId: string, step: string) =>
 
 /** One read of a step's conversation, from the start. */
 export const readTranscript = (runId: string, step: string, signal?: AbortSignal) =>
-  get<StepTranscript>(transcriptPath(runId, step), { signal });
+  getUndecoded<StepTranscript>(transcriptPath(runId, step), { signal });
 
 /** Mirrors the runtime's `LifecycleStep`: the lifecycle state a task's journal says once an entry is on it, the entry's kind and its `at`. */
 export type LifecycleStep = { state: string; event: string; at: string };
@@ -54,7 +54,7 @@ export const stepPathQuery = (
   queryOptions({
     queryKey: ['runs', runId, 'path', step, tryNumber ?? 'current', ...(tryNumber === null ? [stamp] : [])],
     queryFn: () =>
-      get<StepPath>(
+      getUndecoded<StepPath>(
         `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/path${tryNumber === null ? '' : `?try=${tryNumber}`}`,
       ),
     placeholderData: keepPreviousData,

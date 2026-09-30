@@ -32,7 +32,8 @@ import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { clientOf } from '../src/a2a/client.ts';
 import { cardOf } from '../src/a2a/handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a/map.ts';
-import { createEngine, nameFor } from '../src/facade.ts';
+import { nameFor } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
@@ -291,7 +292,7 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
 test('a held Codex task is INPUT_REQUIRED between turns, with no process; its answer resumes the same thread, in the same context — and no running attempt is ever INPUT_REQUIRED', async () => {
   const root = tmp('store');
   const cwd = workdir();
-  const engine = createEngine({ root, harnesses: { codex } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { codex } }));
   const client = agent(root, (taskId) => Effect.runPromise(readJournal(taskId).pipe(Effect.provide(Journal.files(root)))));
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
   const phase = async (want: string) => {
@@ -357,7 +358,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
 test('a held Codex attempt whose statement is on disk before its thread is read is not ended on the statement: it ends once its session is known, and the answer resumes that thread', async () => {
   const root = tmp('store');
   const cwd = workdir({ threadOn: 'thread-go', exitOn: 'exit1' });
-  const engine = createEngine({ root, harnesses: { codex } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { codex } }));
   const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
   const phase = async (want: string) => {
     await engine.tick();

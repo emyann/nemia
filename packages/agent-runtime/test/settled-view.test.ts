@@ -12,7 +12,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type HarnessSpec, type Sighting } from '../src/facade.ts';
+import type { HarnessSpec, Sighting } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -29,9 +30,9 @@ const check: HarnessSpec = {
   }),
 };
 
-const calls = (engine: ReturnType<typeof createEngine>) => engine.io().observed.check?.calls ?? 0;
+const calls = (engine: ReturnType<typeof promiseEngine>) => engine.io().observed.check?.calls ?? 0;
 
-const settle = async (engine: ReturnType<typeof createEngine>, id: string) => {
+const settle = async (engine: ReturnType<typeof promiseEngine>, id: string) => {
   const until = Date.now() + 20_000;
   while (!(await engine.view(id)).state.settled) {
     assert.ok(Date.now() < until, `${id} settled`);
@@ -41,7 +42,7 @@ const settle = async (engine: ReturnType<typeof createEngine>, id: string) => {
 };
 
 test('REFUSED at shipped defaults: a view of a settled `check` task observes nothing, and its logs are still read by the session it ended as', async () => {
-  const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') });
   await settle(engine, id);
 
@@ -55,7 +56,7 @@ test('REFUSED at shipped defaults: a view of a settled `check` task observes not
 });
 
 test('an unsettled `check` task is still observed: in flight, and before its first attempt', async () => {
-  const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
   const cwd = scratch('ae-settled-cwd-');
   fs.writeFileSync(path.join(cwd, 'hold'), '');
   const id = await engine.file({ brief: 'b', cwd });
@@ -102,7 +103,7 @@ test('REFUSED: a settled task on a harness that has `find` observes nothing eith
       return `logs of ${sessionId}`;
     },
   };
-  const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { mine: runner } });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { mine: runner } }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') });
   await engine.tick();
   sessions.set(`ae/${id}/1`, { ...sessions.get(`ae/${id}/1`)!, state: 'completed' });
@@ -119,7 +120,7 @@ test('REFUSED: a settled task on a harness that has `find` observes nothing eith
 });
 
 test('a pass and a view of every task, as the orchestrator makes each pass: the check harness is observed once for the pass and once for each check in flight', async () => {
-  const engine = createEngine({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-settled-root-'), harnesses: { check }, defaultHarness: 'check' }));
   const done = await Promise.all([1, 2, 3, 4, 5].map(async () => engine.file({ brief: 'b', cwd: scratch('ae-settled-cwd-') })));
   for (const id of done) await settle(engine, id);
   const cwd = scratch('ae-settled-cwd-');

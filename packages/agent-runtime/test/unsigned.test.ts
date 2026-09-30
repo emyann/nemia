@@ -20,7 +20,7 @@ const tmp = (label: string) => scratch(`ae-unsigned-${label}-`);
 /** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number };
 
@@ -104,7 +104,7 @@ const closes = (id: string, payload: object) => ({
   message: { id, role: 'assistant', content: [{ type: 'tool_use', id: `tu_${id}`, name: 'StructuredOutput', input: payload }] },
 });
 
-const settledNote = async (engine: ReturnType<typeof createEngine>, id: string) => {
+const settledNote = async (engine: ReturnType<typeof promiseEngine>, id: string) => {
   const entry = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled');
   return entry?.event.kind === 'settled' ? entry.event.note : undefined;
 };
@@ -112,7 +112,7 @@ const settledNote = async (engine: ReturnType<typeof createEngine>, id: string) 
 test("a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
@@ -140,7 +140,7 @@ test("a task that asked for a closeout, whose session goes quiet without one, en
 test('a task that asked for no closeout ends on quiet as it always did: succeeded, and nothing continued', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -161,7 +161,7 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
 test('quiet after a statement of its own succeeds with it; quiet after only a statement made before the attempt began has stated nothing', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
 
     const said = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
@@ -199,7 +199,7 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
 test("THE HARNESS'S `done` without a statement is said to have stated nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const asked = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     const nothing = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();

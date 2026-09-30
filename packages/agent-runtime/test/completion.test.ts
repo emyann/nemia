@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { claudeOps, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
-import { createEngine } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { RunnerError } from '../src/harness/error.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import type { Event } from '../src/core/domain.ts';
@@ -696,7 +696,7 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const root = scratch('ae-remote-');
-    const engine = createEngine({ root });
+    const engine = promiseEngine(Engine.layer({ root }));
     await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } });
     await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
     const at = new Date().toISOString();

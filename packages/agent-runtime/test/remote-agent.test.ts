@@ -1,5 +1,5 @@
 /**
- * A remote A2A agent as a harness, end to end, at shipped defaults: `createEngine` with a harness that is a URL, against
+ * A remote A2A agent as a harness, end to end, at shipped defaults: `promiseEngine` with a harness that is a URL, against
  * the SDK's own server over HTTP (`remote-server.ts`), on each binding the runtime speaks, in each order a card can list
  * them. What is proven is what crosses the wire, counted by the server itself: a spawn is one SendMessage and never two,
  * a pass one GetTask per open task and none once they settle, a stop one CancelTask. And what a refusal refuses: a card
@@ -15,7 +15,8 @@ import { spawn } from 'node:child_process';
 import { Effect } from 'effect';
 import { ClientFactory, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
 import { AgentCard, Role } from '@a2a-js/sdk';
-import { createEngine, type Engine, type EngineOptions, type TaskSpec, type TaskView } from '../src/facade.ts';
+import type { Engine, EngineOptions, TaskSpec, TaskView } from '../src/facade.ts';
+import { Engine as EngineService, promiseEngine } from '../src/index.ts';
 import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
@@ -37,7 +38,7 @@ const HELD = () => [{ state: 'working' as const }];
 
 const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) => ({
   root,
-  e: createEngine({ root, harnesses: { remote: { url: s.url } }, ...o }),
+  e: promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } }, ...o })),
 });
 
 const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
@@ -199,7 +200,7 @@ test('an agent that is not there: unstartable, since its card could not be read 
   const url = s.url;
   await s.close();
   servers.splice(servers.indexOf(s), 1);
-  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
+  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
   const id = await e.file(task());
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
@@ -211,7 +212,7 @@ test('a card that could not be read is named by its origin and path, never its q
   const url = `${s.url}/agent.json?key=SECRET-in-the-query`;
   await s.close();
   servers.splice(servers.indexOf(s), 1);
-  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
+  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
   const id = await e.file(task());
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
@@ -219,7 +220,7 @@ test('a card that could not be read is named by its origin and path, never its q
   assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
 });
 
-test('createEngine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
+test('the Promise engine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
   const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };
   const cases: Array<[unknown, RegExp]> = [
     [{ url: 'https://user:pw@agent.example' }, /carries a user name or password/],
@@ -247,13 +248,21 @@ test('createEngine refuses a remote agent it could never reach, whose address ca
     ],
   ];
   for (const [agent, said] of cases) {
-    const err = await refusal(() => createEngine({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } }));
+    const err = await refusal(() =>
+      promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } })),
+    );
     assert.equal(err.exitCode, 2, String(said));
     assert.match(err.message, said);
     assert.ok(err.message.startsWith('createEngine: the `remote` harness'), err.message);
   }
   const err = await refusal(() =>
-    createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url: 'https://a.example' } }, credentials: 'secret' as never }),
+    promiseEngine(
+      EngineService.layer({
+        root: scratch('ae-remote-'),
+        harnesses: { remote: { url: 'https://a.example' } },
+        credentials: 'secret' as never,
+      }),
+    ),
   );
   assert.equal(err.exitCode, 2);
   assert.match(err.message, /`credentials` is a function/);
@@ -412,10 +421,12 @@ test('a served card that does not decode: unstartable, naming its first wrong fi
   assert.match(a.error ?? '', /The agent's operator serves the card; nothing was sent\.$/);
   assert.equal(s.paths.length, 0, 'no A2A request was made');
 
-  const q = createEngine({
-    root: scratch('ae-remote-'),
-    harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
-  });
+  const q = promiseEngine(
+    EngineService.layer({
+      root: scratch('ae-remote-'),
+      harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
+    }),
+  );
   const b = (await settled(q, await q.file(task()))).state.attempts[0];
   assert.match(b.error ?? '', /agent-card\.json serves is not an A2A 1\.0 agent card/);
   assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
@@ -464,14 +475,16 @@ test("a harness given by its card, not its URL, is reached on the card's interfa
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
   const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
   const asked: string[] = [];
-  const e = createEngine({
-    root: scratch('ae-remote-'),
-    harnesses: { remote: { card } },
-    credentials: (_, url) => {
-      asked.push(url);
-      return undefined;
-    },
-  });
+  const e = promiseEngine(
+    EngineService.layer({
+      root: scratch('ae-remote-'),
+      harnesses: { remote: { card } },
+      credentials: (_, url) => {
+        asked.push(url);
+        return undefined;
+      },
+    }),
+  );
   assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
   assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
 });
@@ -480,13 +493,13 @@ test('an agent that lives under a path has its card read beneath that path, and 
   const done = () => [{ data: { ok: true }, state: 'completed' as const }];
   const under = await serve({ prefix: '/agents/reviewer', script: done });
   for (const url of [under.url, `${under.url}/`]) {
-    const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url } } });
+    const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
     assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded', url);
   }
   assert.deepEqual(under.cards, ['/agents/reviewer/.well-known/agent-card.json', '/agents/reviewer/.well-known/agent-card.json']);
   assert.ok(under.paths.length && under.paths.every((p) => p.startsWith('/agents/reviewer/a2a/')), under.paths.join(' '));
   const named = await serve({ prefix: '/agents/reviewer', cardAt: '/card.json', script: done });
-  const e = createEngine({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } });
+  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } }));
   assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
   assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
 });
@@ -496,7 +509,7 @@ test('restart after `spawned`: a new engine over the same root reads the Task by
   const { e, root } = engineOn(s);
   const id = await e.file(task());
   await running(e, id);
-  const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const gets = s.counts.getTask ?? 0;
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(again, id)).state.settled, 'succeeded');
@@ -515,7 +528,7 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
     journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
   );
   await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
-  const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const v = await running(again, id);
   assert.equal(v.sessionId, s.tasks()[0]);
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
@@ -526,7 +539,7 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
 test('restart with the intent on disk and no Task: never sent twice — a spawn in doubt, then `lost` past the grace window', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const id = await e.file(task({ id: 'in-doubt' }));
   const name = `ae/${id}/1`;
   fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
@@ -546,7 +559,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
     id,
     events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
   );
-  const again = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const done = await settled(again, id);
   assert.equal(done.state.attempts[0].reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0);
@@ -557,7 +570,7 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
     card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
   };
   const root = scratch('ae-remote-');
-  const e = createEngine({ root, harnesses: { remote: dead } });
+  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: dead } }));
   const [signed, stopped, asked, odd] = [await e.file(task()), await e.file(task()), await e.file(task()), await e.file(task())];
   const at = new Date().toISOString();
   for (const id of [signed, stopped, asked, odd]) {
@@ -632,14 +645,16 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
   const id = await e.file(task());
   await running(e, id);
   const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
-  const dead = createEngine({
-    root,
-    harnesses: {
-      remote: {
-        card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
+  const dead = promiseEngine(
+    EngineService.layer({
+      root,
+      harnesses: {
+        remote: {
+          card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
+        },
       },
-    },
-  });
+    }),
+  );
   const back = new Date(Date.now() - 31_000).toISOString();
   writeJournal(
     root,
@@ -823,7 +838,7 @@ test('a pass returns while the agent holds the send, and the next task in it is 
   const held = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
   const quick = await serve({ script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
   const root = scratch('ae-remote-');
-  const e = createEngine({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } });
+  const e = promiseEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
   const a = await e.file(task({ harness: 'held' }));
   const b = await e.file(task({ harness: 'quick' }));
   const [ms] = await timed(() => e.tick());
@@ -846,7 +861,7 @@ test('a pass returns while the agent holds the send, and the next task in it is 
 test('an intent whose sending process lives is left to it: read submitted in another engine, and not sent again', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const id = await e.file(task({ id: 'elsewhere' }));
   const name = `ae/${id}/1`;
   const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
@@ -878,7 +893,7 @@ test('an intent whose sending process lives is left to it: read submitted in ano
 test('an intent whose sending process died is in doubt: not listed, never sent again, `lost` past the grace window', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = createEngine({ root, harnesses: { remote: { url: s.url } } });
+  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const id = await e.file(task({ id: 'died' }));
   const name = `ae/${id}/1`;
   const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
@@ -906,7 +921,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     id,
     events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
   );
-  const done = await settled(createEngine({ root, harnesses: { remote: { url: s.url } } }), id);
+  const done = await settled(promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } })), id);
   assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
 });
@@ -950,15 +965,17 @@ test("credentials is asked by the harness's name too, and missingCredential word
   const s = await serve({ security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
   const asked: string[][] = [];
   const root = scratch('ae-remote-');
-  const e = createEngine({
-    root,
-    harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
-    credentials: (scheme, agentUrl, harness) => {
-      asked.push([scheme, agentUrl, harness]);
-      return harness === 'reviewer' ? 't0k' : undefined;
-    },
-    missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
-  });
+  const e = promiseEngine(
+    EngineService.layer({
+      root,
+      harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
+      credentials: (scheme, agentUrl, harness) => {
+        asked.push([scheme, agentUrl, harness]);
+        return harness === 'reviewer' ? 't0k' : undefined;
+      },
+      missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
+    }),
+  );
   assert.equal((await settled(e, await e.file(task({ harness: 'reviewer' })))).state.settled, 'succeeded');
   assert.deepEqual(asked[0], ['token', s.url, 'reviewer']);
   const a = (await settled(e, await e.file(task({ harness: 'other' })))).state.attempts[0];
@@ -967,8 +984,10 @@ test("credentials is asked by the harness's name too, and missingCredential word
   assert.equal(s.counts.sendMessage, 1, 'only the task with its secret was sent');
 });
 
-test('createEngine refuses a missingCredential that is not a function', async () => {
-  const err = await refusal(() => createEngine({ root: scratch('ae-remote-'), missingCredential: 'set it' as never }));
+test('the Promise engine refuses a missingCredential that is not a function', async () => {
+  const err = await refusal(() =>
+    promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), missingCredential: 'set it' as never })),
+  );
   assert.match(err.message, /`missingCredential` is a function, `\(scheme, agentUrl, harness\) => words`/);
 });
 

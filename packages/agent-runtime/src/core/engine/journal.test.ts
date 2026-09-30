@@ -233,8 +233,8 @@ test("an old filed event is read with the harness's arguments under config, and 
 
 test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
   const dir = legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] });
-  const { createEngine } = await import('../../facade.ts');
-  const engine = createEngine({ root: dir });
+  const { Engine, promiseEngine } = await import('../../index.ts');
+  const engine = promiseEngine(Engine.layer({ root: dir }));
 
   const old = await engine.view('t-old');
   assert.deepEqual(old.state.config, {
@@ -280,16 +280,18 @@ test("config is the newer word: a value there is kept over one beside it, and an
 });
 
 test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
-  const { createEngine } = await import('../../facade.ts');
+  const { Engine, promiseEngine } = await import('../../index.ts');
   const events = [LEGACY as unknown as Event];
-  const engine = createEngine({
-    journal: {
-      append: async () => {},
-      read: async () => events,
-      list: async () => ['t-old'],
-      feed: async () => ({ entries: events.map((event) => ({ taskId: 't-old', event })), cursor: 1 }),
-    },
-  });
+  const engine = promiseEngine(
+    Engine.layer({
+      journal: {
+        append: async () => {},
+        read: async () => events,
+        list: async () => ['t-old'],
+        feed: async () => ({ entries: events.map((event) => ({ taskId: 't-old', event })), cursor: 1 }),
+      },
+    }),
+  );
   assert.deepEqual((await engine.view('t-old')).state.config?.model, 'opus');
   assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
 });
@@ -362,8 +364,8 @@ test("a journal from a runtime that judged the spend cap reads its caps under co
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { createEngine } = await import('../../facade.ts');
-  const { state } = await createEngine({ root: dir }).view('t-capped');
+  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('t-capped');
   assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
   assert.deepEqual(
     state.attempts.map((a) => [a.ended, a.reason, a.limit]),
@@ -432,8 +434,8 @@ test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, 
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { createEngine } = await import('../../facade.ts');
-  const { state } = await createEngine({ root: dir }).view('under');
+  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('under');
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
 });
 
@@ -513,8 +515,11 @@ test("Codex's arguments are read from a journal as filed, and the engine folds t
     Effect.flatMap(Journal, (j) => j.read('t-codex')),
   );
   assert.deepEqual(filed, codex);
-  const { createEngine } = await import('../../facade.ts');
-  assert.deepEqual((await createEngine({ root: dir }).view('t-codex')).state.config, { model: 'gpt-5', codex: { trustFrom: '/repo' } });
+  const { Engine, promiseEngine } = await import('../../index.ts');
+  assert.deepEqual((await promiseEngine(Engine.layer({ root: dir })).view('t-codex')).state.config, {
+    model: 'gpt-5',
+    codex: { trustFrom: '/repo' },
+  });
   assert.deepEqual(bytesOf(dir), before);
 });
 
@@ -599,16 +604,18 @@ test('the in-memory store is decoded the same: an event appended in no shape the
 });
 
 test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
-  const { createEngine } = await import('../../facade.ts');
+  const { Engine, promiseEngine } = await import('../../index.ts');
   const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
-  const engine = createEngine({
-    journal: {
-      append: async () => {},
-      read: async () => events,
-      list: async () => ['t-own'],
-      feed: async () => ({ entries: [], cursor: 0 }),
-    },
-  });
+  const engine = promiseEngine(
+    Engine.layer({
+      journal: {
+        append: async () => {},
+        read: async () => events,
+        list: async () => ['t-own'],
+        feed: async () => ({ entries: [], cursor: 0 }),
+      },
+    }),
+  );
   await assert.rejects(engine.view('t-own'), (e: Error) =>
     e.message.includes(`t-own's journal, entry 1 is no event this runtime writes (its kind is "filled"`),
   );

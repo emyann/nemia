@@ -404,6 +404,13 @@ test('a card dropped is gone, and dropped again answers false', () => {
   assert.equal(filesStore.inbox.drop('c-drop.md'), false);
 });
 
+test('a card that is there and cannot be removed is not dropped as gone: dropping it throws, and it stays', () => {
+  const at = path.join(ROOT, 'inbox', 'c-stuck.md');
+  fs.mkdirSync(at, { recursive: true });
+  assert.throws(() => filesStore.inbox.drop('c-stuck.md'));
+  assert.equal(fs.existsSync(at), true);
+});
+
 test('a card is found where a person reads it', () => {
   assert.equal(filesStore.inbox.where('x.md'), path.join(ROOT, 'inbox', 'x.md'));
 });

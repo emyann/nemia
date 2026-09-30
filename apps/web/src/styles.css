@@ -222,7 +222,8 @@
 
 /*
  * A character card is hovered as its face is: its name's link is stretched over the whole card, so the face under it is never hovered
- * itself. The same lift Blobatar's `.mo-root:hover` gives, where a pointer hovers; reduced motion still stops it.
+ * itself. The same lift Blobatar's `.mo-root:hover` gives, where a pointer hovers; with reduced motion asked for, the face still lifts,
+ * without its transition, as Blobatar's own does.
  */
 @media (hover: hover) and (pointer: fine) {
   [data-agent-card]:hover .mo-root {

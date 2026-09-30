@@ -68,7 +68,7 @@ const formerArgs = { remoteControl: Schema.optional(Schema.Boolean) };
 
 export const HarnessArgsSchema = Schema.StructWithRest(Schema.Struct({ ...harnessArgs, ...formerArgs }), Rest);
 
-const UsageSchema = Schema.StructWithRest(
+export const UsageSchema = Schema.StructWithRest(
   Schema.Struct({
     turns: Schema.optional(Schema.Finite),
     toolCalls: Schema.optional(Schema.Finite),

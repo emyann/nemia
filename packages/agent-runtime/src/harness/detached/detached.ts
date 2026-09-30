@@ -26,6 +26,7 @@ import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } 
 import { writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readText } from '../../core/engine/tally.ts';
+import { outputIn, type SaidMemo } from './said.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -277,17 +278,6 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
  */
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
-/** What a spec's reader says of one output: what it read, or why it refused it (`wrong`, its words). */
-type Said = { read: HarnessOutput } | { wrong: string };
-
-const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): Said => {
-  try {
-    return { read: reader(text) };
-  } catch (e) {
-    return { wrong: e instanceof Error ? e.message : String(e) };
-  }
-};
-
 /**
  * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, stamped
  * with when that output was written; its exit code once it has one, never the worker's -1; and what its output says it used,
@@ -333,9 +323,9 @@ export const detachedFind =
 /**
  * The runner of a detached harness: a worker per session (`bin/ae-worker.ts`), and the directory `runs/<spec's name>`
  * under `root` as its registry, read fresh every pass, the same shape as `claude agents`. Beside each run file: the
- * harness's output (`.log`), its closeout and the closeout's schema, its MCP config, its inbox (`.inbox.jsonl`, so never
- * read as a run file), and a stop asked of it (`.stop`: a file of its own, so the run file keeps one writer, the worker,
- * and not `.json`, so never a run file).
+ * harness's output (`.log`), what was read of it once the run was over (`.said`, `harness/detached/said.ts`), its closeout
+ * and the closeout's schema, its MCP config, its inbox (`.inbox.jsonl`, so never read as a run file), and a stop asked of it
+ * (`.stop`: a file of its own, so the run file keeps one writer, the worker, and not `.json`, so never a run file).
  *
  * Run files are read (`readAll`) by their name alone: a closeout, a schema or an MCP config is also JSON, and a payload
  * that carried a `name` would otherwise be read as a session. A half-written file, one in no shape a worker writes, or one
@@ -349,7 +339,8 @@ export const detachedFind =
  *   reader's business, not the runner's.
  * - `outputOf`: what the spec reads in the harness's output, with when that output was last written — the time a statement
  *   found there is reported with, as a closeout file's is its own mtime. Read again only when the capture has changed, so
- *   a finished run's output is read once per process, and a refusal of it kept as a read is.
+ *   a finished run's output is read once per change of it, by any process: what was read is kept beside it (`outputIn`).
+ *   A refusal is kept by this process alone, as a read is.
  * - `usageOf`: what a run's output says it used, as the attempt's own. A resumed run of a spec whose totals carry the
  *   parent's (`resumeCostCarried`) has the parent's taken off: the parent is the run under the id it resumed that started
  *   last before it — a resume keeps its parent's id, so a later run under that id is a child, never the parent. No
@@ -362,9 +353,9 @@ export const detachedFind =
  *      refuses one at both doors; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
  *   2. Refuses a `cwd` that is not a directory, because `spawn` does not throw for it: the child emits the error later,
  *      and, unheard, that event kills the process that launched the worker — the engine.
- *   3. Clears the previous attempt's closeout, output and stop: a re-spawn of the same attempt must not find the previous
- *      one's answer waiting for it, in its file or in the output a spec reads one from, nor a stop asked of it, which its
- *      worker would read as asked of this one and start nothing.
+ *   3. Clears the previous attempt's closeout, output, what was read of its output, and stop: a re-spawn of the same
+ *      attempt must not find the previous one's answer waiting for it, in its file or in the output a spec reads one from,
+ *      nor a stop asked of it, which its worker would read as asked of this one and start nothing.
  *   4. Writes the closeout's schema, and writes or clears the MCP config: a re-spawn is given the servers its task names,
  *      no more. The inbox is never written or cleared: it is the person's, and a run spawned again under the name starts
  *      past what was said to the one before it (`RunInput.from`).
@@ -415,6 +406,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
   const inboxFile = (name: string) => path.join(dir, `${safe(name)}.inbox.jsonl`);
   const stopFile = (name: string) => path.join(dir, `${safe(name)}.stop`);
+  const saidFile = (name: string) => path.join(dir, `${safe(name)}.said`);
 
   const readAll = (): Array<{ name: string; run: RunFile }> => {
     if (!fs.existsSync(dir)) return [];
@@ -448,35 +440,16 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return { payload, at };
   };
 
-  const outputs = new Map<string, { size: number; mtimeMs: number; said: Said }>();
-  const outputOf = (name: string): { read: HarnessOutput; at: number } | { wrong: string } | undefined => {
-    if (!spec.readOutput) return undefined;
-    let size: number;
-    let mtimeMs: number;
-    try {
-      ({ size, mtimeMs } = fs.statSync(logFile(name)));
-    } catch {
-      return undefined;
-    }
-    let known = outputs.get(name);
-    if (!known || known.size !== size || known.mtimeMs !== mtimeMs) {
-      let text: string;
-      try {
-        text = readText(logFile(name));
-      } catch {
-        return undefined;
-      }
-      known = { size, mtimeMs, said: saidOf(spec.readOutput, text) };
-      outputs.set(name, known);
-    }
-    return 'wrong' in known.said ? known.said : { read: known.said.read, at: known.mtimeMs };
-  };
+  const outputs: SaidMemo = new Map();
+  const outputOf = (name: string, run: RunFile): { read: HarnessOutput; at: number } | { wrong: string } | undefined =>
+    spec.readOutput &&
+    outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, detachedStateOf(run, Date.now()) !== 'working');
 
   const usageOf = (all: Array<{ name: string; run: RunFile }>, run: RunFile, usage: Usage | undefined): Usage | undefined => {
     if (!usage || !spec.resumeCostCarried || !run.resumeFrom) return usage;
     const at = (r: RunFile) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN);
     const parent = all.filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run)).sort((a, b) => at(b.run) - at(a.run))[0];
-    const told = parent && outputOf(parent.name);
+    const told = parent && outputOf(parent.name, parent.run);
     const carried = told && 'read' in told ? told.read.usage : undefined;
     const { costUsd, apiMs, ...own } = usage;
     const less = (mine: number | undefined, theirs: number | undefined) =>
@@ -545,6 +518,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.rmSync(closeoutFile(r.name));
           } catch {}
           fs.rmSync(logFile(r.name), { force: true });
+          fs.rmSync(saidFile(r.name), { force: true });
           fs.rmSync(stopFile(r.name), { force: true });
           outputs.delete(r.name);
           let io: HarnessIO = {};
@@ -593,7 +567,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         const all = readAll();
         const m = new Map<string, Sighting>();
         for (const { name, run } of all) {
-          const output = outputOf(name);
+          const output = outputOf(name, run);
           if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
           m.set(name, sightingOf(name, run, now, statementOf(name), output, usageOf(all, run, output?.read.usage)));
         }

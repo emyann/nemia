@@ -11,6 +11,7 @@ import { transcriptUsage } from '../src/harness/claude/transcript.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { attemptLine, entryLine, limitLines, taskLine, usageLine, usd } from '../src/cli/main.ts';
 import { fold, type Event } from '../src/core/domain.ts';
+import { codexStream, completed, item, THREAD, TURN, USED } from './reader-streams.ts';
 
 const line = (o: object) => JSON.stringify(o);
 const TOKENS = { input_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 1000, output_tokens: 5 };
@@ -796,23 +797,6 @@ test('a count its runner could not see is named as not measured — a Codex atte
     'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured · cache not measured · peak not measured',
   );
 });
-
-/** A stream as `codex exec --json` writes it, its text shortened. */
-const codexStream = (...events: object[]) => ['Reading additional input from stdin...', ...events.map((e) => JSON.stringify(e))].join('\n');
-const THREAD = { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' };
-const TURN = { type: 'turn.started' };
-const item = (phase: 'started' | 'completed', id: string, type: string, rest: object = {}) => ({
-  type: `item.${phase}`,
-  item: { id, type, ...rest },
-});
-const USED = {
-  input_tokens: 373710,
-  cached_input_tokens: 313856,
-  cache_write_input_tokens: 0,
-  output_tokens: 1082,
-  reasoning_output_tokens: 108,
-};
-const completed = (usage: object = USED) => ({ type: 'turn.completed', usage });
 
 test("a Codex run's usage is read from its stream: tokens from turn.completed, tool calls by item, and no turns", () => {
   const read = codexOutput(

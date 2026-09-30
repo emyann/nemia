@@ -118,9 +118,9 @@ export const INSTALL = 'npm install --no-save --no-audit --no-fund';
 const COPY_WAIT_SECONDS = 2;
 
 /**
- * `wf_copied`: the command run with its stdout copied whole into `$wf_stdout` and on to the log, by a `tee` in the background reading a FIFO
- * made in a directory of its own, so the shell waits for the command and never for the copy. A child the command left behind holding its
- * stdout keeps the FIFO open: the copy is waited for `COPY_WAIT_SECONDS` at most, then ended by a watchdog that holds none of the
+ * `wf_copied`: the command run with its stdout copied whole into `$wf_stdout` and on to the log, by a `tee` in the background reading a
+ * FIFO made in a directory of its own, so the shell waits for the command and never for the copy. A child the command left behind holding
+ * its stdout keeps the FIFO open: the copy is waited for `COPY_WAIT_SECONDS` at most, then ended by a watchdog that holds none of the
  * script's streams. Answers the command's own status. Where no FIFO can be made, the command runs uncopied; a file `tee` cannot open
  * still leaves the copy to the log.
  */

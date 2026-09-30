@@ -362,4 +362,6 @@ test('a day whose runs never recorded their landing has no landed count, printed
   assert.match(row ?? '', new RegExp(`^${DAY}\\s+2\\s+—\\s`), 'the day row reads — under landed, not 0');
   const mixed = statsOf(factsOfAll(old('old-1'), old('old-2'), twoRounds('landed')), {}, NOW);
   assert.deepEqual([mixed.all.total.runs, mixed.all.total.landed], [3, 1], 'one run of the day recorded its landing');
+  const aborted = twoRounds('aborted', TEAM, { aborted: 'its check refused' });
+  assert.equal(statsOf(factsOf(aborted), {}, NOW).all.total.landed, 0, 'a run recorded as not landing is counted: 0, not —');
 });

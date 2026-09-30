@@ -2,7 +2,7 @@
  * The run store's interface (`RunStore`, `src/record/record.ts`), held to what its files implementation (`filesStore`) answers: a record
  * made, read with a person's files composed onto it, written back with none of them and no byte moved, refused once it is gone; whether a
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
- * lifted only as it was read.
+ * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`).
  *
  * And the refusal that keeps the interface the one way in: a file of `src` that imports a run's or a person's file functions from
  * `record.store.ts` directly is refused, unless `DIRECT` still names it, and an entry of `DIRECT` that imports none of them is refused too,
@@ -18,6 +18,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
+const { mayFileOf } = await import('../src/tick/file.verb.ts');
 const { acceptFile, approvalFile, askFile, asksDir, holdFile, markCancelled, pruneFile, runFile, runsDir, writeAsk, writeHold } =
   await import('../src/record/record.store.ts');
 
@@ -175,6 +176,24 @@ test('a hold is lifted only as it was put: not one put at another time, and the 
   assert.equal(fs.existsSync(holdFile(run.id)), true);
   assert.equal(filesStore.holds.lift(run.id, hold.at), true);
   assert.equal(fs.existsSync(holdFile(run.id)), false);
+});
+
+test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
+  const run = made('r-may-file');
+  const mayFile = mayFileOf(run);
+  assert.equal(mayFile(), true);
+  const hold = writeHold(run.id, ['other-run']);
+  assert.ok(hold);
+  assert.equal(mayFile(), false);
+  assert.equal(filesStore.holds.lift(run.id, hold.at), true);
+  assert.equal(mayFile(), false);
+  assert.equal(mayFileOf(run)(), true);
+});
+
+test('a pass files nothing for a run whose record is gone', () => {
+  const run = made('r-may-file-gone');
+  fs.rmSync(runFile(run.id));
+  assert.equal(mayFileOf(run)(), false);
 });
 
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */

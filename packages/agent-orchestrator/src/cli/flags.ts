@@ -40,6 +40,12 @@ export const HELP = `wf — run a workflow of agent steps
                                mark a card to start on its own: the tick starts the oldest queued
                                card once a run slot is free; --off takes the mark back
   wf inbox rm <name>           drop a card without starting it
+  wf factory [ls]              the store's factories: the default first — every run and card that
+                               names no factory, read, never written — then each by name with its
+                               repositories (wf factory --help)
+  wf factory add <name> --repo <path> [--repo <path> ...]
+                               file a factory: a lowercase slug naming one or more directories
+  wf factory rm <name>         remove a factory's file
   wf tick [--stats]            one pass: tick the engine, file what became ready — refused while a
                                wf up ticks the store, since it runs the same pass (daemon.json);
                                --stats says after it what the pass cost, phase by phase

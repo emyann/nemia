@@ -114,7 +114,7 @@ const fieldOf = (value: unknown, key: PropertyKey): unknown =>
 const shown = (text: string): string => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
 
 /** The first thing `schema` refuses in `value`: the path to it, and what is there in place of what the tick writes. */
-function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
+export function firstRefusal(value: unknown, error: Schema.SchemaError): { path: readonly PropertyKey[]; words: string } {
   const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
   const found = path.reduce<unknown>((at, key) => fieldOf(at, key), value);

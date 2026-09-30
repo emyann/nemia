@@ -16,7 +16,8 @@
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
  * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
  * `skills.store.ts` (an agent and a skill written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
- * folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import
+ * folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`), `factory.store.ts` (the factories, `factoriesDir`) and
+ * `config.store.ts` (the `WF_` environment). They import
  * neither the runtime nor a controller, and load as a tree:
  * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
  * (`test/boundary.test.ts`).
@@ -177,6 +178,8 @@ export {
   workflowAt,
 } from './inbox/inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox/inbox.ts';
+export { DEFAULT_FACTORY, factoryLines, factoryNameRefusal, noFactoryLine } from './factory/factory.ts';
+export type { Factory, FactoryListing } from './factory/factory.ts';
 export { feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
@@ -281,6 +284,7 @@ export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.sto
 export type { WorkflowWritten } from './folder/write.store.ts';
 export { addToInbox, dropFromInbox, inboxDir, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
+export { addFactory, factoriesDir, readFactories, removeFactory } from './factory/factory.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {

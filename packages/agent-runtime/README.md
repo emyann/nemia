@@ -189,6 +189,13 @@ stateDiagram-v2
   ending --> completed: ATTEMPT_ENDED [endedDone] / settle
   ending --> canceled: ATTEMPT_ENDED [endedStopped] / settle
   ending --> failed: ATTEMPT_ENDED / settle
+  submitted --> stopping: requestStop [stoppable] (by person)
+  starting --> stopping: requestStop [stoppable] (by person)
+  working --> stopping: requestStop [stoppable] (by person)
+  input_required --> stopping: requestStop [stoppable] (by person)
+  ending --> stopping: requestStop [stoppable] (by person)
+  input_required --> submitted: answer [awaitsWord] (by person)
+  input_required --> ending: close [awaitsWord] (by person)
   completed --> [*]
   failed --> [*]
   canceled --> [*]

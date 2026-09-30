@@ -7,7 +7,7 @@ export type { Attempt, Denial, EndReason, Event, Input, Said, Sighting, State, U
 export { SESSION_STATES, formerStateOf, isLive, isSessionState, phaseWordOf, waitsOnPerson } from './session.ts';
 export type { Ended, Outcome, PhaseWord, SessionState } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';
-export type { LifecycleEdge, LifecycleGraph, LifecycleState } from './lifecycle.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleVerb } from './lifecycle.ts';
 export { pathOf } from './path.ts';
 export { firstRefusal } from './event-schema.ts';
 export { firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';

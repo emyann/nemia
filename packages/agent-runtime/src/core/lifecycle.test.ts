@@ -35,9 +35,11 @@ import {
   STATES,
   statesOf,
   transition,
+  VERBS,
   withoutEdge,
   type LifecycleEvent,
   type LifecycleState,
+  type Verb,
 } from './lifecycle.ts';
 import { at, corpusOf, ended, filed, JOURNALS, S, spawned, starting, T0, TASK, type Case } from '../../test/lifecycle-corpus.ts';
 
@@ -262,6 +264,21 @@ test("what the tick's memo rests on: a settled task decides nothing in every jou
   );
 });
 
+/** The states no move reaches from `submitted`, over the machine's edges and the verbs given. */
+const unreached = (verbs: readonly Verb[]): LifecycleState[] => {
+  const moves = [...edgesOf(), ...verbs.flatMap((v) => v.from.map((from) => ({ from, to: v.to })))];
+  const reached = new Set<string>(['submitted']);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const e of moves)
+      if (reached.has(e.from) && !reached.has(e.to)) {
+        reached.add(e.to);
+        grew = true;
+      }
+  }
+  return STATES.filter((s) => !reached.has(s));
+};
+
 test('the machine: its states are the ones named, each edge names one action, every state but a final one leaves or holds by an edge, every state is reached, and a guarded edge falls through to one with no guard, so a guard never leaves an event unanswered', () => {
   assert.deepEqual(statesOf(), [...STATES]);
   assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
@@ -273,19 +290,11 @@ test('the machine: its states are the ones named, each edge names one action, ev
         edgesOf().some((e) => e.from === s),
         `${s} has no edge`,
       );
-  const reached = new Set<string>(['submitted', 'stopping']);
-  for (let grew = true; grew;) {
-    grew = false;
-    for (const e of edgesOf())
-      if (reached.has(e.from) && !reached.has(e.to)) {
-        reached.add(e.to);
-        grew = true;
-      }
-  }
+  assert.deepEqual(unreached(VERBS), [], "reached from where a task begins, by the pass's edges and a person's verbs");
   assert.deepEqual(
-    STATES.filter((s) => !reached.has(s)),
-    [],
-    "reached from where a task begins, or entered by a person's word, which its verb journals and no pass moves by (`requestStop`, `answer`, `close`): the stop from any state not final, an answer or a close from a turn that waits",
+    unreached(VERBS.filter((v) => v.verb !== 'requestStop')),
+    ['stopping'],
+    'a person asking it to stop is the one way into `stopping`: no pass moves there',
   );
   const last = new Map(edgesOf().map((e) => [`${e.from} ${e.event}`, e]));
   for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
@@ -301,14 +310,32 @@ test('the diagram is drawn from the machine: an edge taken away takes exactly it
   );
 });
 
+test("the diagram draws a person's verbs from their data: one line per state each is taken from, and a verb taken away takes exactly its lines", () => {
+  const whole = diagram().split('\n');
+  const close = '  input_required --> ending: close [awaitsWord] (by person)';
+  assert.ok(whole.includes(close), 'a verb is drawn with its guard and who writes it');
+  assert.ok(whole.includes('  working --> stopping: requestStop [stoppable] (by person)'));
+  assert.equal(whole.filter((l) => l.includes(': requestStop ')).length, 5, 'one line per state the stop is taken from');
+  assert.deepEqual(
+    diagram(
+      undefined,
+      VERBS.filter((v) => v.verb !== 'close'),
+    ).split('\n'),
+    whole.filter((l) => l !== close),
+  );
+});
+
 test('the graph a board draws is the machine read as plain data, and a fresh copy on every call', () => {
   const graph = lifecycleGraph();
-  assert.deepEqual(graph, { initial: 'submitted', states: statesOf(), final: [...FINAL], edges: edgesOf() });
+  assert.deepEqual(graph, { initial: 'submitted', states: statesOf(), final: [...FINAL], edges: edgesOf(), verbs: VERBS });
   assert.deepEqual(graph.states, [...STATES]);
   assert.deepEqual(JSON.parse(JSON.stringify(graph)), graph, 'plain data: a JSON round trip changes nothing');
   graph.edges.pop();
   graph.states.pop();
   assert.deepEqual(lifecycleGraph().edges, edgesOf(), 'a caller that changes its copy changes no other');
+  const mine = lifecycleGraph();
+  mine.verbs[0].from.pop();
+  assert.deepEqual(lifecycleGraph().verbs, VERBS, 'nor the verbs, down to the states each is taken from');
   assert.ok(
     lifecycleGraph().edges.some((e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed'),
     'a guarded edge keeps its guard',

@@ -5,7 +5,7 @@
 import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { awaitsAdmission, fold, waitsForInput, type Input, type State } from '../domain.ts';
+import { awaitsAdmission, fold, verbTakes, type Input, type State } from '../domain.ts';
 import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
@@ -178,16 +178,16 @@ export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused'
 }) {}
 
 /**
- * Why `requestStop` would not journal a stop, or `undefined`: a task it has no record of, one that has settled, and one asked
- * to stop already, whose next pass stops what runs and settles it. Off the record alone, so it costs no registry call.
+ * Why `requestStop` would not journal a stop, or `undefined`: a task it has no record of, and one its guard (`stoppable`, by
+ * `verbTakes`) refuses — one that has settled, and one asked to stop already, whose next pass stops what runs and settles it.
+ * Off the record alone, so it costs no registry call.
  */
 export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (verbTakes('requestStop', state)) return undefined;
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
-  if (state.stopRequested)
-    return `\`${taskId}\` has been asked to stop already: the next pass stops what runs and settles it. \`ae ls\` says when it has.`;
-  return undefined;
+  return `\`${taskId}\` has been asked to stop already: the next pass stops what runs and settles it. \`ae ls\` says when it has.`;
 };
 
 /**
@@ -208,13 +208,19 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
 }) {}
 
 /**
- * Why a task cannot take an answer or a close now — or `undefined`. Only a task held open that waits for one does
- * (`waitsForInput`): its current turn signed, nothing is running, and nothing has been said since — and an answer only one
- * whose signing session its harness recorded, since the answer is told to that session. Read off the record
- * alone, so it costs no registry call, and the same at both doors.
+ * Why a task cannot take an answer or a close now — or `undefined`. Only a task its guard (`awaitsWord`, by `verbTakes`) takes
+ * does: held open, its current turn signed, nothing running, nothing said since and no stop asked — and an answer only one
+ * whose signing session its harness recorded, since the answer is told to that session. Otherwise the words say why not. Read
+ * off the record alone, so it costs no registry call, and the same at both doors.
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  const last = state.attempts.at(-1);
+  if (verbTakes(verb, state)) {
+    return verb === 'answer' && !last!.nativeId
+      ? `\`${taskId}\`'s attempt ${last!.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
+      : undefined;
+  }
   if (!state.holdOpen)
     return `\`${taskId}\` was not filed to be held open, so it settles when an attempt signs and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
   if (state.settled)
@@ -222,12 +228,6 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   if (state.closed)
     return `\`${taskId}\` has been closed: the next pass settles it. File a task that continues its session (\`resumeFrom\`) to go on.`;
   if (state.stopRequested) return `\`${taskId}\` has been asked to stop: the next pass settles it.`;
-  const last = state.attempts.at(-1);
-  if (waitsForInput(state)) {
-    return verb === 'answer' && !last!.nativeId
-      ? `\`${taskId}\`'s attempt ${last!.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
-      : undefined;
-  }
   if (!last) return `\`${taskId}\` has not started an attempt yet. Ask again once \`ae ls\` says \`input-required\`.`;
   if (last.ended === null) {
     return `\`${taskId}\`'s attempt ${last.n} is running.${verb === 'answer' ? ' `say` tells a running session something;' : ' `stop` ends it now;'} ask again once \`ae ls\` says \`input-required\`.`;

@@ -41,7 +41,7 @@ export { remoteConfigRefusal } from './a2a/index.ts';
 export { denialText, nameFor } from './core/index.ts';
 /** The task's lifecycle as plain data — states, edges, first and final states — for a board to draw; never the machine or its move. */
 export { lifecycleGraph } from './core/index.ts';
-export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleStep } from './core/index.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleStep, LifecycleVerb } from './core/index.ts';
 export { refusedText } from './core/engine/index.ts';
 export { retiredKeyRefusal } from './core/engine/index.ts';
 export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, Input } from './core/index.ts';

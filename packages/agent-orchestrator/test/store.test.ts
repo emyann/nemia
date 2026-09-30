@@ -5712,6 +5712,10 @@ test("`wf rm`'s refusal is its program's typed failure; anything else is a defec
       ),
     );
   assert.match(String(await recovered(b.e, '../x')), /^"\.\.\/x" is not a run's id/);
+  fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+  assert.match(String(await recovered(b.e, 'garbled')), /is not JSON/, "a refusal the store threw is the program's failure too");
+  assert.ok(under('runs', 'garbled.json'), 'and nothing removed');
+  fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
 
   const run = start({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() });
   await advance(b.e, readRun(run.id));

@@ -148,7 +148,7 @@ Approval in one context never extends to another. The modes used so far:
 - **Owner present:** every gate goes to them.
 - **"Approve by judgement" (a night or a nap):** technical specs and landings the operator approves on its own judgement, answering the
   architect's technical rounds; taste and design wait. Every approval, condition and hold goes into a dated log
-  (`~/.cache/hkb-night-<date>.md`), and the person gets a recap on return: what landed (a table with commits and cost), what the
+  (`~/.cache/nemia-night-<date>.md`), and the person gets a recap on return: what landed (a table with commits and cost), what the
   operator approved with which conditions, what waits for them, refused tool calls, the operator's own mistakes, what was parked.
 - **Per-run consent** ("run the interview, unless you need me"): only for that run.
 

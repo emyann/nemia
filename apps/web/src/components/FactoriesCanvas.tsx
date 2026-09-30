@@ -72,7 +72,7 @@ function NoFactory() {
           <CardTitle>No factory yet</CardTitle>
           <CardDescription>
             Make one with <code>npx wf factory add &lt;name&gt; --repo &lt;path&gt;</code>. A run started in none is the default
-            factory&apos;s, which shows here once it holds one.
+            factory&apos;s, which shows here while it holds one and no factory is made.
           </CardDescription>
         </CardHeader>
       </Card>

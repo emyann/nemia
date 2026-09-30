@@ -6,6 +6,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Workflow } from 'lucide-react';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FactoryCrumb } from '@/components/FactoryCrumb';
+import { FactoryStart } from '@/components/FactoryStart';
 import { NAV } from '@/components/nav';
 import { routeLink } from '@/components/routeLink';
 import {
@@ -35,9 +36,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 /**
- * The frame of every page: the sidebar, a header naming the section — and the factory, inside one (`FactoryCrumb`) — and the page, in
- * a centred column unless a matched route's `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above
- * itself. It follows the workflow feed once
+ * The frame of every page: the sidebar, a header naming the section — and the factory, inside one (`FactoryCrumb`), with the start of a
+ * run in it (`FactoryStart`) — and the page, in a centred column unless a matched route's `staticData` asks for `fullBleed`. The header is
+ * `h-12`, the height the Factory leaves above itself. It follows the workflow feed once
  * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
  * every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
@@ -52,11 +53,12 @@ function Root() {
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <SidebarProvider>
-        <AppSidebar path={path} />
+        <AppSidebar path={path} factory={factory} />
         <SidebarInset className="min-w-0">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3" data-feed={feed}>
             <SidebarTrigger />
             {factory !== undefined ? <FactoryCrumb name={factory} /> : section && <span className="text-sm font-medium">{section}</span>}
+            {factory !== undefined && <FactoryStart name={factory} />}
           </header>
           {fullBleed ? (
             <Outlet />
@@ -78,8 +80,11 @@ function Root() {
  */
 const NavLink = routeLink(SidebarMenuButton);
 
-/** The menu, with `path`'s place in it marked; on a narrow screen it is a sheet over the page, and a pick closes it. */
-function AppSidebar({ path }: { path: string }) {
+/**
+ * The menu, with `path`'s place in it marked, and `factory`, the one whose floor is open, listed among the factories; on a narrow screen it
+ * is a sheet over the page, and a pick closes it.
+ */
+function AppSidebar({ path, factory }: { path: string; factory?: string }) {
   const { isMobile, setOpenMobile } = useSidebar();
   const picked = () => {
     if (isMobile) setOpenMobile(false);
@@ -109,7 +114,7 @@ function AppSidebar({ path }: { path: string }) {
                     <item.icon />
                     <span>{item.label}</span>
                   </NavLink>
-                  {item.to === '/' && <FactoriesMenu path={path} onPick={picked} />}
+                  {item.to === '/' && <FactoriesMenu path={path} open={factory} onPick={picked} />}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -126,15 +131,15 @@ const SubLink = routeLink(SidebarMenuSubButton);
 
 /**
  * The factories under the Factories item, one a block (`factoryBlocks`): the first `MENU_SHOWN`, and a button that shows the rest in place.
- * Each is lit on its own floor. It reads the runs without polling them — a page that shows none must not read them every 5 s — so they are
+ * Each is lit on its own floor, and the one named `open`, whose floor is open, is listed past the first five too. It reads the runs without polling them — a page that shows none must not read them every 5 s — so they are
  * read again only on the feed's events and when a page that polls them is open. Nothing is listed while either read has no answer.
  */
-function FactoriesMenu({ path, onPick }: { path: string; onPick: () => void }) {
+function FactoriesMenu({ path, open, onPick }: { path: string; open?: string; onPick: () => void }) {
   const [all, setAll] = useState(false);
   const factories = useQuery(factoriesQuery);
   const runs = useQuery({ ...runsQuery, refetchInterval: false });
   if (!factories.data || !runs.data) return null;
-  const { shown, hidden } = menuFactories(factoryBlocks(factories.data, runs.data), all);
+  const { shown, hidden } = menuFactories(factoryBlocks(factories.data, runs.data), all, open);
   if (!shown.length) return null;
   return (
     <SidebarMenuSub aria-label="Factories">

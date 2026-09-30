@@ -166,7 +166,7 @@ test('the default floor starts no run: every run started from a floor names its 
   assert.equal(floorPlace(fallback), null);
 });
 
-test("a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start", () => {
+test('a named floor starts on its one repository, on none until a person picks among several, and says why when it cannot start', () => {
   assert.deepEqual(floorPlace(factory('nemia')), { factory: 'nemia', repos: ['/code/nemia'], repo: '/code/nemia' });
   assert.deepEqual(floorPlace(factory('pair', { repos: ['/r/a', '/r/b'] })), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
   const broken = floorPlace(factory('broken', { repos: ['/r/a'], error: '/wf/factories/broken.json is not JSON' }));

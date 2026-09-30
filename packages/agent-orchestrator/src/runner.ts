@@ -15,8 +15,9 @@
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
  * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
- * `skills.store.ts` (an agent and a skill written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox and the queue on
- * disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree:
+ * `skills.store.ts` (an agent and a skill written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
+ * folder read), `inbox.store.ts` (the inbox and the queue on disk, `inboxDir`) and `config.store.ts` (the `WF_` environment). They import
+ * neither the runtime nor a controller, and load as a tree:
  * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
  * (`test/boundary.test.ts`).
  */
@@ -249,7 +250,6 @@ export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, agentPlaces, agentSkillsFound, findAgent, listAgents, removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
-export { PLACE_CONTRACT, PLACE_DEADLINE_MS, PLACE_SAYS, PLACE_VERBS } from './place/place.ts';
 export type {
   BranchStood,
   ChangedFile,

@@ -179,7 +179,7 @@ function lastLines(stderr: string): string {
 function unheard(ran: SpawnSyncReturns<string>, deadlineMs: number): string | undefined {
   const words = lastLines(ran.stderr ?? '');
   const tail = words ? `: ${words}` : '';
-  if ((ran.error as NodeJS.ErrnoException | undefined)?.code === 'ETIMEDOUT')
+  if (ran.error && 'code' in ran.error && ran.error.code === 'ETIMEDOUT')
     return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${tail}`;
   if (ran.error) return `it could not be run: ${ran.error.message}`;
   if (ran.signal) return `it was ended by ${ran.signal}${tail}`;

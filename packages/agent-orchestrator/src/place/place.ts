@@ -1,5 +1,5 @@
 /**
- * The contract between the orchestrator and a place skill (`docs/design-2026-09-29-git-out.md`, *The seam* and *The contracts*): the
+ * The contract between the orchestrator and a place skill (the git-out design, *The seam* and *The contracts*): the
  * verbs a place answers, the request each is handed, the answer each gives, and what the skill's `place.json` declares. Types and constants
  * alone: `place.store.ts` runs a verb's script and decodes what it prints into these.
  *

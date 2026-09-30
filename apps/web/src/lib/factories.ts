@@ -1,9 +1,9 @@
 /**
  * The machine split by factory, without React Flow: a block for each factory, with what it holds; the runs and the queued cards of one
- * factory; and the factories the menu lists. A run or a card belongs to the factory it names, and one naming none to the default factory.
- * Pure.
+ * factory; the factories the menu lists; and where a factory's floor starts a run. A run or a card belongs to the factory it names, and one
+ * naming none to the default factory. Pure.
  */
-import type { Factory, InboxEntry, RunSummary } from './api.ts';
+import type { Factory, InboxEntry, RunSummary, WorkflowListing } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
 
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
@@ -57,12 +57,14 @@ const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryBlock =>
 };
 
 /**
- * The blocks of the machine, one a factory: the default factory first, and only while a run names no factory — an empty default says
- * nothing a person must act on — then each factory in the order the api lists them, one whose file does not read among them.
+ * The blocks of the machine, one a factory, in the order the api lists them, one whose file does not read among them. The default factory
+ * is a block only while no factory is filed and a run names none: an empty default says nothing a person must act on, and once a factory
+ * exists every run is started in one, so the default's runs are read on the Runs page alone.
  */
 export const factoryBlocks = (factories: readonly Factory[], runs: readonly FactoryRun[]): FactoryBlock[] => {
+  const named = factories.filter((f) => !f.default);
   const held = runs.some((run) => run.factory === null);
-  return [...factories.filter((f) => f.default && held), ...factories.filter((f) => !f.default)].map((f) => blockOf(f, runs));
+  return (named.length || !held ? named : factories).map((f) => blockOf(f, runs));
 };
 
 /**
@@ -75,8 +77,37 @@ export const startRepo = (factory: Pick<Factory, 'repos'>, cardRepo: string | nu
 /** How many factories the menu lists before it offers the rest. */
 export const MENU_SHOWN = 5;
 
-/** The factories the menu lists: the first `MENU_SHOWN` of `blocks`, or every one once `all` is asked, and how many it leaves out. */
-export const menuFactories = <T>(blocks: readonly T[], all: boolean): { shown: T[]; hidden: number } => {
-  const shown = all ? [...blocks] : blocks.slice(0, MENU_SHOWN);
+/**
+ * The factories the menu lists: the first `MENU_SHOWN` of `blocks`, or every one once `all` is asked, and how many it leaves out. The
+ * factory named `open`, whose floor is open, is listed all the same: past the first five, it follows them, and they never move.
+ */
+export const menuFactories = <T extends { name: string }>(
+  blocks: readonly T[],
+  all: boolean,
+  open?: string,
+): { shown: T[]; hidden: number } => {
+  const first = all ? [...blocks] : blocks.slice(0, MENU_SHOWN);
+  const lit = first.some((b) => b.name === open) ? undefined : blocks.find((b) => b.name === open);
+  const shown = lit ? [...first, lit] : first;
   return { shown, hidden: blocks.length - shown.length };
 };
+
+/**
+ * Where a factory's floor starts a run: the factory, its repositories and the one it starts on — its only one, else null until a person
+ * picks — or why it cannot start, for a factory whose file does not read or one on no repository. Null for the default factory, whose
+ * floor starts none: a run started from a floor names its factory, and a run in none is started from the Workflows page.
+ */
+export const floorPlace = (factory: Factory): { factory: string; repos: string[]; repo: string | null } | { why: string } | null => {
+  if (factory.default) return null;
+  if (factory.error !== null) return { why: `The factory ${factory.name}'s file does not read: ${factory.error}` };
+  if (!factory.repos.length) {
+    return {
+      why: `The factory ${factory.name} names no repository to start a run on: give its file one, or file it again with wf factory rm ${factory.name} and wf factory add ${factory.name} --repo <path>.`,
+    };
+  }
+  return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, null) };
+};
+
+/** Why a workflow the factory lists cannot start: its folder's `error`, else the steps its hires leave `unfilled`; null when it can. */
+export const whyNotStarted = (workflow: Pick<WorkflowListing, 'error' | 'unfilled'>): string | null =>
+  workflow.error ?? workflow.unfilled ?? null;
